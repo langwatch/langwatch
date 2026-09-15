@@ -18,7 +18,6 @@ describe("VoiceNonceRegistry", () => {
       const first = registry.consume("abc");
       expect(first).toEqual({ ok: true, child: fakeChild });
 
-      // Single use: the same nonce is unknown on a replay.
       expect(registry.consume("abc")).toEqual({ ok: false, reason: "unknown" });
     });
   });
@@ -42,7 +41,14 @@ describe("VoiceNonceRegistry", () => {
       registry.register({ nonce: "abc", child: fakeChild });
 
       now = 100; // exactly at the boundary counts as expired
-      expect(registry.consume("abc")).toEqual({ ok: false, reason: "expired" });
+      // Carries the child that owned it: the listener notifies that specific
+      // child of the refused dial-back instead of it waiting out the full
+      // connect timeout.
+      expect(registry.consume("abc")).toEqual({
+        ok: false,
+        reason: "expired",
+        child: fakeChild,
+      });
       expect(registry.consume("abc")).toEqual({ ok: false, reason: "unknown" });
     });
   });

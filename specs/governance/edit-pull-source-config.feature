@@ -41,17 +41,20 @@ Feature: Edit the configuration of a pull-mode ingestion source
   Rule: Adapter settings are validated before they reach the database
 
     @unit
-    Scenario: A backfill start date is normalized before saving
-      When the admin enters a backfill start of "2026-08-01"
+    Scenario: A date read from history is normalized before saving
+      When the admin picks a "Read history from" date of "2026-08-01"
       And saves the form
-      Then the stored backfill start is a timezone-carrying instant
+      Then the stored start is a timezone-carrying instant
+
+    # The adapter reads usage in daily buckets and prices cost in daily
+    # buckets, so a width is a question with one answer. Asking it only gave
+    # an admin a way to answer it wrongly and have the save refused.
 
     @unit
-    Scenario: An invalid bucket width is rejected at save time
-      When the admin enters a bucket width of "5m"
-      And saves the form
-      Then the form reports the value as invalid
-      And the source configuration is left unchanged
+    Scenario: The bucket width is decided for the admin, not asked of them
+      When the admin opens the edit form
+      Then no bucket width field is shown
+      And saving a usage source stores a bucket width of "1d"
 
     @unit
     Scenario: An invalid cron expression is rejected at save time
@@ -62,9 +65,12 @@ Feature: Edit the configuration of a pull-mode ingestion source
 
   Rule: A setting that can no longer take effect is not offered as editable
 
-    # The usage cursor deliberately never rewinds, so a backfill start edited
+    # The usage cursor deliberately never rewinds, so a start date edited
     # after the first successful run is accepted and then ignored. An input
-    # that silently does nothing is worse than no input.
+    # that silently does nothing is worse than no input. The cost cursor is a
+    # different animal: it binds the start into its own identity, so moving
+    # the start there is the deliberate lever for repairing wrong figures and
+    # locking it would hide the only repair an admin has.
 
     @unit
     Scenario: Backfill start is editable before the source has run
@@ -79,16 +85,13 @@ Feature: Edit the configuration of a pull-mode ingestion source
       When the admin opens the edit form
       Then the backfill start is shown but cannot be changed
 
-    # The cost cursor binds the backfill start into its own identity, so moving
-    # the start discards the cursor and re-reads the widened window. That is the
-    # repair lever for wrong early figures; locking it would send an admin to
-    # archive-and-recreate to correct a number.
     @unit
     Scenario: Backfill start stays editable on a cost source that has pulled
       Given the source has completed at least one pull
       And the source is configured for the cost report
       When the admin opens the edit form
       Then the backfill start is still editable
+      And the marker says moving it re-reads and restates cost history
 
     # Claiming an immutability we cannot justify is the worse error.
     @unit
@@ -98,17 +101,21 @@ Feature: Edit the configuration of a pull-mode ingestion source
       When the admin opens the edit form
       Then no adapter field is locked
 
+    # The explanation sits behind that marker rather than as a paragraph under
+    # the fields, where three of them pushed the fields below the fold. See
+    # dev/docs/best_practices/copywriting.md.
     Scenario: A locked backfill start says why it is locked
       Given the source has completed at least one pull
       And the source is configured for the usage report
       When the admin opens the edit form
-      Then the form explains that the cursor has already moved past it
+      Then the drawer title carries an information marker explaining why
+      And the marker says the cursor has already moved past it
 
   Rule: The report kind is fixed once a source has pulled
 
     # The adapter's two reports price the same spend twice over, and its own
     # header states the rule as "Never both". A changed report no longer
-    # matches the stored cursor, so the new report replays from the backfill
+    # matches the stored cursor, so the new report replays from the configured
     # start and its events land beside the old ones under different ids —
     # nothing collides, nothing complains, and the same money is counted twice.
 

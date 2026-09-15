@@ -2,6 +2,7 @@ import type { SignInMethod } from "@langwatch/identity-contract";
 import { useState } from "react";
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { isCeremonyAbandoned, passkeyFailure } from "../../model/passkey-failure.ts";
 import { MethodButton } from "../elements/method-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
@@ -28,14 +29,6 @@ const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
  */
 function readCode(error: object): string | undefined {
   return "code" in error && typeof error.code === "string" ? error.code : void 0;
-}
-
-/** What went wrong, in a code the client registry has words for. */
-function passkeyFailure(status: number | undefined): { error: string } {
-  const refused = status === 400 || status === 401 || status === 403;
-  return {
-    error: refused ? "identity_passkey_not_recognized" : "identity_passkey_ceremony_failed",
-  };
 }
 
 /**
@@ -80,10 +73,19 @@ function readRefusal(error: { status: number } & object): Refusal {
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
   // Saying "something went wrong" about a cancelled prompt would be telling
   // somebody off for deciding, and the password fields are still on screen.
-  if (code === "ERROR_CEREMONY_ABORTED" || error.status === 0) {
+  //
+  // Only the explicit abort is that decision, though: a client-side failure
+  // also arrives with no status, and treating every status-less error as a
+  // cancel left a FAILED ceremony saying nothing at all — the button stopped
+  // spinning, the screen did not change, and the reader was given no reason to
+  // try anything else.
+  if (isCeremonyAbandoned({ code })) {
     return { kind: "silent" };
   }
-  return { kind: "report", error: passkeyFailure(error.status) };
+  return {
+    kind: "report",
+    error: passkeyFailure(error.status === 0 ? void 0 : error.status),
+  };
 }
 
 /**

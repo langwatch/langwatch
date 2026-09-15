@@ -38,8 +38,66 @@ export const normalizedPullEventSchema = z
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 export type PullResult = {
   events: NormalizedPullEvent[];
+  /**
+   * The cursor to persist. Advanced past everything this run consumed —
+   * INCLUDING input it deliberately skipped — or the incoming cursor unchanged
+   * when the run made no progress.
+   */
   cursor: string | null;
+  /**
+   * How many items this run could not read. Read together with `cursor`: with
+   * an advanced cursor it reports skipped input on an otherwise successful run;
+   * with an unchanged cursor it fails the run.
+   */
   errorCount: number;
+  /**
+   * Whether this run reached the end of what it set out to read.
+   *
+   * `"truncated"` means the run stopped at a limit — a page budget, a file
+   * count, a deadline — with more waiting. It is NOT a failure: the money and
+   * the events already gathered are kept, and `cursor` still advances over
+   * them. It exists because a run that stopped early and a run that drained
+   * the source otherwise leave through the same exit, so a source stuck
+   * half-read is indistinguishable from a source that is simply quiet.
+   *
+   * Optional: an adapter that says nothing is read as `"complete"`, which is
+   * what every adapter meant before the field existed.
+   */
+  completeness?: "complete" | "truncated";
+  /**
+   * Set when this run's `errorCount` includes a page it could not read AT ALL.
+   *
+   * There are two shapes for a nonzero `errorCount`, and this is the third
+   * thing that can happen: an adapter that could not read a page but HAD
+   * already read earlier ones may bank them — return the advanced cursor, the
+   * events it has, and this flag — rather than throw the lot away. The events
+   * are written and the position is persisted, exactly like skipped input, but
+   * the source must NOT read as working: without this flag a source refused
+   * part-way through every run holds a failure count of zero forever and never
+   * turns red. Say so here and the fold counts the failure while keeping the
+   * progress.
+   *
+   * Only for a page nobody could read. Input an adapter deliberately steps
+   * over belongs in `errorCount` alone.
+   */
+  unreadPage?: true;
+  /**
+   * The instant this run is known to have read up to, ISO 8601.
+   *
+   * Distinct from the instant the run finished, and that distinction is the
+   * whole point: the run clock advances on every attempt, so a source stuck
+   * re-reading the same half would look like progress. This value does not
+   * move until the read does.
+   */
+  readThroughAt?: string;
+  /**
+   * Stable codes for things the run continued through rather than failed on.
+   *
+   * A degradation a reader of the source needs to know about — "the money is
+   * here but nobody is attributed to it" — has to survive as data. A log line
+   * cannot be shown to someone looking at the source.
+   */
+  notices?: string[];
 };
 export type PullRunOptions = {
   cursor: string | null;

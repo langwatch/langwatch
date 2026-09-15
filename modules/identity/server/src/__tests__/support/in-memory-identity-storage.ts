@@ -183,6 +183,33 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     );
   }
 
+  async resolveByIssuerSubject({
+    issuer,
+    providerAccountId,
+  }: {
+    issuer: string;
+    providerAccountId: string;
+  }): Promise<(IdentityResolution & { providerId: string }) | null> {
+    for (const heads of this.heads.heads.values()) {
+      for (const identifier of Object.values(heads.identifiers)) {
+        if (
+          identifier.issuer !== issuer ||
+          identifier.providerAccountId !== providerAccountId ||
+          typeof identifier.providerId !== "string" ||
+          !isLiveIdentifierState(identifier.state)
+        ) {
+          continue;
+        }
+        return {
+          userId: identifier.userId,
+          finalized: this.isFinalized(identifier.userId),
+          providerId: identifier.providerId,
+        };
+      }
+    }
+    return null;
+  }
+
   private resolve(matches: (identifier: IdentifierFact) => boolean): IdentityResolution | null {
     for (const heads of this.heads.heads.values()) {
       for (const identifier of Object.values(heads.identifiers)) {
@@ -263,6 +290,9 @@ export const inertIdentityPorts = {
       return null;
     },
     async tryResolveByProviderSubject() {
+      return null;
+    },
+    async resolveByIssuerSubject() {
       return null;
     },
   } satisfies IdentityResolver,

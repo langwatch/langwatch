@@ -106,9 +106,18 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @integration
   Scenario: device-login exchange delivers the personal project key and the CLI stores it
     Given a device code was approved for a user with a personal workspace
+    And the user currently has permission to manage the personal project
     When the CLI polls POST /api/auth/cli/exchange
     Then the device_session response includes personal_project with id, slug, name and api_key
     And the CLI persists personal_project into ~/.langwatch/config.json
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: device-login exchange stays valid when the personal project key is withheld
+    Given a device code was approved for a user with a personal workspace
+    And the user does not have permission to manage the personal project
+    When the CLI polls POST /api/auth/cli/exchange
+    Then the device_session response is still successful
+    And personal_project is omitted from the response
 
   @bdd @cli-onboarding @credentials @integration
   Scenario: a session created before this change lazily exchanges once and rewrites the session file
@@ -130,9 +139,20 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   Scenario: GET /api/auth/cli/personal-project returns the caller's personal project
     Given a valid device-session bearer token whose personal workspace already exists
     And the user is an active member of the token's organization
+    And the user has permission to manage the personal project
     When the CLI calls GET /api/auth/cli/personal-project
     Then the response carries the personal project's id, slug, name and api_key
     And it is the same project the login exchange delivered
+
+  @bdd @cli-onboarding @credentials @integration
+  Scenario: GET /api/auth/cli/personal-project withholds the key without breaking the session
+    Given a valid device-session bearer token whose personal workspace already exists
+    And the user is an active member of the token's organization
+    But the user does not have permission to manage the personal project
+    When the CLI calls GET /api/auth/cli/personal-project
+    Then the response is successful and carries the personal project's identity
+    But the response carries no api_key
+    And the device session remains valid
 
   # ─────────────────────────────────────────────────────────────────────
   # Tenancy boundary: current membership is proven before minting a key

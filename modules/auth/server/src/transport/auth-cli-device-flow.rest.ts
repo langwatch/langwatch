@@ -89,10 +89,13 @@ export interface AuthCliDeviceFlowApi {
     displayEmail?: string | null;
   }) => Promise<CliPersonalWorkspace>;
   /**
-   * Whether one person may write to one project. The ONE gate between a device
-   * session and a shared project's write credential.
+   * Whether one person may ADMINISTER one project — `project:manage`, not the
+   * contributor's `project:update`. The ONE gate between a device flow and a
+   * shared project's base key, which outlives every membership and attributes
+   * nothing. Asked twice on purpose: at approval, and again at exchange. See
+   * `projectKeyAnswer`.
    */
-  canWriteProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
+  canManageProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
   /** This deployment's flag store, for the device journey's rollout gate. */
   featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
   /**
@@ -365,6 +368,17 @@ async function exchange({
     return refuse("authorization_pending", "Approval received but session not ready yet", 428);
   }
 
+  // Exclusive redemption. The poll window above PACES polls; it does not fence
+  // a redemption, because a redemption slower than its four seconds leaves the
+  // record readable by the next poll — and everything below this line hands
+  // out a credential the code is only meant to buy once. Two of them would
+  // hand out two sets and let the second revoke the first's key. The loser
+  // gets the same `slow_down` a too-fast poll gets, which every CLI already
+  // retries.
+  if (!(await app.sessions.claimExchange(device_code))) {
+    return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
+  }
+
   const directory = app.directory();
   const user = await directory.tryFindPerson(record.user_id);
   const organization = await directory.tryFindOrganization(record.organization_id);
@@ -373,6 +387,9 @@ async function exchange({
     logger.error(
       `[auth-cli] approved device_code refers to missing user (${record.user_id}) or org (${record.organization_id})`,
     );
+    // Nothing was consumed, so the code stays redeemable for whatever retry
+    // the CLI makes next.
+    await app.sessions.releaseExchangeClaim(device_code);
 
     return refuse("server_error", "User or organization no longer exists", 500);
   }
@@ -388,6 +405,8 @@ async function exchange({
 
   if (!activeMembership) {
     await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
+    // The claim would otherwise outlive the code it was serialising.
+    await app.sessions.releaseExchangeClaim(device_code);
 
     return refuse("access_denied", "Not an active member of the organization", 410);
   }
@@ -407,7 +426,13 @@ async function exchange({
     clientInfo: parsed.data.client_info,
   });
 
-  if ("refusal" in minted) return minted.refusal;
+  if ("refusal" in minted) {
+    // Nothing was handed out and the code was not consumed, so the claim goes
+    // back rather than blocking the CLI's next poll for half a minute.
+    await app.sessions.releaseExchangeClaim(device_code);
+
+    return minted.refusal;
+  }
 
   // Stamp the device info so the devices inventory can show a recognisable
   // entry. `session_started_at` is preserved through later rotations so the
@@ -422,8 +447,11 @@ async function exchange({
     cliApiKeyId: minted.apiKeyId,
   });
 
-  // Single-use device code: consumed after a successful exchange.
-  await app.sessions.consumeDeviceCode({ record });
+  // Single-use device code: consumed after a successful exchange, poll window
+  // included, so the next poll learns the code is gone (408) rather than that
+  // it polled too soon (429). The CLAIM is deliberately left to expire — see
+  // `releaseExchangeClaim`.
+  await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
 
   return answer({
     kind: "device_session" as const,
@@ -486,9 +514,11 @@ async function refusalForState({
 }
 
 /**
- * The no-paste API-key answer: the user picked a project on the approval page
- * and the approve handler stamped its EXISTING key onto the record, so no
- * access/refresh pair is needed and nothing new is minted here.
+ * The no-paste API-key answer: nothing is minted, the picked project's existing
+ * key is returned. The approval's stamp is a POINTER to that project, never the
+ * answer — a device code lives ten minutes, and in that window a role can be
+ * revoked, the project archived or its key rotated. So project, permission and
+ * key are all read again here, where the credential actually leaves.
  */
 async function projectKeyAnswer({
   app,
@@ -507,20 +537,49 @@ async function projectKeyAnswer({
     logger.warn(
       `[auth-cli] approved project_api_key device_code ${record.device_code} missing project payload — returning pending`,
     );
+    // Transient, and nothing was consumed: the claim goes back so the CLI's
+    // next poll is not told to slow down for half a minute.
+    await app.sessions.releaseExchangeClaim(record.device_code);
 
     return refuse("authorization_pending", "Approval received but project key not ready yet", 428);
   }
 
-  await app.sessions.consumeDeviceCode({ record });
+  const project = await app
+    .directory()
+    .tryFindLiveProject({
+      projectId: record.project_api_key.project_id,
+      organizationId: organization.id,
+    });
+  const stillAdministers =
+    project !== null &&
+    (await app.canManageProject({ userId: user.id, projectId: project.id }));
+  const ownsItIfPersonal = project !== null && (!project.isPersonal || project.ownerUserId === user.id);
+
+  if (!project || !stillAdministers || !ownsItIfPersonal) {
+    // One answer for all three, because they are one fact to the caller: this
+    // exchange is not entitled to that key. Which of the three it was is a
+    // detail about somebody else's project, and 410 stops the CLI polling for
+    // a key it will never get.
+    await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
+    await app.sessions.releaseExchangeClaim(record.device_code);
+
+    return refuse(
+      "access_denied",
+      "You no longer have administrator access to the selected project",
+      410,
+    );
+  }
+
+  // Single-use device code, poll window included; the claim is deliberately
+  // left to expire — see `releaseExchangeClaim`.
+  await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
 
   return answer({
     kind: "api_key" as const,
-    api_key: record.project_api_key.api_key,
-    project: {
-      id: record.project_api_key.project_id,
-      slug: record.project_api_key.project_slug,
-      name: record.project_api_key.project_name,
-    },
+    // The key as it stands NOW, not as the approval saw it: a rotation between
+    // the two would otherwise write a dead key into the caller's .env.
+    api_key: project.apiKey,
+    project: { id: project.id, slug: project.slug, name: project.name },
     user: { id: user.id, email: user.email, name: user.name },
     organization: { id: organization.id, name: organization.name, slug: organization.slug },
     endpoint,
@@ -776,10 +835,10 @@ async function approveProjectKey({
     );
   }
 
-  if (!(await app.canWriteProject({ userId: person.id, projectId: project.id }))) {
+  if (!(await app.canManageProject({ userId: person.id, projectId: project.id }))) {
     return refuse(
       "forbidden",
-      "You need write access to this project to retrieve its API key.",
+      "You need to be an administrator of this project to retrieve its API key.",
       403,
     );
   }

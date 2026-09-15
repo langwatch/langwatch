@@ -247,6 +247,41 @@ const usageSchema = z.object({
   reasoning_tokens: z.number().int(),
 });
 
+/**
+ * `usageSchema` plus the image quantities, for the two reads this repository
+ * rolls up itself (spend-summaries, one end user's spend). /spend-events'
+ * envelope stays on the base schema: it is shaped by the shared webhook
+ * envelope builder, which does not carry these fields yet — adding them
+ * there before that builder does would make every settled/confirmed event
+ * fail its declared output schema.
+ */
+const usageWithImagesSchema = z.object({
+  ...usageSchema.shape,
+  // Always present, 0 on a request/rollup that used no images. The object
+  // already carries the cache and reasoning counts as 0 when unused, so an
+  // optional field would put two conventions in one payload; reconciliation
+  // consumers sum these fields, and a missing one turns a sum into NaN where
+  // a 0 does not.
+  input_image_tokens: z
+    .number()
+    .int()
+    .describe(
+      "Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it.",
+    ),
+  output_image_tokens: z
+    .number()
+    .int()
+    .describe(
+      "Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.",
+    ),
+  image_count: z
+    .number()
+    .int()
+    .describe(
+      "Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum.",
+    ),
+});
+
 /** Money is published twice: a display string and the canonical integer. */
 const costSchema = z.object({
   total_usd: z
@@ -273,7 +308,7 @@ const spendSummaryRowSchema = z.object({
   bucket_start: z.string().nullable(),
   event_count: z.number().int(),
   settled_count: z.number().int(),
-  usage: usageSchema,
+  usage: usageWithImagesSchema,
   cost: costSchema,
 });
 
@@ -330,7 +365,7 @@ const endUserSpendSchema = z.object({
   to: z.string(),
   cost: costSchema,
   request_count: z.number().int(),
-  usage: usageSchema,
+  usage: usageWithImagesSchema,
   caps: z.array(endUserCapSchema),
 });
 
@@ -649,6 +684,9 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
           cache_read_input_tokens: r.tokensCacheRead,
           cache_creation_input_tokens: r.tokensCacheWrite,
           reasoning_tokens: r.tokensReasoning,
+          input_image_tokens: r.tokensInputImage,
+          output_image_tokens: r.tokensOutputImage,
+          image_count: r.imageCount,
         },
         cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
       })),
@@ -759,6 +797,9 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
           cache_read_input_tokens: rollup.tokensCacheRead,
           cache_creation_input_tokens: rollup.tokensCacheWrite,
           reasoning_tokens: rollup.tokensReasoning,
+          input_image_tokens: rollup.tokensInputImage,
+          output_image_tokens: rollup.tokensOutputImage,
+          image_count: rollup.imageCount,
         },
         caps,
       },

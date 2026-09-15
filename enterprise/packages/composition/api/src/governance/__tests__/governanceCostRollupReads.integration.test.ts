@@ -29,7 +29,7 @@ import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integ
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GOVERNANCE_COST_SOURCE,
-} from "../governanceCostRollup.clickhouse.repository.ts";
+} from "../governanceCostRollup.constants.ts";
 import {
   GovernanceCostRollupClickHouseRepository,
   type GovernanceCostRollupRow,
@@ -426,6 +426,45 @@ describe("the governance cost aggregate reads", () => {
       // The day holds 30 now and held 12 before it, so the reader is shown a
       // rise and not a day that spent 42 yesterday.
       expect(day.amountNanoUsd).toBe(30 * NANO);
+    });
+  });
+
+  describe("given a gateway row the retired fold left in the rollup", () => {
+    /** @scenario "Gateway rows left in the rollup are counted nowhere" */
+    it("reads the pulled lane only and never the leftover gateway row", async () => {
+      await repo.upsert(
+        cell({
+          currencyCode: "USD",
+          amountNanoUsd: 100 * NANO,
+          amountNanoMinor: 100 * NANO,
+        }),
+      );
+      // A cell the retired gateway fold wrote under this same tenant and day.
+      // The metered lane reads the gateway ledger now, so this row must reach
+      // no figure on the screen — the pulled-only predicate is what keeps it
+      // out.
+      await repo.upsert({
+        ...cell({
+          currencyCode: "USD",
+          amountNanoUsd: 50 * NANO,
+          amountNanoMinor: 50 * NANO,
+          model: "gpt-5-mini",
+        }),
+        CostSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+      });
+
+      const lanes = await repo.sumDaysByLane({
+        tenantId,
+        fromDay: DAY,
+        toDay: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      // One lane row, pulled, at the pulled amount. The gateway row is not in
+      // reach of a pulled-only read at all.
+      expect(lanes).toHaveLength(1);
+      expect(lanes[0]?.costSource).toBe(GOVERNANCE_COST_SOURCE.PULLED);
+      expect(lanes[0]?.amountNanoUsd).toBe(100 * NANO);
     });
   });
 });

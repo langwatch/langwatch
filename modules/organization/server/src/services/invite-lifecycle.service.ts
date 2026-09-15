@@ -97,6 +97,39 @@ export class InviteLifecycleService {
   }
 
   /**
+   * Extends a pending invite's expiration without rotating its code or
+   * sending anything (D11). Unlike `resendInvite`, the link already in the
+   * inbox starts working again rather than becoming stale under whoever is
+   * holding it — there is nothing new to mail them.
+   */
+  async extendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite }> {
+    const existing = await this.invites.tryFindInviteWithOrganization({ inviteId, organizationId });
+    if (existing?.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const freshExpiration = toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }));
+    const claimed = await this.invites.extendInviteExpiration({
+      inviteId: existing.id,
+      organizationId,
+      expiration: freshExpiration,
+    });
+    if (claimed === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    const { organization: _organization, ...inviteRow } = existing;
+
+    return { invite: { ...inviteRow, expiration: freshExpiration } };
+  }
+
+  /**
    * The invitee, holding an expired link, asks for a fresh one (D11).
    */
   async requestFreshInvite({

@@ -39,7 +39,12 @@ const logger = createLogger("langwatch:authz:ledger");
  */
 export type LedgerWriteSource = GrantEventSource;
 
-const CONVERGENCE_POLL_MS = 150;
+// A background caller waiting on this read-your-writes poll is not being
+// watched by a person — the only cost of a lazy poll is a job slot, and the
+// alternative (acting on a fact the log may not hold yet) is the defect this
+// wait exists to prevent. Over an 8s window, 250ms costs at most thirty-two
+// reads and no accuracy.
+const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
 
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;

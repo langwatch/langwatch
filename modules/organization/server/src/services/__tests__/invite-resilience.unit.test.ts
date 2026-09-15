@@ -259,6 +259,68 @@ describe("InviteService resilience", () => {
     });
   });
 
+  describe("given a pending invitation the inviter extends", () => {
+    beforeEach(() => {
+      mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+        ...makePendingInvite(),
+        expiration: new Date(Date.now() - 1000),
+        organization: { id: "org-1", name: "Acme" },
+      });
+    });
+
+    describe("when the extend runs", () => {
+      it("keeps the code and mails nothing, only pushing the expiry out", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.extendInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        // Unlike resendInvite, nothing about the code changes and nothing
+        // conditions the update on it — extending is meant to work on the
+        // exact link already sitting in an inbox.
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith({
+          where: { id: "inv-race-1", organizationId: "org-1", status: "PENDING" },
+          data: { expiration: expect.any(Date) },
+        });
+        expect(invite.inviteCode).toBe("code-race-1");
+        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+      });
+
+      it("loses quietly when the invite stopped being pending under it", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.extendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+      });
+
+      it("refuses to extend a revoked invitation", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+          ...makePendingInvite(),
+          status: "REVOKED",
+          organization: { id: "org-1", name: "Acme" },
+        });
+
+        await expect(
+          service.extendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given the production invite-expired-mid-debug support case", () => {
     describe("when the inviter resends and the invitee accepts via any verified method", () => {
       /** @scenario "The invite-expired-mid-debug support case replays green" */

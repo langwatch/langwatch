@@ -1,7 +1,8 @@
 /// <reference path="../../model/ambient.d.ts" />
-import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { useOptionalAuthHost } from "../../model/auth-host.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
@@ -54,6 +55,12 @@ export function SignInMethodPicker({
   onPasskeyError: (error: unknown) => void;
 }) {
   const guidance = signInRoutingReasonCopy(reasonCode);
+  // A WebAuthn ceremony hands the screen to the browser and the operating
+  // system: while one is in flight, a second click on another method would
+  // open a competing prompt on top of it. Scoped to this picker rather than a
+  // shared store — sign-in and sign-up never render two pickers at once, so
+  // there is nothing for a wider scope to buy.
+  const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
 
   return (
     <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
@@ -81,6 +88,8 @@ export function SignInMethodPicker({
           renderLocalMethod={renderLocalMethod}
           callbackUrl={callbackUrl}
           onPasskeyError={onPasskeyError}
+          passkeyIsBusy={passkeyIsBusy}
+          onPasskeyBusyChange={setPasskeyIsBusy}
         />
       ))}
     </VStack>
@@ -129,6 +138,9 @@ export function AlternativeMethods({
   const methods = showsAllSocial
     ? [...offered, ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id))]
     : offered;
+  // See `SignInMethodPicker`: the same local flag, so a second click here
+  // cannot start a competing WebAuthn prompt while one is already running.
+  const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
 
   return (
     <VStack width="full" align="stretch" gap={3} data-testid="alternative-methods">
@@ -144,17 +156,44 @@ export function AlternativeMethods({
           callbackUrl={callbackUrl}
           badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}
           onError={onPasskeyError}
+          onBusyChange={setPasskeyIsBusy}
         />
       ) : null}
-      {methods.map((method) => (
-        <FederatedMethodButton
-          key={method.id}
-          method={method}
-          isLastUsed={lastUsedMethodId === method.id}
-          onChosen={onFederatedMethodChosen}
-        />
-      ))}
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <VStack width="full" align="stretch" gap={3}>
+          {methods.map((method) => (
+            <FederatedMethodButton
+              key={method.id}
+              method={method}
+              isLastUsed={lastUsedMethodId === method.id}
+              onChosen={onFederatedMethodChosen}
+            />
+          ))}
+        </VStack>
+      </StandsBackWhileBusy>
     </VStack>
+  );
+}
+
+/**
+ * The seat any other way in sits in while a passkey ceremony is running.
+ *
+ * A system sheet is already over the page; a live rail underneath it invites
+ * a second hand-off on top of the first. `inert` is the primitive that means
+ * "unavailable" all at once — no pointer events, no focus, out of the tab
+ * order — rather than merely faint, and it is restored the moment the flag
+ * that started it clears, which happens on every way the ceremony can end.
+ */
+function StandsBackWhileBusy({ isBusy, children }: { isBusy: boolean; children: ReactNode }) {
+  return (
+    <Box
+      inert={isBusy ? true : undefined}
+      opacity={isBusy ? 0.45 : 1}
+      transition="opacity 160ms ease"
+      data-standing-back={isBusy ? "true" : undefined}
+    >
+      {children}
+    </Box>
   );
 }
 
@@ -228,6 +267,8 @@ function MethodEntry({
   renderLocalMethod,
   callbackUrl,
   onPasskeyError,
+  passkeyIsBusy,
+  onPasskeyBusyChange,
 }: {
   method: SignInMethod;
   isLastUsed: boolean;
@@ -235,27 +276,36 @@ function MethodEntry({
   renderLocalMethod?: (method: SignInMethod) => ReactNode;
   callbackUrl?: string;
   onPasskeyError: (error: unknown) => void;
+  /** Another seat's ceremony is running; this one stands back while it does. */
+  passkeyIsBusy: boolean;
+  /** Told by the passkey seat itself, whenever its own ceremony starts or ends. */
+  onPasskeyBusyChange: (isBusy: boolean) => void;
 }) {
   if (method.kind === "federated") {
     return (
-      <FederatedMethodButton
-        method={method}
-        isLastUsed={isLastUsed}
-        onChosen={onFederatedMethodChosen}
-      />
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <FederatedMethodButton
+          method={method}
+          isLastUsed={isLastUsed}
+          onChosen={onFederatedMethodChosen}
+        />
+      </StandsBackWhileBusy>
     );
   }
 
   // A passkey is local — this deployment authenticates it — but it is a
   // BUTTON, so it wears its badge floated on the seat the way the providers
   // do rather than stacked above it like a form. Drawn here rather than by
-  // each door, so both doors offer it identically.
+  // each door, so both doors offer it identically. Never stood back from its
+  // own busy flag — it is the seat the ceremony started from, and it already
+  // shows its own working state and takes no second press.
   if (method.kind === "passkey") {
     return (
       <PasskeySignInButton
         callbackUrl={callbackUrl}
         badge={isLastUsed ? <LastUsedBadge /> : null}
         onError={onPasskeyError}
+        onBusyChange={onPasskeyBusyChange}
       />
     );
   }
@@ -263,14 +313,16 @@ function MethodEntry({
   const local = renderLocalMethod?.(method);
   if (local) {
     return (
-      <VStack width="full" align="stretch" gap={2}>
-        {isLastUsed ? (
-          <HStack width="full">
-            <LastUsedBadge />
-          </HStack>
-        ) : null}
-        {local}
-      </VStack>
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <VStack width="full" align="stretch" gap={2}>
+          {isLastUsed ? (
+            <HStack width="full">
+              <LastUsedBadge />
+            </HStack>
+          ) : null}
+          {local}
+        </VStack>
+      </StandsBackWhileBusy>
     );
   }
 

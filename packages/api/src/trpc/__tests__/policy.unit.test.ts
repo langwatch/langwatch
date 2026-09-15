@@ -380,6 +380,30 @@ describe("createDeclaredAuthzMiddlewares", () => {
         }),
       ).resolves.toBe("next-called");
     });
+
+    /** @scenario "A no-permission check on a procedure with no .input() runs instead of crashing" */
+    it("does not crash a procedure that declared no .input() at all", async () => {
+      const checks = createDeclaredAuthzMiddlewares(makePorts());
+      const middleware = checks.noPermission({ reason: "nothing scoped" });
+
+      // tRPC hands an undeclared procedure's real, unvalidated input through
+      // untouched: `undefined`, not `{}`. `ScopeInput` promises an object, so
+      // this is only reachable by casting the call itself, the way a
+      // procedure with no `.input()` reaches it at runtime.
+      const callWithNoDeclaredInput = middleware as unknown as (params: {
+        ctx: ReturnType<typeof ctxFor>;
+        input: undefined;
+        next: () => unknown;
+      }) => Promise<unknown>;
+
+      await expect(
+        callWithNoDeclaredInput({
+          ctx: ctxFor(),
+          input: undefined,
+          next: vi.fn().mockReturnValue("next-called"),
+        }),
+      ).resolves.toBe("next-called");
+    });
   });
 
   describe(".serviceAuthorized", () => {

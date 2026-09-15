@@ -15,6 +15,28 @@ describe("shouldFilterCodingAgentSpan", () => {
         ).toBe(false);
       });
 
+      /** @scenario "The codex helper request span is stored with its thread id" */
+      it("keeps a turn/start request span once ingestion stamped a helper thread id on it", () => {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex_cli_rs",
+            spanName: "turn/start",
+            attributeKeys: ["rpc.request_id", "langwatch.thread.id"],
+          }),
+        ).toBe(false);
+      });
+
+      /** @scenario "A codex turn of the user's own is not marked" */
+      it("drops a turn/start request span that carries no stamp", () => {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex_cli_rs",
+            spanName: "turn/start",
+            attributeKeys: ["rpc.request_id", "thread.id"],
+          }),
+        ).toBe(true);
+      });
+
       it("keeps a model-call span carrying gen_ai usage", () => {
         expect(
           shouldFilterCodingAgentSpan({

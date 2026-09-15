@@ -35,3 +35,10 @@ Feature: Every settings page keeps the settings chrome
     Scenario: No settings page wraps itself in a second copy of the sidebar
       Given every route file under a settings section
       Then none of them re-applies a page-level settings layout of its own
+
+    @unit
+    Scenario: An address that only forwards is not framed on the way past
+      Given a settings address whose page moved into a tab of another page
+      When somebody opens the old address
+      Then they are forwarded to the page it moved to
+      And no settings frame is drawn around the forwarding itself

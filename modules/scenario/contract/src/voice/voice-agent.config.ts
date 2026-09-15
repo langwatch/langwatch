@@ -25,6 +25,11 @@ export const phoneTransportSchema = z.object({
       E164_PHONE_PATTERN,
       "Enter the number in E.164 form, like +14155550123",
     ),
+  /**
+   * The agent under test greets on connect; the run waits for its opening turn
+   * before the simulator speaks.
+   */
+  isAgentSpeaksFirst: z.boolean().default(false),
 });
 
 export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [

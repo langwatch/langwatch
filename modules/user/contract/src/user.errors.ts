@@ -233,6 +233,26 @@ export class UserNotOrganizationMemberError extends HandledError {
 }
 
 /** Acting on somebody else's account without standing to. */
+/**
+ * An impersonating operator asked to set or change the subject's password.
+ * Refused outright: how an account signs in belongs to its owner. Without it,
+ * `setOwnFirstPassword` — which demands no current-password proof, because it
+ * exists for accounts holding none — would mint a durable way into exactly the
+ * single-sign-on-only and passkey-only accounts it was built for.
+ */
+export class ImpersonationCannotChangeCredentialsError extends HandledError {
+  declare readonly code: "impersonation_cannot_change_credentials";
+
+  constructor() {
+    super(
+      "impersonation_cannot_change_credentials",
+      "Credentials cannot be changed while impersonating.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "ImpersonationCannotChangeCredentialsError";
+  }
+}
+
 export class UserAccountAccessDeniedError extends HandledError {
   declare readonly code: "forbidden";
 

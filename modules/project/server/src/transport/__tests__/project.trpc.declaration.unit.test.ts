@@ -92,7 +92,9 @@ describe("the project tRPC declarations", () => {
         },
         // The base key is a project-level write credential, so reading it
         // costs what it grants.
-        "project.getProjectAPIKey": { kind: "permission", permission: "project:update" },
+        // Reading the base key is gated the same as rotating it: the key
+        // authenticates every ingestion call the project accepts.
+        "project.getProjectAPIKey": { kind: "permission", permission: "project:manage" },
         "project.getHasFirstMessage": { kind: "permission", permission: "project:view" },
         "project.regenerateApiKey": { kind: "permission", permission: "project:manage" },
         "project.update": { kind: "permission", permission: "project:update" },

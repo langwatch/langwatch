@@ -7,7 +7,10 @@ import type {
 } from "../queues/queue.types.ts";
 import type { EventStore } from "../stores/eventStore.types.ts";
 import { EventingClickHouseEventRepository } from "./adapters/clickhouse/event-repository.clickhouse.ts";
-import { EventingClickHouseEventStore } from "./adapters/clickhouse/event-store.clickhouse.ts";
+import {
+  EventingClickHouseEventStore,
+  type EventLogRetentionClassifier,
+} from "./adapters/clickhouse/event-store.clickhouse.ts";
 import { PrismaProcessStore } from "./adapters/postgres/prisma-process-store.ts";
 import type { EventingClickHouseClientResolver } from "./clickhouse-client-resolver.ts";
 import type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";
@@ -20,6 +23,8 @@ export interface EventingServerRuntimeOptions {
   groupQueue: GroupQueueDependencies<Record<string, unknown>>;
   retention: EventingRetentionConfiguration;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /** Per-row retention class for event_log; the composition root wires it. */
+  classifyEventLogRetention?: EventLogRetentionClassifier;
   consumersEnabled?: boolean;
 }
 
@@ -46,6 +51,7 @@ export class EventingServerRuntime {
       repository,
       retention: options.retention,
       retentionPolicyResolver: options.retentionPolicyResolver,
+      classifyEventLogRetention: options.classifyEventLogRetention,
     });
     const processStore = PrismaProcessStore.create({ database: options.database });
     const queueFactory = createEventingGroupQueueFactory({

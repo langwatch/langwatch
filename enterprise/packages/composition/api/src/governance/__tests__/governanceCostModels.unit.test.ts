@@ -16,12 +16,23 @@
  * Decision: ADR-128 §1 (the model is a wave 1 "where" dimension).
  */
 import { describe, expect, it, vi } from "vitest";
+import type { GovernanceCostProjectScope } from "../governanceCostProjectScope.port.ts";
 
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
 import { GovernanceCostRollupClickHouseRepository as RollupRepo } from "../governanceCostRollup.clickhouse.repository";
 
 const NANO = 1_000_000_000;
+
+/**
+ * An organization with no projects: the metered lane's scope reads empty, which
+ * is what these cases want — they are about the billed lane's models and
+ * spenders, and a metered figure would only add noise.
+ */
+const noProjects: GovernanceCostProjectScope = {
+  findIdsByOrganization: async () => [],
+};
+
 
 /** A prisma double answering only the governance-project lookup. */
 function prismaWith(govProjectId: string | null) {
@@ -59,6 +70,8 @@ function serviceOver(rows: ModelRow[]) {
     prisma: prismaWith("gov-1"),
     costRollup: rollupReturning(rows),
     ocsfEvents: undefined,
+    gatewaySpend: undefined,
+    projects: noProjects,
   });
 }
 
@@ -162,6 +175,8 @@ describe("GovernanceCostService.spendByModel", () => {
         prisma: prismaWith(null),
         costRollup: rollupReturning([]),
         ocsfEvents: undefined,
+        gatewaySpend: undefined,
+        projects: noProjects,
       });
 
       const result = await service.spendByModel({

@@ -1,4 +1,4 @@
-import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import { CLI_LOGIN_KEY_NAME_PREFIX, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
@@ -76,6 +76,29 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
   const where = clause as Record<string, unknown>;
   return (
     isSystemManagedKeyName(where.name) &&
+    where.revokedAt === null &&
+    isElapsedExpiryBound(where.expiresAt)
+  );
+};
+
+/**
+ * Hourly reap sweep for elapsed CLI login keys: matches the reserved name
+ * prefix (exactly one matcher key, `startsWith`), revokedAt: null, and the
+ * elapsed-expiry bound — the exact shape `findElapsedLoginKeys` sends and
+ * nothing looser. `startsWith` is safe here where `isSystemManagedKeyName`
+ * refuses it, because the prefix names platform-minted login keys only
+ * (`ApiKeyService.create` refuses customer keys that would collide).
+ */
+const isCliLoginKeyExpirySweep = (clause: unknown): boolean => {
+  if (!clause || typeof clause !== "object") return false;
+  const where = clause as Record<string, unknown>;
+  const name = where.name;
+  if (!name || typeof name !== "object" || Array.isArray(name)) return false;
+  const nameBound = name as Record<string, unknown>;
+  return (
+    Object.keys(where).length === 3 &&
+    Object.keys(nameBound).length === 1 &&
+    nameBound.startsWith === CLI_LOGIN_KEY_NAME_PREFIX &&
     where.revokedAt === null &&
     isElapsedExpiryBound(where.expiresAt)
   );
@@ -195,7 +218,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // by predicate and action (updateMany only) to prevent reads or deletes of all tenant keys.
     extraBound: ({ clause, action }) =>
       typeof clauseField(clause, "lookupId") === "string" ||
-      (action === "updateMany" && isSystemManagedKeySweep(clause)),
+      (action === "updateMany" && isSystemManagedKeySweep(clause)) ||
+      (action === "findMany" && isCliLoginKeyExpirySweep(clause)),
   },
   RoutingPolicy: {},
   // Governance identity (ADR-128 §11). Every read and write names its

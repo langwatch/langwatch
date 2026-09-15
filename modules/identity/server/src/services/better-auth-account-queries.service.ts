@@ -33,7 +33,19 @@ export type AccountQuery =
    *  `deleteMany` a user delete fans out from. */
   | { kind: "byUser"; userId: string }
   /** updatePassword — every credential account of one user. */
-  | { kind: "byUserAndProvider"; userId: string; providerId: string };
+  | { kind: "byUserAndProvider"; userId: string; providerId: string }
+  /**
+   * The SAME callback lookup as `byProviderSubject`, for a provider whose
+   * issuer is its own rather than one we minted.
+   *
+   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
+   * issuer the provider itself asserts, and no rule of ours derives a
+   * provider id from one. The identifier stores that issuer verbatim — the
+   * backfill copies the legacy column and the attach ceremony records what
+   * better-auth was about to write — so the pair (issuer, providerAccountId)
+   * is a key this branch can answer on, and the index for it already exists.
+   */
+  | { kind: "byIssuerSubject"; issuer: string; accountId: string };
 
 /**
  * An `account` storage operation the identity branch does not serve. `fault: "platform"`
@@ -162,6 +174,12 @@ export class BetterAuthAccountQueriesAdapter {
         if (providerId !== null) {
           return { kind: "byProviderSubject", providerId, accountId };
         }
+        // A provider that asserts its own issuer. Falling through to the
+        // refusal below made every Google, GitHub, GitLab and Azure sign-in on
+        // the deployment fail the moment ONE user was finalized: the callback
+        // key names no user, so it takes the fleet gate, and the throw left no
+        // legacy fallthrough for the users still held on that branch.
+        return { kind: "byIssuerSubject", issuer, accountId };
       }
     }
     if (

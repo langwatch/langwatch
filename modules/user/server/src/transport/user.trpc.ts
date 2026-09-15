@@ -118,6 +118,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
       userId: actor.id,
       password: input.password,
       keepSessionId: keptSessionOf({ actor, browserSession }),
+      caller: callerOf(actor),
     });
 
     return { success: true as const };
@@ -132,6 +133,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
       currentPassword: input.currentPassword,
       newPassword: input.newPassword,
       keepSessionId: keptSessionOf({ actor, browserSession }),
+      caller: callerOf(actor),
     });
 
     return { success: true as const };

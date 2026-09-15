@@ -168,7 +168,26 @@ describe("refreshTelemetryWiringForLogin", () => {
         expect(result.labels.some((l) => l.includes("gemini"))).toBe(true);
         expect(result.labels.some((l) => l.includes("codex"))).toBe(false);
       });
+
+      /** @scenario "A codex pinned to a project still gets the guidance on login" */
+      it("still writes the declare guidance for a pinned codex", async () => {
+        const cfg = baseCfg({
+          tool_project_keys: { codex: { secret: "sk-lw-project-pin" } },
+        });
+        const agentsMd = path.join(temp.home, ".codex", "AGENTS.md");
+        expect(fs.existsSync(agentsMd)).toBe(false);
+
+        await refreshTelemetryWiringForLogin(cfg);
+
+        // The guidance names no endpoint and no key, so the pin has no
+        // reason to withhold it; the wiring the pin does own is untouched.
+        expect(fs.readFileSync(agentsMd, "utf8")).toContain(
+          "langwatch ingest context",
+        );
+        expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
+      });
     });
+
 
     describe("when the org policy forbids direct OTLP for a tool", () => {
       it("leaves that tool's wiring alone and mints nothing for it", async () => {

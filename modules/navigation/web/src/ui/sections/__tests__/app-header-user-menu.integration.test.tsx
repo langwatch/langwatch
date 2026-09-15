@@ -70,6 +70,23 @@ describe("given a reader who never picked a navigation mode", () => {
   });
 });
 
+describe("given an account with no name", () => {
+  describe("when the avatar menu is opened", () => {
+    it("shows the email alone, with no leading space or empty parentheses", async () => {
+      const user = userEvent.setup();
+      renderMenu({
+        currentUser: { id: "user-1", name: null, email: "ada@example.com", image: null },
+      });
+
+      await user.click(screen.getByRole("button", { name: /Open user menu/i }));
+
+      expect(screen.getByText("ada@example.com")).not.toBeNull();
+      expect(screen.queryByText(/null/i)).toBeNull();
+      expect(screen.queryByText(/^\s*\(/)).toBeNull();
+    });
+  });
+});
+
 describe("the My Workspace entry's governance gate", () => {
   describe("given every organization the reader belongs to has governance off", () => {
     /** @scenario The personal entry is hidden when no organization enables governance */

@@ -457,8 +457,8 @@ overrides:
   '@opensearch-project/opensearch': '-'
   '@aws-sdk/xml-builder>fast-xml-parser': ^5.7.0
   '@langchain/community>fast-xml-parser': ^5.7.0
-  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-  '@langwatch/scenario@1.7.0-dev.voice6>langwatch': workspace:*
+  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+  '@langwatch/scenario@1.7.0-dev.voice9>langwatch': workspace:*
   shell-quote@<1.9.0: '>=1.9.0'
   esbuild@<0.28.1: '>=0.28.1'
   minimatch@<3.1.4: '>=3.1.4 <4'
@@ -1428,8 +1428,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/prisma-client
       '@langwatch/scenario':
-        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-server':
         specifier: workspace:*
         version: link:../../modules/scenario/server
@@ -1897,8 +1897,8 @@ importers:
         specifier: 'catalog:'
         version: 3.0.79(zod@4.4.3)
       '@langwatch/scenario':
-        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
@@ -3022,6 +3022,9 @@ importers:
       '@langwatch/gateway-server':
         specifier: workspace:*
         version: link:../../../../modules/gateway/server
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../../packages/handled-error
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3189,8 +3192,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/redaction
       '@langwatch/scenario':
-        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@opentelemetry/context-async-hooks':
         specifier: ^2.1.0
         version: 2.10.0(@opentelemetry/api@1.9.1)
@@ -9460,8 +9463,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
       '@langwatch/scenario':
-        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../suite/contract
@@ -9545,8 +9548,8 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
       '@langwatch/scenario':
-        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../contract
@@ -10641,12 +10644,15 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../prompt/contract
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../../../packages/redaction
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
       '@langwatch/scenario':
-        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -13023,8 +13029,8 @@ importers:
         specifier: 'catalog:'
         version: 3.0.79(zod@4.4.3)
       '@langwatch/scenario':
-        specifier: file:../vendor/langwatch-scenario-1.7.0-dev.voice7.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        specifier: file:../vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -14373,9 +14379,9 @@ packages:
     peerDependencies:
       '@langchain/core': '>=0.3.80'
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz':
-    resolution: {integrity: sha512-JyfksUuTD+8E03I1e+5Uw2zh+Dyud5vd3KHAOvn9SG9b50iw6TJl0SWDDy80iI7v/8E5UIC86hijdd6H8TEC+g==, tarball: file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz}
-    version: 1.7.0-dev.voice6
+  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz':
+    resolution: {integrity: sha512-7Jq0ivvlMaIBPWMvYFmTcvJXsq3bN3lT8AH13ihm1KMcyYb9DYklmNqQifFwCKj8pSIcES1ZTqv9drTT84BRig==, tarball: file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz}
+    version: 1.7.0-dev.voice9
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       '@elevenlabs/elevenlabs-js': '>=2.51.0'
@@ -24685,7 +24691,7 @@ snapshots:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
       js-tiktoken: 1.0.21
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice7.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)':
     dependencies:
       '@ag-ui/core': 0.0.58
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)

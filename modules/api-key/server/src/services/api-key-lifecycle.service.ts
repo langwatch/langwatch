@@ -8,6 +8,7 @@ import {
 import {
   createApiKeyInputSchema,
   type ApiKey,
+  type ApiKeyRevocationCause,
   type ApiKeyScope,
   type CreateApiKeyInput,
   type RevokeApiKeyInput,
@@ -16,10 +17,13 @@ import {
   INGEST_KEY_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
+import { createLogger } from "@langwatch/observability";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { fromDate } from "@langwatch/time";
+
+const logger = createLogger("langwatch:api-key:lifecycle");
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 
@@ -94,6 +98,7 @@ export class ApiKeyLifecycleService {
       userId: parsed.userId ?? null,
       createdByUserId: parsed.createdByUserId ?? null,
       createdByDeviceLabel: parsed.createdByDeviceLabel ?? null,
+      parentApiKeyId: parsed.parentApiKeyId ?? null,
       organizationId: parsed.organizationId,
       expiresAt: parsed.expiresAt ? fromDate(parsed.expiresAt) : null,
       ingestSourceType: parsed.ingestSourceType ?? null,
@@ -227,9 +232,86 @@ export class ApiKeyLifecycleService {
       });
     }
 
-    return publicApiKey(
-      await this.repository.revoke({ id: input.id, cause: input.cause ?? "user" }),
-    );
+    const cause = input.cause ?? "user";
+    const revoked = publicApiKey(await this.repository.revoke({ id: input.id, cause }));
+
+    if (input.cascadeToChildren ?? true) {
+      await this.revokeChildrenOf({
+        parentApiKeyId: input.id,
+        organizationId: input.organizationId,
+        callerUserId: input.callerUserId,
+        cause,
+      });
+    }
+
+    return revoked;
+  }
+
+  /**
+   * Retires the keys minted under one key.
+   *
+   * Lives on the primitive rather than on a CLI-specific caller because the
+   * parent link is a property of the row, and revoke reaches it from the
+   * API-keys page, the REST route and the tRPC mutation as well as from a
+   * `langwatch logout`. A cascade implemented in one caller is one the
+   * others skip.
+   *
+   * Best effort, and never fails the revoke that triggered it: the parent is
+   * already dead by the time this runs, and reporting a failure would say
+   * the revoke did not happen when it did. A child left behind is refused at
+   * authentication anyway, once the token-resolution path reads the parent.
+   *
+   * `callerIsAdmin` is true here for the same reason the cause is remapped:
+   * this is the platform retiring what a dead session owned, not the caller
+   * reaching for someone else's key. Whoever was allowed to revoke the
+   * parent is allowed to have its children go with it.
+   */
+  private async revokeChildrenOf({
+    parentApiKeyId,
+    organizationId,
+    callerUserId,
+    cause,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<void> {
+    let children: Array<{ id: string }>;
+    try {
+      children = await this.repository.findLiveChildren({ parentApiKeyId, organizationId });
+    } catch (err) {
+      logger.warn(
+        { err, parentApiKeyId, organizationId },
+        "could not read the keys minted under a revoked key",
+      );
+      return;
+    }
+
+    // A person's revoke of the parent is not a decision about each child, so
+    // the children record that their session went, not that someone chose
+    // them. Every other cause describes the session itself and passes down.
+    const childCause: ApiKeyRevocationCause = cause === "user" ? "session" : cause;
+
+    for (const child of children) {
+      try {
+        await this.revoke({
+          id: child.id,
+          callerUserId,
+          callerIsAdmin: true,
+          organizationId,
+          awaitProjection: false,
+          cause: childCause,
+          cascadeToChildren: false,
+        });
+      } catch (err) {
+        if (err instanceof ApiKeyAlreadyRevokedError) continue;
+        logger.warn(
+          { err, apiKeyId: child.id, parentApiKeyId },
+          "could not retire a key minted under a revoked key",
+        );
+      }
+    }
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {

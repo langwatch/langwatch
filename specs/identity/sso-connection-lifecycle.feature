@@ -276,3 +276,19 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When it also asks the pipeline for the connection write surface
     Then it is handed the same service the pipeline itself commands through
     And the operator's commands run the same guards and the same break-glass budget
+
+  # --- The issuer is an address we will dial -------------------------------
+  #
+  # The string an operator types becomes the URL this process later fetches
+  # the provider's OpenID configuration from, so the form is a way to ask us
+  # to make a request. It is checked where it is typed, which is the one
+  # moment somebody is present to correct it.
+
+  @unit
+  Scenario: An issuer that only answers on a private network is refused
+    Given an operator registering a connection
+    When the issuer they give resolves to an address inside our own network
+    Then the connection is not registered
+    And they are told to give the issuer URL their provider publishes
+    And nothing in the answer describes our network back to them
+

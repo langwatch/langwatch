@@ -19,6 +19,8 @@ export class CodexLogCanonicaliserService {
       return;
     }
 
+    this.liftConversationId(ctx);
+
     if (eventName === "codex.sse_event") {
       this.liftSseEvent(ctx);
 
@@ -38,12 +40,25 @@ export class CodexLogCanonicaliserService {
     }
   }
 
+  /**
+   * Every codex log record names its session as `conversation.id`. A turn
+   * whose span never lands has only its log records to key the session fold
+   * off, so this lifts it onto both the trace's conversation key and
+   * `langwatch.thread.id`. Read, not taken: the pipeline keys off the same attribute.
+   */
+  private liftConversationId(ctx: LogExtractorContext): void {
+    const conversationId = asString(ctx.bag.attrs.get("conversation.id"));
+    if (conversationId === null) return;
+    ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, conversationId);
+    ctx.setAttr("langwatch.thread.id", conversationId);
+    ctx.recordRule("codex/conversation_id");
+  }
+
   private liftSseEvent(ctx: LogExtractorContext): void {
     const model = asString(ctx.bag.attrs.take("model"));
     const inputTokens = asNumber(ctx.bag.attrs.take("input_token_count"));
     const outputTokens = asNumber(ctx.bag.attrs.take("output_token_count"));
     const cacheReadTokens = asNumber(ctx.bag.attrs.take("cached_token_count"));
-    const threadId = asString(ctx.bag.attrs.take("conversation.id"));
     const principalEmail = asString(ctx.bag.attrs.take("user.email"));
     const reasoningEffort = asString(ctx.bag.attrs.take("model_reasoning_effort"));
 
@@ -70,11 +85,6 @@ export class CodexLogCanonicaliserService {
 
     if (cacheReadTokens !== null) {
       ctx.setAttr("langwatch.cache_read_tokens", String(cacheReadTokens));
-      fired = true;
-    }
-
-    if (threadId !== null) {
-      ctx.setAttr("langwatch.thread.id", threadId);
       fired = true;
     }
 

@@ -99,6 +99,17 @@ export interface IdentityResolution {
 }
 
 /**
+ * A resolution that also names the provider the matched row belongs to.
+ *
+ * The issuer lookup has to carry it: the account read underneath is keyed on
+ * better-auth's verbatim provider id, and the caller that asked by issuer has
+ * no way to know it.
+ */
+export interface IdentityIssuerResolution extends IdentityResolution {
+  providerId: string;
+}
+
+/**
  * AND reads the user's migration-state row in the same Postgres query, so resolution never depends
  * on the write gate's TTL cache — the cache earns its keep on write routing,
  * The reads that carry no `userId` (ADR-116 §2). Each resolves an identifier
@@ -116,4 +127,18 @@ export interface IdentityResolver {
     providerId: string;
     providerAccountId: string;
   }): Promise<IdentityResolution | null>;
+  /**
+   * The same callback lookup for a provider that asserts its OWN issuer.
+   *
+   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
+   * issuer the provider states, which no rule of ours derives a provider id
+   * from. The identifier stores it verbatim, so this answers on the pair the
+   * row is indexed by and hands back the provider id the account read needs —
+   * deriving that id here rather than making the caller guess is the point,
+   * since guessing it is exactly what could answer with another IdP's user.
+   */
+  resolveByIssuerSubject(args: {
+    issuer: string;
+    providerAccountId: string;
+  }): Promise<IdentityIssuerResolution | null>;
 }

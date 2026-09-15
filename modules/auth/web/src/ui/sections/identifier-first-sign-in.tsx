@@ -60,6 +60,7 @@ export function IdentifierFirstSignIn() {
   usePasskeyAutofill({
     enabled: instanceMethods.some((method) => method.kind === "passkey"),
     callbackUrl,
+    onError: setPasskeyError,
   });
 
   useEffect(() => {

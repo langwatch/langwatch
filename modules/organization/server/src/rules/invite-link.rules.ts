@@ -14,3 +14,12 @@ export function buildInviteAcceptUrl(baseHost: string, inviteCode: string): stri
 export function buildMembersSettingsUrl(baseHost: string): string {
   return `${baseHost}/settings/members`;
 }
+
+/**
+ * Where an administrator re-publishes the record that proves a domain
+ * (ADR-123). Carries no token: a verification record is a secret, and a
+ * mailed one would let anybody reading the inbox prove a domain they don't own.
+ */
+export function buildAccessSettingsUrl(baseHost: string): string {
+  return `${baseHost}/settings/access`;
+}

@@ -14,8 +14,19 @@ const routingReasonCopy = {
   break_glass: null,
   domain_routed: null,
   no_domain_match: null,
+  // The methods offered ARE the account's, which is the screen quietly doing
+  // its job. Saying "these are your sign-in methods" over a list of somebody's
+  // sign-in methods is a caption on a photograph of itself.
+  account_methods: null,
 
   // ---- guidance ----
+  identifier_unknown: {
+    title: "There is no account for that email address yet",
+    // Both ways on, and in this order: creating the account is what most
+    // people who land here came to do, and the address being wrong is the
+    // other real possibility rather than an afterthought.
+    describe: "Create one now with the same address, or go back and try a different email.",
+  },
   connection_suspended: {
     title: "Single sign-on is paused for your organization",
     describe:

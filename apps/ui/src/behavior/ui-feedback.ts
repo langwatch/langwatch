@@ -18,8 +18,26 @@ import {
 } from "@langwatch/ui-host/capabilities";
 import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 
+import { isServerUnreachable } from "../model/errors/isServerUnreachable";
+import { isUiNavigatingAway } from "./ui-departure";
+
 /** How long a failure stays up: long enough to read it and copy the error id. */
 const FAILURE_DURATION_MS = 12_000;
+
+/**
+ * What we say when nothing answered at all.
+ *
+ * Said as a WAIT rather than as a fault, because that is what it is: a deploy
+ * rolling, a laptop waking, a server still coming up. The generic line — "We've
+ * been notified. Try again in a moment." — is a promise nobody kept here, since
+ * the request never left the browser and there is no trace to have been
+ * notified about. The screen's own title is dropped with it: it names the
+ * action, and the action is not what went wrong.
+ */
+const SERVER_UNREACHABLE_COPY = {
+  title: "Waiting for LangWatch",
+  description: "We can't reach the server right now. Check your connection, then try again.",
+} as const;
 
 /** Everything a surface needs to render one failure, resolved once. */
 export type ResolvedUiFailureCopy = {
@@ -50,6 +68,21 @@ export function resolveUiFailureCopy({
   title,
   description,
 }: UiFailureNotice): ResolvedUiFailureCopy {
+  // NOTHING ANSWERED, so there is no code to look up and no trace id to offer.
+  // Deliberately AHEAD of the registry, which is what its own doc comment asks
+  // for: the registry answers "which refusal was this", and this answers the
+  // prior question of whether we were refused at all. `isServerUnreachable` is
+  // conservative by construction — anything carrying a status or a code counts
+  // as an answer — so a named refusal can never be repainted as this.
+  if (isServerUnreachable(error)) {
+    return {
+      title: SERVER_UNREACHABLE_COPY.title,
+      description: SERVER_UNREACHABLE_COPY.description,
+      docsUrl: void 0,
+      traceId: void 0,
+    };
+  }
+
   const handled = readHandledError(error);
 
   if (handled) {
@@ -187,6 +220,13 @@ export class BrowserUiFeedback extends UiFeedback {
     // the same question for the screens that report through it; this door is
     // for the hosts a feature reports through directly.
     if (isHandledByGlobalHandler(failure.error)) return;
+
+    // ON THE WAY OUT. A request the unload aborted looks exactly like a server
+    // that never answered, so without this a sign-out or a post-accept redirect
+    // toasts "we cannot reach the server" over the top of the page the reader
+    // is already being taken to. Only the unreachable shape is suppressed: a
+    // refusal that DID arrive still has something to say.
+    if (isUiNavigatingAway() && isServerUnreachable(failure.error)) return;
 
     const copy = resolveUiFailureCopy(failure);
     this.target.create({

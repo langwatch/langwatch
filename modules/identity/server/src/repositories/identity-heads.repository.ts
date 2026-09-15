@@ -17,6 +17,14 @@ export abstract class IdentityHeadsRepository {
   abstract tryFindUserHashKey(args: { userId: string }): Promise<string | null>;
   /** The user's current identifier heads, as the projection knows them. */
   abstract findHeads(args: { userId: string }): Promise<IdentityHeads>;
+  /**
+   * Whether this user's projection has folded at least once — a cursor row
+   * exists. Until it has, the heads may hold PROVISIONAL rows the ledger wrote
+   * for a newborn before staging, and those are not event truth: the attach
+   * guard dedupes against folded heads only, so the queued run still states
+   * the fact the row anticipates.
+   */
+  abstract hasFolded(args: { userId: string }): Promise<boolean>;
   /** An ACTIVE (VERIFIED or PRIMARY) identifier holding this normalized
    *  value, whoever holds it — the cross-user uniqueness guard's read. */
   abstract tryFindActiveIdentifierByValue(args: {

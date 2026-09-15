@@ -51,7 +51,7 @@ A passkey synced across a person's devices is genuinely weaker than one bound to
 # Exit gate / rollback
 
 - **Exit:** register / sign-in / no-email sign-in / delete round-trips green on platform + cross-platform authenticators; mirror rows consistent with plugin table (replay-parity test covers the `Identifier` projection).
-- **Rollback:** `PASSKEYS_ENABLED` off.
+- **Rollback:** none. The plugin is mounted everywhere, deliberately: a deployment with the button on the screen and no endpoint behind it is not a state to be able to reach.
 
 # Security Concerns
 

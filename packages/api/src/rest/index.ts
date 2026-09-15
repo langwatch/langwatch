@@ -242,6 +242,7 @@ export {
   operationIdOf,
   restRouteDocumentation,
   securityForCredentialClass,
+  type DocumentedRouteResponse,
   type PlatformUrlBuilder,
   type RestTransportDocs,
   type SecurityRequirement,

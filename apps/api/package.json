@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision",
+    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
     "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",

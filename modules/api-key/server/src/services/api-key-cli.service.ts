@@ -10,6 +10,8 @@ import {
 } from "@langwatch/authz-contract";
 import {
   cliKeySelectionSchema,
+  loginKeyExpiresAt,
+  CLI_LOGIN_KEY_NAME_PREFIX,
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
@@ -144,14 +146,34 @@ export class ApiKeyCliService {
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
+    /**
+     * When the device session began, carried across every refresh. Together
+     * with `maxSessionDurationDays` and `refreshWindowMs`, drives the key's
+     * `expiresAt` (see {@link loginKeyExpiresAt}) so a session nothing
+     * refreshes again is retired by the hourly sweep, and the ingest keys
+     * under it with it. Omitted, the key mints with no expiry — the prior
+     * behaviour, for a caller that has not adopted session timing yet.
+     */
+    sessionStartedAtMs?: number;
+    maxSessionDurationDays?: number;
+    refreshWindowMs?: number;
   }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
     const scope = await this.resolveCliScopeSummary({
       organizationId: input.organizationId,
       bindings: input.selection.bindings,
       permissions: input.selection.permissions,
     });
+    const expiresAt =
+      input.sessionStartedAtMs === void 0
+        ? void 0
+        : loginKeyExpiresAt({
+            nowMs: input.sessionStartedAtMs,
+            sessionStartedAtMs: input.sessionStartedAtMs,
+            maxSessionDurationDays: input.maxSessionDurationDays ?? 0,
+            refreshWindowMs: input.refreshWindowMs ?? 0,
+          });
     const created = await this.lifecycle.create({
-      name: `CLI login - ${input.deviceLabel}`,
+      name: `${CLI_LOGIN_KEY_NAME_PREFIX}${input.deviceLabel}`,
       userId: input.userId,
       createdByUserId: input.userId,
       organizationId: input.organizationId,
@@ -162,6 +184,7 @@ export class ApiKeyCliService {
         role: "CUSTOM" as const,
       })),
       createdByDeviceLabel: input.deviceLabel,
+      ...(expiresAt === void 0 ? {} : { expiresAt }),
     });
     try {
       await this.revokeCliLoginKeysForDevice({
@@ -200,7 +223,7 @@ export class ApiKeyCliService {
     });
     for (const key of keys) {
       if (
-        !key.name.startsWith("CLI login - ") ||
+        !key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ||
         key.createdByDeviceLabel !== input.deviceLabel ||
         key.id === input.exceptApiKeyId ||
         (input.createdBefore &&
@@ -209,11 +232,16 @@ export class ApiKeyCliService {
         continue;
       }
 
+      // A re-login replaces the device's previous key rather than a person
+      // deciding to kill it, so the ingest keys under it may re-mint under
+      // the session that replaced theirs (see the cause-remap in
+      // ApiKeyLifecycleService.revoke).
       await this.lifecycle.revoke({
         id: key.id,
         callerUserId: input.userId,
         callerIsAdmin: false,
         organizationId: input.organizationId,
+        cause: "rotation",
       });
     }
   }
@@ -237,6 +265,35 @@ export class ApiKeyCliService {
 
       throw error;
     }
+  }
+
+  /**
+   * Moves a live login key's expiry with its session, on a successful
+   * refresh. Silently a no-op for a key that is not a live CLI login key
+   * owned by this user in this organization (see
+   * `ApiKeyRepository.extendLoginKeyExpiry`), so a refresh racing a revoke
+   * never brings a dead key back into the hourly sweep's live set.
+   */
+  async extendCliLoginKeyExpiry(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    sessionStartedAtMs: number;
+    maxSessionDurationDays: number;
+    refreshWindowMs: number;
+  }): Promise<void> {
+    const expiresAt = loginKeyExpiresAt({
+      nowMs: Date.now(),
+      sessionStartedAtMs: input.sessionStartedAtMs,
+      maxSessionDurationDays: input.maxSessionDurationDays,
+      refreshWindowMs: input.refreshWindowMs,
+    });
+    await this.repository.extendLoginKeyExpiry({
+      id: input.apiKeyId,
+      organizationId: input.organizationId,
+      userId: input.userId,
+      expiresAt: fromDate(expiresAt),
+    });
   }
 
   private async resolveCliScopeSummary(input: {

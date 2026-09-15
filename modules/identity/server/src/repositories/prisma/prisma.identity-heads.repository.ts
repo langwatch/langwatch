@@ -10,7 +10,10 @@ import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
  * The composition root already holds a typed `PrismaClient`; naming the models
  * here is what lets it hand that client straight down with no cast at the seam.
  */
-export type PrismaIdentityHeadsDatabase = Pick<PrismaClient, "identifier" | "user">;
+export type PrismaIdentityHeadsDatabase = Pick<
+  PrismaClient,
+  "identifier" | "user" | "identityProjectionCursor"
+>;
 
 /**
  * A user's identifier heads, read off the `Identifier` projection and
@@ -39,6 +42,14 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
       select: { userHashKey: true },
     });
     return user?.userHashKey ?? null;
+  }
+
+  async hasFolded({ userId }: { userId: string }): Promise<boolean> {
+    const cursor = await this.database.identityProjectionCursor.findUnique({
+      where: { userId },
+      select: { userId: true },
+    });
+    return cursor !== null;
   }
 
   async findHeads({ userId }: { userId: string }): Promise<IdentityHeads> {

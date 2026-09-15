@@ -44,6 +44,12 @@ function occurredAtScore(payload: { occurredAt?: unknown }): number {
 export interface JobRegistryEntry {
   process: (payload: any, delivery?: JobDelivery) => Promise<void>;
   groupKeyFn: (payload: any) => string;
+  /**
+   * Exact group for aggregate-scoped migration pre-registration. Absent when
+   * the job routes by a custom group key: that key is only knowable from a
+   * payload, and preflight has to name every group before one exists.
+   */
+  preflightGroupKey?: (identity: { tenantId: string; aggregateId: string }) => string;
   scoreFn: (payload: any) => number;
   delay?: number;
   deduplication?: DeduplicationConfig<any>;
@@ -121,18 +127,32 @@ function validateCommandPayload<EventType extends Event>(
   );
 }
 
-/** Wraps a command's base facade with pre-send schema validation. */
+/**
+ * Wraps a command's base facade with pre-send schema validation, and with the
+ * migration preflight that claims the pipeline's groups BEFORE anything is
+ * staged into them. Order matters both ways: an invalid payload never reaches
+ * the preflight, and a preflight that refuses stops the send.
+ */
 function buildValidatingCommandFacade<EventType extends Event>(
   cmdEntry: CommandRegistryEntry<EventType>,
   baseFacade: EventSourcedQueueProcessor<Record<string, unknown>>,
+  registerPreflight: (
+    identities: readonly { tenantId: string; aggregateId: string }[],
+  ) => Promise<void>,
 ): EventSourcedQueueProcessor<any> {
+  const identityOf = (payload: any) => ({
+    tenantId: String(payload.tenantId),
+    aggregateId: String(cmdEntry.getAggregateId(payload)),
+  });
   return {
     send: async (payload: any, options?: QueueSendOptions<any>) => {
       validateCommandPayload(cmdEntry, payload);
+      await registerPreflight([identityOf(payload)]);
       return baseFacade.send(payload, options);
     },
     sendBatch: async (payloads: any[], options?: QueueSendOptions<any>) => {
       for (const payload of payloads) validateCommandPayload(cmdEntry, payload);
+      await registerPreflight(payloads.map(identityOf));
       return baseFacade.sendBatch(payloads, options);
     },
     close: baseFacade.close,
@@ -216,6 +236,37 @@ export class QueueManager<EventType extends Event = Event> {
     domainKeyFn: (payload: any) => string;
   }): (payload: any) => string {
     return (payload: any) => `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
+  }
+
+  /** The same key `buildGroupKey` produces, from an identity instead of a payload. */
+  private buildPreflightGroupKey(
+    jobPath: string,
+  ): NonNullable<JobRegistryEntry["preflightGroupKey"]> {
+    return ({ tenantId, aggregateId }) =>
+      `${tenantId}/${jobPath}/${this.aggregateType}:${aggregateId}`;
+  }
+
+  /**
+   * Names every group this pipeline's aggregates may reach before a command is
+   * staged, so a migration's allow-list is complete rather than discovered one
+   * job at a time. A job routed by a custom group key contributes `undefined`,
+   * which the queue refuses — failing closed beats staging into a group the
+   * preflight never claimed.
+   */
+  private async registerPreflightAggregateTargets(
+    identities: readonly { tenantId: string; aggregateId: string }[],
+  ): Promise<void> {
+    const register = this.globalQueue?.registerPreflightGroups;
+    const registry = this.globalJobRegistry;
+    if (!register || !registry) return;
+
+    await register.call(this.globalQueue, () => {
+      const pipelinePrefix = `${this.pipelineName}:`;
+      const entries = [...registry.entries()].filter(([key]) => key.startsWith(pipelinePrefix));
+      return identities.flatMap((identity) =>
+        entries.map(([, entry]) => entry.preflightGroupKey?.(identity)),
+      );
+    });
   }
 
   private key(
@@ -406,6 +457,9 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
         scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
@@ -486,6 +540,9 @@ export class QueueManager<EventType extends Event = Event> {
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
         groupKeyFn,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(`${lane.jobPath}/${projectionName}`),
         scoreFn: projectionDef.scoreFn ?? ((event: any) => event.occurredAt ?? event.createdAt),
         process: async (event: any, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
@@ -620,7 +677,9 @@ export class QueueManager<EventType extends Event = Event> {
   ): void {
     const jobEntry = this.buildCommandJobEntry(cmdName, cmdEntry, storeEvents);
     const baseFacade = this.createFacade<Record<string, unknown>>("command", cmdName, jobEntry);
-    const validatingFacade = buildValidatingCommandFacade(cmdEntry, baseFacade);
+    const validatingFacade = buildValidatingCommandFacade(cmdEntry, baseFacade, (identities) =>
+      this.registerPreflightAggregateTargets(identities),
+    );
     this.queues.set(this.key("command", cmdName), validatingFacade);
   }
 
@@ -688,6 +747,12 @@ export class QueueManager<EventType extends Event = Event> {
 
     return {
       groupKeyFn: commandGroupKeyFn,
+      preflightGroupKey:
+        cmdEntry.options.serializeByAggregate || !cmdEntry.getGroupKey
+          ? this.buildPreflightGroupKey(
+              cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
+            )
+          : undefined,
       scoreFn: cmdEntry.options.serializeByAggregate
         ? () => nowInstant().epochMilliseconds
         : (payload: any) => occurredAtScore(payload),
@@ -756,6 +821,11 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: subscriberGroupKeyFn,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(
+              `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
+            ),
         scoreFn: (payload: any) => payload.event.createdAt,
         process: async (payload: any) => {
           await onEvent(subscriberName, payload, {
@@ -911,6 +981,7 @@ export class QueueManager<EventType extends Event = Event> {
             domainKeyFn: groupKeyFn as any,
           })
         : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
+      preflightGroupKey: groupKeyFn ? undefined : ({ tenantId }) => `${tenantId}/job/${name}`,
       scoreFn: scoreFn ? (scoreFn as any) : (payload: any) => occurredAtScore(payload),
       process: process as any,
       delay,

@@ -114,6 +114,84 @@ describe("EventStoreClickHouse retention stamping", () => {
     });
   });
 
+  /**
+   * event_log does not share one category with the rest of a trace pipeline's
+   * tables: a row's own aggregate/event type decides it. This package may not
+   * name the product-feature module that owns that decision (the eventing
+   * package boundary), so the classifier is injected as a plain function —
+   * these cases stand in for the real one
+   * (`@langwatch/data-retention-contract`'s `classifyEventLogRowRetention`).
+   */
+  describe("when an event-log retention classifier is wired", () => {
+    it("stamps a row the classifier calls indefinite with _retention_days = 0, ignoring policy", async () => {
+      const resolver: RetentionPolicyResolver = {
+        resolve: vi.fn().mockResolvedValue({ traces: 30, scenarios: null, experiments: null }),
+      };
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        retentionPolicyResolver: resolver,
+        classifyEventLogRetention: () => "indefinite",
+      });
+
+      await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
+
+      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      expect(values[0]!._retention_days).toBe(0);
+    });
+
+    it("resolves the policy under the key the classifier returns", async () => {
+      const resolver: RetentionPolicyResolver = {
+        resolve: vi.fn().mockResolvedValue({ traces: 30, scenarios: 63, experiments: 91 }),
+      };
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        retentionPolicyResolver: resolver,
+        classifyEventLogRetention: () => "scenarios",
+      });
+
+      await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
+
+      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      expect(values[0]!._retention_days).toBe(63);
+    });
+
+    it("falls back to traces when omitted, unchanged from before the classifier existed", async () => {
+      const resolver: RetentionPolicyResolver = {
+        resolve: vi.fn().mockResolvedValue({ traces: 30, scenarios: 63, experiments: 91 }),
+      };
+      const retention = createEventingRetentionConfiguration({
+        defaultRetentionDays: INJECTED_DEFAULT_RETENTION_DAYS,
+      });
+      const store = EventingClickHouseEventStore.create({
+        repository: EventingClickHouseEventRepository.create({
+          resolveClient: async () => mockClient,
+          retention,
+        }),
+        retention,
+        retentionPolicyResolver: resolver,
+      });
+
+      await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
+
+      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      expect(values[0]!._retention_days).toBe(30);
+    });
+  });
+
   describe("when the tenant has no policy configured", () => {
     it("falls back to the platform default", async () => {
       const resolver: RetentionPolicyResolver = {

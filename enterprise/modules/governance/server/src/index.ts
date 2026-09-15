@@ -88,6 +88,15 @@ export {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
 } from "./eventing/gateway-debit.process.ts";
+export {
+  COST_ROLLUP_WATCH_PROCESS_NAME,
+  CostRollupWatchProcess,
+  type CostRollupWatchState,
+} from "./eventing/cost-rollup-watch.process.ts";
+export {
+  COST_ROLLUP_WATCH_MAX_ATTEMPTS,
+  CostRollupCheckUnsettledError,
+} from "./eventing/cost-rollup-watch.intent.ts";
 export { GovernanceEventDeliveryProcess } from "./eventing/governance-event-delivery.process.ts";
 export { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";

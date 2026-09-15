@@ -1,20 +1,30 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
+import { isIP } from "node:net";
 
 import { configuredTrustedProxies } from "../platform/config/trusted-proxies.config.ts";
 
+const logger = createLogger("langwatch:api:client-address");
+
 /**
- * Which address a request came from: the socket, unless the request arrived from a hop
- * named in `TRUSTED_PROXY_ADDRESSES` (empty by default).
+ * Which address a request came from: the socket, unless the request arrived
+ * from one of this deployment's own hops.
  */
 export function apiClientAddress(
   c: Context,
   options?: { trustedProxies?: readonly string[] },
 ): string | undefined {
+  const socketAddress = apiSocketAddress(c);
+  announceUndeclaredPublicProxyOnce({
+    forwardedFor: c.req.header("x-forwarded-for"),
+    socketAddress,
+    trusted: options?.trustedProxies ?? configuredTrustedProxies(),
+  });
   return clientAddressOf({
     header: (name) => c.req.header(name),
-    socketAddress: apiSocketAddress(c),
+    socketAddress,
     ...(options?.trustedProxies ? { trustedProxies: options.trustedProxies } : {}),
   });
 }
@@ -29,11 +39,17 @@ export function trpcClientAddress(
   options?: { trustedProxies?: readonly string[] },
 ): string | undefined {
   if (!req) return undefined;
+  const header = (name: string): string | undefined => {
+    const value = req.headers[name];
+    return Array.isArray(value) ? value.join(",") : value;
+  };
+  announceUndeclaredPublicProxyOnce({
+    forwardedFor: header("x-forwarded-for"),
+    socketAddress: req.socket?.remoteAddress,
+    trusted: options?.trustedProxies ?? configuredTrustedProxies(),
+  });
   return clientAddressOf({
-    header: (name) => {
-      const value = req.headers[name];
-      return Array.isArray(value) ? value.join(",") : value;
-    },
+    header,
     socketAddress: req.socket?.remoteAddress,
     ...(options?.trustedProxies ? { trustedProxies: options.trustedProxies } : {}),
   });
@@ -46,7 +62,7 @@ function clientAddressOf(input: {
 }): string | undefined {
   const trusted = input.trustedProxies ?? configuredTrustedProxies();
   const socket = input.socketAddress ? (parseAddress(input.socketAddress) ?? undefined) : undefined;
-  if (socket === undefined || !isTrustedProxy(socket, trusted)) {
+  if (socket === undefined || !isInfrastructureHop(socket, trusted)) {
     return socket;
   }
   return forwardedAddress(input.header, trusted) ?? socket;
@@ -60,6 +76,38 @@ export function apiSocketAddress(c: Context): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Said once, not once per request: this is a deployment fact, and repeating it
+ * on a hot path would bury the thing it is trying to point at.
+ */
+let announcedUndeclaredPublicProxy = false;
+
+/**
+ * A proxy on a public address nobody declared. Only this shape is worth saying:
+ * a private hop is recognised and its chain read, but a public one is
+ * indistinguishable from a caller, so every visitor behind it shares one
+ * signed-out budget. Only `TRUSTED_PROXY_ADDRESSES` can tell the two apart, so
+ * this warns rather than guesses — a deployment behind no proxy is fine as is.
+ */
+function announceUndeclaredPublicProxyOnce(input: {
+  forwardedFor: string | undefined;
+  socketAddress: string | undefined;
+  trusted: readonly string[] | undefined;
+}): void {
+  if (announcedUndeclaredPublicProxy) return;
+  if (input.trusted !== undefined && input.trusted.length > 0) return;
+  if (!input.forwardedFor) return;
+
+  const peer = input.socketAddress ? parseAddress(input.socketAddress) : null;
+  if (peer === null || isPrivateAddress(peer)) return;
+
+  announcedUndeclaredPublicProxy = true;
+  logger.warn(
+    { setting: "TRUSTED_PROXY_ADDRESSES" },
+    "Ignored a forwarded-for header from a public peer, so signed-out authentication limits are counting that peer rather than the caller behind it. If it is this deployment's proxy, name it in TRUSTED_PROXY_ADDRESSES.",
+  );
 }
 
 /** In order of preference; the first that yields an untrusted hop wins. */
@@ -76,13 +124,10 @@ const ADDRESS_HEADERS = [
   "fastly-client-ip", // Fastly CDN
 ] as const;
 
-const IPV4 = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6 = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-
 /** The rightmost hop no trusted proxy wrote, across the forwarding headers. */
 function forwardedAddress(
   header: (name: string) => string | undefined,
-  trusted: readonly string[],
+  trusted: readonly string[] | undefined,
 ): string | undefined {
   for (const name of ADDRESS_HEADERS) {
     const value = header(name);
@@ -91,7 +136,7 @@ function forwardedAddress(
     for (let index = hops.length - 1; index >= 0; index--) {
       const address = parseAddress(hops[index] ?? "");
       if (address === null) continue;
-      if (!isTrustedProxy(address, trusted)) return address;
+      if (!isInfrastructureHop(address, trusted)) return address;
     }
   }
   return undefined;
@@ -100,14 +145,61 @@ function forwardedAddress(
 /** One address, or nothing when the text is not one. */
 function parseAddress(value: string): string | null {
   const address = value.replace(/^\s*::ffff:/, "").trim();
-  const isIpAddress = IPV4.test(address) || IPV6.test(address);
-  return isIpAddress ? address : null;
+  return isIP(address) === 0 ? null : address;
 }
 
-function isTrustedProxy(address: string, trusted: readonly string[]): boolean {
+/**
+ * Whether an address is one of this deployment's own hops rather than a caller.
+ * With the setting present the operator has answered exactly, empty included.
+ * Absent, the address itself answers: a private peer reached this process
+ * without crossing the internet, so it is infrastructure. That default is what
+ * keeps a public caller from choosing its own budget AND every visitor behind
+ * an ingress from sharing one.
+ */
+function isInfrastructureHop(address: string, trusted: readonly string[] | undefined): boolean {
+  if (trusted === undefined) return isPrivateAddress(address);
   return trusted.some((entry) =>
     entry.includes("/") ? withinIpv4Range(address, entry) : entry === address,
   );
+}
+
+/**
+ * Ranges that cannot be reached from the public internet, so an address in one
+ * of them belongs to the operator's own network.
+ *
+ * Carrier-grade NAT (100.64.0.0/10) is deliberately absent: it is unreachable
+ * publicly, but it is where a mobile CARRIER puts its subscribers, so a peer in
+ * it is a caller rather than a hop.
+ */
+const PRIVATE_IPV4_RANGES = [
+  "10.0.0.0/8",
+  "172.16.0.0/12",
+  "192.168.0.0/16",
+  "127.0.0.0/8",
+  "169.254.0.0/16",
+] as const;
+
+function isPrivateAddress(address: string): boolean {
+  if (isIP(address) === 4) {
+    return PRIVATE_IPV4_RANGES.some((range) => withinIpv4Range(address, range));
+  }
+  return isPrivateIpv6(address);
+}
+
+/** Loopback (`::1`), unique-local (`fc00::/7`) and link-local (`fe80::/10`). */
+function isPrivateIpv6(address: string): boolean {
+  if (isIP(address) !== 6) return false;
+
+  const normalized = address.toLowerCase();
+  if (normalized === "::1") return true;
+
+  const firstGroup = normalized.split(":")[0];
+  if (!firstGroup) return false;
+
+  const group = Number.parseInt(firstGroup, 16);
+  if (Number.isNaN(group)) return false;
+
+  return (group & 0xfe_00) === 0xfc_00 || (group & 0xff_c0) === 0xfe_80;
 }
 
 /** IPv4 prefix membership; anything unparsable matches nothing. */
@@ -126,7 +218,7 @@ function withinIpv4Range(address: string, range: string): boolean {
 }
 
 function ipv4AsNumber(address: string): number | null {
-  if (!IPV4.test(address)) return null;
+  if (isIP(address) !== 4) return null;
   const octets = address.split(".").map(Number);
   if (octets.some((octet) => octet > 255)) return null;
   return octets.reduce((total, octet) => ((total << 8) | octet) >>> 0, 0);

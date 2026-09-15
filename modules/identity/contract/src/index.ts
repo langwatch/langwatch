@@ -138,6 +138,7 @@ export {
   IdentityPrimaryRequiresVerifiedError,
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
+  IdentityVerificationNotSettledError,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
@@ -447,9 +448,11 @@ export {
 } from "./scim-sync-commands.ts";
 
 export {
+  type AccountSignInMethods,
   compareToLegacy,
   isLocalSignInMethod,
   legacyProviderOf,
+  rankAccountMethods,
   type RoutableConnection,
   type RoutingDecision,
   type RoutingIdentifier,

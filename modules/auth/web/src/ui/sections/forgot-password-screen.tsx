@@ -1,15 +1,4 @@
-import {
-  Box,
-  Button,
-  Card,
-  Container,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -18,8 +7,8 @@ import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts"
 import { authClient } from "../../behavior/auth-client.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
-import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
+import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
@@ -94,55 +83,65 @@ function ForgotPasswordForm() {
     }
   };
 
+  // The same check-your-email every other door shows, in the same card: the
+  // content changes, the surface does not. And it is not a dead end — the
+  // commonest reason to be staring at this card puzzled is that the address
+  // on it is wrong.
   if (submittedEmail) {
     return (
-      <AuthCard title="Check your email">
-        <Text>
-          If an account exists for <b>{submittedEmail}</b>, we have sent a link to reset your
-          password. The link expires in 1 hour.
-        </Text>
-        <BackToSignInLink />
-      </AuthCard>
+      <CheckYourEmail
+        email={submittedEmail}
+        what="If an account exists for it, opening the link lets you choose a new password."
+        onUseDifferentEmail={() => setSubmittedEmail(null)}
+      />
     );
   }
 
   return (
-    <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
+    <AuthCard title="Forgot password">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <Card.Root>
-          <Card.Header>
-            <HStack gap={4}>
-              <LogoIcon width={30.69} height={42} />
-              <Heading size="lg" as="h1">
-                Forgot password
-              </Heading>
-            </HStack>
-          </Card.Header>
-          <Card.Body>
-            <VStack width="full">
-              <Text width="full" color="gray.600">
-                Enter the email for your account and we will send you a link to reset your password.
-              </Text>
-              <HorizontalFormControl
-                label="Email"
-                helper="Enter your email"
-                invalid={form.formState.errors.email?.message !== undefined}
-              >
-                <Input type="email" {...form.register("email")} />
-              </HorizontalFormControl>
-              <HStack width="full" paddingTop={4}>
-                <BackToSignInLink />
-                <Spacer />
-                <Button colorPalette="orange" type="submit" loading={isLoading}>
-                  Send reset link
-                </Button>
-              </HStack>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
+      <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
+        <VStack width="full" align="stretch" gap="14px">
+          <Text color="fg.muted" fontSize="13.5px" lineHeight="1.65">
+            Enter the email for your account and we will send you a link to reset your password.
+          </Text>
+          <FrontDoorField label="Email" error={form.formState.errors.email}>
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                placeholder="you@company.com"
+                // 16px on a phone: anything smaller makes iOS zoom the page in
+                // when the field takes focus, and it never zooms back out.
+                fontSize={{ base: "16px", md: "14px" }}
+                minHeight="44px"
+                autoComplete="username"
+                {...FIELD_SURFACE}
+                _focusVisible={FIELD_FOCUS}
+                {...form.register("email")}
+              />
+            )}
+          </FrontDoorField>
+          <Button
+            className="lw-front-door-primary"
+            type="submit"
+            width="full"
+            minHeight="44px"
+            fontSize="14px"
+            fontWeight={600}
+            backgroundColor="frontDoor.action"
+            color="frontDoor.onAction"
+            _hover={{ backgroundColor: "frontDoor.actionHover" }}
+            loading={isLoading}
+          >
+            Send reset link
+          </Button>
+          <HStack width="full" justify="center">
+            <BackToSignInLink />
+          </HStack>
+        </VStack>
       </form>
-    </Container>
+    </AuthCard>
   );
 }
 

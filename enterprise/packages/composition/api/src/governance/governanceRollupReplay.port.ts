@@ -25,7 +25,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 
-import { GOVERNANCE_COST_ROLLUP_PROJECTION_NAME } from "./governanceCostRollup.clickhouse.repository.ts";
+import { GOVERNANCE_COST_ROLLUP_PROJECTION_NAME } from "./governanceCostRollup.constants.ts";
 import type { RollupReplayPort } from "./identityErasure.service.ts";
 
 const logger = createLogger("langwatch:governance:rollup-replay-port");

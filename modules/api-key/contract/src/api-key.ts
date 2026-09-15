@@ -34,6 +34,13 @@ export const apiKeySchema = z
     userId: z.string().nullable(),
     createdByUserId: z.string().nullable(),
     createdByDeviceLabel: z.string().nullable(),
+    /**
+     * The CLI login key of the device session that minted this ingestion
+     * key. Set by the CLI's personal mint, null for every other key.
+     * Revoking the parent (logout, the devices tab, a re-login from the
+     * same device, session expiry) revokes the children with it.
+     */
+    parentApiKeyId: z.string().nullable().optional(),
     lookupId: z.string().min(1),
     permissionMode: z.string(),
     expiresAt: z.date().nullable(),
@@ -68,6 +75,12 @@ const apiKeyMutationShape = {
   ingestSourceType: z.string().min(1).nullable().optional(),
   ingestionTemplateId: z.string().min(1).nullable().optional(),
   createdByDeviceLabel: z.string().nullable().optional(),
+  /**
+   * The CLI login key of the device session minting this ingestion key, so
+   * revoking that session revokes this key with it. Null (the default) for
+   * every key minted outside a CLI session.
+   */
+  parentApiKeyId: z.string().min(1).nullable().optional(),
   isSystemManaged: z.boolean().optional(),
 };
 export const createApiKeyInputSchema = z.object(apiKeyMutationShape).strict();
@@ -100,6 +113,13 @@ export const revokeApiKeyInputSchema = z
      * leave dead.
      */
     cause: z.enum(API_KEY_REVOCATION_CAUSES).optional(),
+    /**
+     * Whether to retire the keys minted under this one. On by default, so
+     * every entry point cascades; the cascade itself turns it off for the
+     * children it revokes, since a child has no children of its own and
+     * nothing should recurse further.
+     */
+    cascadeToChildren: z.boolean().optional(),
   })
   .strict();
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;

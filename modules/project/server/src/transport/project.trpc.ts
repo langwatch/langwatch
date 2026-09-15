@@ -129,12 +129,15 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   })
 
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants. Rotation stays at
-   * `project:manage`.
+   * The base key authenticates every ingestion call the project accepts, so
+   * revealing it is an administrative act and is gated the same as rotating
+   * it. `project:update` is the contributor's permission — it lets somebody
+   * rename a project, and it used to hand them a credential that outlives
+   * their membership and that nothing on the ingestion path can attribute
+   * back to them.
    */
   .procedure("getProjectAPIKey")
-  .withPermission("project:update")
+  .withPermission("project:manage")
   .handle(async ({ app, input }) => {
     const project = await app.projects().findById(input.projectId);
 

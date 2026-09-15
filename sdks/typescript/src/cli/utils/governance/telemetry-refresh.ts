@@ -567,24 +567,27 @@ export async function refreshTelemetryWiringForLogin(
 
   for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
     try {
-      if (cfg.tool_project_keys?.[tool]?.secret) {
-        // Project-pinned wiring is deliberate scope, not stale personal
-        // wiring; a new login never re-points it at the personal path.
-        continue;
-      }
       if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
         // The new org forbids direct OTLP for this tool; the wrapper
         // surfaces that on the next run rather than login guessing.
         continue;
       }
-      // codex's notify hook is what recovers the conversation, and it does
-      // not depend on the exporter endpoint. A config already pointing at
-      // this login skips the refresh below, so a device whose [otel] block
-      // predates the hook would never be given one. Idempotent and quiet
-      // when the hook is already in place.
+      // codex's notify hook is what recovers the conversation, and the
+      // guidance beside it is what tells a session to declare the checkout
+      // it moved to. Neither names an endpoint or a key, so both stand
+      // ahead of the pin check: a pinned codex needs them exactly as a
+      // personal one does, and only the mint and the rewiring below are a
+      // pin's to refuse. A config already pointing at this login skips the
+      // refresh below, so a device whose [otel] block predates either would
+      // never be given one. Idempotent and quiet when they are in place.
       if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
         assertCodexTurnHarvest();
         assertCodexAgentGuidance();
+      }
+      if (cfg.tool_project_keys?.[tool]?.secret) {
+        // Project-pinned wiring is deliberate scope, not stale personal
+        // wiring; a new login never re-points it at the personal path.
+        continue;
       }
       if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
       // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.

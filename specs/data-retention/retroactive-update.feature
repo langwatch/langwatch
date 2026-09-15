@@ -20,18 +20,37 @@ Feature: Retroactive retention changes
     And confirms in the "Apply retention to existing data?" dialog
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
-    And the update applies uniformly to every retention-managed table including event_log
+    And the event_log mutation updates only trace-class rows
+    And the event_log mutation preserves every security row classified as indefinite
+
+  @unit
+  Scenario: Retroactive updates select the matching event-log category
+    When the admin applies a retention change to existing scenario data
+    Then simulation_runs and suite_runs are updated
+    And only simulation-run, simulation-set, and suite-run rows in event_log are updated
+    When the admin applies a retention change to existing experiment data
+    Then experiment_runs and experiment_run_items are updated
+    And only experiment-run rows in event_log are updated
 
   Scenario: Retroactive update progress is tracked
     When a retroactive update is in progress
     Then the UI shows a progress entry per table from system.mutations
     And the progress shows the parts still pending counting down to zero
 
-  Scenario: Rate-limited to one mutation per tenant per table
+  @unit
+  Scenario: Rate-limited to one mutation per tenant, category, and table
     Given a retroactive update is in progress for stored_spans
     When the admin attempts another retroactive update for stored_spans
     Then the request is rejected with a rate-limit error
     And the error indicates the existing mutation must complete first
+
+  @unit
+  Scenario: Event-log category mutations can run in parallel
+    Given a trace-category event_log mutation is in progress
+    When scenario and experiment retroactive updates start for the same tenant
+    Then neither update is blocked by the trace-category event_log mutation
+    And each event_log mutation carries its explicit retention category
+    And progress reports trace, scenario, and experiment event_log mutations under their own categories
 
   Scenario: Conflict error names the mutation IDs callers can kill
     Given retroactive updates are in progress for stored_spans and trace_summaries

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { authClient, navigate, safeRedirectTarget } from "../../behavior/auth-client.tsx";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
+import { passkeyFailure } from "../../model/passkey-failure.ts";
 import { MethodButton } from "../elements/method-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 
@@ -16,36 +17,36 @@ const PASSKEY: SignInMethod = {
 };
 
 /**
- * Passkey failure code from WebAuthn client, mapped to registry vocabulary
- */
-function passkeyFailure(status: number | undefined): { error: string } {
-  // The server looked at the credential and said no. Same answer whether it
-  // belongs to somebody else or to nobody — the endpoint does not say which.
-  const refused = status === 400 || status === 401 || status === 403;
-  return {
-    error: refused ? "identity_passkey_not_recognized" : "identity_passkey_ceremony_failed",
-  };
-}
-
-/**
  * Passkey sign-in; ceremony browser-driven; no address sent; refusal reported up, not drawn here
  */
 export function PasskeySignInButton({
   callbackUrl,
   badge,
   onError,
+  onBusyChange,
 }: {
   callbackUrl?: string;
   /** "Last used", where this browser remembers getting in this way. */
   badge?: ReactNode;
   /** Where a refusal goes: the card's alert, at the top. */
   onError: (error: unknown) => void;
+  /**
+   * Told while this ceremony is in flight, so a rail with more than one way
+   * in can hold the others back — a second method dialed mid-ceremony would
+   * open a competing WebAuthn prompt on top of this one.
+   */
+  onBusyChange?: (isBusy: boolean) => void;
 }) {
   const [isBusy, setIsBusy] = useState(false);
 
+  const setBusy = (next: boolean) => {
+    setIsBusy(next);
+    onBusyChange?.(next);
+  };
+
   const dial = async () => {
     onError(null);
-    setIsBusy(true);
+    setBusy(true);
     try {
       const result = await authClient.signIn.passkey();
       // A cancelled prompt is not a failure worth shouting about: the person
@@ -64,7 +65,7 @@ export function PasskeySignInButton({
       // is no status to read and nothing to tell apart.
       onError(passkeyFailure(void 0));
     } finally {
-      setIsBusy(false);
+      setBusy(false);
     }
   };
 

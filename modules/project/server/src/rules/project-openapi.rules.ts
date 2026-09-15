@@ -27,22 +27,6 @@ const projectResponse = (description: string): RouteResponse => ({
   content: { "application/json": { schema: { $ref: "#/components/schemas/Project" } } },
 });
 
-/** The project's own ingestion credential, as both key routes publish it. */
-const apiKeyResponse = (description: string): RouteResponse => ({
-  description,
-  content: {
-    "application/json": {
-      schema: {
-        type: "object",
-        properties: {
-          apiKey: { type: "string", description: "Send as X-Auth-Token, Bearer, or Basic" },
-        },
-        required: ["apiKey"],
-      },
-    },
-  },
-});
-
 export const LIST_PROJECTS: RestTransportDocs = {
   summary: "List projects",
   description:
@@ -157,29 +141,37 @@ export const ARCHIVE_PROJECT: RestTransportDocs = {
 };
 
 /**
- * The project's own ingestion key. Reading it is gated on `project:update`
- * rather than `project:view`, to match the write access the key itself grants.
+ * The project's own ingestion key, and the two operations that no longer
+ * answer here. Both are documented rather than removed: a caller who still
+ * holds the old integration needs to find out what happened to it, and a 404
+ * would tell them the project is gone instead.
+ *
+ * Neither publishes a 200 any more, because neither can produce one.
  */
 export const GET_PROJECT_API_KEY: RestTransportDocs = {
   summary: "Get the project API key",
   description:
-    "Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.",
+    "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
   responses: {
-    200: apiKeyResponse("The project's API key"),
     401: INVALID_TOKEN,
-    403: INSUFFICIENT_PERMISSIONS,
-    404: { description: "No project with that id in this organization", content: {} },
+    403: {
+      description:
+        "A signed-in project administrator is required; API-key principals cannot reveal base keys",
+      content: {},
+    },
   },
 };
 
 export const REGENERATE_PROJECT_API_KEY: RestTransportDocs = {
   summary: "Regenerate the project API key",
   description:
-    "Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.",
+    "Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.",
   responses: {
-    200: apiKeyResponse("The new API key. The previous one no longer authenticates."),
     401: INVALID_TOKEN,
-    403: INSUFFICIENT_PERMISSIONS,
-    404: { description: "No project with that id in this organization", content: {} },
+    403: {
+      description:
+        "A signed-in project administrator is required; API-key principals cannot rotate base keys",
+      content: {},
+    },
   },
 };

@@ -402,8 +402,9 @@ export function createGovernanceCliRestApp(options: {
    * The authorization rule every route that hands back a project's key shares:
    * a personal project is honoured only as the caller's OWN explicit pick, and
    * because the key is the shared write credential usable outside the console's
-   * RBAC constraints, membership alone is not enough — the caller needs a
-   * write-capable project permission. A view-only member cannot extract it.
+   * RBAC constraints, membership alone is not enough — the caller needs
+   * administrative project permission. A view-only or update-only member
+   * cannot extract it.
    */
   const refuseProjectKeyHandout = async (
     c: Context,
@@ -423,7 +424,7 @@ export function createGovernanceCliRestApp(options: {
     const canWriteProject = await ports.permittedOnProject({
       userId,
       projectId: project.id,
-      permission: "project:update",
+      permission: "project:manage",
     });
     if (!canWriteProject) {
       return c.json(

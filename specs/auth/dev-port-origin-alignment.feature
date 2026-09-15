@@ -8,6 +8,10 @@ Feature: Signing in works on whatever port the app is actually served on
   # which is correct for a cross-site request and wrong for a developer whose
   # checkout simply took a different port.
   #
+  # What that check refuses, and why it refuses rather than guesses, is
+  # specs/auth/auth-origin-pinning.feature. This file is only the case where it
+  # must NOT fire: a checkout on a second port is this installation.
+  #
   # The configured address is written twice: once by the launcher, from the port
   # it is about to bind, and once by the environment file, which is committed
   # with the default port and cannot know about the second checkout. The
@@ -18,16 +22,19 @@ Feature: Signing in works on whatever port the app is actually served on
     Given the environment file pins the app address to the default port
     And the app is started on a different port
 
+  @integration
   Scenario: Sign-in succeeds on a non-default port
     When I sign in with a valid email and password
     Then I am signed in
     And the request is not refused as coming from an unrecognised address
 
+  @integration
   Scenario: The address the app checks against follows the port it was started on
     When the app finishes loading its configuration
     Then the address it accepts sign-ins from names the port it was started on
     And the address it hands to the identity layer names the same port
 
+  @integration
   Scenario: A wrong password is still a wrong password
     When I sign in with a valid email and the wrong password
     Then I am told the email or password is wrong
@@ -37,6 +44,7 @@ Feature: Signing in works on whatever port the app is actually served on
   # whoever set it: a proxy in front of a preview environment, a tunnel, a
   # hostname-routed local stack, or a real deployment. Rewriting those would
   # break exactly the setups they exist for.
+  @unit
   Scenario Outline: A deliberately configured address is left alone
     Given the app address is configured as "<address>"
     When the app finishes loading its configuration
@@ -48,6 +56,7 @@ Feature: Signing in works on whatever port the app is actually served on
       | http://127.0.0.1:5560                       |
       | https://app.mystack.langwatch.localhost     |
 
+  @unit
   Scenario: A real deployment is never rewritten
     Given the app is running as a deployed installation
     And the app address is configured as "https://app.langwatch.ai"
@@ -57,6 +66,7 @@ Feature: Signing in works on whatever port the app is actually served on
   # The launcher also derives other addresses from the port, and those may be
   # overridden from the environment file on purpose. Realigning the sign-in
   # address must not take that away.
+  @unit
   Scenario: Addresses deliberately pinned in the environment file still win
     Given the environment file pins the gateway address to a host outside this machine
     When the app finishes loading its configuration

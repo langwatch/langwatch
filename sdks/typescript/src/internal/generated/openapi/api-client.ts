@@ -24655,6 +24655,592 @@ export interface operations {
             };
         };
     };
+    getApiGatewayV1SpendSummaries: {
+        parameters: {
+            query: {
+                /** @description One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key. */
+                group_by: string;
+                bucket?: "none" | "hour" | "day";
+                timezone?: string;
+                /** @description true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent. */
+                allow_unstable?: string;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                to: number;
+                cursor?: string;
+                limit?: number;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                /** @description Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those. */
+                status?: "success" | "error" | "confirmed" | "failed" | "settled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-key spend rollups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            key: string;
+                            group: {
+                                [key: string]: string;
+                            };
+                            bucket_start: string | null;
+                            event_count: number;
+                            settled_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
+                            };
+                            cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                nano_usd: number;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiGatewayV1SpendEvents: {
+        parameters: {
+            query: {
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                to: number;
+                cursor?: string;
+                limit?: number;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of billing envelopes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            type: string;
+                            created: string;
+                            schema_version: string;
+                            data: {
+                                event_id: string;
+                                event_type: string;
+                                gateway_request_id: string;
+                                occurred_at: string;
+                                usage: {
+                                    input_tokens: number;
+                                    output_tokens: number;
+                                    cache_read_input_tokens: number;
+                                    cache_creation_input_tokens: number;
+                                    reasoning_tokens: number;
+                                    /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                    input_image_tokens: number;
+                                    /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                    output_image_tokens: number;
+                                    /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                    image_count: number;
+                                } | null;
+                                cost: {
+                                    /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                    total_usd: string;
+                                    /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                    nano_usd: number;
+                                } | null;
+                                status: string;
+                                needs_reconciliation: boolean | null;
+                                settle_reason: string | null;
+                                error: {
+                                    class: string;
+                                    http_status: number | null;
+                                } | null;
+                                duration_ms: number | null;
+                                labels: string[];
+                                metadata: {
+                                    [key: string]: unknown;
+                                };
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getApiGatewayV1EndUsersByIdSpend: {
+        parameters: {
+            query?: {
+                window?: "day" | "week" | "month";
+                from?: number;
+                to?: number;
+                virtual_key_id?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Spend and standing for one end user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            end_user_id: string;
+                            window: string;
+                            from: string;
+                            to: string;
+                            cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                nano_usd: number;
+                            };
+                            request_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
+                            };
+                            caps: {
+                                budget_id: string;
+                                anchor_id: string;
+                                window: string;
+                                /** @enum {string} */
+                                on_breach: "block" | "warn";
+                                /** @description The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
+                                limit_usd: string;
+                                /** @description Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
+                                spent_usd: string;
+                                period_started_at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    postApiGatewayV1SpendEventsReplay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    from: number;
+                    to: number;
+                    endpoint_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Replay accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            endpoint_id: string;
+                            replay_id: string;
+                            replayed: number;
+                            window: {
+                                from: string;
+                                to: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
     listWorkflows: {
         parameters: {
             query?: never;

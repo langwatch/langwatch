@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ApiKeyNotFoundError, LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { fromDate, type Instant } from "@langwatch/time";
 import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
 
 const CURRENT_TOKEN = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
@@ -42,6 +43,7 @@ type Fakes = {
   legacyProjectId?: string | null;
   identity?: Record<string, unknown> | null;
   upgradeFails?: boolean;
+  parentLiveness?: { revokedAt: Instant | null; expiresAt: Instant | null } | null;
 };
 
 function serviceWith(fakes: Fakes = {}) {
@@ -53,6 +55,10 @@ function serviceWith(fakes: Fakes = {}) {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");
       },
+      findLivenessById: async () =>
+        fakes.parentLiveness === undefined
+          ? { revokedAt: null, expiresAt: null }
+          : fakes.parentLiveness,
     },
     tokens: {
       findTokenParts: (token: string) =>
@@ -136,6 +142,48 @@ describe("ApiKeyTokenResolutionService", () => {
 
         expect(verified).not.toBeNull();
         expect(verified).not.toHaveProperty("hashedSecret");
+      });
+    });
+
+    describe("given a key minted under a CLI login session", () => {
+      /** @scenario "A key minted as its session is being retired does not outlive it" */
+      it("refuses it once the parent login key is revoked", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ parentApiKeyId: "login-key-1" }),
+          parentLiveness: { revokedAt: fromDate(new Date()), expiresAt: null },
+        });
+
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
+      });
+
+      /** @scenario "A key minted as its session is being retired does not outlive it" */
+      it("refuses it once the parent login key's session has expired", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ parentApiKeyId: "login-key-1" }),
+          parentLiveness: { revokedAt: null, expiresAt: fromDate(new Date(Date.now() - 1000)) },
+        });
+
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
+      });
+
+      it("refuses it once the parent login key row is gone", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ parentApiKeyId: "login-key-1" }),
+          parentLiveness: null,
+        });
+
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
+      });
+
+      it("accepts it while the parent login key is still live", async () => {
+        const { service } = serviceWith({
+          row: storedKey({ parentApiKeyId: "login-key-1" }),
+          parentLiveness: { revokedAt: null, expiresAt: fromDate(new Date(Date.now() + 60_000)) },
+        });
+
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+          id: "key-1",
+        });
       });
     });
 

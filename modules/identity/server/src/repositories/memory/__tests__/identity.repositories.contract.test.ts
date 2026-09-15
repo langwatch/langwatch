@@ -35,6 +35,8 @@ describe("given the memory identity repositories", () => {
       await repositories.users.storeUserHashKeyIfMissing({ userId: "user_1", userHashKey: "k2" });
 
       expect(await repositories.heads.tryFindUserHashKey({ userId: "user_1" })).toBe("k1");
+      // The memory store folds synchronously, so a user it knows has folded.
+      expect(await repositories.heads.hasFolded({ userId: "user_1" })).toBe(true);
     });
   });
 

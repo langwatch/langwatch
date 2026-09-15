@@ -35,12 +35,15 @@ describe("the projects REST declaration", () => {
         ["get", "/:projectId", "getProject", "project:view"],
         ["patch", "/:projectId", "updateProject", "project:update"],
         ["delete", "/:projectId", "archiveProject", "project:delete"],
-        ["get", "/:projectId/api-key", "getProjectApiKey", "project:update"],
+        // Both base-key routes answer "authenticated" rather than a
+        // permission: they refuse every token, so no permission would grant
+        // them and none is asked for.
+        ["get", "/:projectId/api-key", "getProjectApiKey", "authenticated"],
         [
           "post",
           "/:projectId/regenerate-api-key",
           "regenerateProjectApiKey",
-          "project:manage",
+          "authenticated",
         ],
       ]);
     });
@@ -51,13 +54,39 @@ describe("the projects REST declaration", () => {
      * grant reach every project in it.
      */
     it("asks every by-id route's permission at the project its path names", () => {
-      const byId = declaration.routes.filter((route) => route.path.startsWith("/:projectId"));
+      const byId = declaration.routes.filter(
+        (route) => route.path.startsWith("/:projectId") && route.permission !== undefined,
+      );
 
-      expect(byId).toHaveLength(5);
+      expect(byId).toHaveLength(3);
       for (const route of byId) {
         expect([route.operation, route.permissionTarget]).toEqual([
           route.operation,
           { at: "route", param: "projectId" },
+        ]);
+      }
+    });
+
+    /**
+     * A permission on either base-key route would be a promise that some
+     * credential can pass it, and none can — a project administrator told
+     * "insufficient permissions" goes and widens their token, which is the one
+     * thing that must not work here.
+     */
+    it("asks no permission on either base-key route, because none would grant it", () => {
+      const baseKeyRoutes = declaration.routes.filter((route) =>
+        route.path.endsWith("api-key"),
+      );
+
+      expect(baseKeyRoutes.map((route) => route.operation)).toEqual([
+        "getProjectApiKey",
+        "regenerateProjectApiKey",
+      ]);
+      for (const route of baseKeyRoutes) {
+        expect([route.operation, route.permission, route.access?.kind]).toEqual([
+          route.operation,
+          undefined,
+          "authenticated",
         ]);
       }
     });

@@ -193,7 +193,11 @@ export const SOURCE_TYPE_OPTIONS = [
   },
   {
     value: "anthropic_admin",
-    label: "Anthropic Admin API (usage & cost)",
+    // Named after the product. Which report a source pulls is a question the
+    // composer asks two fields later, where the admin can actually answer it;
+    // the old "(usage & cost)" put the answer in a menu that offered no
+    // choice between them.
+    label: "Anthropic Admin API",
     mode: "pull",
     blurb:
       "Polls Anthropic's organization usage/cost reports with an Admin API key (sk-ant-admin-...). Pick ONE report per source: usage (token counts, we price them) or cost (Anthropic's reported spend, excludes Priority Tier). Never create both for the same org — the same spend would be counted twice.",

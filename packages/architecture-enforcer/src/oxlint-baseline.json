@@ -9187,10 +9187,6 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/costRollupComparatorSchedule.integration.test.ts",
-      "measured": "2026-09-11"
-    },
-    {
       "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/__tests__/directoryDepartmentSync.integration.test.ts",
       "measured": "2026-09-11"
     },
@@ -9268,10 +9264,6 @@
     },
     {
       "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/costRollupComparator.service.ts",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|enterprise/packages/composition/api/src/governance/costRollupComparatorSchedule.ts",
       "measured": "2026-09-11"
     },
     {

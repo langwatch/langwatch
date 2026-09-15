@@ -1,6 +1,10 @@
 import { generate } from "@langwatch/ksuid";
-import { HIDDEN_SYSTEM_KEY_NAMES, type ApiKeyRevocationCause } from "@langwatch/api-key-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import {
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+  type ApiKeyRevocationCause,
+} from "@langwatch/api-key-contract";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,
@@ -29,6 +33,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     const key: StoredApiKey = {
       ...data,
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
+      parentApiKeyId: data.parentApiKeyId ?? null,
       id: generate(API_KEY_KSUID_RESOURCE).toString(),
       expiresAt: expiresAt ? toDate(expiresAt) : null,
       revokedAt: startsDisabled ? now : null,
@@ -158,6 +163,61 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     for (const key of elapsed) this.#database.replaceKey({ ...key, revokedAt: now });
 
     return elapsed.length;
+  }
+
+  async findLiveChildren(input: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.#list(
+      (key) =>
+        key.organizationId === input.organizationId &&
+        key.parentApiKeyId === input.parentApiKeyId &&
+        key.revokedAt === null,
+    ).map((key) => ({ id: key.id }));
+  }
+
+  async findLivenessById(input: {
+    id: string;
+  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+    const key = this.#database.keys().find((row) => row.id === input.id);
+    if (!key) return null;
+    return {
+      revokedAt: key.revokedAt ? fromDate(key.revokedAt) : null,
+      expiresAt: key.expiresAt ? fromDate(key.expiresAt) : null,
+    };
+  }
+
+  async findElapsedLoginKeys(input: {
+    now: Instant;
+  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>> {
+    const now = toDate(input.now);
+    return this.#list(
+      (key) =>
+        key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) &&
+        key.revokedAt === null &&
+        key.expiresAt !== null &&
+        key.expiresAt.getTime() <= now.getTime(),
+    ).map((key) => ({ id: key.id, userId: key.userId, organizationId: key.organizationId }));
+  }
+
+  async extendLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const key = this.#database.keys().find((row) => row.id === input.id);
+    if (
+      !key ||
+      key.organizationId !== input.organizationId ||
+      key.userId !== input.userId ||
+      !key.name.startsWith(CLI_LOGIN_KEY_NAME_PREFIX) ||
+      key.revokedAt !== null
+    ) {
+      return;
+    }
+    this.#database.replaceKey({ ...key, expiresAt: toDate(input.expiresAt) });
   }
 
   #reachesProject(key: StoredApiKey, projectId: string): boolean {

@@ -899,6 +899,44 @@ export type PulledUsageLedgerRow = {
   observedAt: Instant;
 };
 
+/**
+ * What one look at one day's cost found. `reportDrift` rides on the look rather
+ * than taking a day back, because saying a disagreement is real means naming
+ * the cells it was found in, and a second call would compare the day again and
+ * report figures this look never saw.
+ */
+export interface CostRollupDayLook {
+  /** Cells where the summary and the events state different money. */
+  mismatchedCells: number;
+  /**
+   * Cells whose summary row demonstrably has not folded every charge of the
+   * day. Non-empty is proof the summary is catching up; empty proves nothing.
+   */
+  cellsBehind: number;
+  /** How far the summary trails the events it is derived from. */
+  lagMs: number;
+  /**
+   * Counts and names this look's disagreement, once and for the record. Only
+   * a caller that has spent its whole retry ladder may call it; a look that
+   * found no disagreement is a no-op.
+   */
+  reportDrift(): void;
+}
+
+/**
+ * One look at one organization's day of pulled charges. It reports what it
+ * saw and judges nothing — a summary the fold is seconds behind on and a
+ * summary that is wrong are the same picture from one look.
+ */
+export interface CostRollupDayComparer {
+  /**
+   * The cost lane this comparer holds a day's charges against. Read by the
+   * check so every comparison names its lane without repeating a literal.
+   */
+  readonly costSource: string;
+  compareDay(params: { tenantId: string; day: string }): Promise<CostRollupDayLook>;
+}
+
 export interface PulledUsageLedgerRepository {
   insert(rows: PulledUsageLedgerRow[]): Promise<void>;
 }

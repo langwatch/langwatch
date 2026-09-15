@@ -45,7 +45,7 @@ describe("SystemMigrationsPassTask", () => {
   });
 
   describe("when the launcher aborts before the task starts", () => {
-    /** @scenario "Shutting down stops the loop between passes" */
+    /** @scenario "Cancelling startup stops the loop between passes" */
     it("starts no pass at all", async () => {
       const pass = vi.fn();
       const controller = new AbortController();

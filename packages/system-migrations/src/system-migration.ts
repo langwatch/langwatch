@@ -9,6 +9,8 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
 export interface SystemMigration {
   /** Boot execution policy; omitted migrations retain the background default. */
   readonly executionMode?: "background" | "startup";
+  /** Whether a held outcome must prevent startup. Defaults to finite. */
+  readonly startupSettlement?: "finite" | "recurring";
   /**
    * Stable identifier - the state table's key. Renaming it orphans every
    * stored record, so never do that; what operators read is `title`.

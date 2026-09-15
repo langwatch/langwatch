@@ -114,7 +114,7 @@ describe("startSystemMigrations", () => {
 
   describe("given a tenant that is held and never advances", () => {
     describe("when the app starts", () => {
-      /** @scenario "A held tenant that never advances does not loop forever" */
+      /** @scenario "A recurring reconciliation does not loop forever" */
       it("stops after the first pass rather than re-proving it forever", async () => {
         // The trap a terminal-based stop condition would fall into: this
         // tenant is visited and re-written `migrated` every pass, so `held`
@@ -198,7 +198,9 @@ describe("startSystemMigrations", () => {
 
   describe("given a pass that keeps reporting progress", () => {
     describe("when the loop reaches its maximum passes", () => {
-      /** @scenario "A loop that never converges stops at its cap and says so" */
+      /**
+       * @scenario "The boot chain drives the migrations to convergence before the process starts"
+       */
       it("stops at the cap and logs the passes it gave up after", async () => {
         stubs.runPass.mockResolvedValue(summaryOf({ advanced: 1 }));
 
@@ -220,7 +222,7 @@ describe("startSystemMigrations", () => {
 
   describe("given a shutdown while the loop is between passes", () => {
     describe("when stop is called", () => {
-      /** @scenario "Shutting down stops the loop between passes" */
+      /** @scenario "Cancelling startup stops the loop between passes" */
       it("runs no further pass and resolves without waiting out the interval", async () => {
         stubs.runPass.mockResolvedValue(summaryOf({ advanced: 1 }));
 
@@ -238,7 +240,7 @@ describe("startSystemMigrations", () => {
         expect(stubs.errors).toEqual([]);
       });
 
-      /** @scenario "Shutting down stops the loop between passes" */
+      /** @scenario "Cancelling startup stops the loop between passes" */
       it("passes the abort signal into every pass", () => {
         stubs.runPass.mockResolvedValue(summaryOf({ advanced: 0 }));
 
@@ -255,7 +257,9 @@ describe("startSystemMigrations", () => {
 
   describe("given a pass that throws", () => {
     describe("when the loop runs it", () => {
-      /** @scenario "A failed pass ends the loop rather than retrying it" */
+      /**
+       * @scenario "The boot chain drives the migrations to convergence before the process starts"
+       */
       it("stops rather than retrying against whatever is already broken", async () => {
         stubs.runPass.mockRejectedValue(new Error("state table unreachable"));
 

@@ -17,6 +17,10 @@
     "./retention-tables": {
       "types": "./dist/retention-tables.d.ts",
       "default": "./src/retention-tables.ts"
+    },
+    "./event-log-retention-policy": {
+      "types": "./dist/event-log-retention-policy.d.ts",
+      "default": "./src/event-log-retention-policy.ts"
     }
   },
   "scripts": {

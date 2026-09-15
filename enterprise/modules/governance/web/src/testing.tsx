@@ -267,16 +267,21 @@ function GovernanceHostHarness({
 }
 
 /**
- * jsdom ships neither of these, and both are reached by Chakra's overlays on
+ * jsdom ships none of these, and all are reached by Chakra's overlays on
  * the way to positioning themselves. A missing `ResizeObserver` surfaces as an
  * unhandled rejection out of an animation frame rather than as a failure, so
- * the shard fails with its own summary all green.
+ * the shard fails with its own summary all green. `scrollIntoView` and
+ * `scrollTo` are the same shape of gap, reached whenever a drawer's Advanced
+ * disclosure opens (`AdvancedSettingsGroup`'s scroll-into-view effect) or a
+ * `ScopeChipPicker`/select scrolls its open list — both jsdom leaves
+ * unimplemented on `Element.prototype`.
  */
 function installBrowserApisJsdomLacks(): void {
   if (typeof window === "undefined") return;
   if (!window.matchMedia) {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
+      writable: true,
       value: (query: string) => ({
         matches: false,
         media: query,
@@ -289,9 +294,24 @@ function installBrowserApisJsdomLacks(): void {
       }),
     });
   }
+  if (!window.Element.prototype.scrollIntoView) {
+    Object.defineProperty(window.Element.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: () => undefined,
+    });
+  }
+  if (!window.Element.prototype.scrollTo) {
+    Object.defineProperty(window.Element.prototype, "scrollTo", {
+      configurable: true,
+      writable: true,
+      value: () => undefined,
+    });
+  }
   if (!window.ResizeObserver) {
     Object.defineProperty(window, "ResizeObserver", {
       configurable: true,
+      writable: true,
       value: class {
         observe() {}
         unobserve() {}

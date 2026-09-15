@@ -51,6 +51,11 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return "key_material";
   }
 
+  /** Folded: these doubles hold no provisional newborn rows. */
+  async hasFolded() {
+    return true;
+  }
+
   async tryFindActiveIdentifierByValue() {
     return null;
   }

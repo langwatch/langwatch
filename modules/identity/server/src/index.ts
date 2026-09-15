@@ -14,10 +14,7 @@ export { SsoConnectionLedgerWriterAdapter } from "./services/eventing-sso-connec
 export { PrismaSsoConnectionProjectionRepository } from "./repositories/prisma/prisma.sso-connection-projection.repository.ts";
 export type { SsoConnectionEvent } from "./projections/sso-connection-state.projection.ts";
 export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";
-export {
-  type DeriveIdentifierIdInput,
-  type IdentifierIdentity,
-} from "./app/identity.members.ts";
+export { type DeriveIdentifierIdInput, type IdentifierIdentity } from "./app/identity.members.ts";
 export { computeIdentifierHash, deriveNewbornUserId } from "./rules/identifier-hash.rules.ts";
 export { s256Challenge } from "./rules/pkce.rules.ts";
 export { mintUserHashKey } from "./rules/user-hash-key.rules.ts";
@@ -124,6 +121,7 @@ export { IdentityService } from "./services/identity.service.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
 export { MfaGuardsService } from "./services/mfa-guards.service.ts";
 export {
+  type SignInAccountLookup,
   type SignInBreakGlassLimiter,
   type SignInDomainRouting,
   type SignInMethodPolicyResolver,
@@ -258,6 +256,7 @@ export {
 } from "./repositories/prisma/prisma.join-request.repository.ts";
 export { PrismaJoinRequestProjectionRepository } from "./repositories/prisma/prisma.join-request-projection.repository.ts";
 export { LegacySsoDomainRoutingRepository } from "./repositories/prisma/prisma.legacy-sso-domain-routing.repository.ts";
+export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";
 export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/prisma.sso-connection-routing.repository.ts";
 export { JoinRequestsService } from "./services/join-requests.service.ts";
 export {

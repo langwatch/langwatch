@@ -6,6 +6,10 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
+import {
+  buildIsAgentSpeaksFirstScript,
+  isAgentSpeaksFirst,
+} from "../agent-first-script.ts";
 import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run.service.ts";
 import type { NlpFetchTimeouts } from "./nlp-fetch.service.ts";
@@ -64,7 +68,11 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return AgentTestScriptAdapter.create().build({ adapter, script: jobData.script });
+    return AgentTestScriptAdapter.create().build({
+      adapter,
+      script: jobData.script,
+      isAgentSpeaksFirst: isAgentSpeaksFirst(jobData.adapterData),
+    });
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
@@ -76,6 +84,12 @@ function buildRunCast({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
+  // A phone agent that greets on connect opens the run with its own turn (so
+  // the greeting is captured first), then hands over to the simulator/judge
+  // loop; every other run keeps the default cast, which opens with the caller.
+  const isAgentSpeaksFirstScript = buildIsAgentSpeaksFirstScript(
+    jobData.adapterData,
+  );
   return {
     agents: [
       adapter,
@@ -85,6 +99,7 @@ function buildRunCast({
         model: judgeModel,
       }),
     ],
+    ...(isAgentSpeaksFirstScript ? { script: isAgentSpeaksFirstScript } : {}),
   };
 }
 

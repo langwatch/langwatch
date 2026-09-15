@@ -108,6 +108,21 @@ export interface IdentityStorageAdapterDeps {
    * deploy of the entrance from changing anything on its own.
    */
   birth: IdentityBirth;
+  passkeyRemoval: PasskeyRemovalPort;
+}
+
+export type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user";
+
+/**
+ * The atomic persistence boundary behind better-auth's one-passkey delete.
+ *
+ * The decision and the deletion have to share one serializable transaction:
+ * two removals deciding from the same stale set of passkeys would each see
+ * another way in and both remove one, which is how somebody locks themselves
+ * out of their own account.
+ */
+export interface PasskeyRemovalPort {
+  deleteIfAnotherWayInRemains(args: { passkeyId: string }): Promise<PasskeyRemovalOutcome>;
 }
 
 /**
@@ -158,6 +173,7 @@ function identityCustomAdapter({
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
   birth,
+  passkeyRemoval,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
@@ -226,6 +242,27 @@ function identityCustomAdapter({
         (clause.operator === undefined || clause.operator.toLowerCase() === "eq") &&
         typeof clause.value === "string"
       );
+    };
+
+    /** The exact one-row shape emitted by the passkey plugin's delete route. */
+    const exactRecordId = (
+      model: string,
+      where: readonly CleanedWhere[] | undefined,
+    ): string | null => {
+      const canonical = canonicalWhere(model, where);
+      if (canonical.length !== 1) {
+        return null;
+      }
+      const clause = canonical[0];
+      if (
+        clause === undefined ||
+        clause.field !== "id" ||
+        (clause.operator !== undefined && clause.operator.toLowerCase() !== "eq") ||
+        (clause.connector !== undefined && clause.connector.toUpperCase() !== "AND")
+      ) {
+        return null;
+      }
+      return typeof clause.value === "string" ? clause.value : null;
     };
 
     /** The record a `user` query names outright — the same narrowing
@@ -341,6 +378,30 @@ function identityCustomAdapter({
           const row = await accounts.tryFindByProviderSubject({
             userId: resolved.userId,
             providerId: query.providerId,
+            providerAccountId: query.accountId,
+          });
+          return row === null ? null : [row];
+        }
+        case "byIssuerSubject": {
+          // The same read as above for a provider whose issuer is its own.
+          // The provider id comes BACK from resolution rather than being
+          // derived here: a subject is unique only within an issuer, and
+          // guessing the provider is how one IdP's subject answers for
+          // another IdP's user.
+          //
+          // A miss, or a user the backfill has not finalized, returns null
+          // and the caller falls through to the legacy row that is still
+          // their truth — which is what this branch must do rather than
+          // refuse, since the callback key names no user and so every user
+          // on the deployment rides the same answer.
+          const resolved = await resolution.resolveByIssuerSubject({
+            issuer: query.issuer,
+            providerAccountId: query.accountId,
+          });
+          if (!resolved?.finalized) return null;
+          const row = await accounts.tryFindByProviderSubject({
+            userId: resolved.userId,
+            providerId: resolved.providerId,
             providerAccountId: query.accountId,
           });
           return row === null ? null : [row];
@@ -528,6 +589,59 @@ function identityCustomAdapter({
       );
     };
 
+    /**
+     * Translates an `issuer` clause in an account `where` for the legacy
+     * engine — a pass-through except: an issuer beside the providerId it was
+     * minted from is dropped (same fact twice); beside a DIFFERENT providerId
+     * it refuses (no rows); a synthetic issuer standing alone rewrites to
+     * providerId, so a row whose stored issuer is null is still found.
+     */
+    const legacyAccountWhere = async (
+      model: string,
+      where: readonly CleanedWhere[],
+    ): Promise<CleanedWhere[] | null> => {
+      const canonicalNameOf = (clause: CleanedWhere): string =>
+        getDefaultFieldName({ model, field: clause.field });
+      const issuerClause = where.find((clause) => canonicalNameOf(clause) === "issuer");
+      if (issuerClause === undefined) return [...where];
+      const issuer = issuerClause.value;
+      if ((issuerClause.operator?.toLowerCase() ?? "eq") !== "eq" || typeof issuer !== "string") {
+        return null;
+      }
+      const rest = where.filter((clause) => clause !== issuerClause);
+      const derived = BetterAuthAccountQueriesAdapter.providerIdFromIssuer(issuer);
+      const providerClause = rest.find((clause) => canonicalNameOf(clause) === "providerId");
+      if (providerClause !== undefined) {
+        const providerId = providerClause.value;
+        if (typeof providerId !== "string") return null;
+        if (derived === providerId) return rest;
+        // A real connection issuer beside a providerId that does not decode
+        // to it is ordinary single sign-on, not a contradiction — see the
+        // upstream note this mirrors. Refusing every such pair refused every
+        // RETURNING connection sign-in.
+        return null;
+      }
+      if (derived === null) return [...where];
+      return [{ ...issuerClause, field: "providerId", value: derived }];
+    };
+
+    /**
+     * Minted back onto every account row the LEGACY branch serves: 1.7 checks
+     * the issuer on a row it is handed, and a null one fails its own
+     * comparison — reaching a RETURNING user as "Something went wrong signing
+     * you in". Fallback rather than the common case (every row was backfilled).
+     */
+    const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
+      if (modelOf(model) !== "account") return row;
+      if (row.issuer != null) return row;
+      const providerId = row.providerId;
+      if (typeof providerId !== "string") return row;
+      return {
+        ...row,
+        issuer: BetterAuthAccountQueriesAdapter.issuerForProviderId(providerId),
+      };
+    };
+
     const adapter: CustomAdapter = {
       create: async ({ model, data, select }) => {
         const canonical = toCanonicalKeys(model, data);
@@ -553,10 +667,11 @@ function identityCustomAdapter({
           // ceremony pinned would stop being the row's.
           forceAllowId: true,
         });
-        return toStorageKeys(model, row) as never;
+        return toStorageKeys(model, await withLegacyIssuer(model, row)) as never;
       },
 
       findOne: async ({ model, where, select, join }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -567,17 +682,21 @@ function identityCustomAdapter({
             const row = rows[0];
             return row ? (toStorageKeys(model, { ...row }) as never) : null;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return null;
+          legacyWhere = translated;
         }
         const found = await legacy.findOne<Row>({
           model,
-          where: modelOf(model) === "user" ? await resolveUserWhere(model, where) : where,
+          where: modelOf(model) === "user" ? await resolveUserWhere(model, legacyWhere) : legacyWhere,
           select,
           join,
         });
-        return found === null ? null : (toStorageKeys(model, found) as never);
+        return found === null ? null : (toStorageKeys(model, await withLegacyIssuer(model, found)) as never);
       },
 
       findMany: async ({ model, where, limit, select, sortBy, offset, join }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -596,31 +715,46 @@ function identityCustomAdapter({
             }
             return rows.slice(0, limit).map((row) => toStorageKeys(model, { ...row })) as never;
           }
+          // A findMany with no `where` asks for every account row, and there
+          // is nothing in "everything" to translate.
+          if (where !== undefined) {
+            const translated = await legacyAccountWhere(model, where);
+            if (translated === null) return [] as never;
+            legacyWhere = translated;
+          }
         }
         const found = await legacy.findMany<Row>({
           model,
           where:
-            modelOf(model) === "user" && where !== undefined
-              ? await resolveUserWhere(model, where)
-              : where,
+            modelOf(model) === "user" && legacyWhere !== undefined
+              ? await resolveUserWhere(model, legacyWhere)
+              : legacyWhere,
           limit,
           select,
           sortBy,
           offset,
           join,
         });
-        return found.map((row) => toStorageKeys(model, row)) as never;
+        return (await Promise.all(
+          found.map(async (row) => toStorageKeys(model, await withLegacyIssuer(model, row))),
+        )) as never;
       },
 
       count: async ({ model, where }) => {
         if (modelOf(model) === "account") {
           const rows = await routeAccount({ model, operation: "count", where });
           if (rows !== null) return rows.length;
+          // Counting every account row has no issuer clause to translate.
+          if (where === undefined) return legacy.count({ model });
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          return legacy.count({ model, where: translated });
         }
         return legacy.count({ model, where });
       },
 
       update: async ({ model, where, update }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -639,6 +773,9 @@ function identityCustomAdapter({
             });
             return fresh === undefined ? null : (toStorageKeys(model, { ...fresh }) as never);
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return null;
+          legacyWhere = translated;
         }
         if (modelOf(model) === "user") {
           const remaining = await withoutRoutedEmail({
@@ -662,13 +799,16 @@ function identityCustomAdapter({
         }
         const row = await legacy.update<Row>({
           model,
-          where,
+          where: legacyWhere,
           update: toCanonicalKeys(model, update as Row),
         });
-        return row === null ? null : (toStorageKeys(model, row) as never);
+        return row === null
+          ? null
+          : (toStorageKeys(model, await withLegacyIssuer(model, row)) as never);
       },
 
       updateMany: async ({ model, where, update }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -682,6 +822,9 @@ function identityCustomAdapter({
             });
             return rows.length;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          legacyWhere = translated;
         }
         if (modelOf(model) === "user") {
           const remaining = await withoutRoutedEmail({ model, where, update });
@@ -694,12 +837,31 @@ function identityCustomAdapter({
         }
         return legacy.updateMany({
           model,
-          where,
+          where: legacyWhere,
           update: toCanonicalKeys(model, update),
         });
       },
 
       delete: async ({ model, where }) => {
+        if (modelOf(model) === "passkey") {
+          const passkeyId = exactRecordId(model, where);
+          if (passkeyId === null) {
+            throw refused(
+              new IdentityUnsupportedStorageQueryError(
+                "identity storage adapter: better-auth issued a passkey delete that was not one exact id equality. Passkey deletion is guarded atomically and cannot fall through to an unguarded storage delete.",
+              ),
+            );
+          }
+          const outcome = await passkeyRemoval.deleteIfAnotherWayInRemains({ passkeyId });
+          if (outcome === "would_strand_user") {
+            throw APIError.from("BAD_REQUEST", {
+              code: "LAST_WAY_IN",
+              message:
+                "This is the only way you can sign in. Add another sign-in method first, then remove this one.",
+            });
+          }
+          return;
+        }
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -710,6 +872,10 @@ function identityCustomAdapter({
             await detachOnIdentityBranch(rows);
             return;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return;
+          await legacy.delete({ model, where: translated });
+          return;
         }
         await legacy.delete({ model, where });
       },
@@ -728,6 +894,9 @@ function identityCustomAdapter({
               erasingUser: isWholeUserScope(model, where),
             });
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          return legacy.deleteMany({ model, where: translated });
         }
         return legacy.deleteMany({ model, where });
       },

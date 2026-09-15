@@ -28,6 +28,12 @@ export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,
 } from "./processes/agent-sandbox-key-reap.process.ts";
+export {
+  CLI_LOGIN_KEY_REAP_INTERVAL_MS,
+  CLI_LOGIN_KEY_REAP_PROCESS_NAME,
+} from "./processes/cli-login-key-reap.process.ts";
+export type { CliLoginKeyReapDeps } from "./intents/cli-login-key-reap.intent.ts";
+export { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
 export { ApiKeyTokenAdapter } from "./repositories/memory/memory.api-key-token.repository.ts";
 export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service.ts";
 export {

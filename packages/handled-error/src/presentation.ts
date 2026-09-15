@@ -1833,6 +1833,22 @@ const presentations = {
     describe: () =>
       "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
   },
+  auth_rate_limited: {
+    title: "Too many attempts",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Wait a few minutes, then try again.";
+      const minutes = Math.ceil(seconds / 60);
+      return minutes <= 1
+        ? "Wait a minute, then try again."
+        : `Wait ${minutes} minutes, then try again.`;
+    },
+  },
+  auth_no_address_to_confirm: {
+    title: "This account has no email address",
+    describe: () =>
+      "Add an email address in your account settings, then confirm it.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -2365,6 +2381,15 @@ const presentations = {
     title: "That verification link has expired",
     describe: () => "Request a new verification email and use the newest link.",
   },
+  // Deliberately NOT "didn't work" and not "expired": the link is still good
+  // and the person did nothing wrong, so the copy asks for the one thing that
+  // actually resolves it rather than sending them back to their inbox for a
+  // new email they do not need.
+  identity_verification_not_settled: {
+    title: "We're still confirming that address",
+    describe: () =>
+      "Your confirmation went through and we're finishing up. Open the same link again in a moment.",
+  },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
     describe: () => "Refresh the page to see your current sign-in methods, then try again.",
@@ -2406,6 +2431,21 @@ const presentations = {
     title: "You'd have no way back into your account",
     describe: () =>
       "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
+  },
+  // better-auth's own code, raised by the passkey-removal guard in
+  // `modules/identity/server/src/services/better-auth-identity-storage.service.ts`
+  // on the mounted `/passkey/delete-passkey` route, which is not translated
+  // into one of our own subclasses. See `app-codes.ts` for why it is spelled
+  // SCREAMING_CASE rather than our usual snake_case.
+  //
+  // Its sibling `MFA_REQUIRED_BY_ORGANIZATION` guards `/two-factor/disable`,
+  // which has no route here yet: nothing raises it, so its copy was removed
+  // rather than left to read as coverage we do not have. It comes back with
+  // the two-step-verification gate.
+  LAST_WAY_IN: {
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "That is the only way into this account. Add another way to sign in first.",
   },
   identity_mfa_code_invalid: {
     // Deliberately says nothing about whether two-step verification is even
@@ -2518,15 +2558,18 @@ const presentations = {
     describe: () =>
       "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
   },
+  // Raised when the account was refused before any of it was recorded, so the
+  // copy can promise nothing was half-created — that promise is the whole
+  // reason the refusal is loud rather than a silent partial success.
+  identity_engine_unavailable: {
+    title: "We couldn't finish setting up your account",
+    describe: () =>
+      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
   identity_email_in_use: {
     title: "That email address is already in use",
     describe: () =>
       "Another account already holds it. Sign in with that account, or use a different address here.",
-  },
-  identity_engine_unavailable: {
-    title: "We couldn't finish creating your account",
-    describe: () =>
-      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
   },
 
   // ---- governance ----
@@ -2537,6 +2580,48 @@ const presentations = {
   ingestion_source_not_found: {
     title: "Ingestion source not found",
     describe: () => "It may have been archived. Reload to see the current list.",
+  },
+  impersonation_cannot_change_credentials: {
+    // A deliberate denial, like the admin-to-admin impersonation one: how an
+    // account signs in belongs to its owner, and support access must never
+    // mint or replace a credential on it.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. How this account signs in can only be changed by its owner.",
+  },
+  ingestion_key_not_found: {
+    title: "Ingestion key not found",
+    describe: () =>
+      "That key is not one of yours, or it was already removed. Refresh the list and try again.",
+  },
+  ingestion_key_revoke_incomplete: {
+    title: "Some keys could not be revoked",
+    describe: (error) => {
+      const survivors = error.meta.survivors;
+      const named =
+        Array.isArray(survivors) && survivors.length > 0
+          ? ` Still live: ${survivors.map((label) => String(label)).join(", ")}.`
+          : "";
+      return `No new key was minted because the previous keys for this source could not all be revoked.${named} Try again; keys already revoked stay revoked.`;
+    },
+  },
+  ingestion_key_session_revoked: {
+    title: "This device is signed out",
+    describe: () =>
+      "The CLI session on this machine was signed out, so it cannot mint an ingestion key. Run `langwatch login --device` and try again.",
+  },
+  ingestion_key_source_not_allowed: {
+    title: "This source is set up from the CLI",
+    describe: (error) => {
+      const sourceType = error.meta.sourceType;
+      const tool = typeof sourceType === "string" ? sourceType : "this tool";
+      return `A key for ${tool} is minted on the machine that runs it. Run \`langwatch instrument\` there, or connect a source a template names.`;
+    },
+  },
+  ingestion_key_workspace_missing: {
+    title: "Finish setting up your workspace",
+    describe: () =>
+      "Your personal workspace is not ready yet. Sign in again and retry the connection.",
   },
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",

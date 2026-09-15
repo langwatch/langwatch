@@ -361,6 +361,12 @@ export class InviteService {
     return this.lifecycle.resendInvite(params);
   }
 
+  async extendInvite(
+    params: Parameters<InviteLifecycleService["extendInvite"]>[0],
+  ): ReturnType<InviteLifecycleService["extendInvite"]> {
+    return this.lifecycle.extendInvite(params);
+  }
+
   async requestFreshInvite(
     params: Parameters<InviteLifecycleService["requestFreshInvite"]>[0],
   ): ReturnType<InviteLifecycleService["requestFreshInvite"]> {

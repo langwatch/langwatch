@@ -5,7 +5,11 @@
 
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
-import { redactAttributeNative, redactStringNative } from "@langwatch/redaction/pii";
+import {
+  isHeldOutIdentifierAttribute,
+  redactAttributeNative,
+  redactStringNative,
+} from "@langwatch/redaction/pii";
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import type { PIICheckOptions } from "../app/data-privacy.members.ts";
@@ -154,6 +158,7 @@ export class OtlpRecordPiiRedactionService {
       body: string;
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -171,11 +176,14 @@ export class OtlpRecordPiiRedactionService {
     }
 
     const batch = this.createRedactionBatch();
+    // The body is free text, not an attribute value, so no hold-out applies:
+    // an identifier written in a sentence sits next to content that may well
+    // hold personal data.
     if (log.body) {
       batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
 
-    this.collectRecordEntries(batch, log.attributes);
+    this.collectRecordEntries(batch, log.attributes, log.attributeNames);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -230,6 +238,7 @@ export class OtlpRecordPiiRedactionService {
     metric: {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
+      attributeNames?: Record<string, string>;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
@@ -247,7 +256,7 @@ export class OtlpRecordPiiRedactionService {
     }
 
     const batch = this.createRedactionBatch();
-    this.collectRecordEntries(batch, metric.attributes);
+    this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
     this.collectRecordEntries(batch, metric.resourceAttributes);
 
     await this.applyRedactionBatch(batch, options);
@@ -285,11 +294,25 @@ export class OtlpRecordPiiRedactionService {
     };
   }
 
-  private collectRecordEntries(batch: RedactionBatch, record: Record<string, string>): void {
+  /**
+   * The log/metric counterpart of the span half's identifier hold-out, over a
+   * flattened record. `attributeNames` restores the real name where the
+   * record is keyed by an addressing path; passed for `attributes` only —
+   * never `resourceAttributes`, which is keyed by its own names already and
+   * would resolve against an unrelated attribute path if handed the map.
+   */
+  private collectRecordEntries(
+    batch: RedactionBatch,
+    record: Record<string, string>,
+    attributeNames?: Record<string, string>,
+  ): void {
     for (const key of Object.keys(record)) {
-      if (record[key]) {
-        batch.tryPush(record, key, record[key]!);
+      const value = record[key];
+      if (!value) continue;
+      if (isHeldOutIdentifierAttribute({ key: attributeNames?.[key] ?? key, value })) {
+        continue;
       }
+      batch.tryPush(record, key, value);
     }
   }
 

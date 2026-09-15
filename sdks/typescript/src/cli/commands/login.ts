@@ -7,6 +7,7 @@ import { rememberProjectName } from "@/cli/utils/identityNotice";
 import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
+import { recordCliLocation } from "@/cli/utils/governance/cli-location";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -167,7 +168,20 @@ export const loginCommand = async (options?: {
   token?: string;
 }): Promise<void> => {
   try {
-    // Persist endpoint before flow runs; env var becomes picker's default.
+    // First, so every flow below reads a config that already says how to run
+    // this CLI; the Claude Code plugin's hooks look it up there.
+    recordCliLocation();
+
+    // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
+    // resolved value BEFORE the chosen flow runs so subsequent reads
+    // (in the device flow, the API-key flow, any sub-command spawned
+    // later) see the right control-plane URL. The 4-source resolver
+    // (flag > env > config > default) honors this value via the
+    // persisted-config layer for any flow that doesn't explicitly take
+    // a flag. Only the flag skips the cloud/self-hosted picker; persisting
+    // the env var here is what makes that endpoint the picker's first and
+    // default choice, so `LANGWATCH_ENDPOINT=... langwatch login` is one
+    // Enter rather than a re-typed URL.
     const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
     const presetEndpoint = options?.endpoint ?? endpointFromEnv;
     if (presetEndpoint) {

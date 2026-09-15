@@ -73,6 +73,15 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       is not a mode word)
 
   @integration
+  Scenario: A type is named after the product, not after what it returns
+    When the admin opens the "Add source" menu
+    Then the Anthropic entry reads "Anthropic Admin API"
+    And it does not list in its own name the reports it can pull
+    # The old label was "Anthropic Admin API (usage & cost)". A menu is for
+    # picking a product, and the parenthetical answered a question the
+    # composer asks two fields later — where the admin can actually choose.
+
+  @integration
   Scenario: Non-enterprise plans see locked source types they cannot pick
     Given the org is on a non-enterprise plan
     When the admin opens the "Add source" menu
@@ -120,6 +129,120 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the composer offers no source-type dropdown
     And the composer starts from a blank configuration for the picked type,
       even when a different type was being composed moments before
+
+  Rule: The two fields every source shares ask for the same thing the same way
+
+    @integration
+    Scenario: The description field asks for a description
+      When the admin opens the composer for any source type
+      Then the empty description field reads "Description for this source"
+      And the empty display name field reads "Display name for this source"
+      # The description used to prompt "What this fleet covers + who owns it",
+      # which asked for two particular facts and used a word ("fleet") that
+      # appears nowhere else the admin can see. The two fields sit on top of
+      # each other and now ask in the same shape.
+
+  Rule: A scheduled source proposes how far back to read, in plain words
+
+    A new source with no history is worth almost nothing on the day it is
+    added, so the form proposes a start rather than leaving it empty. The
+    proposal is per source type, because providers differ in how far back
+    they will serve. Both are declared in one table beside the cadence
+    defaults, so the proposal and any copy describing it read one source.
+
+    @unit
+    Scenario: The field asks when to start reading, not for a backfill start
+      When the admin looks at the field on an OpenAI Admin source
+      Then it is labelled "Read history from"
+      And the hint says this is the first day we read data for
+      And that later runs continue forward from where the last one stopped
+      And that clearing it reads only the last few days
+      And it still notes that spend broken down by API key is only available
+        from December 2025 onward, with earlier days still read and still
+        naming the person
+
+    @unit
+    Scenario: A new OpenAI source proposes a year of history
+      When the admin opens the composer on the OpenAI Admin type
+      Then the field holds midnight UTC one year before today
+      # The provider serves four years back, so a year is a deliberate choice
+      # rather than a limit: enough to show a year-on-year trend on day one
+      # without a first run that reads four years of days.
+
+    @unit
+    Scenario: Editing an existing source shows what it holds
+      Given an OpenAI Admin source was saved reading history from a
+        particular day
+      When the admin opens it to edit
+      Then the field shows that day
+      And it is not replaced by one year before today
+
+    @unit
+    Scenario: Clearing the proposal still means the adapter's own default
+      When the admin clears the field on a new source and creates it
+      Then the stored configuration carries no start date
+      And the adapter's own default decides how far back the first run reads
+
+  Rule: The edit drawer names the source it is editing
+
+    @integration
+    Scenario: The edit title names the provider and shows its logo
+      When the admin opens an "Anthropic Admin API" source for editing
+      Then the drawer title reads "Edit Anthropic Admin API"
+      And the provider's logo sits beside it
+      And the same is true for every other source type, each naming its own
+      # The title used to read "Edit source" for all of them. An admin who
+      # reached the drawer from a row, a detail page or a browser tab had
+      # nothing in the header telling them which source they were changing.
+
+    @integration
+    Scenario: An unrecognised source type still gets a title
+      Given a source whose type the composer has no entry for
+      When the admin opens it for editing
+      Then the drawer title reads "Edit source"
+
+  Rule: Notes about why a field is locked sit behind the title, not above the fields
+
+    @integration
+    Scenario: The locked-field notes move behind an information marker
+      Given an Anthropic Admin API source that has already pulled
+      When the admin opens it for editing
+      Then the note explaining that the report is fixed once a source has
+        pulled is not a paragraph under the fields
+      And it is reachable from an information marker beside the drawer title
+      # Same rule the create drawer's prerequisites already follow: three
+      # paragraphs of explanation printed in the body push the fields they
+      # describe below the fold, and are scrolled past by everyone who read
+      # them once. See dev/docs/best_practices/copywriting.md.
+
+    @integration
+    Scenario: A pulled usage source carries the two notes that apply to it
+      Given an Anthropic Admin API source on the usage report that has
+        already pulled
+      When the admin opens it for editing
+      Then the marker carries the note that the report is fixed and the note
+        that the start date is fixed
+      And it does not carry the note about restating cost history
+
+    @integration
+    Scenario: A pulled cost source carries a different two
+      Given an Anthropic Admin API source on the cost report that has
+        already pulled
+      When the admin opens it for editing
+      Then the marker carries the note that the report is fixed and the note
+        that moving the start re-reads and restates cost history
+      And it does not say the start date is fixed, because on a cost source
+        it is not: moving it is the deliberate lever for repairing figures
+      # The three notes never all apply at once. A fixed start and a start
+      # worth moving are the two halves of one condition, and which half an
+      # admin sees is decided by the report.
+
+    @integration
+    Scenario: A source with nothing locked shows no marker at all
+      Given an Anthropic Admin API source that has never pulled
+      When the admin opens it for editing
+      Then no information marker appears beside the drawer title
+      # An empty marker is a promise of an explanation that is not there.
 
   Rule: The Genie composer leads with the credential that survives a schedule
 
@@ -302,7 +425,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
 
     @integration
     Scenario: A source that pulls counts is offered no destination
-      When the admin composes an "Anthropic Admin API (usage & cost)" source,
+      When the admin composes an "Anthropic Admin API" source,
         which pulls usage totals rather than conversations
       Then no destination picker appears in the drawer
       And the same is true when editing it
@@ -367,7 +490,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
 
     @unit
     Scenario: A counts-pulling source with a destination still routes nothing
-      Given an "Anthropic Admin API (usage & cost)" source has a
+      Given an "Anthropic Admin API" source has a
         destination project stored on it, which its own drawer never
         offered and nothing on the way in refused
       When a run pulls its usage and cost totals

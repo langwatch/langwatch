@@ -1,4 +1,4 @@
-Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
+Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
 
   Ongoing, live authentication behavior for the three production sign-in
   paths. These scenarios were recovered from the now-deleted
@@ -7,19 +7,20 @@ Feature: Sign-in flows (credentials, Google OAuth, Auth0 OAuth)
   describe PERSISTENT sign-in behavior that must keep working long after the
   cutover, so they live on here as a durable spec record.
 
-  These are intentionally untagged: they document live behavior rather than
-  asserting a single bound test, so they are not counted by the
+  The first two are intentionally untagged: they document live behavior
+  rather than asserting a single bound test, so they are not counted by the
   feature-parity gate. Binding notes per scenario record where the behavior
-  is actually exercised today.
+  is actually exercised today. The enterprise OAuth callback-path outline is
+  tagged and bound to `legacyCallbackParity.test.ts`, since that behavior has
+  a real assertion rather than only browser-QA evidence.
 
   Ported at D13 (ADR-117): what the SCREENS do in front of these flows now
   starts with the address, and the answer to where it signs in is the
   router's - specs/identity/signin-signup-screens.feature owns and binds that,
   and specs/identity/signin-router.feature owns the decisions themselves. What
-  stays here is the transport underneath, unchanged by the front door: the
-  same endpoints, the same session cookie, the same legacy callback path that
-  customer identity-provider applications are configured against. The Auth0
-  flow retires at D10, when the legacy callback shim goes.
+  stays here is the transport underneath, unchanged by the auth screens: the
+  same endpoints, the same session cookie, and the same pinned callback paths
+  that customer identity-provider applications are configured against.
 
   # Exercised end-to-end by the BetterAuth smoke test
   # ([gone] e2e/auth-regression/better-auth-smoketest.ts, "Credentials

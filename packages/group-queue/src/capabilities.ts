@@ -79,6 +79,7 @@ function processorOptions<Payload extends Record<string, unknown>>(
     failures: dependencies.failures,
     drainTimeoutMs: dependencies.policy?.drainTimeoutMs,
     policy: dependencies.policy,
+    dispatchGroupAllowListKey: dependencies.dispatchGroupAllowListKey,
   };
 }
 
@@ -119,6 +120,18 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>> {
 
   waitUntilReady(): Promise<void> {
     return this.#processor.waitUntilReady();
+  }
+
+  /** See GroupQueueProcessor.registerPreflightGroups — a producer registers, never consumes. */
+  registerPreflightGroups(
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ): Promise<void> {
+    return this.#processor.registerPreflightGroups(resolveGroupIds);
+  }
+
+  /** See GroupQueueProcessor.waitUntilPreflightIdle. */
+  waitUntilPreflightIdle(): Promise<void> {
+    return this.#processor.waitUntilPreflightIdle();
   }
 
   close(): Promise<void> {

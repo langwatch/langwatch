@@ -395,11 +395,39 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
     unsupported<OrganizationInviteRepository["findListableInvites"]>("findListableInvites");
   revokeOpenInvite =
     unsupported<OrganizationInviteRepository["revokeOpenInvite"]>("revokeOpenInvite");
-  tryFindInviteWithOrganization = unsupported<
-    OrganizationInviteRepository["tryFindInviteWithOrganization"]
-  >("tryFindInviteWithOrganization");
+  async tryFindInviteWithOrganization({
+    inviteId,
+    organizationId,
+  }: {
+    inviteId: string;
+    organizationId: string;
+  }): Promise<InviteWithOrganization | null> {
+    const invite = this.invitesById.get(inviteId);
+    if (!invite || invite.organizationId !== organizationId) return null;
+
+    return { ...invite, organization: this.organizations.get(invite.organizationId) ?? null };
+  }
+
   rotateInviteCode =
     unsupported<OrganizationInviteRepository["rotateInviteCode"]>("rotateInviteCode");
+
+  async extendInviteExpiration({
+    inviteId,
+    organizationId,
+    expiration,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    expiration: Date;
+  }): Promise<number> {
+    const invite = this.invitesById.get(inviteId);
+    if (!invite || invite.organizationId !== organizationId || invite.status !== "PENDING") {
+      return 0;
+    }
+    this.invitesById.set(inviteId, { ...invite, expiration });
+
+    return 1;
+  }
   tryFindProjectSlugForTeams = unsupported<
     OrganizationInviteRepository["tryFindProjectSlugForTeams"]
   >("tryFindProjectSlugForTeams");

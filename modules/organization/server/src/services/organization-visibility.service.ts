@@ -173,7 +173,7 @@ export class OrganizationVisibilityService {
   #probeProject(input: { userId: string; projectId: string }): Promise<boolean> {
     return this.deps.permissions.hasPermission({
       userId: input.userId,
-      permission: "project:update",
+      permission: "project:manage",
       projectId: input.projectId,
     });
   }

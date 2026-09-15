@@ -44,7 +44,8 @@ export const SignUpVerificationEmail = ({
     {firstSteps && <FirstSteps {...firstSteps} />}
     <Paragraph>
       This link expires in 1 hour and can be used once. If this was not you, you can ignore this
-      email: nothing has been created.
+      email — the account cannot sign anybody in until this address is confirmed, and it will not
+      be used for anything else.
     </Paragraph>
   </EmailLayout>
 );

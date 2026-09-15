@@ -31,7 +31,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
   GOVERNANCE_COST_ROLLUP_TABLE,
-} from "./governanceCostRollup.clickhouse.repository.ts";
+} from "./governanceCostRollup.constants.ts";
 
 const logger = createLogger("langwatch:governance:rollup-erasure");
 

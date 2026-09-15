@@ -13,7 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GOVERNANCE_COST_SOURCE } from "../governanceCostRollup.clickhouse.repository.ts";
+import { GOVERNANCE_COST_SOURCE } from "../governanceCostRollup.constants.ts";
 import { CostRollupComparatorService } from "../costRollupComparator.service";
 import type {
   GovernanceCostRollupClickHouseRepository,

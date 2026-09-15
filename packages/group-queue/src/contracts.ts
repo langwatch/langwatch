@@ -103,6 +103,12 @@ export interface GroupQueueDependencies<Payload> {
   failures?: GroupQueueFailureClassifier;
   objectStoreFor?: (projectId: string) => ObjectStore;
   resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
+  /**
+   * Names the preflight allow-list this queue's dispatch is scoped by. Set by
+   * the migration role so system-migrations can register the groups it will
+   * touch and drain them before anything else consumes the queue.
+   */
+  dispatchGroupAllowListKey?: string;
 }
 
 export interface QueueAuditAdapter<Payload> {

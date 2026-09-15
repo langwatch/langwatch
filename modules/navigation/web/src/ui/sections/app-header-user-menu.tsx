@@ -13,7 +13,11 @@ import {
   useNavigationModeStore,
 } from "../../behavior/navigation-mode.store.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
-import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
+import {
+  useNavigationHost,
+  type NavigationHost,
+  type NavigationUser,
+} from "../../model/navigation-host.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { UserAvatar } from "../elements/user-avatar.tsx";
 
@@ -23,6 +27,17 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
 };
 
 const NAVIGATION_MODES = Object.keys(NAVIGATION_MODE_LABELS) as NavigationMode[];
+
+/**
+ * The menu's own header line: "Name (email)" where there is a name, and just
+ * the email where there is not. An account with no name used to read as
+ * "null (email)" or an empty leading pair of parentheses — either way,
+ * furniture around the one thing that actually identifies the account.
+ */
+function accountMenuTitle(user: Pick<NavigationUser, "name" | "email">): string {
+  const email = user.email ?? "";
+  return user.name ? `${user.name} (${email})` : email;
+}
 
 export function AppHeaderUserMenu() {
   const host = useNavigationHost();
@@ -69,7 +84,7 @@ export function AppHeaderUserMenu() {
         <Portal>
           <Menu.Content>
             {accountMenu?.leading}
-            <Menu.ItemGroup title={`${user.name ?? ""} (${user.email ?? ""})`}>
+            <Menu.ItemGroup title={accountMenuTitle(user)}>
               <PersonalWorkspaceEntries entries={personalWorkspaceEntries} host={host} />
               {!plan.isLiteMember && (
                 <Menu.Item value="api-keys" asChild>

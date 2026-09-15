@@ -132,6 +132,23 @@ describe("ProcessManagerBuilder", () => {
         ).toThrow(/positive finite number/);
       });
     });
+
+    describe("when the schedule is also given a key", () => {
+      it("refuses the pair, naming the singleton the schedule is armed on", () => {
+        expect(() =>
+          buildProcessManager<ProcessTestEvent>({
+            name: "keyedSweep",
+            applier: (pm) =>
+              pm
+                .state({ lastWakeAt: null as number | null })
+                .schedule({ everyMs: 30_000 })
+                .onWake<{ evaluateGraph: IntentSpec<typeof payloadSchema> }>((state) => ({ state }))
+                .intent("evaluateGraph", payloadSchema, async () => {})
+                .keyBy((event) => event.data.traceId),
+          }),
+        ).toThrow(/cannot be keyed and scheduled/);
+      });
+    });
   });
 
   describe("given a signal-driven process manager", () => {

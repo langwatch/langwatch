@@ -12,13 +12,29 @@ import {
   agentSandboxKeyReapSchema,
   agentSandboxKeyReapWake,
 } from "../processes/agent-sandbox-key-reap.process.ts";
+import {
+  type CliLoginKeyReapDeps,
+  runCliLoginKeyReap,
+} from "../intents/cli-login-key-reap.intent.ts";
+import {
+  CLI_LOGIN_KEY_REAP_INITIAL_STATE,
+  CLI_LOGIN_KEY_REAP_INTERVAL_MS,
+  CLI_LOGIN_KEY_REAP_PROCESS_NAME,
+  type CliLoginKeyReapState,
+  cliLoginKeyReapSchema,
+  cliLoginKeyReapWake,
+} from "../processes/cli-login-key-reap.process.ts";
 
 export interface AgentSandboxMaintenancePipelineDeps {
   sandboxKeyReap: AgentSandboxKeyReapDeps;
+  /** The hourly sweep over CLI login keys whose session ran out. */
+  cliLoginKeyReap: CliLoginKeyReapDeps;
 }
 
-// Retiring sandbox keys belongs in credential maintenance, not run management. Keys are minted per
-// run and only reaped by this sweep. No events; costs nothing beyond scheduled wake.
+// Credential maintenance the API-key feature owns end to end: the sandbox key a code agent run
+// left behind, and the CLI login key a device session stopped refreshing. Neither is retired by
+// anything else, so both are scheduled sweeps rather than event-driven. No events; costs nothing
+// beyond scheduled wake.
 export class EventingAgentSandboxMaintenanceAdapter {
   private constructor(private readonly deps: AgentSandboxMaintenancePipelineDeps) {}
 
@@ -28,6 +44,7 @@ export class EventingAgentSandboxMaintenanceAdapter {
 
   build() {
     const sandboxKeyReap = this.deps.sandboxKeyReap;
+    const cliLoginKeyReap = this.deps.cliLoginKeyReap;
 
     return definePipeline<Event>({
       name: "agent_sandbox_maintenance",
@@ -47,6 +64,16 @@ export class EventingAgentSandboxMaintenanceAdapter {
           // One bounded UPDATE over the (name, revokedAt, expiresAt) index, so
           // the default-ish lease is ample.
           .outbox({ leaseDurationMs: 60 * 1000, maxAttempts: 3 }),
+      )
+      .withProcessManager(CLI_LOGIN_KEY_REAP_PROCESS_NAME, (pm) =>
+        pm
+          .state<CliLoginKeyReapState>(CLI_LOGIN_KEY_REAP_INITIAL_STATE)
+          .schedule({ everyMs: CLI_LOGIN_KEY_REAP_INTERVAL_MS })
+          .onWake(cliLoginKeyReapWake)
+          .intent("reap", cliLoginKeyReapSchema, runCliLoginKeyReap(cliLoginKeyReap))
+          // One bounded read, then a revoke per elapsed key with its cascade.
+          // Sessions run out a few at a time, so the default-ish lease holds.
+          .outbox({ leaseDurationMs: 5 * 60 * 1000, maxAttempts: 3 }),
       )
       .build();
   }

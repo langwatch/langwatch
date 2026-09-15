@@ -475,9 +475,16 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
       { kind: "no-permission", reason, allow },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
         const allowedKeys = Object.keys(allow ?? {});
+        // `input` is typed as ScopeInput (always an object), but a procedure
+        // declared with no `.input()` at all hands tRPC's actual runtime
+        // value through untouched — `undefined` — so the type is a promise
+        // the runtime does not keep. Without this guard, `key in input`
+        // throws and every such procedure 500s at the boundary instead of
+        // running the (vacuous, but valid) no-permission check.
+        const safeInput: object = typeof input === "object" && input !== null ? input : {};
 
         for (const key of SENSITIVE_SCOPE_FIELDS) {
-          if (key in input && !allowedKeys.includes(key)) {
+          if (key in safeInput && !allowedKeys.includes(key)) {
             throw new Error(`${key} is not allowed to be used without permission check`);
           }
         }

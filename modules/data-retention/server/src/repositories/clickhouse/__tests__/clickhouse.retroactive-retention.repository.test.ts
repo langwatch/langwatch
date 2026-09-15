@@ -82,12 +82,28 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     }
 
     expect(commands.some((command) => command.sql.includes("TraceId"))).toBe(false);
-    expect(commands.some((command) => command.sql.includes("NOT IN"))).toBe(false);
     expect(commands.some((command) => command.sql.includes("'project-1'"))).toBe(false);
+
+    // event_log carries every category's rows plus a durable security slice,
+    // so its own command additionally excludes indefinite rows and the other
+    // finite categories' aggregates. No other table's rows need that filter.
+    const eventLogCommand = required(
+      commands.find((candidate) => candidate.sql.includes("ALTER TABLE event_log")),
+    );
+    expect(eventLogCommand.sql).toContain("AggregateType NOT IN");
+    expect(eventLogCommand.sql).toContain("langwatch:event-log-retention-category:traces");
+    expect(
+      commands
+        .filter((command) => !command.sql.includes("ALTER TABLE event_log"))
+        .some((command) => command.sql.includes("NOT IN")),
+    ).toBe(false);
   });
 
-  /** @scenario "Apply retention to existing project data" */
-  it("updates the scenario and experiment tables for their categories", async () => {
+  /**
+   * @scenario "Apply retention to existing project data"
+   * @scenario "Retroactive updates select the matching event-log category"
+   */
+  it("updates the scenario and experiment tables for their categories, plus only their own event_log rows", async () => {
     const scenarios = createRepository([]);
     await scenarios.repository.triggerUpdate({
       projectId: "project-1",
@@ -98,8 +114,16 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       expect.arrayContaining([
         expect.stringContaining("ALTER TABLE simulation_runs"),
         expect.stringContaining("ALTER TABLE suite_runs"),
+        expect.stringContaining("ALTER TABLE event_log"),
       ]),
     );
+    const scenariosEventLog = required(
+      scenarios.commands.find((command) => command.sql.includes("ALTER TABLE event_log")),
+    );
+    expect(scenariosEventLog.sql).toContain(
+      "AggregateType IN ('simulation_run', 'simulation_set', 'suite_run')",
+    );
+    expect(scenariosEventLog.sql).toContain("langwatch:event-log-retention-category:scenarios");
 
     const experiments = createRepository([]);
     await experiments.repository.triggerUpdate({
@@ -111,8 +135,14 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       expect.arrayContaining([
         expect.stringContaining("ALTER TABLE experiment_runs"),
         expect.stringContaining("ALTER TABLE experiment_run_items"),
+        expect.stringContaining("ALTER TABLE event_log"),
       ]),
     );
+    const experimentsEventLog = required(
+      experiments.commands.find((command) => command.sql.includes("ALTER TABLE event_log")),
+    );
+    expect(experimentsEventLog.sql).toContain("AggregateType IN ('experiment_run')");
+    expect(experimentsEventLog.sql).toContain("langwatch:event-log-retention-category:experiments");
   });
 
   /** @scenario "A second retroactive update is refused while the first is still running" */
@@ -156,6 +186,37 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     expect(error.blocked.map((mutation) => mutation.mutationId)).toEqual(["mut-1", "mut-2"]);
 
     expect(commands).toHaveLength(0);
+  });
+
+  /** @scenario "Event-log category mutations can run in parallel" */
+  it("does not block a different category on an in-flight event_log mutation for another category", async () => {
+    const tracesMarkedRow = {
+      mutationId: "mut-traces",
+      table: "event_log",
+      isDone: 0,
+      partsToDo: 5,
+      createTime: "2026-01-01T00:00:00",
+      command:
+        "ALTER TABLE event_log UPDATE _retention_days = 91 WHERE TenantId = 'project-1' " +
+        "AND _retention_days != 91 AND (NOT (...)) " +
+        "AND length('langwatch:event-log-retention-category:traces') > 0",
+    };
+
+    const scenarios = createRepository([tracesMarkedRow]);
+    const result = await scenarios.repository.triggerUpdate({
+      projectId: "project-1",
+      category: "scenarios",
+      newRetentionDays: 63,
+    });
+    // Not blocked: the in-flight mutation is marked for a disjoint row set.
+    expect(result.tables).toContain("event_log");
+
+    const traces = createRepository([tracesMarkedRow]);
+    const error = await traces.repository
+      .triggerUpdate({ projectId: "project-1", category: "traces", newRetentionDays: 91 })
+      .catch((cause: unknown) => cause);
+    // Blocked: same category as the in-flight mutation's marker.
+    expect(error).toBeInstanceOf(RetroactiveMutationInProgressError);
   });
 
   it("maps progress categories and escapes the tenant filter through query parameters", async () => {

@@ -48,6 +48,11 @@ class HeadsOf implements IdentityHeadsRepository {
     return "key_material";
   }
 
+  /** Folded: these doubles hold no provisional newborn rows. */
+  async hasFolded() {
+    return true;
+  }
+
   async findHeads() {
     return this.heads;
   }

@@ -3,6 +3,7 @@ import {
   type EventingClickHouseClientResolver,
   type EventingProcessPersistenceDatabase,
 } from "@langwatch/eventing/server";
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract";
 import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { ResourceScope } from "@langwatch/runtime-composition";
@@ -72,6 +73,9 @@ export function createWorkerDurableComposition(
       ...(options.persistence.retentionPolicyResolver
         ? { retentionPolicyResolver: options.persistence.retentionPolicyResolver }
         : {}),
+      // Security aggregates keep their history whatever the tenant's trace
+      // retention says — the classifier names them row by row.
+      classifyEventLogRetention: classifyEventLogRowRetention,
     },
     database: options.database,
     ...(options.enterprise ? { enterprise: options.enterprise } : {}),

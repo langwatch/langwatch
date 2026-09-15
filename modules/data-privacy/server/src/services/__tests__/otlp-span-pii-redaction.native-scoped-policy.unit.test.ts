@@ -663,6 +663,91 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
 });
 
 /**
+ * The identifier hold-out (packages/redaction's `isHeldOutIdentifierAttribute`)
+ * is consulted a second time on the STRICT/analysis-service path, not only the
+ * native one: redaction runs at ingestion and the original is never stored, so
+ * a trace/span/run id handed to the analysis service by mistake is lost for
+ * good. A pure-decimal trace address is the fixture that proves the NAME half
+ * of the rule specifically, because it is not opaque-shaped on its own
+ * (`isOpaqueIdentifierValue` refuses a value with no letter) — only the
+ * reserved key name holds it out.
+ */
+describe("OtlpSpanPiiRedactionService identifier hold-out on the analysis-service path", () => {
+  /** A decimal trace address: reserved by name, not by shape. */
+  const DECIMAL_TRACE_ADDRESS = "17575001234540000091234567890123";
+
+  describe("given a strict policy that sends content to the analysis-service batch", () => {
+    it("keeps a held-out span attribute out of the batch and out of the stored span", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
+      const span = spanWith({
+        trace_id: DECIMAL_TRACE_ADDRESS,
+        input: "My name is Alexander Hamilton.",
+      });
+
+      await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+
+      expect(attr(span, "trace_id")).toBe(DECIMAL_TRACE_ADDRESS);
+      expect(attr(span, "input")).toBe("[REDACTED]");
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]![0]).toEqual(["My name is Alexander Hamilton."]);
+    });
+  });
+
+  describe("given a log record keyed by path rather than by attribute name", () => {
+    it("resolves the hold-out through attributeNames and keeps the value", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
+      const log = {
+        body: "",
+        attributes: { "log.0.value.stringValue": DECIMAL_TRACE_ADDRESS },
+        resourceAttributes: {},
+        attributeNames: { "log.0.value.stringValue": "trace_id" },
+      };
+
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+
+      expect(log.attributes["log.0.value.stringValue"]).toBe(DECIMAL_TRACE_ADDRESS);
+      expect(batchSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not consult the attributes' name map for resource attributes", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
+      // Same path spelling and the same decimal address on both sides, but the
+      // name map belongs to `attributes` only. A resource attribute is keyed
+      // by its own name, and "res.0" is not itself a reserved trace/span name,
+      // so nothing holds this one out — it goes to the batch and comes back
+      // redacted, proving the map was not applied here.
+      const log = {
+        body: "",
+        attributes: {},
+        resourceAttributes: { "res.0": DECIMAL_TRACE_ADDRESS },
+        attributeNames: { "res.0": "trace_id" },
+      };
+
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+
+      expect(log.resourceAttributes["res.0"]).toBe("[REDACTED]");
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]![0]).toEqual([DECIMAL_TRACE_ADDRESS]);
+    });
+
+    it("still sends the log body to the batch — free text takes no hold-out", async () => {
+      const { service, batchSpy } = makeService(mkPolicy({ piiLevel: "strict" }));
+      const log = {
+        body: "My name is Alexander Hamilton.",
+        attributes: {},
+        resourceAttributes: {},
+      };
+
+      await service.redactLog(log, "ESSENTIAL", TENANT);
+
+      expect(log.body).toBe("[REDACTED]");
+      expect(batchSpy).toHaveBeenCalledTimes(1);
+      expect(batchSpy.mock.calls[0]![0]).toEqual(["My name is Alexander Hamilton."]);
+    });
+  });
+});
+
+/**
  * PII exceptions are honored for native pass (secrets and essential entities)
  * but not for strict-only entities (names, locations) detected by analysis
  * service batch. Presidio has no exception parameter; documented contract.

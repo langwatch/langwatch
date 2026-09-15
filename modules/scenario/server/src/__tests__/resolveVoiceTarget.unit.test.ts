@@ -52,7 +52,11 @@ describe("resolveVoiceTarget", () => {
         });
         const target = await resolveVoiceTarget({
           projectId: "p1",
-          config: { transport: "phone", phoneNumber: "+14155559999" },
+          config: {
+            transport: "phone",
+            phoneNumber: "+14155559999",
+            isAgentSpeaksFirst: false,
+          },
         });
         expect(target).toEqual({
           transport: "phone",
@@ -63,6 +67,7 @@ describe("resolveVoiceTarget", () => {
             authToken: "tok-secret",
             fromNumber: "+14155550000",
           },
+          isAgentSpeaksFirst: false,
         });
       });
     });
@@ -73,12 +78,17 @@ describe("resolveVoiceTarget", () => {
         findTwilioProviderForProject.mockResolvedValue(null);
         const target = await resolveVoiceTarget({
           projectId: "p1",
-          config: { transport: "phone", phoneNumber: "+14155559999" },
+          config: {
+            transport: "phone",
+            phoneNumber: "+14155559999",
+            isAgentSpeaksFirst: false,
+          },
         });
         expect(target).toEqual({
           transport: "phone",
           agentId: "+14155559999",
           credential: null,
+          isAgentSpeaksFirst: false,
         });
         expect(getTwilioCredential).not.toHaveBeenCalled();
 

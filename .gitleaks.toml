@@ -38,6 +38,36 @@ paths = ['''enterprise/modules/billing/contract/src/stripe-catalog\.json''']
 # get its own entry naming its own file, which is what an allowlist scoped by
 # path is for.
 
+# WebAuthn AAGUIDs are public model identifiers assigned to authenticators.
+# They identify products such as iCloud Keychain and YubiKey, not a device,
+# account or credential. The UI maps these registry values to readable labels.
+#
+# Scoped by VALUE, path and rule with AND. Every UUID is anchored, so a real
+# token that merely contains one of these public identifiers is still caught,
+# as is any other high-entropy value added to the source file.
+[[allowlists]]
+description = "Public WebAuthn authenticator model AAGUIDs, not credentials"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''modules/coding-agent/web/src/passkeyAuthenticators\.ts''']
+regexes = [
+  '''^fbfc3007-154e-4ecc-8c0b-6e020557d7bd$''',
+  '''^dd4ec289-e01d-41c9-bb89-70fa845d4bf2$''',
+  '''^adce0002-35bc-c60a-648b-0b25f1f05503$''',
+  '''^ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4$''',
+  '''^b93fd961-f2e6-462f-b122-82002247de78$''',
+  '''^bada5566-a7aa-401f-bd96-45619a55120d$''',
+  '''^d548826e-79b4-db40-a3d8-11116f7e8349$''',
+  '''^cb69481e-8ff7-4039-93ec-0a2729a154a8$''',
+  '''^ee882879-721c-4913-9775-3dfcce97072a$''',
+  '''^fa2b99dc-9e39-4257-8f92-4a30d23c4118$''',
+  '''^2fc0579f-8113-47ea-b116-bb5a8db9202a$''',
+  '''^73bb0cd4-e502-49b8-9c6f-b59445bf720b$''',
+  '''^c1f9a0bc-1dd2-404a-b27f-8e29047a43fd$''',
+  '''^d8522d9f-575b-4866-88a9-ba99fa02f35b$''',
+  '''^39a5647e-1853-446c-a1f6-a79bae9f5bc7$''',
+]
+
 # The self-hosted license fixtures are base64 payloads signed with the TEST
 # keypair that sits beside them in `fixtures/license-keys.fixture.ts`, checked in
 # on purpose: license validation is signature verification, so a test that does not
@@ -386,3 +416,43 @@ paths = [
 description = "RFC 6455 sample Sec-WebSocket-Key in the voice listener handshake tests, a client-invented nonce"
 targetRules = ["generic-api-key"]
 regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']
+
+# The bech32 test vectors in the bitcoin-address suite, which prove the
+# recognizer rejects a witness version or a witness program bitcoin does not
+# allow. They come in pairs: the same construction at a value bitcoin permits
+# and at one it does not, so the permitted member validating is what shows the
+# other is rejected for its version or its program rather than for a checksum
+# that never lined up.
+#
+# Naming them, as this file requires. None is a credential and none can become
+# one: a bech32 string is a PUBLIC address, the thing you hand out to be paid,
+# and these were generated for this test rather than observed. The rejected
+# members are not bitcoin addresses at all — no wallet will parse them — and the
+# accepted members encode payloads of counted-up bytes, so they are well-formed
+# addresses to keys nobody holds. There is nothing to revoke, and nothing to
+# send anywhere.
+#
+# They cannot be assembled at run time the way the base64 fixture in the
+# identifier hold-out suite is. The checksum IS the thing under test, so a test
+# that computed it would be asserting one implementation against a copy of
+# itself; the literal is what makes the vector a vector.
+#
+# gitleaks' `generic-api-key` rule fires on the `const token = "<entropy>"`
+# shape and cannot tell an address from a key.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real secret that merely starts with
+# these characters.
+[[allowlists]]
+description = "Generated bech32 vectors in the bitcoin-address tests; public addresses to keys nobody holds"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8$''',
+  '''^bc13r23clxd5mzfsh79vn6pg0kaytjeq8w4un2kxzn$''',
+  '''^bc1pqvwl8xs0$''',
+  '''^bc1pqdnfnnda$''',
+  '''^bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvg37tfmf9tk2uup37w6hww86h3lrlsvrg5rvlw2s2x$''',
+  '''^bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvge0qxlk$''',
+  '''^bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas$''',
+  '''^bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl$''',
+]

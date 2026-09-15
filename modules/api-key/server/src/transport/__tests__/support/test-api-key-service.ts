@@ -13,6 +13,7 @@ export class TestApiKeyService implements ApiKeyApi {
   enrichApiKeyList = unsupported<ApiKeyApi["enrichApiKeyList"]>();
   enrichBindingsWithNames = unsupported<ApiKeyApi["enrichBindingsWithNames"]>();
   ensureCallerIsOrgMember = unsupported<ApiKeyApi["ensureCallerIsOrgMember"]>();
+  extendCliLoginKeyExpiry = unsupported<ApiKeyApi["extendCliLoginKeyExpiry"]>();
   findById = unsupported<ApiKeyApi["findById"]>();
   findByLookupId = unsupported<ApiKeyApi["findByLookupId"]>();
   findDefaultCliSelection = unsupported<ApiKeyApi["findDefaultCliSelection"]>();

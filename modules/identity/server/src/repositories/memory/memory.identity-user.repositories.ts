@@ -1,4 +1,8 @@
-import { emptyIdentityHeads, type IdentifierFact, type IdentityHeads } from "@langwatch/identity-contract";
+import {
+  emptyIdentityHeads,
+  type IdentifierFact,
+  type IdentityHeads,
+} from "@langwatch/identity-contract";
 import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
 import { Temporal } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
@@ -8,7 +12,10 @@ import type {
   IdentityBackfillRepository,
 } from "../identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
-import type { AbandonedNewborn, IdentityNewbornRepository } from "../identity-newborn.repository.ts";
+import type {
+  AbandonedNewborn,
+  IdentityNewbornRepository,
+} from "../identity-newborn.repository.ts";
 import type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
@@ -32,6 +39,14 @@ export class MemoryIdentityHeadsRepository implements IdentityHeadsRepository {
 
   async tryFindUserHashKey(args: { userId: string }): Promise<string | null> {
     return this.store.findUserRow(args)?.userHashKey ?? null;
+  }
+
+  /**
+   * The in-memory store folds synchronously, so a user the store knows has
+   * folded: there is no staging lane here for a provisional row to outrun.
+   */
+  async hasFolded(args: { userId: string }): Promise<boolean> {
+    return this.store.findUserRow(args) !== null;
   }
 
   async findHeads(args: { userId: string }): Promise<IdentityHeads> {

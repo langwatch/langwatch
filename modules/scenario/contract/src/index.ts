@@ -63,6 +63,18 @@ export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
 export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";
+// The worker's own public media listener (apps/worker/.../voice-ws-listener.ts)
+// hands the accepted upgrade socket to the owning scenario child, and
+// authenticates the nonce that upgrade carried — both are worker-side
+// concerns implemented against these contract primitives, so the worker
+// reaches them through the package's public surface rather than a deep
+// relative import across the module boundary.
+export { VoiceNonceRegistry } from "./voice/voice-nonce-registry.ts";
+export { handOffVoiceSocket } from "./voice/voice-socket-handoff.ts";
+export {
+  VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
+  type VoiceMediaUpgradeRefusedMessage,
+} from "./voice/voice-nonce-handoff.ts";
 export {
   runEvaluatorDefinitionSchema,
   runEvaluatorFieldSchema,

@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   landingRef,
   routeMock,
+  routeStateRef,
   acceptMock,
   acceptStateRef,
   askMock,
@@ -33,6 +34,9 @@ const {
     },
   },
   routeMock: vi.fn(),
+  routeStateRef: {
+    current: { error: null as unknown, isPending: false },
+  },
   acceptMock: vi.fn(),
   acceptStateRef: {
     current: { error: null as unknown, isPending: false },
@@ -54,8 +58,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,
-          isPending: false,
-          error: null,
+          ...routeStateRef.current,
         }),
       },
       requestFreshInvite: {
@@ -124,6 +127,7 @@ describe("given an invitation link", () => {
     sessionRef.current = { data: null };
     acceptStateRef.current = { error: null, isPending: false };
     askStateRef.current = { error: null, isPending: false, isSuccess: false };
+    routeStateRef.current = { error: null, isPending: false };
     routeMock.mockResolvedValue(localPicker);
     landingRef.current = {
       data: {
@@ -313,6 +317,43 @@ describe("given an invitation link", () => {
       expect(container.textContent).not.toContain("Acme");
       expect(container.textContent).not.toContain("Dana");
       expect(screen.queryByTestId("method-picker")).toBeNull();
+    });
+  });
+
+  describe("when the invitation itself is valid but routing to a method fails", () => {
+    beforeEach(() => {
+      // The invite loaded fine — this is the SEPARATE call that asks which
+      // sign-in methods the instance offers, and it is the one that fails.
+      routeMock.mockRejectedValue(new Error("network down"));
+      routeStateRef.current = { error: handled("internal_server_error", 500), isPending: false };
+    });
+
+    it("renders a way forward instead of leaving the card empty", async () => {
+      renderLanding();
+
+      // The card still names who is asking — that came from a separate,
+      // successful call — and now also offers a retry rather than nothing.
+      expect(await screen.findByTestId("invite-inviter")).toBeTruthy();
+      expect(await screen.findByTestId("invite-routing-retry")).toBeTruthy();
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+    });
+
+    it("says what happened, in the alert every other failure on this card uses", async () => {
+      renderLanding();
+
+      expect(await screen.findByText(/could not start sign-in/i)).toBeTruthy();
+    });
+
+    it("recovers the method picker once the retry succeeds", async () => {
+      renderLanding();
+      await screen.findByTestId("invite-routing-retry");
+
+      routeMock.mockResolvedValueOnce(localPicker);
+      routeStateRef.current = { error: null, isPending: false };
+      await userEvent.click(screen.getByTestId("invite-routing-retry"));
+
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("invite-routing-retry")).toBeNull();
     });
   });
 });

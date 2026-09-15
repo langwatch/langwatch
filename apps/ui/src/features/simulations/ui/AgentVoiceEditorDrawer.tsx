@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import {
@@ -136,6 +137,7 @@ type VoiceForm = {
   transport: VoiceTransport;
   agentId: string;
   phoneNumber: string;
+  isAgentSpeaksFirst: boolean;
 };
 
 /** The form values seeded from a saved agent's stored config. */
@@ -147,12 +149,14 @@ function formFromAgent(agentData: {
     transport?: VoiceTransport;
     agentId?: string;
     phoneNumber?: string;
+    isAgentSpeaksFirst?: boolean;
   };
   return {
     name: agentData.name ?? "",
     transport: config.transport ?? DEFAULT_TRANSPORT,
     agentId: config.agentId ?? "",
     phoneNumber: config.phoneNumber ?? "",
+    isAgentSpeaksFirst: config.isAgentSpeaksFirst ?? false,
   };
 }
 
@@ -164,6 +168,9 @@ function formFromDraft(projectId: string): VoiceForm {
     transport: draft?.transport ?? DEFAULT_TRANSPORT,
     agentId: draft?.agentId ?? "",
     phoneNumber: draft?.phoneNumber ?? "",
+    // The draft (create flow) never persists the phone-only toggle; a new phone
+    // target starts with the agent NOT speaking first.
+    isAgentSpeaksFirst: false,
   };
 }
 
@@ -332,6 +339,7 @@ function useVoiceFormState({
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [isAgentSpeaksFirst, setIsAgentSpeaksFirst] = useState(false);
   const formInitializedRef = useRef(false);
   const lastAgentIdRef = useRef<string | undefined>(undefined);
 
@@ -353,6 +361,7 @@ function useVoiceFormState({
     setTransport(initial.transport);
     setVoiceAgentId(initial.agentId);
     setPhoneNumber(initial.phoneNumber);
+    setIsAgentSpeaksFirst(initial.isAgentSpeaksFirst);
     formInitializedRef.current = true;
   }, [agentData, agentId, isCreating, isOpen, projectId]);
 
@@ -383,6 +392,8 @@ function useVoiceFormState({
     setVoiceAgentId,
     phoneNumber,
     setPhoneNumber,
+    isAgentSpeaksFirst,
+    setIsAgentSpeaksFirst,
   };
 }
 
@@ -471,6 +482,7 @@ function submitVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
+    isAgentSpeaksFirst: boolean;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -478,7 +490,11 @@ function submitVoiceAgent({
   if (!projectId || !isValid) return;
   const config =
     form.transport === "phone"
-      ? { transport: form.transport, phoneNumber: form.phoneNumber.trim() }
+      ? {
+          transport: form.transport,
+          phoneNumber: form.phoneNumber.trim(),
+          isAgentSpeaksFirst: form.isAgentSpeaksFirst,
+        }
       : { transport: form.transport, agentId: form.voiceAgentId.trim() };
   const savedAgentId = agentId ?? createdAgentRowId;
   if (savedAgentId) {
@@ -518,6 +534,7 @@ function useSaveVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
+    isAgentSpeaksFirst: boolean;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -796,6 +813,8 @@ function VoiceAgentDrawerBody({
           setVoiceAgentId={form.setVoiceAgentId}
           phoneNumber={form.phoneNumber}
           setPhoneNumber={form.setPhoneNumber}
+          isAgentSpeaksFirst={form.isAgentSpeaksFirst}
+          setIsAgentSpeaksFirst={form.setIsAgentSpeaksFirst}
           hasTwilioKey={editor.hasTwilioKey}
           hasElevenLabsKey={editor.hasElevenLabsKey}
           hasAttemptedSubmit={editor.hasAttemptedSubmit}
@@ -927,6 +946,8 @@ function VoiceAgentForm({
   setVoiceAgentId,
   phoneNumber,
   setPhoneNumber,
+  isAgentSpeaksFirst,
+  setIsAgentSpeaksFirst,
   hasTwilioKey,
   hasElevenLabsKey,
   hasAttemptedSubmit,
@@ -939,6 +960,8 @@ function VoiceAgentForm({
   setVoiceAgentId: (value: string) => void;
   phoneNumber: string;
   setPhoneNumber: (value: string) => void;
+  isAgentSpeaksFirst: boolean;
+  setIsAgentSpeaksFirst: (value: boolean) => void;
   hasTwilioKey: boolean;
   hasElevenLabsKey: boolean;
   hasAttemptedSubmit: boolean;
@@ -1006,11 +1029,25 @@ function VoiceAgentForm({
       </Field.Root>
 
       {isPhone ? (
-        <PhoneNumberField
-          phoneNumber={phoneNumber}
-          setPhoneNumber={setPhoneNumber}
-          invalid={phoneNumberInvalid}
-        />
+        <>
+          <PhoneNumberField
+            phoneNumber={phoneNumber}
+            setPhoneNumber={setPhoneNumber}
+            invalid={phoneNumberInvalid}
+          />
+          <Field.Root>
+            <Switch
+              checked={isAgentSpeaksFirst}
+              onCheckedChange={(e) => setIsAgentSpeaksFirst(e.checked)}
+              inputProps={{ "data-testid": "voice-agent-speaks-first" }}
+            >
+              Agent speaks first
+            </Switch>
+            <Field.HelperText>
+              Turn on if the agent greets as soon as the call connects.
+            </Field.HelperText>
+          </Field.Root>
+        </>
       ) : (
         <ElevenLabsAgentIdField
           voiceAgentId={voiceAgentId}

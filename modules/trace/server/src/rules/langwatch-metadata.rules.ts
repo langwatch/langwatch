@@ -1,3 +1,4 @@
+import { METADATA_SUBKEY_PREFIXES } from "@langwatch/redaction/pii";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
@@ -87,7 +88,6 @@ function canonicaliseMetadataBlob(ctx: ExtractorContext): void {
 
 function canonicaliseMetadataSubkeys(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
-  const METADATA_SUBKEY_PREFIXES = ["langwatch.metadata.", "langwatch.trace."] as const;
   for (const prefix of METADATA_SUBKEY_PREFIXES) {
     for (const { key, value } of attrs.takeByPrefix(prefix)) {
       const bareKey = key.slice(prefix.length);

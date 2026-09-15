@@ -54,10 +54,17 @@ function mount({
   projects = {},
   probePermission = async () => true,
   fieldProtections = {},
+  permits = () => true,
 }: {
   projects?: Partial<ProjectApi>;
   probePermission?: () => Promise<boolean>;
   fieldProtections?: Record<string, unknown>;
+  /**
+   * The authorization answer for THIS request, at the scope the input named.
+   * The door resolves it per call, so two calls with two answers are two
+   * projects as far as every procedure below can tell.
+   */
+  permits?: (permission: string) => boolean;
 } = {}) {
   const provisionLangyVirtualKey = vi.fn(async () => {});
   const recordApiKeyRegenerated = vi.fn(async () => {});
@@ -80,7 +87,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestPorts(),
+    ports: projectTrpcTestPorts(permits),
   }).mount(projectTrpcTransport, () => browser);
 
   return {
@@ -153,6 +160,39 @@ describe("the project tRPC namespace", () => {
       await expectRefusal(caller.getProjectAPIKey({ projectId: "nope" }), {
         code: "project_not_found",
         httpStatus: 404,
+      });
+    });
+
+    /**
+     * The base key authenticates every ingestion call the project accepts, so
+     * revealing it is gated the same as rotating it. `project:update` is the
+     * contributor's permission, and it used to be enough.
+     *
+     * `@scenario "Permission is checked against the requested project"` — the
+     * project the answer is resolved AT is pinned by
+     * `project.trpc.declaration.unit.test.ts`; what these two pin is which
+     * permission that resolution asks for.
+     */
+    /** @scenario "Permission is checked against the requested project" */
+    it("refuses a caller who may update the project but not manage it", async () => {
+      const findById = vi.fn(async () => ({ apiKey: "sk-lw-base" }) as never);
+      const { caller } = mount({
+        projects: { findById },
+        permits: (permission) => permission !== "project:manage",
+      });
+
+      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).rejects.toThrow();
+      expect(findById).not.toHaveBeenCalled();
+    });
+
+    it("answers the caller who may manage it", async () => {
+      const { caller } = mount({
+        projects: { findById: async () => ({ id: "project_123", apiKey: "sk-lw-base" }) as never },
+        permits: (permission) => permission === "project:manage",
+      });
+
+      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).resolves.toMatchObject({
+        apiKey: "sk-lw-base",
       });
     });
   });

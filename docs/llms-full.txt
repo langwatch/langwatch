@@ -3679,8 +3679,8 @@ Webhook deliveries and the REST routes carry the same envelope: `{ "id", "type",
 | `organization_id`, `project_id`                      | The organization, and the trace project of the virtual key.                                                                                                                                                                                                |
 | `virtual_key_id`, `principal_user_id`, `end_user_id` | The key, the person behind a personal key or `null`, the end user of your product or `null`.                                                                                                                                                               |
 | `trace_id`                                           | The trace in Trace Explorer.                                                                                                                                                                                                                               |
-| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `realtime_session` or `passthrough`.                                                                 |
-| `usage`                                              | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`. `input_tokens` excludes the cached and audio tokens. `reasoning_tokens` is a subset of `output_tokens`. `null` on `settled` and `admitted`. |
+| `model`, `model_provider_id`, `request_type`         | The model the gateway resolved, the provider credential that served it, and `chat`, `messages`, `embeddings`, `responses`, `speech`, `transcription`, `image_generation`, `image_edit`, `realtime_session` or `passthrough`.                              |
+| `usage`                                              | `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens`, `image_count`, always present and 0 when unused. Each priced quantity is charged once at its own rate, and `input_tokens` excludes the cached, audio and image tokens. `reasoning_tokens` is a subset of `output_tokens`, and `image_count` counts images, so no rate prices either and neither belongs in a cost sum. An `image_generation` row reports `output_tokens` 0 with its render under `output_image_tokens`. `null` on `settled` and `admitted`. |
 | `cost`                                               | `total_usd` as a decimal string, `nano_usd` as an integer (1 USD is 1,000,000,000 nano USD), and `rate_version`, for example `registry@2026-08-01`. `null` on `settled` and `admitted`.                                                                    |
 | `status`                                             | `success`, `error`, `settled` or `admitted`.                                                                                                                                                                                                               |
 | `needs_reconciliation`, `settle_reason`              | `true` and `confirmation_deadline_expired` on `settled`.                                                                                                                                                                                                   |
@@ -5156,7 +5156,11 @@ Your receiver does three things, in order:
 2. **Dedup by envelope `id`** and ingest. Delivery is at least once and ids are stable, so an upsert keyed on `id` is enough; retries and replays become no-ops. Each delivery also carries `X-LangWatch-Delivery-Id` and `X-LangWatch-Delivery-Attempt`.
 3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-event-payload).
 
-Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time. The `usage` object on a delivered event has five fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` and `reasoning_tokens`. Reasoning tokens are reported for display and are never priced separately.
+Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time.
+
+The `usage` object on a delivered event has eight fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens` and `image_count`. Every field is always present, and a request that did not use a bucket reports it as 0. Reasoning tokens are reported for display and are never priced separately.
+
+The token buckets are disjoint. An image generation reports `output_tokens` 0 and its render under `output_image_tokens`, so reading `output_tokens` alone sees none of the image traffic. Reconcile every field, but price only the billable ones: each is charged once at its own rate, and `reasoning_tokens` and `image_count` carry no rate at all.
 
 A delivery that fails is retried after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours, then every 12 hours, 11 attempts in total. A `Retry-After` header on your response is honoured as a floor.
 
@@ -6424,11 +6428,15 @@ The first run issues your personal key, prints `issued your personal virtual key
 
 ## Your keys and devices
 
-Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices** tab lists the CLI sessions signed in on your account.
+Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
 
 Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
-`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your keys stay valid until you revoke them.
+`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your virtual keys stay valid until you revoke them.
+
+### Ingestion keys follow the CLI session
+
+An ingestion key that the CLI mints for a tool belongs to the login session on that machine. It is retired when you run `langwatch logout` there, when you revoke that device from the **Devices and keys** tab, or when the session reaches the end of its window. Every live key is listed on that tab under the device it came from, so you can see and revoke each one on its own.
 
 ## Your usage and budget
 
@@ -11191,7 +11199,7 @@ Anomaly rules are not in the table: they have no REST surface and no authoring p
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
 | Ingestion templates | `/api/governance/ingestion-templates` | [Ingestion templates](/ai-governance/ingestion-templates) |
-| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates) |
+| Ingestion keys | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate` / `revoke`) | [Ingestion templates](/ai-governance/ingestion-templates) |
 | Members | `/api/governance/members` | [Members and Teams](/platform/members-and-teams) |
 | Invites | `/api/governance/invites` | [Members and Teams](/platform/members-and-teams) |
 | Role bindings | `/api/governance/role-bindings` | [Access Control (RBAC)](/platform/rbac) |
@@ -11221,19 +11229,24 @@ A few resource-shape notes that generalise across the namespace:
 - **Resource-specific verbs**: `update-ottl-rules` (instead of generic `update`) and `clone-from-platform` (instead of generic `create`) reflect the domain, admins don't generically PATCH every field; they specifically replace OTTL or clone a platform row. Other resources will introduce their own resource-specific verbs (`rotate` on ingestion sources, `assign-to-user` on role bindings, `revoke` on sessions) the same way.
 - **Error mapping**: `403 PlatformTemplateImmutable` (admin tried to PATCH a platform-published row), `404 TemplateNotFound` (cross-org probe), `400 InvalidSourceType`, validation. All map to a common `errorSchema` with `{ type, code, message }`.
 
-The second resource to ship is `ingestion-keys` (Lane B-2 commit at `5275e7e11`). An ingestion key is just an `ApiKey` (prefix `sk-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate`):
+The second resource to ship is `ingestion-keys`. An ingestion key is just an `ApiKey` (prefix `ik-lw-`) scoped to one project with an ingest-only role, there is no separate binding model. The CLI mints one through a dedicated auth route; the dashboard manages the rest through the `ingestionKey` tRPC router (`list` / `install` / `rotate` / `revoke`):
 
-| Verb      | Method + path                                                          | Returns                                                                                                   | RBAC             |
-| --------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------- |
-| `mint`    | `POST /api/v1/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once)                                    | `aiTools:manage` |
-| `list`    | tRPC `ingestionKey.list`                                               | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
-| `install` | tRPC `ingestionKey.install`                                            | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once)                                            | `aiTools:manage` |
-| `rotate`  | tRPC `ingestionKey.rotate`                                             | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately)           | `aiTools:manage` |
+| Verb      | Method + path                                                          | Returns                                                                                                                        | RBAC                 |
+| --------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `mint`    | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "ik-lw-…", prefix, endpoint }` (token returned exactly once)                                                          | device session       |
+| `list`    | tRPC `ingestionKey.list`                                               | one row per live key: `apiKeyId`, `sourceType`, `deviceLabel`, `parentApiKeyId`, `createdAtMs`, `lastUsedAtMs` (never the token) | `organization:view`  |
+| `install` | tRPC `ingestionKey.install`                                            | `{ token: "ik-lw-…", prefix, apiKeyId }` (token returned exactly once)                                                          | `organization:view`  |
+| `rotate`  | tRPC `ingestionKey.rotate`                                             | the same plus `revokedCount` and `revokedDeviceLabels` (every previous key for the source is refused immediately)               | `organization:view`  |
+| `revoke`  | tRPC `ingestionKey.revoke` (`{ apiKeyId }`)                            | `{ success: true }`; idempotent, another person's key answers `ingestion_key_not_found`                                         | `organization:view`  |
 
-Two consequences:
+Three consequences:
 
-- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `sk-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
+- **Ingest-only role, single project**: the minted `ApiKey` carries an ingest-only role scoped to exactly one project, so the token can write traces into that project but cannot read or mutate any other governance resource. The full `ik-lw-…` secret is shown exactly once at mint/install/rotate; thereafter only the prefix is returned.
 - **`source_type` selects the shaping**: the mint body's `source_type` records which upstream tool the key ingests for, so the gateway can apply the matching ingestion-template OTTL transform when traces arrive on that key. A key minted for an org-authored template carries that template's id.
+- **A personal CLI key follows its session**: a personal key the CLI mints stores the session's login key as `parentApiKeyId`. Logout, a devices-tab revoke, a re-login from the same device and session expiry all revoke that login key, and every key parented to it goes with it. A mint from a revoked session answers 401.
+- **Each side records its own cause**: the login key carries why it died (`user` for a logout or a devices-tab revoke, `rotation` for a re-login, `expired` for a session that ran out, `offboarded` for a membership that ended). The keys under it carry the same cause, except `user`, which reaches them as `session`. A re-login therefore leaves `rotation` on the keys, which is what tells the CLI it may re-mint under the session that replaced theirs.
+- **A project CLI key does not**: a key minted into a named team project carries no parent and outlives the session that asked for it.
+- **Only the CLI mints for a tool it wraps**: `install` and the MCP mint accept only source types a published template names, and a wrapped tool answers `ingestion_key_source_not_allowed`.
 
 The Zod schemas backing each request and response body are the same schemas the corresponding service-layer function consumes. The OpenAPI generator (`describeRoute` + `hono-openapi`) reads them directly, so the spec and the runtime are guaranteed in sync.
 
@@ -11280,7 +11293,7 @@ SELECT * FROM "AuditLog"
 
 All four rows have **identical** payload shapes apart from the `metadata.surface` field, same event kind, same target, same actor. Surface attribution helps incident response (which automation made this change?) without changing the audit-row event-kind taxonomy.
 
-The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate` on ingestion keys) all carry surface attribution as of the Lane B-3 commit at `fc6d54100`. Minting or rotating an ingestion key emits a `gateway.ingestion_key.minted` audit row, and revoking one emits `gateway.ingestion_key.revoked`.
+The mutating verbs across the two shipped resources (`createOrgTemplate`, `updateOttlRules`, `archiveOrgTemplate`, `cloneFromPlatform` on templates; `install`, `rotate`, `revoke` on ingestion keys) all carry surface attribution. Minting an ingestion key emits an `ingestionKey.mint` audit row, rotating a source emits `ingestionKey.rotate` with the count of keys it revoked, and revoking one emits `ingestionKey.revoke`.
 
 ## Verifying the contract
 
@@ -11288,19 +11301,21 @@ The wire shape, request bodies, response envelopes, status-code mapping, and sur
 
 **Ingestion-templates wire shape**: `enterprise/modules/governance/server/src/app/__tests__/governance.transport.unit.test.ts`. 20 cases covering the full ingestion-templates verb set, the 401, 400, 403 and 404 envelopes in this family's nested `{ error: { type, code, message } }` body, and the audit-uniform assertion that a state-changing call is attributed with `surface: "hono"`. It is the successor to the monolith's `governance-rest-api.integration.test.ts`: what that suite proved about the DOOR moved here, and what it proved about the DOMAIN moved to the service tests beside it.
 
-**Surface-spoof rejection**: same file. Fires Hono POSTs with `X-LangWatch-Surface` set to `cli` and to in-process values, and asserts only `cli` is honoured while everything else falls back to `"hono"`. `resolveSurfaceFromRequest` in `enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts` filters the header against the `GovernanceCallSurface` vocabulary, which is what stops an external HTTP caller forging an in-process surface tag: `cli` is the only value the Hono surface accepts on inbound, and `trpc` and `mcp` are reachable only in-process.
+**Surface-spoof rejection**: same file. Fires Hono POSTs with `X-LangWatch-Surface` set to `cli` and to in-process values, and asserts only `cli` is honoured while everything else falls back to `"hono"`. `resolveSurfaceFromRequest` in `enterprise/modules/governance/server/src/transport/governance.rest.ts` filters the header against the `GovernanceCallSurface` vocabulary, which is what stops an external HTTP caller forging an in-process surface tag: `cli` is the only value the Hono surface accepts on inbound, and `trpc` and `mcp` are reachable only in-process.
 
 **Cross-surface audit uniformity**: `enterprise/modules/governance/server/src/app/__tests__/governance.app.unit.test.ts`, scenario "audit rows are identical apart from metadata.surface". Creates the same organization template over all four surfaces, tRPC, Hono REST, CLI and MCP, and asserts the four writes are field-for-field identical apart from `surface`. Surface attribution therefore cannot drift into a second opinion about what a write means, and there is no separate MCP-transport regression because the MCP tool reaches this same application call.
 
 **No-bypass invariant (CI-enforced)**: the `prisma-containment` policy in `packages/architecture-enforcer/src/prisma-boundaries.ts`, run by `pnpm lint:architecture`. It rejects any file importing generated Prisma outside a repository under `server/src/repositories/prisma/` or the Postgres composition adapter `server/src/adapters/postgres.<subject>.adapter.ts`. That is the umbrella spec's `@no-bypass` invariant enforced repo-wide rather than for governance alone, so the repository-pattern boundary cannot silently drift.
 
-**Ingestion-key flows**: `enterprise/modules/governance/server/src/ports/__tests__/ingestion-key.service.unit.test.ts` pins the service-level ordering, that a replacement key is minted only after the prior one is hard-revoked, and that an additive issue leaves another machine's key alone. The wire-level guarantees below are contract rather than covered ground, they carry no test of their own today:
+**Ingestion-key flows**: `enterprise/modules/governance/server/src/services/__tests__/ingestion-key.service.unit.test.ts` pins the service-level ordering, that a replacement key is minted only after the prior one is hard-revoked, and that an additive issue leaves another machine's key alone. The wire-level guarantees below are contract rather than covered ground, they carry no test of their own today:
 
-- the mint route returns a one-time `sk-lw-…` token and thereafter exposes only the prefix
-- `install` and `rotate` audit rows both stamp `metadata.surface === "hono"` end-to-end (cross-validates the B-3 surface threading at `fc6d54100`)
-- `rotate` emits `gateway.ingestion_key.minted` and revoking a key emits `gateway.ingestion_key.revoked` at the wire level, previously unit-only
+- the mint route answers 201 with an `ik-lw-…` token, its prefix and the OTLP endpoint, and a second mint for the same source returns a different token rather than replacing the first
+- a mint from a CLI session stores that session's login key as `parentApiKeyId` and the session's device label, and a mint from a session whose login key was revoked answers 401
+- the describe route reports a key's status and its `revocation_cause`, which is what the CLI reads before it re-mints
 
-The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:manage` caller) is the canonical reference for any downstream lane (CLI, MCP) that needs an ingestion-key test path.
+Surface attribution is not asserted there. `metadata.surface` on the ingestion-key audit rows is locked by `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` and `platform/app/ee/governance/services/__tests__/auditSurface.crossSurface.integration.test.ts`.
+
+The `organization:view` caller plus a project-scoped ingest-only RoleBinding is the setup pattern any downstream lane (CLI, MCP) needs for an ingestion-key test path. The cascade itself is locked by `auth-cli-logout.integration.test.ts` and `auth-cli-refresh-expiry.integration.test.ts`, and the service rules by `platform/app/ee/governance/services/__tests__/ingestionKey.lifecycle.unit.test.ts`.
 
 **No-bypass invariant (CI-enforced)**: `platform/app/ee/governance/repositories/__tests__/no-bypass.unit.test.ts`. 3 tests (Lane B-7 at `94c219035`) statically reject any future PR that adds a direct `prisma.ingestionTemplate.*` call outside the allowlist. Locks the umbrella spec's `@no-bypass` invariant in CI so the repository-pattern boundary won't silently drift.
 
@@ -11311,6 +11326,8 @@ The setup pattern in this file (project + ingest-only RoleBinding + `aiTools:man
 **Surface-spoof rejection regression**: same file as above (Lane B-8 extension at `cb4c8224c`). Fires three Hono POSTs with `X-LangWatch-Surface` set to `trpc`, `mcp`, and `evil`, and asserts all three audit rows fall back to `metadata.surface === "hono"`.
 
 That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest` as the defense against external HTTP callers forging in-process surface tags. The only value the Hono surface accepts on inbound is `cli`; everything else falls through to the route's default `"hono"`. With the cross-surface uniformity test, this pins the umbrella spec's `@audit-uniform` invariant for v1.
+
+`cli` itself is a hint from an already-authenticated caller rather than a claim the route can verify, since the CLI presents the same credentials any other HTTP client does. Read it as "which client said it did this", never as a permission.
 
 To run locally:
 
@@ -11688,11 +11705,11 @@ Use `--json` in scripts and CI; the human table is for interactive exploration.
 
 The first preview ships with the two governance resources wired through Hono REST + service-layer + repository (Ask B-1 through B-7). Additional resources fold into the same `langwatch governance <resource> <verb>` namespace as the umbrella spec's coverage extends.
 
-| Resource              | Verbs (shipped in preview)                                                                        | RBAC                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `status`              | `status` (top-level, no verb tree, prints setup-state OR-of-flags)                                | `aiTools:view`                                    |
-| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform`            | `aiTools:view` (reads), `aiTools:manage` (writes) |
-| `ingestion-keys`      | `list` `mint` `rotate` (project-scoped ingest-only ApiKeys, `sk-lw-` token returned once at mint) | `aiTools:manage`                                  |
+| Resource              | Verbs (shipped in preview)                                                                                 | RBAC                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| `status`              | `status` (top-level, no verb tree, prints setup-state OR-of-flags)                                         | `aiTools:view`                                    |
+| `ingestion-templates` | `list` `admin-list` `get` `create` `update-ottl-rules` `archive` `clone-from-platform`                      | `aiTools:view` (reads), `aiTools:manage` (writes) |
+| `ingestion-keys`      | `list` `mint` `rotate` `revoke` (project-scoped ingest-only ApiKeys, `ik-lw-` token returned once at mint) | `organization:view`                               |
 
 Resources expected to fold into the same namespace as their REST surfaces ship: `anomaly-rules`, `audit-log`, `gateway-budgets`, `ingestion-sources`, `members`, `invites`, `role-bindings`, `ai-tool-entries`, `sessions`, `virtual-keys`. The CLI is built so adding a new resource is a `commands/governance/<resource>.ts` file plus a `governanceCmd.command(...)` wiring in `sdks/typescript/src/cli/index.ts`.
 
@@ -13915,6 +13932,7 @@ governance_ingestion_templates_clone_from_platform
 
 governance_ingestion_keys_list
 governance_ingestion_keys_mint
+governance_ingestion_keys_revoke
 
 governance_anomaly_rules_list
 governance_anomaly_rules_create
@@ -14025,7 +14043,7 @@ An agent connecting through the OAuth flow as an admin can fully configure gover
 2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/v1/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
-5. `governance_audit_log_query`, verify steps 2-4 all emitted audit rows
+5. `governance_audit_log_query`, verify steps 2 to 4 all emitted audit rows
 
 If every step succeeds and step 5 returns the matching audit rows, an agent can run the whole setup without a single UI click.
 
@@ -34045,25 +34063,25 @@ The `CI` half of each expression keeps the default the SDK applies on its own. W
 ---
 title: Evaluators
 sidebarTitle: Evaluators
-keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, tool call, contexts, golden answer, sql
-description: An evaluator attached to a test suite runs after every scenario run, reads the conversation, the scenario's fields or the trace, and reports beside the judge's verdict. A required pass or fail evaluator fails the scenario when it fails, and a score-only evaluator never gates.
+keywords: langwatch, agent testing, evaluators, test suite, fields, mappings, required, gate, faithfulness, rag, answer clarity, pii, golden answer, tool call, contexts
+description: An evaluator attached to a test suite runs after every scenario run and reports beside the judge's verdict, such as a faithfulness check on a RAG agent, an answer clarity score, a PII scan, or a comparison against a golden answer the scenario carries. A required evaluator fails the run when it fails.
 ---
 
 ## When to attach an evaluator
 
-The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
+The judge grades behavior from the criteria. An evaluator adds a check the [evaluator library](/evaluations/evaluators/overview) already does well: whether the answer of a RAG agent is faithful to the contexts it retrieved, a score for the clarity of the answer, a PII scan of the transcript, or a comparison against a golden answer the scenario carries. Any evaluator of the project can be attached, LLM judges included.
 
-A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
+For a golden answer, the test suite declares [fields](/agent-testing/test-suites#fields), for example `reference_answer`, and each scenario carries its value. A blank value skips the evaluators that read it.
 
 ## Attach an evaluator
 
-**Edit suite** on a test suite opens the suite editor. Under **Customize test suite**, **Add evaluators** shows the attached evaluators as chips and **Add evaluator** opens the evaluator list of the project. Picking one attaches it with its mappings inferred; when a required input is still unmapped, or when the evaluator reads an expected value, the evaluator drawer opens on the attachment so you confirm where each input reads from.
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add evaluator** lists the evaluators of the project, and picking one attaches it with its mappings inferred. When a required input is still unmapped, or the evaluator reads an expected value, the drawer opens on the attachment so you confirm each mapping.
 
 <Frame>
-<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, and two evaluator chips, SQL Query Equivalence marked as required and a score judge" />
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The suite editor with two fields, golden_sql and table_schema, each with a drag handle, and two evaluator chips, SQL Query Equivalence with the required dot and a score judge" />
 </Frame>
 
-A chip with an amber alert has a required input with no mapping. Press it to open the drawer. **Run suite** does not start while an attachment is in that state: it opens the drawer on the offending evaluator instead.
+A chip with an amber alert has a required input with no mapping. **Run suite** does not start in that state: it opens the drawer on that evaluator instead.
 
 ## Mappings
 
@@ -34076,34 +34094,96 @@ Every evaluator input reads from one source:
 | **Trace** | `contexts`, `spans`, `tool_calls.<tool>.input`, `tool_calls.<tool>.output` | The retrieved contexts of the run's traces, every span of those traces as JSON in start order, or the input or output of the last call of a tool. Needs [linked traces](/agent-testing/linking-your-traces). |
 | A value | | A literal, the same for every scenario. |
 
-Mappings are inferred when an evaluator is attached. An input named `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts.
+Mappings are inferred from the input names: `input`, `question` or `user_input` reads the first user message; `output`, `response` or `answer` reads the last agent message; `transcript`, `conversation` or `messages` reads the transcript; `contexts` or `retrieved_contexts` reads the trace's contexts. So a faithfulness evaluator on a RAG agent needs no mapping at all once its traces are linked.
 
-An input named `expected_output`, `expected_contexts` or another `expected_*` reads a suite field. A field identifier equal to the input name wins. Otherwise the words of the identifier decide: `expected_output` takes a field carrying `golden`, `answer`, `sql`, `query`, `label` or `target`, which is how it takes `golden_sql`; `expected_contexts` takes one carrying `schema`, `context` or `table`, which is how it takes `table_schema`.
+An `expected_*` input reads a suite field: the field with the same name, otherwise the one field whose name shares a word with the input. `expected_output` also takes `golden`, `answer`, `sql`, `query`, `label` or `target`, and `expected_contexts` takes `schema`, `context` or `table`. A suite with a single field maps it regardless, and two matches leave the input for you to pick in the drawer. A tool call or the spans are never inferred: set them by hand.
 
-Two fields matching leaves the input unmapped, so you pick one in the drawer. With no match at all, a suite with a single field maps the input to it. A tool call or the spans are never inferred: set them by hand. `spans` hands a code or LLM evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
+<Frame>
+<img className="block" src="/images/agent-testing/evaluator-drawer-mappings-required.png" alt="The SQL Query Equivalence drawer with output mapped to tool_calls.run_sql.input, expected_output to Scenario.fields.golden_sql, expected_contexts to Scenario.fields.table_schema, and Required to pass switched on" />
+</Frame>
 
-The example of a text-to-SQL agent: the suite declares `golden_sql` and `table_schema`, and **SQL Query Equivalence** reads `output` from `tool_calls.run_sql.input`, `expected_output` from `fields.golden_sql` and `expected_contexts` from `fields.table_schema`.
+For example, the drawer above reads `output` from the `run_sql` tool call and the two expected inputs from the `golden_sql` and `table_schema` fields, one mapping per input under **Variables**. `spans` hands an evaluator the whole run, every span of every trace as JSON, when one tool call at a time is not enough.
 
 ## Required evaluators and scores
 
-**Required to pass** on the attachment makes a failing result fail the scenario. It is on by default for an evaluator that produces a pass or fail verdict. A score-only evaluator reports its score beside the verdict and never gates, whatever the switch says.
+**Required to pass** makes a failing result fail the scenario. It is on by default for an evaluator with a pass or fail verdict. A score-only evaluator, such as an answer clarity score, reports beside the verdict and never gates.
 
 ## What each run reports
 
-After the conversation and the judge, the platform runs every attached evaluator and stores one result per evaluator on the run:
+After the judge, every attached evaluator runs and the run keeps one result per evaluator:
 
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. |
+| `passed`, `failed` | The evaluator's verdict. A failed required evaluator fails the scenario, and the verdict line names it. A required input the trace never delivered, no such tool call, no retrieved contexts or no spans, is recorded as `failed` with the reason naming it. |
 | `scored` | A score, for an evaluator with no pass or fail verdict. |
 | `skipped` | A field the mapping reads is blank on this scenario. The reason names the field. |
-| `error` | The trace has no such tool call or no retrieved contexts, or the evaluator itself failed. The reason says which. |
+| `error` | The evaluator itself failed to run. The reason says why. |
 
-The run drawer lists the evaluators under the criteria, and the run header shows a pill per evaluator with its pass rate or its mean score. See [Results](/agent-testing/results#evaluator-results).
+Between the judge's verdict and the evaluator results the run reads `Evaluating`, and `langwatch test-suite run --wait` treats it as still going. A required evaluator that never ran fails the run instead of leaving it pending. The run header shows one pill per evaluator with its pass rate or its mean score, and the run drawer lists the rows under the criteria. See [Results](/agent-testing/results#evaluator-results).
 
 ## Evaluators on a run plan
 
-The [run dialog](/agent-testing/run-plans#the-run-dialog) shows the evaluators inherited from the test suites in scope, and **Add evaluator** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover scenarios from suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+The [run dialog](/agent-testing/run-plans#the-run-dialog) lists the evaluators inherited from the test suites in scope, and **Add evaluator** under **On this run** adds one to the plan itself. A plan evaluator reads the conversation and the trace only, because a plan may cover suites with different fields. Use it for a check that applies to every scenario, such as a PII scanner.
+
+## Step by step: a golden answer on every scenario
+
+The screenshots follow a text-to-SQL suite, where the golden answer is a query and the evaluator is **SQL Query Equivalence**. The steps are the same for any evaluator that compares against a field, such as a reference answer on a RAG agent.
+
+<Steps>
+  <Step title="Declare the fields on the suite">
+    On the **Scenarios** tab, press **Edit suite** and, under **Customize test suite**, **Add fields**. Add one field per value the evaluator compares against, here `golden_sql` and `table_schema` of type **Text**, then **Save**. The editor of every scenario in the suite now asks for them.
+  </Step>
+  <Step title="Give each scenario its values">
+    Open a scenario with **Edit** in its row menu. After the criteria, the editor shows one box per field. Fill them and **Save**. A blank value is allowed: the evaluators that read it are skipped for that scenario.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/scenario-editor-field-values.png" alt="The scenario editor with the golden_sql and table_schema boxes filled in under the criteria" />
+    </Frame>
+  </Step>
+  <Step title="Attach the evaluator and confirm its mappings">
+    Back in the suite editor, press **Add evaluator** and pick the evaluator. The drawer opens with the expected inputs inferred from the fields. Here `output` has to read the query the agent ran rather than its reply, so change it to the **Trace** source, tool call `run_sql`, `input`. Leave **Required to pass** on and press **Save Changes**, then **Save** on the suite.
+
+    A score-only evaluator, such as an answer clarity judge, is attached the same way. Its switch is disabled with `Scores report, they do not gate.`
+  </Step>
+  <Step title="Run the suite">
+    Press **Run suite**, pick the agent and press **Run N scenarios**. The dialog lists the inherited evaluators, and **Add evaluator** under **On this run** adds a check for this run only. While the evaluators run, a row reads `Evaluating` in the **Result** column and `Grading` in the **Evaluators** column.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/run-dialog-inherited-and-extra.png" alt="The run dialog with the evaluators inherited from the Case lookups suite and a PII Leak Scanner added on this run" />
+    </Frame>
+  </Step>
+  <Step title="Read the results">
+    The run header shows one pill per evaluator, and every row shows one pill per evaluator with its verdict, its score or `Skipped`. Press a row: the drawer lists the evaluators under **EVALUATORS**, below the criteria, with the `REQUIRED` mark, the explanation and the **Inputs** it compared. A run the required evaluator failed reads `Verdict: FAILED · SQL Query Equivalence`, with the judge's criteria kept.
+
+    <Frame>
+    <img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
+    </Frame>
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### The evaluator was skipped
+
+The scenario has no value for the field the mapping reads. The reason names it, for example `no golden_sql on this scenario`, and the run keeps the judge's verdict. Fill the field, then **Rerun this scenario** from the row menu.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-evaluator-rows-skipped.png" alt="The run drawer of a passed run, with SQL Query Equivalence skipped and the reason no golden_sql on this scenario, while the other two evaluators report" />
+</Frame>
+
+### Run suite opens the evaluator drawer instead of running
+
+A required input has no mapping. The chip shows an amber alert, and **Run** opens the drawer on that evaluator with `Please map all required fields: expected_output`. Map the input, press **Save Changes** and run again. The API refuses the same run with `suite_evaluator_mappings_missing`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/run-gate-opens-editor-at-offender.png" alt="The run dialog behind the SQL Query Equivalence drawer, open on the unmapped expected_output input with the message Please map all required fields" />
+</Frame>
+
+### The evaluator failed with a reason about the trace
+
+`no run_sql call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace` means the run's traces did not hold what the mapping reads. The platform waits for the traces and retries, and on the last attempt records the evaluator as `failed`, so a required one fails the run.
+
+Check that the traces reach the project and join the run, see [Linking your traces](/agent-testing/linking-your-traces), and that the tool name in the mapping is the span name the agent reports.
 
 ## From the CLI and the API
 
@@ -34112,6 +34192,13 @@ langwatch test-suite create "Case lookups" \
   --field golden_sql:text --field table_schema:text \
   --evaluator sql-query-equivalence --required
 
+langwatch scenario create "Open cases count" \
+  --situation "The user is a support lead who wants to know how many support cases are open." \
+  --criteria "Gives a number of open cases" \
+  --test-suite "Case lookups" \
+  --field golden_sql="SELECT COUNT(*) FROM cases WHERE status = 'open'" \
+  --field table_schema="CREATE TABLE cases (id INT, status TEXT, created_at TIMESTAMP)"
+
 langwatch test-suite update "Case lookups" --evaluators-json evaluators.json
 
 langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --evaluator pii-leak-scanner
@@ -34119,7 +34206,7 @@ langwatch run-plan run --test-suite "Case lookups" --target http:agent_abc123 --
 langwatch simulation-run get <scenarioRunId> --format json   # results.evaluations
 ```
 
-`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, for a tool call mapping:
+`--evaluator` infers the mappings the way the suite editor does. `--evaluators-json` takes the full attachment list, which is how a tool call mapping is set:
 
 ```json
 [{
@@ -34134,11 +34221,11 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 }]
 ```
 
-The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`. `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python and TypeScript SDKs take `fields` and `evaluators` on `test_suites.create` / `testSuites.create`, `test_suites.update` / `testSuites.update` and on `run_plans.run` / `runPlans.run`; the MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
+The same list travels as `evaluators` on `POST /api/v1/test-suites`, `PATCH /api/v1/test-suites/{id}` and `config.evaluators` on `POST /api/v1/run-plans/run`, and `GET /api/simulation-runs/{scenarioRunId}` answers with `results.evaluations`. See the [Test Suites API reference](/api-reference/test-suites/overview) and the [Run Plans API reference](/api-reference/run-plans/overview). The Python SDK takes `fields` and `evaluators` on `test_suites.create`, `test_suites.update` and `run_plans.run`; the TypeScript SDK takes them on `testSuites.create`, `testSuites.update` and, under `config`, on `runPlans.run`. The MCP tools `platform_create_test_suite`, `platform_update_test_suite` and `platform_run_plan` take the same.
 
 ## From code
 
-A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict like a platform-run scenario's. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
+A scenario written with the Scenario SDK attaches evaluators in the test itself, with the same mappings and the same gate, and its results appear on the platform beside the judge's verdict. See [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation.
 
 Also check: [Test suites](/agent-testing/test-suites), [Scenarios](/agent-testing/scenarios), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces).
 
@@ -34723,6 +34810,9 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
   <Card title="Test suites" icon="folder" href="/agent-testing/test-suites">
     Group scenarios, run a group, and where scenarios written in code appear.
   </Card>
+  <Card title="Evaluators" icon="clipboard-check" href="/agent-testing/evaluators">
+    Grade every run with a faithfulness check, a score or a golden answer, and fail the scenario when a required check fails.
+  </Card>
   <Card title="Run plans" icon="play" href="/agent-testing/run-plans">
     What happens when you press Run, and how runs join one history.
   </Card>
@@ -34964,7 +35054,9 @@ Press a run plan. The sidebar lists its runs as **Run #n** with the note, the ti
 
 **Show run settings** opens the configuration the run used: **Started**, **Targets**, **Parameters**, **Repeat**, **Simulator model** and **Judge model**.
 
-The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** cell shows one pill per evaluator that ran, with its verdict or its score. The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`.
+The **Table** view has one row per scenario execution: **Result**, **Scenario**, **Evaluators** and **Time · cost**. The **Evaluators** column appears only on a run that has evaluators, and its cell shows one pill per attached evaluator, with its verdict, its score or its status when it was skipped or hit an error; a row whose evaluators are still running reads `Grading`.
+
+The row menu offers **Open the conversation**, **Rerun this scenario** and **Edit scenario**. The **Grid** view shows the same executions as cards, one colour per result, each ending in `Completed` or `Failed`, or in `Evaluating` while the evaluators of the run are still reporting.
 
 <Frame>
 <img className="block" src="/images/agent-testing/run-detail-grid.png" alt="The Grid view of a run, one card per scenario execution" />
@@ -34986,16 +35078,28 @@ Under the transcript: **FAILED CRITERIA**, **PASSED CRITERIA** and **JUDGE REASO
 
 An [evaluator](/agent-testing/evaluators) attached to the test suite or to the run plan runs after the judge, and the run keeps one result per evaluator. The drawer lists them under the criteria, one row each: the status, the name, a mark when it is required, the verdict or the score, and the reason under it.
 
+<Frame>
+<img className="block" src="/images/agent-testing/results-run-evaluator-pills.png" alt="The results page of a run: the header pills SQL Query Equivalence 67%, Answer clarity score 9.25 and PII Leak Scanner 100%, and one pill per evaluator on each row, one of them Skipped and one Fail" />
+</Frame>
+
+The header shows one pill per evaluator, and the **Evaluators** column shows one pill per evaluator on every row. A skipped evaluator keeps its pill, in grey.
+
 | Status | Meaning |
 |---|---|
-| `passed`, `failed` | The evaluator's verdict, and what a required input the trace never delivered is recorded as: no such tool call, or no retrieved contexts. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
+| `passed`, `failed` | The evaluator's verdict. When the trace never delivered a required input, the result is `failed` with the reason `no <tool> call in the trace`, `no retrieved contexts in the trace` or `no spans in the trace`. A failed **required** evaluator fails the scenario: the verdict reads `Failed · <evaluator name>` and the judge reasoning is kept. The reason says which input was missing. |
 | `scored` | The score of an evaluator with no pass or fail verdict. A score never fails a scenario. |
 | `skipped` | The scenario has no value for a field the mapping reads. The reason names the field. |
 | `error` | The evaluator itself failed to run. The reason says why. |
 
+<Frame>
+<img className="block" src="/images/agent-testing/run-drawer-evaluator-rows-failed.png" alt="The run drawer of a failed run: the verdict line reads FAILED · SQL Query Equivalence, the passed criterion, and the evaluator rows with the failed required SQL Query Equivalence and its explanation, a 7.00 clarity score and a passed PII Leak Scanner" />
+</Frame>
+
+A run the required **SQL Query Equivalence** failed: the verdict line names it, its row shows the explanation and the **Inputs**, and the criterion the judge passed is kept above.
+
 The run header shows a pill per evaluator: the pass rate for one with a verdict, the mean for one with a score. The verdict of a run is settled when the evaluators are in. A run whose evaluators all pass, or that has none, keeps the judge's verdict.
 
-Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so a batch is not reported as green while a required evaluator can still fail one of its runs.
+Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface: the **Result** column shows `Evaluating` with a spinner and the **Evaluators** column shows `Grading`. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so a batch is not reported as green while a required evaluator can still fail one of its runs.
 
 The run stays pending until its evaluators are recorded. A grading job that is lost is recorded as errored evaluators once its deadline passes, so a required evaluator that never ran fails the run instead of leaving it pending.
 
@@ -35007,13 +35111,13 @@ While the run is going, the drawer shows `The conversation is running…` and th
 
 ## What a status means
 
-The **Result** column of the table shows `Passed`, `Failed` or `Running`. The **Status** chip of the drawer is more precise:
+The **Result** column of the table shows `Passed`, `Failed`, `Running` or `Evaluating`. The **Status** chip of the drawer is more precise:
 
 | Status | Meaning | What to do |
 |---|---|---|
 | `completed` | The judge delivered a verdict and every evaluator is in. The verdict itself is `PASSED` or `FAILED`, and a failed required evaluator is what makes it `FAILED` even when the judge passed the run. | On a fail, read the reasoning in the **RESULTS** block and the evaluator rows, then the transcript. |
 | `running`, `queued`, `pending` | The conversation, or the verdict, is not done. | Wait, or **Stop**. |
-| `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
+| `evaluating` | The conversation is over and the judge has decided, but the evaluators the suite and the plan attach have not been recorded yet. A required one can still fail the run. The table shows `Evaluating` in the **Result** column and `Grading` in the **Evaluators** column. | Wait. The API and the CLI report this run as `PENDING_EVALUATION` and do not count it as finished. |
 | `failed` with an error in the drawer | The target did not answer: the URL is wrong, the agent is down, the authentication was refused, or a local tunnel ended. The drawer shows the error the target returned. | Fix the agent, then **Rerun this scenario**. |
 | `cancelled` | Stopped with **Stop** or **Stop all**. | **Rerun this scenario** when needed. |
 | `stalled` | The run stopped reporting before a verdict. | **Rerun this scenario**. A stalled run counts as not passed. |
@@ -35748,6 +35852,17 @@ The chips, in the order the dialog shows them:
 | **Run against a prompt**     | Replaces the agent with a prompt from the project as the target. See [Targets](/agent-testing/targets).                                                                                                                                                    |
 | **Custom simulation models** | Opens **Simulation models**: the **User simulator** and the **Judge** for this run. Without them, the project default model plays both. A scenario's own **Override models** wins over both.                                                               |
 | **Run multiple times**       | The repeat count, `times per scenario and target`, 1 to 5. Every scenario runs that many times, and the result of each repetition is its own row.                                                                                                          |
+| **Add evaluators**           | Opens **Evaluators**: the evaluators inherited from the test suites in scope, each under `Inherited from <suite> · edit in the suite`, and **Add evaluator** under **On this run** for one on the plan itself. A plan evaluator reads the conversation and the trace only, since a plan has no scenario field to map to. The block is already open when a test suite in scope attaches any. See [Evaluators](/agent-testing/evaluators#evaluators-on-a-run-plan). |
+
+<Frame>
+  <img
+    className="block"
+    src="/images/agent-testing/run-dialog-inherited-and-extra.png"
+    alt="The run dialog with the evaluators inherited from the Case lookups suite and a PII Leak Scanner added on this run"
+  />
+</Frame>
+
+The **Evaluators** block: two chips inherited from the `Case lookups` suite, and a PII Leak Scanner added under **On this run**.
 
 <Note>
   The dialog shows **No model provider is set up** when the project has no model provider for the
@@ -35776,7 +35891,7 @@ A scope by labels is dynamic: a scenario that gets the label later is in the nex
 
 ## While it runs
 
-The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
+The run opens as soon as it starts. Each row shows `Running` until the judge is done, then `Passed` or `Failed`. A row with evaluators shows `Evaluating` between the two, until every evaluator has reported. **Stop all** cancels every conversation that is still running, and every running row has its own **Stop**. A cancelled run keeps the results that were already in.
 
 <Frame>
   <img
@@ -36084,6 +36199,8 @@ When your adapter calls an agent that runs as a separate service, the judge cann
 
 Spread `input.propagation_headers` (Python) or `input.propagationHeaders` (TypeScript) onto your adapter's outgoing HTTP request, so the remote service joins each turn's trace. [Linking your traces](/agent-testing/linking-your-traces) covers the mechanism, the wait behavior, and how to write trace-aware criteria.
 
+Also check: [Evaluators on Scenarios](https://langwatch.ai/scenario/advanced/evaluators) in the Scenario documentation, for an evaluator declared in the test itself that grades every run against a golden answer, with the same mappings and the same gate as one attached on the platform.
+
 ---
 
 # FILE: ./agent-testing/scenarios.mdx
@@ -36139,6 +36256,12 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 ## Field values
 
 When the test suite declares [fields](/agent-testing/test-suites#fields), the editor shows one control per field after the criteria, and the value is stored on the scenario. An [evaluator](/agent-testing/evaluators) attached to the suite reads the value through its mapping, for example `expected_output` from `golden_sql`.
+
+<Frame>
+<img className="block" src="/images/agent-testing/scenario-editor-field-values.png" alt="The scenario editor with the golden_sql and table_schema boxes filled in under the criteria" />
+</Frame>
+
+The `golden_sql` and `table_schema` boxes under the criteria are the fields the `Case lookups` suite declares. A text box grows with its text.
 
 A blank value is no value: the evaluators that read the field are skipped for this scenario, with the reason `no golden_sql on this scenario`. A scenario moved to another suite keeps the values it holds; the editor lists the ones the new suite does not declare under **Not in this suite**, each with a remove action.
 
@@ -36423,7 +36546,7 @@ The **Results** tab lists every run plan of the project. A run plan is the histo
 - After every incident or complaint, add a scenario for it.
 - Keep scenarios short: one situation, a few criteria.
 
-Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).
+Also check: [Evaluators](/agent-testing/evaluators) to grade every run with a faithfulness check, a score or a golden answer, [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites), [Run plans](/agent-testing/run-plans), [Results](/agent-testing/results).
 
 ---
 
@@ -36466,7 +36589,13 @@ Under the suite name, the header shows a chip per field and a chip per evaluator
 
 A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
 
-**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
+
+<Frame>
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+</Frame>
+
+The field rows of the `Case lookups` suite, with the drag handle on the left of each.
 
 | Setting        | Rule                                                                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

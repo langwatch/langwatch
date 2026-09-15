@@ -426,6 +426,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
           sumIf(TokensCacheRead, Status IN ('confirmed', 'failed')) AS TokensCacheRead,
           sumIf(TokensCacheWrite, Status IN ('confirmed', 'failed')) AS TokensCacheWrite,
           sumIf(TokensReasoning, Status IN ('confirmed', 'failed')) AS TokensReasoning,
+          sumIf(TokensInputImage, Status IN ('confirmed', 'failed')) AS TokensInputImage,
+          sumIf(TokensOutputImage, Status IN ('confirmed', 'failed')) AS TokensOutputImage,
+          sumIf(ImageCount, Status IN ('confirmed', 'failed')) AS ImageCount,
           sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
@@ -483,6 +486,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     tokensCacheRead: number;
     tokensCacheWrite: number;
     tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
   }> {
     const empty = {
       spendUsd: nanoUsdToDecimalString(0),
@@ -493,6 +499,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
       tokensReasoning: 0,
+      tokensInputImage: 0,
+      tokensOutputImage: 0,
+      imageCount: 0,
     };
     if (tenantIds.length === 0) return empty;
     const client = await this.resolveClient(tenantIds[0]!);
@@ -506,7 +515,10 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
           sum(TokensOutput) AS TokensOutput,
           sum(TokensCacheRead) AS TokensCacheRead,
           sum(TokensCacheWrite) AS TokensCacheWrite,
-          sum(TokensReasoning) AS TokensReasoning
+          sum(TokensReasoning) AS TokensReasoning,
+          sum(TokensInputImage) AS TokensInputImage,
+          sum(TokensOutputImage) AS TokensOutputImage,
+          sum(ImageCount) AS ImageCount
         FROM ${TABLE} FINAL
         WHERE TenantId IN {tenantIds:Array(String)}
           AND EndUserId = {endUserId:String}
@@ -536,6 +548,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       tokensCacheRead: Number(row.TokensCacheRead ?? 0),
       tokensCacheWrite: Number(row.TokensCacheWrite ?? 0),
       tokensReasoning: Number(row.TokensReasoning ?? 0),
+      tokensInputImage: Number(row.TokensInputImage ?? 0),
+      tokensOutputImage: Number(row.TokensOutputImage ?? 0),
+      imageCount: Number(row.ImageCount ?? 0),
     };
   }
 
@@ -706,6 +721,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       tokensCacheRead: GatewaySpendEventsRepository.summed(raw, "TokensCacheRead"),
       tokensCacheWrite: GatewaySpendEventsRepository.summed(raw, "TokensCacheWrite"),
       tokensReasoning: GatewaySpendEventsRepository.summed(raw, "TokensReasoning"),
+      tokensInputImage: GatewaySpendEventsRepository.summed(raw, "TokensInputImage"),
+      tokensOutputImage: GatewaySpendEventsRepository.summed(raw, "TokensOutputImage"),
+      imageCount: GatewaySpendEventsRepository.summed(raw, "ImageCount"),
       costNanoUsd: nano,
       costUsd: nanoUsdToDecimalString(nano),
     };

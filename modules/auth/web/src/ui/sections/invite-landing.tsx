@@ -143,6 +143,11 @@ function SignedOutInvite({
           opened part-way down the rail of methods would push the rest of it
           down the page and say its piece where nobody is looking. */}
       <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Could not start sign-in"
+        className="lw-front-door-alert"
+      />
+      <HandledErrorAlert
         error={passkeyError}
         fallbackTitle="Could not use a passkey"
         className="lw-front-door-alert"
@@ -180,6 +185,23 @@ function SignedOutInvite({
             </HStack>
           )}
         />
+      ) : routing.error ? (
+        // A routing failure used to leave this card on an empty document
+        // below the inviter's name — no picker, no retry, nothing the reader
+        // could do about it. The alert above says what happened; this is the
+        // way forward the sibling sign-in screen gives the same failure by
+        // way of its address form staying live for a resubmit — there is no
+        // form here to resubmit, so the retry is its own control.
+        <HStack>
+          <Button
+            colorPalette="orange"
+            data-testid="invite-routing-retry"
+            loading={routing.isDeciding}
+            onClick={() => void decide({ identifier: null })}
+          >
+            Try again
+          </Button>
+        </HStack>
       ) : null}
     </AuthCard>
   );

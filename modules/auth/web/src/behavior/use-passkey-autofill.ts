@@ -1,6 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { authClient, navigate, safeRedirectTarget } from "./auth-client.tsx";
 import { rememberLastUsedMethod } from "../model/last-used-method.ts";
+import {
+  isCeremonyAbandoned,
+  passkeyFailureFrom,
+  readPasskeyErrorCode,
+} from "../model/passkey-failure.ts";
 
 /**
  * The waiting half: ask whether the browser can do this at all, then leave a
@@ -13,16 +18,33 @@ import { rememberLastUsedMethod } from "../model/last-used-method.ts";
 async function offerPasskeyFromAutofill({
   isLive,
   callbackUrl,
+  onError,
 }: {
   isLive: () => boolean;
   callbackUrl?: string;
+  onError: (error: unknown) => void;
 }): Promise<void> {
   try {
     const available = await window.PublicKeyCredential?.isConditionalMediationAvailable?.();
     if (!available || !isLive()) return;
 
     const result = await authClient.signIn.passkey({ autoFill: true });
-    if (!isLive() || !result || result.error) return;
+    if (!isLive() || !result) return;
+
+    // Up to here nobody had started anything, and silence was right. Past
+    // here somebody PICKED a credential and is waiting for a door to open, so
+    // a refusal they never see reads as the click having done nothing at all.
+    // The plugin does not throw an abandoned ceremony — it RESOLVES it,
+    // carrying a 400, straight into the branch below that reads a 400 as "the
+    // server looked at this credential and said no". Only a ceremony that
+    // genuinely resolved with a refusal is reported; an abandoned one stays
+    // silent, same as before.
+    if (result.error) {
+      if (!isCeremonyAbandoned({ code: readPasskeyErrorCode(result.error) })) {
+        onError(passkeyFailureFrom(result.error));
+      }
+      return;
+    }
 
     rememberLastUsedMethod({ id: "passkey" });
     navigate(safeRedirectTarget(callbackUrl));
@@ -37,11 +59,22 @@ async function offerPasskeyFromAutofill({
 export function usePasskeyAutofill({
   enabled,
   callbackUrl,
+  onError,
 }: {
   /** Only where this deployment actually offers passkeys. */
   enabled: boolean;
   callbackUrl?: string;
+  /**
+   * Told when a passkey somebody PICKED could not be used. Never told about a
+   * request nobody answered, or one they dismissed.
+   */
+  onError?: (error: unknown) => void;
 }): void {
+  // Read after the await, like `isLive`: the ceremony may resolve a minute
+  // after it started, and the caller may have handed us a new callback since.
+  const reportError = useRef(onError);
+  reportError.current = onError;
+
   useEffect(() => {
     if (!enabled) return;
 
@@ -65,6 +98,7 @@ export function usePasskeyAutofill({
       void offerPasskeyFromAutofill({
         isLive: () => live,
         callbackUrl,
+        onError: (error) => reportError.current?.(error),
       });
     };
 

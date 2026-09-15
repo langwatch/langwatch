@@ -6,6 +6,7 @@
 import { publicRoute } from "@langwatch/api/access";
 import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { AuthApi, frontDoorTrpc } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -167,10 +168,11 @@ export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
   .noPermission({ reason: OWN_ADDRESS })
   .handle(async ({ app, actor }, email) => {
     if (!email) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "This account has no email address to confirm.",
-      });
+      throw new HandledError(
+        "auth_no_address_to_confirm",
+        "This account has no email address to confirm.",
+        { httpStatus: 400 },
+      );
     }
 
     const withinBudget = await app.isWithinBudget({
@@ -215,6 +217,6 @@ async function spend({
 }
 
 /** The refusal every throttle here raises, with the surface's own wording. */
-function throttled(message: string): TRPCError {
-  return new TRPCError({ code: "TOO_MANY_REQUESTS", message });
+function throttled(message: string): HandledError {
+  return new HandledError("auth_rate_limited", message, { httpStatus: 429, retryable: true });
 }

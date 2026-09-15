@@ -6,6 +6,7 @@
  * never replaces a full one. Spec: specs/identity/passkeys.feature
  */
 import {
+  ImpersonationCannotChangeCredentialsError,
   UserPasswordAlreadySetError,
   UserPasswordAuthUnavailableError,
 } from "@langwatch/user-contract";
@@ -20,6 +21,12 @@ import {
 } from "./user.fixture.ts";
 
 const SELF = { email: "sam@acme.com" };
+
+/** The account's own owner, asking for themselves. */
+const owner = (id: string) => ({ id, operatorId: id, impersonated: false });
+
+/** An operator browsing as that account: the subject is theirs, the account is not. */
+const operatorAs = (id: string) => ({ id, operatorId: "operator-1", impersonated: true });
 
 /** A passkey sign-up: a real account row holding no password at all. */
 function passwordlessAccount(): {
@@ -48,6 +55,7 @@ describe("setting a first password", () => {
 
       await app.setOwnFirstPassword({
         userId: created.id,
+        caller: owner(created.id),
         password: "a-good-password",
         keepSessionId: "sess-1",
       });
@@ -64,6 +72,7 @@ describe("setting a first password", () => {
 
       await app.setOwnFirstPassword({
         userId: created.id,
+        caller: owner(created.id),
         password: "a-good-password",
         keepSessionId: "sess-1",
       });
@@ -94,6 +103,7 @@ describe("setting a first password", () => {
       await expect(
         app.setOwnFirstPassword({
           userId: created.id,
+          caller: owner(created.id),
           password: "a-good-password",
           keepSessionId: "sess-1",
         }),
@@ -109,7 +119,12 @@ describe("setting a first password", () => {
       const created = await account.create();
 
       await expect(
-        app.setOwnFirstPassword({ userId: created.id, password: "short", keepSessionId: null }),
+        app.setOwnFirstPassword({
+          userId: created.id,
+          caller: owner(created.id),
+          password: "short",
+          keepSessionId: null,
+        }),
       ).rejects.toMatchObject({ meta: { fieldErrors: { password: expect.any(Array) } } });
       await expect(app.hasPassword({ id: created.id })).resolves.toBe(false);
     });
@@ -135,6 +150,7 @@ describe("setting a first password", () => {
       await expect(
         app.setOwnFirstPassword({
           userId: created.id,
+          caller: owner(created.id),
           password: "a-good-password",
           keepSessionId: "sess-1",
         }),
@@ -142,8 +158,8 @@ describe("setting a first password", () => {
     });
   });
 
-  describe("given an operator browsing as somebody", () => {
-    it("keeps no session, because the row it holds is the operator's own", async () => {
+  describe("given a request that carried no browser session of its own", () => {
+    it("keeps no session, because there is no row to spare", async () => {
       const auth = createUserTestAuth();
       const account = passwordlessAccount();
       const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
@@ -151,10 +167,38 @@ describe("setting a first password", () => {
 
       await app.setOwnFirstPassword({
         userId: created.id,
+        caller: owner(created.id),
         password: "a-good-password",
         keepSessionId: null,
       });
 
+      expect(auth.revokeOtherBrowserSessions).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The operation exists for accounts holding NO password, so it asks for no
+   * proof beyond the session — which is exactly why an operator must not reach
+   * it. A password minted here would be a way into the account that outlives
+   * the impersonation, on precisely the single-sign-on-only and passkey-only
+   * accounts the operation was built for.
+   */
+  describe("given an operator browsing as somebody", () => {
+    it("refuses outright, sets no password and ends no session", async () => {
+      const auth = createUserTestAuth();
+      const account = passwordlessAccount();
+      const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
+      const created = await account.create();
+
+      await expect(
+        app.setOwnFirstPassword({
+          userId: created.id,
+          caller: operatorAs(created.id),
+          password: "a-good-password",
+          keepSessionId: null,
+        }),
+      ).rejects.toBeInstanceOf(ImpersonationCannotChangeCredentialsError);
+      await expect(app.hasPassword({ id: created.id })).resolves.toBe(false);
       expect(auth.revokeOtherBrowserSessions).not.toHaveBeenCalled();
     });
   });

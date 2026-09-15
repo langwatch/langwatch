@@ -1,6 +1,10 @@
 import { PrismaRepository, type PrismaRepositoryClient } from "@langwatch/prisma-client";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import { HIDDEN_SYSTEM_KEY_NAMES, type ApiKeyRevocationCause } from "@langwatch/api-key-contract";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import {
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  HIDDEN_SYSTEM_KEY_NAMES,
+  type ApiKeyRevocationCause,
+} from "@langwatch/api-key-contract";
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,
@@ -167,5 +171,60 @@ export class PrismaApiKeyRepository
       data: { revokedAt: now },
     });
     return count;
+  }
+  findLiveChildren(input: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.database.apiKey.findMany({
+      where: {
+        organizationId: input.organizationId,
+        parentApiKeyId: input.parentApiKeyId,
+        revokedAt: null,
+      },
+      select: { id: true },
+    });
+  }
+  async findLivenessById(
+    input: { id: string },
+  ): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+    const row = await this.database.apiKey.findUnique({
+      where: { id: input.id },
+      select: { revokedAt: true, expiresAt: true },
+    });
+    if (!row) return null;
+    return {
+      revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
+      expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+    };
+  }
+  findElapsedLoginKeys(input: {
+    now: Instant;
+  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>> {
+    return this.database.apiKey.findMany({
+      where: {
+        name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
+        revokedAt: null,
+        expiresAt: { not: null, lte: toDate(input.now) },
+      },
+      select: { id: true, userId: true, organizationId: true },
+    });
+  }
+  async extendLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    await this.database.apiKey.updateMany({
+      where: {
+        id: input.id,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },
+        revokedAt: null,
+      },
+      data: { expiresAt: toDate(input.expiresAt) },
+    });
   }
 }

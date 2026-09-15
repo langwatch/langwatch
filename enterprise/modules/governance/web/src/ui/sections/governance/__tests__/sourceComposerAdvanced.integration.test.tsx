@@ -24,20 +24,21 @@
  * destination picker says inside, so the create drawer states the outcome of
  * leaving it closed where they cannot miss it.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import { SourceComposerDrawer, SourceEditDrawer } from "../governance-inventory.screen.tsx";
 
 /**
  * `OttlEditor` calls tRPC on render and is not what this file is about, so it
  * gets the smallest stub that lets the drawers mount — the same one
- * `sourceEditDestination.integration.test.tsx` uses.
+ * `source-edit-destination.integration.test.tsx` uses.
  */
-vi.mock("~/utils/api", () => ({
-  api: {
+vi.mock("../../../../behavior/governance-api.ts", () => {
+  const api = {
     ingestionSources: {
       ottlStarter: {
         useQuery: () => ({ data: undefined, isLoading: false, error: null }),
@@ -53,12 +54,11 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-  },
-}));
+  };
+  return { api, governanceApi: api };
+});
 
-vi.mock("~/components/ui/toaster", () => ({
-  toaster: { create: vi.fn() },
-}));
+afterEach(cleanup);
 
 const ORG_ID = "org_acme";
 
@@ -106,11 +106,9 @@ function ComposerHarness({ sourceType }: { sourceType: string }) {
 }
 
 const renderComposer = (sourceType = "databricks_genie") =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ComposerHarness sourceType={sourceType} />
-    </ChakraProvider>,
-  );
+  renderWithGovernanceHost(<ComposerHarness sourceType={sourceType} />, {
+    host: fakeGovernanceHost(),
+  });
 
 /**
  * Scoped to the field rather than reached through `getByRole("combobox")`:
@@ -191,17 +189,16 @@ const routingSource = {
 } as unknown as Parameters<typeof SourceEditDrawer>[0]["source"];
 
 const renderEditDrawer = (source = editableSource) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SourceEditDrawer
-        organizationId={ORG_ID}
-        destinationCtx={DESTINATION_CTX}
-        source={source}
-        onClose={vi.fn()}
-        onSubmit={vi.fn()}
-        isPending={false}
-      />
-    </ChakraProvider>,
+  renderWithGovernanceHost(
+    <SourceEditDrawer
+      organizationId={ORG_ID}
+      destinationCtx={DESTINATION_CTX}
+      source={source}
+      onClose={vi.fn()}
+      onSubmit={vi.fn()}
+      isPending={false}
+    />,
+    { host: fakeGovernanceHost() },
   );
 
 /**
@@ -243,6 +240,23 @@ describe("given the create drawer for a pull-mode conversation source", () => {
       renderComposer();
 
       expect(screen.getAllByText("Advanced")).toHaveLength(1);
+    });
+
+    /** @scenario "The description field asks for a description" */
+    it("asks for the name and the description in the same shape", () => {
+      renderComposer();
+
+      // The description used to prompt "What this fleet covers + who owns it":
+      // two particular facts, asked for with a word that appears nowhere else
+      // an admin can see. The two fields sit on top of each other, so the
+      // mismatched shape was visible without reading either of them.
+      expect(
+        screen.getByPlaceholderText("Display name for this source"),
+      ).toBeTruthy();
+      expect(
+        screen.getByPlaceholderText("Description for this source"),
+      ).toBeTruthy();
+      expect(screen.queryByPlaceholderText(/fleet/i)).toBeNull();
     });
   });
 

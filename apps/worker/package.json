@@ -32,7 +32,8 @@
     }
   },
   "scripts": {
-    "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
+    "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
+    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/worker.entrypoint.ts",
     "typecheck": "node ../../dev/scripts/typecheck-app.mjs ./tsconfig.declarations.json tsconfig.test.json --checkers 1",

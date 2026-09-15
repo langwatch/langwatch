@@ -187,6 +187,7 @@ describe("the identity ceremonies", () => {
 
   describe("when a latched user is about to be deleted", () => {
     /** @scenario "Deleting a latched user runs the erase ceremony before the row delete" */
+    /** @scenario Tenant retention never enrolls durable security projections */
     it("erases the user before the row goes", async () => {
       const { ceremonies, identity } = harness();
 

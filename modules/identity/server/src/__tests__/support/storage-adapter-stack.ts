@@ -3,7 +3,7 @@ import {
   IdentityEngineUnavailableError,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
-import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
@@ -14,11 +14,11 @@ import {
   BetterAuthCeremonyBridgeAdapter,
   IdentityCeremoniesAdapter,
 } from "../../services/better-auth-identity-ceremonies.service.ts";
-import { BetterAuthIdentityStorageAdapter } from "../../services/better-auth-identity-storage.service.ts";
-import type {
-  IdentityAccounts,
-  IdentityResolver,
-} from "../../rules/identity-storage.rules.ts";
+import {
+  BetterAuthIdentityStorageAdapter,
+  type PasskeyRemovalPort,
+} from "../../services/better-auth-identity-storage.service.ts";
+import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import {
   adoptUserEmailCommandId,
@@ -41,7 +41,38 @@ const emptyDb = (): MemoryDB => ({
   session: [],
   account: [],
   verification: [],
+  passkey: [],
 });
+
+/**
+ * The adapter tests exercise the passkey table without mounting the browser
+ * passkey endpoints. Keep the real plugin schema here so Better Auth validates
+ * those direct adapter calls against the same row shape as production.
+ */
+const passkeySchemaPlugin: BetterAuthPlugin = {
+  id: "passkey",
+  schema: {
+    passkey: {
+      fields: {
+        name: { type: "string", required: false },
+        publicKey: { type: "string", required: true },
+        userId: {
+          type: "string",
+          references: { model: "user", field: "id" },
+          required: true,
+          index: true,
+        },
+        credentialID: { type: "string", required: true, index: true },
+        counter: { type: "number", required: true },
+        deviceType: { type: "string", required: true },
+        backedUp: { type: "boolean", required: true },
+        transports: { type: "string", required: false },
+        createdAt: { type: "date", required: false },
+        aaguid: { type: "string", required: false },
+      },
+    },
+  },
+};
 
 /**
  * One `betterAuth()` shape for both stacks, differing only in the engine.
@@ -56,6 +87,7 @@ function authOver(
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
+    plugins: [passkeySchemaPlugin],
     emailAndPassword: { enabled: true },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });
@@ -102,10 +134,28 @@ export interface IdentityStack {
  * better-auth over the identity storage adapter (ADR-116 §1), with the same
  * — ADR-116 §5's move from a hook-level veto to a storage-level one — and a
  */
+/**
+ * The memory engine standing in for the current legacy Prisma account table.
+ * `Account` now has an issuer column; the wrapper remains the named fixture
+ * for tests that pin translation against that real schema rather than against
+ * an earlier, issuer-less version of it.
+ */
+function schemaBoundLegacyEngine(db: MemoryDB) {
+  return memoryAdapter(db);
+}
+
 export function identityStack({
   inert = false,
   withDatabaseHooks = false,
-}: { inert?: boolean; withDatabaseHooks?: boolean } = {}): IdentityStack {
+  schemaBoundLegacy = false,
+  passkeyRemoval,
+}: {
+  inert?: boolean;
+  withDatabaseHooks?: boolean;
+  /** Use the named fixture that represents the current Prisma account shape. */
+  schemaBoundLegacy?: boolean;
+  passkeyRemoval?: PasskeyRemovalPort;
+} = {}): IdentityStack {
   const db = emptyDb();
   const heads = new InMemoryHeads();
   const commands: IdentityCommand[] = [];
@@ -233,13 +283,18 @@ export function identityStack({
   });
   const auth = authOver(
     BetterAuthIdentityStorageAdapter.create({
-      legacyEngine: memoryAdapter(db),
+      legacyEngine: schemaBoundLegacy ? schemaBoundLegacyEngine(db) : memoryAdapter(db),
       accounts,
       resolution,
       ceremonies,
       isUserOnIdentityWrites,
       isAnyoneOnIdentityWrites,
       birth,
+      // A stack that names no removal port is testing something else; the
+      // refusal keeps a passkey delete from quietly taking the legacy path.
+      passkeyRemoval: passkeyRemoval ?? {
+        deleteIfAnotherWayInRemains: async () => "not_found",
+      },
     }).factory(),
     // The application's own wiring, verbatim: the account ceremonies bound to
     // better-auth's `databaseHooks` alongside the adapter that also runs them.

@@ -222,6 +222,9 @@ export class ApiKeyService {
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
+    sessionStartedAtMs?: number;
+    maxSessionDurationDays?: number;
+    refreshWindowMs?: number;
   }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }> {
     return this.cli.mintCliLoginKey(input);
   }
@@ -242,6 +245,17 @@ export class ApiKeyService {
     organizationId: string;
   }): Promise<void> {
     return this.cli.revokeCliLoginKeyForLogout(input);
+  }
+
+  async extendCliLoginKeyExpiry(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    sessionStartedAtMs: number;
+    maxSessionDurationDays: number;
+    refreshWindowMs: number;
+  }): Promise<void> {
+    return this.cli.extendCliLoginKeyExpiry(input);
   }
 
   async enrichBindingsWithNames(input: {

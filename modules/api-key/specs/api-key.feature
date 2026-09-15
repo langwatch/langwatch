@@ -88,3 +88,85 @@ Feature: API key lifecycle
     When the API-key feature installs
     Then it registers the agent-sandbox maintenance pipeline
     And the pipeline's sweep runs the feature's own revoke
+
+  # The CLI login-key parent cascade. A personal ingest key minted by a CLI
+  # device session carries `parentApiKeyId`, so revoking the session's login
+  # key (a person's own revoke, a re-login, or the session running out)
+  # retires the keys minted under it too — from the API-keys page, the REST
+  # route, the tRPC mutation and the hourly sweep alike, since the cascade
+  # lives on the revoke primitive rather than in any one caller.
+
+  @unit
+  Scenario: Revoking a login key retires its ingest keys
+    Given a login key with ingestion keys minted under it
+    When a person revokes the login key
+    Then each ingest key minted under it is also revoked
+    And the ingest keys record that the session went, cause "session", not that someone chose them
+
+  @unit
+  Scenario: A cause other than a person's own revoke passes through to the children unchanged
+    Given a login key with an ingestion key minted under it
+    When the login key is revoked with cause "rotation"
+    Then the ingestion key is revoked with the same cause "rotation"
+
+  @unit
+  Scenario: A cascade that fails does not fail the revoke that triggered it
+    Given a login key whose children cannot be read
+    When the login key is revoked
+    Then the revoke still reports the login key as revoked
+
+  @unit
+  Scenario: A cascade does not recurse past one level
+    Given a login key with one ingestion key minted under it
+    When the login key is revoked
+    Then the cascade looks for children exactly once
+
+  @unit
+  Scenario: A key minted as its session is being retired does not outlive it
+    Given an ingestion key parented to a login key
+    When the login key is revoked or its session has expired
+    Then verifying the ingestion key's token is refused
+    And verifying it while the login key is still live succeeds
+
+  # The CLI login-key sweep. A session the CLI stops refreshing leaves Redis
+  # by TTL, which runs no code, so this hourly sweep is what retires its
+  # login key — and, through the ordinary revoke cascade, the ingest keys
+  # parented to it.
+
+  @unit
+  Scenario: The CLI login-key sweep retires elapsed sessions and their ingest keys
+    Given a CLI login key whose session has run out
+    When the sweep runs
+    Then it revokes the key through the feature's own revoke, not a raw update
+    And a row with no user is skipped rather than failing the sweep
+    And a key another caller already revoked is tolerated
+
+  @unit
+  Scenario: The worker composes the CLI login-key sweep from the feature package
+    Given a worker graph composed with the process database
+    When the API-key feature installs
+    Then it registers the CLI login-key sweep on the agent-sandbox maintenance pipeline
+    And the pipeline's sweep revokes through the installing graph's own app
+
+  # Device labels. One derivation serves the CLI login key and every ingest
+  # key minted under it, so the two carry the same label and a devices
+  # listing can show a key beside the session that minted it.
+
+  @unit
+  Scenario: A device label is reduced to the charset a key name carries
+    Given a free-form device label with characters a key name cannot carry
+    When the label is sanitized
+    Then it is lowercased, trimmed to 24 characters and stripped of stray dashes
+
+  @unit
+  Scenario: A session with neither a chosen label nor a hostname is unknown-device
+    Given a device session whose client_info carries neither field
+    When its label is derived
+    Then it reads "unknown-device"
+
+  @unit
+  Scenario: A session's login-key expiry tracks the sooner of the refresh window and the org ceiling
+    Given an organization with a maximum session duration
+    When a login key's expiry is computed
+    Then it is the sooner of the refresh window from now and the ceiling from the session start
+    And a session already past the ceiling does not slide forward on a later refresh

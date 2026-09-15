@@ -250,6 +250,9 @@ export class ApiKeyApp implements ApiKeyApi {
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
+    sessionStartedAtMs?: number;
+    maxSessionDurationDays?: number;
+    refreshWindowMs?: number;
   }) {
     return this.#service.mintCliLoginKey(input);
   }
@@ -261,6 +264,16 @@ export class ApiKeyApp implements ApiKeyApi {
     createdBefore?: Instant;
   }): Promise<void> {
     return this.#service.revokeCliLoginKeysForDevice(input);
+  }
+  async extendCliLoginKeyExpiry(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    sessionStartedAtMs: number;
+    maxSessionDurationDays: number;
+    refreshWindowMs: number;
+  }): Promise<void> {
+    return this.#service.extendCliLoginKeyExpiry(input);
   }
   async revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;
@@ -394,6 +407,10 @@ export class ApiKeyApp implements ApiKeyApi {
       // Human label of the CLI device session that minted this ingestion key
       // ("Rogerio's MacBook Pro"); null for keys without device provenance.
       createdByDeviceLabel: apiKey.createdByDeviceLabel,
+      // The CLI login key of the session that minted this ingestion key, so a
+      // key with no label of its own can still be shown against the machine
+      // it came from. Null for keys minted outside a CLI session.
+      parentApiKeyId: apiKey.parentApiKeyId ?? null,
       roleBindings: apiKey.roleBindings.map((rb) => ({
         id: rb.id,
         role: rb.role,

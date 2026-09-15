@@ -118,6 +118,7 @@ describe("runSystemMigrationsAtStartup", () => {
     ).rejects.toThrow(RangeError);
   });
 
+  /** @scenario "A finite held migration prevents startup" */
   it("rejects no progress after the bounded polls", async () => {
     await expect(
       runSystemMigrationsAtStartup({
@@ -142,6 +143,7 @@ describe("runSystemMigrationsAtStartup", () => {
     ).rejects.toBeInstanceOf(SystemMigrationStartupIncompleteError);
   });
 
+  /** @scenario "Cancelling startup stops the loop between passes" */
   it("does not report readiness after a mid-pass abort", async () => {
     const controller = new AbortController();
     await expect(
@@ -170,6 +172,7 @@ describe("runSystemMigrationsAtStartup", () => {
     ).rejects.toBeInstanceOf(SystemMigrationStartupIncompleteError);
   });
 
+  /** @scenario "A failed pass prevents startup" */
   it("preserves a failed pass cause", async () => {
     const cause = new Error("database unavailable");
     let failure: unknown;
@@ -190,6 +193,7 @@ describe("runSystemMigrationsAtStartup", () => {
     if (failure instanceof SystemMigrationStartupIncompleteError) expect(failure.cause).toBe(cause);
   });
 
+  /** @scenario "Cancelling startup stops the loop between passes" */
   it("preserves the abort reason", async () => {
     const controller = new AbortController();
     const reason = new Error("shutdown");

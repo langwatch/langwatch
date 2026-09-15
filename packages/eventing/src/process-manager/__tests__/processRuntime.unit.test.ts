@@ -67,6 +67,15 @@ function physicalEvent(id: string): ProcessTestEvent {
   };
 }
 
+/** The same event landing on a different process instance. */
+function keyedEvent({ id, traceId }: { id: string; traceId: string }): ProcessTestEvent {
+  return {
+    ...physicalEvent(id),
+    idempotencyKey: `${id}:${traceId}`,
+    data: { traceId },
+  };
+}
+
 describe("ProcessRuntime", () => {
   describe("given a process manager derives an operation key from its event", () => {
     it("persists the process under that key instead of the aggregate ID", async () => {
@@ -112,6 +121,72 @@ describe("ProcessRuntime", () => {
         }),
       ).toBeNull();
       await runtime.stop();
+    });
+  });
+
+  describe("given a keyed process manager gathers several aggregates", () => {
+    it("lanes its deliveries by the process key and evolves one instance per key", async () => {
+      const store = InMemoryProcessStore.createForTesting();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<ProcessTestEvent>({
+        name: "keyedInbox",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .keyBy((event) => `trace:${event.data.traceId}`)
+            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({
+              state: { count: state.count + 1 },
+            })),
+      });
+      const [subscriber] = runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["keyedInbox", definition]]),
+      }).subscribers;
+
+      // Without the lane, two deliveries to one instance run concurrently and
+      // fight over its revision; the group key is what serializes them.
+      expect(
+        subscriber!.options?.groupKeyFn?.(keyedEvent({ id: "physical-1", traceId: "trace-1" })),
+      ).toBe("trace:trace-1");
+      expect(
+        subscriber!.options?.groupKeyFn?.(keyedEvent({ id: "physical-2", traceId: "trace-2" })),
+      ).toBe("trace:trace-2");
+
+      const context = { tenantId, aggregateId: "trigger-1" };
+      await subscriber!.handle(keyedEvent({ id: "physical-1", traceId: "trace-1" }), context);
+      await subscriber!.handle(keyedEvent({ id: "physical-2", traceId: "trace-1" }), context);
+      await subscriber!.handle(keyedEvent({ id: "physical-3", traceId: "trace-2" }), context);
+
+      const findKey = async (processKey: string) =>
+        store.findByRef<{ count: number }>({
+          ref: { processName: "keyedInbox", projectId: tenantId, processKey },
+        });
+      expect((await findKey("trace:trace-1"))?.state).toEqual({ count: 2 });
+      expect((await findKey("trace:trace-2"))?.state).toEqual({ count: 1 });
+      await runtime.stop();
+    });
+  });
+
+  describe("given a process manager declares no key", () => {
+    it("leaves the subscriber on the default aggregate lane", () => {
+      const store = InMemoryProcessStore.createForTesting();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<ProcessTestEvent>({
+        name: "unkeyedInbox",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(TEST_PROCESS_EVENT_TYPE, (state) => ({ state })),
+      });
+
+      const [subscriber] = runtime.registerPipeline<ProcessTestEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["unkeyedInbox", definition]]),
+      }).subscribers;
+
+      expect(subscriber!.options?.groupKeyFn).toBeUndefined();
     });
   });
 

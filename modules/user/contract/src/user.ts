@@ -246,11 +246,22 @@ export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAc
  */
 const keptBrowserSession = z.string().min(1).nullable();
 
+/**
+ * Who asked for a credential write, carried as a FACT rather than inferred.
+ *
+ * `keepSessionId` is null while impersonating too, but that is a statement
+ * about which session to spare, not about who is asking — a request that
+ * carried no browser session at all is null for a different reason. A write
+ * that must be refused outright needs to be told, not to guess.
+ */
+const credentialWriteCaller = userCallerSchema;
+
 export const setOwnFirstPasswordInputSchema = z
   .object({
     userId: z.string().min(1),
     password: z.string().min(1),
     keepSessionId: keptBrowserSession,
+    caller: credentialWriteCaller,
   })
   .strict();
 export type SetOwnFirstPasswordInput = z.infer<typeof setOwnFirstPasswordInputSchema>;
@@ -261,6 +272,7 @@ export const changeOwnPasswordInputSchema = z
     currentPassword: z.string().min(1),
     newPassword: z.string().min(1),
     keepSessionId: keptBrowserSession,
+    caller: credentialWriteCaller,
   })
   .strict();
 export type ChangeOwnPasswordInput = z.infer<typeof changeOwnPasswordInputSchema>;

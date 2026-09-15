@@ -3,6 +3,7 @@ import {
   AppGovernanceEventingRuntime,
   AppIngestionPullExecutionRuntime,
   AppIngestionPullLifecycleRuntime,
+  createGovernanceCostRollupStore,
 } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
 import { AppIngestionPullWorkerAdapter } from "@langwatch/enterprise-api/governance/ingestion-pull-worker.adapter";
 import { AppGovernanceOcsfEventsAdapter } from "@langwatch/enterprise-api/governance/governance-ocsf-events.adapter";
@@ -78,6 +79,11 @@ export function createWorkerGovernanceIngestion(
         >[0],
       ),
       OtelGovernanceIngestionPullMetrics.create(),
+      createGovernanceCostRollupStore(
+        options.resolveClickHouseClient as unknown as Parameters<
+          typeof createGovernanceCostRollupStore
+        >[0],
+      ),
     ),
     AppIngestionPullLifecycleRuntime.create(
       options.database,

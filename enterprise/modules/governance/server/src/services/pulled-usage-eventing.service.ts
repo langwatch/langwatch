@@ -8,6 +8,7 @@ import {
   pulledUsageObservationKey,
   pulledUsageObservedEventDataSchema,
   type PulledUsageObservedEvent,
+  type PulledUsageRetractedEvent,
 } from "@langwatch/enterprise-governance-contract";
 import {
   defineAggregate,
@@ -17,11 +18,20 @@ import {
   type Event,
 } from "@langwatch/eventing";
 import {
+  COST_ROLLUP_WATCH_PROCESS_NAME,
+  CostRollupWatchProcess,
+} from "../eventing/cost-rollup-watch.process.ts";
+import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   PulledUsageLedgerProcess,
 } from "../eventing/pulled-usage-ledger.process.ts";
 
-type PulledUsageEvent = PulledUsageObservedEvent & Event;
+/**
+ * Both events the aggregate declares. The retraction is in the type as well as
+ * in `PULLED_USAGE_PROCESSING_EVENT_TYPES`, so a process manager that handles
+ * it is type-checked against the same set the pipeline registers.
+ */
+type PulledUsageEvent = (PulledUsageObservedEvent & Event) | (PulledUsageRetractedEvent & Event);
 
 const RecordPulledUsageCommand = defineCommand({
   commandType: PULLED_USAGE_COMMAND_TYPES.RECORD,
@@ -46,14 +56,19 @@ const RecordPulledUsageCommand = defineCommand({
 });
 
 export class PulledUsageEventingAdapter {
-  private constructor(private readonly ledger: PulledUsageLedgerProcess | undefined) {}
+  private constructor(
+    private readonly ledger: PulledUsageLedgerProcess | undefined,
+    private readonly costRollupWatch: CostRollupWatchProcess | undefined,
+  ) {}
 
   static create(
     options: {
       ledger?: PulledUsageLedgerProcess;
+      /** Absent in a deployment with no cost summary to check. */
+      costRollupWatch?: CostRollupWatchProcess;
     } = {},
   ): PulledUsageEventingAdapter {
-    return new PulledUsageEventingAdapter(options.ledger);
+    return new PulledUsageEventingAdapter(options.ledger, options.costRollupWatch);
   }
 
   static commandHandlers() {
@@ -68,10 +83,15 @@ export class PulledUsageEventingAdapter {
         events: defineEvents(PULLED_USAGE_PROCESSING_EVENT_TYPES),
       }),
     }).withCommand("recordPulledUsage", RecordPulledUsageCommand);
-    return this.ledger
-      ? pipeline
-          .withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager())
-          .build()
-      : pipeline.build();
+    if (this.ledger) {
+      pipeline.withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager());
+    }
+    if (this.costRollupWatch) {
+      pipeline.withProcessManager(
+        COST_ROLLUP_WATCH_PROCESS_NAME,
+        this.costRollupWatch.processManager(),
+      );
+    }
+    return pipeline.build();
   }
 }

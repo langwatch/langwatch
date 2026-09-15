@@ -237,6 +237,23 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return count;
   }
 
+  async extendInviteExpiration({
+    inviteId,
+    organizationId,
+    expiration,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    expiration: Date;
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.updateMany({
+      where: { id: inviteId, organizationId, status: "PENDING" },
+      data: { expiration },
+    });
+
+    return count;
+  }
+
   tryFindInviteByCodeWithOrganization({
     inviteCode,
   }: {

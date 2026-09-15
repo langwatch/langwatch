@@ -10,19 +10,20 @@ import { describe, expect, it } from "vitest";
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
 /**
- * Walk the same three trees as `codes.unit.test.ts`: errors from `ee/` and
- * workspace packages reach customers like those from `src/`.
+ * Walk the same trees as `codes.unit.test.ts`: an error raised in a module or
+ * in the enterprise tree reaches a customer exactly as one raised here does.
  */
 const ROOTS = [
   join(PACKAGE_ROOT, "src"),
-  // `ee` moved to `enterprise` in `4faa77c658`, which the packages
-  // root below already walks. Leaving it named did not shrink the corpus, it
-  // threw ENOENT out of `walk` and took the whole guard with it.
-  // Repo-root, not app-local: the workspace packages were consolidated into a
-  // single `packages/` tree. See codes.unit.test.ts for the same walk.
+  // `ee` moved to `enterprise` in `4faa77c658`. Repo-root, not app-local: the
+  // workspace packages were consolidated into a single `packages/` tree.
   join(PACKAGE_ROOT, "../../packages"),
+  // Where the features went. Most handled errors are declared in a module's
+  // contract now, so without these the guard was reading a fraction of the
+  // corpus and its own floor was what noticed.
+  join(PACKAGE_ROOT, "../../modules"),
+  join(PACKAGE_ROOT, "../../enterprise"),
 ];
-
 /**
  * Below this many messages, assume the extractor stopped matching rather than that the
  * codebase stopped raising handled errors. A scanner that finds nothing reports no
@@ -76,7 +77,9 @@ function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === "node_modules") continue;
+      // `dist` is the same sources compiled; reading it counts every message
+      // twice and lets a stale build keep a deleted one in the corpus.
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
       walk(path, out);
     } else if (/\.tsx?$/.test(entry.name) && !isTestFile(path)) {
       out.push(path);

@@ -65,6 +65,9 @@ export class GatewaySpendEventsService {
     tokensCacheRead: number;
     tokensCacheWrite: number;
     tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
   }> {
     return this.repository.readEndUserSpend(input);
   }

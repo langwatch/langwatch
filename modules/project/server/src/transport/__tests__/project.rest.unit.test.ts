@@ -434,18 +434,19 @@ describe("the projects REST family", () => {
       expect((await send("/api/projects/project_doesnotexist")).status).toBe(404);
     });
 
-    it("reports a project in another organization as not found", async () => {
+    /** @scenario A project in another organization is not disclosed */
+    it("reports a project in another organization as not found, disclosing nothing", async () => {
+      const foreign = projectWithTeam({
+        team: { ...projectWithTeam().team, organizationId: "organization-other" },
+      });
       const { send } = mountProjectRest({
-        projects: {
-          findWithTeam: vi.fn(async () =>
-            projectWithTeam({
-              team: { ...projectWithTeam().team, organizationId: "organization-other" },
-            }),
-          ),
-        },
+        projects: { findWithTeam: vi.fn(async () => foreign) },
       });
 
-      expect((await send("/api/projects/project_1")).status).toBe(404);
+      const response = await send("/api/projects/project_1");
+
+      expect(response.status).toBe(404);
+      expect(await response.text()).not.toContain(foreign.apiKey);
     });
   });
 
@@ -642,101 +643,69 @@ describe("the projects REST family", () => {
     });
   });
 
-  describe("given the base key, which is a project-level write credential", () => {
-    /** @scenario A caller who can change the project reads the base key */
-    it("hands the base key to a caller who can update that project", async () => {
-      const { send } = mountProjectRest({
-        projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
-        grantedOnProject: { project_1: ["project:update"] },
-      });
-
-      const response = await send("/api/projects/project_1/api-key");
-
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ apiKey: project().apiKey });
-    });
-
-    /** @scenario A read-only credential cannot read the base key */
-    it("refuses a caller who can only view the project, and discloses nothing", async () => {
+  /**
+   * `/api/projects` is reached with an ORGANIZATION API token, and the base
+   * key is a credential that authenticates every ingestion call the project
+   * accepts. Both routes are therefore withdrawn from this door outright — see
+   * `refuseBaseKeyToApiToken`.
+   */
+  describe("given a caller holding an organization API token", () => {
+    /** @scenario "An API key principal cannot read the base key" */
+    it("refuses the base key however much the token holds on that project", async () => {
       const findWithTeam = vi.fn(async () => projectWithTeam());
       const { send } = mountProjectRest({
         projects: { findWithTeam },
-        grantedOnProject: { project_1: ["project:view"] },
+        grantedOnProject: { project_1: ["project:view", "project:update", "project:manage"] },
       });
 
       const response = await send("/api/projects/project_1/api-key");
 
       expect(response.status).toBe(403);
       expect(await response.text()).not.toContain(project().apiKey);
+    });
+
+    /** @scenario "API key refusal happens before the project is read" */
+    it("refuses an unknown project id the same way, without looking it up", async () => {
+      const findWithTeam = vi.fn(async () => null);
+      const { send } = mountProjectRest({
+        projects: { findWithTeam },
+        grantedOnProject: { project_doesnotexist: ["project:manage"] },
+      });
+
+      const response = await send("/api/projects/project_doesnotexist/api-key");
+
+      // 403 and not 404: a 404 here would answer "does this project exist?"
+      // for any token that can reach the door.
+      expect(response.status).toBe(403);
       expect(findWithTeam).not.toHaveBeenCalled();
     });
 
-    /** @scenario Permission is checked against the requested project */
-    it("refuses a project-scoped caller asking about a sibling project", async () => {
+    it("names the one way the key can still be read", async () => {
       const { send } = mountProjectRest({
         projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
-        grantedOnProject: { project_1: ["project:update"], project_2: [] },
+        grantedOnProject: { project_1: ["project:manage"] },
       });
 
-      expect((await send("/api/projects/project_1/api-key")).status).toBe(200);
-
-      const sibling = await send("/api/projects/project_2/api-key");
-      expect(sibling.status).toBe(403);
-      expect(await sibling.text()).not.toContain(project().apiKey);
-    });
-
-    /** @scenario A project in another organization is not disclosed */
-    it("reports a project in another organization as not found", async () => {
-      const foreign = projectWithTeam({
-        team: { ...projectWithTeam().team, organizationId: "organization-other" },
-      });
-      const { send } = mountProjectRest({
-        projects: { findWithTeam: vi.fn(async () => foreign) },
-        grantedOnProject: { project_1: ["project:update"] },
-      });
-
-      const response = await send("/api/projects/project_1/api-key");
-
-      expect(response.status).toBe(404);
-      expect(await response.text()).not.toContain(foreign.apiKey);
+      expect(await (await send("/api/projects/project_1/api-key")).text()).toContain(
+        "signed-in project administrator",
+      );
     });
   });
 
-  describe("when the base key is rotated", () => {
-    it("answers with the new key", async () => {
+  describe("when an organization API token asks for the base key to be rotated", () => {
+    it("refuses, and rotates nothing", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
       const { send } = mountProjectRest({
         projects: { findWithTeam: vi.fn(async () => projectWithTeam()) },
         apiKeys: { regenerateLegacyProjectKey },
+        grantedOnProject: { project_1: ["project:manage"] },
       });
 
       const response = await send("/api/projects/project_1/regenerate-api-key", {
         method: "POST",
       });
 
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ apiKey: "sk-lw-rotated" });
-      expect(regenerateLegacyProjectKey).toHaveBeenCalledWith({ projectId: "project_1" });
-    });
-
-    it("reports a project in another organization as not found, rotating nothing", async () => {
-      const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
-      const { send } = mountProjectRest({
-        projects: {
-          findWithTeam: vi.fn(async () =>
-            projectWithTeam({
-              team: { ...projectWithTeam().team, organizationId: "organization-other" },
-            }),
-          ),
-        },
-        apiKeys: { regenerateLegacyProjectKey },
-      });
-
-      const response = await send("/api/projects/project_1/regenerate-api-key", {
-        method: "POST",
-      });
-
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(403);
       expect(regenerateLegacyProjectKey).not.toHaveBeenCalled();
     });
   });
@@ -780,6 +749,12 @@ describe("the projects REST family", () => {
       expect(archive).not.toHaveBeenCalled();
     });
 
+    /**
+     * Still refused, and now for a stronger reason than scope: this door
+     * refuses base-key rotation to EVERY organization token, sibling or not.
+     * The scenario asks only that a sibling's key is not rotated, so it is
+     * satisfied either way.
+     */
     /** @scenario Rotating a project's ingestion key is authorized on that project */
     it("refuses to rotate a sibling project's ingestion key, and rotates nothing", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");

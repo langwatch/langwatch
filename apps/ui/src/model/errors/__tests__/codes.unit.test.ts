@@ -23,8 +23,17 @@ const ROOTS = [
   join(PACKAGE_ROOT, "../api/src"),
   join(PACKAGE_ROOT, "../worker/src"),
   // `ee` was a root until `4faa77c658` moved governance and SCIM into
-  // `enterprise`, which the packages root below already walks.
+  // `enterprise`, which is walked below.
   join(PACKAGE_ROOT, "../../packages"),
+  // And the trees the features themselves moved into, which is now most of
+  // the product. Without these the guard walked the three applications and the
+  // shared packages while every module's errors — the majority of the codes
+  // this registry carries copy for — went unseen, so it reported hundreds of
+  // live codes as dead copy and could not have caught a genuinely dead one
+  // among them. `enterprise` covers both its modules and its composition
+  // packages.
+  join(PACKAGE_ROOT, "../../modules"),
+  join(PACKAGE_ROOT, "../../enterprise"),
 ].filter((root) => existsSync(root));
 
 /**
@@ -114,7 +123,10 @@ function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === "node_modules") continue;
+      // `dist` is the same sources compiled. Reading it would count a code
+      // twice, and — worse — a stale build would keep a deleted code looking
+      // raised, which is exactly the drift this guard exists to catch.
+      if (entry.name === "node_modules" || entry.name === "dist") continue;
       walk(path, out);
     } else if (/\.tsx?$/.test(entry.name) && !isTestFile(path)) {
       out.push(path);
@@ -144,10 +156,36 @@ function declaredCodes(): Set<string> {
 }
 
 /**
- * Codes that were already raised without customer copy when this guard was repaired,
- * and the three whose copy was already dead.
+ * Raised by better-auth on a route we mount but do not translate, so it reaches
+ * the client spelled its way — which no CODE_PATTERN matches. Listed so
+ * "nothing raises this" does not fire on live copy.
+ * `MFA_REQUIRED_BY_ORGANIZATION` is absent because its route has no successor
+ * here yet, so its copy was removed rather than left reading as coverage.
+ */
+const BETTER_AUTH_PASSTHROUGH_CODES = new Set(["LAST_WAY_IN"]);
+
+/**
+ * Codes raised without customer copy. The first block below became visible when
+ * the scan was widened to `modules/` and `enterprise/` — not new drift, they
+ * were uncopied all along and the guard could not see them. Each is a code a
+ * customer can reach with no words written for it.
  */
 const UNCOPIED_CODES_BACKLOG = new Set<string>([
+  "agent_already_exists",
+  "agent_connections_unavailable",
+  "agent_copies_not_found",
+  "agent_copy_selection_invalid",
+  "agent_http_testing_unavailable",
+  "agent_is_not_copy",
+  "agent_source_not_found",
+  "agent_source_permission_denied",
+  "annotation_not_found",
+  "annotation_queue_not_found",
+  "annotation_score_not_found",
+  "dashboard_widget_query_not_found",
+  "invalid_agent_config",
+  "nlp_lambda_fleet_not_composed",
+  "payload_too_large",
   "annotation_annotator_invalid",
   "annotation_project_not_found",
   "annotation_queue_member_invalid",
@@ -212,8 +250,42 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "workflow_version_required",
 ]);
 
-/** Copy that outlived the code raising it. Renames left these behind. */
+/**
+ * Raised in a shape this scan cannot see: a plain `Error` whose message is the
+ * slug, a `TRPCError` carrying it as a message, or a code the browser only
+ * READS. Not dead copy — live refusals wearing the wrong clothes, which leave
+ * this list by becoming handled errors.
+ */
+const RAISED_IN_AN_UNSCANNABLE_SHAPE = new Set<string>([
+  "budget_not_found",
+  "invalid_cursor",
+  "spend_source_unavailable",
+  "suite_evaluator_mappings_missing",
+]);
+
+/**
+ * Copy that outlived the code raising it. Renames left the last four behind;
+ * the rest became visible when the scan widened to `modules/` and
+ * `enterprise/`. Each is a deletion candidate once its owner confirms the
+ * error is gone for good rather than waiting on a port.
+ */
 const DEAD_COPY_BACKLOG = new Set<string>([
+  // Not dead, waiting: `presentation.datasetSearch.unit.test.ts` pins this
+  // one's copy, and the class that used to throw it
+  // (`DatasetTooLargeToSearchError`) is imported by
+  // `modules/dataset/server`'s own search tests but declared nowhere. The copy
+  // outlives a raiser that has to come back, not one that was renamed.
+  "dataset_too_large_to_search",
+  "cache_rule_not_found",
+  "contested_credentials",
+  "gateway_provider_bindings_gone",
+  "health_check_failed",
+  "prompt_playground_chat_unavailable",
+  "rum_ingest_disabled",
+  "rum_payload_invalid",
+  "rum_payload_too_large",
+  "rum_rate_limited",
+  "saved_workbench_charts_disabled_for_playground",
   "model_default_user_key_required",
   /**
    * Its declaring class went with `subscription/errors.ts` in 8a32e35208.
@@ -273,6 +345,8 @@ describe("APP_ERROR_CODES", () => {
           !RELAYED_META_CODES.has(code) &&
           !CLIENT_MINTED_CODES.has(code) &&
           !PARAMETERIZED_CODES.has(code) &&
+          !BETTER_AUTH_PASSTHROUGH_CODES.has(code) &&
+          !RAISED_IN_AN_UNSCANNABLE_SHAPE.has(code) &&
           !DEAD_COPY_BACKLOG.has(code),
       );
 

@@ -37,6 +37,12 @@ export interface SpendSummaryRow {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
+  /** Image tokens billed on the input side, 0 when no row in the group used one. Priced at its own rate and disjoint from tokensInput. */
+  tokensInputImage: number;
+  /** Image tokens the answer was billed for, 0 when no row in the group produced one. Priced at its own rate and disjoint from tokensOutput. */
+  tokensOutputImage: number;
+  /** Images the group's requests carried, 0 when none did. Display only: no rate prices it. */
+  imageCount: number;
   costNanoUsd: number;
   costUsd: string;
 }
@@ -100,5 +106,8 @@ export abstract class GatewaySpendEvents {
     tokensCacheRead: number;
     tokensCacheWrite: number;
     tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
   }>;
 }

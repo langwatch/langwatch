@@ -6,7 +6,11 @@
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
-import { redactAttributeNative, redactStringNative } from "@langwatch/redaction/pii";
+import {
+  isHeldOutIdentifierAttribute,
+  redactAttributeNative,
+  redactStringNative,
+} from "@langwatch/redaction/pii";
 import {
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   type OtlpSpanPiiRedactionServiceDependencies,
@@ -336,6 +340,12 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== null &&
         attr.value.stringValue.length > 0
       ) {
+        if (
+          isHeldOutIdentifierAttribute({ key: attr.key, value: attr.value.stringValue })
+        ) {
+          continue;
+        }
+
         if (
           totalLength + attr.value.stringValue.length >
           this.deps.piiRedactionMaxAttributeLength

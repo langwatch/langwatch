@@ -77,6 +77,12 @@ export const apiKeyListEntrySchema = z
     ingestionTemplateId: z.string().nullable(),
     /** Human label of the CLI device session that minted an ingestion key. */
     createdByDeviceLabel: z.string().nullable(),
+    /**
+     * The CLI login key of the session that minted this ingestion key, so a
+     * key with no label of its own can still be shown against the machine it
+     * came from. Null for keys minted outside a CLI session.
+     */
+    parentApiKeyId: z.string().nullable().optional(),
     roleBindings: z.array(apiKeyListRoleBindingSchema),
   })
   .strict();

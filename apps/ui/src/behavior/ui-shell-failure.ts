@@ -7,7 +7,7 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 
 import { useUiAddress } from "./ui-address";
-import { uiLeaveTo } from "./ui-departure";
+import { isUiNavigatingAway, uiLeaveTo } from "./ui-departure";
 import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "./ui-feedback";
 import { useUiRouteReading } from "./ui-scope-route";
 import { UI_SIGN_IN_PATH } from "./ui-session";
@@ -75,5 +75,10 @@ export function useUiShellFailure({
 
   if (departure !== null) return { departing: true, copy: null };
   if (!error) return { departing: false, copy: null };
+  // Already leaving, by an earlier decision of this or another host: the graph
+  // failing now is the unload aborting its requests, not a shell that cannot
+  // load. Reported as departing so nothing is drawn over the page on its way
+  // out.
+  if (isUiNavigatingAway()) return { departing: true, copy: null };
   return { departing: false, copy: resolveUiFailureCopy({ error, fallbackTitle }) };
 }

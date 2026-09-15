@@ -155,6 +155,50 @@ describe("the SSO license-gate request hook", () => {
     });
   });
 
+  describe("given a request to better-auth's own raw sign-up route", () => {
+    /** @scenario "Raw password sign-up is closed on every deployment, licensed or not" */
+    it("refuses with 404 before any license or gate state is read, even in plain email mode", async () => {
+      const federation = new StubFederation();
+      federation.federationCapableValue = false;
+      const run = buildHook(federation);
+
+      await expect(
+        run("/api/auth/sign-up/email", { email: "a@b.com", password: "x" }),
+      ).rejects.toThrow(APIError);
+      expect(federation.resolvePolicy).not.toHaveBeenCalled();
+    });
+
+    it("still refuses on a federation-capable deployment", async () => {
+      const federation = new StubFederation();
+      federation.federationCapableValue = true;
+      const run = buildHook(federation);
+
+      await expect(
+        run("/api/auth/sign-up/email", { email: "a@b.com", password: "x" }),
+      ).rejects.toThrow(APIError);
+      expect(federation.resolvePolicy).not.toHaveBeenCalled();
+    });
+
+    it("closes a trailing-slash variant the same way", async () => {
+      const federation = new StubFederation();
+      const run = buildHook(federation);
+
+      await expect(
+        run("/api/auth/sign-up/email/", { email: "a@b.com", password: "x" }),
+      ).rejects.toThrow(APIError);
+    });
+
+    it("leaves sign-in by email untouched", async () => {
+      const federation = new StubFederation();
+      federation.federationCapableValue = false;
+      const run = buildHook(federation);
+
+      await expect(
+        run("/api/auth/sign-in/email", { email: "a@b.com", password: "x" }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("given a signed-in user's browser reading its own session", () => {
     /** @scenario "Existing sessions keep working across a gate change" */
     it("answers without consulting the license gate at all", async () => {

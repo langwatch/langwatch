@@ -82,10 +82,21 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
   }
 
   async resolvePolicy(): Promise<SignInMethodPolicy> {
+    // Resolved ONCE, and every branch below reads this answer rather than
+    // asking the gate again. On the healthy path re-asking was free (the memo
+    // answers); on the failure path it was not — the gate evicts its memo on
+    // rejection (ADR-027 Decision 6, self-healing), so each extra await
+    // recomputed a licensing scan behind its own timeout, and one
+    // unauthenticated request held several slow database reads open exactly
+    // when the database was already struggling.
     const federationLicensed = await this.inputs.federationLicensed();
-    const federated = await SignInMethodPolicyService.tryResolveFederatedMethod(
-      this.inputs.resolveAuthProvider,
-    );
+    // DENY is email mode by definition (ADR-027 Decision 2), which is also what
+    // `resolveAuthProvider` would conclude — skipping it here spends no second
+    // gate read to reach the same answer. When the gate allows, the memo is
+    // warm and the call costs nothing.
+    const federated = federationLicensed
+      ? await SignInMethodPolicyService.tryResolveFederatedMethod(this.inputs.resolveAuthProvider)
+      : null;
     // Offered alongside whatever else answers, never instead of it: somebody
     // without a passkey on THIS device must still find the way they used last
     // time. It is appended, so the order the screen renders does not move.
@@ -93,7 +104,14 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
 
     return {
       defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
-      localMethods: [...LOCAL_METHOD_SET, ...passkeys],
+      // NOT the passkeys. Break-glass is the door somebody reaches for when the
+      // identity provider cannot be answered, and the whole reason it exists is
+      // that anybody can use it from any machine — which is exactly what a
+      // credential bound to one device is not. `PASSKEY_METHOD` says so where
+      // it is defined; this is the line that has to agree with it. Appending
+      // them here was invisible while the plugin was behind a setting that
+      // defaulted off, and would go live the moment it is not.
+      localMethods: LOCAL_METHOD_SET,
       federationLicensed,
       // Only a self-hosted deployment auto-redirects on its sole connection.
       selfHosted: this.inputs.selfHosted(),

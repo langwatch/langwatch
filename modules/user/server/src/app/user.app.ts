@@ -64,6 +64,7 @@ import type {
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
+  ImpersonationCannotChangeCredentialsError,
   UserAccountAccessDeniedError,
   UserAvatarRateLimitedError,
   UserBudgetRequestNotDeliveredError,
@@ -621,6 +622,14 @@ export class UserApp implements UserApi {
    * other session ends the moment a password lands.
    */
   async setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void> {
+    // Refused before anything else. While impersonating, the account written
+    // IS the subject's, and this method demands no proof of the current
+    // password — so without this an operator could mint a durable credential
+    // on exactly the single-sign-on-only and passkey-only accounts it exists
+    // for. `keepSessionId` being null while impersonating is the defensive
+    // half of the same rule; this is the refusal itself.
+    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
+
     const problem = passwordProblem(input.password);
 
     if (problem) {
@@ -657,6 +666,11 @@ export class UserApp implements UserApi {
    * session could brute-force `currentPassword`.
    */
   async changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
+    // Same rule as `setOwnFirstPassword`: how an account signs in belongs to
+    // its owner. Knowing the current password does not make it the operator's
+    // to replace, and a replacement outlives the impersonation session.
+    if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
+
     const provider = await this.#members.deployment.authProvider();
 
     // A denied SSO deployment is coerced to email mode (ADR-027), and a person

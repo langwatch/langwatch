@@ -11,6 +11,12 @@ export type ApiKeyCreateRecord = {
   userId: string | null;
   createdByUserId: string | null;
   createdByDeviceLabel?: string | null;
+  /**
+   * The CLI login key of the device session minting this key, so revoking
+   * that session revokes this key with it. Undefined/null for every key
+   * minted outside a CLI session.
+   */
+  parentApiKeyId?: string | null;
   organizationId: string;
   expiresAt: Instant | null;
   ingestSourceType: string | null;
@@ -70,4 +76,55 @@ export abstract class ApiKeyRepository {
    * and policy belongs above persistence.
    */
   abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
+  /**
+   * The live keys minted under one key, inside its organization.
+   *
+   * Bounded by `organizationId` so the cascade goes through the ordinary
+   * tenancy guard rather than a cross-tenant hatch: a cascade always knows
+   * whose organization it is retiring keys in.
+   */
+  abstract findLiveChildren(input: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>>;
+  /**
+   * Whether one key is still usable, by id, without its bindings.
+   *
+   * The auth path asks this about a key's parent on every request that
+   * presents a session-minted key, so it reads only the two columns that
+   * decide it.
+   */
+  abstract findLivenessById(input: {
+    id: string;
+  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
+  /**
+   * Every unrevoked CLI login key (name carries {@link CLI_LOGIN_KEY_NAME_PREFIX})
+   * whose session has run out.
+   *
+   * Cross-tenant by design, like {@link revokeExpiredByName}: the caller is
+   * the hourly sweep, not a request, and a session the CLI stops refreshing
+   * leaves no other trace to scope a read to. `expiresAt: { not: null }` is
+   * carried explicitly so a login key minted before device metadata (and
+   * therefore no expiry) is never swept.
+   */
+  abstract findElapsedLoginKeys(input: {
+    now: Instant;
+  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>>;
+  /**
+   * Moves a live CLI login key's expiry with its session. A successful
+   * refresh calls this with the value `loginKeyExpiresAt` gives for the new
+   * refresh window, so a session nothing keeps refreshing is still retired
+   * by the hourly sweep rather than sliding forward forever.
+   *
+   * Scoped by name prefix as well as id/organization/user so this can never
+   * touch a key that is not a CLI login key. A key already revoked is left
+   * alone (`revokedAt: null`), so a refresh racing a revoke never brings a
+   * dead key back into the sweep's live set.
+   */
+  abstract extendLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    expiresAt: Instant;
+  }): Promise<void>;
 }

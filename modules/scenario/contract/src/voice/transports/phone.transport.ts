@@ -6,6 +6,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../voice-public-url-env.ts";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
@@ -40,6 +41,27 @@ export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
  * step with the SDK on a version bump.
  */
 export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
+
+/**
+ * How long the callee must stay silent, in seconds, before the SDK ends the
+ * callee's turn and hands the floor back to the simulated caller.
+ *
+ * Twilio Media Streams deliver 20 ms frames continuously — silence included —
+ * and carry no speech/silence signal of their own (see ADR-131 "Turn-taking on
+ * the media stream"). The SDK's Twilio adapter therefore gates inbound frames
+ * on speech energy (`speechGate`, on by default since 1.7.0-dev.voice8) so
+ * that a pause in the callee's speech reaches the runtime as a real gap, and
+ * THIS knob is what turns that gap into a turn boundary. Without the gate the
+ * turn only ever ended on hang-up or the SDK's 60s hard ceiling, so the caller
+ * spoke exactly once and the callee was left asking "hello? are you still
+ * there?" (#8014).
+ *
+ * 0.8s rather than the SDK's 0.6s default: a phone callee's inter-sentence
+ * pauses run longer than a browser agent's, and the a-leg round trip adds
+ * jitter. Long enough not to cut a sentence mid-way, short enough that the
+ * caller answers promptly.
+ */
+export const PHONE_RESPONSE_TAIL_SILENCE_SECONDS = 0.8;
 
 /**
  * A phone target was exercised on a path it has no meaning on (a browser mint
@@ -89,7 +111,9 @@ export type TwilioAgentFactory = (options: {
 
 /** The real SDK adapter's `placeCall` shape. Its recording option is `record`
  *  — the SDK's published name, which must not change; our interface exposes it
- *  as `shouldRecord` and this factory translates at the vendor boundary. */
+ *  as `shouldRecord` and this factory translates at the vendor boundary.
+ *  `responseTailSilence` is the SDK base adapter's public turn-end knob (a
+ *  mutable field, not a constructor option). */
 type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
   placeCall(args: {
     to: string;
@@ -97,6 +121,7 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
     maxCallDurationSeconds?: number;
     record?: boolean;
   }): Promise<void>;
+  responseTailSilence: number;
 };
 
 /** SDK's own adapter instance, not a wrapper: role validation and adapter
@@ -104,6 +129,11 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
  */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
   const sdk = scenarioVoice.twilioAgent(options) as unknown as SdkTwilioAdapter;
+  // Phone turn-taking: end the callee's turn after this much silence. The
+  // SDK's inbound speech gate is left at its default (on), so silence between
+  // the callee's utterances actually reaches the runtime as a gap — see
+  // PHONE_RESPONSE_TAIL_SILENCE_SECONDS.
+  sdk.responseTailSilence = PHONE_RESPONSE_TAIL_SILENCE_SECONDS;
   const originalPlaceCall = sdk.placeCall.bind(sdk);
   const adapter = sdk as unknown as TwilioAdapterLike;
   // Translate our `shouldRecord` to the SDK's published `record` option; this
@@ -132,6 +162,46 @@ export class VoicePublicBaseUrlInvalidError extends Error {
         "as an invalid stream URL and the call fails with error 11100.",
     );
     this.name = "VoicePublicBaseUrlInvalidError";
+  }
+}
+
+/**
+ * Thrown when a phone run is about to dial but there is no public media URL the
+ * WORKER's own listener answers: `VOICE_PUBLIC_BASE_URL` is unset (the worker
+ * minted no quick tunnel — most often because the `cloudflared` binary is
+ * missing, so the mint failed with ENOENT at worker boot) and the only value
+ * left is the app's own `BASE_HOST`, which runs no voice media listener.
+ *
+ * Dialling `BASE_HOST` is the exact production failure this guards: Twilio
+ * opens the media stream against `app.langwatch.ai`, the handshake never
+ * completes, and the call dies with Twilio error 31920 after a 120-second
+ * timeout with no trace attached. Failing HERE — at adapter-build time —
+ * turns that silent timeout into an immediate, actionable run error naming
+ * the remedy.
+ *
+ * A plain {@link Error}, not a {@link HandledError}: the remedy is an OPERATOR
+ * action (set the env var, ship the binary), not one the customer can take, so
+ * per ADR-045 it degrades to a generic "unknown" plus a trace id at the API
+ * boundary rather than promising the caller an action they do not have —
+ * matching {@link VoicePublicBaseUrlInvalidError} directly below.
+ */
+export class VoicePublicBaseUrlMissingError extends Error {
+  constructor(source: PublicBaseUrlSource | "none", reason?: string) {
+    // When the worker recorded WHY it minted no tunnel (its cloudflared tunnel
+    // boot failed), name that real cause — otherwise the run error is a generic
+    // "no public media URL" that hides a "spawn cloudflared ENOENT" behind it.
+    const reasonSuffix = reason
+      ? ` The worker's public URL tunnel failed to open: ${reason}`
+      : "";
+    super(
+      `No public media URL for the outbound phone call (VOICE_PUBLIC_BASE_URL ` +
+        `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
+        `media listener, so Twilio would dial a URL nothing answers and the ` +
+        `call would fail with error 31920 after a 120s timeout. Set ` +
+        `VOICE_PUBLIC_BASE_URL, or ensure cloudflared is installed so the ` +
+        `worker can mint a tunnel at boot.${reasonSuffix}`,
+    );
+    this.name = "VoicePublicBaseUrlMissingError";
   }
 }
 
@@ -323,26 +393,51 @@ export function createPhoneTransport(
         TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
       );
       const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
-      // Log which base URL and env var this run's Twilio media stream is
-      // routed to. There is no span available at this point to stamp
-      // `voice.twilio.stream_base_url` on directly, so a failed call (error
-      // 11100, zero duration) can still be traced back to what URL Twilio
-      // actually received via this log line.
-      if (resolvedBaseUrl) {
-        logger.info(
-          {
-            agentId,
-            streamBaseUrl: resolvedBaseUrl.value,
-            streamBaseUrlSource: resolvedBaseUrl.source,
-          },
-          "resolved Twilio media-stream base URL for outbound call",
+      // A phone call MUST route Twilio's media stream to a URL the WORKER's own
+      // listener answers. That is only ever VOICE_PUBLIC_BASE_URL (an explicit
+      // config, or the worker's minted quick tunnel). BASE_HOST is the app's
+      // origin, which runs no voice media listener, so dialling it hands Twilio
+      // a dead URL — the exact prod 31920 failure. Refuse to build the adapter
+      // rather than dial into a 120s timeout.
+      if (!resolvedBaseUrl || resolvedBaseUrl.source === "BASE_HOST") {
+        const source = resolvedBaseUrl?.source ?? "none";
+        // The worker threads WHY its tunnel mint failed through this env var
+        // (set at boot, forwarded by the child's environment), read from the
+        // same env the base URL was resolved from so a test's injected env is
+        // honored.
+        const reason = (deps.processEnv ?? process.env)[
+          VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV
+        ]?.trim();
+        logger.error(
+          { agentId, streamBaseUrlSource: source, reason },
+          "no voice public base URL for outbound call; refusing to dial",
+        );
+        throw new VoicePublicBaseUrlMissingError(
+          source,
+          reason && reason.length > 0 ? reason : undefined,
         );
       }
+      // Record only the URL origin in telemetry and logs — never the full
+      // resolved URL, which may carry credentials or query parameters (CWE-532
+      // sensitive-data exposure). The functional value handed to Twilio below
+      // stays complete.
+      const streamBaseUrlOrigin = new URL(resolvedBaseUrl.value).origin;
+      // Log which base URL and env var this run's Twilio media stream is
+      // routed to, so a later failure (e.g. error 11100) can be traced back to
+      // what URL Twilio actually received.
+      logger.info(
+        {
+          agentId,
+          streamBaseUrl: streamBaseUrlOrigin,
+          streamBaseUrlSource: resolvedBaseUrl.source,
+        },
+        "resolved Twilio media-stream base URL for outbound call",
+      );
       const adapter = twilioAgentFactory({
         accountSid: twilio.accountSid,
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
-        publicBaseUrl: resolvedBaseUrl?.value,
+        publicBaseUrl: resolvedBaseUrl.value,
         httpPort: resolveHttpPort(deps.processEnv),
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is

@@ -42,36 +42,37 @@ function organizationPayload(): FullyLoadedOrganization[] {
 }
 
 /**
- * Permits `project:update` exactly when the case under test says so, and never
- * permits `organization:manage`: the base key is gated on the project, and a
- * manage answer would mask which question decided it.
+ * Grants exactly the permissions named in `granted`, and nothing implied by
+ * them: `project:update` and `project:manage` are asked and answered
+ * independently, so a case can hold one without the other. `organization:manage`
+ * is never granted here - the base key is gated on the project, and an
+ * organization-level answer would mask which question decided it.
  */
-function testPermissions(canUpdateProject: boolean): AuthzApi {
+function testPermissions(granted: readonly string[]): AuthzApi {
   return {
-    hasPermission: vi.fn(
-      async (check: { permission: string }) =>
-        check.permission === "project:update" && canUpdateProject,
+    hasPermission: vi.fn(async (check: { permission: string }) =>
+      granted.includes(check.permission),
     ),
     listBindingsForSynthesis: vi.fn(async () => []),
   } as unknown as AuthzApi;
 }
 
-function visibility(canUpdateProject: boolean) {
+function visibility(granted: readonly string[]) {
   return OrganizationVisibilityService.create({
     reader: {
       getAllForUser: vi.fn(async () => organizationPayload()),
       findOrganizationWithMembers: vi.fn(async () => null),
       findMemberById: vi.fn(async () => null),
     },
-    permissions: testPermissions(canUpdateProject),
+    permissions: testPermissions(granted),
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
     demoProject: { userId: "", projectId: "" },
   });
 }
 
 /** The only project in the only team of the only organization. */
-async function readProject(canUpdateProject: boolean) {
-  const organizations = await visibility(canUpdateProject).listVisible({ isDemo: false }, CALLER);
+async function readProject(granted: readonly string[]) {
+  const organizations = await visibility(granted).listVisible({ isDemo: false }, CALLER);
   const project = organizations[0]?.teams[0]?.projects[0];
 
   if (!project) throw new Error("the redaction dropped the project it was meant to redact");
@@ -80,19 +81,28 @@ async function readProject(canUpdateProject: boolean) {
 }
 
 describe("given the base key in the organizations payload", () => {
-  describe("when the caller can change the project", () => {
-    /** @scenario The base key stays in the session payload for those who can change the project */
+  describe("when the caller can manage the project", () => {
+    /** @scenario The base key stays in the session payload for project admins */
     it("includes the base key in the payload", async () => {
-      const project = await readProject(true);
+      const project = await readProject(["project:manage"]);
 
       expect(project.apiKey).toBe(BASE_API_KEY);
     });
   });
 
-  describe("when the caller can only view the project", () => {
-    /** @scenario The base key is withheld from the session payload for read-only roles */
+  describe("when the caller can update but not manage the project", () => {
+    /** @scenario The base key is withheld from the session payload for project members */
     it("withholds the base key from the payload", async () => {
-      const project = await readProject(false);
+      const project = await readProject(["project:update"]);
+
+      expect(project.apiKey).toBe("");
+    });
+  });
+
+  describe("when the caller can only view the project", () => {
+    /** @scenario The base key is withheld from the session payload for project members */
+    it("withholds the base key from the payload", async () => {
+      const project = await readProject([]);
 
       expect(project.apiKey).toBe("");
     });
@@ -101,15 +111,16 @@ describe("given the base key in the organizations payload", () => {
   /**
    * The LangWatchQL key is a control-plane secret, not a credential any client
    * surface renders: it is withheld from everyone, unlike the base key, which
-   * is gated on permission. The caller who CAN change the project is the case
+   * is gated on permission. The caller who CAN manage the project is the case
    * that matters - a permission-gated redaction would hand it to them.
    */
   describe("when the LangWatchQL key is on the project", () => {
     it.each([
-      ["a caller who can change the project", true],
-      ["a caller who can only view the project", false],
-    ])("withholds it from the payload for %s", async (_label, canUpdateProject) => {
-      const project = await readProject(canUpdateProject);
+      ["a caller who can manage the project", ["project:manage"]],
+      ["a caller who can update but not manage the project", ["project:update"]],
+      ["a caller who can only view the project", []],
+    ])("withholds it from the payload for %s", async (_label, granted) => {
+      const project = await readProject(granted);
 
       expect(project.lwqlKey).toBe("");
     });

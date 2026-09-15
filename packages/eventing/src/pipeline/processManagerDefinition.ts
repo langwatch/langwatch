@@ -1,7 +1,10 @@
 import type { ZodTypeAny, z } from "zod";
 
 import type { Event } from "../domain/types.ts";
-import type { ProcessEventEnvelope, ProcessIntent } from "../process-manager/processManager.types.ts";
+import type {
+  ProcessEventEnvelope,
+  ProcessIntent,
+} from "../process-manager/processManager.types.ts";
 import type { DeduplicationConfig } from "../queues/queue.types.ts";
 import type { ExecutionTarget } from "../runtime.types.ts";
 
@@ -137,8 +140,9 @@ export interface ProcessManagerConfig<
   eventTypes: readonly string[];
   /**
    * Derives the durable process identity from a committed event. Defaults to
-   * the event aggregate ID. Use this when one aggregate owns several
-   * independently revision-fenced operations.
+   * the event aggregate ID. Deriving it from the event alone is what lets the
+   * generated subscriber reuse it as its `groupKeyFn`, so every event landing
+   * on one instance drains in one FIFO lane instead of racing its revision.
    */
   keyBy?: (event: E) => string;
   /** Named, schema-validated synchronous signals accepted by this process. */
@@ -189,6 +193,11 @@ export function defineProcessManager<
   }
   if (config.schedule && !config.onWake) {
     throw new Error(`Process manager "${config.name}" declares a schedule but no onWake handler`);
+  }
+  if (config.schedule && config.keyBy) {
+    throw new Error(
+      `Process manager "${config.name}" cannot be keyed and scheduled: a schedule is armed on the singleton instance, which keyBy would move`,
+    );
   }
   if (
     config.eventTypes.length === 0 &&

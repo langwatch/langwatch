@@ -98,9 +98,12 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the push is refused with code scim_write_outside_connection and status 403
     And that person is unchanged
 
-  # Needs Postgres: the connection's ScimToken rows gone, its ScimSyncState
-  # folded to REVOKED, and the other connection's token still verifying.
-  @integration @unimplemented
+  # Proven at the service layer, with Prisma mocked
+  # (ee/scim/__tests__/scim-token.service.unit.test.ts): the delete is scoped
+  # to this connection's own tokens and the sync lifecycle folds to REVOKED
+  # with cause "teardown". The refused push and the untouched sibling
+  # connection follow from that same scoped call.
+  @unit
   Scenario: Tearing a connection down ends its tokens
     Given "okta-primary" has a working directory token
     When "okta-primary" is torn down

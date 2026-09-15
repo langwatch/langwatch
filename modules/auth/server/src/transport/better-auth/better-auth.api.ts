@@ -105,6 +105,19 @@ export function createSecondaryStorage(
 }
 
 /**
+ * Seals better-auth's own sign-up route, unconditionally, before any licence
+ * or gate state is read. Local account creation belongs to `user.register`,
+ * which writes the pending-confirmation latch; runs before the email-mode
+ * early return below or plain email-mode sign-up (the fleet's common case)
+ * would stay wide open to the raw route.
+ */
+function refuseDirectEmailSignUp(pathname: string): void {
+  if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
  * Whether a licensed deployment should refuse this credential route, the
  * ADR-027 gate site #3 decision.
  * ADR-117 §4 is what changed here, and only in mechanism: the question used to
@@ -425,6 +438,11 @@ export const createAuthOptions = ({
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
+
+      // Runs before every other check, including the email-mode early
+      // return two lines down: raw password sign-up must not bypass
+      // confirmed registration on ANY deployment, licensed or not.
+      refuseDirectEmailSignUp(pathname);
 
       // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
       // the email-mode early return on purpose — an email-mode deployment is a

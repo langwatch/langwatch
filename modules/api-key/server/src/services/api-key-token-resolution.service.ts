@@ -78,6 +78,17 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
 
+    // A key minted under a CLI session cannot outlive that session. The
+    // cascade retires it when the login key is revoked, but the cascade is
+    // one caller's work and a credential must not depend on it having run: a
+    // transient failure mid-cascade, or a revoke through a path with no
+    // cascade behind it, would otherwise leave this key authenticating under
+    // a session that ended. The parent is the authority, so this is the one
+    // place that has to agree with it.
+    if (row.parentApiKeyId && !(await this.isParentLive(row.parentApiKeyId))) {
+      return null;
+    }
+
     const verification = this.options.tokens.verify(split.secret, row.hashedSecret);
     if (verification === "no_match") {
       return null;
@@ -165,6 +176,20 @@ export class ApiKeyTokenResolutionService {
 
   private findTokenParts(token: string): { lookupId: string; secret: string } | null {
     return this.options.tokens.findTokenParts(token);
+  }
+
+  /**
+   * Whether the CLI login key a key was minted under is still live.
+   *
+   * A parent that is gone reads as dead: the row is the only record of the
+   * session, so its absence is not something to authenticate past. Expiry
+   * counts as well as revocation, which is what retires the children of a
+   * session that ran out in the window before the hourly sweep reaches it.
+   */
+  private async isParentLive(parentApiKeyId: string): Promise<boolean> {
+    const parent = await this.repository.findLivenessById({ id: parentApiKeyId });
+    if (!parent || parent.revokedAt) return false;
+    return !(parent.expiresAt && Temporal.Instant.compare(parent.expiresAt, nowInstant()) < 0);
   }
 
   private async findLegacyProjectKeyResolution(

@@ -192,6 +192,161 @@ describe("given a CLI starting a device login", () => {
     });
   });
 
+  /**
+   * The no-paste API-key journey, and the window it opens. A device code lives
+   * ten minutes: between the browser approving a project and the CLI polling
+   * for it, an administrator can revoke the person's role on that project,
+   * archive it, or rotate its key. The approval stamp is a pointer to the
+   * project, never the answer.
+   */
+  describe("given a project-key grant approved for a project the person administers", () => {
+    async function approvedProjectKeyGrant(world: ReturnType<typeof deviceFlowWorld>) {
+      const api = mount(world);
+      const grant = (await (
+        await api.post("/api/auth/cli/device-code", { credential_type: "project_api_key" })
+      ).json()) as { device_code: string; user_code: string };
+
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        project_id: "project-shared",
+      });
+
+      return { api, grant };
+    }
+
+    describe("when the project's key is rotated before the CLI polls", () => {
+      it("answers the key the project holds now, not the one the approval saw", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject({ apiKey: "sk-lw-at-approval" });
+        const { api, grant } = await approvedProjectKeyGrant(world);
+
+        world.project = liveProject({ apiKey: "sk-lw-rotated" });
+
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(exchanged.status).toBe(200);
+        await expect(exchanged.json()).resolves.toMatchObject({
+          kind: "api_key",
+          api_key: "sk-lw-rotated",
+        });
+      });
+    });
+
+    describe("when the person stops administering the project before the CLI polls", () => {
+      it("answers a fatal access_denied and discloses no key", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, grant } = await approvedProjectKeyGrant(world);
+
+        world.administersProject = false;
+
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(exchanged.status).toBe(410);
+
+        const body = await exchanged.text();
+
+        expect(JSON.parse(body)).toMatchObject({ error: "access_denied" });
+        expect(body).not.toContain("sk-lw-shared");
+      });
+    });
+
+    describe("when the project is archived before the CLI polls", () => {
+      it("answers a fatal access_denied rather than the stamped key", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, grant } = await approvedProjectKeyGrant(world);
+
+        world.project = null;
+
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(exchanged.status).toBe(410);
+        await expect(exchanged.json()).resolves.toMatchObject({ error: "access_denied" });
+      });
+    });
+
+    describe("when the project became somebody else's personal workspace", () => {
+      it("refuses, because a personal project only backs its own owner's key", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, grant } = await approvedProjectKeyGrant(world);
+
+        world.project = liveProject({ isPersonal: true, ownerUserId: "somebody-else" });
+
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(exchanged.status).toBe(410);
+      });
+    });
+  });
+
+  /**
+   * The exclusive redemption claim. The poll window paces polls; it does not
+   * fence a redemption, because a redemption slower than the window leaves the
+   * record readable by the next poll — and a second redemption would hand out
+   * a second credential and revoke the first's key.
+   */
+  describe("given an approved device code being redeemed", () => {
+    const claims = (world: ReturnType<typeof deviceFlowWorld>) =>
+      world.store.keys().filter((key) => key.includes("claim:"));
+
+    describe("when the redemption succeeds", () => {
+      it("leaves the claim standing, so a slower concurrent poll cannot redeem it again", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+          device_code: string;
+          user_code: string;
+        };
+
+        await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+        expect(claims(world)).toEqual([]);
+
+        expect((await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })).status).toBe(200);
+
+        expect(claims(world)).toHaveLength(1);
+      });
+    });
+
+    describe("when the redemption bought nothing", () => {
+      it("gives the claim back, so the CLI's next poll is not told to slow down", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+          device_code: string;
+          user_code: string;
+        };
+
+        await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+
+        world.personExists = false;
+
+        const refused = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+
+        expect(refused.status).toBe(500);
+        expect(claims(world)).toEqual([]);
+      });
+    });
+  });
+
   describe("when an admin disables the member's seat before the refresh token is used", () => {
     /** @scenario "a disabled member's session cannot be renewed" */
     it("refuses the rotation with 401 and issues no new token pair", async () => {
@@ -332,6 +487,18 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
     return Promise.resolve();
   }
 
+  /**
+   * The keys currently held. Read by the redemption-claim tests, which assert
+   * on the presence of the claim itself: whether it survives a successful
+   * exchange is the whole point of it, and nothing else observes that.
+   *
+   * No expiry here. A test that wants a key gone deletes it, which is what an
+   * elapsed TTL amounts to.
+   */
+  keys(): string[] {
+    return [...this.values.keys()];
+  }
+
   indexTokens(input: { indexKey: string; memberKeys: string[] }): Promise<void> {
     const members = this.sets.get(input.indexKey) ?? new Set<string>();
 
@@ -349,6 +516,28 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   }
 }
 
+/** The project a `project_api_key` grant points at, as the directory answers it now. */
+type LiveProject = {
+  id: string;
+  slug: string;
+  name: string;
+  apiKey: string;
+  isPersonal: boolean;
+  ownerUserId: string | null;
+};
+
+function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
+  return {
+    id: "project-shared",
+    slug: "shared",
+    name: "Shared",
+    apiKey: "sk-lw-shared",
+    isPersonal: false,
+    ownerUserId: null,
+    ...overrides,
+  };
+}
+
 function deviceFlowWorld(
   overrides: {
     mintToken?: string;
@@ -358,23 +547,44 @@ function deviceFlowWorld(
     publicBaseUrl?: string | undefined;
   } = {},
 ) {
-  const world = {
+  const store = new InMemoryDeviceSessionStore();
+  /** What the world answers right now — every field a test may move mid-flow. */
+  interface DeviceFlowWorld {
+    activeMembership: boolean;
+    /** The project the directory answers NOW, moved between approve and exchange. */
+    project: LiveProject | null;
+    /** Whether the person still administers it NOW. */
+    administersProject: boolean;
+    /** Whether the identity read answers at all, for the release-on-failure path. */
+    personExists: boolean;
+    store: InMemoryDeviceSessionStore;
+    mintedKeys: Array<{ deviceLabel: string; userId: string }>;
+    revokedForLogout: Array<{ apiKeyId: string; userId: string }>;
+  }
+  const world: DeviceFlowWorld = {
     activeMembership: true,
-    mintedKeys: [] as Array<{ deviceLabel: string; userId: string }>,
-    revokedForLogout: [] as Array<{ apiKeyId: string; userId: string }>,
+    project: null,
+    administersProject: true,
+    personExists: true,
+    store,
+    mintedKeys: [],
+    revokedForLogout: [],
   };
 
   const directory: AuthDirectory = {
     tryFindOrganizationIdBySsoDomain: () => Promise.resolve(null),
-    tryFindPerson: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
+    tryFindPerson: () =>
+      Promise.resolve(
+        world.personExists ? { id: USER_ID, name: "Bob", email: "bob@example.test" } : null,
+      ),
     tryFindOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
     maxSessionDurationDays: () => Promise.resolve(0),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
-    tryFindLiveProject: () => Promise.resolve(null),
+    tryFindLiveProject: () => Promise.resolve(world.project),
   };
 
   const door: AuthCliDeviceFlowApi = {
-    sessions: CliDeviceSessionService.create({ store: new InMemoryDeviceSessionStore() }),
+    sessions: CliDeviceSessionService.create({ store }),
     directory: () => directory,
     session: () =>
       Promise.resolve(
@@ -419,7 +629,7 @@ function deviceFlowWorld(
           apiKey: "project-key",
         },
       }),
-    canWriteProject: () => Promise.resolve(true),
+    canManageProject: () => Promise.resolve(world.administersProject),
     featureFlags: () => ({ isEnabled: () => Promise.resolve(true) }) as never,
     publicBaseUrl: "publicBaseUrl" in overrides ? overrides.publicBaseUrl : "https://app.test",
   };

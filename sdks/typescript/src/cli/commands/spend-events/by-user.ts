@@ -29,6 +29,9 @@ export const spendByUserCommand = async (
         console.log(
           `Tokens:    in ${spend.usage.input_tokens} / out ${spend.usage.output_tokens} / cache r ${spend.usage.cache_read_input_tokens} w ${spend.usage.cache_creation_input_tokens}`,
         );
+        console.log(
+          `Images:    in ${spend.usage.input_image_tokens} tok / out ${spend.usage.output_image_tokens} tok / ${spend.usage.image_count} image${spend.usage.image_count !== 1 ? "s" : ""}`,
+        );
         console.log();
       },
     };

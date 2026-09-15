@@ -15,8 +15,8 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     Three credential classes share one inventory:
       • web session — short-lived cookie + refresh
       • CLI device session — `langwatch login --device` against ~/.langwatch
-      • ingestion key — `sk-lw-<...>` (write-only, ingest-only ApiKey) minted
-        from /me Trace Ingest
+      • ingestion key — `ik-lw-<...>` (write-only, ingest-only ApiKey) minted
+        by a CLI session or from /me Trace Ingest
 
   Per ingestion-templates-catalog.feature + ingestion-key-lifecycle.feature:
     Ingestion keys are TODAY surfaced ONLY at /me Trace Ingest tile-grid
@@ -52,16 +52,25 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
         relative time + first-issued absolute time
     And there is a "Revoke all sessions" button at the top of the page
 
-  @bdd @sessions-and-devices @inventory @binding-tokens-included
+  @integration @sessions-and-devices @inventory @binding-tokens-included
   Scenario: Ingestion keys appear on the devices tab alongside CLI sessions
-    Given jane has only one credential — an ingestion key for claude_code
+    Given jane's "MacBook Pro" CLI session minted an ingestion key for claude_code
+    And jane has an ingestion key for cursor that no live session minted
     When jane opens the devices tab on "/me/configure"
-    Then she sees ONE card for the claude_code ingestion key
-    And the card class label is "Ingestion key · claude_code"
-    And the card last-used reflects the ingestion key's `lastUsedAt`
+    Then the "MacBook Pro" card carries a row labelled "Ingestion key · claude_code"
+    And the cursor key is listed under a card titled "Other keys"
     # The devices inventory is the authoritative single-pane-of-glass
     # for every active credential. No credential type is invisible from this
     # page (defense against losing track of long-lived keys).
+
+  @integration @sessions-and-devices @inventory
+  Scenario: Ingestion key card shows last used
+    Given jane's claude_code ingestion key was last used 2 hours ago
+    And her cursor ingestion key has never been used
+    When jane opens the devices tab on "/me/configure"
+    Then the claude_code row reads "Last used 2h ago"
+    And the cursor row reads "Last used Never"
+    And each row also carries the date the key was first issued
 
   # ---------------------------------------------------------------------------
   # Single-card revoke
@@ -79,7 +88,14 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       | class      | label                       | audit kind                                      |
       | web        | "MacBook Pro — Chrome"      | gateway.web_session.revoked                     |
       | cli        | "MacBook Pro — claude-code" | gateway.cli_device.revoked                      |
-      | ingest_key | "claude_code template"      | gateway.ingestion_key.revoked                   |
+
+  @integration @sessions-and-devices @revoke-single
+  Scenario: User revokes a single ingestion key card
+    Given jane's "MacBook Pro" card carries a claude_code ingestion key row
+    When she clicks "Revoke" on that row and confirms
+    Then `ingestionKey.revoke` is called with that key's id
+    And both the session list and the ingestion key list are read again
+    And the other rows on the card stay listed
 
   # ---------------------------------------------------------------------------
   # Bulk revoke — security-relevant signal
@@ -164,12 +180,60 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   # No-leak invariant
   # ---------------------------------------------------------------------------
 
-  @bdd @sessions-and-devices @inventory @no-leak
+  @integration @sessions-and-devices @inventory @no-leak
   Scenario: User sees only their own credentials on the devices tab (never other users')
-    Given jane has 4 credentials (per Background)
-    And user "ben@acme.com" has 2 credentials of his own
+    Given jane has a CLI session with an ingestion key under it
+    And user "ben@acme.com" has a CLI session with an ingestion key of his own
     When jane opens the devices tab on /me/configure
-    Then she sees exactly 4 cards
-    And ben's 2 credentials are NOT listed
+    Then she sees only her own session, carrying her own login key id
+    And ben's session and key are NOT listed
     # The devices tab is per-user; admin oversight is at /governance per the
     # admin-bird-eye scenario. Cross-user leakage would be a P0.
+
+  # ---------------------------------------------------------------------------
+  # What a web session signed in WITH (D06 amendment)
+  # ---------------------------------------------------------------------------
+  #
+  # Additive: every scenario above is untouched. A web session now records
+  # which of the person's sign-in methods minted it and what that sign-in
+  # PROVED, so the inventory can say how each one got in rather than only
+  # that it exists.
+  #
+  # No interplay with `maxSessionDurationDays` to settle. That policy ends
+  # sessions by AGE; an organization's two-step requirement is a membership
+  # condition and ends none, ever - so the two never contend over the same
+  # session. Per-identifier revocation below is narrower than either: it ends
+  # the sessions one sign-in method minted and nothing else.
+  #
+  # Spec: specs/identity/mfa-and-session-shape.feature (D06).
+
+  @integration @sessions-and-devices @inventory @sign-in-method
+  Scenario: Each web session says how it signed in
+    Given jane signed in on one device with her password and on another with a passkey
+    When jane opens the devices tab on "/me/configure"
+    Then each web session names the method it signed in with
+    And each one says whether a second factor was proven at sign-in
+    And nothing on the card shows the wire vocabulary a method reference uses
+
+  @integration @sessions-and-devices @inventory @sign-in-method
+  Scenario: A session that recorded nothing reads as an ordinary sign-in
+    Given jane holds a web session minted before sessions recorded what they proved
+    When jane opens the devices tab on "/me/configure"
+    Then the session is listed like any other
+    And it reads as a normal sign-in rather than as a warning
+    And nothing offers to end it on those grounds
+
+  @unit @sessions-and-devices @revoke-single @per-identifier
+  Scenario: Ending the sessions one sign-in method minted leaves the others alone
+    Given jane holds web sessions minted by her password and by her identity provider
+    When the sessions minted by one of those methods are ended
+    Then only those sessions end
+    And the sessions minted by the other method keep working
+    And no CLI device session and no ingestion key is touched
+
+  @unit @sessions-and-devices @revoke-single @per-identifier
+  Scenario: Ending sessions for a sign-in method that is not yours ends nothing
+    Given jane asks to end the sessions of a sign-in method belonging to somebody else
+    When the request is handled
+    Then no session ends
+    And jane is told nothing about whose method it was

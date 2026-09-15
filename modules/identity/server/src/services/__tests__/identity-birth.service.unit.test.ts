@@ -24,6 +24,7 @@ function harness(overrides?: {
   const order: string[] = [];
   const heads = {
     tryFindUserHashKey: async () => "key_material",
+    hasFolded: async () => true,
     findHeads: async ({ userId }: { userId: string }) => ({
       userId,
       identifiers: {},

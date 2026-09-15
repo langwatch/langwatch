@@ -411,8 +411,8 @@ overrides:
   # rather than in the catalog because catalogs reject `file:`; the path is
   # relative to the workspace root, which is what makes one entry serve all
   # five consumers.
-  "@langwatch/scenario": "file:./vendor/langwatch-scenario-1.7.0-dev.voice7.tgz"
-  "@langwatch/scenario@1.7.0-dev.voice6>langwatch": "workspace:*"
+  "@langwatch/scenario": "file:./vendor/langwatch-scenario-1.7.0-dev.voice9.tgz"
+  "@langwatch/scenario@1.7.0-dev.voice9>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping
@@ -576,12 +576,21 @@ packageExtensions:
 
 # Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
 # the rest came from platform/app/.
+#
+# cloudflared's postinstall downloads the actual `cloudflared` binary into its
+# own bin/ (`node lib/cloudflared.js bin install latest`). pnpm 10 runs a
+# dependency's build/postinstall ONLY when it is allowlisted here, so without
+# this entry the binary is never fetched, the voice worker's quick-tunnel mint
+# spawns a non-existent path (ENOENT), no VOICE_PUBLIC_BASE_URL is set, and
+# phone calls dial a URL nothing answers (Twilio error 31920). See
+# specs/features/agents/voice-phone.feature.
 onlyBuiltDependencies:
   - "@prisma/client"
   - "@prisma/engines"
   - "@scarf/scarf"
   - bcrypt
   - bufferutil
+  - cloudflared
   - core-js
   - cpu-features
   - esbuild

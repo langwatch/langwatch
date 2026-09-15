@@ -10,6 +10,13 @@ export {
   subtractProtectedRanges,
 } from "./essentialPii.ts";
 export {
+  isHeldOutIdentifierAttribute,
+  METADATA_SUBKEY_PREFIXES,
+  isOpaqueIdentifierValue,
+  isReservedIdentifierAttributeKey,
+  reservesTraceAddress,
+} from "./identifierHoldout.ts";
+export {
   compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
   isIdentifierAttributeName,

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  type CostRollupDayComparer,
+  type CostRollupDayLook,
+  CostRollupWatchProcess,
   type GovernanceEventingChannel,
   type GovernanceDiagnosticsSink,
   IngestionPullEventingAdapter,
@@ -32,12 +35,19 @@ import type {
   RecordIngestionPullRunFailedCommand,
   RecordPulledUsageCommand,
 } from "@langwatch/enterprise-governance-contract";
+import type { ClickHouseClient } from "@clickhouse/client";
 import type { EventSourcing } from "@langwatch/eventing";
 import { mapCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import type { GovernanceInternalProject } from "@langwatch/project-server";
 import { nowInstant } from "@langwatch/time";
+import {
+  CostRollupComparatorService,
+  reportCostRollupDrift,
+} from "./costRollupComparator.service.ts";
+import { GOVERNANCE_COST_SOURCE } from "./governanceCostRollup.constants.ts";
+import { GovernanceCostRollupClickHouseRepository } from "./governanceCostRollup.clickhouse.repository.ts";
 
 const logger = createLogger("langwatch:enterprise:governance-eventing");
 
@@ -183,15 +193,32 @@ export class AppIngestionPullExecutionRuntime {
     readonly worker: IngestionPullWorkerService,
     readonly ledger: GovernancePulledUsageLedger | undefined,
     readonly metrics: GovernanceIngestionPullMetrics,
+    readonly costRollup: GovernanceCostRollupClickHouseRepository | undefined,
   ) {}
 
   static create(
     worker: IngestionPullWorkerService,
     ledger: GovernancePulledUsageLedger | undefined,
     metrics: GovernanceIngestionPullMetrics,
+    /**
+     * The daily cost summary the drift check reads. Absent in a deployment
+     * that holds no summary — the check is then not mounted at all, rather
+     * than mounted to compare days against a store nobody writes.
+     */
+    costRollup?: GovernanceCostRollupClickHouseRepository,
   ): AppIngestionPullExecutionRuntime {
-    return new AppIngestionPullExecutionRuntime(worker, ledger, metrics);
+    return new AppIngestionPullExecutionRuntime(worker, ledger, metrics, costRollup);
   }
+}
+
+/**
+ * The drift check's daily summary store, built here so a composition root
+ * hands over its ClickHouse resolver and never names the repository class.
+ */
+export function createGovernanceCostRollupStore(
+  resolveClient: (tenantId: string) => Promise<ClickHouseClient>,
+): GovernanceCostRollupClickHouseRepository {
+  return new GovernanceCostRollupClickHouseRepository(resolveClient);
 }
 
 /** Complete lifecycle collaborators for durable ingestion-pull scheduling. */
@@ -237,6 +264,44 @@ class AppPulledUsageLedger implements PulledUsageLedgerRepository {
 
   insert(rows: PulledUsageLedgerRow[]): Promise<void> {
     return this.repository.insertPulledUsageRows(rows);
+  }
+}
+
+/**
+ * The pulled lane's day comparer, behind the check's port.
+ *
+ * `reportDrift` is handed back on the look rather than exposed as a second
+ * call, because saying a disagreement is real means naming the cells it was
+ * found in: a second call would have to compare the day again and would then
+ * report figures the look that decided never saw.
+ */
+class AppCostRollupDayComparer implements CostRollupDayComparer {
+  readonly costSource = GOVERNANCE_COST_SOURCE.PULLED;
+
+  private constructor(private readonly comparator: CostRollupComparatorService) {}
+
+  static create(rollup: GovernanceCostRollupClickHouseRepository): AppCostRollupDayComparer {
+    return new AppCostRollupDayComparer(new CostRollupComparatorService(rollup));
+  }
+
+  async compareDay({
+    tenantId,
+    day,
+  }: {
+    tenantId: string;
+    day: string;
+  }): Promise<CostRollupDayLook> {
+    const comparison = await this.comparator.compareDay({
+      tenantId,
+      day,
+      costSource: this.costSource,
+    });
+    return {
+      mismatchedCells: comparison.mismatches.length,
+      cellsBehind: comparison.behind.length,
+      lagMs: comparison.lagMs,
+      reportDrift: () => reportCostRollupDrift({ tenantId, comparison }),
+    };
   }
 }
 
@@ -467,6 +532,11 @@ export class AppGovernanceEventingAdapter {
         ledger: this.runtime.execution.ledger
           ? PulledUsageLedgerProcess.create(
               AppPulledUsageLedger.create(this.runtime.execution.ledger),
+            )
+          : undefined,
+        costRollupWatch: this.runtime.execution.costRollup
+          ? CostRollupWatchProcess.create(
+              AppCostRollupDayComparer.create(this.runtime.execution.costRollup),
             )
           : undefined,
       }).build(),

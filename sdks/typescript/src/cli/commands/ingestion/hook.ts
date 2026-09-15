@@ -1,10 +1,63 @@
 /**
- * `langwatch ingest hook <tool>`: posts one small OTLP log record joining a
- * coding session's traces to the code it worked on. NOTHING ON STDOUT EVER;
- * ALWAYS EXIT ZERO.
+ * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
+ * of every session.
+ *
+ * Coding agents know exactly which repository, branch and worktree a session is
+ * working in and export none of it over telemetry. Each of the three that can
+ * run our code inside a session reaches this same command, and each hands it
+ * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
+ *
+ *   - Claude Code and Codex call it directly as a command hook, and the
+ *     LangWatch Claude Code plugin calls it through its launcher
+ *     (`plugins/langwatch/scripts/launch.mjs`), which runs whatever
+ *     `langwatch` is installed.
+ *   - opencode has no command hooks, so the plugin the CLI installs subscribes
+ *     to its session event bus and spawns this command with the same payload.
+ *
+ * THE CROSS-VERSION CONTRACT. The plugin and the CLI release separately, so a
+ * plugin from any version has to run with a CLI from any version. This
+ * command and `ingest guidance` therefore accept and ignore options and
+ * arguments they do not know (registered with `allowUnknownOption` and
+ * `allowExcessArguments` in program.ts) and always exit zero, whatever they
+ * were called with. A future plugin passing an argument this build does not
+ * understand still gets the session reported; a usage error there would be
+ * prose on stderr and a non-zero exit on every session start.
+ *
+ * The session id each seam reports is the one that agent puts on its own
+ * telemetry, so the record this posts joins the session the agent is already
+ * describing. So the command runs git itself and posts one small OTLP log
+ * record, which is what lets a session's traces be joined to the code they were
+ * working on.
+ *
+ * Where that record goes is `resolveTarget` below, and it is deliberately not
+ * the environment alone: Claude Code hands its child processes an environment
+ * with every `OTEL_*` variable removed, and Codex hands its hooks one with no
+ * exporter variables either, so a hook that trusted them would never send
+ * anything from a real session.
+ *
+ * Two constraints shape every branch below.
+ *
+ *   - NOTHING ON STDOUT, EVER. A SessionStart hook's stdout is injected into
+ *     the user's session context, so one stray line would land in the
+ *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
+ *     contains "langwatch" (the CLI's existing debug convention).
+ *   - ALWAYS EXIT ZERO, AND SOON. Unparseable input, no repository, no
+ *     telemetry configured, a collector that refuses the post: every one of
+ *     them returns quietly. Every wait is bounded, stdin included, so a seam
+ *     that never closes a pipe cannot leave the hook alive for the rest of the
+ *     session. A hook is never allowed to be why a session broke.
+ *
+ * A failed post deliberately leaves the fingerprint file alone, so the next
+ * hook in the same session retries instead of assuming the context landed.
+ *
+ * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
-import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
+import {
+  type GovernanceConfig,
+  loadConfig,
+} from "@/cli/utils/governance/config";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 
@@ -81,18 +134,27 @@ export interface HookCommandOptions {
 }
 
 /**
- * The part of the device config the hook needs to reach a collector. Both
- * fields are optional here: a CLI never signed in has neither, which is
- * "no telemetry configured" rather than an error.
+ * The part of the device config the hook needs to reach a collector. Every
+ * field is optional here even though the config type requires the control
+ * plane: a CLI that was never signed in has none of them, and that is the
+ * "no telemetry configured" case rather than an error.
  */
 export type CliTelemetryConfig = Partial<
-  Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys">
+  Pick<
+    GovernanceConfig,
+    "control_plane_url" | "default_personal_ingest_keys" | "tool_project_keys"
+  >
 >;
 
-/** Where one record goes and what authenticates it. */
+/** Where one record goes, what authenticates it, and which source named it. */
 export interface TelemetryTarget {
   endpoint: string;
   headers: Record<string, string>;
+  /**
+   * Which of the three sources named this target. Read on a 401: only a
+   * personal key is this device's to replace.
+   */
+  source: "environment" | "pin" | "personal";
 }
 
 /**
@@ -201,42 +263,37 @@ async function runHook({
   });
 
   // A 401 means the key this device exports with is dead: revoked on the
-  // platform, rotated by an older server, evicted by the cap. The agent's own
+  // platform, or retired with the session that minted it. The agent's own
   // exporter fails the same way and says nothing, so this is the one place
-  // the device finds out. Re-mint, rewrite the wiring, retry, and tell the
-  // user to restart the agent: the running process still holds the old key.
+  // the device finds out. A personal key is re-minted under the current
+  // session, the wiring rewritten, the record retried, and the user told to
+  // restart the agent, which still holds the old key. A pinned key stops at
+  // the report.
   let liveTarget = target;
   if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
-    const outcome = await healRevokedKey({
-      agent,
-      rejectedToken: bearerOf(target.headers),
-    }).catch((error: Error) => {
-      debug({ message: `heal failed: ${error.message}`, env });
-      return { status: "failed" } as const;
-    });
-    // Only an attempt spends the window. A decline is read off the config
-    // without touching the platform, so holding the window would cost nothing
-    // to repeat and would silence the next 401 that this device CAN repair.
-    if (outcome.status === "declined") {
-      releaseHealWindow({ stateDir, agent });
-    }
-    if (outcome.status === "healed") {
-      liveTarget = outcome.target;
-      debug({ message: "ingest key re-minted and wiring rewritten", env });
-      await own.retry?.(outcome.target);
-      if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
-    } else if (outcome.status === "withheld") {
-      // The platform did not revoke this key itself, so a person may have.
-      // The device stays dead until a person sets it up again, so the only
-      // repair is to say so.
-      debug({ message: "ingest key was revoked by a person; not re-minted", env });
-      if (agent === "claude_code") notifyClaude(REVOKED_NOTICE);
-    } else if (outcome.status === "expired") {
-      // The platform refused the device's session, so nothing here can mint.
-      // Without this line the session ends with telemetry silently going
-      // nowhere and no sign of why.
-      debug({ message: "device session is signed out; not re-minted", env });
-      if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
+    // A pinned key is not this device's to replace: minting a personal one in
+    // its place would move the session's telemetry into another project
+    // without saying so. The healer declines a pinned tool for that same
+    // reason, so the report is the whole repair, and the only person who can
+    // make it is the one who pinned the key.
+    if (target.source === "pin") {
+      debug({
+        message: "the pinned ingest key was rejected; not re-minted",
+        env,
+      });
+      if (agent === "claude_code") notifyClaude(PINNED_REJECTED_NOTICE);
+    } else {
+      await healOrReport({
+        agent,
+        env,
+        target,
+        own,
+        stateDir,
+        healRevokedKey,
+        adoptHealed: (healed) => {
+          liveTarget = healed;
+        },
+      });
     }
   }
 
@@ -251,6 +308,61 @@ async function runHook({
   });
 }
 
+/**
+ * Re-mint the personal key the collector rejected, rewrite the tool's wiring,
+ * retry the record, and tell the user what became of it.
+ */
+async function healOrReport({
+  agent,
+  env,
+  target,
+  own,
+  stateDir,
+  healRevokedKey,
+  adoptHealed,
+}: {
+  agent: string;
+  env: NodeJS.ProcessEnv;
+  target: TelemetryTarget;
+  own: OwnContextOutcome;
+  stateDir: string;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+  adoptHealed: (target: TelemetryTarget) => void;
+}): Promise<void> {
+  const outcome = await healRevokedKey({
+    agent,
+    rejectedToken: bearerOf(target.headers),
+  }).catch((error: Error) => {
+    debug({ message: `heal failed: ${error.message}`, env });
+    return { status: "failed" } as const;
+  });
+  // Only an attempt spends the window. A decline is read off the config
+  // without touching the platform, so holding the window would cost nothing
+  // to repeat and would silence the next 401 that this device CAN repair.
+  if (outcome.status === "declined") {
+    releaseHealWindow({ stateDir, agent });
+  }
+  if (outcome.status === "healed") {
+    const healed: TelemetryTarget = { ...outcome.target, source: "personal" };
+    adoptHealed(healed);
+    debug({ message: "ingest key re-minted and wiring rewritten", env });
+    await own.retry?.(healed);
+    if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
+  } else if (outcome.status === "withheld") {
+    // The platform did not revoke this key itself, so a person may have.
+    // The device stays dead until a person sets it up again, so the only
+    // repair is to say so.
+    debug({ message: "ingest key was revoked by a person; not re-minted", env });
+    if (agent === "claude_code") notifyClaude(REVOKED_NOTICE);
+  } else if (outcome.status === "expired") {
+    // The platform refused the device's session, so nothing here can mint.
+    // Without this line the session ends with telemetry silently going
+    // nowhere and no sign of why.
+    debug({ message: "device session is signed out; not re-minted", env });
+    if (agent === "claude_code") notifyClaude(SIGNED_OUT_NOTICE);
+  }
+}
+
 /** What the user reads after a heal; Claude Code shows `systemMessage`. */
 const HEAL_NOTICE =
   "LangWatch: the ingest key this machine exports with had been revoked. A new key was minted and wired; restart Claude Code so telemetry resumes.";
@@ -258,6 +370,10 @@ const HEAL_NOTICE =
 /** What the user reads when the key was revoked on purpose and stays dead. */
 const REVOKED_NOTICE =
   "LangWatch: the ingest key this machine exports with was revoked and was not replaced. Run `langwatch instrument claude` to set this machine up again.";
+
+/** What the user reads when the key this tool is pinned to stops working. */
+const PINNED_REJECTED_NOTICE =
+  "LangWatch: the ingest key this machine is pinned to was rejected, so telemetry is not being recorded. A pinned key is never replaced automatically. Run `langwatch instrument claude --key <ingest-key>` or `--project <id>` with a live key.";
 
 /** What the user reads when the device is signed out of LangWatch. */
 const SIGNED_OUT_NOTICE =
@@ -504,9 +620,25 @@ interface OwnContextOutcome {
 }
 
 /**
- * Where to post the record. The environment is the first source, but can't
- * be the only one: Claude Code strips `OTEL_*` from hooks it spawns. Falls
- * back to the CLI's own device config; null when neither names a collector.
+ * Where to post the record, and what to authenticate it with.
+ *
+ * The environment is the first source, per the OTel exporter spec, and the
+ * only one when the hook is driven by something other than an agent the CLI
+ * signed in. It cannot be the only one: Claude Code strips every `OTEL_*`
+ * variable from the processes it spawns, hooks included, so a session
+ * exporting perfectly well hands its hooks an environment with no endpoint in
+ * it at all.
+ *
+ * The fallback is the CLI's own device config, written by `langwatch login`,
+ * `langwatch instrument` and `langwatch ingest install`. It holds two
+ * credentials for one agent and they are read in the order `instrument`
+ * chooses between them: the tool's pin first (`tool_project_keys`, with the
+ * endpoint override it may carry), then the personal ingest key minted for
+ * this agent under the control plane the CLI is signed in to. Null when no
+ * source can name a collector, which is the "no telemetry configured" no-op.
+ *
+ * Shared with `langwatch ingest context`, which posts the same record from
+ * the same sources when the agent declares its context itself.
  */
 export function resolveTarget({
   env,
@@ -522,18 +654,50 @@ export function resolveTarget({
     return {
       endpoint: fromEnv,
       headers: parseOtlpHeaders(env.OTEL_EXPORTER_OTLP_HEADERS),
+      source: "environment",
     };
   }
 
   const config = readCliConfig();
-  const base = config.control_plane_url?.trim().replace(/\/+$/, "");
+  const controlPlane = config.control_plane_url;
+
+  // `langwatch instrument <tool> --key/--project` pins the tool to one ingest
+  // key, and while that pin stands the personal path is neither consulted nor
+  // rewritten, so a pinned tool has no personal key to read here. The pin is
+  // kept per tool rather than per agent, hence the slug translation. It wins
+  // over the personal key, and the endpoint it carries wins with it, because a
+  // pin is an explicit choice of where this tool's data goes;
+  // `installTelemetryWiring` picks the same credential for the env block, so
+  // the record posted here and the traces the agent exports land together.
+  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[agent] ?? agent];
+  const pinnedSecret = pinned?.secret?.trim();
+  if (pinnedSecret) {
+    const pinnedEndpoint = logsEndpointUnder(pinned?.endpoint ?? controlPlane);
+    // A pin with nowhere to send is still a pin: falling through to the
+    // personal key would post this tool's context into another project.
+    if (!pinnedEndpoint) return null;
+    return {
+      endpoint: pinnedEndpoint,
+      headers: { Authorization: `Bearer ${pinnedSecret}` },
+      source: "pin",
+    };
+  }
+
+  const endpoint = logsEndpointUnder(controlPlane);
   const secret = config.default_personal_ingest_keys?.[agent]?.secret?.trim();
-  if (!base || !secret) return null;
+  if (!endpoint || !secret) return null;
 
   return {
-    endpoint: `${base}/api/otel/v1/logs`,
+    endpoint,
     headers: { Authorization: `Bearer ${secret}` },
+    source: "personal",
   };
+}
+
+/** The OTLP logs path under a control plane base, or null when there is none. */
+function logsEndpointUnder(base: string | undefined): string | null {
+  const normalized = base?.trim().replace(/\/+$/, "");
+  return normalized ? `${normalized}/api/otel/v1/logs` : null;
 }
 
 export async function postSessionContext({

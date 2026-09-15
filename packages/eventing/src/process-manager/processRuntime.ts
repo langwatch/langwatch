@@ -231,11 +231,16 @@ export class ProcessRuntime {
       const registered = this.registerProcessManager(definition);
       const hasNoEventTypes = definition.config.eventTypes.length === 0;
       if (hasNoEventTypes) continue;
+      const keyBy = definition.config.keyBy;
       subscribers.push({
         name: `pm:${definition.config.name}`,
         eventTypes: definition.config.eventTypes,
+        // A keyed process gathers several aggregates into one instance, so its
+        // deliveries must serialize into one lane per key — concurrent ones
+        // would fight over the instance revision.
+        ...(keyBy ? { options: { groupKeyFn: keyBy } } : {}),
         handle: async (event, context) => {
-          const processKey = definition.config.keyBy?.(event) ?? context.aggregateId;
+          const processKey = keyBy?.(event) ?? context.aggregateId;
           if (processKey.trim().length === 0) {
             throw new Error(
               `Process manager "${definition.config.name}" derived an empty process key for event ${event.id}`,

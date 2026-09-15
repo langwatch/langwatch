@@ -11,6 +11,8 @@ export interface RequestContext {
   organizationId?: string;
   projectId?: string;
   userId?: string;
+  /** Internal queue scope propagated across durable event fan-out. */
+  queueDispatchScopeKey?: string;
 }
 
 /**
@@ -24,6 +26,7 @@ export interface JobContextMetadata {
   organizationId?: string;
   projectId?: string;
   userId?: string;
+  queueDispatchScopeKey?: string;
 }
 
 const asyncLocalStorage = new AsyncLocalStorage<RequestContext>();
@@ -96,6 +99,7 @@ export function createContextFromJobData(metadata?: JobContextMetadata): Request
     organizationId: metadata?.organizationId,
     projectId: metadata?.projectId,
     userId: metadata?.userId,
+    queueDispatchScopeKey: metadata?.queueDispatchScopeKey,
   };
 }
 
@@ -112,5 +116,6 @@ export function getJobContextMetadata(): JobContextMetadata {
     organizationId: context?.organizationId,
     projectId: context?.projectId,
     userId: context?.userId,
+    queueDispatchScopeKey: context?.queueDispatchScopeKey,
   };
 }

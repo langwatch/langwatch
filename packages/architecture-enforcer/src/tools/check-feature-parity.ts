@@ -126,6 +126,12 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "sdks/typescript/src",
   "sdks/typescript/__tests__",
   "sdks/python/src",
+  // The identity front-door e2e pass runs against a live app with no other
+  // suite behind it — a Playwright ceremony against a real virtual WebAuthn
+  // authenticator and a real Postgres-backed verification token is the only
+  // place several of these scenarios are proven end-to-end. Without this
+  // root their `@scenario` bindings would be invisible to the checker even
+  // though the tests exist and run in `e2e-ci.yml`.
   "dev/tests",
   // The agent plugin is hand-authored manifests plus a bundle, so its only
   // tests are the ones that read those manifests and spawn that bundle. Without
@@ -364,7 +370,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
@@ -386,7 +391,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/cursor.feature",
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
-  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
   "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
@@ -427,7 +431,6 @@ const LEGACY_INERT: string[] = [
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
   "specs/ci/migration-order.feature",
-  "specs/ci/no-committed-screenshots.feature",
   "specs/ci/no-docker-integration-tests.feature",
   "specs/ci/pr-impact-map.feature",
   "specs/claude/drive-pr.feature",
@@ -435,9 +438,9 @@ const LEGACY_INERT: string[] = [
   "specs/coding-agent/personal-usage.feature",
   "specs/components/code-block-editor.feature",
   "specs/data-retention/data-size-metering.feature",
-  "specs/data-retention/ingestion-stamping.feature",
   "specs/data-retention/monitoring.feature",
   "specs/data-retention/plan-gated-retention-menu.feature",
+  "specs/data-retention/retention-policy-configuration.feature",
   "specs/data-retention/retroactive-update.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
@@ -506,8 +509,13 @@ const LEGACY_INERT: string[] = [
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
+  // PLANNED, NOT YET BUILT (ADR-135). Every scenario is @unimplemented because
+  // the dispatch-and-read write path does not exist yet — tagging them now
+  // would report bindings that are not there. Each scenario names the tag it
+  // becomes; the implementation swaps them and DELETES THIS ENTRY. If this
+  // line is still here when the change is called done, the change is not done.
+  "specs/identity/one-decision-per-write.feature",
   "specs/identity/org-admin-identity-surface.feature",
-  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-command-bar-activation.feature",
@@ -692,6 +700,11 @@ const LEGACY_INERT: string[] = [
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
   "sdks/typescript/specs/cli/daemon.feature",
+  // Reason: the gateway half of this file is still unwritten and stays
+  // @unimplemented. It left LEGACY_INERT because the trail now enforces one
+  // real scenario - that a signed-in caller cannot fill it with refusals -
+  // and a file enforcing something is no longer inert.
+  "specs/audit-log/audit-log.feature",
   // Reason: arrived from main already partially tagged (#7778 self-mapped
   // Azure deployments on the dispatch path). Its six untagged scenarios
   // describe gateway endpoint derivation, which this branch does not own.
@@ -709,6 +722,12 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
   "specs/ai-gateway/governance/my-usage-dashboard.feature",
+  // Reason: #7960 tagged and bound the four scenarios the devices tab now
+  // answers, and retired its LEGACY_INERT entry. The eight untagged ones
+  // describe the org-wide max-session-duration policy and the admin sessions
+  // widget, neither of which is built, and the bulk revoke of every
+  // credential class at once, which is.
+  "specs/ai-gateway/governance/sessions-and-devices.feature",
   // Reason: #8041 tagged and bound two scenarios (opaque id placement on
   // export, and the drop of an opaque email beside a user id) and retired
   // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
@@ -724,12 +743,25 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/cli-onboarding/login-unified.feature",
   "specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature",
   "specs/ai-governance/cli-wrappers/latest-login-wins.feature",
+  // Reason: #7960 tagged and bound the scenario for logout retiring the
+  // ingest keys its session minted, and retired the file's LEGACY_INERT
+  // entry. The twenty-one untagged ones describe the rest of what logout
+  // unwires locally, settings.json, the plugin, the codex blocks and the
+  // shell rc, which that change did not touch.
+  "specs/ai-governance/cli-wrappers/logout.feature",
   "specs/ai-governance/cli-wrappers/shell-rc-persistence.feature",
   "specs/ai-governance/personal-portal/admin-catalog-editor.feature",
   "specs/ai-governance/personal-portal/tool-catalog-rbac.feature",
   "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the
+  // enterprise-OAuth callback-path outline to `legacyCallbackParity.test.ts`.
+  // The other two scenarios (on-prem credentials, Google OAuth) are
+  // deliberately untagged per the file's own header — they document live
+  // behaviour proven by browser QA and other unit tests, not a single bound
+  // assertion, so tagging them would misstate what covers them.
+  "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
@@ -742,6 +774,23 @@ const LEGACY_PARTIAL: string[] = [
   "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/cache-write-ttl-pricing.feature",
   "specs/coding-agent/terminal-view.feature",
+  // Reason: left LEGACY_INERT when this branch bound its scenarios. All four
+  // this branch authored are now tagged and bound. The six that remain
+  // untagged predate it and describe retention stamping it does not own:
+  // two need a test in the scenario and experiment pipelines, which assert
+  // no _retention_days today; one is a ClickHouse MATERIALIZED column only an
+  // integration test can prove; one is an absence-of-restamping invariant;
+  // and the trace-pipeline pair is proven for event_log but not yet for
+  // stored_metric_records or dspy_steps. Each needs a test, not a tag.
+  "specs/data-retention/ingestion-stamping.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the three
+  // event-log-category scenarios (category selection, per-tenant/category/
+  // table rate limiting, and parallel category mutations) to
+  // `retroactiveUpdate.unit.test.ts`. The seven that remain untagged predate
+  // this branch and describe the UI/progress-card side (confirmation dialog,
+  // progress tracking, kill-mutation button) and the immediate-vs-retroactive
+  // stamping contract, which this branch does not own.
+  "specs/data-retention/retroactive-update.feature",
   "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/zod-first-schema-source-of-truth.feature",
   "specs/event-sourcing/payload-cost.feature",
@@ -1173,8 +1222,10 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
     }
 
     const rest = src.slice(i);
-    const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?\s*\(/);
-
+    // Vitest's typed table form is still a test call: `it.each<T>([...])`.
+    // Keep the type argument narrow and line-local so proximity remains a
+    // lexical check rather than attempting to parse arbitrary TypeScript.
+    const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/);
     return m !== null;
   }
 
@@ -1967,8 +2018,37 @@ interface ParityAnalysis {
   listErrors: string[];
 }
 
+/**
+ * `LEGACY_INERT` says a file yields NO enforced scenario. `LEGACY_UNBOUND` and
+ * `LEGACY_PARTIAL` both say it yields some. A file on the inert list and on
+ * either of the other two is therefore always a mistake, and it is one two
+ * branches can make without conflicting: one tags a scenario in the file and
+ * moves it to `LEGACY_PARTIAL`, the other leaves it untagged and adds it to
+ * `LEGACY_INERT`, and main gets both. The stale-entry check then fails on the
+ * copy that no longer describes the file, which is what this catches first.
+ *
+ * `LEGACY_UNBOUND` and `LEGACY_PARTIAL` are not exclusive of each other: a
+ * file can have enforced scenarios that are unbound and untagged ones beside
+ * them, and it needs both entries to be tolerated.
+ */
+function validateNoCrossListEntries(): string[] {
+  const inert = new Set(LEGACY_INERT);
+  return [
+    { name: "LEGACY_UNBOUND", entries: LEGACY_UNBOUND },
+    { name: "LEGACY_PARTIAL", entries: LEGACY_PARTIAL },
+  ].flatMap(({ name, entries }) =>
+    entries
+      .filter((entry) => inert.has(entry))
+      .map(
+        (entry) =>
+          `${entry} is listed in LEGACY_INERT and ${name} — the first says the file enforces nothing, the second says it enforces something, keep the one that matches the file and delete the other`,
+      ),
+  );
+}
+
 function validateAllExemptionLists(allFeatures: string[]): string[] {
   return [
+    ...validateNoCrossListEntries(),
     ...validateExemptionList({
       name: "LEGACY_UNBOUND",
       entries: LEGACY_UNBOUND,

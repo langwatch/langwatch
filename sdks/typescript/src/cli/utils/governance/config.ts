@@ -10,6 +10,12 @@ import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 
+/** Where a CLI runs from: the node binary and the entry script, both absolute. */
+export interface CliLocation {
+  node: string;
+  entry: string;
+}
+
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
   gateway_url: string;
@@ -112,9 +118,40 @@ export interface GovernanceConfig {
   claude_plugin_last_update_check?: number;
 
   /**
-   * Per-wrapped-tool routing mode: "gateway" routes HTTP calls through the
-   * AI Gateway; "ingestion" enables the tool's native OTel exporter; "ask"
-   * re-prompts (default). Mutually exclusive per the no-double-trace rule.
+   * How to run this CLI from a process that cannot resolve it on PATH: the
+   * absolute path of the node binary it last ran under and of its own entry
+   * script. Written by `langwatch login`, `langwatch claude` and `langwatch
+   * instrument`, only when the values changed (see cli-location.ts).
+   *
+   * Read by the Claude Code plugin's launcher (`plugins/langwatch/scripts/
+   * launch.mjs`), which runs the hook commands through it before falling back
+   * to `langwatch` on PATH. A Claude Code started from a desktop app inherits
+   * a PATH with no version manager on it, and this is what still finds the
+   * CLI there. The launcher checks both paths exist before using them, so a
+   * node upgraded through a version manager leaves a stale record that is
+   * simply skipped.
+   */
+  cli_location?: CliLocation;
+
+  /**
+   * Per-wrapped-tool routing mode answer.
+   *
+   *   "gateway"   — Path A: route the tool's HTTP calls through
+   *                  the AI Gateway via base-URL swap (full server-
+   *                  side I/O + cost capture, no client OTel).
+   *   "ingestion" — Path B: enable the tool's native OTel exporter
+   *                  pointed at /api/otel with the tool's ingest
+   *                  credential (project pin or personal `ik-lw-` key).
+   *                  For codex this also writes the [otel] block to
+   *                  ~/.codex/config.toml automatically.
+   *   "ask"       — re-prompt on the next `langwatch <tool>`. The
+   *                  default when this key is absent.
+   *
+   * The two modes are mutually exclusive per the no-double-trace
+   * rule — gateway capture + OTel emission on the same call would
+   * double-count both traces and cost. The wrapper picks Path A
+   * by default when a personal VK is configured, and falls back
+   * to Path B when no VK + the user opts in.
    */
   tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
 

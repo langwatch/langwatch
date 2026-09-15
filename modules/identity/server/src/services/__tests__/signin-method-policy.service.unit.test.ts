@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeSignIn } from "@langwatch/identity-contract";
 import {
   LOCAL_METHOD_SET,
+  PASSKEY_METHOD,
   PASSWORD_METHOD,
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
@@ -86,6 +87,49 @@ describe("the instance sign-in method policy", () => {
         kind: "federated",
         connectionId: null,
       });
+    });
+  });
+
+  describe("given a deployment that offers passkeys", () => {
+    beforeEach(() => {
+      licensedStore(true);
+      offersPasskeys = true;
+    });
+
+    it("appends the passkey to the default method set", async () => {
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      expect(policy.defaultMethods.at(-1)).toEqual(PASSKEY_METHOD);
+    });
+
+    /**
+     * Break-glass is the door somebody reaches for when the identity provider
+     * cannot be answered, and it has to work from any machine. A passkey is
+     * bound to one device, so a set that names it is a break-glass that fails
+     * exactly for the person who needs it — sitting at a different machine.
+     */
+    it("keeps the passkey out of the break-glass set", async () => {
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      expect(policy.localMethods).toEqual(LOCAL_METHOD_SET);
+      expect(policy.localMethods).not.toContainEqual(PASSKEY_METHOD);
+    });
+  });
+
+  describe("given a license gate that denies", () => {
+    /**
+     * The gate evicts its memo on rejection (ADR-027 Decision 6, self-healing),
+     * so a second read is a second licensing scan behind its own timeout — and
+     * one unauthenticated request then holds several slow database reads open
+     * exactly when the database is already struggling. A denial is email mode
+     * by definition, so there is nothing the second read could add.
+     */
+    it("does not ask the provider resolver a second question", async () => {
+      licensedStore(false);
+
+      await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      expect(resolveAuthProvider).not.toHaveBeenCalled();
     });
   });
 

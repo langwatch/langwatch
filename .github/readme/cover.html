@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LangWatch README cover</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b1020;
+    --text: #f1f5f9;
+    --muted: #aab4c8;
+    --orange: #f7841e;
+    --line: rgba(255, 255, 255, 0.08);
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px;
+    height: 400px;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .backdrop {
+    position: absolute; inset: 0;
+    background-size: cover;
+    background-position: center right;
+  }
+  .veil {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg,
+      rgba(11, 16, 32, 1) 0%,
+      rgba(11, 16, 32, 0.97) 40%,
+      rgba(11, 16, 32, 0.60) 62%,
+      rgba(11, 16, 32, 0.20) 100%);
+  }
+  .grid {
+    position: absolute; right: -60px; top: -40px;
+    width: 720px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    transform: rotate(-8deg);
+  }
+  .card {
+    height: 76px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.03);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; font-weight: 600;
+    color: rgba(170, 180, 200, 0.35);
+  }
+  .card.pass { color: rgba(74, 222, 128, 0.55); border-color: rgba(74, 222, 128, 0.14); }
+  .card.fail { color: rgba(248, 113, 113, 0.65); border-color: rgba(248, 113, 113, 0.22); background: rgba(248, 113, 113, 0.05); }
+  .card.run  { color: rgba(247, 132, 30, 0.7); border-color: rgba(247, 132, 30, 0.25); }
+  .content {
+    position: absolute; left: 72px; top: 0;
+    height: 400px; width: 760px;
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    gap: 22px;
+  }
+  .logo { height: 34px; width: auto; }
+  h1 {
+    margin: 0;
+    font-size: 46px; line-height: 1.12; font-weight: 700; letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--orange); }
+  p {
+    margin: 0;
+    font-size: 19px; line-height: 1.45; color: var(--muted);
+    max-width: 620px;
+  }
+  .areas { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    font-size: 14px; font-weight: 600;
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.04);
+    color: #dbe2ee;
+  }
+  /* The default: cream background, navy copy, over the flat illustration in backdrop.jpg.
+     ?theme=dark switches to the dark palette above (for a dark backdrop or the card grid). */
+  body.light {
+    --bg: #f5f3ee;
+    --text: #1d293d;
+    --muted: #4b5a70;
+    --orange: #e17100;
+    --line: rgba(29, 41, 61, 0.14);
+  }
+  body.light .veil {
+    background: linear-gradient(90deg,
+      rgba(245, 243, 238, 1) 0%,
+      rgba(245, 243, 238, 0.97) 40%,
+      rgba(245, 243, 238, 0.45) 62%,
+      rgba(245, 243, 238, 0.05) 100%);
+  }
+  body.light .pill { background: rgba(29, 41, 61, 0.04); color: #1d293d; }
+</style>
+</head>
+<body>
+  <div class="backdrop" id="backdrop"></div>
+  <div class="grid" id="grid">
+    <div class="card pass">✓ Pass</div><div class="card pass">✓ Pass</div><div class="card"></div><div class="card pass">✓ Pass</div><div class="card fail">✕ Fail</div>
+    <div class="card"></div><div class="card pass">✓ Pass</div><div class="card run">● Running</div><div class="card pass">✓ Pass</div><div class="card"></div>
+    <div class="card pass">✓ Pass</div><div class="card fail">✕ Fail</div><div class="card pass">✓ Pass</div><div class="card"></div><div class="card pass">✓ Pass</div>
+    <div class="card"></div><div class="card pass">✓ Pass</div><div class="card pass">✓ Pass</div><div class="card run">● Running</div><div class="card pass">✓ Pass</div>
+    <div class="card pass">✓ Pass</div><div class="card"></div><div class="card fail">✕ Fail</div><div class="card pass">✓ Pass</div><div class="card pass">✓ Pass</div>
+    <div class="card"></div><div class="card pass">✓ Pass</div><div class="card"></div><div class="card pass">✓ Pass</div><div class="card"></div>
+  </div>
+  <div class="veil"></div>
+  <div class="content">
+    <img class="logo" src="logo.svg" alt="LangWatch">
+    <h1>The open-source platform<br>for <span>AI in production</span></h1>
+    <p>Trace, test, route and govern every LLM call in your company, from your own agents to the coding assistants your engineers use.</p>
+    <div class="areas">
+      <span class="pill">LLM Ops</span>
+      <span class="pill">Coding Agents</span>
+      <span class="pill">AI Gateway</span>
+      <span class="pill">AI Governance</span>
+    </div>
+  </div>
+  <script>
+    // Cream copy over backdrop.jpg by default. ?bg=<image> swaps the backdrop, ?bg=grid uses
+    // the card grid instead, and ?theme=dark gives the dark palette with the light wordmark.
+    const params = new URLSearchParams(location.search);
+    const bg = params.get("bg") || "backdrop.jpg";
+    if (params.get("theme") !== "dark") {
+      document.body.classList.add("light");
+      document.querySelector(".logo").src = "logo-navy.svg";
+    }
+    if (bg === "grid") {
+      document.getElementById("backdrop").remove();
+    } else {
+      document.getElementById("backdrop").style.backgroundImage = `url(${JSON.stringify(bg)})`;
+      document.getElementById("grid").remove();
+    }
+  </script>
+</body>
+</html>

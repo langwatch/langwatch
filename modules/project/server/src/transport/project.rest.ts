@@ -7,7 +7,6 @@
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import {
   BadRequestError,
   defineRestMiddleware,
@@ -123,6 +122,22 @@ const projectParamsSchema = z.object({ projectId: z.string().min(1) });
 const LISTING_ANSWERS_WHAT_THE_KEY_REACHES =
   "the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused";
 
+/**
+ * Why the two base-key routes answer nothing rather than check a permission.
+ * This door is reached with an ORGANIZATION token, and the base key outlives
+ * every membership and attributes nothing, so trading one credential for it is
+ * refused for all of them. A permission gate would be worse than useless: an
+ * administrator told "insufficient permissions" goes and widens their token.
+ */
+const BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN =
+  "the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller";
+
+function refuseBaseKeyToApiToken(): never {
+  throw new ForbiddenError(
+    "A signed-in project administrator must manage the base API key in the browser",
+  );
+}
+
 export const projectRest = defineRestRouter(ProjectManagementApi)
   .withNamespace("projects")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -230,28 +245,21 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
     return { id: project.id, name: project.name, archivedAt: project.archivedAt };
   })
 
-  // The base key is a project-level write credential, so reading it is gated
-  // with `project:update` to match the access it grants — not `project:view`.
+  // Both base-key routes are WITHDRAWN for this door, whatever the caller
+  // holds. See `refuseBaseKeyToApiToken`.
   .get("/:projectId/api-key", "getProjectApiKey")
   .withParams(projectParamsSchema)
-  .withPermission("project:update", { at: "route", param: "projectId" })
+  .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
   .withDocs(GET_PROJECT_API_KEY)
-  .handle(async ({ app, input, scope }) => ({
-    apiKey: (await projectInOrganization({ app, id: input.projectId, organizationId: scope.id }))
-      .apiKey,
-  }))
+  .handle(async () => refuseBaseKeyToApiToken())
 
   .post("/:projectId/regenerate-api-key", "regenerateProjectApiKey")
   .withParams(projectParamsSchema)
-  .withPermission("project:manage", { at: "route", param: "projectId" })
+  .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
   .withDocs(REGENERATE_PROJECT_API_KEY)
-  .handle(async ({ app, input, scope }) => {
-    await projectInOrganization({ app, id: input.projectId, organizationId: scope.id });
-
-    return { apiKey: await rotateIngestionKey({ app, projectId: input.projectId }) };
-  })
+  .handle(async () => refuseBaseKeyToApiToken())
   .build();
 
 /** One project, as every route in this family reports it. */
@@ -344,26 +352,6 @@ async function archiveProject({
   } catch (error) {
     if (error instanceof ProjectNotFoundError) throw new NotFoundError("Project not found");
     if (error instanceof PersonalProjectProtectedError) throw new ForbiddenError(error.message);
-
-    throw error;
-  }
-}
-
-/**
- * A project whose credential the service cannot find reads as a project this
- * family does not have, which is what the caller can act on.
- */
-async function rotateIngestionKey({
-  app,
-  projectId,
-}: {
-  app: ProjectManagementApi;
-  projectId: string;
-}): Promise<string> {
-  try {
-    return await app.apiKeys().regenerateLegacyProjectKey({ projectId });
-  } catch (error) {
-    if (error instanceof ApiKeyNotFoundError) throw new NotFoundError("Project not found");
 
     throw error;
   }

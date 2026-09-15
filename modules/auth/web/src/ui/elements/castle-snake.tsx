@@ -5,7 +5,19 @@ import { MONO_FONT } from "../../model/front-door-theme.ts";
 import type { Direction, SnakeGame } from "../../model/castle-snake.ts";
 import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake.ts";
 
-/** Easter egg snake game: double-tap castle, fixed canvas, arrows/Escape only. */
+/**
+ * Easter egg snake game: double-tap castle, fixed canvas, arrows/Escape only.
+ *
+ * ── Motion ──────────────────────────────────────────────────────────────────
+ * This is the one thing on the auth screens that moves under
+ * `prefers-reduced-motion: reduce`, and that is deliberate, not an oversight.
+ * The setting asks not to be moved at by a page; it does not ask for a game
+ * that somebody just deliberately started to sit still. Everything ambient —
+ * the entrance, the warp, the rise — stays stood down exactly as before.
+ * Please do not "fix" this by gating it.
+ *
+ * Spec: specs/identity/auth-screen-castle-snake.feature
+ */
 
 /** The pitch of the ground's signal grid. Change one, change the other. */
 const CELL = 72;

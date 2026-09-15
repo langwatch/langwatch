@@ -9,11 +9,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getConnInfo } = vi.hoisted(() => ({ getConnInfo: vi.fn() }));
 vi.mock("@hono/node-server/conninfo", () => ({ getConnInfo }));
 
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ warn, info: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+}));
+
 import { apiClientAddress, trpcClientAddress } from "../api-client-address.ts";
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllEnvs();
+  // The default-trust path is what most of these exercise, and it only holds
+  // when the setting is genuinely absent — an ambient value in the shell that
+  // ran the suite would otherwise decide the answer.
+  vi.stubEnv("TRUSTED_PROXY_ADDRESSES", undefined);
 });
 
 describe("apiClientAddress()", () => {
@@ -154,5 +163,139 @@ describe("apiClientAddress()", () => {
 
       expect(resolved).toBe("203.0.113.7");
     });
+  });
+});
+
+/**
+ * The module latches "we have said this once" at module scope, so any case that
+ * asserts on the warning takes a fresh instance of the module rather than
+ * reading a flag an earlier case already set.
+ */
+async function freshResolver() {
+  vi.resetModules();
+  return await import("../api-client-address.ts");
+}
+
+describe("given TRUSTED_PROXY_ADDRESSES is not set", () => {
+  describe("when the request arrives from a private peer", () => {
+    it("reads the chain that peer forwarded, rather than counting the ingress as the caller", async () => {
+      const { apiClientAddress: resolve } = await freshResolver();
+      getConnInfo.mockReturnValue({ remote: { address: "10.0.0.9" } });
+
+      let captured: string | undefined;
+      const app = new Hono();
+      app.get("/", (c) => {
+        captured = resolve(c);
+        return c.json({ ok: true });
+      });
+      await app.request("/", {
+        headers: { "x-forwarded-for": "203.0.113.1, 198.51.100.23, 10.0.0.9" },
+      });
+
+      expect(captured).toBe("198.51.100.23");
+    });
+
+    it("says nothing about an undeclared proxy, because a private hop needs no announcement", async () => {
+      const { apiClientAddress: resolve } = await freshResolver();
+      getConnInfo.mockReturnValue({ remote: { address: "10.0.0.9" } });
+
+      const app = new Hono();
+      app.get("/", (c) => {
+        resolve(c);
+        return c.json({ ok: true });
+      });
+      await app.request("/", { headers: { "x-forwarded-for": "203.0.113.1" } });
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the request arrives from an IPv6 loopback peer", () => {
+    it("reads it as infrastructure, so a local proxy's chain is still followed", async () => {
+      const { trpcClientAddress: resolve } = await freshResolver();
+
+      expect(
+        resolve({
+          headers: { "x-forwarded-for": "203.0.113.7" },
+          socket: { remoteAddress: "::1" },
+        }),
+      ).toBe("203.0.113.7");
+    });
+  });
+
+  describe("when the request arrives from a public peer", () => {
+    it("keys on that peer and ignores the header it appended", async () => {
+      const { trpcClientAddress: resolve } = await freshResolver();
+
+      expect(
+        resolve({
+          headers: { "x-forwarded-for": "203.0.113.7" },
+          socket: { remoteAddress: "198.51.100.4" },
+        }),
+      ).toBe("198.51.100.4");
+    });
+
+    /** @scenario "An undeclared public proxy is named once, not once per request" */
+    it("warns once, naming the setting that fixes it, however many requests arrive", async () => {
+      const { trpcClientAddress: resolve } = await freshResolver();
+      const request = {
+        headers: { "x-forwarded-for": "203.0.113.7" },
+        socket: { remoteAddress: "198.51.100.4" },
+      };
+
+      resolve(request);
+      resolve(request);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        { setting: "TRUSTED_PROXY_ADDRESSES" },
+        expect.stringContaining("TRUSTED_PROXY_ADDRESSES"),
+      );
+    });
+  });
+});
+
+describe("given TRUSTED_PROXY_ADDRESSES is set but names no address", () => {
+  /**
+   * Deliberate emptiness and absence are different answers: somebody wrote the
+   * setting and named nobody, which is "trust nothing" and turns the
+   * private-address fallback off.
+   */
+  it("trusts nothing, so even a private ingress's header is ignored", async () => {
+    vi.stubEnv("TRUSTED_PROXY_ADDRESSES", "");
+    const { trpcClientAddress: resolve } = await freshResolver();
+
+    expect(
+      resolve({
+        headers: { "x-forwarded-for": "203.0.113.7" },
+        socket: { remoteAddress: "10.0.0.9" },
+      }),
+    ).toBe("10.0.0.9");
+  });
+});
+
+describe("given TRUSTED_PROXY_ADDRESSES names a proxy", () => {
+  it("trusts only what it names, so another private peer reads as the caller", async () => {
+    vi.stubEnv("TRUSTED_PROXY_ADDRESSES", "192.168.1.1");
+    const { trpcClientAddress: resolve } = await freshResolver();
+
+    expect(
+      resolve({
+        headers: { "x-forwarded-for": "203.0.113.7" },
+        socket: { remoteAddress: "10.0.0.9" },
+      }),
+    ).toBe("10.0.0.9");
+  });
+
+  it("says nothing about an undeclared proxy, because the operator has answered", async () => {
+    vi.stubEnv("TRUSTED_PROXY_ADDRESSES", "192.168.1.1");
+    const { trpcClientAddress: resolve } = await freshResolver();
+
+    resolve({
+      headers: { "x-forwarded-for": "203.0.113.7" },
+      socket: { remoteAddress: "198.51.100.4" },
+    });
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -127,6 +127,14 @@ export interface ApiKeyApi {
     organizationId: string;
     deviceLabel: string;
     selection: CliKeySelection;
+    /**
+     * When the device session began, and the organization's session policy,
+     * so the minted key's expiry tracks the session (see
+     * `loginKeyExpiresAt`). Omitted, the key mints with no expiry.
+     */
+    sessionStartedAtMs?: number;
+    maxSessionDurationDays?: number;
+    refreshWindowMs?: number;
   }): Promise<{ token: string; apiKeyId: string; scope: CliKeyScopeSummary }>;
   revokeCliLoginKeysForDevice(input: {
     userId: string;
@@ -139,6 +147,19 @@ export interface ApiKeyApi {
     apiKeyId: string;
     userId: string;
     organizationId: string;
+  }): Promise<void>;
+  /**
+   * Moves a live login key's expiry with its session, on a successful
+   * refresh, so a session nothing keeps refreshing is still retired by the
+   * hourly sweep rather than sliding forward forever.
+   */
+  extendCliLoginKeyExpiry(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+    sessionStartedAtMs: number;
+    maxSessionDurationDays: number;
+    refreshWindowMs: number;
   }): Promise<void>;
   enrichBindingsWithNames(input: {
     bindings: ApiKeyBinding[];

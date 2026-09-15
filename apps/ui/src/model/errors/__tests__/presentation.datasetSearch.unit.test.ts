@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { explainHandledError } from "../presentation";
-import type { HandledErrorShape } from "../readHandledError";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 const SERVER_MESSAGE =
   "Dataset has 120000 rows, more than the 50000 a single search will read";

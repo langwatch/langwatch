@@ -21,19 +21,24 @@ function serviceWith(options: {
   listForUser?: () => Promise<StoredApiKey[]>;
   createdKey?: { id: string; createdAt: Date };
   revoke?: (input: { id: string }) => Promise<unknown>;
+  extendLoginKeyExpiry?: (input: unknown) => Promise<void>;
 }) {
   const revoke = vi.fn(options.revoke ?? (() => Promise.resolve()));
+  const create = vi.fn();
+  const extendLoginKeyExpiry = vi.fn(options.extendLoginKeyExpiry ?? (() => Promise.resolve()));
   const created = options.createdKey ?? {
     id: "apikey-new",
     createdAt: new Date("2026-01-02T00:00:00Z"),
   };
+  create.mockResolvedValue({ token: "sk-lw-minted", apiKey: created });
 
   const repository = {
     listForUser: options.listForUser ?? (() => Promise.resolve([])),
+    extendLoginKeyExpiry,
   } as unknown as ApiKeyRepository;
 
   const lifecycle = {
-    create: () => Promise.resolve({ token: "sk-lw-minted", apiKey: created }),
+    create,
     revoke,
   } as unknown as ApiKeyLifecycleService;
 
@@ -49,7 +54,7 @@ function serviceWith(options: {
     lifecycle,
   );
 
-  return { service, revoke, created };
+  return { service, revoke, create, created, extendLoginKeyExpiry };
 }
 
 describe("given a CLI login key mint", () => {
@@ -174,6 +179,77 @@ describe("given a CLI login key mint", () => {
         (_, index) => revoke.mock.calls[index]?.[0]?.id === OLD_KEY.id,
       );
       expect(oldKeyRevokeAttempts).toHaveLength(1);
+    });
+  });
+
+  describe("when the user logs in again from the same device", () => {
+    it("revokes the previous key with cause rotation, not a person's own decision", async () => {
+      const { service, revoke } = serviceWith({
+        listForUser: () => Promise.resolve([OLD_KEY]),
+      });
+
+      await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+      });
+
+      expect(revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ id: OLD_KEY.id, cause: "rotation" }),
+      );
+    });
+  });
+
+  describe("given session timing", () => {
+    /** @scenario "A session's login-key expiry tracks the sooner of the refresh window and the org ceiling" */
+    it("mints the login key with an expiry when session timing is supplied", async () => {
+      const { service, create } = serviceWith({});
+
+      await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+        sessionStartedAtMs: 1_000_000,
+        maxSessionDurationDays: 0,
+        refreshWindowMs: 60_000,
+      });
+
+      expect(create.mock.calls[0]![0]).toMatchObject({ expiresAt: new Date(1_000_000 + 60_000) });
+    });
+
+    it("mints with no expiry when session timing is omitted, as before", async () => {
+      const { service, create } = serviceWith({});
+
+      await service.mintCliLoginKey({
+        userId: "user-1",
+        organizationId: "org-1",
+        deviceLabel: "laptop",
+        selection: { bindings: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }], permissions: [] },
+      });
+
+      expect(create.mock.calls[0]![0]).not.toHaveProperty("expiresAt");
+    });
+  });
+
+  describe("extendCliLoginKeyExpiry", () => {
+    /** @scenario "A session's login-key expiry tracks the sooner of the refresh window and the org ceiling" */
+    it("moves the key's expiry to the new refresh window through the repository", async () => {
+      const { service, extendLoginKeyExpiry } = serviceWith({});
+
+      await service.extendCliLoginKeyExpiry({
+        apiKeyId: "apikey-1",
+        userId: "user-1",
+        organizationId: "org-1",
+        sessionStartedAtMs: Date.now() - 1000,
+        maxSessionDurationDays: 0,
+        refreshWindowMs: 60_000,
+      });
+
+      expect(extendLoginKeyExpiry).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "apikey-1", organizationId: "org-1", userId: "user-1" }),
+      );
     });
   });
 });

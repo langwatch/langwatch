@@ -83,6 +83,30 @@ Feature: Voice agents: reach an agent by phone
     Then connecting and disconnecting are delegated to the SDK's own adapter
 
   # ---------------------------------------------------------------------------
+  # Turn-taking on the call (#8014 — the caller must get more than one turn)
+  # ---------------------------------------------------------------------------
+  # Twilio streams a frame every 20 ms for the whole call, silence included, and
+  # signals no turn boundary. The SDK adapter gates inbound audio on speech so a
+  # pause reaches the runtime as a gap; the phone transport sets how long that
+  # gap must be before the callee's turn ends. See ADR-131 "Turn-taking".
+
+  @unit
+  Scenario: The default phone factory ends the callee's turn on a phone-length pause
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the SDK constructs its own adapter for that target
+    Then the adapter is built with the phone transport's response tail-silence, longer than the SDK's default
+    And the SDK's inbound speech gate is left enabled at its default
+
+  @integration @unimplemented
+  # Verified live against a real phone number, not by an automated test — see
+  # the PR's Human verification section.
+  Scenario: A phone call against a talkative callee gives the caller several turns
+    Given a phone target whose callee pauses between sentences
+    When a scenario with a minimum of three turns runs against it
+    Then the callee's turn ends on tail silence, not on the hard ceiling or the hang-up
+    And the simulated caller speaks at least three times on a single trace
+
+  # ---------------------------------------------------------------------------
   # Whole-call audio (#8014 — "they can listen to the whole call")
   # ---------------------------------------------------------------------------
 
@@ -99,10 +123,16 @@ Feature: Voice agents: reach an agent by phone
     Then it returns nothing and the drawer shows no whole-call player
 
   @unit
-  Scenario: VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host
-    Given VOICE_PUBLIC_BASE_URL is not set
-    When the runner resolves the public base URL
-    Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
+  Scenario: A phone run fails fast when only the app's base host is available
+    Given VOICE_PUBLIC_BASE_URL is not set but the app's BASE_HOST is
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run, naming the missing VOICE_PUBLIC_BASE_URL and the cloudflared tunnel remedy rather than dialling the app's own host, which runs no voice media listener
+
+  @unit
+  Scenario: A phone run fails fast when no public base URL is available at all
+    Given neither VOICE_PUBLIC_BASE_URL nor BASE_HOST is set
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run rather than dialling a URL nothing answers
 
   @unit
   Scenario: A phone call's scenario child never binds the worker's media port
@@ -305,3 +335,113 @@ Feature: Voice agents: reach an agent by phone
     And a nonce registered to that child
     When an upgrade arrives on that nonce's media path
     Then the child receives the socket handle and the bytes read during the upgrade
+
+  # ---------------------------------------------------------------------------
+  # Cloudflared binary on PATH (the SDK spawns a bare `cloudflared`)
+  # ---------------------------------------------------------------------------
+  # The scenario SDK opens its quick tunnel with a bare-command spawn, a PATH
+  # lookup. Before the worker opens a tunnel it makes the cloudflared binary
+  # reachable on PATH, downloading it only as a fallback, and surfaces any
+  # failure so the run error names the real cause.
+
+  @unit
+  Scenario: cloudflared already on PATH is used as-is
+    Given a cloudflared binary is already reachable on PATH
+    When the worker ensures cloudflared is available
+    Then it uses the one on PATH and downloads nothing
+
+  @unit
+  Scenario: A present cloudflared binary is put on PATH without downloading
+    Given no cloudflared is on PATH but its binary is already present on disk
+    When the worker ensures cloudflared is available
+    Then it makes that binary reachable on PATH without downloading
+
+  @unit
+  Scenario: A missing cloudflared binary is downloaded then put on PATH
+    Given no cloudflared is on PATH and its binary is missing from disk
+    When the worker ensures cloudflared is available
+    Then it downloads the binary and makes it reachable on PATH
+
+  @unit
+  Scenario: A cloudflared download failure surfaces as a tunnel binary error
+    Given no cloudflared is on PATH and the fallback download fails
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the underlying cause
+
+  @unit
+  Scenario: A cloudflared download that hangs is abandoned
+    Given no cloudflared is on PATH and the fallback download never completes
+    When the worker ensures cloudflared is available
+    Then it abandons the download after the timeout and fails with a tunnel binary error
+
+  @unit
+  Scenario: An unresolvable cloudflared package surfaces as a tunnel binary error
+    Given the cloudflared package cannot be resolved
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the resolution failure
+
+  @unit
+  Scenario: cloudflared resolves through the langwatch SDK scope first
+    Given the langwatch SDK scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it uses the langwatch scope's package and tries no later scope
+
+  @unit
+  Scenario: cloudflared falls back to the scenario scope when the langwatch scope fails
+    Given the langwatch scope cannot resolve cloudflared but the scenario scope can
+    When the worker resolves cloudflared across its scopes
+    Then it uses the scenario scope's package
+
+  @unit
+  Scenario: cloudflared unresolvable from every scope names all tried scopes
+    Given no scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it fails with an error naming every scope it tried
+
+  @unit
+  Scenario: A voice worker puts cloudflared on PATH before opening its quick tunnel
+    Given a voice worker about to open its quick tunnel
+    When it opens the tunnel
+    Then it makes cloudflared reachable on PATH before spawning the tunnel
+
+  @unit
+  Scenario: A voice worker's tunnel fails to open when the cloudflared binary is unavailable
+    Given cloudflared cannot be made reachable on PATH
+    When a voice worker tries to open its quick tunnel
+    Then it never spawns the tunnel and the open fails
+
+  @unit
+  Scenario: A failed voice tunnel boot records its reason for the phone run error
+    Given a voice worker whose quick tunnel fails to open
+    When the worker boots
+    Then it records why the tunnel failed for a later phone run to read
+
+  @unit
+  Scenario: A phone run's missing-URL error names the worker's tunnel failure reason
+    Given the worker recorded why its public URL tunnel failed to open
+    When the phone transport builds the outbound adapter with no public base URL
+    Then the run error names that recorded reason rather than a generic message
+
+  # ---------------------------------------------------------------------------
+  # Agent speaks first (scenario#995, scenario#992 — some agents greet on connect)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: A callee that greets on connect opens the call when Agent speaks first is on
+    Given a phone target whose agent greets as soon as the call connects
+    And "Agent speaks first" is turned on for that target and saved
+    When a scenario run places the call
+    Then the callee's greeting is recorded as the first turn of the conversation
+    And the simulator's first line is spoken only after the greeting ends, and replies to it
+    And the run completes without the callee asking whether anyone is there
+
+  # ---------------------------------------------------------------------------
+  # Callee transcript in the run conversation (scenario#994)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: Callee turns show their transcript in the run conversation
+    Given a phone target and a scenario that runs several turns
+    When the run finishes and its conversation is viewed
+    Then every callee turn shows an audio player with its transcript beside it, the same way the simulator's turns do
+    And the transcript text matches what the judge was given for that turn
