@@ -58,6 +58,15 @@ const stubBetterAuthAdapter = vi.hoisted(() => ({
  * named explicitly below.
  */
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth plugin list, which is on this
+  // router's import graph. Off so the passkey ceremony is not mounted: this
+  // suite asserts nothing about it, and a mock that omits the export fails
+  // the whole file at collection rather than at an assertion.
+  deploymentOffersPasskeys: () => false,
+  // Whether an address is governed by an organization's own connection, read
+  // by the credential-route refusal on the same import graph. No address in
+  // these suites is, so the honest inert answer is "no".
+  addressRoutesToConnection: async () => false,
   clearSignUpConfirmationPending: async () => void 0,
   ssoSelfServe: () => mockSelfServe,
   ssoBreakGlass: () => mockBreakGlass,

@@ -85,6 +85,13 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),
     clearSignUpConfirmationPending: async () => void 0,
+    // Neither of these is a factory, so neither can be `inert`: the plugin
+    // list reads the first at module load and the credential-route refusal
+    // reads the second per call, and both use the ANSWER rather than an
+    // object. Off and "not routed" are the inert answers — this suite
+    // asserts about neither.
+    deploymentOffersPasskeys: () => false,
+    addressRoutesToConnection: async () => false,
     // The one factory this suite asserts about: the surface under test.
     scimOversight: () => mockService,
     // index.ts hands the built instance to this holder at module load.
