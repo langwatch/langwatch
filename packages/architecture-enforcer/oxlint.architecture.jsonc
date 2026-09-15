@@ -26,6 +26,15 @@
     "langwatch/fallible-result-naming": "error",
     "langwatch/no-try-prefix": "error",
     "langwatch/return-await-outside-try": "error",
+    // NOT enabled: `positional-parameter-list` is registered in the plugin
+    // above but deliberately left out of this map. Measured 2026-09-15 over
+    // apps/modules/enterprise/packages/sdks: 1513 findings / 722 files at 3+
+    // parameters, 398 / 222 at 4+, 122 / 86 at 5+. The drive that built it set
+    // a 150-file ceiling for landing and 4+ exceeds it. The findings sampled
+    // clean, so this is real debt rather than a detection fault; raising the
+    // threshold to 5+ would loosen what CLAUDE.md actually asks for, so the
+    // next step is narrowing `applies` to service and public-API surfaces
+    // rather than moving the number.
     "langwatch/feature-source-filename": "error",
     "langwatch/feature-source-layout": "error",
     "langwatch/feature-source-subject": "error",

@@ -85,3 +85,4 @@ export { testDescriptionIsAnActionRule } from "./rules/test-description-is-an-ac
 export { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.mjs";
 export { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 export { returnAwaitOutsideTryRule } from "./rules/return-await-outside-try.rule.mjs";
+export { positionalParameterListRule } from "./rules/positional-parameter-list.rule.mjs";
