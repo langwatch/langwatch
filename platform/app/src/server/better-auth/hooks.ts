@@ -1,4 +1,5 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import { isNativeSocialProvider } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
 
@@ -245,6 +246,31 @@ export class BetterAuthDatabaseHooks {
   }
 
   /**
+   * Whether a provider that does not match the organization's is refused
+   * outright, or only soft-flagged — and which rule decided, for the log line
+   * an operator reads when somebody reports being turned away.
+   *
+   * The account count is asked only where it can change the answer: a native
+   * provider is refused whoever is pressing it, so the query is one this path
+   * stops making rather than makes and ignores.
+   */
+  private async wrongProviderVerdict({
+    userId,
+    providerId,
+  }: {
+    userId: string;
+    providerId: string;
+  }): Promise<{ refuse: boolean; rule: string }> {
+    if (isNativeSocialProvider(providerId)) {
+      return { refuse: true, rule: "native_social_provider" };
+    }
+    const existingAccountCount = await this.deps.accounts.countForUser({
+      userId,
+    });
+    return { refuse: existingAccountCount === 0, rule: "first_account" };
+  }
+
+  /**
    * Before a new Account row is created. Ports the provider-linking and
    * `pendingSsoSetup` logic from the NextAuth signIn callback:
    *
@@ -256,9 +282,17 @@ export class BetterAuthDatabaseHooks {
    * - existing user + SSO org + correct provider → let it through;
    *   reconciliation is deferred to `afterAccountCreate` so the cleanup only
    *   commits once the new Account row exists.
-   * - existing user + SSO org + wrong provider → set `pendingSsoSetup=true`
-   *   and DO NOT hard-block, so existing users are not locked out during a
-   *   migration; the banner in DashboardLayout is what tells them.
+   * - any user + SSO org + a NATIVE social provider → HARD BLOCK. These
+   *   buttons (Google, GitHub, Microsoft) mount beside the broker rather than
+   *   through it, so no existing member's way in runs through one and
+   *   refusing locks nobody out. Admitting one would give an organization
+   *   that enforces single sign-on a second door, outside the identity
+   *   provider it deprovisions in. A connection this organization is
+   *   MIGRATING to is not one of these — that link runs earlier, and a direct
+   *   provider is never a native social key.
+   * - existing user + SSO org + wrong BROKERED provider → set
+   *   `pendingSsoSetup=true` and DO NOT hard-block, so existing users are not
+   *   locked out during a migration; the banner in DashboardLayout tells them.
    * - no SSO org → normal account creation.
    */
   async beforeAccountCreate({
@@ -307,21 +341,22 @@ export class BetterAuthDatabaseHooks {
 
     if (isSsoProviderMatch(org, account)) return;
 
-    // Wrong provider for this SSO org. Determine whether this is a first-time
-    // signup (hard block) or an existing user trying a different provider
-    // (soft block via pendingSsoSetup banner).
+    // Wrong provider for this SSO org.
     if (account.providerId !== "credential" && org.ssoProvider) {
-      const existingAccountCount = await this.deps.accounts.countForUser({
+      const { refuse, rule } = await this.wrongProviderVerdict({
         userId: user.id,
+        providerId: account.providerId,
       });
-      if (existingAccountCount === 0) {
+
+      if (refuse) {
         logger.warn(
           {
             userId: user.id,
             attemptedProvider: account.providerId,
             orgSsoProvider: org.ssoProvider,
+            rule,
           },
-          "Blocked new signup: provider does not match SSO-enforced org",
+          "Refused sign-in: provider does not match SSO-enforced org",
         );
         throw APIError.from("FORBIDDEN", {
           code: "SSO_PROVIDER_NOT_ALLOWED",

@@ -415,22 +415,64 @@ describe("beforeAccountCreate", () => {
     });
   });
 
-  describe("when an EXISTING user's email domain matches an org with WRONG SSO provider", () => {
-    /** @scenario Existing user with wrong SSO provider gets pending flag */
+  describe("when an EXISTING user's email domain matches an org with a WRONG BROKERED provider", () => {
+    /** @scenario Existing user with wrong brokered SSO provider gets pending flag */
     it("soft-blocks by setting pendingSsoSetup=true without throwing", async () => {
       const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
-        organization: legacyOrganization({ ssoProvider: "okta" }),
+        organization: legacyOrganization({ ssoProvider: "waad|acme-conn" }),
         // Existing user — already has a linked account from a prior login.
         accountCount: 1,
       });
 
-      await hooks.beforeAccountCreate({ account: account() });
+      // Through the broker, on one of its other connections: the
+      // mid-migration member this soft flag exists for.
+      await hooks.beforeAccountCreate({
+        account: account({
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
+        }),
+      });
 
       expect(users.updatePendingSsoSetup).toHaveBeenCalledWith({
         userId: "user_1",
         pendingSsoSetup: true,
       });
+    });
+  });
+
+  describe("when a NATIVE social provider is used at an SSO-enforced domain", () => {
+    const enforcedOrg = () =>
+      hooksOver({
+        user: userRow({ email: "existing@acme.com" }),
+        organization: legacyOrganization({ ssoProvider: "waad|acme-conn" }),
+        // Existing member — the population that used to be let in.
+        accountCount: 1,
+      });
+
+    /** @scenario A native social sign-in at an SSO-enforced domain is refused */
+    it("refuses an existing member with SSO_PROVIDER_NOT_ALLOWED", async () => {
+      const { hooks, users } = enforcedOrg();
+
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      // The soft flag is for the broker's migration population, not this one:
+      // a refused sign-in must not also strand them behind a banner.
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
+    });
+
+    it("reaches that answer without counting the user's accounts", async () => {
+      const { hooks, accounts } = enforcedOrg();
+
+      await expect(
+        hooks.beforeAccountCreate({
+          account: account({ providerId: "microsoft", accountId: "sub-2" }),
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      expect(accounts.countForUser).not.toHaveBeenCalled();
     });
   });
 
