@@ -135,8 +135,53 @@ export interface LangWatchQLViewColumn {
    * unfiltered one; written bare, the second reference picked up the first's
    * alias and `CapturedInput` came back empty for every span. Passing the
    * qualifier in is what makes forgetting impossible rather than remembered.
+   *
+   * `joined` qualifies a column of the view's {@link LangWatchQLViewJoin} table,
+   * present only when the view declares a join. A column read from the joined
+   * side leaves {@link sourceColumns} empty and reads through `joined` — the
+   * grant on that side is driven by {@link LangWatchQLViewJoin.sourceColumns}
+   * instead, so its columns are not granted on the primary table.
    */
-  readonly expression?: (source: (column: string) => string) => string;
+  readonly expression?: (
+    source: (column: string) => string,
+    joined?: (column: string) => string,
+  ) => string;
+}
+
+/**
+ * A second physical table a view joins, so one dataset can be rendered from two
+ * sources.
+ *
+ * Absent on every shipped view but the ones that genuinely span two tables. The
+ * tenant boundary covers both sides: {@link LangWatchQLViewJoin.table} is listed
+ * as a source table alongside the primary, so a row policy is created on it too
+ * (`lwqlSourceTables` in `../provisioning/catalogStatements.ts`). Only a
+ * ClickHouse-resident view may declare a join — a PostgreSQL-resident dataset
+ * reaches ClickHouse through its own engine table and cannot.
+ */
+export interface LangWatchQLViewJoin {
+  /** The joined table, in the same source database as the primary. */
+  readonly table: string;
+  /**
+   * Alias the view body gives the joined table, used in {@link on}, the view's
+   * {@link LangWatchQLViewDefinition.where} and the `joined` qualifier that
+   * column expressions receive.
+   */
+  readonly alias: string;
+  /**
+   * The `ON` predicate, as SQL over the primary alias (`LWQL_SOURCE_ALIAS`) and
+   * {@link alias}. Assembled as text, so it must reference only those two
+   * aliases and validated identifiers — never a caller-supplied value.
+   */
+  readonly on: string;
+  /** Join kind. `INNER` when absent. */
+  readonly kind?: "INNER" | "LEFT";
+  /**
+   * Columns of {@link table} the view reads, granted to the restricted identity
+   * on that table — the joined-side counterpart of {@link lwqlViewSourceColumns}.
+   * Must include every column {@link on} and the joined column expressions read.
+   */
+  readonly sourceColumns: readonly string[];
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
@@ -323,6 +368,24 @@ export interface LangWatchQLViewDefinition {
   readonly freshness: string;
   readonly dedup: LangWatchQLViewDedup;
   readonly columns: readonly LangWatchQLViewColumn[];
+  /**
+   * A second physical table this view joins, so the dataset spans two sources.
+   *
+   * Absent on a single-table view, which is all of them today. Present, its
+   * table is tenant-policed alongside {@link sourceTable} and its columns are
+   * granted separately — see {@link LangWatchQLViewJoin}.
+   */
+  readonly join?: LangWatchQLViewJoin;
+  /**
+   * A pre-filter applied in the view body, as SQL over the source aliases.
+   *
+   * Needed where a physical table multiplexes record kinds and the view exposes
+   * one of them — `EventName = 'api_request_body'`, `SpanName = 'claude_code.tool'`
+   * — so the predicate runs before any projection or extraction. Absent means
+   * no pre-filter, which keeps every existing view's SQL byte-for-byte the same.
+   * Assembled as text: reference only the source aliases and validated literals.
+   */
+  readonly where?: string;
 }
 
 /**
@@ -390,10 +453,13 @@ export function lwqlGrainColumns(
 export function columnExpression({
   column,
   source,
+  joined,
   isAggregated = false,
 }: {
   readonly column: LangWatchQLViewColumn;
   readonly source: (name: string) => string;
+  /** Qualifies a joined-table column; present only for a view with a join. */
+  readonly joined?: (name: string) => string;
   readonly isAggregated?: boolean;
 }): string {
   if (column.expression) {
@@ -407,7 +473,7 @@ export function columnExpression({
           `expression; the cast is derived from the column itself, so an expression could name another one`,
       );
     }
-    return column.expression(source);
+    return column.expression(source, joined);
   }
   if (column.sourceColumns.length !== 1) {
     throw new Error(

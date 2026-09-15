@@ -166,7 +166,14 @@ function quotedColumn(value: string): string {
  * back empty for every row while the view looked correct. Qualifying every
  * source reference with this alias is what keeps the two apart.
  */
-const SOURCE_ALIAS = "src";
+export const SOURCE_ALIAS = "src";
+
+/**
+ * The primary alias, for a join's `ON` predicate and pre-filter `where` to
+ * reference the left side by. Exported under a namespaced name so a catalog
+ * entry can build those strings without hard-coding {@link SOURCE_ALIAS}.
+ */
+export const LWQL_SOURCE_ALIAS = SOURCE_ALIAS;
 
 /**
  * Alias the tenant-predicate subquery gives the key map.
@@ -427,6 +434,58 @@ function groupedColumnExpression(
 }
 
 /**
+ * Qualifies a joined-table column — the joined-side counterpart of
+ * `sourceColumn`, passed to a column's expression as its `joined` argument.
+ *
+ * `undefined` for a single-table view, so a column there gets no joined
+ * qualifier and cannot reference a table the view does not read.
+ */
+function joinedColumnQualifier(
+  view: LangWatchQLViewDefinition,
+): ((name: string) => string) | undefined {
+  const { join } = view;
+  if (!join) return undefined;
+  return (name: string) =>
+    `${assertIdentifier(join.alias, "join alias")}.${quotedColumn(name)}`;
+}
+
+/**
+ * The `<kind> JOIN <table> AS <alias> ON <predicate>` clause, or `""` for a
+ * single-table view — which is what keeps every existing view's SQL byte-identical.
+ *
+ * The joined table lives in the same source database as the primary: a join is
+ * a ClickHouse-only shape (guarded in {@link lwqlViewStatement}), so its
+ * database is the fact one, never the LangWatchQL one.
+ */
+function joinRelationClause(
+  view: LangWatchQLViewDefinition,
+  sourceDatabase: string,
+): string {
+  const { join } = view;
+  if (!join) return "";
+  const relation = `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(join.table, "join table")}`;
+  return (
+    `\n${join.kind ?? "INNER"} JOIN ${relation} ` +
+    `AS ${assertIdentifier(join.alias, "join alias")} ON ${join.on}`
+  );
+}
+
+/**
+ * The pre-filter clause. ANDed onto whatever `where` the dedup or postgres
+ * shape already emitted, and opens the clause itself when there is none.
+ *
+ * Empty when the view declares no pre-filter, so an existing view's rendered
+ * SQL is unchanged to the byte.
+ */
+function preFilterClause(
+  view: LangWatchQLViewDefinition,
+  where: string,
+): string {
+  if (!view.where) return "";
+  return where ? `\n  AND (${view.where})` : `\nWHERE ${view.where}`;
+}
+
+/**
  * `CREATE OR REPLACE VIEW` for one catalog entry.
  *
  * `OR REPLACE` rather than `IF NOT EXISTS`: re-provisioning a server whose
@@ -453,6 +512,15 @@ export function lwqlViewStatement({
   // to collapse and neither dedup shape applies; what it needs instead is the
   // predicate that keeps the read off the primary from being a whole-table one.
   const postgres = isPostgresResident(view);
+  // A join reaches a second fact table in the same source database. Refused for
+  // a PostgreSQL-resident dataset, whose only relation is its own engine table.
+  if (view.join && postgres) {
+    throw new Error(
+      `LangWatchQL view ${view.name} declares a join and is PostgreSQL-resident; ` +
+        `a join reads a second ClickHouse fact table and cannot apply here`,
+    );
+  }
+  const joinedColumn = joinedColumnQualifier(view);
   const strategy = dedupStrategyFor({ view, dedup });
   const grain = lwqlGrainColumns(view);
   // An aggregating source whose published grain is narrower than the engine's
@@ -475,7 +543,11 @@ export function lwqlViewStatement({
         ? sourceColumn(column.name)
         : grouped
           ? groupedColumnExpression(view, column)
-          : columnExpression({ column, source: sourceColumn });
+          : columnExpression({
+              column,
+              source: sourceColumn,
+              joined: joinedColumn,
+            });
       return `  ${expression} AS ${quotedColumn(column.name)}`;
     })
     .join(",\n");
@@ -484,11 +556,13 @@ export function lwqlViewStatement({
     strategy === "final" && !postgres && !grouped
       ? `${aliased} FINAL`
       : aliased;
+  const joinClause = joinRelationClause(view, sourceDatabase);
   const where = postgres
     ? `\n${postgresTenantPredicate({ names, sourceDatabase })}`
     : strategy === "in-tuple"
       ? `\n${dedupPredicate(view, relation)}`
       : "";
+  const preFilter = preFilterClause(view, where);
   const groupBy = grouped
     ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}`
     : "";
@@ -497,7 +571,7 @@ export function lwqlViewStatement({
     `${assertIdentifier(names.database, "database")}.${assertIdentifier(view.name, "view")}\n` +
     `SQL SECURITY INVOKER\n` +
     `AS SELECT\n${projection}\n` +
-    `FROM ${from}${where}${groupBy}`
+    `FROM ${from}${joinClause}${where}${preFilter}${groupBy}`
   );
 }
 
@@ -521,6 +595,36 @@ export function lwqlSourceColumnGrantStatement({
   const columns = lwqlGrantedSourceColumns(view).map(quotedColumn).join(", ");
   return (
     `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
+    `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
+  );
+}
+
+/**
+ * Column-scoped `SELECT` on a joined view's *second* source table.
+ *
+ * The counterpart of {@link lwqlSourceColumnGrantStatement} for the joined
+ * side: an `INVOKER` view reads that table as the caller too, so the caller
+ * must hold a grant on every column the join's `ON` and its joined-column
+ * expressions read — declared on {@link LangWatchQLViewJoin.sourceColumns}.
+ * Returns `undefined` for a view with no join, so a catalog of single-table
+ * views produces no extra statements.
+ */
+export function lwqlJoinSourceColumnGrantStatement({
+  names,
+  sourceDatabase,
+  view,
+}: {
+  names: LangWatchQLNames;
+  sourceDatabase: string;
+  view: LangWatchQLViewDefinition;
+}): string | undefined {
+  if (!view.join) return undefined;
+  const columns = [...new Set(view.join.sourceColumns)]
+    .map(quotedColumn)
+    .join(", ");
+  const relation = `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(view.join.table, "join table")}`;
+  return (
+    `GRANT SELECT(${columns}) ON ${relation} ` +
     `TO ${assertIdentifier(names.restrictedUser, "restrictedUser")}`
   );
 }
@@ -564,6 +668,17 @@ export function lwqlSourceTables({
       tenantColumn: TENANT_COLUMN,
       database,
     });
+    // A joined view reads a second fact table, which must be policed too or the
+    // join reaches the joined side unscoped. It is a ClickHouse fact table in
+    // the source database (a join is refused for PostgreSQL-resident views), so
+    // its tenant column is the default and its database is the fact one.
+    if (view.join) {
+      byTable.set(`${database}.${view.join.table}`, {
+        table: view.join.table,
+        tenantColumn: TENANT_COLUMN,
+        database,
+      });
+    }
   }
   return [...byTable.values()];
 }
@@ -788,6 +903,16 @@ export function lwqlViewSetupStatements({
         ? lwqlGrantStatement({ names, table: view.sourceTable })
         : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),
+    // The joined side's column grant, for the views that span two tables. Empty
+    // for every single-table view, so the emitted statements are unchanged.
+    ...views.flatMap((view) => {
+      const grant = lwqlJoinSourceColumnGrantStatement({
+        names,
+        sourceDatabase,
+        view,
+      });
+      return grant ? [grant] : [];
+    }),
     ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
   ];
 }
