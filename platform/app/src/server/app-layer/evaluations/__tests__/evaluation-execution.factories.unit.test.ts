@@ -139,4 +139,37 @@ describe("setupModelEnv", () => {
       ).rejects.toThrow("Provider gemini is not enabled");
     });
   });
+
+  // Spec: specs/evaluators/evaluator-generation-params.feature
+  describe("when the settings carry generation parameters", () => {
+    /** @scenario "Configured generation parameters reach the evaluator engine" */
+    it("forwards each of them as a request variable, as configured", async () => {
+      vi.mocked(getProjectModelProviders).mockResolvedValue({
+        anthropic: buildProvider({
+          provider: "anthropic",
+          models: ["claude-sonnet-4-5"],
+        }),
+      });
+
+      const env = await setupModelEnv(
+        "anthropic/claude-sonnet-4-5",
+        false,
+        "proj-1",
+        {
+          model: "anthropic/claude-sonnet-4-5",
+          temperature: 1,
+          top_p: 1,
+          max_tokens: 64000,
+          top_k: 40,
+          verbosity: "medium",
+        },
+      );
+
+      expect(env.X_LITELLM_temperature).toBe("1");
+      expect(env.X_LITELLM_top_p).toBe("1");
+      expect(env.X_LITELLM_max_tokens).toBe("64000");
+      expect(env).not.toHaveProperty("X_LITELLM_top_k");
+      expect(env).not.toHaveProperty("X_LITELLM_verbosity");
+    });
+  });
 });
