@@ -23,6 +23,8 @@ interface ClickHouseMonitorPerformanceRow {
   ScoreCount: string;
   PassSum: string;
   PassCount: string;
+  /** sumMap's tuple: the labels seen, and how often each one was seen. */
+  LabelCounts: [string[], Array<number | string>];
 }
 
 /**
@@ -48,13 +50,15 @@ const queryForTimeZone = (timeZone: string) => `
     sum(ifNull(Score, 0)) AS ScoreSum,
     count(Score) AS ScoreCount,
     sum(ifNull(Passed, 0)) AS PassSum,
-    count(Passed) AS PassCount
+    count(Passed) AS PassCount,
+    sumMap([ifNull(Label, '')], [toUInt64(1)]) AS LabelCounts
   FROM (
     SELECT
       evaluations.EvaluatorId AS EvaluatorId,
       evaluations.Status AS Status,
       evaluations.Score AS Score,
       evaluations.Passed AS Passed,
+      evaluations.Label AS Label,
       traces.TraceOccurredAt AS TraceOccurredAt
     FROM (
       SELECT
@@ -74,12 +78,13 @@ const queryForTimeZone = (timeZone: string) => `
         tupleElement(Latest, 2) AS EvaluatorId,
         tupleElement(Latest, 3) AS Status,
         tupleElement(Latest, 4) AS Score,
-        tupleElement(Latest, 5) AS Passed
+        tupleElement(Latest, 5) AS Passed,
+        tupleElement(Latest, 6) AS Label
       FROM (
         SELECT
           TenantId,
           EvaluationId,
-          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed), UpdatedAt) AS Latest
+          argMax(tuple(TraceId, EvaluatorId, Status, Score, Passed, Label), UpdatedAt) AS Latest
         FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
           AND EvaluatorId IN {evaluatorIds:Array(String)}
@@ -157,4 +162,22 @@ const toPerformanceBucket = (
   scoreCount: Number(row.ScoreCount),
   passSum: Number(row.PassSum),
   passCount: Number(row.PassCount),
+  labelCounts: toLabelCounts(row.LabelCounts),
 });
+
+/**
+ * sumMap answers as a pair of parallel arrays. Results with no label land
+ * under the empty key, which is every result of a scoring evaluator, so that
+ * key is dropped rather than counted as a label of its own.
+ */
+const toLabelCounts = (
+  counts: ClickHouseMonitorPerformanceRow["LabelCounts"] | undefined,
+): Record<string, number> => {
+  const [labels, occurrences] = counts ?? [[], []];
+  const byLabel: Record<string, number> = {};
+  labels.forEach((label, index) => {
+    if (label === "") return;
+    byLabel[label] = Number(occurrences[index] ?? 0);
+  });
+  return byLabel;
+};
