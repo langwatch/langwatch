@@ -1,15 +1,8 @@
 /**
  * The migrated ClickHouse these repository suites read and write, or null.
- *
- * They used to get it from `startTestContainers()` in the monolith, which
- * started a container and replayed the migrations into it. That module went
- * with platform/app.
- *
- * The replacement is the shape every other package suite that needs a
- * datastore already uses (`@langwatch/trace-server`'s repository suites,
- * `@langwatch/analytics-server`'s evaluation-analytics suite): read the
- * connection string the job supplies, and `describe.skipIf` it away when
- * there is none.
+ * Replaces `startTestContainers()` (went with platform/app): reads the
+ * connection string the job supplies and `describe.skipIf` away when none,
+ * the same shape every other datastore-needing package suite uses.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 

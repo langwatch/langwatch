@@ -663,14 +663,10 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
 });
 
 /**
- * The identifier hold-out (packages/redaction's `isHeldOutIdentifierAttribute`)
- * is consulted a second time on the STRICT/analysis-service path, not only the
- * native one: redaction runs at ingestion and the original is never stored, so
- * a trace/span/run id handed to the analysis service by mistake is lost for
- * good. A pure-decimal trace address is the fixture that proves the NAME half
- * of the rule specifically, because it is not opaque-shaped on its own
- * (`isOpaqueIdentifierValue` refuses a value with no letter) — only the
- * reserved key name holds it out.
+ * The identifier hold-out (`isHeldOutIdentifierAttribute`) is checked again
+ * on the STRICT path: the original is never stored, so an id leaked to the
+ * analysis service is lost for good. A pure-decimal trace id proves the NAME
+ * half specifically, since it isn't opaque-shaped on its own.
  */
 describe("OtlpSpanPiiRedactionService identifier hold-out on the analysis-service path", () => {
   /** A decimal trace address: reserved by name, not by shape. */

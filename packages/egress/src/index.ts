@@ -63,14 +63,9 @@ export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.t
 
 /**
  * The corporate proxy a self-hosted deployment's outbound vendor calls leave
- * through.
- *
- * Here rather than in the platform application because it IS the egress fence's
- * other half: the SSRF policy decides which addresses we may reach, and this
- * decides how we reach them. Every caller that talks HTTPS to a vendor — the
- * mail gateways, the AWS clients — resolves it the same way, and a second copy
- * of the `no_proxy` matching is how one transport starts bypassing a proxy the
- * others honour.
+ * through — the egress fence's other half: the SSRF policy decides which
+ * addresses we may reach, this decides how. Every HTTPS caller resolves it
+ * the same way, so a second `no_proxy` copy can't bypass what others honour.
  */
 export {
   configureProcessOutboundProxy,

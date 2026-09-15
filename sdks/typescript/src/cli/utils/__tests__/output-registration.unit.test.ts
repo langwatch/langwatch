@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { AGENT_MODE_ENV_VARS, registerOutputOptions, resolveActionOutputOptions } from "../output";
 
-/** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
+/**
+ * Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must
+ * not leak into tests.
+ */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {

@@ -1,19 +1,8 @@
 /**
- * The improvement loop with the workbench OPEN in front of the user.
- *
- * Every other prompt-optimization suite runs with no page attached, so every
- * workbench action takes the backend fallback by construction. This one
- * attaches a fake workbench tab (`fake-workbench-tab.ts`) to the same turn
- * stream the adapter already reads, so the actions Langy dispatches are claimed
- * and carried out by a page, through the app's own store and transforms.
- *
- * The tab is closed halfway through the conversation, which is what makes this
- * one run cover both legs: the user steps away, the same verbs continue on the
- * backend, and the workbench still has to reach the state the shared assertion
- * describes.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-workbench-live.scenario.test.ts --reporter=verbose
+ * The improvement loop with the workbench OPEN in front of the user. Unlike
+ * other suites (no page attached), this attaches a fake workbench tab so
+ * dispatched actions are claimed by a page; the tab closes halfway through
+ * so the run covers both the page and backend legs.
  */
 
 import { openai } from "@ai-sdk/openai";

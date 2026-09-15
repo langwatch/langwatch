@@ -1,27 +1,7 @@
 /**
- * Persist the langwatch export block to the user's shell rc file
- * (~/.zshrc / ~/.bashrc / ~/.config/fish/config.fish) so a new
- * shell auto-picks up the gateway + OTLP env vars without running
- * `langwatch <tool>` as a wrapper.
- *
- * Spec for bug-bash item 1:
- *   1.2 - after login, OFFER to persist the export block. Y/n/never.
- *   1.3 - Remember choice. Stay quiet inside an already-configured
- *         shell (env already has the gateway vars set).
- *
- * Design notes:
- *   - The block is bracketed with marker comments so a second
- *     persist run is idempotent (regex replace, no duplicate
- *     blocks).
- *   - "never" persists `shell_rc_preference: "skip"` on the config
- *     so future logins on this machine stay quiet.
- *   - "not now" (n) does NOT persist - the next login re-asks. The
- *     in-shell quietness comes from the already-configured detect.
- *   - Detect "already configured" by checking process.env for both
- *     ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN. If either is
- *     present, assume the user already wired it up (via the rc
- *     file or by sourcing the export manually) and skip the
- *     prompt silently.
+ * Persists the langwatch export block to the user's shell rc file so a new
+ * shell auto-picks up gateway + OTLP env vars. Marker-bracketed for repeat-run
+ * idempotency; an already-configured shell (env vars already set) is skipped.
  */
 
 import * as fs from "node:fs";
@@ -45,12 +25,9 @@ import { assertCodexAgentGuidance } from "./codex-agents-md";
 
 /**
  * Tools whose Path B telemetry persists as a scoped shell function (no
- * config-file env target). Drives BOTH the logout target scan
- * (telemetry-targets.ts) and the gateway spawn's `unset -f`
- * (wrapper.ts) — a persisted rc function re-injects the OTel env at
- * invocation time, AFTER the wrapper's exports, so gateway runs must
- * remove the function from the shell session (never from the rc file)
- * or the same calls get captured twice.
+ * config-file env target). A persisted rc function re-injects OTel env
+ * AFTER the wrapper's exports, so gateway runs must unset it from the
+ * shell session (never the rc file) or calls get captured twice.
  */
 export const SHELL_FUNCTION_TOOLS: readonly string[] = [
   "gemini",
@@ -132,17 +109,10 @@ export function isShellAlreadyConfigured(): boolean {
 }
 
 /**
- * Whether the shell rc file already has a langwatch marker block carrying
- * THIS export set. Lets the persist offer stay quiet when the user has
- * already installed the current exports but hasn't sourced the rc in this
- * shell yet (so the env isn't live in process.env). Checks the file on
- * disk, not just the environment.
- *
- * `requiredKeys` makes the match export-set aware: a bare marker block, or
- * a block for a DIFFERENT export set (e.g. a stale block missing the OTLP
- * vars this run needs), does NOT count as installed, so the offer still
- * fires and persists the current vars. Omit `requiredKeys` to test only
- * for the presence of a well-formed block.
+ * Whether the shell rc file already has a langwatch marker block, checked
+ * on disk rather than via env (in case the user hasn't sourced the rc yet).
+ * `requiredKeys` makes the match export-set aware, so a stale block missing
+ * a key this run needs does not count as installed.
  */
 export function rcHasLangwatchBlock({
   shell,
@@ -172,15 +142,10 @@ function quote(s: string): string {
 }
 
 /**
- * Build a shell function that wraps `<tool>` so the OTEL telemetry env is
- * set ONLY for `<tool>` invocations, not exported into every shell child.
- * This is the fallback for any tool with no config-file env target (gemini,
- * opencode, …): `command <tool>` inside the function bypasses the function
- * itself (no recursion) and runs the real binary.
- *
- * posix (zsh/bash) uses a function with an env-prefix; fish uses a function
- * with block-local `set -lx`. The body (no begin/end markers) is returned
- * for `persistBlockToRc` to bracket with the tool's markers.
+ * Builds a shell function that scopes the OTEL telemetry env to `<tool>`
+ * invocations only, rather than exporting it into every shell child. The
+ * fallback for tools with no config-file env target (gemini, opencode, …);
+ * `command <tool>` inside the function avoids recursion into itself.
  */
 export function buildScopedToolFunction(
   tool: string,
@@ -334,26 +299,11 @@ function persistQuestion({ tool, targetHint }: { tool: string; targetHint: strin
 }
 
 /**
- * Ingestion-mode (Path B) persist offer. Called by the
- * `langwatch <tool>` wrapper AFTER it resolves to ingestion mode,
- * so the user can install the tool's OTLP telemetry exports into
- * whatever the target for `<tool>` is. Once persisted, a plain
- * `<tool>` invocation (without the `langwatch` wrapper) inherits
- * the OTEL_EXPORTER_OTLP_* env and captures automatically - which
- * is the whole point of "installing" the telemetry.
- *
- * The target depends on the tool:
- *   - `claude` writes to `~/.claude/settings.json`'s `env` block
- *     — Claude Code loads that on every invocation, so the vars
- *     stay scoped to `claude` runs and don't leak into every
- *     other shell child.
- *   - Every other supported wrapper (codex, cursor, gemini,
- *     opencode) falls back to the detected shell rc file.
- *
- * Persists the exact OTEL env the wrapper just computed for this
- * run (`vars`), not the gateway block. Y / n / never, same
- * `shell_rc_preference=skip` opt-out. Stays quiet when the target
- * already carries the current export set.
+ * Ingestion-mode (Path B) persist offer, called after the `langwatch <tool>`
+ * wrapper resolves to ingestion mode: once persisted, a plain `<tool>`
+ * invocation (no wrapper) inherits OTEL_EXPORTER_OTLP_* and keeps capturing.
+ * `claude` writes to `~/.claude/settings.json`'s `env` block; every other
+ * wrapper falls back to the shell rc file.
  */
 export async function maybeOfferIngestionShellRcPersist({
   cfg,
@@ -483,12 +433,8 @@ function isNotifyMergeRefusal(err: unknown): boolean {
 
 /**
  * Ask codex to run the turn harvest after every completed turn. Idempotent.
- *
- * Codex's telemetry export carries tokens, model and timing but no
- * conversation: the reply is dropped before export and no codex setting brings
- * it back. What codex does offer is `notify`, a program it runs after every
- * completed turn. Pointed at our own harvest, that is what turns a plain
- * `codex` into traces with something to read.
+ * Codex's telemetry drops the conversation; pointed at our harvest, `notify`
+ * is what turns a plain `codex` run into traces with something to read.
  */
 export function installCodexTurnHarvest(
   options: { filePath?: string } = {},
@@ -511,14 +457,10 @@ export function installCodexTurnHarvest(
 }
 
 /**
- * Assert the turn harvest for codex, which belongs to the same wiring that
- * persisted the exports: those exports carry no conversation, and this is what
- * recovers it. Idempotent, and quiet unless it changed something.
- *
- * A write that fails is not worth failing the persist over, since the exports
- * it rides beside are already installed and capturing. The exception is a
- * config shape the merge refuses, which the user can fix and would otherwise
- * never hear about.
+ * Asserts the codex turn harvest, which recovers the conversation the
+ * exports alone don't carry. Idempotent and quiet unless it changed
+ * something; a write failure doesn't fail the persist, except a config
+ * shape the merge refuses, which the user could otherwise never hear about.
  */
 export function assertCodexTurnHarvest(): void {
   let outcome: CodexTurnHarvestOutcome;
@@ -567,17 +509,11 @@ export function assertCodexTurnHarvest(): void {
 }
 
 /**
- * Wire the session context seam for a tool whose telemetry exports live in its
- * own settings file, on the run where the user just consented. Claude Code
- * exports no repository identity over telemetry; the seam is what reports it,
- * and it belongs to the same "yes" that persisted the exports.
- *
- * The plugin is the seam we want, so this is the one moment allowed to install
- * it: the user is present, so a marketplace trust prompt can reach them, and
- * they just answered a question that named the plugin. Anything that stops the
- * plugin from landing (a `claude` too old for it, a network that is down) falls
- * back to the hook entries written straight into the settings file, which are
- * what this always did.
+ * Wires the session context seam for a tool whose exports live in its own
+ * settings file, on the run the user just consented — Claude Code exports
+ * no repository identity over telemetry, so this seam is what reports it.
+ * This is the one moment allowed to install the plugin (user present for a
+ * trust prompt); anything that blocks it falls back to raw hook entries.
  */
 function installClaudeSessionContext(tool: string): void {
   if (tool !== "claude") return;
@@ -597,13 +533,10 @@ function installClaudeSessionContext(tool: string): void {
 }
 
 /**
- * Re-assert the session context seam on a run that is only verifying an
- * already-configured device. Nobody was asked anything on this run, so it does
- * no network and spawns nothing: it reads what is on disk and edits local files.
- *
- * The one thing it does change is leftovers. A device that took the plugin on a
- * previous run may still carry the raw hook entries the plugin replaced, and
- * leaving both wired runs the same two hooks twice per session.
+ * Re-asserts the session context seam when only verifying an already
+ * configured device — no network, no spawns, just local file edits. The one
+ * change it makes is removing leftover raw hooks a previous plugin install
+ * replaced, so nothing runs the same hook twice per session.
  */
 function reassertClaudeSessionContext(tool: string): void {
   if (tool !== "claude") return;

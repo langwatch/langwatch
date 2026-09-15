@@ -5,19 +5,9 @@ import { failSpinner } from "./spinnerError";
 
 /**
  * Fails a spinner from a non-2xx `Response`, keeping whatever the platform
- * named.
- *
- * The pattern this replaces — `new Error(await formatFetchError(response))` —
- * keeps the sentence and throws away everything else. By the time the failure
- * is rendered there is no code and no status left, so `--format json` reports
- * `network_error`, `httpStatus: 0` and `terminal: false`, and the fallback
- * table adds "check your network connection". An agent reading that document
- * is told a permission refusal is a connectivity blip it should retry.
- *
- * Reading the body once and handing it to `handledErrorFrom` keeps the code,
- * the status and the platform's own tips whenever the platform named the
- * failure. When it did not, the fallback is the same sentence the old path
- * produced, so nothing regresses for a bare 500 or an HTML page from a proxy.
+ * named — unlike the bare-Error pattern this replaces, which lost the code
+ * and status, so a permission refusal reported as a retryable "network_error"
+ * that told an agent to retry a wall.
  */
 export async function failSpinnerFromResponse({
   spinner,

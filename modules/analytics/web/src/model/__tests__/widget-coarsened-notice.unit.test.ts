@@ -1,17 +1,7 @@
 /**
- * What a coarsened widget tells the member.
- *
- * The notice exists because the substitution is otherwise invisible: the card
- * redraws at a coarser step and nothing on screen says the answer is not the
- * one the chart was configured to give. So the claims worth pinning are that it
- * names *both* steps — the one asked for and the one used — and that it cites
- * the ceiling that forced the change rather than asserting a bare number the
- * member cannot check.
- *
- * A pure function, tested as one: it lives in its own module precisely so this
- * suite does not have to mount a widget — and everything Chakra, tRPC and Vega
- * behind it — to read one sentence.
- *
+ * What a coarsened widget tells the member: since the substitution is
+ * otherwise invisible, the notice must name *both* steps (asked-for and
+ * used) and cite the ceiling that forced the change, not a bare number.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

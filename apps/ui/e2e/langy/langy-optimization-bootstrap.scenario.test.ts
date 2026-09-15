@@ -1,6 +1,7 @@
 /**
- * The bootstrap branches of the prompt optimization skill: a workbench missing its
- * dataset, a goal that could mean several things, and a user who names nothing at all.
+ * The bootstrap branches of the prompt optimization skill: a workbench
+ * missing its dataset, a goal that could mean several things, and a user
+ * who names nothing at all.
  */
 
 import { openai } from "@ai-sdk/openai";

@@ -1,56 +1,8 @@
 /**
- * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
- * of every session.
- *
- * Coding agents know exactly which repository, branch and worktree a session is
- * working in and export none of it over telemetry. Each of the three that can
- * run our code inside a session reaches this same command, and each hands it
- * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
- *
- *   - Claude Code and Codex call it directly as a command hook, and the
- *     LangWatch Claude Code plugin calls it through its launcher
- *     (`plugins/langwatch/scripts/launch.mjs`), which runs whatever
- *     `langwatch` is installed.
- *   - opencode has no command hooks, so the plugin the CLI installs subscribes
- *     to its session event bus and spawns this command with the same payload.
- *
- * THE CROSS-VERSION CONTRACT. The plugin and the CLI release separately, so a
- * plugin from any version has to run with a CLI from any version. This
- * command and `ingest guidance` therefore accept and ignore options and
- * arguments they do not know (registered with `allowUnknownOption` and
- * `allowExcessArguments` in program.ts) and always exit zero, whatever they
- * were called with. A future plugin passing an argument this build does not
- * understand still gets the session reported; a usage error there would be
- * prose on stderr and a non-zero exit on every session start.
- *
- * The session id each seam reports is the one that agent puts on its own
- * telemetry, so the record this posts joins the session the agent is already
- * describing. So the command runs git itself and posts one small OTLP log
- * record, which is what lets a session's traces be joined to the code they were
- * working on.
- *
- * Where that record goes is `resolveTarget` below, and it is deliberately not
- * the environment alone: Claude Code hands its child processes an environment
- * with every `OTEL_*` variable removed, and Codex hands its hooks one with no
- * exporter variables either, so a hook that trusted them would never send
- * anything from a real session.
- *
- * Two constraints shape every branch below.
- *
- *   - NOTHING ON STDOUT, EVER. A SessionStart hook's stdout is injected into
- *     the user's session context, so one stray line would land in the
- *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
- *     contains "langwatch" (the CLI's existing debug convention).
- *   - ALWAYS EXIT ZERO, AND SOON. Unparseable input, no repository, no
- *     telemetry configured, a collector that refuses the post: every one of
- *     them returns quietly. Every wait is bounded, stdin included, so a seam
- *     that never closes a pipe cannot leave the hook alive for the rest of the
- *     session. A hook is never allowed to be why a session broke.
- *
- * A failed post deliberately leaves the fingerprint file alone, so the next
- * hook in the same session retries instead of assuming the context landed.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * `langwatch ingest hook <tool>`: runs at session start/end, posting one OTLP
+ * log to join the session's traces to its repo/branch. NOTHING ON STDOUT EVER
+ * (a hook's stdout is injected into the model's prompt) and ALWAYS EXIT ZERO.
+ * @see specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import {
@@ -620,25 +572,10 @@ interface OwnContextOutcome {
 }
 
 /**
- * Where to post the record, and what to authenticate it with.
- *
- * The environment is the first source, per the OTel exporter spec, and the
- * only one when the hook is driven by something other than an agent the CLI
- * signed in. It cannot be the only one: Claude Code strips every `OTEL_*`
- * variable from the processes it spawns, hooks included, so a session
- * exporting perfectly well hands its hooks an environment with no endpoint in
- * it at all.
- *
- * The fallback is the CLI's own device config, written by `langwatch login`,
- * `langwatch instrument` and `langwatch ingest install`. It holds two
- * credentials for one agent and they are read in the order `instrument`
- * chooses between them: the tool's pin first (`tool_project_keys`, with the
- * endpoint override it may carry), then the personal ingest key minted for
- * this agent under the control plane the CLI is signed in to. Null when no
- * source can name a collector, which is the "no telemetry configured" no-op.
- *
- * Shared with `langwatch ingest context`, which posts the same record from
- * the same sources when the agent declares its context itself.
+ * Where to post the record: env first (OTel exporter spec), but not the only
+ * source — Claude Code strips every `OTEL_*` var from hooks it spawns. Falls
+ * back to the CLI's own device config: the tool's pin first, then the
+ * personal ingest key. Null means no source can name a collector.
  */
 export function resolveTarget({
   env,

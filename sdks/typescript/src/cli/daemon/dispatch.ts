@@ -1,14 +1,8 @@
 /**
- * The CLI's front door.
- *
- * Every `langwatch …` invocation lands here. It decides — from argv, env and
- * the shape of stdio, without loading commander or any command module — whether
- * a warm daemon can serve this call, and falls back to running the command
- * in-process otherwise.
- *
- * The fallback is not an error path. It is the DEFAULT path: with no daemon
- * running, this module connects to nothing, finds nothing, and hands over to
- * exactly the code that ran before daemon mode existed.
+ * The CLI's front door: every `langwatch …` invocation lands here, deciding
+ * from argv/env/stdio whether a warm daemon can serve the call. The fallback
+ * to running in-process is the DEFAULT path, not an error path — with no
+ * daemon running it hands over to exactly the pre-daemon code.
  */
 
 import { runWithCredentialHolder } from "@/internal/credentialContext";
@@ -124,23 +118,15 @@ export async function runCli(argv: string[]): Promise<void> {
 /**
  * The pre-daemon code path, verbatim: build the commander tree and parse.
  *
- * Dynamically imported so that a daemon-served invocation never loads commander
- * or any command module — that module graph is ~80ms of the ~165ms cold start
- * this whole feature exists to remove, and a static import would make every
- * invocation pay it whether it needed it or not. (The CLI already loads every
- * command this way for the same reason.)
+ * Dynamically imported so a daemon-served invocation never pays commander's
+ * ~80ms of this feature's ~165ms cold start.
  */
 async function runInProcess(argv: string[]): Promise<void> {
   const { buildProgram } = await import("../program.js");
-  // parseAsync + await: a rejected action promise (e.g. an invalid --jq
-  // expression surfacing from printResult outside a command's try/catch)
-  // must become this call's rejection — a clean exit — not an unhandled
-  // rejection with a raw stack.
-  //
+  // parseAsync + await: a rejected action promise must become this call's
+  // rejection — a clean exit — not an unhandled rejection with a raw stack.
+
   // Wrapped in a credential holder so the resolved key lands in a
-  // request-scoped store rather than the global env, matching the daemon path
-  // (internal/credentialContext.ts). For a cold CLI this is the one command
-  // in the process, but keeping the wrapper here means both paths behave
-  // identically and the resolver never has to touch process.env for the key.
+  // request-scoped store rather than the global env, matching the daemon path.
   await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
 }

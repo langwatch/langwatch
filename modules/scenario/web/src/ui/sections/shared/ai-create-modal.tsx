@@ -435,9 +435,9 @@ function InspirationChips({
 }
 
 /**
- * Idle footer for the assistant path: the model hint on the left, the one warm "Draft with {assistant}" action on
- * the right — the same clean orange action the inline `ScenarioAIGeneration` panel uses, so the two
- * scenario-draft surfaces read as one design.
+ * Idle footer for the assistant path: the model hint on the left, and the
+ * same warm "Draft with {assistant}" action `ScenarioAIGeneration` uses,
+ * so the two scenario-draft surfaces read as one design.
  */
 function AssistFooter({
   onGenerate,

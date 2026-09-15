@@ -2,23 +2,10 @@ import { modelDisplayLabel } from "@langwatch/model-provider-contract";
 import { displayFirstName } from "./display-first-name.ts";
 
 /**
- * Who the two sides of a playground conversation are.
- *
- * "User" and "Assistant" name neither of them on this surface. One side is the
- * person reading, who is writing the messages themselves rather than reading
- * back somebody else's transcript. The other is the model they picked, which
- * is the thing they are iterating on: a playground session is a run of the
- * same prompt against one model and then another, and a transcript labelled
- * "Assistant" says nothing about which of them produced it once the picker has
- * moved on.
- *
- * The prompt's own handle was the other candidate for that side. It loses
- * because it is the constant in the comparison and the model is the variable,
- * and because a saved prompt already names itself in the tab beside the
- * conversation.
- *
- * A side we cannot name is left unset rather than blank, so the thread falls
- * back to the role label it already had instead of drawing an empty chip.
+ * Who the two sides of a playground conversation are: the person reading
+ * (not "User") and the model they picked (not "Assistant"), since a session
+ * iterates one prompt across models and "Assistant" wouldn't say which. A
+ * side we cannot name is left unset, so the thread falls back to its role label.
  */
 export function playgroundConversationLabels({
   userName,
@@ -34,14 +21,10 @@ export function playgroundConversationLabels({
 }
 
 /**
- * The model's name as the rest of the product writes it: the family name the
- * model picker and the default-models table show, without the provider prefix
- * the id carries.
- *
- * A bare id with no prefix keeps its whole self. `modelDisplayLabel` drops
- * everything before the first slash, which for such an id is the entire
- * string, and a bubble labelled with an empty chip is worse than one labelled
- * "Assistant".
+ * The model's name as the rest of the product writes it: family name only,
+ * no provider prefix. A bare id with no prefix keeps its whole self, since
+ * `modelDisplayLabel` would otherwise drop the entire string past the first
+ * slash it doesn't have.
  */
 function modelLabel(model?: string | null): string | undefined {
   const fullModelId = model?.trim();

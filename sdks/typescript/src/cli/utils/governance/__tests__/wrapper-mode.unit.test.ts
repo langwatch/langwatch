@@ -349,36 +349,10 @@ describe("resolveWrapperMode", () => {
 
   describe("when claude resolves to ingestion mode", () => {
     /**
-     * claude-code 2.x has four documented OTEL_LOG_* unlock knobs
-     * (code.claude.com/docs/en/monitoring-usage). Without them the
-     * OTel wire is metadata-only — tokens, cost, durations, tool
-     * sizes-in-bytes — and assistant response text + tool I/O text
-     * are silently absent (quadruple-proven dead end before we
-     * found these). The four knobs:
-     *
-     *   OTEL_LOG_USER_PROMPTS=1   lifts user prompt text onto
-     *                             user_prompt events
-     *   OTEL_LOG_TOOL_DETAILS=1   lifts tool_input/tool_parameters
-     *                             attrs (Bash command, Edit diff,
-     *                             file paths) onto tool_decision +
-     *                             tool_result so the trace shows
-     *                             WHAT the tool did
-     *   OTEL_LOG_TOOL_CONTENT=1   lifts tool input/output content
-     *                             onto the tool.output span event;
-     *                             active now that we set the
-     *                             ENHANCED_TELEMETRY_BETA flag
-     *   OTEL_LOG_RAW_API_BODIES=1 emits api_request_body +
-     *                             api_response_body events
-     *                             carrying the FULL JSON of every
-     *                             API call (system prompts +
-     *                             message history + assistant
-     *                             text + tool_use blocks). THIS
-     *                             is the only OTel surface that
-     *                             carries assistant response text.
-     *
-     * Dropping any of USER_PROMPTS / TOOL_DETAILS / RAW_API_BODIES
-     * silently regresses content visibility. Pin all four here so
-     * a refactor can't quietly undo the unlock.
+     * claude-code 2.x needs 4 OTEL_LOG_* knobs or the wire is metadata-only
+     * (no prompt/tool/response text) — RAW_API_BODIES alone carries response
+     * text. Pinned so a refactor can't silently drop one and lose content
+     * visibility.
      */
     it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -417,31 +391,10 @@ describe("resolveWrapperMode", () => {
 
   describe("when gemini resolves to ingestion mode", () => {
     /**
-     * gemini-cli 0.46-preview only emits OTLP traces + log records when
-     * a specific combination of env knobs is set. Each one is load-bearing:
-     *
-     *   GEMINI_TELEMETRY_ENABLED=true        — master switch
-     *   GEMINI_TELEMETRY_TARGET=local        — `otlp` is rejected at runtime
-     *                                          (the schema docstring is a lie,
-     *                                          parseTelemetryTargetValue accepts
-     *                                          only local|gcp)
-     *   GEMINI_TELEMETRY_USE_COLLECTOR=true  — pairs with target=local to route
-     *                                          through OTLP HTTP exporters
-     *                                          instead of the SDK default
-     *                                          (console/no-op) exporters
-     *   GEMINI_TELEMETRY_TRACES_ENABLED=true — captures detailed attribute
-     *                                          spans (without it the api_request
-     *                                          span has no attrs, no model lift)
-     *   GEMINI_TELEMETRY_OTLP_ENDPOINT       — explicit endpoint; the env-fallback
-     *                                          to OTEL_EXPORTER_OTLP_ENDPOINT
-     *                                          worked in some bundle revisions
-     *                                          and not others, so set it explicitly
-     *   GEMINI_TELEMETRY_LOG_PROMPTS=true    — embeds the user prompt text in
-     *                                          the user_prompt event so the
-     *                                          receiver lifts it to langwatch.input
-     *
-     * Dropping ANY of these silently kills the OTLP path. This test locks the
-     * 6-knob requirement so a refactor can't quietly regress to "metrics only".
+     * gemini-cli 0.46-preview needs 6 telemetry env knobs together, all
+     * load-bearing — notably TARGET=local (its own schema docstring claiming
+     * "otlp" works is a lie; only local|gcp are accepted at runtime).
+     * Dropping any one silently kills the OTLP path.
      */
     it("sets all 6 gemini telemetry knobs required for OTLP traces + log records", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");

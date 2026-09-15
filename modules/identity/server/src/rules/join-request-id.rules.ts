@@ -1,14 +1,10 @@
 import { generate } from "@langwatch/ksuid";
 
 /**
- * Join-request identity (D12) — the analogue of `sso-connection-id.ts` one
- * aggregate over. Every form a join-request id or a join-request command id
- * takes lives here, so the string that decides whether a retry is the same
- * command is never a template literal three modules apart from the one it has
- * to agree with.
- *
- * These strings are a persisted contract: changing one makes every prior
- * command a different command. Add a form; never edit one.
+ * Join-request identity (D12): every form a join-request id or command id
+ * takes lives here, so the string deciding whether a retry is the same
+ * command is never duplicated elsewhere. A persisted contract — changing a
+ * form makes every prior command a different command. Add a form; never edit one.
  */
 
 /** A request somebody made — random, minted once. */
@@ -39,13 +35,10 @@ export function expireJoinCommandId({
 }
 
 /**
- * The command id an APPROVAL dispatches with.
- *
- * Derived from the request and who resolved it rather than minted fresh: an
- * approval retried after a partial failure — the fact landed, the membership
- * did not — has to be the same command, or the retry would state a second
- * approval on a request that already has one. This is what makes "a replayed
- * approval attaches membership exactly once" a property of the pipeline.
+ * The command id an APPROVAL dispatches with, derived from the request and
+ * resolver rather than minted fresh: a retry after a partial failure (fact
+ * landed, membership didn't) must be the same command, so a replayed
+ * approval attaches membership exactly once.
  */
 export function approveJoinCommandId({
   joinRequestId,

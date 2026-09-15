@@ -1,51 +1,8 @@
 /**
- * Resolves an `LW.navigate(target, params)` call from a sandboxed chart
- * frame into a real page navigation, for the two widget hosts
- * (`DashboardWidgetCard`, `DashboardWidgetFrame`) that wire up
- * `SandboxedChartFrame`'s `onNavigate` prop.
- *
- * `pages/[project]/traces.tsx` renders TracesV2Page EXCLUSIVELY — there is no
- * legacy fallback — and traces-v2 does NOT read filter state from the query
- * string (`src/hooks/useFilterParams.ts` / `src/server/filters/registry.ts`
- * are the LEGACY explorer's mechanism and are unrelated here). Its state
- * lives in the URL FRAGMENT as `#<lensId>?q=<liqe expression>&from=&to=`,
- * parsed/built by `features/traces-v2/utils/urlState.ts`
- * (`parseFragment`/`buildFragment`) and read on mount/popstate by
- * `features/traces-v2/hooks/useURLSync.ts`. `q` is not free text — it is a
- * liqe expression (`field:value` clauses, `AND`/`OR`, quoting) compiled to
- * ClickHouse by `server/app-layer/traces/query-language/*`, whose queryable
- * field names are declared in `query-language/metadata.ts`'s `SEARCH_FIELDS`
- * (e.g. `user`, `conversation`, `customer`, `origin` — NOT the legacy
- * registry's field ids or urlKeys, which mostly don't match: e.g.
- * `metadata.user_id` -> urlKey `user_id`, but the liqe field is `user`).
- *
- * This hook mirrors `features/langy/logic/traceExplorerLink.ts`
- * (`buildTraceExplorerHref`/`explorerFragment`), the one other in-repo
- * producer of traces-v2 deep links: build a liqe `q` from AND-ed
- * `field:value` clauses (values escaped via the query-language's own
- * `escapeValue`, so quoting matches what the Explorer's own UI would
- * produce), land on the `all-traces` lens, and push the fragment as part of
- * a single string URL (an object `{ pathname, query }` push has no hash
- * field in `~/utils/compat/next-router`'s `buildUrl`, so a raw string is
- * used instead — `buildUrl` passes non-`?`-prefixed strings straight to
- * `navigate()`, which parses pathname/search/hash correctly and updates
- * `useLocation()`, which `useURLSync` watches).
- *
- * `params` keys are filter FIELD ids from the legacy registry's vocabulary
- * (e.g. `"metadata.user_id"`), for continuity with how chart authors already
- * write these — translated here to the liqe field name via an explicit map,
- * NOT the registry's urlKey. A bare liqe field name (e.g. `"user"`) is also
- * accepted as-is. Unmapped keys warn-and-drop rather than silently producing
- * an empty-result or wrong-field query.
- *
- * `startDate`/`endDate` (epoch ms) map to the fragment's absolute `from`/`to`
- * — the same absolute-window treatment `traceExplorerLink.ts` uses for a
- * window the caller named explicitly.
- *
- * `projectId` never comes from the frame's `params` — always from host
- * context (the `projectSlug` this hook is called with) — so a widget cannot
- * navigate into a different project's traces. An unrecognized target is a
- * warn-and-no-op, never a throw: author code is semi-trusted, not trusted.
+ * Resolves an `LW.navigate(target, params)` call from a sandboxed,
+ * semi-trusted chart frame into a real page navigation. `projectId` always
+ * comes from host context, never the frame's params, so a widget cannot
+ * navigate into a different project's traces.
  */
 
 import { useCallback } from "react";

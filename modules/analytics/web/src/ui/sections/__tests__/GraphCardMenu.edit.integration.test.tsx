@@ -1,19 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * Where a card's Edit action lands, by kind — and, for a saved LangWatchQL
- * chart, that there is no Edit action at all.
- *
- * A dashboard widget is edited in place: the builder can't read its
- * `{ code, queries }` payload, so its Edit item runs the card's `onEdit`
- * (which opens the edit drawer) and never navigates. A saved LangWatchQL
- * chart has no editor surface anymore: the Custom query workbench page that
- * used to open for it was removed, and nothing replaced it, so offering Edit
- * there would send a member to a route that no longer exists. The label and
- * the behaviour are asserted together: a right label that still navigated
- * away would read as a pass if either were checked alone.
- *
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
+ * Where a card's Edit action lands, by kind: a dashboard widget opens the
+ * edit drawer in place, but a saved LangWatchQL chart has no editor surface
+ * anymore (its workbench route was removed) — so it gets no Edit action.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

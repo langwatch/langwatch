@@ -1,11 +1,7 @@
 /**
- * The connection write surface the adapter hands back beside the pipeline definition.
- *
- * The operator back office commands connections without running the pipeline, and before
- * this accessor existed the only way to reach `SsoConnectionService` was to rebuild the
- * guards, the break-glass binding and the ledger writer outside this file — a second
- * composition with its own break-glass budget, deciding the same commands differently.
- *
+ * The connection write surface the adapter hands back beside the pipeline
+ * definition, so the back office can act without rebuilding the guards,
+ * break-glass binding and ledger writer as a second composition.
  * @see modules/identity/server/src/repositories/prisma/prisma.sso-connection-pipeline.repository.ts
  */
 import type { EventSourcing } from "@langwatch/eventing";

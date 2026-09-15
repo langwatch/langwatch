@@ -1,14 +1,10 @@
 import type { RedisConnection } from "./types.ts";
 
 /**
- * Closes Redis connections owned by a process composition root.
- *
- * ioredis exposes `disconnect()` on both standalone and cluster clients and
- * the existing App shutdown path deliberately uses it: shutdown must stop
- * reconnecting immediately rather than waiting for queued commands to drain.
- * Keeping that policy here gives every owner the same lifecycle operation and
- * makes repeated signal handling safe without putting connection state in a
- * module singleton.
+ * Closes Redis connections owned by a process composition root. Uses
+ * `disconnect()`, not a graceful close: shutdown must stop reconnecting
+ * immediately rather than wait for queued commands to drain. Instance-scoped
+ * (not a module singleton) so repeated signal handling stays safe.
  */
 export class RedisShutdownService {
   private readonly closePromises = new WeakMap<RedisConnection, Promise<void>>();

@@ -1,11 +1,8 @@
 /**
- * The recognizers themselves, one pattern at a time.
- *
- * Beside `essentialPii.unit.test.ts` rather than folded into it: that suite is
- * bound to the span-PII spec's scenarios and reads as a contract, and this one
- * is the mechanical sweep — every entity, its checksums, and the near-misses
- * each pattern must NOT claim. A recognizer that stops firing is silent, and
- * these cases are what makes it loud.
+ * The recognizers themselves, one pattern at a time — beside (not folded
+ * into) `essentialPii.unit.test.ts`, which is bound to the spec's scenarios;
+ * this is the mechanical sweep of every entity, its checksums, and the
+ * near-misses each pattern must NOT claim.
  */
 import { describe, expect, it } from "vitest";
 

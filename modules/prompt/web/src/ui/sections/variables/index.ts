@@ -1,14 +1,8 @@
 /**
- * Variables UI.
- *
- * The interface for defining prompt variables and mapping them onto the
- * sources a run can read: dataset columns, workflow node fields, or a literal
- * value. Shared by the prompt playground, the optimization studio, evaluations
- * and the agent editors.
- *
+ * Variables UI: defines prompt variables and maps them onto dataset columns,
+ * workflow node fields, or a literal value, shared across playground, studio,
+ * evaluations and the agent editors.
  * @see specs/variables-ui/variables-section.feature
- * @see specs/variables-ui/variable-insertion-menu.feature
- * @see specs/variables-ui/prompt-textarea.feature
  */
 
 export { FormVariablesSection } from "./form-variables-section.tsx";

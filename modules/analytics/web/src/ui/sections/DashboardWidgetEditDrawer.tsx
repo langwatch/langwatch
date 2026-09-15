@@ -1,16 +1,8 @@
 /**
- * The widget editor: a wide drawer with a live chart preview pinned at the
- * top, above two full-height tabs — Code (the React/TSX file) and Queries
- * (every declared query: SQL, params, last result, standalone Run). Cards
- * are presentation-only; this drawer is the only place a widget's code or
- * queries are edited.
- *
- * Holds no draft state of its own — every value and every change handler
- * comes from the card that opened it, which is what makes the preview
- * live-update as this drawer edits: both read and write the exact same
- * state. The preview element itself is built by the card too (`chart`) —
- * this file only decides where it sits, not what it is, since the card is
- * also where the executor and the debounce that feeds it live.
+ * The widget editor: a wide drawer with a live chart preview, Code and
+ * Queries tabs. Holds no draft state of its own — every value and handler
+ * comes from the card that opened it, so the preview live-updates because
+ * both read and write the exact same state.
  */
 
 import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";

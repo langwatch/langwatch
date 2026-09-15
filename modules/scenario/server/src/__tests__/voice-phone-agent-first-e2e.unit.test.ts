@@ -1,18 +1,8 @@
 /**
  * @vitest-environment node
- *
- * "Agent speaks first" for a phone voice target: when the callee greets on
- * connect, the run must open with the agent's own turn so the greeting is
- * captured as the first turn, then hand over to the normal simulator/judge
- * loop (`proceed()`), which runs the scenario to its conclusion. Every other
- * target keeps the default cast, which opens with the user simulator.
- *
- * This drives the real script builder and EXECUTES the produced steps against
- * a recording executor — the same way the SDK's own runner invokes them — so
- * the assertion is on runtime behavior (which turn is asked for, in what
- * order), not on the shape of opaque step functions.
- *
  * @see specs/features/agents/voice-phone.feature
+ * "Agent speaks first": a phone target that greets on connect opens with the
+ * agent's own turn, captured as turn one, before the normal simulator loop.
  */
 
 import * as ScenarioRunner from "@langwatch/scenario";

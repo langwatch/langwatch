@@ -1,23 +1,7 @@
 /**
  * @vitest-environment node
- *
- * @see specs/setup/app-router-type-seam.feature
  * @see dev/docs/adr/130-the-api-router-type-is-declared.md
- *
- * A ratchet on one number: how many workspace source files the compiler has to
- * load to answer what `AppRouter` is.
- *
- * The walk follows type-only imports as well as value ones, because that is
- * what the compiler does. `import type` erases at runtime, so the value-graph
- * guard beside this one skips it — but the module is still parsed, bound and
- * checked, and its own value imports are still followed. Forty type-only
- * imports of forty composed-feature records is how the API application's whole
- * graph ended up inside the browser application's typecheck.
- *
- * Resolution is the workspace resolver's, so a third-party specifier is not
- * followed. The count is first-party source files only, which is the half a
- * change in this repository moves; it tracked `tsc --listFiles`'s own
- * workspace bucket exactly when both were measured.
+ * A ratchet on how many workspace files the compiler loads to resolve `AppRouter`.
  */
 import { existsSync } from "node:fs";
 import { dirname, join, sep } from "node:path";

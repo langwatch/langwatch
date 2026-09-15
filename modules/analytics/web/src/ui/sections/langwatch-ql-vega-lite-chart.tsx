@@ -1,11 +1,7 @@
 /**
- * The LangWatchQL chart: validate, then draw, and never anything in between.
- *
- * The order is the whole design. A specification is checked against the
- * bundled Vega-Lite schema and the LangWatchQL policy *before* Vega is loaded with
- * it, the data is injected here rather than accepted from the specification,
- * and every way it can go wrong has a state of its own that names the cause.
- * There is no path through this component that renders an empty chart.
+ * A specification is validated against the bundled Vega-Lite schema and the
+ * LangWatchQL policy *before* Vega is loaded with it, so there is no path
+ * through this component that renders an empty chart.
  *
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
@@ -90,28 +86,17 @@ function LangWatchQLChartCanvas({
   isRefused: boolean;
 }) {
   /*
-    The mount point stays in the tree while a refusal is shown, so a
-    corrected specification has somewhere to draw into. Removing it was a
-    deadlock: the refusal outlives the render that clears it, so the
-    effect that re-embeds would find no container and give up, and the
-    chart would never come back.
-
-    Hidden, it is out of the layout and out of the accessibility tree, so
-    nothing renders an empty plotting area.
+    The mount point stays in the tree (hidden, not removed) while a refusal
+    is shown: removing it would deadlock, since the re-embed effect for a
+    corrected spec would find no container to draw into.
   */
   return (
     <Box hidden={isRefused} display={isRefused ? "none" : void 0}>
       <Box
-        // The chart is a picture of the result. Its accessible name is the
-        // whole of what a reader who cannot see it gets from this element —
-        // the same rows are in the table, which is the real fallback.
-        //
-        // The name lives HERE, on a wrapper, and never on the mount point:
-        // Vega writes its own `role="graphics-document"` and
-        // `aria-label="Vega visualization"` onto the element it embeds
-        // into, so a label on the mount point does not survive a real
-        // embed. `role="img"` also makes everything inside this element
-        // presentational, so Vega's own labelling is not read twice.
+        // The label lives on this wrapper, never the mount point: Vega
+        // writes its own role="graphics-document" and aria-label onto the
+        // element it embeds into, so a label there would not survive.
+        // role="img" also keeps that inner labelling from being read twice.
         role="img"
         aria-label={ariaLabel ?? "Chart of the query result"}
         aria-describedby={descriptionId}

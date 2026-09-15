@@ -1,26 +1,7 @@
 /**
  * @vitest-environment node
- *
- * @see specs/setup/memory-footprint.feature — "Server code cannot reach
- * browser-only UI, even transitively" and "Backend code never imports a module
- * out of a browser package"
- *
- * An architectural guard, not a snapshot. It walks the real value-import graph
- * the way Node does and fails with the offending chain.
- *
- * It has to be transitive, because the leak it prevents was invisible to a
- * direct-import check: one route module imported a single display-name constant
- * from a React component, and that hop pulled Chakra UI, Ark UI, Emotion,
- * react-dom and react-router — 2,020 modules of browser-only code — into the
- * API, worker and ingestion processes alike.
- *
- * Only VALUE imports are followed: `import type` is erased at compile time and
- * cannot pull a module at runtime, so backend code may freely name a
- * component's types.
- *
- * This is the rebuild of `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts`,
- * which went with the platform application in Cutover C. Nineteen of its twenty
- * subjects no longer existed, so the roots are new; the contract is not.
+ * @see specs/setup/memory-footprint.feature
+ * Transitive: one type-name import once pulled 2,020 browser-only modules into the API/worker.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -41,13 +22,10 @@ import {
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * The one allowed terminal: `@langwatch/mail` renders its templates with
- * react-email, server-side, at send time. React is legitimate there and nowhere
- * else on a backend graph.
- *
- * It is a TERMINAL rather than an excused importer — the walk stops on entry —
- * so a service that sends mail is not reported for the React its templates
- * legitimately use, while a file that reaches React some other way still is.
+ * The one allowed terminal: `@langwatch/mail` renders templates with
+ * react-email, server-side. It's a TERMINAL (the walk stops on entry), not
+ * an excused importer, so a file that reaches React some other way is
+ * still reported.
  */
 const MAIL_PACKAGE = join(REPO_ROOT, "packages", "mail") + sep;
 
@@ -75,13 +53,10 @@ const API_SRC = join(REPO_ROOT, "apps", "api", "src");
 const WORKER_SRC = join(REPO_ROOT, "apps", "worker", "src");
 
 /**
- * The process entrypoints, and every composition module.
- *
- * The entrypoints matter more than anything under them: whatever they reach is,
- * by definition, resident in a running backend process. The compositions matter
- * because they are what an entrypoint reaches — a composition is wired into a
- * process by name, so a browser package on one is a browser package in the
- * process that composes it, whether or not today's entrypoint happens to.
+ * The process entrypoints, and every composition module: a composition is
+ * wired into a process by name, so a browser package on one is a browser
+ * package in the process that composes it, whether or not today's
+ * entrypoint happens to reach it.
  */
 const applicationRoots = (): string[] => {
   const roots: string[] = [];
@@ -129,13 +104,10 @@ const BACKEND_ROOTS = [
 ].sort();
 
 /**
- * The browser package trees. A backend graph may not reach a module inside one
- * at all — not only the browser toolkits it happens to import today.
- *
- * The distinction is the point. `apps/ui` and each feature's `web` package are
- * built for a browser and reviewed as browser code; a module in one that looks
- * framework-free today acquires a React edge the next time somebody edits it,
- * and nothing in that review would say a backend process is downstream.
+ * The browser package trees: a backend graph may not reach a module inside
+ * one at all — not just the toolkits it imports today. A module that looks
+ * framework-free can acquire a React edge later, and browser-code review
+ * would not know a backend process is downstream.
  */
 const browserModuleRoots = (): string[] => {
   const roots = [join(REPO_ROOT, "apps", "ui")];
@@ -288,16 +260,10 @@ describe("browser-only UI never reaches backend code", () => {
     });
   });
 
-  // Both halves are pinned. Asserting only the exclusion passes just as
-  // happily when the import is deleted — which is how the platform version of
-  // this case quietly lost its subject.
-  //
-  // The subject is a browser module rather than a backend one because no
-  // backend file names a browser type today, which is the guard's whole point:
-  // the two that did were moved rather than excused. What is pinned here is the
-  // WALKER — `moduleImports` sees the statement, `valueImports` refuses to
-  // count it — and that is what lets a backend file name a component's props
-  // without being reported the day one does.
+  // Both halves are pinned — asserting only the exclusion passes even if the
+  // import is deleted. `moduleImports` sees the statement; `valueImports`
+  // refuses to count it — that is what lets a backend file name a browser
+  // component's props without being reported.
   describe("given a type-only import of a browser package", () => {
     const module = join(
       REPO_ROOT,

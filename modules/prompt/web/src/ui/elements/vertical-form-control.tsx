@@ -1,13 +1,8 @@
 /**
- * A labelled field, stacked, with its errors under the input.
- *
- * A NARROWED family-local copy of `platform/app/src/components/VerticalFormControl.tsx`,
- * which is a thin wrapper over `HorizontalFormControl` — a two-direction
- * component with 40-odd callers this move may not repoint. Only the vertical
- * branch travels, and it is inlined rather than kept behind a `direction` prop
- * nothing here passes. `FormErrorDisplay`'s message walk travels with it,
- * because putting an error under the input it belongs to is the behaviour and
- * not the decoration.
+ * A labelled field, stacked, with its errors under the input. A narrowed,
+ * family-local copy of the old two-direction `VerticalFormControl` — only
+ * the vertical branch travels. `FormErrorDisplay`'s message walk comes with
+ * it, since showing an error under its input is behaviour, not decoration.
  */
 
 import { Box, Field, HStack, type SystemStyleObject, Text, VStack } from "@chakra-ui/react";

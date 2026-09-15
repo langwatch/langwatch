@@ -1,11 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * What the playground's chrome says: the editor header's one primary action,
- * the prompt editor's section title, and the workspace toolbar's offer to
- * start a new prompt.
- *
  * @see specs/prompts/playground-surface-hierarchy.feature
+ * What the playground's chrome says: the editor header's one primary action,
+ * the section title, and the toolbar's offer to start a new prompt.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

@@ -16,7 +16,9 @@ import {
 } from "@langwatch/gateway-contract";
 
 /**
- * Spend in both units, or null when it can't be honestly carried: spendAvailable=false and per-person templates (a distribution, not one total) both answer null, never a figure mistaken for real money.
+ * Spend in both units, or null when it can't be honestly carried:
+ * spendAvailable=false and per-person templates (a distribution, not one
+ * total) both answer null, never a figure mistaken for real money.
  */
 function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
   if (!spendAvailable || b.scopeType === "ATTRIBUTED_USER") {
@@ -38,7 +40,9 @@ export class GatewayBudgetDtoAdapter {
   private constructor() {}
 
   /**
-   * readAt is when spend was totalled, so callers with no spend read take the wall clock; the period brackets to that same instant so a boundary crossing can't print a fresh period beside the old figure.
+   * readAt is when spend was totalled, so callers with no spend read take
+   * the wall clock; the period brackets to that same instant so a boundary
+   * crossing can't print a fresh period beside the old figure.
    */
   toBudgetDto({
     budget: b,

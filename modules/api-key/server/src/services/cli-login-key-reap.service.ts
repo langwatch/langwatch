@@ -7,15 +7,10 @@ const logger = createLogger("langwatch:api-key:cli-login-key-reaper");
 
 /**
  * A session the CLI stops refreshing leaves Redis by TTL, which runs no
- * code, so this sweep is what retires its login key (name carries
- * {@link CLI_LOGIN_KEY_NAME_PREFIX}) and, through the ordinary revoke
- * cascade, the ingest keys parented to it.
- *
- * Each elapsed key is revoked through the module's own `revoke`, one at a
- * time, so the cascade runs and every row keeps its own tenant scope: the
- * only thing that crosses organizations here is the read of which keys
- * elapsed, admitted by {@link ApiKeyRepository.findElapsedLoginKeys} on
- * exactly that predicate.
+ * code, so this sweep is what retires its login key and, through the
+ * ordinary revoke cascade, its parented ingest keys. Each elapsed key is
+ * revoked one at a time through the module's own `revoke`, so the only
+ * thing crossing organizations here is the read of which keys elapsed.
  */
 export class CliLoginKeyReapService {
   static create(options: {

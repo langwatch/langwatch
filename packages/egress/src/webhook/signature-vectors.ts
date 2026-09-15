@@ -6,27 +6,10 @@ import {
 } from "./signature.ts";
 
 /**
- * Emits the cross-language signature test vectors from the sender's own
- * implementation.
- *
- * Three verifiers have to agree byte for byte: this server, the TypeScript
- * SDK's `verifyWebhookSignature`, and the Python SDK's
- * `verify_webhook_signature`. Agreement asserted in three separate test
- * suites is agreement only until one of them is edited, so the vectors are
- * generated HERE, from the code that actually signs deliveries, and the two
- * SDKs assert against the committed file rather than against a local idea of
- * the algorithm.
- *
- * Regenerate with
- * `pnpm --filter @langwatch/tasks task webhook-signature-vectors`. The
- * companion unit test beside this file fails when the committed file drifts
- * from what the generator would write, so a change to the signing code cannot
- * land without the vectors moving with it.
- *
- * The data lives here, next to the signing code it is generated from, and the
- * writer lives in the process that owns webhook delivery. That split is what
- * lets the drift check run as an ordinary package unit test with no file
- * system writing in it.
+ * Emits cross-language signature test vectors from the sender's own
+ * implementation, so this server and both SDKs verify against one committed
+ * file instead of three separate ideas of the algorithm. A companion test
+ * fails when the file drifts from what the generator would write.
  */
 
 /** Where the SDK suites read from, repo-root relative. */

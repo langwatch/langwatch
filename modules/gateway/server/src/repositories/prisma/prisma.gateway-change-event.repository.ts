@@ -1,5 +1,8 @@
 /**
- * GatewayChangeEvent is the monotonic revision feed the Go gateway long-polls via GET /api/internal/gateway/changes?since=<revision>. Any mutation affecting a gateway-visible artifact (VK, budget, ModelProvider) must append an event here.
+ * GatewayChangeEvent is the monotonic revision feed the Go gateway long-polls
+ * via GET /api/internal/gateway/changes?since=<revision>. Any mutation
+ * affecting a gateway-visible artifact (VK, budget, ModelProvider) must
+ * append an event here.
  */
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";

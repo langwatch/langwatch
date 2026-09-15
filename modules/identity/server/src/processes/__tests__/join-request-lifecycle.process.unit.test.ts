@@ -10,14 +10,10 @@ import {
 } from "../join-request-lifecycle.process.ts";
 
 /**
- * The two timers on one wake column.
- *
- * A process instance has exactly ONE `nextWakeAt`, so the day-7 reminder
- * re-arms itself to the day-14 deadline rather than a second timer existing.
- * These tests are the readable statement of that: what each wake does, and
- * what disarms it.
- *
- * Spec: specs/identity/join-requests.feature
+ * The two timers on one wake column: a process instance has exactly ONE
+ * `nextWakeAt`, so the day-7 reminder re-arms itself to the day-14 deadline
+ * rather than a second timer existing.
+ * @see specs/identity/join-requests.feature
  */
 
 const REQUESTED_AT = 1_700_000_000_000;

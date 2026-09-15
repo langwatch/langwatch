@@ -7,13 +7,8 @@ import {
 } from "./responseFormat";
 
 /**
- * Converter utility for transforming between YAML prompt format and API service format.
- *
- * The YAML format follows the GitHub .prompt.yaml file format standard,
- * while the API format is our internal prompt service schema tied to the database.
- *
- * This separation allows us to maintain and evolve both formats independently
- * while keeping the conversion logic centralized and well-tested.
+ * Converts between the YAML `.prompt.yaml` format (GitHub's standard) and
+ * this service's internal API schema, keeping the two evolvable independently.
  */
 export class PromptConverter {
   /**

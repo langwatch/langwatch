@@ -1,17 +1,8 @@
 /**
  * @vitest-environment node
- *
  * @see specs/langy/langy-health-canary.feature
- *
- * Route-level proof for `GET /api/health/langy`, driven through the real Hono
- * app with the same auth seams as `langy-api-refusal-chain.unit.test.ts`: the
- * probe shares the turn routes' authorization chain, so the same mocks stand in
- * for the same boundaries. The canary service's own budget/single-flight logic
- * is unit-tested against an injected boundary in
- * `../../health-probes/__tests__/langy-canary.service.unit.test.ts` — here its
- * production entrypoint (`runLangyHealthCanary`) is mocked as the one boundary
- * this route crosses, so "no turn is started" means "the entrypoint was never
- * invoked".
+ * Mocks `runLangyHealthCanary` as the one boundary this route crosses, so
+ * "no turn is started" means "the entrypoint was never invoked".
  */
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,13 +96,9 @@ function getHealth(headers: Record<string, string> = {}) {
 }
 
 /**
- * Everything a caller could read off a response: status, every header, body.
- * The dark 404 is compared to an unmounted path's through this, so any header
- * the probe adds on its other paths (Cache-Control) counts as a difference. A
- * live probe against a stack with the surface off showed the 404 carries no
- * such header, and a comparator that skipped headers had let the spec promise
- * one anyway; a comparator that picked headers by name would only see the
- * ones its author thought of.
+ * Captures every header (not a chosen subset) so the dark 404 can be compared
+ * to an unmounted path's byte-for-byte — a comparator that picked headers by
+ * name would miss any the probe adds that its author didn't think of.
  */
 async function describeResponse(res: Response) {
   return {

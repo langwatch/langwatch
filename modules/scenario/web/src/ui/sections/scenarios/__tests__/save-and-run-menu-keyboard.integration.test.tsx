@@ -1,5 +1,5 @@
 /**
- * The agent rows of the save-and-run menu read to the keyboard: the focus reaches a row and Enter runs the scenario against it.
+ * Save-and-run menu rows read to the keyboard: focus reaches a row, Enter runs it.
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
