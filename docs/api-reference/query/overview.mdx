@@ -45,29 +45,31 @@ Both endpoints answer with the standard LangWatch error envelope and a real HTTP
 
 ## Queryable views
 
-Every view is a read-only projection over one ClickHouse or PostgreSQL table. `GET /api/v1/query/schema` is the live source of truth — the table below is a human-readable index of the same 47 views, grouped by what they're for.
+Every view is a read-only projection over one ClickHouse or PostgreSQL table. `GET /api/v1/query/schema` is the live source of truth: the table below is a human-readable index of the same 47 views, grouped by what they're for.
 
 ### How the catalog is built
 
-Every ClickHouse table is a view by default: the catalog is derived from a generated columns manifest, so a new table shows up here automatically once it's catalogued, rather than needing a hand-written entry. Two column families are gated rather than freely selectable: free-text carriers (captured input, captured output, tool output, log bodies) sit behind the `output` gate (`input` for a few views that separate the two), and billed/derived cost columns sit behind the `costs` gate. A gate's state comes from the project's privacy settings — it is never inferred from the query. Selecting a gated column your key's project has not opened is refused outright with `GATED_COLUMN`, never silently dropped from the result.
+Every ClickHouse table is a view by default: the catalog is derived from a generated columns manifest, so a new table shows up here automatically once it's catalogued, rather than needing a hand-written entry.
+
+Two column families are gated rather than freely selectable: free-text carriers (captured input, captured output, tool output, log bodies) sit behind the `output` gate (`input` for a few views that separate the two), and billed/derived cost columns sit behind the `costs` gate. A gate's state comes from the project's privacy settings, never from the query. Selecting a gated column your key's project has not opened is refused outright with `GATED_COLUMN`, never silently dropped from the result.
 
 <!-- lwql-views-start -->
 
-#### Observability — traces, spans, logs
+#### Observability: traces, spans, logs
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
 | `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
-| `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | — | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
+| `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
 | `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries. | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
 | `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind. | `output` | one row per SeriesId | `LastSeenAt` |
-| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | — | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
-| `objects` | Stored file objects: what was captured, its size and hash. | — | one row per id | `created_at` |
-| `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | — | one row per AnnotationId | `CreatedAt` |
+| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
+| `objects` | Stored file objects: what was captured, its size and hash. | None | one row per id | `created_at` |
+| `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | None | one row per AnnotationId | `CreatedAt` |
 | `langy_conversation_messages` | Langy conversation turns, one row per message. | `output` | one row per (TenantId, ConversationId, MessageId) | `CreatedAt` |
-| `langy_usage_events` | Langy usage telemetry: tool calls, outcomes and durations. | — | one row per (TenantId, OccurredAt, EventId) | `OccurredAt` |
+| `langy_usage_events` | Langy usage telemetry: tool calls, outcomes and durations. | None | one row per (TenantId, OccurredAt, EventId) | `OccurredAt` |
 
 #### Coding agents
 
@@ -75,10 +77,10 @@ Every ClickHouse table is a view by default: the catalog is derived from a gener
 |------|-------------|-------|-------|-------------|
 | `coding_sessions` | One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session. | `input`, `costs` | one row per (TenantId, SessionId), latest version only | `StartedAt` |
 | `coding_session_events` | One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order. | `costs` | one row per (TenantId, SessionId, TimeUnixMs, RecordId) | `TimeUnixMs` |
-| `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | — | one row per (TenantId, TraceId) | `OccurredAt` |
+| `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | None | one row per (TenantId, TraceId) | `OccurredAt` |
 | `coding_tool_results` | One row per coding-agent tool call, with the text it printed back to the agent. | `output` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
 
-`coding_tool_results.OutputText` is what the tool printed back to the agent — read it to answer "what did this failed tool call print":
+`coding_tool_results.OutputText` is what the tool printed back to the agent. Read it to answer "what did this failed tool call print":
 
 ```sql
 SELECT ToolName, OutputText
@@ -95,18 +97,18 @@ LIMIT 20
 | `evaluations` | One row per evaluation run, with its score and outcome. | `input`, `output` | one row per (TenantId, EvaluationId), latest version only | `ScheduledAt` |
 | `simulations` | One row per simulation run, with its verdict and criteria. | `input`, `output` | one row per (TenantId, ScenarioRunId), latest version only | `StartedAt` |
 | `simulation_trace_metrics` | Cost and latency metrics per simulated trace. | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
-| `experiments` | One row per experiment, with its display name and kind. | — | one row per ExperimentId | `CreatedAt` |
+| `experiments` | One row per experiment, with its display name and kind. | None | one row per ExperimentId | `CreatedAt` |
 | `experiment_items` | Individual item results within an experiment run with evaluations. | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
 | `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores. | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
 | `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details. | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
 | `batch_evaluations` | One row per offline batch evaluation of a dataset row, with its score, outcome and cost. | `costs` | one row per BatchEvaluationId | `CreatedAt` |
-| `test_suite_runs` | Test suite execution results with completion and pass counts. | — | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
+| `test_suite_runs` | Test suite execution results with completion and pass counts. | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
 
-Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over) — everything else queryable through LangWatchQL is a view.
+Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over). Everything else queryable through LangWatchQL is a view.
 
 #### Metrics & rollups
 
-Rollup views (`_by_minute`, `_rollups`) return **finalised values only** — figures for a bucket that was still open when the row was written are absent, not partial. A metric a caller wants without touching per-row data belongs here.
+Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figures for a bucket that was still open when the row was written are absent, not partial. A metric a caller wants without touching per-row data belongs here.
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
@@ -115,8 +117,8 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only** — fig
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
-| `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | — | one row per (SeriesId, BucketStart) | `BucketStart` |
-| `session_metrics` | Per-session time-series metrics with aggregate statistics. | — | one row per (SessionId, SeriesId) | `AsOf` |
+| `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
+| `session_metrics` | Per-session time-series metrics with aggregate statistics. | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
 
 #### Gateway & billing
@@ -126,11 +128,11 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only** — fig
 | `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend. | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
 | `gateway_budget_totals` | Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window. | `costs` | one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only | `PeriodStart` |
 | `gateway_request_spend` | Individual API request spend and reconciliation details. | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
-| `billing_events` | Billing events for customer invoice generation. | — | one row per DeduplicationKeyHash | `EventTimestamp` |
+| `billing_events` | Billing events for customer invoice generation. | None | one row per DeduplicationKeyHash | `EventTimestamp` |
 
 #### Governance & audit
 
-Governance views are keyed by the organization's hidden `internal_governance` project. A key scoped to an ordinary project sees **zero rows** here — not an error, not a gate refusal — until the caller's project set includes the org-level governance project.
+Governance views are keyed by the organization's hidden `internal_governance` project. A key scoped to an ordinary project sees **zero rows** here, not an error and not a gate refusal, until the caller's project set includes the org-level governance project.
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
@@ -138,7 +140,7 @@ Governance views are keyed by the organization's hidden `internal_governance` pr
 | `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
 | `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
 | `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
-| `automation_events` | Audit log of automation trigger executions and actions. | — | one row per EventId | `OccurredAt` |
+| `automation_events` | Audit log of automation trigger executions and actions. | None | one row per EventId | `OccurredAt` |
 
 #### Legacy
 
@@ -148,27 +150,27 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 |------|-------------|-------|-------|-------------|
 | `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables. | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
 | `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by `logs`; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
-| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | — | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
 
 #### Entities & reference data
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `projects` | The caller's project, with its display name and slug. | — | one row per TenantId | `CreatedAt` |
-| `prompts` | One row per prompt configuration, with the name its versions are known by. | — | one row per PromptId | `CreatedAt` |
-| `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | — | one row per PromptVersionId | `CreatedAt` |
+| `projects` | The caller's project, with its display name and slug. | None | one row per TenantId | `CreatedAt` |
+| `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
+| `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
 
 <!-- lwql-views-end -->
 
 ### Tables intentionally left out
 
-A table off the catalog above is always a recorded decision, never an oversight — a coverage guard fails the build until every ClickHouse table is either catalogued or given a reason here:
+A table off the catalog above is always a recorded decision, never an oversight: a coverage guard fails the build until every ClickHouse table is either catalogued or given a reason here:
 
 | Table | Reason |
 |-------|--------|
-| `lwql_api_key_tenant_map` | Access-control plumbing, not customer telemetry — holds key hashes the row policy reads to self-filter; the policy already scopes it, so exposing it would leak the isolation mechanism for no customer benefit. |
-| `goose_db_version` | The goose migration-version table, engine-internal tooling state — no tenant column at all. |
-| Any table ending in `_mv`, or naming a `.inner` target | Materialised-view internals — engine plumbing, not a table a caller would query; its data is already exposed through the table it feeds. |
+| `lwql_api_key_tenant_map` | Access-control plumbing, not customer telemetry: holds key hashes the row policy reads to self-filter; the policy already scopes it, so exposing it would leak the isolation mechanism for no customer benefit. |
+| `goose_db_version` | The goose migration-version table, engine-internal tooling state, no tenant column at all. |
+| Any table ending in `_mv`, or naming a `.inner` target | Materialised-view internals: engine plumbing, not a table a caller would query; its data is already exposed through the table it feeds. |
 
 ## Supported functions
 
