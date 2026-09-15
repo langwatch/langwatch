@@ -23,6 +23,15 @@
   "plugins": ["react", "unicorn", "typescript", "oxc", "vitest"],
   "rules": {
     "complexity": ["error", { "max": 25 }],
-    "no-nested-ternary": "error"
+    "no-nested-ternary": "error",
+
+    // Vitest's `expect` takes a second argument — `expect(actual, message)` is
+    // in its own types as `<T>(actual: T, message?: string): Assertion<T>` —
+    // and the repo uses it to label which loop iteration failed. The rule's
+    // default ceiling of 1 is a jest-era assumption: it reported 106 findings
+    // here, 97 of them that deliberate label, and its stated fix ("remove the
+    // extra arguments") deletes working failure diagnostics. The 9 real ones,
+    // an async matcher never awaited, still report.
+    "vitest/valid-expect": ["warn", { "maxArgs": 2 }]
   }
 }

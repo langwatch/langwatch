@@ -21,39 +21,31 @@ export const COMMENT_SWEEP_COMMAND = "pnpm exec oxlint --config .oxlintrc.archit
 
 /** The two answers that are almost always right, in the order to try them. */
 const WHERE_IT_BELONGS =
-  "Delete it when the code already says it. Otherwise move the narrative - a decision and its" +
-  " alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a" +
-  " page under `dev/docs/best_practices/`, and leave one line here linking it.";
+  "Delete it when the code already says it, or move the narrative into an ADR under" +
+  " `dev/docs/adr/` and leave one line here linking it.";
 
-/** Stated wherever the annotation is, so nobody reads it as a general escape hatch. */
+/** Named, not explained: the reasoning is ADR-140's job, which is the rule's own point. */
 const KEEP_IS_A_LAST_RESORT =
-  `\`${LINT_KEEP_ANNOTATION}\` is a last resort and is almost never the answer: it is for a block a` +
-  " reader needs at the code itself - a state table, an ordering constraint, a wire format - whose" +
-  " full narrative is already recorded in an ADR. Write" +
-  ` \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\` on its own line inside the block,` +
-  " naming that ADR; the annotation's own line does not count toward the length.";
-
-const SWEEP_HINT =
-  "More than one block in a file is a sweep, not an edit: list them all with" +
-  ` \`${COMMENT_SWEEP_COMMAND}\` and rewrite them in one pass.`;
+  `Keeping a block this long needs \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\`` +
+  " inside it and is almost never right; see ADR-140.";
 
 /** Declared as `what` + `fix` so a rule can interpolate either half. */
 export const COMMENT_BLOCK_SIZE_WHAT = "Comment block has {{lines}} lines; the maximum is {{max}}.";
 
-export const COMMENT_BLOCK_SIZE_FIX =
-  `${WHERE_IT_BELONGS} ${KEEP_IS_A_LAST_RESORT} ${SWEEP_HINT}`;
+export const COMMENT_BLOCK_SIZE_FIX = `${WHERE_IT_BELONGS} ${KEEP_IS_A_LAST_RESORT}`;
 
 export const COMMENT_BLOCK_ERROR_WHAT =
-  `${COMMENT_BLOCK_SIZE_WHAT} At {{error}} lines or more this is an error and cannot be` +
-  ` suppressed: \`${LINT_KEEP_ANNOTATION}\` does not apply at this size.`;
+  `${COMMENT_BLOCK_SIZE_WHAT} At {{error}} lines or more nothing suppresses this.`;
 
-export const COMMENT_BLOCK_ERROR_FIX = `${WHERE_IT_BELONGS} ${SWEEP_HINT}`;
+export const COMMENT_BLOCK_ERROR_FIX = `${WHERE_IT_BELONGS} See ADR-140.`;
 
 export const COMMENT_KEEP_REASON_WHAT =
-  `\`${LINT_KEEP_ANNOTATION}\` on this {{lines}}-line block does not both give a reason of` +
-  " {{words}} words or more and name the ADR recording it, so the block is still over {{max}} lines.";
+  `\`${LINT_KEEP_ANNOTATION}\` needs both a reason of {{words}} words or more and the ADR` +
+  " recording it, so this {{lines}}-line block is still over {{max}}.";
 
-export const COMMENT_KEEP_REASON_FIX = `${KEEP_IS_A_LAST_RESORT} ${WHERE_IT_BELONGS}`;
+export const COMMENT_KEEP_REASON_FIX =
+  `Write \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\` on its own line inside the` +
+  " block, or delete the block and move its narrative into that ADR.";
 
 const WARN_MESSAGE = `${COMMENT_BLOCK_SIZE_WHAT} ${COMMENT_BLOCK_SIZE_FIX}`;
 const ERROR_MESSAGE = `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_FIX}`;

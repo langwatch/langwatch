@@ -41,7 +41,7 @@ describe("given a source file outside the burn-down allowlist", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("commentBlockSize");
-      expect(found[0].message).toContain("cannot be suppressed");
+      expect(found[0].message).toContain("nothing suppresses this");
     });
   });
 

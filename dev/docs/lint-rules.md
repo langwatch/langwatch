@@ -199,8 +199,8 @@ Options: none.
 Messages:
 
 - `commentBlockSize`
-  - what: Comment block has {{lines}} lines; the maximum is {{max}}. At {{error}} lines or more this is an error and cannot be suppressed: `@lint-keep` does not apply at this size.
-  - fix: Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it. More than one block in a file is a sweep, not an edit: list them all with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and rewrite them in one pass.
+  - what: Comment block has {{lines}} lines; the maximum is {{max}}. At {{error}} lines or more nothing suppresses this.
+  - fix: Delete it when the code already says it, or move the narrative into an ADR under `dev/docs/adr/` and leave one line here linking it. See ADR-140.
 - `commentColumns`
   - what: Comment line is {{width}} columns; wrap at {{max}}.
   - fix: Rewrap the block at {{max}} columns, or cut it to the sentence that earns its place.
@@ -218,10 +218,10 @@ Messages:
 
 - `commentBlockSize`
   - what: Comment block has {{lines}} lines; the maximum is {{max}}.
-  - fix: Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it. `@lint-keep` is a last resort and is almost never the answer: it is for a block a reader needs at the code itself - a state table, an ordering constraint, a wire format - whose full narrative is already recorded in an ADR. Write `@lint-keep <reason> dev/docs/adr/<file>.md` on its own line inside the block, naming that ADR; the annotation's own line does not count toward the length. More than one block in a file is a sweep, not an edit: list them all with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and rewrite them in one pass.
+  - fix: Delete it when the code already says it, or move the narrative into an ADR under `dev/docs/adr/` and leave one line here linking it. Keeping a block this long needs `@lint-keep <reason> dev/docs/adr/<file>.md` inside it and is almost never right; see ADR-140.
 - `commentKeepReason`
-  - what: `@lint-keep` on this {{lines}}-line block does not both give a reason of {{words}} words or more and name the ADR recording it, so the block is still over {{max}} lines.
-  - fix: `@lint-keep` is a last resort and is almost never the answer: it is for a block a reader needs at the code itself - a state table, an ordering constraint, a wire format - whose full narrative is already recorded in an ADR. Write `@lint-keep <reason> dev/docs/adr/<file>.md` on its own line inside the block, naming that ADR; the annotation's own line does not count toward the length. Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it.
+  - what: `@lint-keep` needs both a reason of {{words}} words or more and the ADR recording it, so this {{lines}}-line block is still over {{max}}.
+  - fix: Write `@lint-keep <reason> dev/docs/adr/<file>.md` on its own line inside the block, or delete the block and move its narrative into that ADR.
 
 ## `langwatch/condition-shape`
 

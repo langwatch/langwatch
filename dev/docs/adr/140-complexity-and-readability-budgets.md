@@ -137,6 +137,13 @@ Two consequences worth stating, because both were bugs in the first draft:
   blocks across 221 files were caught in that contradiction; 190 others stay
   over the limit on prose alone, which is the part worth cutting. `@deprecated`
   and `@example` are excluded from the discount: those carry prose.
+- The message says all this in two sentences and links here for the rest, which
+  is the rule's own instruction applied to itself: at 6,466 warnings a
+  600-character explanation repeated per finding is the wall the limit exists to
+  prevent. Working practice that does not belong in a lint line: more than one
+  block in a file is a sweep rather than an edit — list them all with
+  `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and rewrite
+  them in one pass.
 - A `// oxlint-disable-next-line` comment is **not** a way to silence either
   tier. It is contiguous with the block, so it merges into it and makes it one
   line longer, it does not suppress a report anchored at the block's first
