@@ -12,9 +12,11 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 /**
  * Every tree that ships UI.
  */
-const ROOTS = [join(PACKAGE_ROOT, "src"), join(PACKAGE_ROOT, "../../packages")].filter((root) =>
-  existsSync(root),
-);
+const ROOTS = [
+  join(PACKAGE_ROOT, "src"),
+  join(PACKAGE_ROOT, "../../packages"),
+  join(PACKAGE_ROOT, "../../modules"),
+].filter((root) => existsSync(root));
 
 /**
  * Cheap substring test that decides whether a file is worth parsing.
@@ -623,7 +625,7 @@ const leaksIn = (source: string): boolean => findLeaks(source).length > 0;
 /**
  * A file inside a `modules/<family>/web` package.
  */
-const FEATURE_WEB_FILE = /[/\\]packages[/\\]features[/\\][^/\\]+[/\\]web[/\\]/;
+const FEATURE_WEB_FILE = /[/\\]modules[/\\][^/\\]+[/\\]web[/\\]/;
 
 /** The Design System toaster's module specifier, however the import is spelled. */
 const DESIGN_SYSTEM_TOASTER_IMPORT = /\bfrom\s*["']@langwatch\/design-system\/toaster["']/;

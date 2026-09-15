@@ -15,6 +15,7 @@ import {
 import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
+import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because
@@ -43,6 +44,7 @@ function useAddToDashboardHandler({
   isDashboardWidget,
 }: AddToDashboardHandlerProps) {
   const utils = api.useUtils();
+  const showErrorToast = useShowErrorToast();
   const dashboard = api.dashboards.getOrCreateFirst.useQuery(
     { projectId },
     { enabled: showAddToDashboard && isDashboardWidget },
@@ -73,12 +75,8 @@ function useAddToDashboardHandler({
           void utils.dashboardWidgets.list.invalidate({ projectId });
           void utils.graphs.getAll.invalidate();
         },
-        onError: () => {
-          toaster.create({
-            title: "Error adding to dashboard",
-            type: "error",
-            duration: 3000,
-          });
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't add this to the dashboard" });
         },
       },
     );

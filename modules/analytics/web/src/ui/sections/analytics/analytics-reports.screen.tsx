@@ -17,7 +17,7 @@ import {
 import { FilterSidebar } from "../filter-sidebar.tsx";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import AnalyticsLayout from "../analytics-layout.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
+import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
 import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
 import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
@@ -32,6 +32,7 @@ function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
   const host = useAnalyticsHost();
+  const showErrorToast = useShowErrorToast();
   const projectId = project?.id ?? "";
 
   // Get dashboard ID from URL, or use first dashboard
@@ -101,12 +102,8 @@ function ReportsContent() {
           onSuccess: () => {
             void dashboardsQuery.refetch();
           },
-          onError: () => {
-            toaster.create({
-              title: "Error renaming dashboard",
-              type: "error",
-              duration: 3000,
-            });
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't rename this dashboard" });
           },
         },
       );
@@ -120,12 +117,8 @@ function ReportsContent() {
         onSuccess: () => {
           void graphsQuery.refetch();
         },
-        onError: () => {
-          toaster.create({
-            title: "Error deleting graph",
-            type: "error",
-            duration: 3000,
-          });
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't delete this graph" });
         },
       },
     );
@@ -138,12 +131,8 @@ function ReportsContent() {
         onSuccess: () => {
           void graphsQuery.refetch();
         },
-        onError: () => {
-          toaster.create({
-            title: "Error saving the dashboard layout",
-            type: "error",
-            duration: 3000,
-          });
+        onError: (error) => {
+          showErrorToast({ error, fallbackTitle: "Couldn't save the dashboard layout" });
         },
       },
     );

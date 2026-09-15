@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { toaster } from "@langwatch/design-system/toaster";
 import type { DashboardWidgetQuery } from "../model/dashboardWidgetDefinition.ts";
 import { analyticsApi as api } from "./analytics-api.ts";
 import {
   STARTER_WIDGET_CODE,
   STARTER_WIDGET_QUERIES,
 } from "../model/dashboard-widget/presets.ts";
+import { useShowErrorToast } from "./analytics-feedback.ts";
 import { useWidgetPreview } from "./useWidgetPreview.ts";
 
 /**
@@ -30,6 +30,7 @@ export function useCreateDashboardWidgetDrawer({
 }) {
   const utils = api.useUtils();
   const createWidget = api.dashboardWidgets.create.useMutation();
+  const showErrorToast = useShowErrorToast();
 
   const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
   const [draftName, setDraftName] = useState("New widget");
@@ -75,12 +76,8 @@ export function useCreateDashboardWidgetDrawer({
           void utils.dashboardWidgets.list.invalidate({ projectId });
           onClose();
         },
-        onError: () =>
-          toaster.create({
-            title: "Error creating widget",
-            type: "error",
-            duration: 3000,
-          }),
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't create this widget" }),
       },
     );
   };

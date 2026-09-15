@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePeriodSelector } from "../elements/period-selector.tsx";
-import { toaster } from "@langwatch/design-system/toaster";
-import { describeError } from "../../model/describe-error.ts";
+import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
 import {
   dashboardWidgetDefinitionSchema,
@@ -27,6 +26,7 @@ export function useDraggableGraphCard({
 }) {
   const utils = api.useUtils();
   const updateWidget = api.dashboardWidgets.update.useMutation();
+  const showErrorToast = useShowErrorToast();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const { period } = usePeriodSelector();
 
@@ -68,12 +68,7 @@ export function useDraggableGraphCard({
           options?.onSuccess?.();
         },
         onError: (error) =>
-          toaster.create({
-            title: "Couldn't save this widget",
-            description: describeError({ error }),
-            type: "error",
-            duration: 5000,
-          }),
+          showErrorToast({ error, fallbackTitle: "Couldn't save this widget" }),
       },
     );
   };
