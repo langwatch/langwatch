@@ -74,6 +74,7 @@ import {
   postgresApprovedViewStatement,
   postgresEngineTableStatement,
 } from "./postgresMapping";
+import { LWQL_SOURCE_ALIAS } from "./sourceAlias";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its
@@ -166,14 +167,12 @@ function quotedColumn(value: string): string {
  * back empty for every row while the view looked correct. Qualifying every
  * source reference with this alias is what keeps the two apart.
  */
-export const SOURCE_ALIAS = "src";
+export const SOURCE_ALIAS = LWQL_SOURCE_ALIAS;
 
-/**
- * The primary alias, for a join's `ON` predicate and pre-filter `where` to
- * reference the left side by. Exported under a namespaced name so a catalog
- * entry can build those strings without hard-coding {@link SOURCE_ALIAS}.
- */
-export const LWQL_SOURCE_ALIAS = SOURCE_ALIAS;
+// Re-exported so existing importers keep reaching it here, while the constant
+// itself lives in a leaf module a catalog entry can import without closing an
+// import cycle back through this builder. See {@link ./sourceAlias}.
+export { LWQL_SOURCE_ALIAS };
 
 /**
  * Alias the tenant-predicate subquery gives the key map.
@@ -496,6 +495,37 @@ function preFilterClause(
  * `dedup` is the default strategy; an entry pinning its own wins over it — see
  * {@link dedupStrategyFor}.
  */
+/**
+ * Fail provisioning loudly when a `where`/`on` predicate reads columns that no
+ * grant covers.
+ *
+ * The predicate columns are declared explicitly ({@link
+ * LangWatchQLViewDefinition.whereSourceColumns}, {@link
+ * LangWatchQLViewJoin.onSourceColumns}) rather than parsed out of the SQL, so a
+ * predicate set without its column list would silently drop those columns from
+ * the grants and deny the restricted read at query time. Caught here, at
+ * provisioning, it is a clear catalog error instead of a runtime permission one.
+ */
+function assertPredicateColumnsDeclared(view: LangWatchQLViewDefinition): void {
+  if (view.where && !view.whereSourceColumns?.length) {
+    throw new Error(
+      `LangWatchQL view ${view.name} sets a where predicate but no ` +
+        `whereSourceColumns; list the columns it reads so they are granted`,
+    );
+  }
+  if (view.join) {
+    const on = view.join.onSourceColumns;
+    const declared = (on?.primary?.length ?? 0) + (on?.joined?.length ?? 0) > 0;
+    if (!declared) {
+      throw new Error(
+        `LangWatchQL view ${view.name} declares a join but no ` +
+          `join.onSourceColumns; list the columns its ON reads on each side ` +
+          `so they are granted`,
+      );
+    }
+  }
+}
+
 export function lwqlViewStatement({
   names,
   sourceDatabase,
@@ -520,6 +550,7 @@ export function lwqlViewStatement({
         `a join reads a second ClickHouse fact table and cannot apply here`,
     );
   }
+  assertPredicateColumnsDeclared(view);
   const joinedColumn = joinedColumnQualifier(view);
   const strategy = dedupStrategyFor({ view, dedup });
   const grain = lwqlGrainColumns(view);
@@ -619,7 +650,15 @@ export function lwqlJoinSourceColumnGrantStatement({
   view: LangWatchQLViewDefinition;
 }): string | undefined {
   if (!view.join) return undefined;
-  const columns = [...new Set(view.join.sourceColumns)]
+  const columns = [
+    ...new Set([
+      ...view.join.sourceColumns,
+      // Columns the `ON` reads on the joined side, granted here even when no
+      // projected expression reads them — otherwise the join predicate itself
+      // is denied on the joined table.
+      ...(view.join.onSourceColumns?.joined ?? []),
+    ]),
+  ]
     .map(quotedColumn)
     .join(", ");
   const relation = `${assertIdentifier(sourceDatabase, "sourceDatabase")}.${assertIdentifier(view.join.table, "join table")}`;

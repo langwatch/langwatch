@@ -19,13 +19,14 @@
  *   the derived entries; not registered here.
  */
 
+import { LWQL_SOURCE_ALIAS } from "../../provisioning/sourceAlias";
 import type { DatasetOverride } from "../defineDatasetFromTable";
-import { LWQL_SOURCE_ALIAS } from "../../provisioning/catalogStatements";
 import type { LangWatchQLViewDefinition } from "../types";
 
 export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   coding_agent_trace_sessions: {
-    description: "Correlates a trace to the coding-agent session it belongs to.",
+    description:
+      "Correlates a trace to the coding-agent session it belongs to.",
     grain: "one row per (TenantId, TraceId)",
     timeColumn: "OccurredAt",
     joinKeys: ["TraceId", "SessionId"],
@@ -80,6 +81,7 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
   timeColumn: "CapturedAt",
   freshness: "seconds behind ingestion",
   where: `${LWQL_SOURCE_ALIAS}.\`SpanName\` = 'claude_code.tool'`,
+  whereSourceColumns: ["SpanName"],
   join: {
     table: "log_records",
     alias: "l",
@@ -88,6 +90,10 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       `${LWQL_SOURCE_ALIAS}.\`TenantId\` = l.\`TenantId\` AND ` +
       `${LWQL_SOURCE_ALIAS}.\`TraceId\` = l.\`CorrelationTraceId\` AND ` +
       `l.\`EventName\` = 'api_request_body'`,
+    onSourceColumns: {
+      primary: ["TenantId", "TraceId"],
+      joined: ["TenantId", "CorrelationTraceId", "EventName"],
+    },
     sourceColumns: [
       "TenantId",
       "CorrelationTraceId",
@@ -137,7 +143,8 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
     {
       name: "ToolUseId",
       type: "String",
-      description: "The tool call's id, as the agent's wire protocol assigned it.",
+      description:
+        "The tool call's id, as the agent's wire protocol assigned it.",
       gates: [],
       sourceColumns: ["SpanAttributes"],
       expression: (source) => `${source("SpanAttributes")}['tool_use_id']`,

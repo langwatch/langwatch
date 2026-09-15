@@ -23,6 +23,7 @@ import { lwqlRowPolicyStatement } from "../accessModel";
 import {
   LWQL_SOURCE_ALIAS,
   lwqlJoinSourceColumnGrantStatement,
+  lwqlSourceColumnGrantStatement,
   lwqlSourceTables,
   lwqlViewSetupStatements,
   lwqlViewStatement,
@@ -50,11 +51,13 @@ const JOIN_VIEW: LangWatchQLViewDefinition = {
   freshness: "test",
   dedup: { keyColumns: ["TenantId", "Key"], strategy: "none" },
   where: `${LWQL_SOURCE_ALIAS}.\`LeftVal\` != ''`,
+  whereSourceColumns: ["LeftVal"],
   join: {
     table: "join_right",
     alias: "jr",
     kind: "INNER",
     on: `${LWQL_SOURCE_ALIAS}.\`Key\` = jr.\`Key\``,
+    onSourceColumns: { primary: ["Key"], joined: ["Key"] },
     sourceColumns: ["TenantId", "Key", "RightVal"],
   },
   columns: [
@@ -216,5 +219,78 @@ describe("given a catalog view that joins a second table", () => {
           `TO ${NAMES.restrictedUser}`,
       );
     });
+  });
+});
+
+/**
+ * A column read only to filter (`where`) or to match (`on`) — never projected —
+ * must still be granted, or the restricted read is denied on it at query time
+ * (langwatch-saas#... / #8085 step 3 defect: `SELECT(SpanName)` was missing on
+ * the joined view's primary table).
+ */
+describe("given a view whose predicate reads columns no projection does", () => {
+  const PREDICATE_ONLY_VIEW: LangWatchQLViewDefinition = {
+    ...JOIN_VIEW,
+    name: "predicate_probe",
+    // `Kind` (primary) and `RightKind` (joined) appear only in where/on.
+    where: `${LWQL_SOURCE_ALIAS}.\`Kind\` = 'x'`,
+    whereSourceColumns: ["Kind"],
+    join: {
+      ...JOIN_VIEW.join!,
+      on: `${LWQL_SOURCE_ALIAS}.\`Key\` = jr.\`Key\` AND jr.\`RightKind\` = 'y'`,
+      onSourceColumns: { primary: ["Key"], joined: ["Key", "RightKind"] },
+    },
+  };
+
+  it("grants the where-only column on the primary table", () => {
+    const grant = lwqlSourceColumnGrantStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view: PREDICATE_ONLY_VIEW,
+    });
+    expect(grant).toContain("`Kind`");
+  });
+
+  it("grants the on-only column on the joined table", () => {
+    const grant = lwqlJoinSourceColumnGrantStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view: PREDICATE_ONLY_VIEW,
+    });
+    expect(grant).toContain("`RightKind`");
+  });
+});
+
+describe("given a predicate declared without its source columns", () => {
+  it("refuses a where with no whereSourceColumns", () => {
+    const view: LangWatchQLViewDefinition = {
+      ...JOIN_VIEW,
+      name: "bad_where",
+      whereSourceColumns: undefined,
+    };
+    expect(() =>
+      lwqlViewStatement({
+        names: NAMES,
+        sourceDatabase: SOURCE_DATABASE,
+        view,
+        dedup: SHIPPED_LWQL_DEDUP,
+      }),
+    ).toThrow(/whereSourceColumns/);
+  });
+
+  it("refuses a join with no onSourceColumns", () => {
+    const view: LangWatchQLViewDefinition = {
+      ...JOIN_VIEW,
+      name: "bad_join",
+      join: { ...JOIN_VIEW.join!, onSourceColumns: undefined },
+    };
+    expect(() =>
+      lwqlViewStatement({
+        names: NAMES,
+        sourceDatabase: SOURCE_DATABASE,
+        view,
+        dedup: SHIPPED_LWQL_DEDUP,
+      }),
+    ).toThrow(/onSourceColumns/);
   });
 });

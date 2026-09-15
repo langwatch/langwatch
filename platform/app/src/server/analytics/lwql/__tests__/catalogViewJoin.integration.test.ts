@@ -53,6 +53,7 @@ const JOIN_VIEW: LangWatchQLViewDefinition = {
     alias: "jr",
     kind: "INNER",
     on: `${LWQL_SOURCE_ALIAS}.\`Key\` = jr.\`Key\``,
+    onSourceColumns: { primary: ["Key"], joined: ["Key"] },
     sourceColumns: ["TenantId", "Key", "RightVal"],
   },
   columns: [

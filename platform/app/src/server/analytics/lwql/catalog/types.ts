@@ -182,6 +182,20 @@ export interface LangWatchQLViewJoin {
    * Must include every column {@link on} and the joined column expressions read.
    */
   readonly sourceColumns: readonly string[];
+  /**
+   * Columns referenced only by {@link on} (not by any exposed column's
+   * `sourceColumns`), split by table so each is granted where it lives.
+   *
+   * `ON` reaches both tables and a bare name like `TenantId` exists on both, so
+   * the two sides are named explicitly rather than parsed out of the SQL.
+   * Required whenever a join is declared; provisioning refuses a join without it.
+   */
+  readonly onSourceColumns?: {
+    /** Columns of the primary {@link LangWatchQLViewDefinition.sourceTable}. */
+    readonly primary?: readonly string[];
+    /** Columns of the joined {@link table}. */
+    readonly joined?: readonly string[];
+  };
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
@@ -397,6 +411,14 @@ export interface LangWatchQLViewDefinition {
    * Assembled as text: reference only the source aliases and validated literals.
    */
   readonly where?: string;
+  /**
+   * Columns {@link where} references, granted on {@link sourceTable}.
+   *
+   * Listed explicitly rather than parsed out of the predicate SQL. Required
+   * whenever {@link where} is set (provisioning refuses a `where` without it),
+   * so a column used only to filter is granted like one that is projected.
+   */
+  readonly whereSourceColumns?: readonly string[];
 }
 
 /**
@@ -533,6 +555,11 @@ export function lwqlViewSourceColumns(
       ...view.columns.flatMap((column) => column.sourceColumns),
       ...view.dedup.keyColumns,
       ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+      // A column read only to filter (`where`) or to match the join (`on`, its
+      // primary side) is a source column the view reads just as a projected one
+      // is, and must be granted or the restricted read is denied on it.
+      ...(view.whereSourceColumns ?? []),
+      ...(view.join?.onSourceColumns?.primary ?? []),
     ]),
   ].sort();
 }
