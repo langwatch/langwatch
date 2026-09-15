@@ -262,3 +262,44 @@ the difference between a complete screen and a narrow reusable surface.
   other browser packages.
 - `apps/ui` can grow into a runnable application without recreating the
   monolithic folder taxonomy of `platform/app`.
+
+## Amendment: a module declares its own web surface uses (2026-09-15)
+
+The boundaries above stand. Where a cross-feature web edge is declared does not.
+
+The decision above gives the browser application's catalogue the only vocabulary
+for "this web package uses that one": a frontend feature lists specifiers under
+`uses.surfaces`, and the edge is derived by matching the feature's `root`
+against the importing module's feature name. That match is the limit. A module
+whose web package collaborates with a sibling but whose name is not any frontend
+feature root — `scenario`, `trace`, `experiment`, `workflow`, `coding-agent`,
+`user`, and every enterprise module — has no catalogue entry to speak through,
+so its legal surfaces-only edge could only be recorded as debt in the boundary
+edge baseline. Widening the catalogue was rejected: a frontend feature is a
+product capability in the browser, not a rename of a backend module, and forcing
+one entry per module to carry a declaration would make it both.
+
+A module therefore declares, in the `feature.json` it already has, the sibling
+web surfaces its own web package consumes:
+
+```json
+{
+  "layoutVersion": 0,
+  "web": { "uses": { "surfaces": ["@langwatch/suite-web/surfaces/run-formatters"] } }
+}
+```
+
+The rules are the catalogue's rules, unchanged. A declared specifier must name
+one exact exported `surfaces/<id>` entry of a feature-web package, and both the
+declaring and the named package must be governed; a screen, a bare package
+entry, any other subpath and a surface nothing exports are refused where they
+are written, against the module's own `feature.json`, rather than ignored. The
+two halves are unioned into the one allow-list the manifest policy already
+consults, so a declaration widens nothing else: an undeclared web→web package
+dependency is still a `cross-feature` violation, and the per-import rule that
+accepts `./surfaces/<id>` and refuses every other subpath is untouched.
+
+`feature.json` accordingly carries two keys and no more — `layoutVersion` and
+`web`. Feature ownership is still declared centrally in `modules/catalogue.json`;
+what a module may now say locally is which doors it walks through, which is a
+statement about its own dependencies rather than about what it owns.

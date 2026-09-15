@@ -1,6 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { readFeatureCatalogue } from "./feature-catalogue.ts";
+import {
+  FEATURE_CONFIGURATION_KEYS,
+  FEATURE_WEB_DECLARATION_SHAPE,
+  parseFeatureWebDeclaration,
+} from "./feature-web-declaration.ts";
 import { walkFiles } from "./layout.ts";
 import { createWorkspaceModuleResolver, type WorkspaceModuleResolver } from "./module-graph.ts";
 import type {
@@ -90,13 +95,24 @@ function readFeatureConfiguration(
 
   const keys = Object.keys(value as Record<string, unknown>);
 
-  if (keys.length !== 1 || keys[0] !== "layoutVersion") {
+  if (keys.some((key) => !FEATURE_CONFIGURATION_KEYS.has(key))) {
     violations.push({
       policy: "feature-source-subject",
       file: path,
       message:
-        "feature.json may only select layoutVersion; feature ownership is declared centrally.",
+        "feature.json may only select layoutVersion and declare its web surface uses; feature ownership is declared centrally.",
       allowed: "Change modules/catalogue.json and the owning ADR/spec to expand feature ownership.",
+    });
+  }
+
+  const { error } = parseFeatureWebDeclaration(value);
+
+  if (error) {
+    violations.push({
+      policy: "feature-source-subject",
+      file: path,
+      message: `feature.json web declaration must match its shape: ${error}`,
+      allowed: FEATURE_WEB_DECLARATION_SHAPE,
     });
   }
 

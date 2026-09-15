@@ -800,7 +800,7 @@ describe("strict feature source layout", () => {
 
     // The local manifest is refused in its own right...
     expect(messages).toContain(
-      "feature.json may only select layoutVersion; feature ownership is declared centrally.",
+      "feature.json may only select layoutVersion and declare its web surface uses; feature ownership is declared centrally.",
     );
   });
 

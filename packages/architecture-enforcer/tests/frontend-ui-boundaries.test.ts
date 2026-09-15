@@ -59,8 +59,13 @@ function writeCatalogue(
   );
 }
 
-function webPackage(feature: string, exports: Record<string, string>): ClassifiedPackage {
-  const packageRoot = `modules/${feature}/web`;
+function webPackage(
+  feature: string,
+  exports: Record<string, string>,
+  { enterprise = false }: { enterprise?: boolean } = {},
+): ClassifiedPackage {
+  const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
+  const packageRoot = `${featureRoot}/web`;
   write(
     `${packageRoot}/package.json`,
     JSON.stringify({
@@ -79,9 +84,25 @@ function webPackage(feature: string, exports: Record<string, string>): Classifie
     },
     kind: "web",
     feature,
-    featureRoot: join(root, `modules/${feature}`),
-    enterprise: false,
+    featureRoot: join(root, featureRoot),
+    enterprise,
   };
+}
+
+/**
+ * The module-side declaration: the sibling web surfaces a module's own web
+ * package consumes, written into the feature.json the module already has.
+ */
+function writeModuleDeclaration(
+  feature: string,
+  surfaces: string[],
+  { enterprise = false }: { enterprise?: boolean } = {},
+): void {
+  const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
+  write(
+    `${featureRoot}/feature.json`,
+    JSON.stringify({ layoutVersion: 0, web: { uses: { surfaces } } }),
+  );
 }
 
 /**
@@ -261,6 +282,115 @@ describe("frontend UI architecture boundaries", () => {
     expect(lintManifests(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
       expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
     );
+  });
+
+  /** @scenario "A module declares the sibling surfaces its web package consumes" */
+  it("permits a manifest dependency a module declares in its own feature.json", () => {
+    const scenarioWeb = webPackage("scenario", {
+      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
+    });
+    const suiteWeb = webPackage("suite", {
+      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
+    });
+    // No frontend feature has "scenario" as its root, so the browser
+    // catalogue has no entry through which this edge could be declared.
+    writeCatalogue([], ["@langwatch/scenario-web", "@langwatch/suite-web"]);
+    scenarioWeb.manifest.dependencies = { "@langwatch/suite-web": "workspace:*" };
+
+    writeModuleDeclaration("scenario", ["@langwatch/suite-web/surfaces/run-formatters"]);
+
+    const snapshot = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
+    const pairs = declaredWebDependencyPairs(snapshot);
+
+    expect(pairs.has("@langwatch/scenario-web->@langwatch/suite-web")).toBe(true);
+    expect(lintManifests(snapshot, pairs)).toEqual([]);
+
+    writeModuleDeclaration("scenario", []);
+
+    const undeclared = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
+
+    expect(declaredWebDependencyPairs(undeclared)).toEqual(new Set());
+    expect(lintManifests(undeclared, declaredWebDependencyPairs(undeclared))).toEqual(
+      expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
+    );
+  });
+
+  /** @scenario "A declared surface use names a real surface door or fails" */
+  it("rejects a declared use naming a missing surface or a non-surface subpath", () => {
+    const scenarioWeb = webPackage("scenario", {
+      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
+    });
+    const suiteWeb = webPackage("suite", {
+      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
+      "./screens/suite": "./src/screens/suite/index.ts",
+    });
+    writeCatalogue([], ["@langwatch/scenario-web", "@langwatch/suite-web"]);
+    writeModuleDeclaration("scenario", [
+      "@langwatch/suite-web/surfaces/missing",
+      "@langwatch/suite-web/screens/suite",
+      "@langwatch/suite-web",
+    ]);
+
+    const declarationViolations = lint([scenarioWeb, suiteWeb]).filter(
+      (violation) => violation.policy === "ui-web-capability-declaration",
+    );
+
+    expect(declarationViolations.map((violation) => violation.specifier)).toEqual([
+      "@langwatch/suite-web/surfaces/missing",
+      "@langwatch/suite-web/screens/suite",
+      "@langwatch/suite-web",
+    ]);
+    expect(declarationViolations[0]!.file).toBe(join(root, "modules/scenario/feature.json"));
+    expect(
+      declaredWebDependencyPairs(snapshotOf({ root, packages: [scenarioWeb, suiteWeb] })),
+    ).toEqual(new Set());
+  });
+
+  /** @scenario "A declared surface use stays inside governance" */
+  it("rejects a declared use naming an ungoverned web package", () => {
+    const scenarioWeb = webPackage("scenario", {
+      "./surfaces/scenario-summary": "./src/surfaces/scenario-summary/index.ts",
+    });
+    const suiteWeb = webPackage("suite", {
+      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
+    });
+    writeCatalogue([], ["@langwatch/scenario-web"]);
+    writeModuleDeclaration("scenario", ["@langwatch/suite-web/surfaces/run-formatters"]);
+
+    const snapshot = snapshotOf({ root, packages: [scenarioWeb, suiteWeb] });
+
+    expect(
+      lint([scenarioWeb, suiteWeb])
+        .filter((violation) => violation.policy === "ui-web-package-governance")
+        .map((violation) => violation.specifier),
+    ).toEqual(["@langwatch/suite-web/surfaces/run-formatters"]);
+    expect(declaredWebDependencyPairs(snapshot)).toEqual(new Set());
+  });
+
+  /** @scenario "An enterprise module declares a surface use of a core module" */
+  it("permits a declared surface use from an enterprise module", () => {
+    const entitlementWeb = webPackage(
+      "entitlement",
+      { "./surfaces/entitlement-badge": "./src/surfaces/entitlement-badge/index.ts" },
+      { enterprise: true },
+    );
+    const suiteWeb = webPackage("suite", {
+      "./surfaces/run-formatters": "./src/surfaces/run-formatters/index.ts",
+    });
+    writeCatalogue([], ["@langwatch/entitlement-web", "@langwatch/suite-web"]);
+    entitlementWeb.manifest.dependencies = { "@langwatch/suite-web": "workspace:*" };
+
+    writeModuleDeclaration("entitlement", ["@langwatch/suite-web/surfaces/run-formatters"], {
+      enterprise: true,
+    });
+
+    const snapshot = snapshotOf({ root, packages: [entitlementWeb, suiteWeb] });
+    const pairs = declaredWebDependencyPairs(snapshot);
+
+    expect(pairs.has("@langwatch/entitlement-web->@langwatch/suite-web")).toBe(true);
+    expect(
+      lintManifests(snapshot, pairs).filter((violation) => violation.policy === "cross-feature"),
+    ).toEqual([]);
   });
 
   /** @scenario "A web package can be governed before its screen migration completes" */

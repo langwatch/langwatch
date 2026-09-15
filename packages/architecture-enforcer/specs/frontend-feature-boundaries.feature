@@ -29,6 +29,34 @@ Feature: Frontend feature boundary lint
     And an undeclared feature-web screen or surface import fails with the owning catalogue entry
 
   @unit @architecture
+  Scenario: A module declares the sibling surfaces its web package consumes
+    Given no frontend feature in the browser catalogue is rooted at the scenario module
+    And the scenario module names a Suite run-formatters surface in its own feature.json
+    When architecture lint checks the scenario web package's manifest dependency on the Suite web package
+    Then it accepts the dependency as a declared surface collaboration
+    And the same dependency without the declaration still fails as a cross-feature edge
+
+  @unit @architecture
+  Scenario: A declared surface use names a real surface door or fails
+    Given a module declares a surface its target package does not export
+    Or it declares a screen entry, a bare package entry or another private subpath
+    When architecture lint reads the declaration
+    Then it reports the declaration itself against the module's feature.json
+    And the dangling declaration allowlists no package dependency
+
+  @unit @architecture
+  Scenario: A declared surface use stays inside governance
+    Given a module declares a surface of a web package the catalogue does not govern
+    When architecture lint reads the declaration
+    Then it reports the ungoverned package and allowlists no dependency
+
+  @unit @architecture
+  Scenario: An enterprise module declares a surface use of a core module
+    Given an enterprise module names a core module's declared surface in its feature.json
+    When architecture lint checks the enterprise web package's manifest dependency
+    Then it accepts the dependency exactly as it does for a core module
+
+  @unit @architecture
   Scenario: Owner-only screens cannot be imported by another frontend feature
     Given prompt-studio owns @langwatch/prompt-web/screens/prompt-studio
     When trace-explorer imports that screen
