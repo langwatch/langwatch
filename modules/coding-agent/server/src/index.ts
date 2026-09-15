@@ -1,7 +1,3 @@
-export { CodingAgentProjectionPersistenceService } from "./services/coding-agent-projection-persistence.service.ts";
-export { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
-export { ClickHouseCodingAgentRepositories } from "./repositories/clickhouse/clickhouse.coding-agent.repositories.ts";
-export { MemoryCodingAgentRepositories } from "./repositories/memory/memory.coding-agent.repositories.ts";
 export type { CodingAgentRepositories } from "./repositories/coding-agent.repositories.ts";
 export type {
   CodingAgentBillingPolicy,
@@ -10,10 +6,9 @@ export type {
   CodingAgentProjectActivity,
   CodingAgentPullRequestMapping,
 } from "./app/coding-agent.members.ts";
-export {
-  CodingAgentPullRequestMappingBackfillService,
-  type CodingAgentBackfillProjects,
-  type CodingAgentSessionReads,
+export type {
+  CodingAgentBackfillProjects,
+  CodingAgentSessionReads,
 } from "./services/coding-agent-pull-request-mapping-backfill.service.ts";
 export { SystemCodingAgentClockAdapter } from "./services/coding-agent-clock.service.ts";
 export { ModelCatalogCostEstimatorAdapter } from "./services/model-catalog-cost-estimator.service.ts";
@@ -22,9 +17,12 @@ export {
   type RedisCodingAgentProcessingRepositoryOptions,
 } from "./repositories/redis/redis.coding-agent-processing.repository.ts";
 export {
-  EventingCodingAgentProcessingAdapter,
-  type CodingAgentProcessingPipeline,
-  type CodingAgentProcessingPipelineDeps,
+  createCodingAgentProcessing,
+  type CodingAgentProcessingCapability,
+} from "./coding-agent.server.ts";
+export type {
+  CodingAgentProcessingPipeline,
+  CodingAgentProcessingPipelineDeps,
 } from "./repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 export { OtelCodingAgentCostMetricsAdapter } from "./services/coding-agent-cost-metrics.service.ts";
 export type {
@@ -45,11 +43,10 @@ export {
  * Both doors reach the same object, so a rule written on it is the rule both
  * doors get.
  */
-export {
-  CodingAgentCallerScopeService,
-  type CallerProjectDisplay,
-  type CallerProjectScope,
-  type CodingAgentCallerScopeDependencies,
+export type {
+  CallerProjectDisplay,
+  CallerProjectScope,
+  CodingAgentCallerScopeDependencies,
 } from "./services/coding-agent-caller-scope.service.ts";
 export {
   type CodingAgentCallerScopeDirectory,
@@ -58,13 +55,11 @@ export {
   type CodingAgentScopePermissions,
   type CodingAgentScopeProject,
 } from "./app/coding-agent.members.ts";
-export {
-  CodingAgentApp,
-  CodingAgentUnavailableError,
-  type CodingAgentCaller,
-  type CodingAgentCallerScope,
-  type CodingAgentPullRequestRef,
-  type CodingAgentScopeMembers,
+export type {
+  CodingAgentCaller,
+  CodingAgentCallerScope,
+  CodingAgentPullRequestRef,
+  CodingAgentScopeMembers,
 } from "./app/coding-agent.app.ts";
 export { codingAgentServer } from "./coding-agent.server.ts";
 export {

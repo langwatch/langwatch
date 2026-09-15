@@ -1,6 +1,11 @@
+import type { ProjectApi } from "@langwatch/project-contract";
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { PromptApp } from "./app/prompt.app.ts";
+import {
+  PostgresPromptAdapter,
+  type PostgresPromptAdapterOptions,
+} from "./services/prompt-postgres-composition.service.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 import { promptRest, promptRestCredential, promptRestFacts } from "./transport/prompt.rest.ts";
 import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
@@ -34,3 +39,17 @@ export const promptServer = defineServerModule("prompt")
           };
     }),
   ]);
+
+/**
+ * The prompt reader a worker composition mounts beside its own app: the
+ * PostgreSQL-backed prompt service, wrapped in the same reader Prompt's own
+ * process uses, over the process's own Prisma client.
+ */
+export function createPromptReader(
+  options: PostgresPromptAdapterOptions & { projects: ProjectApi },
+): PromptApp {
+  const { projects, ...adapterOptions } = options;
+  const prompts = PostgresPromptAdapter.create(adapterOptions).build();
+
+  return PromptApp.createReader({ prompts, projects });
+}

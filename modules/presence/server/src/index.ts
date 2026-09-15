@@ -1,4 +1,8 @@
-export { presenceServer } from "./presence.server.ts";
+export {
+  presenceServer,
+  createBroadcast,
+  type PresenceBroadcastCapability,
+} from "./presence.server.ts";
 export { presenceTrpcTransport } from "./transport/presence.trpc.ts";
 export {
   type PresenceBroadcast,
@@ -6,7 +10,6 @@ export {
   type PresenceEmitter,
   type PresenceInfrastructure,
 } from "./app/presence.app.ts";
-export { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 
 /**
  * The tenant broadcast fabric the presence emitter and the export relay both subscribe on.

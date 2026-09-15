@@ -683,16 +683,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/agent/server/src/index.ts|./app/agent.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/agent/server/src/index.ts|./rules/agent-id.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/analytics/server/src/index.ts|./rules/analytics-filter-conditions.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -953,47 +943,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./app/coding-agent.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./repositories/clickhouse/clickhouse.coding-agent.repositories.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./repositories/coding-agent-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./repositories/memory/memory.coding-agent.repositories.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./repositories/redis/redis.coding-agent-processing.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./repositories/redis/redis.coding-agent-session-pipeline.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./services/coding-agent-caller-scope.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./services/coding-agent-projection-persistence.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/coding-agent/server/src/index.ts|./services/coding-agent-pull-request-mapping-backfill.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1158,137 +1108,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./app/experiment.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/clickhouse/clickhouse.experiment-dspy.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/clickhouse/clickhouse.experiment-run-state-store.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/clickhouse/clickhouse.experiment-run.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/experiment-run-abort.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/experiment-run-progress.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/prisma/prisma.experiment-workflow-version.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/prisma/prisma.experiment.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/redis/redis.experiment-run-abort.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/redis/redis.experiment-run-processing.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./repositories/redis/redis.experiment-run-progress.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./rules/experiment-blank-workbench-state.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./rules/experiment-run-event-types.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./rules/experiment-run-url.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./rules/experiment-schemas.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./rules/experiment-workbench-actor.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-execution-data.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-find-or-create.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-polling-run.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-run-orchestrator.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-run-results-writer.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-run-state-mirror.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-saved-state-execution.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-workbench-target-names.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment-workflow-evaluation.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/experiment/server/src/index.ts|./services/experiment.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1424,16 +1249,6 @@
     },
     {
       "key": "private-runtime-export|modules/github/server/src/index.ts|./repositories/prisma/prisma.github.repositories.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/github/server/src/index.ts|./services/github-branch-demand.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/github/server/src/index.ts|./services/github-connection.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1694,11 +1509,6 @@
     },
     {
       "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./services/subsystem-probe.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/presence/server/src/index.ts|./repositories/presence-repositories.registry.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2028,37 +1838,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./repositories/redis/redis.topic-clustering-bootstrap.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./repositories/topic-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./services/langevals-staged-payload.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./services/topic-clustering-eventing.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/topic/server/src/index.ts|./services/topic-clustering-metrics.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./services/topic-clustering-processing-producer.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/topic/server/src/index.ts|./services/topic-clustering-schedule.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

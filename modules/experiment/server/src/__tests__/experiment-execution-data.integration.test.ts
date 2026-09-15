@@ -24,7 +24,7 @@ import { promptServiceFixture } from "@langwatch/prompt-server/testing";
 import {
   ExperimentExecutionDataService,
   type ExperimentWorkflowDsl,
-} from "@langwatch/experiment-server";
+} from "../services/experiment-execution-data.service.ts";
 
 /**
  * This suite writes and reads the rows itself and does not exercise

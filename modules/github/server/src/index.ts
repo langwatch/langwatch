@@ -16,17 +16,19 @@ export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.
 export type { GithubBranchMaintenance } from "./app/github.members.ts";
 export type { GithubBranchDemand } from "./app/github.members.ts";
 export type { GithubProjectActivity } from "./app/github.members.ts";
-export {
-  GithubBranchDemandService,
-  type BranchMappingRequest,
-} from "./services/github-branch-demand.service.ts";
+export type { BranchMappingRequest } from "./services/github-branch-demand.service.ts";
 export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./processes/github-branch-recheck.process.ts";
-export { GithubConnectionService } from "./services/github-connection.service.ts";
 export { GithubApp, type GithubInfrastructure } from "./app/github.app.ts";
-export { githubServer } from "./github.server.ts";
+export {
+  githubServer,
+  composeGithubApi,
+  composeGithubBranchMaintenance,
+  composeGithubBranchDemand,
+  createGithubMaintenancePipeline,
+} from "./github.server.ts";
 
 // The GitHub App installation flow's REST family: the session-gated start, the
 // protocol-mandated Setup URL and the HMAC-verified webhook, plus the two

@@ -1,18 +1,18 @@
-export {
-  createTopicClusteringProcessingPipeline,
-  TopicClusteringEventingService,
-  type ProjectedTopic,
-  topicClusteringRunHistoryProjectionEntrySchema,
-  type TopicClusteringProcessingPipelineDeps,
-  type TopicClusteringRunHistoryData,
-  type TopicClusteringRunHistoryEntry,
-  type TopicClusteringRunStatusData,
-  type TopicModelData,
+export type {
+  ProjectedTopic,
+  TopicClusteringProcessingPipelineDeps,
+  TopicClusteringRunHistoryData,
+  TopicClusteringRunHistoryEntry,
+  TopicClusteringRunStatusData,
+  TopicModelData,
 } from "./services/topic-clustering-eventing.service.ts";
-export { TopicClusteringProcessingProducerService } from "./services/topic-clustering-processing-producer.service.ts";
 export { TopicApp } from "./app/topic.app.ts";
-export { topicServer } from "./topic.server.ts";
-export { topicRepositories } from "./repositories/topic-repositories.registry.ts";
+export {
+  topicServer,
+  createTopicWorkerInstaller,
+  type TopicWorkerInstaller,
+  createTopicClusteringMetrics,
+} from "./topic.server.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
 export {
   PrismaTopicServerInstallerRepository,
@@ -20,16 +20,11 @@ export {
   type TopicServerInstallerDependencies,
 } from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
-export { EventingTopicClusteringScheduleService } from "./services/topic-clustering-schedule.service.ts";
 export {
   OtelTopicClusteringMetricsService,
   TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME,
   TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
 } from "./services/topic-clustering-metrics.service.ts";
-export {
-  BOOTSTRAP_CLAIM_TTL_SECONDS,
-  RedisTopicClusteringBootstrapRepository,
-} from "./repositories/redis/redis.topic-clustering-bootstrap.repository.ts";
 export {
   classifyClusteringError,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -79,12 +74,10 @@ export {
   STAGED_PAYLOAD_HEADER,
   type StagedLangevalsPayload,
 } from "./app/topic.members.ts";
-export {
-  LangevalsStagedPayloadService,
-  PayloadTooLargeError,
-  type LangevalsCallKind,
-  type LangevalsStagedPayloadConfig,
-  type StagedFetchOptions,
+export type {
+  LangevalsCallKind,
+  LangevalsStagedPayloadConfig,
+  StagedFetchOptions,
 } from "./services/langevals-staged-payload.service.ts";
 export {
   type TopicClusteringLangevals,

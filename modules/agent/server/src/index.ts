@@ -1,5 +1,4 @@
-export { AgentApp, type AgentAppConfig } from "./app/agent.app.ts";
-export { nextAgentId } from "./rules/agent-id.rules.ts";
+export type { AgentAppConfig } from "./app/agent.app.ts";
 export { agentServer } from "./agent.server.ts";
 export { agentTrpcTransport } from "./transport/agent.trpc.ts";
 export { httpProxyTrpcTransport } from "./transport/http-proxy.trpc.ts";

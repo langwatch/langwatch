@@ -14,8 +14,33 @@ import {
 } from "./transport/coding-agent.rest.ts";
 import { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
 import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
+import {
+  RedisCodingAgentProcessingRepository,
+  type RedisCodingAgentProcessingRepositoryOptions,
+} from "./repositories/redis/redis.coding-agent-processing.repository.ts";
+import type { CodingAgentProcessingPipeline } from "./repositories/redis/redis.coding-agent-session-pipeline.repository.ts";
 
 export type { CodingAgentInfrastructure } from "./app/coding-agent.app.ts";
+
+/**
+ * The worker's one entry point into Coding Agent's durable session
+ * processing (ADR-056) — everything it needs from this feature, without
+ * naming the repository class that builds it.
+ */
+export interface CodingAgentProcessingCapability {
+  buildProcessing(): CodingAgentProcessingPipeline;
+}
+
+/**
+ * Composes Coding Agent's worker-facing processing capability from the
+ * process's own substrates (its ClickHouse client, its Redis, its trace
+ * canonicalisation).
+ */
+export function createCodingAgentProcessing(
+  options: RedisCodingAgentProcessingRepositoryOptions,
+): CodingAgentProcessingCapability {
+  return RedisCodingAgentProcessingRepository.create(options);
+}
 
 export const codingAgentServer = defineServerModule("coding-agent")
   .withRepositories(codingAgentRepositories)

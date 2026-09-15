@@ -1,15 +1,8 @@
 export type { PromptService } from "./services/prompt.service.ts";
 export { PostgresPromptAdapter } from "./services/prompt-postgres-composition.service.ts";
-export { promptServer } from "./prompt.server.ts";
+export { promptServer, createPromptReader } from "./prompt.server.ts";
 export {
   PromptApp,
-  PromptHasNoCopiesError,
-  PromptNoCopiesSelectedError,
-  PromptNotACopyError,
-  PromptTagInvalidError,
-  PromptTagMissingError,
-  PromptTagProtectedRefusalError,
-  PromptTagTakenError,
   type PromptCaller,
   type PromptInfrastructure,
   type PromptTagCatalogPrincipal,
