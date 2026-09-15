@@ -21,7 +21,7 @@ export const channelTakesOnlyItsClientRule = defineRule({
     channelTakesMoreThanItsClient: {
       what: "A channel names {{crossed}} (`{{specifier}}`).",
       why: "A channel takes the client it speaks to. State is the repository's, behaviour is the app's, and a channel that reads either becomes a second app nobody looks in.",
-      fix: "Take the client alone and let the service that owns the decision call this channel.",
+      fix: "Remove this import from the channel; move the call into the service that owns the decision, and have that service invoke this channel with just the client.",
     },
   },
   applies: isChannel,

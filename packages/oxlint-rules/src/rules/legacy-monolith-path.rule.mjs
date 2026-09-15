@@ -19,7 +19,7 @@ export const legacyMonolithPathRule = defineRule({
     legacyMonolithPath: {
       what: "`{{name}}` names the deleted monolith.",
       why: "Nothing maps `~/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.",
-      fix: "Point it at the package that owns the code now - `modules/<feature>/{contract,server,web}`, `packages/<name>` or `apps/<app>`.",
+      fix: "Find where the code lives now by searching its basename across `modules/*/{contract,server,web}/src`, `packages/*/src` and `apps/*/src`, then re-point this specifier at that package.",
     },
   },
   create(context, file) {

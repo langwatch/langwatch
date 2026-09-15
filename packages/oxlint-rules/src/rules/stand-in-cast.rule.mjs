@@ -36,12 +36,12 @@ export const standInCastRule = defineRule({
   messages: {
     doubleCast: {
       what: "`as {{through}} as {{target}}` casts through {{through}} to reach {{target}}.",
-      fix: "Give the value the type it really has, or parse it at the seam with the contract's schema.",
+      fix: "If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise fix the type of whatever produced it so the cast is unnecessary.",
       why: "A cast through `unknown` or `any` removes the only check that stood between the two types.",
     },
     anyCast: {
       what: "`as any` drops the type of this expression.",
-      fix: "Name the real type, or parse the value at the seam with the contract's schema.",
+      fix: "If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise name its real type in place of `any`.",
     },
   },
   create(context, file) {

@@ -89,6 +89,52 @@ function importedSpecifier(node) {
   return typeof node.source?.value === "string" ? node.source.value : undefined;
 }
 
+/** The name a binding brings in, whichever specifier shape it is. */
+function bindingNameOf(binding) {
+  return binding.imported?.name ?? binding.local?.name;
+}
+
+function quoted(names) {
+  return names.map((name) => `\`${name}\``).join(", ");
+}
+
+/**
+ * Names the bindings this import brought in that are not allowed here, and
+ * the one imperative that fixes them: repository runtime helpers need the
+ * repository/registry seam, repository client types need `import type` at
+ * that same seam, and everything else (a connection or lifecycle symbol)
+ * needs to stay a type import with the instance taken from the composition
+ * root.
+ */
+function describeFeaturePrismaViolation(node, importKind, adapter, registry) {
+  const bindings = node.specifiers ?? [];
+  const offending = bindings.filter(
+    (binding) => !allowedRepositoryImport(binding, importKind, adapter, registry),
+  );
+  const names = offending.map(bindingNameOf).filter((name) => typeof name === "string");
+
+  const runtimeHelpers = names.filter((name) => REPOSITORY_RUNTIME_HELPERS.has(name));
+  const clientTypes = names.filter((name) => REPOSITORY_CLIENT_TYPES.has(name));
+
+  if (runtimeHelpers.length > 0) {
+    return {
+      instead: `Call ${quoted(runtimeHelpers)} only from a \`*.repository.ts\` file under \`repositories/prisma/\` or a \`*-repositories.registry.ts\`.`,
+      name: quoted(runtimeHelpers),
+    };
+  }
+  if (clientTypes.length > 0) {
+    return {
+      instead: `Import ${quoted(clientTypes)} with \`import type\` only, inside a \`repositories/prisma/*.repository.ts\` file or the Postgres composition adapter.`,
+      name: quoted(clientTypes),
+    };
+  }
+  const name = names.length > 0 ? quoted(names) : "This import";
+  return {
+    instead: `Import ${name} as a type only and take the instance from the composition root; features do not own connections.`,
+    name,
+  };
+}
+
 export const prismaContainmentRule = defineRule({
   name: "prisma-containment",
   kind: "problem",
@@ -98,8 +144,8 @@ export const prismaContainmentRule = defineRule({
       fix: "Move the query into a `*.repository.ts` there and call it through the service.",
     },
     featurePrismaClient: {
-      what: "Feature packages cannot own Prisma connection or lifecycle services.",
-      fix: "Import `PrismaClient` as a type only and take the instance from the composition root; features do not own connections.",
+      what: "{{name}} cannot be imported directly into a feature package here.",
+      fix: "{{instead}}",
     },
   },
   create(context, file) {
@@ -135,7 +181,13 @@ export const prismaContainmentRule = defineRule({
       const featurePrismaImport =
         pkg.feature && (specifier === PRISMA_ROOT || specifier === `${PRISMA_ROOT}/ownership`);
       if (featurePrismaImport && !repositoryImportOnly) {
-        context.report({ node, messageId: "featurePrismaClient" });
+        const { instead, name } = describeFeaturePrismaViolation(
+          node,
+          node.importKind,
+          adapter,
+          isPrismaRepositoryRegistry(pkg),
+        );
+        context.report({ node, messageId: "featurePrismaClient", data: { instead, name } });
       }
     };
 

@@ -25,7 +25,9 @@ describe("given a reusable package", () => {
       expect(found[0].messageId).toBe("environment");
       expect(found[0].message).toBe(
         "Do not read `process.env` here." +
-          " Parse it in `platform/config/` or a `*.composition.ts` file and pass the typed value in.",
+          " If the app already has a `platform/config/` module, add this key there and pass the" +
+          " typed value in; otherwise parse it directly in this file's own `*.composition.ts` and" +
+          " pass the typed value in.",
       );
     });
   });

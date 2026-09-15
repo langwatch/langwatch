@@ -57,7 +57,7 @@ export const environmentBoundariesRule = defineRule({
   messages: {
     environment: {
       what: "Do not read `process.env` here.",
-      fix: "Parse it in `platform/config/` or a `*.composition.ts` file and pass the typed value in.",
+      fix: "If the app already has a `platform/config/` module, add this key there and pass the typed value in; otherwise parse it directly in this file's own `*.composition.ts` and pass the typed value in.",
     },
   },
   create(context, file) {

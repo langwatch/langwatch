@@ -73,7 +73,7 @@ export const featureSourceSubjectRule = defineRule({
   messages: {
     foreignSubject: {
       what: "Source module {{path}} claims {{subject}}, which belongs to the singular {{owner}} feature.",
-      fix: "Move the file into `modules/{{owner}}/…` (see the `feature-move` skill), or rename the subject if it is genuinely different.",
+      fix: "Move the file to `modules/{{owner}}/{{role}}/src/{{path}}` (see the `feature-move` skill), or rename the subject if it is genuinely different.",
     },
   },
   create(context, file) {
@@ -106,7 +106,7 @@ export const featureSourceSubjectRule = defineRule({
         context.report({
           node,
           messageId: "foreignSubject",
-          data: { path: source.sourcePath, subject, owner },
+          data: { path: source.sourcePath, subject, owner, role: source.role },
         });
       },
     };

@@ -11,6 +11,17 @@ const GOVERNED_SOURCE =
   /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|server|web)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
 const EXCLUDED = /(?:^|\/)__tests__(?:\/|$)|^packages\/test-harness\//;
 const REFLECT_MEMBERS = new Set(["get", "set", "has", "apply", "construct", "deleteProperty"]);
+const WHITESPACE = /\s+/g;
+const TARGET_BUDGET = 40;
+
+/** The patched target as the reader sees it written, so the message quotes the source. */
+function targetTextOf(source, node) {
+  if (!node) return "this target";
+  const text = source.slice(node.range[0], node.range[1]).replace(WHITESPACE, " ").trim();
+  if (text.length === 0) return "this target";
+
+  return text.length > TARGET_BUDGET ? `${text.slice(0, TARGET_BUDGET)}…` : text;
+}
 
 function isGoverned(workspacePath) {
   return GOVERNED_SOURCE.test(workspacePath) && !EXCLUDED.test(workspacePath);
@@ -38,8 +49,8 @@ export const noRuntimeReflectionRule = defineRule({
       fix: "Call the method directly; add it to the interface if it is missing.",
     },
     defineProperty: {
-      what: "`Object.defineProperty` patches an object that is not a class prototype.",
-      fix: "Declare the property on the class or the object literal instead of patching it in.",
+      what: "`Object.defineProperty` patches `{{target}}`, which is not a class prototype.",
+      fix: "Declare the property directly where `{{target}}` is defined — in its class body or its object literal — instead of patching it in afterward.",
     },
   },
   create(context, file) {
@@ -47,6 +58,7 @@ export const noRuntimeReflectionRule = defineRule({
     if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "no-runtime-reflection" })) {
       return {};
     }
+    const source = context.sourceCode.text;
 
     return {
       NewExpression(node) {
@@ -72,7 +84,11 @@ export const noRuntimeReflectionRule = defineRule({
         ) {
           const target = node.arguments[0];
           if (!isPrototypeTarget(target)) {
-            context.report({ node, messageId: "defineProperty" });
+            context.report({
+              node,
+              messageId: "defineProperty",
+              data: { target: targetTextOf(source, target) },
+            });
           }
         }
       },

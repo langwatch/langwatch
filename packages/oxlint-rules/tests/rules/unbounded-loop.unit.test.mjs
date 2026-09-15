@@ -31,7 +31,10 @@ describe("given a strict feature server module", () => {
       expect(found[0].messageId).toBe("unboundedLoop");
       expect(found[0].message).toBe(
         "This `for (;;)` loop states no exit condition in its header." +
-          " Put the deadline or the retry budget in the header, or move the waiting into a method whose signature carries it.",
+          " State whichever bound this loop already tracks directly in its header — a deadline" +
+          " (`while (now() < deadline)`) or an attempt counter" +
+          " (`for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++)`) — or, if it tracks no such" +
+          " bound yet, move it into a function whose signature takes one as a parameter.",
       );
     });
 

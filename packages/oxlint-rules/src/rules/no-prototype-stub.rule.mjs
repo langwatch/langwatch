@@ -23,7 +23,7 @@ export const noPrototypeStubRule = defineRule({
   messages: {
     prototypeStub: {
       what: "`Object.create({{name}}.prototype)` builds a test double from a class prototype.",
-      fix: "Build the stub as an object literal typed as the interface, or use the module fixture.",
+      fix: "Write it as an object literal typed `satisfies {{name}}`, or import the module's exported fixture if one already exists for this double.",
     },
   },
   create(context, file) {

@@ -32,8 +32,9 @@ describe("given a strict feature source file claiming another feature's subject"
         path: "services/project.service.ts",
         subject: "project",
         owner: "project",
+        role: "server",
       });
-      expect(found[0].message).toContain("modules/project/");
+      expect(found[0].message).toContain("modules/project/server/src/services/project.service.ts");
       expect(found[0].message).toContain("feature-move");
     });
   });

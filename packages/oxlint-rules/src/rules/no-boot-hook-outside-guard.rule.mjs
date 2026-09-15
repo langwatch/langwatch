@@ -13,7 +13,7 @@ export const noBootHookOutsideGuardRule = defineRule({
   messages: {
     bootHookOutsideGuard: {
       what: "`process.on(\"{{event}}\", ...)` is registered outside the boot guard.",
-      fix: "Let the boot guard (`packages/observability/src/boot-guard.ts`) own process-level failure handling.",
+      fix: "Delete this listener and move its handling into `packages/observability/src/boot-guard.ts`, the one place that owns process-level failure handling.",
     },
   },
   create(context, file) {

@@ -48,7 +48,7 @@ export const typeOnlyValueImportRule = defineRule({
   messages: {
     valueImportOfType: {
       what: "`{{name}}` is imported as a value here, but its declaration in `{{specifier}}` is a type or interface.",
-      fix: "Import it with `import type` instead.",
+      fix: "Add `type` before `{{name}}` in this import: `{ type {{name}} }`.",
     },
   },
   create(context, file) {
