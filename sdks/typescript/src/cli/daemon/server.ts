@@ -64,11 +64,9 @@ export interface DaemonServer {
 }
 
 /**
- * The trust problems that mean somebody ELSE holds this path, as opposed to
- * the ones that just mean we left debris behind (`socket-missing`, or a
- * corpse `cleanStaleSocket` will unlink — including a dangling symlink, which
- * `identifyFile` resolves via `lstat`). Everything else is an ownership or
- * mode problem: a path we can neither trust nor repair.
+ * Trust problems meaning somebody ELSE holds this path, as opposed to ones
+ * meaning we just left debris behind (`socket-missing`, or a corpse
+ * `cleanStaleSocket` will unlink). Everything else is ownership/mode we can't repair.
  */
 const SQUATTED_SOCKET_PROBLEMS: ReadonlySet<string> = new Set([
   "socket-dir-not-a-directory",
@@ -86,12 +84,9 @@ export class DaemonAlreadyRunningError extends Error {
 }
 
 /**
- * Is something actually listening on this socket, or is it a corpse left by a
- * SIGKILLed daemon? Connecting distinguishes the two (ECONNREFUSED vs a live
- * connect), which keeps a crash from wedging every future invocation. A
- * socket owned by somebody else counts as not-alive too, so `listen()` reports
- * the squat as DaemonAlreadyRunningError instead of letting a squatter block
- * the real daemon from ever starting.
+ * Is something actually listening, or is this a corpse left by a SIGKILLed
+ * daemon? Connecting distinguishes the two, so a crash never wedges future
+ * invocations. A socket owned by somebody else counts as not-alive too.
  */
 export async function isSocketAlive(socketPath: string): Promise<boolean> {
   if (!fs.existsSync(socketPath)) return false;
@@ -111,12 +106,9 @@ export async function isSocketAlive(socketPath: string): Promise<boolean> {
 }
 
 /**
- * Which FILE a path pointed at, at a moment in time.
- *
- * The socket path is shared by every daemon this identity ever runs, so "the
- * socket at this path" is not an identity — `unlink(path)` deletes whatever is
- * there NOW, which need not be the thing the caller meant. (dev, ino) is the
- * identity; the path is only a name that currently happens to lead to it.
+ * Which FILE a path pointed at, at a moment in time: the socket path is
+ * shared across every daemon, so `unlink(path)` deletes whatever is there NOW,
+ * not necessarily what the caller meant. (dev, ino) is the real identity.
  */
 export interface FileIdentity {
   dev: number;
@@ -124,11 +116,9 @@ export interface FileIdentity {
 }
 
 /**
- * What NAME `filePath` is right now, or null if nothing holds it.
- *
- * `lstat`, never `stat`: `stat` gets a dangling symlink wrong (reports
- * nothing, so a corpse looks clean) and a live one wrong the other way
- * (identifies the target, not the link `unlink(2)` actually removes).
+ * What NAME `filePath` is right now, or null if nothing holds it. `lstat`,
+ * never `stat`: stat gets a dangling symlink wrong (looks clean) and a live
+ * one wrong the other way (identifies the target, not the link unlink(2) removes).
  */
 function identifyFile(filePath: string): FileIdentity | null {
   try {
@@ -142,10 +132,8 @@ function identifyFile(filePath: string): FileIdentity | null {
 
 /**
  * Unlink `filePath`, but only while it still holds the file `expected`
- * identified. Reports whether it removed anything.
- *
- * A process only ever removes a socket it created itself — deleting somebody
- * else's leaves a live daemon running on an unreachable inode forever.
+ * identified — a process only ever removes a socket it created itself.
+ * Deleting somebody else's leaves a live daemon on an unreachable inode forever.
  */
 export function unlinkIfSameFile(filePath: string, expected: FileIdentity | null): boolean {
   if (expected === null) return false;
@@ -179,12 +167,9 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
 }
 
 /**
- * The private path a daemon BINDS, before publishing the result under the
- * shared one. See `publishSocket` for why the shared path is never bound.
- *
- * Pid-scoped, so two daemons racing to start never bind the same file. The
- * `.sock` suffix is REPLACED, not appended, to stay inside sockaddr_un's path
- * limit (`MAX_STAGING_OVERHEAD_BYTES` in identity.ts).
+ * The private path a daemon BINDS before publishing under the shared one
+ * (see `publishSocket`). Pid-scoped so two racing daemons never bind the same
+ * file; the `.sock` suffix is REPLACED, not appended, to fit sockaddr_un's limit.
  */
 export function stagingSocketPath(socketPath: string, pid: number): string {
   const base = socketPath.endsWith(".sock") ? socketPath.slice(0, -".sock".length) : socketPath;
@@ -193,9 +178,8 @@ export function stagingSocketPath(socketPath: string, pid: number): string {
 
 /**
  * Give a bound socket its shared name. `link`, not `rename`: link is
- * fail-CLOSED, so a daemon that published first throws EEXIST here rather
- * than being silently unlinked by a renaming winner. See the fallback note
- * below for the exotic-filesystem case where link is unavailable.
+ * fail-CLOSED, so a daemon that published first throws EEXIST rather than
+ * being silently unlinked by a renaming winner (fallback note below).
  */
 export function publishSocket(stagingPath: string, socketPath: string): void {
   try {
@@ -205,12 +189,10 @@ export function publishSocket(stagingPath: string, socketPath: string): void {
       throw new DaemonAlreadyRunningError(socketPath);
     }
 
-    // link() failed for a reason other than "somebody got there first" — a
-    // filesystem that will not hard-link a socket at all. rename(2) REPLACES
-    // whatever holds the target, so only rename onto a name nothing holds:
-    // an occupant now means a daemon published while we were starting, and
-    // renaming over it would orphan that live process instead of just losing
-    // our own start to it.
+    // link() failed for a reason other than "somebody got there first" (a
+    // filesystem that won't hard-link a socket). rename(2) REPLACES whatever
+    // holds the target, so only rename onto a name nothing holds — an occupant
+    // now means a daemon published concurrently, and renaming over it would orphan it.
     if (identifyFile(socketPath) !== null) {
       throw new DaemonAlreadyRunningError(socketPath);
     }
@@ -244,10 +226,9 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   let idleTimer: NodeJS.Timeout | undefined;
   let uninstallInterceptors: (() => void) | undefined;
   /**
-   * The socket file THIS daemon published, recorded once it is listening. Every
+   * The socket file THIS daemon published, recorded once listening. Every
    * later unlink is checked against it, so shutdown can never remove a
-   * successor's socket — and a daemon that never got as far as publishing
-   * (`null`) removes nothing at all.
+   * successor's socket; a daemon that never got as far as publishing removes nothing.
    */
   let publishedSocket: FileIdentity | null = null;
   /** Live client connections, so shutdown can cut them if a drain times out. */
@@ -325,12 +306,11 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // its credentials against the daemon's globals instead of its caller's, and
     // would then report an exit code the client trusts. So: let them finish.
     if (!(await drainInflight(shutdownGraceMs))) {
-      // They did not. Cut the connections rather than let the clients believe a
-      // result computed under a rewritten environment. The `fallback` frame
-      // goes first so the outcome is DIAGNOSED rather than inferred from a
-      // dead socket: if output already crossed DEFAULT_MAX_BUFFER_BYTES and
-      // reached the real stdout, the client can't safely re-run and instead
-      // reports truncated output with a non-command status.
+      // They did not. Cut the connections rather than let clients believe a
+      // result computed under a rewritten environment. The `fallback` frame goes
+      // first so the outcome is DIAGNOSED, not inferred from a dead socket: if
+      // output already crossed DEFAULT_MAX_BUFFER_BYTES, the client reports
+      // truncated output with a non-command status instead of re-running unsafely.
       for (const connection of connections) {
         if (connection.destroyed) continue;
         // `end`, not `write`+`destroy`: destroy() discards anything still in the
@@ -572,12 +552,11 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
 
     ensureSocketDir(options.socketDir);
 
-    // ensureSocketDir repairs the DIRECTORY's mode, but a squatter who got
-    // there while it was still loose has already left their socket file inside
-    // it, and that file is still theirs. Refusing loudly here — rather than
-    // letting `isSocketAlive` report it and `listen()` misread it as
-    // DaemonAlreadyRunningError — is what keeps the squat from reading as "a
-    // daemon is already running" forever, which no amount of restarting fixes.
+    // ensureSocketDir repairs the DIRECTORY's mode, but a squatter who got there
+    // while it was still loose has already left their socket file inside it,
+    // and that file is still theirs. Refusing loudly here — rather than letting
+    // `listen()` misread it as DaemonAlreadyRunningError — keeps the squat from
+    // reading as "a daemon is already running" forever, which restarting can't fix.
     const trust = inspectSocketTrust(options.socketPath);
     if (trust !== null && SQUATTED_SOCKET_PROBLEMS.has(trust)) {
       throw new UntrustedSocketDirError(options.socketPath, trust);
@@ -614,13 +593,10 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     secureSocketFile(stagingPath);
 
     // Our identity, taken from the name only WE can hold, before the shared one
-    // is in play at all. Reading it back off the shared path after publishing
-    // looks equivalent and is not: anything that replaced that name in the gap
-    // would be recorded as ours, and `stop()` would later delete a stranger's
-    // live socket — the exact outage `unlinkIfSameFile` exists to prevent. The
-    // staging path is a hard link to the very inode we bound (and, in the
-    // rename fallback, becomes the shared name unchanged), so the identity is
-    // knowable with certainty here and merely probable there.
+    // is in play. Reading it back off the shared path after publishing looks
+    // equivalent and is not: anything that replaced that name in the gap would
+    // be recorded as ours, and `stop()` would later delete a stranger's live
+    // socket — the exact outage `unlinkIfSameFile` exists to prevent.
     const mine = identifyFile(stagingPath);
 
     try {

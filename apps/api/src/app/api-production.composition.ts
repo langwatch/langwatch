@@ -70,10 +70,9 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       connected: config.infrastructure.connectedAgents,
     },
     /**
-     * The resolution carries all five fields or is absent entirely ("absent
-     * means unprovisioned"), while the module declares the same five each
-     * optional — so an unprovisioned deployment passes an empty object, not
-     * a missing one, and analytics reads every field as unset.
+     * The resolution carries all five fields or is absent entirely; the module
+     * declares the same five each optional, so an unprovisioned deployment
+     * passes an empty object, not a missing one, and reads every field as unset.
      */
     analytics: {
       langwatchQl: config.infrastructure.clickhouse.langwatchQl ?? {},
@@ -223,9 +222,8 @@ const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
 /**
  * The one ledger every create declared replayable keeps its receipts in: a
- * receipt is an encrypted row in this application's database, so a family
- * cannot hold one of its own. A deployment with no database has nowhere to
- * keep one, and a route declaring the behaviour is refused at mount instead.
+ * receipt is an encrypted row in this application's database, so a deployment
+ * with no database has nowhere to keep one and is refused at mount instead.
  */
 function apiIdempotencyLedger(options: {
   readonly config: ProcessConfig;
@@ -241,9 +239,8 @@ function apiIdempotencyLedger(options: {
 
 /**
  * The licence source for a process that opened no database: the core
- * `createAbsentLicenseSource` default, named once, with the same
- * consequence line the deleted `api-usage.composition.ts` wrote its own
- * absences to.
+ * `createAbsentLicenseSource` default, named once, with the same consequence
+ * line the deleted `api-usage.composition.ts` wrote its own absences to.
  */
 function absentLicenseSource(logger: Logger, processName: string): EntitlementSource {
   logger.warn(
@@ -323,10 +320,9 @@ function redisSlice(
 }
 
 /**
- * Which gateway this deployment sends through.
- *
- * `off` is a statement, so a deployment that named no gateway reaches the mail
- * member as a refusal by name rather than as messages dropped quietly.
+ * Which gateway this deployment sends through. `off` is a statement, so a
+ * deployment that named no gateway reaches the mail member as a refusal by
+ * name rather than as messages dropped quietly.
  */
 function mailSlice(config: ApiConfig): MailConfig {
   const mail = config.mail;
@@ -364,10 +360,9 @@ export type ApiProcessMemberOverrides = {
 };
 
 /**
- * The api process, booted.
- *
- * Nothing is constructed until `boot`, and boot builds exactly the union the
- * installed modules declared: a client no module reads is never opened.
+ * The api process, booted. Nothing is constructed until `boot`, and boot
+ * builds exactly the union the installed modules declared: a client no
+ * module reads is never opened.
  */
 export async function bootApiProcess(options: {
   readonly config: ApiConfig;
@@ -458,12 +453,10 @@ export async function bootApiProcess(options: {
       stop: () => producerResources.close(),
     })
     .withTransports((peers: TransportPeers) => {
-      // The same auth peer the REST host reaches for: unless the launcher
-      // handed this process a resolver, the tRPC door reads sessions through
-      // the auth module too, so the two doors cannot decide differently about
-      // who somebody is. Left absent, the door stays mounted and refuses every
-      // signed-in caller as anonymous — which the browser shell reads as
-      // "signed out" and answers with a redirect loop through the sign-in page.
+      // The same auth peer the REST host reaches for, so the two doors can't
+      // decide differently about who somebody is. Left absent, the door stays
+      // mounted and refuses every signed-in caller as anonymous — which the
+      // browser shell reads as "signed out" and answers with a redirect loop.
       const auth = peers.find(AuthApi);
       const trpcSession =
         options.trpcSession ?? (auth ? composeApiTrpcSession({ auth }) : undefined);
@@ -502,13 +495,10 @@ export async function bootApiProcess(options: {
   }
   reportAbsentTrpcNamespaces(runtime.transports.trpc);
 
-  // The built browser bundle, served by this process off the same listener.
-  // `apps/ui` is a build, not a deployable: the image ships its `dist/client`
-  // beside this app (infra/docker/Dockerfile:217,240) and the chart runs one
-  // interactive Deployment (charts/langwatch/templates/app/deployment.yaml), so
-  // the pod that answers `/api/*` is the pod a browser asks for `/`. Asked LAST,
-  // after every address the mounted families declare, because it is the
-  // fallback — and the families' own route table is what it defers to, so a
+  // The built browser bundle, served by this process off the same listener:
+  // `apps/ui` is a build, not a deployable, so the pod answering `/api/*` is
+  // also the pod a browser asks for `/`. Asked LAST, after every mounted
+  // family's own address, since it is the fallback they defer to — so a
   // root-level address like the hosted MCP endpoint's `/mcp` stays theirs.
   const staticSurface = tryCreateApiStaticSurface({
     environment: globalThis.process.env,
@@ -528,20 +518,16 @@ export type ApiBootedProcess = Readonly<{
   trpc: ApiTrpcHost;
   /**
    * The built browser bundle, served straight off the Node server ahead of the
-   * Hono application. Absent when this build carries no `apps/ui/dist/client` —
-   * a source checkout that never ran the browser build, which then answers `/`
-   * from the Hono application alone exactly as it did before.
+   * Hono application. Absent when this build carries no `apps/ui/dist/client`,
+   * which then answers `/` from the Hono application alone as it did before.
    */
   staticSurface?: ApiPreRoutingSurface;
 }>;
 
 /**
- * Names each namespace this build does not serve, once, at boot.
- *
- * The list is a conversion queue, not a failure: a namespace leaves it the
- * moment its module declares its transport. What WOULD be a failure is a
- * namespace that is neither mounted nor listed, so an entry the process turned
- * out to serve is reported too — a stale line hides a converted module.
+ * Names each namespace this build does not serve, once, at boot. The list is
+ * a conversion queue, not a failure — a namespace leaves it once its module
+ * declares transport; one neither mounted nor listed is reported too.
  */
 function reportAbsentTrpcNamespaces(mounted: Readonly<Record<string, unknown>>): void {
   const logger = createLogger("langwatch:api:trpc");

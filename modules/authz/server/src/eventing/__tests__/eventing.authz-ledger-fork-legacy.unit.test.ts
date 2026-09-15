@@ -374,10 +374,8 @@ describe("given an organization the genesis import has not reached", () => {
 
     /**
      * The service layer's `assertNameFree` is advisory (a read ahead of the
-     * append, not inside it), so two concurrent renames can both pass it and
-     * race for the same `(organizationId, name)` unique index here. The
-     * loser must still get the deterministic conflict, not a raw Prisma
-     * error degrading to an unknown 500.
+     * append), so two concurrent renames can race for the same unique index —
+     * the loser must still get the deterministic conflict, not a raw 500.
      */
     it("maps a concurrent name collision onto the deterministic conflict", async () => {
       const { writer, db } = harness({ onLedger: false });

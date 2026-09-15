@@ -1,8 +1,7 @@
 /**
- * `defineRestRouter`: one complete declaration per route, under a namespace and
- * a version - its sources, its answers, the door it is asked behind and the
- * handler that answers it - with the declaration-time asserts that refuse an
- * incoherent route where it is written rather than where it is mounted.
+ * `defineRestRouter`: one complete declaration per route — its sources, its
+ * answers, the door it is asked behind and the handler that answers it — with
+ * declaration-time asserts that refuse an incoherent route where it is written.
  */
 import type { Actor } from "@langwatch/actor";
 import type {
@@ -119,9 +118,8 @@ type OutputSchema =
 
 /**
  * What a project-scoped door knows about the caller beyond the request's own
- * input: the slug a platform URL is built from, the person a personal view is
- * filtered for, and the actor an action is recorded against. Named here, in the
- * file that binds facts, so every project family declares the same one.
+ * input: the platform-URL slug, the person a personal view is filtered for,
+ * and the actor an action is recorded against — named here so every family agrees.
  */
 export const projectRestFacts = defineRestMiddleware(
   "projectRestFacts",
@@ -141,9 +139,8 @@ export type RestDeprecation = Readonly<{
 
 /**
  * The credentials a declaration may choose a door for. `public` is absent on
- * purpose: nothing is resolved for it, so a declaration naming it would type
- * its handler's scope as a value no door establishes. A route answering
- * without a credential declares `publicRoute` access instead.
+ * purpose: nothing is resolved for it, so naming it would type a handler's
+ * scope as a value no door establishes — use `publicRoute` access instead.
  */
 export type RestDoorCredential = Extract<
   Credential,
@@ -151,10 +148,9 @@ export type RestDoorCredential = Extract<
 >;
 
 /**
- * Which scope tier each door's credential resolves. The one table: the type a
- * handler reads and the tier the runtime asserts both come from here, so a door
- * cannot promise one tier and hand over another. `null` is a door whose
- * credential names no tenant at all - a deployment's own shared secret.
+ * Which scope tier each door's credential resolves — the one table both the
+ * handler's type and the runtime's assert read, so a door can't promise one
+ * tier and hand over another. `null` means no tenant (a deployment's own secret).
  */
 export const DOOR_SCOPE_TIER = {
   project: "project",
@@ -225,9 +221,8 @@ type HandlerArgumentsFor<
 type RouteAccessKind = "scoped" | "public" | "authenticated" | "optional" | "deferred";
 /**
  * What a stored handler is invoked with, once the declaration's own types are
- * gone: every door's arguments widened to one shape. The `handle` signature is
- * where a handler's real types are enforced; this is only what the runtime
- * calls, declared as a method so the parameter stays bivariant.
+ * gone: every door's arguments widened to one shape. Real types are enforced
+ * by `handle`; this is a method only so the parameter stays bivariant.
  */
 export type StoredHandlerArguments<Api> = Readonly<{
   app: Api;
@@ -308,10 +303,9 @@ type RawResponseArguments<Output extends RouteAnswer> = Output extends RestRawAn
   : unknown;
 
 /**
- * Where a route's permission is checked. `route` asks it at the scope the
- * route's own path names - the project or the team it addresses - rather than
- * at the one the credential resolved. The parameter is the field that tier is
- * spelled with, so the tier follows the name.
+ * Where a route's permission is checked: `route` asks at the scope the route's
+ * own path names (the project or team it addresses), not the one the
+ * credential resolved. `param` is the field that tier is spelled with.
  */
 export type RestPermissionTarget = Readonly<{ at: "route"; param: ScopeTierField }>;
 
@@ -774,9 +768,8 @@ class RouteBuilder<
 
   /**
    * Declares how the route is reached instead of naming a permission:
-   * `publicRoute` resolves no credential at all, so its handler is handed a
-   * null actor and a null scope and the document publishes no security
-   * requirement; `anyAuthenticated` still opens the family's own door.
+   * `publicRoute` resolves no credential, so its handler gets a null actor/scope
+   * and the document publishes no security requirement; `anyAuthenticated` still opens the door.
    */
   withAccess<Kind extends RouteAccess>(
     access: Kind,
@@ -896,9 +889,8 @@ class RouteBuilder<
 
   /**
    * The several answers this route may give, each with the body it carries:
-   * `responds({ 200: report, 503: report })`. An unhealthy platform report is
-   * an answer, not a failure, so the handler returns `{ status, body }` typed
-   * by this declaration and the document lists every status.
+   * `responds({ 200: report, 503: report })`. An unhealthy report is an answer,
+   * not a failure — the handler returns `{ status, body }` typed by this declaration.
    */
   responds<const Answers extends RestRouteAnswers>(
     answers: Answers,
@@ -1162,10 +1154,9 @@ class RouteBuilder<
   }
 
   /**
-   * The door THIS route answers behind, where it differs from the family's own.
-   * It retypes the handler's actor and scope through `DOOR_SCOPE_TIER`, so a
-   * route that raises its own door reads the scope that door resolves rather
-   * than the family's.
+   * The door THIS route answers behind, where it differs from the family's own:
+   * retypes the handler's actor/scope through `DOOR_SCOPE_TIER`, so the route
+   * reads the scope ITS door resolves, not the family's.
    */
   withCredential<NewDoor extends RestDoorCredential>(
     credential: NewDoor,

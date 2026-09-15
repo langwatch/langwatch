@@ -178,10 +178,9 @@ function findFirstId(value: unknown): string | undefined {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fields on a model-provider write whose values are secrets. All three ride the same
- * `modelProvider.update` mutation: `customKeys` holds the API key as typed, `providerConfig`
- * is a passthrough object we do not police, and `extraHeaders` is where `Authorization: Bearer`
- * is entered.
+ * Fields on a model-provider write whose values are secrets, both riding the
+ * same `modelProvider.update` mutation: `customKeys` holds the API key as
+ * typed; `providerConfig` is a passthrough object this code does not police.
  */
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
@@ -215,11 +214,8 @@ const SENSITIVE_FIELD_NAME =
 
 /**
  * A name ending in `Id` or `Ids` NAMES a credential; it does not carry one.
- * `apiKeyId` is the row reference the trail is read by — without it a
- * revocation row cannot say which key was retired, and the surfaces that
- * needed it were wrapping their own applications to smuggle it past this
- * rule. `apiKeySecret` still matches the rule below; `apiKeySecretId` is an
- * identifier either way.
+ * `apiKeyId` is the row reference the trail is read by, and `apiKeySecretId`
+ * is still just an identifier — only `apiKeySecret` matches the rule below.
  */
 const IDENTIFIER_FIELD_NAME = /ids?$/;
 
@@ -355,11 +351,9 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The request-log record for one finished call.
-//
-// Everything here is pure: the log target and the exception reporter arrive as
-// arguments, so the decisions - whether a call is recorded at all, at which
-// level, and with which status - can be asked directly.
+// The request-log record for one finished call. Everything here is pure: the
+// log target and exception reporter arrive as arguments, so the decisions can
+// be asked directly.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Threshold to surface slow calls; one second catches regressions at 1.5-2.3s per call */
@@ -371,11 +365,8 @@ const slowCallThrottle = createWarnThrottle(SLOW_CALL_THROTTLE_MS);
 
 /**
  * Zero or negative turns the warning off; unset or unparseable keeps the
- * default.
- *
- * `env` is required rather than defaulted to `process.env`: a reusable package
- * receives typed configuration and does not read the environment itself, which
- * is what `environment-boundaries` enforces.
+ * default. `env` is required rather than defaulted to `process.env`: a
+ * reusable package receives typed config, per `environment-boundaries`.
  */
 export function resolveSlowCallBudgetMs(env: NodeJS.ProcessEnv): number {
   const raw = env.TRPC_SLOW_CALL_MS;
@@ -513,17 +504,15 @@ export function handleTrpcCallLogging({
 
 /**
  * Routers whose calls flood the request log without being useful for
- * debugging: presence (peer cursor / drawer presence heartbeats fire
- * every few seconds per open tab). Logging + tracing them buries the
- * signal in noise. Errors are still reported by the middlewares below.
+ * debugging (presence heartbeats fire every few seconds per open tab).
+ * Logging/tracing them buries the signal; errors are still reported below.
  */
 const SILENCED_LOG_PATH_PREFIXES = ["presence."] as const;
 
 /**
- * tRPC call types whose volume is unbounded - SSE subscriptions emit
- * a "trpc call" log line per delivered message. Silencing the
- * subscription type as a whole keeps the dev log readable without
- * sprinkling per-router opt-outs across the codebase.
+ * tRPC call types whose volume is unbounded: SSE subscriptions emit a
+ * "trpc call" log line per delivered message. Silencing the type as a whole
+ * avoids sprinkling per-router opt-outs across the codebase.
  */
 const SILENCED_LOG_TYPES = new Set(["subscription"]);
 
@@ -537,11 +526,8 @@ export function isSilencedCall({ path, type }: { path: string; type: string }): 
 
 /**
  * Records one finished tRPC call: decides whether it is logged at all, then
- * how loudly.
- *
- * The two halves belong together. Silencing runs first and drops the record
- * entirely, so "a slow presence heartbeat raises nothing" is a property of the
- * pair and of neither alone.
+ * how loudly. The two halves belong together — silencing runs first and drops
+ * the record entirely, a property of the pair, not of either alone.
  */
 export function recordTrpcCall(args: Parameters<typeof handleTrpcCallLogging>[0]): void {
   // Errors are still reported on a silenced path: the volume that earns the
