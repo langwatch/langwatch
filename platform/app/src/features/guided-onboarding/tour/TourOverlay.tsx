@@ -7,8 +7,12 @@
  * drives them is in TourLayer.
  */
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import { Castle, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  LangyMark,
+  LangyMarkGradientDefs,
+} from "~/features/langy/components/LangyMark";
 import type { TourHandoff } from "./guidedTourStore";
 import {
   EASING,
@@ -19,6 +23,12 @@ import {
   TOUR_TRAVEL_MS,
 } from "./tourGeometry";
 import { readMs, type TourStep } from "./tourSteps";
+
+/**
+ * The tour paints Langy's mark outside the Langy panel, so it carries its own
+ * paint server rather than borrowing the panel's, which is not mounted here.
+ */
+const TOUR_MARK_GRADIENT_ID = "langy-tour-mark-grad";
 
 /* ---------- the circle-timer on the Next button ---------- */
 
@@ -173,7 +183,6 @@ export function TourCursor({
         color="white"
         boxShadow="md"
       >
-        <Castle size={10} strokeWidth={2.2} aria-hidden="true" />
         (langy)
       </HStack>
       {step?.click && (
@@ -234,18 +243,16 @@ export function TourCaption({
       <HStack align="start" gap={2.5}>
         <Box
           as="span"
-          marginTop="2px"
+          marginTop="1px"
           display="flex"
           width="24px"
           height="24px"
           flexShrink={0}
           alignItems="center"
           justifyContent="center"
-          borderRadius="lg"
-          background="fg"
-          color="bg.surface"
         >
-          <Castle size={13} strokeWidth={1.8} aria-hidden="true" />
+          <LangyMarkGradientDefs id={TOUR_MARK_GRADIENT_ID} />
+          <LangyMark size={22} gradientId={TOUR_MARK_GRADIENT_ID} />
         </Box>
         <Text fontSize="13px" lineHeight="1.6">
           {step.text}
