@@ -54,6 +54,22 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # release-please and the post-processor both write branches. The PAT
+          # also lets the resulting push trigger normal release-PR validation.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+
+      - name: Test release-note deduplication
+        run: node --test --experimental-strip-types .github/scripts/dedupe-release-notes.test.ts
+
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -61,3 +77,14 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      # A squash merge can expose both its conventional-commit subject and a
+      # conventional-commit line at the start of its body. release-please then
+      # writes two bullets for one commit SHA. Post-process only the release
+      # PRs returned by this trusted action; never hand-edit a release PR.
+      - name: Deduplicate generated release notes
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          RELEASE_PLEASE_PRS: ${{ steps.release.outputs.prs }}
+        run: node --experimental-strip-types .github/scripts/dedupe-release-notes.ts
