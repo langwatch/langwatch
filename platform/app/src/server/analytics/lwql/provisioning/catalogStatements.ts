@@ -733,11 +733,14 @@ export function lwqlSourceTables({
     // A joined view reads a second fact table, which must be policed too or the
     // join reaches the joined side unscoped. It is a ClickHouse fact table in
     // the source database (a join is refused for PostgreSQL-resident views), so
-    // its tenant column is the default and its database is the fact one.
+    // its database is the fact one. Almost every joined source names its project
+    // column `TenantId`; one that spells it differently (`project_id`) declares
+    // it on {@link LangWatchQLViewJoin.tenantColumn} so its policy filters the
+    // real column. Default preserved so every existing join renders unchanged.
     if (view.join) {
       byTable.set(`${database}.${view.join.table}`, {
         table: view.join.table,
-        tenantColumn: TENANT_COLUMN,
+        tenantColumn: view.join.tenantColumn ?? TENANT_COLUMN,
         database,
       });
     }

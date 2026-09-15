@@ -222,6 +222,18 @@ export interface LangWatchQLViewJoin {
     /** Columns of the joined {@link table}. */
     readonly joined?: readonly string[];
   };
+  /**
+   * The joined table's column holding the owning project, when it is not the
+   * default `TenantId`.
+   *
+   * The joined-side counterpart of {@link LangWatchQLViewDefinition.tenantColumn}:
+   * a join reaches a second fact table, which is tenant-policed alongside the
+   * primary, and a joined source that spells its project column differently
+   * (`project_id`) declares it here so its row policy filters the right column
+   * rather than one it does not carry. Absent means the default `TenantId`, so
+   * every existing single-tenant-column join renders unchanged.
+   */
+  readonly tenantColumn?: string;
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
