@@ -205,11 +205,9 @@ class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
 }
 
 /**
- * The invitations this deployment administers, through the shape the invitation door reads
- * them. `InviteService`, its repository and its throttle are the deleted composition's own
- * `InviteService`/`PrismaOrganizationInviteRepository`/`InviteSendThrottleService`, unmoved;
- * only the wrapper's method names changed, to match the converted door's `OrganizationInvitations`
- * port rather than the retired tRPC ports type.
+ * The invitations this deployment administers, in the shape the door reads.
+ * The service, repository and throttle are the deleted composition's own,
+ * unmoved; only the wrapper's method names changed to match the door's port.
  */
 export class InviteServiceOrganizationInvitations implements OrganizationInvitations {
   static create(options: {
@@ -435,10 +433,9 @@ function organizationSignals(logger: Logger): OrganizationSignals {
 }
 
 /**
- * The parts of the sign-up ceremony that belong to other features. The first
- * project goes through the project application this process composed rather
- * than a second creation path, so it writes the same rows the project surface
- * writes.
+ * The parts of the sign-up ceremony belonging to other features. The first
+ * project goes through the project application rather than a second creation
+ * path, so it writes the same rows the project surface writes.
  */
 function organizationCeremony(options: { projects: ProjectApi }): OrganizationCeremony {
   return {
@@ -471,10 +468,9 @@ function organizationCeremony(options: { projects: ProjectApi }): OrganizationCe
 }
 
 /**
- * One person's own verified address, and the display names a pending list
- * renders. The address comes from the SAME identity application `user.*`
- * answers from; the fallback is the legacy verified column, exactly as the
- * deleted composition read it.
+ * One person's verified address, and the display names a pending list renders.
+ * The address comes from the SAME identity application `user.*` answers from;
+ * the fallback is the legacy verified column, as the deleted composition read it.
  */
 function organizationDirectory(options: {
   identity: Pick<IdentityApi, "verifiedEmailsOf">;
@@ -501,13 +497,9 @@ function organizationDirectory(options: {
 }
 
 /**
- * The invitations this deployment administers: `InviteService` composed from this process's
- * own reads (prisma, redis) plus the peers `ServerOrganizationApp` already depends on
- * (entitlement for plans, authz for grants, role for assignability, identity for acceptor
- * matching). Mail and the workspace-size census stay uncomposed — both are ports over
- * aggregates this process does not reach cleanly (react-email rendering, another feature's
- * project count) — and `InviteServiceDependencies` treats their absence as a supported state,
- * not a refusal: every invitation still gets written and carries its accept URL.
+ * `InviteService` composed from this process's own reads plus the peers
+ * `ServerOrganizationApp` depends on. Mail and the workspace-size census
+ * stay uncomposed — their absence is supported: invitations still write and carry an accept URL.
  */
 function organizationInvitations(input: {
   prisma: PrismaClient;

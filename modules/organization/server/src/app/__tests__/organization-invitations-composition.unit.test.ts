@@ -1,7 +1,6 @@
 /**
- * The invitation member `organization-composition.build.ts` composes: `InviteServiceOrganizationInvitations`
- * maps `InviteService`'s own method names onto the `OrganizationInvitations` port the door reads,
- * and `ServerOrganizationApp` still refuses by name for a role this deployment composed none for.
+ * `InviteServiceOrganizationInvitations` maps `InviteService`'s method names onto
+ * the port the door reads; the app still refuses a role it composed none for.
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -86,7 +85,8 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
   return repository;
 }
 
-/** The invitation door as the composed process would hand it to `OrganizationInvitationDoorService`. */
+/** The invitation door as the composed process would hand it to
+ *  `OrganizationInvitationDoorService`. */
 function invitations(options: { teamsInOrganization?: readonly string[] } = {}) {
   const repository = fakeInviteRepository(options);
   const throttle = InviteSendThrottleService.create(new FakeInviteRateLimit());

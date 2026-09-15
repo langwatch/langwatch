@@ -141,14 +141,9 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
 };
 
 /**
- * What an invitation naming a team or custom role that cannot be assigned
- * does to the batch: `strict` refuses the whole batch by name, `lenient`
- * drops that assignment - or the invitation - and creates the rest.
- *
- * The TRANSPORT decides, never the composition: a provisioning caller that
- * names the wrong team is told so, while the invite form keeps the
- * drop-and-carry-on behaviour it has always had. It is deliberately NOT part
- * of any request schema, so no client can pick its own validation.
+ * An invitation naming an unassignable team/role: `strict` refuses the batch
+ * (provisioning callers), `lenient` drops the assignment and carries on (the
+ * invite form's historical behaviour). The transport picks, outside any schema.
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
@@ -207,11 +202,9 @@ export interface OrganizationApi {
   ): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
   /**
-   * Provisions a new organization end to end: the organization and its first
-   * team, a bootstrap admin service key, and the read-back summary. On
-   * failure past organization creation it compensates by deleting the
-   * organization, reporting a failed compensation rather than raising it over
-   * the original error.
+   * Provisions an organization end to end: it, its first team, a bootstrap
+   * admin key, the summary. A failure past creation deletes the organization
+   * and reports a failed compensation rather than raising it over the cause.
    */
   createForProvisioningWithAdminKey(input: {
     name: string;
@@ -378,9 +371,8 @@ export interface OrganizationApi {
   // -- the doors ------------------------------------------------------------
   //
   // What each tRPC namespace calls once its transport has stated access. The
-  // orchestration these carry - per-viewer redaction, the invitation
-  // ceremony, the seat and plan guards - used to sit in the transport, where
-  // it could not be tested without a router.
+  // orchestration here - redaction, the invitation ceremony, the seat and plan
+  // guards - used to live in the transport, untestable without a router.
 
   /** Every organization the caller can reach, redacted for them. */
   listVisibleOrganizations(
