@@ -20,6 +20,7 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
+import { parseScimFilter } from "./scim-filter";
 import { reconcileScimGrants } from "./scim-grants.reconciler";
 
 const logger = createLogger("langwatch:scim:group");
@@ -75,8 +76,20 @@ export class ScimGroupService {
     startIndex?: number;
     count?: number;
     excludeMembers?: boolean;
-  }): Promise<ScimListResponse<ScimGroup>> {
-    const displayNameFilter = this.parseDisplayNameFilter(filter);
+  }): Promise<ScimListResponse<ScimGroup> | ScimError> {
+    const parsed = parseScimFilter({
+      filter,
+      supported: ["displayName", "externalId"],
+    });
+    if (!parsed.ok) {
+      return {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        scimType: "invalidFilter",
+        detail: parsed.detail,
+      };
+    }
+    const term = parsed.term;
 
     const where = {
       organizationId,
@@ -87,9 +100,14 @@ export class ScimGroupService {
       // organization's tokens.
       OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
       scimSource: { not: null as string | null },
-      ...(displayNameFilter
-        ? { name: { equals: displayNameFilter, mode: "insensitive" as const } }
+      ...(term?.attribute === "displayName"
+        ? { name: { equals: term.value, mode: "insensitive" as const } }
         : {}),
+      // An `externalId` term narrows to the group the directory means. A
+      // value this organization has never pushed narrows to nobody rather
+      // than widening back to every group — the same rule the people
+      // listing follows.
+      ...(term?.attribute === "externalId" ? { externalId: term.value } : {}),
     };
 
     const [groups, totalCount] = await Promise.all([
@@ -104,19 +122,24 @@ export class ScimGroupService {
         },
         skip: startIndex - 1,
         take: count,
-        orderBy: { createdAt: "asc" },
+        // `createdAt` alone leaves groups made in the same instant in an
+        // order the store picks, and two pages cut from two different such
+        // orders overlap. The id settles the tie.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       }),
       this.prisma.group.count({ where }),
     ]);
 
+    const resources = groups.map((g) =>
+      this.toScimGroup(g, g.members, excludeMembers),
+    );
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
       startIndex,
-      itemsPerPage: count,
-      Resources: groups.map((g) =>
-        this.toScimGroup(g, g.members, excludeMembers),
-      ),
+      // What this page holds, not what was asked for (RFC 7644 §3.4.2.4).
+      itemsPerPage: resources.length,
+      Resources: resources,
     };
   }
 
@@ -647,12 +670,6 @@ export class ScimGroupService {
         lastModified: group.updatedAt.toISOString(),
       },
     };
-  }
-
-  private parseDisplayNameFilter(filter?: string): string | null {
-    if (!filter) return null;
-    const match = filter.match(/^displayName\s+eq\s+"([^"]+)"$/);
-    return match?.[1] ?? null;
   }
 
   private extractMemberIds(value: unknown): string[] {
