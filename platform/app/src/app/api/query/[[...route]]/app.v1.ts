@@ -144,14 +144,14 @@ const HEADER_RULE =
 const RESULT_CEILINGS = `A statement that names no \`LIMIT\` is capped at ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows: that \`LIMIT\` is appended before the query runs. A statement whose own \`LIMIT\` asks for more is refused with \`LIMIT_TOO_HIGH\` — lower it and page the rest with \`LIMIT\`/\`OFFSET\` and an \`ORDER BY\`. When using \`UNION\`, every top-level branch must carry its own \`LIMIT\` clause of ${DEFAULT_LWQL_RESULT_LIMITS.maxRows.toLocaleString("en-US")} rows or fewer, or the query is refused with \`LIMIT_REQUIRED_PER_BRANCH\`. A result whose body exceeds about ${DEFAULT_LWQL_RESULT_LIMITS.maxResultBytes.toLocaleString("en-US")} bytes is refused outright with \`lwql_result_too_large\`, never cut — select fewer columns or a smaller \`LIMIT\`.`;
 
 const RUN_DESCRIPTION =
-  "Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
+  "Executes one read-only LangWatchQL SELECT over the analytics views and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.\n\n" +
   `Diagnostics are advisory and never reject a query. ${LWQL_CLEAN_DIAGNOSTICS_MEANING}\n\n` +
   `${HEADER_RULE}\n\n` +
   `${RESULT_CEILINGS}\n\n` +
   "Failures answer with their real HTTP status (a refused query is 403, not 200) and this API's canonical error envelope — the same `code` and `meta` every other REST family publishes.";
 
 const SCHEMA_DESCRIPTION =
-  "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\n" +
+  "Lists the LangWatchQL analytics views this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each view's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.\n\n" +
   "Scoped to the projects the credential can read and their permissions: a column this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.\n\n" +
   `${HEADER_RULE}`;
 
@@ -235,7 +235,7 @@ function registerSchema(secured: QuerySecuredApp): void {
         ...canonicalBaseResponses,
         200: {
           description:
-            "The datasets and columns this key may query, with the permissions that unlock each one.",
+            "The views and columns this key may query, with the permissions that unlock each one.",
           content: {
             "application/json": { schema: resolver(lwqlSchemaSchema) },
           },

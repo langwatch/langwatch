@@ -940,7 +940,7 @@ describe("given the LangWatchQL service", () => {
     it("still describes the schema, which discloses nothing a caller could read", () => {
       expect(
         serviceWith(null).describeSchema({ protections: FULLY_PERMITTED })
-          .datasets,
+          .views,
       ).toHaveLength(LWQL_VIEW_CATALOG.length);
     });
   });

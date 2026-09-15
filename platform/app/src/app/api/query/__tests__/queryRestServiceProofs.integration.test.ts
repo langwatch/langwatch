@@ -1200,12 +1200,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       const gated = await readSchema(gatedProject);
 
       expect(permitted.database).toBe(database);
-      expect(permitted.datasets.map((dataset: any) => dataset.name)).toEqual(
+      expect(permitted.views.map((dataset: any) => dataset.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${database}.${view.name}`),
       );
 
       const columnOf = (schema: any, dataset: string, column: string) =>
-        schema.datasets
+        schema.views
           .find((entry: any) => entry.name === `${database}.${dataset}`)
           .columns.find((entry: any) => entry.name === column);
 
@@ -1226,7 +1226,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         true,
       );
       expect(
-        permitted.datasets.flatMap((dataset: any) =>
+        permitted.views.flatMap((dataset: any) =>
           dataset.columns.filter((column: any) => !column.available),
         ),
       ).toEqual([]);
@@ -1235,7 +1235,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     it("publishes an example query the caller can actually run", async () => {
       const schema = await readSchema(gatedProject);
 
-      for (const dataset of schema.datasets) {
+      for (const dataset of schema.views) {
         const response = await post(
           { sql: dataset.exampleSql },
           { token: gatedProject.apiKey },
@@ -1251,8 +1251,8 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       for (const project of [openProject, gatedProject]) {
         const schema = await readSchema(project);
 
-        expect(schema.datasets.length).toBeGreaterThan(0);
-        for (const dataset of schema.datasets) {
+        expect(schema.views.length).toBeGreaterThan(0);
+        for (const dataset of schema.views) {
           const where = `${project.slug}: ${dataset.name}`;
           expect(dataset.description, where).not.toBe("");
           expect(dataset.grain, where).not.toBe("");
@@ -1274,7 +1274,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           }
         }
 
-        const units = schema.datasets.flatMap((dataset: any) =>
+        const units = schema.views.flatMap((dataset: any) =>
           dataset.columns
             .filter((column: any) => column.unit !== null)
             .map((column: any) => column.unit),
@@ -1330,9 +1330,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       );
       try {
         const names = async (project: Project) =>
-          (await readSchema(project)).datasets.map(
-            (dataset: any) => dataset.name,
-          );
+          (await readSchema(project)).views.map((dataset: any) => dataset.name);
 
         // The gated project's data-privacy rule withholds captured input, so
         // the dataset that needs it is not there at all.
@@ -1474,7 +1472,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         .mockRejectedValue(new Error("policy store unreachable"));
       try {
         const schema = await readSchema(openProject);
-        const contentColumns = schema.datasets.flatMap((dataset: any) =>
+        const contentColumns = schema.views.flatMap((dataset: any) =>
           dataset.columns.filter(
             (column: any) =>
               column.gates.includes("input") || column.gates.includes("output"),

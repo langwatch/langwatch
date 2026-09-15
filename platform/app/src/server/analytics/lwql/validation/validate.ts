@@ -112,7 +112,7 @@ export interface LangWatchQLTableReference {
  * One equality a `JOIN` was written on, with each side exactly as the caller
  * wrote it — `t.TraceId`, not a resolved column.
  *
- * Resolving a side to a dataset is the reader's job, and
+ * Resolving a side to a view is the reader's job, and
  * {@link LangWatchQLQueryBlock.tables} is what it takes to do it: the qualifier
  * is either an alias or a table name from that same list. The walk deliberately
  * does not do it here, because doing so would mean deciding what an ambiguous
@@ -158,7 +158,7 @@ export interface LangWatchQLQueryBlock {
    * what a read touches. A join condition is deliberately absent: it says which
    * rows line up, not which rows are read.
    *
-   * Recorded because "this query has no predicate on the dataset's partitioning
+   * Recorded because "this query has no predicate on the view's partitioning
    * column" is a question about the query's shape, and the walk is the only
    * pass that ever looks at the tree. It reads the name as written, so a filter
    * written against a *projection alias* (`SELECT toStartOfHour(t) AS b … WHERE
@@ -400,7 +400,7 @@ function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
 /**
  * The floor every violation code clears: a corrective sentence, keyed on the
  * code alone. A code with a sharper, context-derived field (`allowedFunctions`,
- * `availableDatasets`, `dataset`/`availableColumns`) still carries this — the
+ * `availableViews`, `view`/`availableColumns`) still carries this — the
  * sharper field is the better answer, `hint` is what a caller falls back to
  * when it only reads one field, and what every other code has instead of a
  * sharper one.
@@ -421,11 +421,11 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
   OUTPUT_CLAUSE:
     "Remove the output/format clause — this API controls the response format.",
   SCHEMA_NOT_ALLOWED:
-    "Query one of the analytics datasets listed by GET /api/v1/query/schema instead.",
+    "Query one of the analytics views listed by GET /api/v1/query/schema instead.",
   TABLE_NOT_ALLOWED:
-    "Use one of the datasets named in this violation's availableDatasets, or listed by GET /api/v1/query/schema.",
+    "Use one of the views named in this violation's availableViews, or listed by GET /api/v1/query/schema.",
   TABLE_FUNCTION:
-    "Read from one of the analytics datasets listed by GET /api/v1/query/schema instead of a table function.",
+    "Read from one of the analytics views listed by GET /api/v1/query/schema instead of a table function.",
   FUNCTION_NOT_ALLOWED:
     "Rewrite the expression using one of the functions named in this violation's allowedFunctions.",
   LIMIT_TOO_HIGH: `Lower the LIMIT to ${LWQL_MAX_RESULT_ROWS.toLocaleString(
@@ -441,14 +441,14 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
   NESTING_TOO_DEEP:
     "Flatten the query — reduce subquery, CTE, or expression nesting.",
   UNSUPPORTED_SYNTAX:
-    "Rewrite the query as a plain read query over the analytics datasets.",
+    "Rewrite the query as a plain read query over the analytics views.",
 };
 
 /** The sharper fields a call site can attach on top of the {@link DEFAULT_VIOLATION_HINTS} floor. */
 type ViolationExtra = Partial<
   Pick<
     LangWatchQLViolation,
-    "availableDatasets" | "dataset" | "availableColumns" | "maxRows"
+    "availableViews" | "view" | "availableColumns" | "maxRows"
   >
 >;
 
@@ -486,7 +486,7 @@ function report({
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
-  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics datasets.";
+  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics views.";
 
 /**
  * The default-deny fallthrough.
@@ -550,7 +550,7 @@ function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void {
  * node lists its projection first — so walking fields as written would check
  * a column reference in the projection before the block has recorded which
  * table it was read from. A gated-column refusal wants that table (to name
- * its dataset and columns; see `resolveGatedColumnDataset`), so `from` has to
+ * its view and columns; see `resolveGatedColumnView`), so `from` has to
  * be walked, and its table recorded on the block, before any other field of
  * the same `SELECT` is. `Array.prototype.sort` is stable, so this reorders
  * nothing else.
@@ -673,15 +673,15 @@ function walkChildNodes({
 // ---------------------------------------------------------------------------
 
 /**
- * Which dataset a gated reference's columns should be listed against, when the
+ * Which view a gated reference's columns should be listed against, when the
  * walk can tell.
  *
  * A qualified reference (`t.body`) resolves through the block's alias/table
  * list; an unqualified one resolves only when the block reads exactly one
  * table — with two tables in scope an unqualified name is ambiguous between
- * them, and guessing would risk naming the wrong dataset's columns.
+ * them, and guessing would risk naming the wrong view's columns.
  */
-function resolveGatedColumnDataset({
+function resolveGatedColumnView({
   name,
   frame,
   ctx,
@@ -704,9 +704,9 @@ function resolveGatedColumnDataset({
       ? tables[0]
       : undefined;
   if (!matched) return {};
-  const availableColumns = ctx.policy.datasetColumns.get(matched.table);
+  const availableColumns = ctx.policy.viewColumns.get(matched.table);
   return {
-    dataset: matched.table,
+    view: matched.table,
     ...(availableColumns ? { availableColumns } : {}),
   };
 }
@@ -731,7 +731,7 @@ function gateColumnReference({
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
-    extra: resolveGatedColumnDataset({ name, frame, ctx }),
+    extra: resolveGatedColumnView({ name, frame, ctx }),
   });
 }
 
@@ -946,7 +946,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       frame,
       code: "TABLE_NOT_ALLOWED",
       message:
-        "Name the dataset directly — a table cannot be chosen by a bound parameter.",
+        "Name the view directly — a table cannot be chosen by a bound parameter.",
       node,
     });
     return null;
@@ -959,7 +959,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       frame,
       code: "SCHEMA_NOT_ALLOWED",
       message:
-        "Server metadata is not readable through this API. Query the analytics datasets instead.",
+        "Server metadata is not readable through this API. Query the analytics views instead.",
       node,
     });
     return null;
@@ -987,9 +987,9 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
-      message: `The dataset "${echoIdentifier(written)}" is not available to you. Use one of the datasets from the schema endpoint.`,
+      message: `The view "${echoIdentifier(written)}" is not available to you. Use one of the views from the schema endpoint.`,
       node,
-      extra: { availableDatasets: ctx.policy.availableDatasets },
+      extra: { availableViews: ctx.policy.availableViews },
     });
     return null;
   }
@@ -1023,7 +1023,7 @@ function joinSideName(value: unknown): string | null {
  *
  * Descends `AND` only. An equality reached through an `OR`, a `NOT`, or any
  * other function is not a key the join is guaranteed to have matched on, and
- * recording it would tell a diagnostic that two datasets line up on a column
+ * recording it would tell a diagnostic that two views line up on a column
  * when they may not.
  */
 function collectJoinEdges({
@@ -1098,7 +1098,7 @@ function conjunctArguments(node: unknown): unknown[] | null {
  * The join edge an `a = b` node names, or `null` for anything else.
  *
  * Both sides have to resolve to a name: an equality against an expression is
- * not a key two datasets line up on, and recording half of one would claim a
+ * not a key two views line up on, and recording half of one would claim a
  * match that was never written.
  */
 function readEqualityEdge(
@@ -1227,7 +1227,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
  * Records a column named in a filter or grouping position on the block it sits
  * in.
  *
- * The leaf segment only: what a diagnostic asks is "was this dataset's time
+ * The leaf segment only: what a diagnostic asks is "was this view's time
  * column filtered", and `t.OccurredAt`, `OccurredAt` and
  * `analytics.traces.OccurredAt` are all the same answer to it.
  */
@@ -1391,7 +1391,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
         kind: "refuse",
         code: "TABLE_FUNCTION",
         message:
-          "Table functions cannot be used here. Read from the analytics datasets listed by the schema endpoint.",
+          "Table functions cannot be used here. Read from the analytics views listed by the schema endpoint.",
       },
       subquery: { kind: "node" },
       final: SCALAR,

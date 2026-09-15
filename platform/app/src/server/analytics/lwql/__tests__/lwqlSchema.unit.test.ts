@@ -49,7 +49,7 @@ function schemaFor(protections: Protections) {
 }
 
 function columnsOf(protections: Protections) {
-  return schemaFor(protections).datasets.flatMap((dataset) =>
+  return schemaFor(protections).views.flatMap((dataset) =>
     dataset.columns.map((column) => ({ dataset: dataset.name, ...column })),
   );
 }
@@ -71,13 +71,13 @@ function policyFor(protections: Protections) {
 describe("given the LangWatchQL schema catalog", () => {
   describe("when it is published for a caller", () => {
     it("names every dataset, qualified with the LangWatchQL database", () => {
-      expect(schemaFor(FULLY_PERMITTED).datasets.map((d) => d.name)).toEqual(
+      expect(schemaFor(FULLY_PERMITTED).views.map((d) => d.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
       );
     });
 
     it("carries the grain, join keys, partition-pruning column and freshness of each dataset", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         expect(dataset.grain, dataset.name).not.toBe("");
         expect(dataset.joinKeys.length, dataset.name).toBeGreaterThan(0);
         expect(dataset.timeColumn, dataset.name).not.toBe("");
@@ -93,7 +93,7 @@ describe("given the LangWatchQL schema catalog", () => {
      */
     /** @scenario "Every view publishes a project identifier column to filter on" */
     it("lists an ungated, joinable TenantId column on every dataset", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         const tenantColumn = dataset.columns.find(
           (column) => column.name === "TenantId",
         );
@@ -298,7 +298,7 @@ describe("given the LangWatchQL schema catalog", () => {
      */
     it("is valid LangWatchQL for a caller with no permissions at all", () => {
       const policy = policyFor(WITHOUT_ANYTHING);
-      for (const dataset of schemaFor(WITHOUT_ANYTHING).datasets) {
+      for (const dataset of schemaFor(WITHOUT_ANYTHING).views) {
         const result = validateLangWatchQL({
           sql: dataset.exampleSql,
           ...policy,
@@ -311,7 +311,7 @@ describe("given the LangWatchQL schema catalog", () => {
     });
 
     it("filters on the column that prunes the dataset's partitions", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         expect(dataset.exampleSql, dataset.name).toContain(
           `WHERE ${dataset.timeColumn} >=`,
         );
@@ -325,7 +325,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * skips it.
      */
     it("never puts the tenant scope column in its projection", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         const projection = /select\s+([\s\S]*?)\s+from\b/i.exec(
           dataset.exampleSql,
         )?.[1];
@@ -352,24 +352,24 @@ describe("given the LangWatchQL schema catalog", () => {
 
     it("leaves it out of the published schema entirely", () => {
       expect(
-        schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
+        schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name),
       ).not.toContain(GATED_DATASET_QUALIFIED_NAME);
     });
 
     it("publishes it to a caller who holds the permission, so absence is about the permission", () => {
       expect(
-        schemaWith(FULLY_PERMITTED).datasets.map((dataset) => dataset.name),
+        schemaWith(FULLY_PERMITTED).views.map((dataset) => dataset.name),
       ).toContain(GATED_DATASET_QUALIFIED_NAME);
     });
 
     it("keeps every other dataset, rather than hiding the schema", () => {
       expect(
-        schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name),
+        schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name),
       ).toEqual(LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`));
     });
 
     it("names the dataset's permission on each of its columns", () => {
-      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+      const dataset = schemaWith(FULLY_PERMITTED).views.find(
         (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
       )!;
       expect(dataset.columns.map((column) => column.gates)).toEqual([
@@ -386,7 +386,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * to select, published as "a runnable query over this dataset".
      */
     it("publishes a runnable example for the gated dataset", () => {
-      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+      const dataset = schemaWith(FULLY_PERMITTED).views.find(
         (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
       )!;
       const result = validateLangWatchQL({

@@ -26,13 +26,13 @@
  * have, and reusing the derivation is what makes it impossible rather than
  * merely unlikely.
  *
- * ## A dataset the caller can read nothing in is absent, not empty
+ * ## A view the caller can read nothing in is absent, not empty
  *
  * A column stays listed because naming its gate is what makes the refusal
- * actionable. A *dataset* with nothing readable in it has no such half-answer
+ * actionable. A *view* with nothing readable in it has no such half-answer
  * to give — every column would carry the same refusal, and the list would be a
  * page of them. {@link lwqlVisibleViews} decides, and the validator agrees
- * without a second arrangement: every column of an absent dataset is withheld,
+ * without a second arrangement: every column of an absent view is withheld,
  * so referencing one is refused.
  *
  * @see ./catalog/types.ts — the derivations this projects
@@ -67,7 +67,7 @@ const EXAMPLE_LOOKBACK_DAYS = 7;
 /** Rows an example query asks for. */
 const EXAMPLE_ROW_LIMIT = 100;
 
-/** One column of a LangWatchQL dataset, as the schema endpoint publishes it. */
+/** One column of a LangWatchQL view, as the schema endpoint publishes it. */
 export interface LangWatchQLSchemaColumn {
   readonly name: string;
   /** ClickHouse type, exactly what a query gets back. */
@@ -90,29 +90,29 @@ export interface LangWatchQLSchemaColumn {
   readonly available: boolean;
 }
 
-/** One LangWatchQL dataset, with everything a caller needs to write SQL over it. */
-export interface LangWatchQLSchemaDataset {
+/** One LangWatchQL view, with everything a caller needs to write SQL over it. */
+export interface LangWatchQLSchemaView {
   /** The name a caller writes, qualified with the LangWatchQL database. */
   readonly name: string;
   readonly description: string;
   /** What one row is, after deduplication. */
   readonly grain: string;
-  /** Columns another LangWatchQL dataset can be joined to this one on. */
+  /** Columns another LangWatchQL view can be joined to this one on. */
   readonly joinKeys: readonly string[];
   /** Filter on this to prune partitions. */
   readonly timeColumn: string;
-  /** How far behind ingestion this dataset can be. */
+  /** How far behind ingestion this view can be. */
   readonly freshness: string;
   readonly columns: readonly LangWatchQLSchemaColumn[];
-  /** A runnable query over this dataset, naming only unrestricted columns. */
+  /** A runnable query over this view, naming only unrestricted columns. */
   readonly exampleSql: string;
 }
 
 /** The LangWatchQL schema as one caller sees it. */
 export interface LangWatchQLSchema {
-  /** Database every dataset name is qualified with. */
+  /** Database every view name is qualified with. */
   readonly database: string;
-  readonly datasets: readonly LangWatchQLSchemaDataset[];
+  readonly views: readonly LangWatchQLSchemaView[];
   /**
    * Every function name a query may call. Permission-independent — the
    * functions a query may call do not vary by what a key can see — and equal to
@@ -123,11 +123,11 @@ export interface LangWatchQLSchema {
 }
 
 /**
- * A runnable query over one dataset.
+ * A runnable query over one view.
  *
  * Deliberately built from unrestricted columns only, so the example is valid
  * for every caller regardless of permissions — an example a caller cannot run
- * teaches them the wrong thing about the API. It filters on the dataset's time
+ * teaches them the wrong thing about the API. It filters on the view's time
  * column because that is the advice the catalog exists to give: without that
  * predicate the read touches every partition the tenant has.
  */
@@ -138,10 +138,10 @@ export function lwqlExampleSql({
   database: string;
   view: LangWatchQLViewDefinition;
 }): string {
-  // The column's own gates, not the combined dataset-plus-column ones: a
-  // dataset gated as a whole is only *visible* to a caller who already holds
+  // The column's own gates, not the combined view-plus-column ones: a
+  // view gated as a whole is only *visible* to a caller who already holds
   // its gates, so its ungated columns are runnable for everyone who can see
-  // the example — while the combined set would leave such a dataset with no
+  // the example — while the combined set would leave such a view with no
   // columns at all and emit `SELECT ` with nothing to select.
   const projection = view.columns
     .filter((column) => column.gates.length === 0)
@@ -150,7 +150,7 @@ export function lwqlExampleSql({
     .map((column) => column.name);
   if (projection.length === 0) {
     // Every column carries its own gate: the one query still runnable by any
-    // caller who can see the dataset is a count. No ORDER BY — an aggregate
+    // caller who can see the view is a count. No ORDER BY — an aggregate
     // without GROUP BY has nothing to order.
     return (
       `SELECT count() AS rows\n` +
@@ -187,7 +187,7 @@ export function describeLangWatchQLSchema({
   return {
     database,
     functions: LWQL_ALLOWED_FUNCTION_NAMES,
-    datasets: lwqlVisibleViews({ protections, views }).map((view) => ({
+    views: lwqlVisibleViews({ protections, views }).map((view) => ({
       name: `${database}.${view.name}`,
       description: view.description,
       grain: view.grain,

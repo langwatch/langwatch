@@ -395,7 +395,7 @@ describe("given the /api/v1/query REST family", () => {
       const result = await readSchema(projectA);
 
       expect(result.database).toBe(database);
-      expect(result.datasets.map((dataset: any) => dataset.name)).toEqual(
+      expect(result.views.map((view: any) => view.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${database}.${view.name}`),
       );
     });

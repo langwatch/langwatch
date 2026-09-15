@@ -13,12 +13,12 @@ import type {
 } from "~/server/analytics/lwql";
 
 /**
- * A response with two datasets, a gated column, units, join keys and example
+ * A response with two views, a gated column, units, join keys and example
  * SQL — everything the browser and the completion model are supposed to read.
  */
 export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   database: "analytics",
-  datasets: [
+  views: [
     {
       name: "analytics.traces_daily",
       description: "One row per trace, rolled up by day.",
@@ -90,20 +90,18 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   functions: ["avg", "count", "toStartOfHour"],
 };
 
-/** Every dataset name the response carries. */
-export const SCHEMA_DATASET_NAMES = SCHEMA_RESPONSE.datasets.map(
-  (dataset) => dataset.name,
-);
+/** Every view name the response carries. */
+export const SCHEMA_VIEW_NAMES = SCHEMA_RESPONSE.views.map((view) => view.name);
 
 /** Every column name the response carries, gated ones included. */
-export const SCHEMA_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap((dataset) =>
-  dataset.columns.map((column) => column.name),
+export const SCHEMA_COLUMN_NAMES = SCHEMA_RESPONSE.views.flatMap((view) =>
+  view.columns.map((column) => column.name),
 );
 
 /** Every column name the response marks available to this member. */
-export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap(
-  (dataset) =>
-    dataset.columns
+export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.views.flatMap(
+  (view) =>
+    view.columns
       .filter((column) => column.available)
       .map((column) => column.name),
 );

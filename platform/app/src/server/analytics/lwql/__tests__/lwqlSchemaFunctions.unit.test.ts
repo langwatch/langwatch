@@ -2,7 +2,7 @@
  * The allowed LangWatchQL functions, published on the schema itself
  * (issue #8085, AC8).
  *
- * `describeLangWatchQLSchema` already projects the catalog into datasets and
+ * `describeLangWatchQLSchema` already projects the catalog into views and
  * columns; this adds the one thing it does not yet carry — the function
  * allowlist a caller may use in `sql`. Pure and permission-independent: the
  * functions a query may call do not vary by what a project's key can see, so

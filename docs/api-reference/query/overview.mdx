@@ -1,9 +1,9 @@
 ---
 title: "Overview"
-description: "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query."
+description: "Run a read-only LangWatchQL SELECT over your project's analytics views, or discover which views and columns your key can query."
 ---
 
-The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics datasets. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the datasets, columns, and function names your key can query.
+The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics views. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the views, columns, and function names your key can query.
 
 The request body is the query itself, and a `200` is the result itself: no envelope, no wrapper object around it. A failure answers with the standard LangWatch error envelope and a real HTTP status, so one parser reads every response.
 
@@ -12,7 +12,7 @@ The request body is the query itself, and a `200` is the result itself: no envel
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/v1/query` | Run one LangWatchQL statement. |
-| `GET` | `/api/v1/query/schema` | List queryable datasets, columns, permission gates, and function names. |
+| `GET` | `/api/v1/query/schema` | List queryable views, columns, permission gates, and function names. |
 
 ## Authentication
 

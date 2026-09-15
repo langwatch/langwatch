@@ -119,7 +119,7 @@ export interface LangWatchQLViolation {
    *
    * The bar this API holds itself to: a caller — usually an agent with no
    * UI — never receives a refusal with nothing to act on. The more specific
-   * fields below (`allowedFunctions`, `availableDatasets`,
+   * fields below (`allowedFunctions`, `availableViews`,
    * `availableColumns`) are the sharper answer where one is resolvable;
    * `hint` is the floor every code clears regardless.
    */
@@ -136,19 +136,19 @@ export interface LangWatchQLViolation {
    */
   readonly allowedFunctions?: readonly string[];
   /**
-   * The dataset names the caller may reference, attached to `TABLE_NOT_ALLOWED`
+   * The view names the caller may reference, attached to `TABLE_NOT_ALLOWED`
    * when a written name failed to resolve — never to the bound-parameter
-   * variant of that code, which named no dataset to correct.
+   * variant of that code, which named no view to correct.
    */
-  readonly availableDatasets?: readonly string[];
+  readonly availableViews?: readonly string[];
   /**
-   * The dataset a `GATED_COLUMN` refusal's field was read from, when the walk
+   * The view a `GATED_COLUMN` refusal's field was read from, when the walk
    * could resolve it to exactly one table in scope.
    */
-  readonly dataset?: string;
+  readonly view?: string;
   /**
-   * The columns of {@link dataset} the caller may reference, attached
-   * alongside it when the policy carries column data for that dataset.
+   * The columns of {@link view} the caller may reference, attached
+   * alongside it when the policy carries column data for that view.
    */
   readonly availableColumns?: readonly string[];
   /**

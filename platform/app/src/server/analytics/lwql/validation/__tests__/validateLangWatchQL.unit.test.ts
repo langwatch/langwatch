@@ -31,7 +31,7 @@ function validate(
     gatedColumns: readonly string[];
     defaultDatabase?: string;
     limits?: { maxSubqueryDepth: number; maxNodeDepth: number };
-    datasetColumns?: Readonly<Record<string, readonly string[]>>;
+    viewColumns?: Readonly<Record<string, readonly string[]>>;
   } = POLICY,
 ): LangWatchQLValidation {
   return validateLangWatchQL({ sql, ...policy });
@@ -497,7 +497,7 @@ describe("validateLangWatchQL", () => {
 
   describe("given a violation whose refusal should name what exists", () => {
     /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
-    it("lists the caller's allowed datasets on an unknown dataset", () => {
+    it("lists the caller's allowed views on an unknown view", () => {
       const result = validate("SELECT id FROM billing.invoices");
 
       expect(result.ok).toBe(false);
@@ -505,14 +505,14 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "TABLE_NOT_ALLOWED",
       );
-      expect(violation?.availableDatasets).toEqual([
+      expect(violation?.availableViews).toEqual([
         "analytics.spans",
         "analytics.traces",
       ]);
     });
 
     /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
-    it("sorts and deduplicates availableDatasets regardless of the policy's own order", () => {
+    it("sorts and deduplicates availableViews regardless of the policy's own order", () => {
       const result = validate("SELECT id FROM billing.invoices", {
         allowedTables: [
           "analytics.traces",
@@ -528,17 +528,17 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "TABLE_NOT_ALLOWED",
       );
-      expect(violation?.availableDatasets).toEqual([
+      expect(violation?.availableViews).toEqual([
         "analytics.spans",
         "analytics.traces",
       ]);
     });
 
     /**
-     * The bound-parameter TABLE_NOT_ALLOWED names no dataset to correct — it
-     * still gets a hint, but never a stale/irrelevant dataset list.
+     * The bound-parameter TABLE_NOT_ALLOWED names no view to correct — it
+     * still gets a hint, but never a stale/irrelevant view list.
      */
-    it("omits availableDatasets when no dataset name was written", () => {
+    it("omits availableViews when no view name was written", () => {
       const result = validate("SELECT id FROM {which:Identifier}");
 
       expect(result.ok).toBe(false);
@@ -546,15 +546,15 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "TABLE_NOT_ALLOWED",
       );
-      expect(violation?.availableDatasets).toBeUndefined();
+      expect(violation?.availableViews).toBeUndefined();
       expect(violation?.hint).toBeTruthy();
     });
 
     /** @scenario "A GATED_COLUMN violation names the view's columns" */
-    it("names the dataset and its columns on a gated field read through an alias", () => {
+    it("names the view and its columns on a gated field read through an alias", () => {
       const result = validate("SELECT t.body FROM traces AS t", {
         ...POLICY,
-        datasetColumns: {
+        viewColumns: {
           "analytics.traces": ["TraceId", "Cost", "body"],
         },
       });
@@ -564,15 +564,15 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "GATED_COLUMN",
       );
-      expect(violation?.dataset).toBe("analytics.traces");
+      expect(violation?.view).toBe("analytics.traces");
       expect(violation?.availableColumns).toEqual(["body", "Cost", "TraceId"]);
     });
 
     /** @scenario "A GATED_COLUMN violation names the view's columns" */
-    it("resolves the dataset from the sole table in scope when the reference is unqualified", () => {
+    it("resolves the view from the sole table in scope when the reference is unqualified", () => {
       const result = validate("SELECT body FROM traces", {
         ...POLICY,
-        datasetColumns: { "analytics.traces": ["TraceId", "body"] },
+        viewColumns: { "analytics.traces": ["TraceId", "body"] },
       });
 
       expect(result.ok).toBe(false);
@@ -580,13 +580,13 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "GATED_COLUMN",
       );
-      expect(violation?.dataset).toBe("analytics.traces");
+      expect(violation?.view).toBe("analytics.traces");
     });
 
-    it("does not guess a dataset for an unqualified gated field with two tables in scope", () => {
+    it("does not guess a view for an unqualified gated field with two tables in scope", () => {
       const result = validate(
         "SELECT body FROM traces JOIN spans ON traces.TraceId = spans.TraceId",
-        { ...POLICY, datasetColumns: { "analytics.traces": ["body"] } },
+        { ...POLICY, viewColumns: { "analytics.traces": ["body"] } },
       );
 
       expect(result.ok).toBe(false);
@@ -594,13 +594,13 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "GATED_COLUMN",
       );
-      expect(violation?.dataset).toBeUndefined();
+      expect(violation?.view).toBeUndefined();
       expect(violation?.availableColumns).toBeUndefined();
       // Still not left with nothing to act on.
       expect(violation?.hint).toBeTruthy();
     });
 
-    it("omits availableColumns when the policy carries no column data for the dataset", () => {
+    it("omits availableColumns when the policy carries no column data for the view", () => {
       const result = validate("SELECT body FROM traces");
 
       expect(result.ok).toBe(false);
@@ -608,7 +608,7 @@ describe("validateLangWatchQL", () => {
       const violation = result.violations.find(
         (entry) => entry.code === "GATED_COLUMN",
       );
-      expect(violation?.dataset).toBe("analytics.traces");
+      expect(violation?.view).toBe("analytics.traces");
       expect(violation?.availableColumns).toBeUndefined();
     });
 
@@ -727,7 +727,7 @@ describe("validateLangWatchQL", () => {
       return result.blocks;
     };
 
-    it("records the datasets a block reads, with the aliases it gave them", () => {
+    it("records the views a block reads, with the aliases it gave them", () => {
       expect(
         blocksOf(
           "SELECT t.TraceId FROM traces AS t JOIN analytics.spans AS s ON t.TraceId = s.TraceId",
@@ -768,7 +768,7 @@ describe("validateLangWatchQL", () => {
     /**
      * An equality that only holds on one arm of an `OR` is not a key the join
      * matched on, and neither is one over a computed value. Recording either
-     * would tell a fanout rule two datasets line up when they may not.
+     * would tell a fanout rule two views line up when they may not.
      */
     it.each([
       [

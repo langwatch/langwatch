@@ -109,7 +109,7 @@ export const lwqlResultSchema = z.object({
 
 export const lwqlSchemaSchema = z.object({
   database: z.string(),
-  datasets: z.array(
+  views: z.array(
     z.object({
       name: z.string(),
       description: z.string(),

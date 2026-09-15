@@ -102,7 +102,7 @@ describe("given the generated OpenAPI document", () => {
           ?.properties ?? {};
 
       expect(Object.keys(properties)).toEqual(
-        expect.arrayContaining(["database", "datasets"]),
+        expect.arrayContaining(["database", "views"]),
       );
       expect(properties).not.toHaveProperty("jsonrpc");
     });

@@ -69,7 +69,7 @@ export {
 export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,
-  LangWatchQLSchemaDataset,
+  LangWatchQLSchemaView,
 } from "./schema";
 export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
 export type { LangWatchQLTimeWindow } from "./timeWindow";
