@@ -317,9 +317,8 @@ describe("given a cut-over organization's capped share link", () => {
      * annotating, read back through the grant head and expanded by the
      * collector. The neighbouring view-only link is the control — the two
      * differ in exactly one column and confer different things.
-     *
-     * @scenario "A non-default permission survives on both stores"
      */
+    /** @scenario "A non-default permission survives on both stores" */
     it("expands a link's stored permission into everything it confers", async () => {
       const annotateToken = `--test-share-token-annotate-${ns}`;
       const annotateId = `share_annotate_${ns}`;
