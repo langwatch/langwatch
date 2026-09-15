@@ -141,12 +141,29 @@ Feature: BetterAuth config (unmounted)
   # `pendingSsoSetup` is the flag this sets; it is reconciled once against
   # identifier data and dropped at bake end. Under the auth screens the same
   # situation is a routing decision the screen explains instead (ADR-117 §6).
-  Scenario: Existing user with wrong SSO provider gets pending flag
-    Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
+  #
+  # Scoped to the BROKER now that native social buttons mount beside it. An
+  # existing member arriving through the broker on a connection the
+  # organization has since stopped pinning is mid-migration, and locking them
+  # out is the failure this soft flag exists to avoid.
+  Scenario: Existing user with wrong brokered SSO provider gets pending flag
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
-    When that user signs in via Google
+    When that user signs in through the broker on a different connection
     Then signin succeeds
     And pendingSsoSetup is set to true
+
+  # A native provider is a button the deployment mounts itself, beside the
+  # broker. No existing way in runs through one, so refusing it locks nobody
+  # out - and admitting it would hand an organization that enforces single
+  # sign-on a second door it never agreed to. The refusal carries the code
+  # the error page already renders as "use your organization's sign-in".
+  Scenario: A native social sign-in at an SSO-enforced domain is refused
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+    And pendingSsoSetup is left alone
 
   # ============================================================================
   # RETIRED at D06 — the legacy impersonation pair, and the plugin allow-list

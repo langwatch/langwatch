@@ -562,8 +562,8 @@ describe("beforeAccountCreate", () => {
     });
   });
 
-  describe("when an EXISTING user's email domain matches an org with WRONG SSO provider", () => {
-    /** @scenario Existing user with wrong SSO provider gets pending flag */
+  describe("when an EXISTING user's email domain matches an org with a WRONG BROKERED provider", () => {
+    /** @scenario Existing user with wrong brokered SSO provider gets pending flag */
     it("soft-blocks by setting pendingSsoSetup=true without throwing", async () => {
       const update = vi.fn().mockResolvedValue(undefined);
       const prisma = makePrismaMock({
@@ -579,7 +579,7 @@ describe("beforeAccountCreate", () => {
           findUnique: vi.fn().mockResolvedValue({
             id: "org_1",
             ssoDomain: "acme.com",
-            ssoProvider: "okta",
+            ssoProvider: "waad|acme-conn",
           }),
         },
         account: {
@@ -589,15 +589,87 @@ describe("beforeAccountCreate", () => {
         },
       });
 
+      // Through the broker, on one of its other connections: the
+      // mid-migration member this soft flag exists for.
       await beforeAccountCreate({
         prisma,
-        account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
+        },
       });
 
       expect(update).toHaveBeenCalledWith({
         where: { id: "user_1" },
         data: { pendingSsoSetup: true },
       });
+    });
+  });
+
+  describe("when a NATIVE social provider is used at an SSO-enforced domain", () => {
+    const makeNativePrisma = (accountCount: number) => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const count = vi.fn().mockResolvedValue(accountCount);
+      return {
+        update,
+        count,
+        prisma: makePrismaMock({
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "user_1",
+              email: "existing@acme.com",
+              deactivatedAt: null,
+            }),
+            update,
+          },
+          organization: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "org_1",
+              ssoDomain: "acme.com",
+              ssoProvider: "waad|acme-conn",
+            }),
+          },
+          account: { deleteMany: vi.fn(), count },
+        }),
+      };
+    };
+
+    /** @scenario A native social sign-in at an SSO-enforced domain is refused */
+    it("refuses an existing member with SSO_PROVIDER_NOT_ALLOWED", async () => {
+      const { prisma, update } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      // The soft flag is for the broker's migration population, not this one:
+      // a refused sign-in must not also strand them behind a banner.
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("reaches that answer without counting the user's accounts", async () => {
+      const { prisma, count } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "microsoft",
+            accountId: "sub-2",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      expect(count).not.toHaveBeenCalled();
     });
   });
 
