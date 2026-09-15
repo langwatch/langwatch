@@ -1,7 +1,9 @@
 Feature: The stand-in-cast lint rule
   A cast through unknown or any is a type hole with a comment attached: the
-  value is whatever it was at runtime and the reader is told otherwise. Fix
-  the type, or parse the value at the seam where it arrives.
+  value is whatever it was at runtime and the reader is told otherwise. In
+  production, fix the type, or parse the value at the seam where it arrives.
+  A test file has no trust boundary to parse at, so it gets its own messages:
+  build the stub to the real shape instead of casting past the compiler.
 
   Background:
     Given a workspace whose agent feature is at strict layout version 0
@@ -50,8 +52,22 @@ Feature: The stand-in-cast lint rule
     Then it reports nothing
 
   @unit
-  Scenario: A stand-in cast in a test file is not governed
+  Scenario: A double cast inside a test reports the test message
     Given a test file that casts through unknown to build a double
+    When the stand-in-cast rule runs over it
+    Then it reports doubleCastInTest
+    And the message tells the reader to build the stub to the target's real shape
+
+  @unit
+  Scenario: An any cast inside a test reports the test message
+    Given a test file that casts a value to any
+    When the stand-in-cast rule runs over it
+    Then it reports anyCastInTest
+    And the message tells the reader to build the stub to the real type
+
+  @unit
+  Scenario: A const assertion in a test is left alone
+    Given a test file that freezes a literal with as const
     When the stand-in-cast rule runs over it
     Then it reports nothing
 

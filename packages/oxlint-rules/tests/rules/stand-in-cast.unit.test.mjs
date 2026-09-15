@@ -81,15 +81,34 @@ describe("given a governed source file", () => {
 });
 
 describe("given a test file", () => {
+  const TEST_SOURCE = "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts";
+
   describe("when it casts through unknown to build a double", () => {
-    /** @scenario "A stand-in cast in a test file is not governed" */
+    /** @scenario "A double cast inside a test reports the test message" */
+    it("reports doubleCastInTest", () => {
+      const found = report("const client = {} as unknown as PrismaClient;", TEST_SOURCE);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].messageId).toBe("doubleCastInTest");
+      expect(found[0].data.through).toBe("unknown");
+      expect(found[0].data.target).toBe("PrismaClient");
+    });
+  });
+
+  describe("when it casts a value to any", () => {
+    /** @scenario "An any cast inside a test reports the test message" */
+    it("reports anyCastInTest", () => {
+      const found = report("const loose = value as any;", TEST_SOURCE);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].messageId).toBe("anyCastInTest");
+    });
+  });
+
+  describe("when a literal is frozen with as const", () => {
+    /** @scenario "A const assertion in a test is left alone" */
     it("reports nothing", () => {
-      expect(
-        report(
-          "const client = {} as unknown as PrismaClient;",
-          "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts",
-        ),
-      ).toEqual([]);
+      expect(report("const roles = ['admin', 'member'] as const;", TEST_SOURCE)).toEqual([]);
     });
   });
 });

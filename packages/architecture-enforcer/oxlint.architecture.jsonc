@@ -108,6 +108,14 @@
     "langwatch/empty-catch": "error",
     // Measured 2026-09-10 over the `lint:oxlint` paths: 328 reports across
     // 178 files.
+    // Widened 2026-09-15 to cover test files, which it previously exempted:
+    // 1894 reports across 792 test files (362 `as any`, 1532 double casts),
+    // recorded in the baseline as the debt that existed at the moment of
+    // widening. Those 792 rows are deliberate: the register only forgives
+    // rows for a rule it has never seen, so it reads a widened rule as growth
+    // rather than as newly governed ground. Tests get their own message ids —
+    // a test value crossed no trust boundary, so the fix is a typed stub, not
+    // a schema.
     "langwatch/stand-in-cast": "error",
     // Measured 2026-09-10 over the `lint:oxlint` paths: 9 reports across 9
     // files.

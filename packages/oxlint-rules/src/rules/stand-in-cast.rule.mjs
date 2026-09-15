@@ -3,14 +3,17 @@ import { defineRule } from "../define-rule.mjs";
 
 // `x as unknown as T` and `x as any` are the two ways to tell the compiler to
 // stop asking. Both are a type hole with a comment attached: the value is
-// whatever it was at runtime and the reader is told otherwise. Fix the type,
-// or parse the value at the seam where it arrives. `as const`, a widening
-// `as T` on a literal, and `satisfies` all keep the check and are untouched.
+// whatever it was at runtime and the reader is told otherwise. In production,
+// fix the type, or parse the value at the seam where it arrives. In a test,
+// there is no trust boundary to parse at — the fix is a typed stub: build the
+// mock to the real shape (a factory/builder) or check it with `satisfies`
+// instead of forcing it past the compiler. `as const`, a widening `as T` on a
+// literal, and `satisfies` all keep the check and are untouched in both.
 
 const GOVERNED = /^(?:enterprise\/modules|modules|apps|packages)\//;
 
 function isGovernedSource(file) {
-  return file.isProduction && GOVERNED.test(file.workspacePath);
+  return GOVERNED.test(file.workspacePath);
 }
 
 const WHITESPACE = /\s+/g;
@@ -43,11 +46,23 @@ export const standInCastRule = defineRule({
       what: "`as any` drops the type of this expression.",
       fix: "If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise name its real type in place of `any`.",
     },
+    doubleCastInTest: {
+      what: "`as {{through}} as {{target}}` forces this test value to {{target}} without checking it.",
+      fix: "Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast.",
+      why: "A test value never crossed a trust boundary, so there is nothing to parse — the fix is a typed stub, not a schema.",
+    },
+    anyCastInTest: {
+      what: "`as any` drops the type of this test stub.",
+      fix: "Build the stub to the real type instead of casting: give each mocked member its real signature so the object type-checks without the cast.",
+    },
   },
   create(context, file) {
     if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "stand-in-cast" })) {
       return {};
     }
+
+    const doubleCastId = file.isTest ? "doubleCastInTest" : "doubleCast";
+    const anyCastId = file.isTest ? "anyCastInTest" : "anyCast";
 
     // The inner half of a double cast is reported once, as the outer one.
     const covered = new WeakSet();
@@ -62,7 +77,7 @@ export const standInCastRule = defineRule({
           covered.add(inner);
           context.report({
             node,
-            messageId: "doubleCast",
+            messageId: doubleCastId,
             data: {
               through: typeTextOf(source, inner.typeAnnotation),
               target: typeTextOf(source, node.typeAnnotation),
@@ -73,12 +88,12 @@ export const standInCastRule = defineRule({
         }
 
         if (isAnyAnnotation(node.typeAnnotation)) {
-          context.report({ node, messageId: "anyCast" });
+          context.report({ node, messageId: anyCastId });
         }
       },
       TSTypeAssertion(node) {
         if (isAnyAnnotation(node.typeAnnotation)) {
-          context.report({ node, messageId: "anyCast" });
+          context.report({ node, messageId: anyCastId });
         }
       },
     };
