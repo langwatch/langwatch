@@ -229,7 +229,10 @@ describe("given the opt-out catalog over the committed manifest", () => {
     );
     for (const view of derived) {
       const manifestTable = manifestByTable.get(view.sourceTable);
-      expect(manifestTable, `${view.sourceTable} not in manifest`).toBeDefined();
+      expect(
+        manifestTable,
+        `${view.sourceTable} not in manifest`,
+      ).toBeDefined();
       const override = LWQL_ALL_OVERRIDES[view.sourceTable] ?? {};
       const skip = override.skipColumns ?? {};
       // A column is covered when it is exposed under its own name or read by an

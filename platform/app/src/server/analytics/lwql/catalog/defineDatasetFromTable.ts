@@ -198,13 +198,17 @@ function summedType(valueType: string): string {
  * caller then hand-maps it in an override and pins it with a unit assertion.
  */
 function aggregateStateSpec(type: string): AggregateStateSpec | null {
-  const simple = /^SimpleAggregateFunction\(\s*([A-Za-z0-9_]+)\s*,\s*(.+)\)$/.exec(
-    type,
-  );
+  const simple =
+    /^SimpleAggregateFunction\(\s*([A-Za-z0-9_]+)\s*,\s*(.+)\)$/.exec(type);
   if (simple) {
-    return { combinator: simple[1]!, finalized: simple[2]!.trim(), simple: true };
+    return {
+      combinator: simple[1]!,
+      finalized: simple[2]!.trim(),
+      simple: true,
+    };
   }
-  if (!type.startsWith("AggregateFunction(") || !type.endsWith(")")) return null;
+  if (!type.startsWith("AggregateFunction(") || !type.endsWith(")"))
+    return null;
   const inner = type.slice("AggregateFunction(".length, -1);
   const args = sortTopLevel(inner);
   const func = args[0];
@@ -765,9 +769,7 @@ export function deriveDefaultCatalog({
       override.grainColumns ??
       (aggregating
         ? exposedSortKey
-        : sortKey
-            .filter((column) => column !== tenantColumn)
-            .map(exposedOf));
+        : sortKey.filter((column) => column !== tenantColumn).map(exposedOf));
     const timeColumn = override.timeColumn ?? defaultTimeColumn(manifestTable);
     const name = override.name ?? defaultDatasetName(manifestTable.name);
     // An aggregating dataset must advertise its whole bucket key as its join

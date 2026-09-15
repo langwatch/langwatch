@@ -515,7 +515,9 @@ export function lwqlPhysicalColumn(
   view: LangWatchQLViewDefinition,
   exposedName: string,
 ): string {
-  const column = view.columns.find((candidate) => candidate.name === exposedName);
+  const column = view.columns.find(
+    (candidate) => candidate.name === exposedName,
+  );
   const source = column?.sourceColumns[0];
   return source && source.length > 0 ? source : exposedName;
 }
