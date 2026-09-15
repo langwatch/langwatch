@@ -336,6 +336,7 @@ describe("the project tRPC namespace", () => {
       expect(probePermission).toHaveBeenCalledWith({
         permission: "project:manage",
         scope: { tier: "project", id: "project_123" },
+        by: expect.objectContaining({ id: ACTOR_ID }),
       });
     });
 
@@ -346,10 +347,10 @@ describe("the project tRPC namespace", () => {
         probePermission: async () => false,
       });
 
-      await expectRefusal(
-        caller.update({ projectId: "project_123", traceSharingEnabled: true }),
-        { code: "permission_denied", httpStatus: 403 },
-      );
+      await expectRefusal(caller.update({ projectId: "project_123", traceSharingEnabled: true }), {
+        code: "permission_denied",
+        httpStatus: 403,
+      });
       expect(update).not.toHaveBeenCalled();
     });
 
@@ -389,6 +390,7 @@ describe("the project tRPC namespace", () => {
       expect(probePermission).toHaveBeenCalledWith({
         permission: "project:delete",
         scope: { tier: "project", id: "victim" },
+        by: expect.objectContaining({ id: ACTOR_ID }),
       });
       expect(archive).not.toHaveBeenCalled();
     });
@@ -484,6 +486,7 @@ describe("the project tRPC namespace", () => {
       expect(probePermission).toHaveBeenCalledWith({
         permission: "project:create",
         scope: { tier: "team", id: "team-1" },
+        by: expect.objectContaining({ id: ACTOR_ID }),
       });
     });
 
@@ -503,6 +506,7 @@ describe("the project tRPC namespace", () => {
       expect(probePermission).toHaveBeenCalledWith({
         permission: "organization:manage",
         scope: { tier: "organization", id: "org-1" },
+        by: expect.objectContaining({ id: ACTOR_ID }),
       });
     });
 

@@ -19,6 +19,7 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
@@ -29,6 +30,7 @@ import { ProjectCredentialsService } from "../services/project-credentials.servi
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
+import type { ProjectBrowserApi, ProjectPermissionScope } from "../transport/project.trpc.ts";
 
 export type ProjectInfrastructure = Readonly<{
   topicClustering: {
@@ -44,32 +46,60 @@ export type ProjectInfrastructure = Readonly<{
 
 export type TopicClusteringCommands = ProjectInfrastructure["topicClustering"];
 
+/**
+ * The two process members this application reads, from the closed fourteen-name
+ * vocabulary. Their shapes are restated rather than imported from
+ * `@langwatch/infrastructure`: a module depends on contracts.
+ */
+type ProjectProcessMembers = Readonly<{
+  /** The deployment's symmetric cipher, for the stored-object credentials. */
+  encryption: Readonly<{ encrypt(plaintext: string): string }>;
+  /** Where a best-effort failure is reported when nothing can be done about it. */
+  logger: Readonly<{
+    error(payload: Readonly<Record<string, unknown>>, message: string): void;
+  }>;
+}>;
+
 type ProjectDependencies = Readonly<{
   organizations: typeof OrganizationApi;
   apiKeys: typeof ApiKeyApi;
   share: typeof ShareApi;
   topics: typeof TopicApi;
+  /**
+   * Asked about a scope the door's declared check did not resolve. Every
+   * process that installs this module installs AuthZ, which is what makes it
+   * a dependency rather than an answer the door has to carry in.
+   */
+  authorization: typeof AuthzApi;
 }>;
 type ProjectSetup = FeatureSetup<
   ProjectDependencies,
-  ProjectInfrastructure,
+  ProjectInfrastructure & ProjectProcessMembers,
   undefined,
   ProjectRepositories
 >;
 
 /**
- * The project feature's application.
- *
- * It implements two things by name: the module's own {@link ProjectApiContract},
- * which is what peer modules call, and {@link ProjectManagementApi}, which is
- * what the `/api/projects` door calls. The second is declared here rather than
- * left to agree by attention — the door is handed this object through the
- * operations-only feature-API proxy, so a member it names and this class does
- * not serve is not a type error at the seam, it is a `TypeError` on the first
- * request. Naming the door's shape in this `implements` clause is what turns
- * that back into a build failure.
+ * The part of the browser door's witness this application answers today. The
+ * three left out are other verticals' answers — trace protections, the Langy
+ * key mint, the audit record — and `apps/worker` installs this module beside
+ * none of them, so naming one as a dependency refuses its boot. Who supplies
+ * them: `.claude/handoffs/project-trpc-witness-alignment.md`.
  */
-export class ProjectApp implements ProjectApiContract, ProjectManagementApi {
+type ServedBrowserApi = Pick<
+  ProjectBrowserApi,
+  "projects" | "encryptProjectSecret" | "probePermission" | "reportTopicClusteringFailure"
+>;
+
+/**
+ * The project feature's application: what peer modules call, what the
+ * `/api/projects` door calls, and what the browser door reaches. Each door is
+ * handed this object through the operations-only proxy, so a member it names
+ * and this class does not serve throws on the first request — which is what
+ * naming every door's shape in the `implements` clause turns back into a build
+ * failure.
+ */
+export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ServedBrowserApi {
   listPaths(input: { projectIds: string[] }) {
     return this.#projectService.listPaths(input);
   }
@@ -80,19 +110,31 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi {
     apiKeys: ApiKeyApi,
     share: ShareApi,
     topics: TopicApi,
+    authorization: AuthzApi,
   };
+  /** Both names are from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["encryption", "logger"] as const;
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
   readonly #apiKeys: ApiKeyApi;
+  readonly #authorization: AuthzApi;
+  readonly #encryption: ProjectProcessMembers["encryption"];
+  readonly #logger: ProjectProcessMembers["logger"];
   private constructor(
     projectService: ProjectApplicationService,
     operations: ProjectOperationsService,
     apiKeys: ApiKeyApi,
+    authorization: AuthzApi,
+    encryption: ProjectProcessMembers["encryption"],
+    logger: ProjectProcessMembers["logger"],
   ) {
     this.#projectService = projectService;
     this.#operations = operations;
     this.#apiKeys = apiKeys;
+    this.#authorization = authorization;
+    this.#encryption = encryption;
+    this.#logger = logger;
   }
 
   static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
@@ -109,7 +151,68 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi {
       topicClustering: members.topicClustering,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
     });
-    return new ProjectApp(projects, operations, dependencies.apiKeys);
+    return new ProjectApp(
+      projects,
+      operations,
+      dependencies.apiKeys,
+      dependencies.authorization,
+      members.encryption,
+      members.logger,
+    );
+  }
+
+  /**
+   * This module's own application, as the browser door reaches it: the door
+   * holds one reference, so the project reads its procedures make and the
+   * deployment answers they need arrive through the same object.
+   */
+  projects(): ProjectApiContract {
+    return this;
+  }
+
+  /** The deployment's cipher, for the stored-object credentials on the form. */
+  encryptProjectSecret(value: string): string {
+    return this.#encryption.encrypt(value);
+  }
+
+  /**
+   * Whether `by` holds `permission` at a scope the door's declared check did
+   * not resolve. The caller is an argument because this application is the
+   * process's one instance: a probe reading a "current user" from anywhere
+   * else would answer for whoever asked last.
+   */
+  probePermission(input: {
+    permission: AuthzPermission;
+    scope: ProjectPermissionScope;
+    by: Readonly<{ id: string }>;
+  }): Promise<boolean> {
+    const { permission, scope, by } = input;
+
+    switch (scope.tier) {
+      case "project":
+        return this.#authorization.hasPermission({
+          userId: by.id,
+          permission,
+          projectId: scope.id,
+        });
+      case "team":
+        return this.#authorization.hasPermission({ userId: by.id, permission, teamId: scope.id });
+      case "organization":
+        return this.#authorization.hasPermission({
+          userId: by.id,
+          permission,
+          organizationId: scope.id,
+        });
+    }
+  }
+
+  /**
+   * A clustering request that did not land. Reported rather than raised: the
+   * door has already decided this is best effort, and the topic module
+   * re-schedules on its own.
+   */
+  reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void {
+    this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
   }
 
   /**

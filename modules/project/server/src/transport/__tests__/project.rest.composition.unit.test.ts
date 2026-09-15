@@ -17,6 +17,7 @@
  * Spec: specs/projects/projects-management-door.feature
  */
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
@@ -34,21 +35,27 @@ const OTHER_ORGANIZATION_ID = "organization-other";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
 
 /**
- * The three peer applications this family never reaches, as the feature-API
+ * The four peer applications this family never reaches, as the feature-API
  * references they really are: declared and deliberately never bound, so any
  * call refuses by name instead of quietly answering. No cast, and no
  * hand-written twin of another module's contract.
+ *
+ * AuthZ is among them: the management door authenticates an organization
+ * credential and enforces its own scope, so nothing here probes a permission.
+ * The browser door is the one that does.
  */
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
   apis.declare(OrganizationApi);
   apis.declare(ShareApi);
   apis.declare(TopicApi);
+  apis.declare(AuthzApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
     share: apis.reference(ShareApi),
     topics: apis.reference(TopicApi),
+    authorization: apis.reference(AuthzApi),
   };
 }
 
@@ -143,6 +150,10 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     members: {
       topicClustering: { requestClustering: async () => undefined },
       now: () => NOW.getTime(),
+      // Neither member is reached on this door: the management family writes no
+      // stored-object credential and reports no best-effort failure.
+      encryption: { encrypt: (plaintext) => `cipher(${plaintext})` },
+      logger: { error: () => undefined },
     },
     config: undefined,
     resources: new ResourceScope(),

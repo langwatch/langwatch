@@ -48,13 +48,15 @@ export interface ProjectBrowserApi {
   /** The deployment's secret encryption, for the stored-object credentials. */
   encryptProjectSecret(value: string): string;
   /**
-   * Whether the caller holds `permission` at a scope the declared check did
-   * not resolve: the team or organization a create names, and the OTHER
-   * project an archive acts on.
+   * Whether `by` holds `permission` at a scope the declared check did not
+   * resolve: the team or organization a create names, and the OTHER project an
+   * archive acts on. The caller travels as an argument because the process's
+   * one application instance answers it, for every request in flight.
    */
   probePermission(input: {
     permission: AuthzPermission;
     scope: ProjectPermissionScope;
+    by: Readonly<{ id: string }>;
   }): Promise<boolean>;
   /** The caller's captured-content visibility for the project. */
   getFieldProtections(input: { projectId: string }): Promise<ProjectFieldProtections>;
@@ -105,7 +107,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
     },
   })
   .handle(async ({ app, input, actor }) => {
-    await requireCreateStanding({ app, input });
+    await requireCreateStanding({ app, input, actor });
 
     const project = await app.projects().create(
       {
@@ -174,8 +176,8 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
    */
   .procedure("update")
   .withPermission("project:update")
-  .handle(async ({ app, input }) => {
-    await requireTraceSharingStanding({ app, input });
+  .handle(async ({ app, input, actor }) => {
+    await requireTraceSharingStanding({ app, input, actor });
 
     const updatedProject = await app.projects().updateSettings({
       projectId: input.projectId,
@@ -219,7 +221,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
 
   .procedure("archiveById")
   .withPermission("project:delete")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, input, actor }) => {
     if (input.projectToArchiveId === input.projectId) {
       throw new CannotArchiveCurrentProjectError();
     }
@@ -230,6 +232,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
     const canDeleteTarget = await app.probePermission({
       permission: "project:delete",
       scope: { tier: "project", id: input.projectToArchiveId },
+      by: actor,
     });
 
     if (!canDeleteTarget) throw new ProjectPermissionDeniedError("project:delete");
@@ -271,6 +274,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
 async function requireCreateStanding({
   app,
   input,
+  actor,
 }: {
   app: ProjectBrowserApi;
   input: Readonly<{
@@ -278,6 +282,7 @@ async function requireCreateStanding({
     teamId?: string | undefined;
     newTeamName?: string | undefined;
   }>;
+  actor: Readonly<{ id: string }>;
 }): Promise<void> {
   if (!input.teamId && !input.newTeamName) throw new ProjectCreateTargetMissingError();
 
@@ -285,10 +290,12 @@ async function requireCreateStanding({
     ? await app.probePermission({
         permission: "project:create",
         scope: { tier: "team", id: input.teamId },
+        by: actor,
       })
     : await app.probePermission({
         permission: "organization:manage",
         scope: { tier: "organization", id: input.organizationId },
+        by: actor,
       });
 
   if (!permitted) throw new ProjectCreateDeniedError();
@@ -302,15 +309,18 @@ async function requireCreateStanding({
 async function requireTraceSharingStanding({
   app,
   input,
+  actor,
 }: {
   app: ProjectBrowserApi;
   input: Readonly<{ projectId: string; traceSharingEnabled?: boolean | undefined }>;
+  actor: Readonly<{ id: string }>;
 }): Promise<void> {
   if (input.traceSharingEnabled === undefined) return;
 
   const permitted = await app.probePermission({
     permission: "project:manage",
     scope: { tier: "project", id: input.projectId },
+    by: actor,
   });
 
   if (!permitted) throw new TraceSharingDeniedError();
