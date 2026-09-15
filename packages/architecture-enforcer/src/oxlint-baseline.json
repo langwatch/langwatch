@@ -18887,6 +18887,14 @@
       "measured": "2026-09-07"
     },
     {
+      "key": "redis-containment|modules/agent/server/src/services/connected-agent.service.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "redis-containment|modules/langy/server/src/repositories/prisma/prisma.langy.repositories.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "repository-takes-only-its-store|enterprise/modules/billing/server/src/repositories/prisma/prisma.subscription.repository.ts",
       "measured": "2026-09-10"
     },

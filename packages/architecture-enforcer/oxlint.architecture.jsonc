@@ -66,6 +66,7 @@
     "langwatch/refusal-is-a-handled-error": "error",
     "langwatch/channel-takes-only-its-client": "error",
     "langwatch/clickhouse-containment": "error",
+    "langwatch/redis-containment": "error",
     "langwatch/repository-takes-only-its-store": "error",
     "langwatch/service-does-not-open-a-channel": "error",
     "langwatch/module-app-only-across-packages": "error",

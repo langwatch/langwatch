@@ -60,6 +60,7 @@ export { secretsThroughSourceRule } from "./rules/secrets-through-source.rule.mj
 export { serviceDoesNotOpenAChannelRule } from "./rules/service-does-not-open-a-channel.rule.mjs";
 export { channelTakesOnlyItsClientRule } from "./rules/channel-takes-only-its-client.rule.mjs";
 export { clickhouseContainmentRule } from "./rules/clickhouse-containment.rule.mjs";
+export { redisContainmentRule } from "./rules/redis-containment.rule.mjs";
 export { refusalIsAHandledErrorRule } from "./rules/refusal-is-a-handled-error.rule.mjs";
 export { repositoryTakesOnlyItsStoreRule } from "./rules/repository-takes-only-its-store.rule.mjs";
 export { serviceClassesRule } from "./rules/service-classes.rule.mjs";
