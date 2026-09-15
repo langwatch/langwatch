@@ -2,8 +2,13 @@
  * The `/api/projects` family on a runtime that stands in for the deployment:
  * one organization door, the credential fact, the route-scoped permission the
  * by-id routes ask, and the flat legacy envelope this family publishes.
+ *
+ * The door is handed its application through the SAME operations-only
+ * feature-API proxy the composition hands it — not the stub object directly —
+ * so a route naming an operation the application does not serve fails here the
+ * way it fails in production. That the real `ProjectApp` serves them is
+ * `project.rest.composition.unit.test.ts`.
  */
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   createRestRuntime,
   ForbiddenError,
@@ -13,15 +18,11 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { LocalFeatureApis } from "@langwatch/runtime-composition";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import {
-  projectRest,
-  projectRestCredential,
-  type ProjectManagementDirectory,
-} from "../project.rest.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import { TestProjectDirectory } from "./support/test-project-directory.ts";
+import { projectRest, projectRestCredential, ProjectManagementApi } from "../project.rest.ts";
+import { TestProjectManagementApi } from "./support/test-project-management-api.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 export const USER_ID = "user-1";
@@ -52,21 +53,38 @@ const renderRefusal: RestErrorHandler = (error, c) => {
   return c.json({ error: "Internal server error" }, 500);
 };
 
+/** What a test may narrow about the credential the door is reached with. */
+export type ProjectRestAccess = {
+  granted?: readonly string[];
+  grantedOnProject?: Readonly<Record<string, readonly string[]>>;
+};
+
 /**
- * The family over one project boundary and one credential boundary, each
- * stubbed method by method. `granted` is what the credential holds at the
- * organization; `grantedOnProject` what it holds at a named project.
+ * The family over one application boundary, stubbed operation by operation.
+ * `granted` is what the credential holds at the organization;
+ * `grantedOnProject` what it holds at a named project.
  */
 export function mountProjectRest(
-  options: {
-    projects?: Partial<ProjectManagementDirectory>;
-    apiKeys?: Partial<TestApiKeyService>;
-    granted?: readonly string[];
-    grantedOnProject?: Readonly<Record<string, readonly string[]>>;
-  } = {},
+  options: ProjectRestAccess & { app?: Partial<ProjectManagementApi> } = {},
 ) {
-  const projects = new TestProjectDirectory(options.projects ?? {});
-  const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
+  const { app, ...access } = options;
+
+  return mountProjectRestApplication(new TestProjectManagementApi(app ?? {}), access);
+}
+
+/**
+ * The same family over a WHOLE application — the one the composition builds,
+ * bound to its module-API token and reached through the operations-only proxy,
+ * exactly as `transport-mounting` does at boot.
+ */
+export function mountProjectRestApplication(
+  application: ProjectManagementApi,
+  options: ProjectRestAccess = {},
+) {
+  const apis = new LocalFeatureApis();
+  apis.declare(ProjectManagementApi);
+  apis.bind(ProjectManagementApi, application);
+  apis.ready();
   const granted = new Set<string>(options.granted ?? EVERY_PERMISSION);
   const grantedOnProject = options.grantedOnProject;
 
@@ -100,7 +118,7 @@ export function mountProjectRest(
   });
 
   const hono = runtime.mount(projectRest.router(), {
-    app: () => ({ projects: () => projects, apiKeys: () => apiKeys }),
+    app: () => apis.reference(ProjectManagementApi),
     onError: renderRefusal,
     facts: [
       bindRestMiddleware(projectRestCredential, () => ({

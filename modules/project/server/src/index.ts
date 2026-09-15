@@ -30,7 +30,6 @@ export {
   type ProjectManagementApi,
   projectRest,
   projectRestCredential,
-  type ProjectManagementDirectory,
 } from "./transport/project.rest.ts";
 export {
   type ProjectBrowserApi,

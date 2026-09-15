@@ -35,6 +35,7 @@ import type {
   AnalyticsTimeseriesReadOptions,
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
+  LangWatchQLCaller,
   LangWatchQLExecuteInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
@@ -51,6 +52,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
@@ -65,6 +67,7 @@ import {
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
+import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
 import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
 import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
@@ -208,7 +211,15 @@ class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
   }
 }
 
-export class AnalyticsApp implements AnalyticsApiContract {
+/**
+ * Both doors' shapes are declared in the `implements` clause, not left to
+ * agree by attention: a transport is handed this object through the
+ * operations-only feature-API proxy, so an operation a door names and this
+ * class does not serve is a `TypeError` on the first request rather than a
+ * type error at the seam. `/api/v1/query` answered 500 to every call for
+ * exactly that reason.
+ */
+export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -442,5 +453,24 @@ export class AnalyticsApp implements AnalyticsApiContract {
       userId: input.userId,
       projectId: input.projectId,
     });
+  }
+
+  /**
+   * The same restricted tenant identity for a CREDENTIAL rather than a member.
+   *
+   * It stops at the project because that is all the question is: an API key's
+   * protections are the key's own cut, already resolved as a transport fact by
+   * `resolveApiKeyProtections`, so resolving them a second time here could only
+   * disagree with the answer the door is already holding. Read through the same
+   * project peer as {@link resolveRunCaller}, and refusing with
+   * `project_not_found` the same way.
+   */
+  async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {
+    const project = await this.#dependencies.projects.findById(input.projectId);
+    if (!project) {
+      throw new NotFoundError("project_not_found", "Project", input.projectId);
+    }
+
+    return { id: project.id, lwqlKey: project.lwqlKey };
   }
 }

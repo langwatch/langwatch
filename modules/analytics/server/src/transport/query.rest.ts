@@ -6,11 +6,8 @@
 import {
   langWatchQLProtectionsSchema,
   lwqlStatementSchema,
+  type AnalyticsApi,
   type LangWatchQLCaller,
-  type LangWatchQLExecuteInput,
-  type LangWatchQLProtections,
-  type LangWatchQLQueryResult,
-  type LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
 import {
   canonicalBaseResponses,
@@ -31,16 +28,25 @@ import {
 /**
  * What the query door reaches. The project identity is the process's: the tenant
  * capability is hashed from a secret the request deliberately does not carry.
+ *
+ * The catalogue and the execution are taken straight off {@link AnalyticsApi},
+ * so this door cannot ask for a spelling the contract does not have — it asked
+ * for `describeSchema` and `execute` until now, which the application has
+ * never served under those names, and every request answered 500. `AnalyticsApp`
+ * declares `implements AnalyticsQueryApi` for the third.
  */
-export interface AnalyticsQueryApi {
+export interface AnalyticsQueryApi extends Pick<
+  AnalyticsApi,
+  "describeLangWatchQLSchema" | "executeLangWatchQL"
+> {
   /**
-   * The project identity one execution runs under. Its LangWatchQL secret is
-   * read server-side and must never leave the handler — no field of it may
-   * appear in a response.
+   * The project identity one execution runs under, resolved for a CREDENTIAL
+   * rather than for a member — this door carries no session, and its caller's
+   * protections arrive as a fact rather than being resolved here. The
+   * LangWatchQL secret it carries is read server-side and must never leave the
+   * handler: no field of it may appear in a response.
    */
-  runCallerFor(input: { projectId: string }): Promise<LangWatchQLCaller>;
-  describeSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
-  execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
 }
 
 export const AnalyticsQueryApi = moduleApi<AnalyticsQueryApi>("analytics");
@@ -172,8 +178,8 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
   .handle(async ({ app, input, scope }, protections) => {
     const { sql, parameters, timeWindow, granularitySeconds } = input;
 
-    return app.execute({
-      project: await app.runCallerFor({ projectId: scope.id }),
+    return app.executeLangWatchQL({
+      project: await app.resolveApiKeyRunCaller({ projectId: scope.id }),
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
@@ -204,5 +210,5 @@ export const queryRest = defineRestRouter(AnalyticsQueryApi)
       },
     },
   })
-  .handle(({ app }, protections) => app.describeSchema({ protections }))
+  .handle(({ app }, protections) => app.describeLangWatchQLSchema({ protections }))
   .build();

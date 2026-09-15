@@ -6,7 +6,7 @@
  *       specs/api-keys/project-key-read-access.feature
  */
 import { anyAuthenticated } from "@langwatch/api/access";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
   BadRequestError,
   defineRestMiddleware,
@@ -29,10 +29,11 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
   type Project,
+  type ProjectApi,
   type ProjectWithTeam,
+  type UpdateProjectInput,
 } from "@langwatch/project-contract";
 import { moduleApi } from "@langwatch/runtime-composition";
-import type { ProjectService } from "../services/project.service.ts";
 import { z } from "zod";
 
 import {
@@ -46,19 +47,70 @@ import {
 } from "../rules/project-openapi.rules.ts";
 
 /**
- * What the management door reaches: this module's own project directory, and
- * the credential service that mints a service key and rotates the ingestion
- * key. Two accessors, because those are the boundaries the routes call.
+ * What the management door reaches, as flat operations the module's own
+ * application serves.
+ *
+ * Every member is implemented by `ProjectApp`, which declares `implements
+ * ProjectManagementApi` — so a door that asks for something the composition
+ * does not supply fails the build rather than the first request. It used to
+ * ask for two accessors (`projects()`, `apiKeys()`) that no application had,
+ * and every route in this family answered 500.
+ *
+ * The two reads are taken straight off {@link ProjectApi} so they cannot drift
+ * from the contract. The five writes are declared here because they are this
+ * door's own question — an ORGANIZATION credential acting on one of that
+ * organization's projects — and no peer module asks it.
  */
-/** The five project operations the management door calls, and nothing else. */
-export type ProjectManagementDirectory = Pick<
-  ProjectService,
-  "listByOrganization" | "update" | "findWithTeam" | "create" | "archive"
->;
-
-export interface ProjectManagementApi {
-  projects(): ProjectManagementDirectory;
-  apiKeys(): ApiKeyApi;
+export interface ProjectManagementApi extends Pick<
+  ProjectApi,
+  "listByOrganization" | "findWithTeam"
+> {
+  /**
+   * Provisions a project in this organization. Distinct from
+   * `ProjectApi.create(input, by)` because a management credential may be a
+   * service key, which acts as nobody: the actor here is nullable and that
+   * one's is not.
+   */
+  createInOrganization(
+    input: Readonly<{
+      organizationId: string;
+      userId: string | null;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+    }>,
+  ): Promise<Project>;
+  /**
+   * Writes exactly the fields the request carried, scoped to the organization
+   * the credential resolved — never to the project's own organization, which
+   * would let a token issued for one organization write to another's project.
+   */
+  updateInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+  ): Promise<Project>;
+  /**
+   * Archives one of this organization's projects, answering with the row it
+   * archived — this family publishes `{ id, name, archivedAt }`, so a bare
+   * "already archived" verdict would not serve it.
+   */
+  archiveInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string }>,
+  ): Promise<Project>;
+  /** Which of the organization's projects the presented credential reaches. */
+  resolveVisibleProjects(
+    input: Readonly<{ apiKeyId: string; organizationId: string }>,
+  ): Promise<ApiKeyVisibleProjects>;
+  /** The service key minted alongside a newly provisioned project. */
+  provisionServiceKey(
+    input: Readonly<{
+      projectId: string;
+      projectName: string;
+      organizationId: string;
+      createdByUserId: string | null;
+    }>,
+  ): Promise<{ token: string; apiKeyId: string }>;
 }
 
 export const ProjectManagementApi = moduleApi<ProjectManagementApi>("project");
@@ -152,12 +204,12 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withDocs(LIST_PROJECTS)
   .withMiddleware(projectRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
-    const visible = await app.apiKeys().resolveVisibleProjects({
+    const visible = await app.resolveVisibleProjects({
       apiKeyId: credential.apiKeyId,
       organizationId: scope.id,
     });
 
-    const result = await app.projects().listByOrganization({
+    const result = await app.listByOrganization({
       organizationId: scope.id,
       page: input.page,
       limit: input.limit,
@@ -182,19 +234,17 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       userId: credential.userId,
     });
 
-    const serviceKey = await app.apiKeys().create({
-      name: `${project.name} Service Key`,
-      userId: null,
-      createdByUserId: credential.userId,
+    const serviceKey = await app.provisionServiceKey({
+      projectId: project.id,
+      projectName: project.name,
       organizationId: scope.id,
-      permissionMode: "all",
-      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: project.id }],
+      createdByUserId: credential.userId,
     });
 
     return {
       ...projectResponse(project),
       serviceApiKey: serviceKey.token,
-      serviceApiKeyId: serviceKey.apiKey.id,
+      serviceApiKeyId: serviceKey.apiKeyId,
     };
   })
 
@@ -218,8 +268,8 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .handle(async ({ app, input, scope }) => {
     try {
       return projectResponse(
-        await app.projects().update({
-          id: input.projectId,
+        await app.updateInOrganization({
+          projectId: input.projectId,
           organizationId: scope.id,
           data: {
             ...(input.name !== undefined && { name: input.name }),
@@ -291,7 +341,7 @@ async function projectInOrganization({
   id: string;
   organizationId: string;
 }): Promise<ProjectWithTeam> {
-  const project = await app.projects().findWithTeam(id);
+  const project = await app.findWithTeam(id);
 
   if (!project || project.team.organizationId !== organizationId) {
     throw new NotFoundError("Project not found");
@@ -319,7 +369,7 @@ async function provisionProject({
   userId: string | null;
 }): Promise<Project> {
   try {
-    return await app.projects().create({
+    return await app.createInOrganization({
       organizationId,
       userId,
       teamId: input.teamId,
@@ -348,7 +398,7 @@ async function archiveProject({
   organizationId: string;
 }): Promise<Project> {
   try {
-    return await app.projects().archive({ id, organizationId });
+    return await app.archiveInOrganization({ projectId: id, organizationId });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) throw new NotFoundError("Project not found");
     if (error instanceof PersonalProjectProtectedError) throw new ForbiddenError(error.message);

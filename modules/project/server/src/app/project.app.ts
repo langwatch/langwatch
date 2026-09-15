@@ -1,4 +1,4 @@
-import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -28,6 +28,7 @@ import { ProjectOperationsService } from "../services/project-operations.service
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
+import type { ProjectManagementApi } from "../transport/project.rest.ts";
 
 export type ProjectInfrastructure = Readonly<{
   topicClustering: {
@@ -56,7 +57,19 @@ type ProjectSetup = FeatureSetup<
   ProjectRepositories
 >;
 
-export class ProjectApp implements ProjectApiContract {
+/**
+ * The project feature's application.
+ *
+ * It implements two things by name: the module's own {@link ProjectApiContract},
+ * which is what peer modules call, and {@link ProjectManagementApi}, which is
+ * what the `/api/projects` door calls. The second is declared here rather than
+ * left to agree by attention — the door is handed this object through the
+ * operations-only feature-API proxy, so a member it names and this class does
+ * not serve is not a type error at the seam, it is a `TypeError` on the first
+ * request. Naming the door's shape in this `implements` clause is what turns
+ * that back into a build failure.
+ */
+export class ProjectApp implements ProjectApiContract, ProjectManagementApi {
   listPaths(input: { projectIds: string[] }) {
     return this.#projectService.listPaths(input);
   }
@@ -71,12 +84,15 @@ export class ProjectApp implements ProjectApiContract {
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
+  readonly #apiKeys: ApiKeyApi;
   private constructor(
     projectService: ProjectApplicationService,
     operations: ProjectOperationsService,
+    apiKeys: ApiKeyApi,
   ) {
     this.#projectService = projectService;
     this.#operations = operations;
+    this.#apiKeys = apiKeys;
   }
 
   static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
@@ -93,7 +109,87 @@ export class ProjectApp implements ProjectApiContract {
       topicClustering: members.topicClustering,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
     });
-    return new ProjectApp(projects, operations);
+    return new ProjectApp(projects, operations, dependencies.apiKeys);
+  }
+
+  /**
+   * The `/api/projects` management operations. Each is scoped to the
+   * organization the door's credential resolved, which is the argument the
+   * in-app paths above resolve from the project itself instead: a management
+   * token issued for one organization must not reach another's project, and
+   * that difference is the whole reason these are separate operations.
+   */
+  createInOrganization(
+    input: Readonly<{
+      organizationId: string;
+      userId: string | null;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+    }>,
+  ): Promise<Project> {
+    return this.#projectService.create({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      teamId: input.teamId,
+      newTeamName: input.newTeamName,
+      name: input.name,
+      language: input.language,
+      framework: input.framework,
+    });
+  }
+
+  updateInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string; data: UpdateProjectInput }>,
+  ): Promise<Project> {
+    return this.#projectService.update({
+      id: input.projectId,
+      organizationId: input.organizationId,
+      data: input.data,
+    });
+  }
+
+  archiveInOrganization(
+    input: Readonly<{ projectId: string; organizationId: string }>,
+  ): Promise<Project> {
+    return this.#projectService.archive({
+      id: input.projectId,
+      organizationId: input.organizationId,
+    });
+  }
+
+  resolveVisibleProjects(
+    input: Readonly<{ apiKeyId: string; organizationId: string }>,
+  ): Promise<ApiKeyVisibleProjects> {
+    return this.#apiKeys.resolveVisibleProjects(input);
+  }
+
+  /**
+   * The service key a newly provisioned project is handed back with: an
+   * organization key bound as ADMIN on that project alone, belonging to no
+   * member. The binding shape lives here rather than in the door because it is
+   * what a project's own service credential IS, not how one door spells it.
+   */
+  async provisionServiceKey(
+    input: Readonly<{
+      projectId: string;
+      projectName: string;
+      organizationId: string;
+      createdByUserId: string | null;
+    }>,
+  ): Promise<{ token: string; apiKeyId: string }> {
+    const created = await this.#apiKeys.create({
+      name: `${input.projectName} Service Key`,
+      userId: null,
+      createdByUserId: input.createdByUserId,
+      organizationId: input.organizationId,
+      permissionMode: "all",
+      bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: input.projectId }],
+    });
+
+    return { token: created.token, apiKeyId: created.apiKey.id };
   }
 
   isPresenceEnabled(input: { projectId: string }) {

@@ -24,7 +24,8 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import { langWatchQLCallerProtections, queryRest, type AnalyticsQueryApi } from "../query.rest.ts";
+import { LocalFeatureApis } from "@langwatch/runtime-composition";
+import { AnalyticsQueryApi, langWatchQLCallerProtections, queryRest } from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
@@ -1368,15 +1369,23 @@ function mountQueryDoor({
   });
 
   const queryApi: AnalyticsQueryApi = {
-    runCallerFor: async () => tenant(),
-    describeSchema: (input) => service().describeSchema(input),
-    execute: (input) => service().execute(input),
+    resolveApiKeyRunCaller: async () => tenant(),
+    describeLangWatchQLSchema: (input) => service().describeSchema(input),
+    executeLangWatchQL: (input) => service().execute(input),
   };
+
+  // Reached through the operations-only feature-API proxy, the way the
+  // composition hands an application to a door: a route naming an operation
+  // the application does not serve must fail here rather than in production.
+  const apis = new LocalFeatureApis();
+  apis.declare(AnalyticsQueryApi);
+  apis.bind(AnalyticsQueryApi, queryApi);
+  apis.ready();
 
   const app = new Hono().route(
     "/",
     runtime.mount(queryRest.router(), {
-      app: () => queryApi,
+      app: () => apis.reference(AnalyticsQueryApi),
       onError: renderHandled,
       facts: [
         bindRestMiddleware(langWatchQLCallerProtections, () => ({
