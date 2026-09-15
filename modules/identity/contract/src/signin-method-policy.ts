@@ -1,11 +1,15 @@
-import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { SignInMethodPolicyResolver } from "./signin-router.service.ts";
+import type { SignInMethod, SignInMethodPolicy } from "./signin-routing.ts";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
  * routing gate moved into. `NEXTAUTH_PROVIDER` becomes the self-hosted
  * default method set; a second element can be added later without ending it.
  */
+
+/** Instance-level method policy, including ADR-027's frozen license gate. */
+export interface SignInMethodPolicyResolver {
+  resolvePolicy(): Promise<SignInMethodPolicy>;
+}
 
 /**
  * What the deployment answers so the policy can be resolved.

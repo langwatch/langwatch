@@ -136,6 +136,8 @@ export {
   IdentityPasskeyNotRecognizedError,
   IdentityPrimaryMustDemoteFirstError,
   IdentityPrimaryRequiresVerifiedError,
+  IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE,
+  IdentityUnsupportedStorageQueryError,
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
   IdentityVerificationNotSettledError,
@@ -386,6 +388,14 @@ export {
   passwordProblem,
 } from "./password-policy.ts";
 export { primaryEmailOf } from "./primary-email.ts";
+export {
+  LOCAL_METHOD_SET,
+  PASSKEY_METHOD,
+  PASSWORD_METHOD,
+  SignInMethodPolicyService,
+  type SignInMethodPolicyInputs,
+  type SignInMethodPolicyResolver,
+} from "./signin-method-policy.ts";
 export { reduceIdentity } from "./reduce.ts";
 export {
   emptyScimSync,

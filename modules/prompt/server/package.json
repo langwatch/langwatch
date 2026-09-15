@@ -19,6 +19,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
     }
   },
   "scripts": {

@@ -1,5 +1,5 @@
+import { LOCAL_METHOD_SET } from "@langwatch/identity-contract";
 import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
-import { LOCAL_METHOD_SET } from "./signin-method-policy.service.ts";
 
 /**
  * Activation's break-glass precondition, before break-glass BINDINGS exist.

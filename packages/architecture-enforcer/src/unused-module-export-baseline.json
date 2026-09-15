@@ -3111,10 +3111,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/prompt/server/src/services/prompt-postgres-composition.service.ts|PromptPersistence",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/prompt/server/src/services/prompt-sync.service.ts|ConfigData",
       "measured": "2026-09-10"
     },

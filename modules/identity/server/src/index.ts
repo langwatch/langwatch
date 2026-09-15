@@ -124,7 +124,6 @@ export {
   type SignInAccountLookup,
   type SignInBreakGlassLimiter,
   type SignInDomainRouting,
-  type SignInMethodPolicyResolver,
   type SignInRouteRequest,
   SignInRouterService,
   type SignInRouterDeps,
@@ -266,13 +265,6 @@ export {
   type JoinRequestsServiceDeps,
   type JoinSetting,
 } from "./rules/join-requests-contract.rules.ts";
-export {
-  LOCAL_METHOD_SET,
-  PASSKEY_METHOD,
-  PASSWORD_METHOD,
-  SignInMethodPolicyService,
-  type SignInMethodPolicyInputs,
-} from "./services/signin-method-policy.service.ts";
 export {
   PrismaIdentityHeadsRepository,
   type PrismaIdentityHeadsDatabase,

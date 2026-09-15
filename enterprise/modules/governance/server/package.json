@@ -51,10 +51,8 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/project-server": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/trace-server": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
@@ -67,6 +65,7 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/gateway-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
     "nanoid": "^6.0.0",
     "typescript": "catalog:",
     "vitest": "catalog:"

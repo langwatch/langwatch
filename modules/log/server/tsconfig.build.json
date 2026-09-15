@@ -33,9 +33,6 @@
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../data-privacy/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -55,9 +52,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../trace/server/tsconfig.build.json"
     }
   ]
 }

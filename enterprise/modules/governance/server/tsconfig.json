@@ -72,9 +72,6 @@
       "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/project/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
@@ -84,9 +81,6 @@
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/trace/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
@@ -94,6 +88,9 @@
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/trace/server/tsconfig.build.json"
     }
   ]
 }

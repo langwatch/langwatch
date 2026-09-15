@@ -16703,10 +16703,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/services/signin-method-policy.service.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|modules/identity/server/src/services/signin-router.service.ts",
       "measured": "2026-09-10"
     },

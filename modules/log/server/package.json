@@ -23,7 +23,6 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/data-privacy-contract": "workspace:*",
-    "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -31,13 +30,13 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/trace-server": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",
     "langwatch": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/trace-server": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

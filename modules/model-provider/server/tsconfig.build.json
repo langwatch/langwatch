@@ -60,9 +60,6 @@
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
-      "path": "../../secret/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/task/tsconfig.build.json"
     },
     {

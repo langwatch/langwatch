@@ -20,7 +20,7 @@ import { AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { PostgresPromptAdapter } from "@langwatch/prompt-server";
+import { promptServiceFixture } from "@langwatch/prompt-server/testing";
 import {
   ExperimentExecutionDataService,
   type ExperimentWorkflowDsl,
@@ -168,8 +168,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     await prisma.$disconnect();
   });
 
-  const createPromptService = (): PromptApi =>
-    PostgresPromptAdapter.create({ database: prisma! }).build();
+  const createPromptService = (): PromptApi => promptServiceFixture({ database: prisma! });
 
   const services = () => ({
     datasets: {} as DatasetApi,

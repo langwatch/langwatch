@@ -4,14 +4,14 @@
  * The suite moved with the policy. What it proved before — that ADR-027's
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { routeSignIn } from "@langwatch/identity-contract";
+import { routeSignIn } from "../signin-routing.ts";
 import {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
   PASSWORD_METHOD,
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
-} from "../signin-method-policy.service.ts";
+} from "../signin-method-policy.ts";
 
 const federationLicensed = vi.fn<() => Promise<boolean>>();
 const resolveAuthProvider = vi.fn<() => Promise<string>>();
@@ -99,7 +99,7 @@ describe("the instance sign-in method policy", () => {
     it("appends the passkey to the default method set", async () => {
       const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
 
-      expect(policy.defaultMethods.at(-1)).toEqual(PASSKEY_METHOD);
+      expect(policy.defaultMethods[policy.defaultMethods.length - 1]).toEqual(PASSKEY_METHOD);
     });
 
     /**

@@ -72,9 +72,6 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -100,9 +97,6 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../trace/server/tsconfig.build.json"
     }
   ]
 }

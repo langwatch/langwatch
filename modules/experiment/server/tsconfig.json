@@ -18,9 +18,6 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../agent/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -66,16 +63,10 @@
       "path": "../../prompt/contract/tsconfig.build.json"
     },
     {
-      "path": "../../prompt/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/server/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
@@ -88,6 +79,9 @@
     },
     {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/server/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

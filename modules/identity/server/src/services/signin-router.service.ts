@@ -2,7 +2,7 @@ import {
   type AccountSignInMethods,
   type RoutableConnection,
   type RoutingDecision,
-  type SignInMethodPolicy,
+  type SignInMethodPolicyResolver,
   routeSignIn,
   routingIdentifierOf,
 } from "@langwatch/identity-contract";
@@ -22,11 +22,6 @@ export interface SignInDomainRouting {
   /** Every connection this instance could auto-redirect to with no address
    *  in hand (the self-hosted sole-connection rule). */
   listActiveConnections(): Promise<readonly RoutableConnection[]>;
-}
-
-/** Instance-level method policy, including ADR-027's frozen license gate. */
-export interface SignInMethodPolicyResolver {
-  resolvePolicy(): Promise<SignInMethodPolicy>;
 }
 
 /**

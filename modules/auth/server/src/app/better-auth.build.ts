@@ -4,10 +4,13 @@
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
-import { SignInMethodPolicyService } from "@langwatch/identity-server";
+import {
+  SignInMethodPolicyService,
+  type RoutingDecision,
+  type SignInMethodPolicy,
+} from "@langwatch/identity-contract";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -41,11 +44,11 @@ export type BetterAuthDeploymentIdentity = Readonly<{
 
 /** Better Auth's storage engine: the stock Prisma adapter over the module's own client. */
 export class PrismaBetterAuthStorage extends BetterAuthStorage {
-  static create(database: PrismaClient): PrismaBetterAuthStorage {
+  static create(database: ProcessMembers["prisma"]): PrismaBetterAuthStorage {
     return new PrismaBetterAuthStorage(database);
   }
 
-  private constructor(private readonly database: PrismaClient) {
+  private constructor(private readonly database: ProcessMembers["prisma"]) {
     super();
   }
 
@@ -260,7 +263,7 @@ export type BuildBetterAuthOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no instance. */
   identity: BetterAuthDeploymentIdentity;
   /** The typed client every database hook reads and writes through. */
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   /** Better Auth's session cache lives here when this process has a Redis. */
   redis: RedisConnection | null;
   /** The Auth application whose sessions this instance mints and revokes. */
