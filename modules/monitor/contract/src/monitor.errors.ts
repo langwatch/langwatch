@@ -76,3 +76,16 @@ export class MonitorSourceProjectForbiddenError extends HandledError {
     this.name = "MonitorSourceProjectForbiddenError";
   }
 }
+
+/** A capability this deployment did not compose, refused by name. */
+export class MonitorCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "MonitorCapabilityUnavailableError";
+  }
+}
