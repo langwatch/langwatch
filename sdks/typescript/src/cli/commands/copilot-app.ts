@@ -162,7 +162,7 @@ async function resolveCopilotAppKey(
       saveConfig({
         ...cfg,
         default_personal_ingest_keys: {
-          ...(cfg.default_personal_ingest_keys ?? {}),
+          ...cfg.default_personal_ingest_keys,
           [sourceType]: { secret: resolved.token },
         },
       });

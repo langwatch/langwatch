@@ -20,7 +20,7 @@ const GROUP_ID = "group-1";
 const USER_ID = "user-1";
 const USER_ID_2 = "user-2";
 
-const backends: ReadonlyArray<Readonly<{ name: string; create: () => OrganizationRepositories }>> = [
+const backends: readonly Readonly<{ name: string; create: () => OrganizationRepositories }>[] = [
   {
     name: "memory",
     create: () => organizationRepositories.definitions.memory.create(),

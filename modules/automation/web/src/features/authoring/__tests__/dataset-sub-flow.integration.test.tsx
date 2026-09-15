@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { refetchMock, datasets } = vi.hoisted(() => ({
   refetchMock: vi.fn(),
   datasets: {
-    rows: [] as Array<{ id: string; name: string; columnTypes: unknown }>,
+    rows: [] as { id: string; name: string; columnTypes: unknown }[],
   },
 }));
 

@@ -194,7 +194,7 @@ describe("shortReason", () => {
 });
 
 describe("the headline one call produces", () => {
-  const headlines: Array<[string, LocalCall, string]> = [
+  const headlines: [string, LocalCall, string][] = [
     ["a command", bashCall("uv run pytest"), "Bash(uv run pytest)"],
     [
       "a read",
@@ -251,7 +251,7 @@ describe("the headline one call produces", () => {
 });
 
 describe("the result of a file call", () => {
-  const cases: Array<[string, LocalCall, string, string]> = [
+  const cases: [string, LocalCall, string, string][] = [
     [
       "a read",
       { ...envelope, tool: "local_read", params: { path: "a.py" } },
@@ -510,7 +510,7 @@ describe("the line a running command draws", () => {
     });
   });
 
-  const elapsed: Array<[number, string]> = [
+  const elapsed: [number, string][] = [
     [0, "0s"],
     [12_400, "12s"],
     [59_999, "59s"],
@@ -544,7 +544,7 @@ describe("holding the transcript", () => {
 });
 
 describe("the line a settled answer produces", () => {
-  const cases: Array<[string, Parameters<typeof settledLine>[0], string]> = [
+  const cases: [string, Parameters<typeof settledLine>[0], string][] = [
     [
       "a session grant from the terminal",
       { decision: "allow_pattern", patterns: ["uv run"] },

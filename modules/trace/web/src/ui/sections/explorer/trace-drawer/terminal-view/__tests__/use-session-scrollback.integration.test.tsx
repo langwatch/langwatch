@@ -24,12 +24,12 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
     },
     /** The session's turns, time ascending, as the conversation read returns them. */
     conversation: {
-      turns: [] as Array<{
+      turns: [] as {
         traceId: string;
         timestamp: number;
         totalTokens?: number | null;
         totalCost?: number | null;
-      }>,
+      }[],
       isLoading: false,
     },
   };

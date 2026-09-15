@@ -33,7 +33,7 @@ export abstract class VirtualKeyAuthorizationRepository {
     organizationId: string;
   }): Promise<{
     traceProjectId: string | null;
-    scopes: Array<{ scopeType: string; scopeId: string }>;
+    scopes: { scopeType: string; scopeId: string }[];
   } | null>;
   /** Of the named guardrails, those belonging to this project. */
   abstract findGuardrailIdsInProject(input: {

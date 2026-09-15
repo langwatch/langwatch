@@ -22,7 +22,7 @@ export class GatewayBudgetScopeReachService {
   resolveBudgets(input: {
     candidates: GatewayKeyReachCandidate[];
     traceProjects: TraceDestinationProject[];
-    budgets: Array<GatewayBudgetScope & { id: string }>;
+    budgets: (GatewayBudgetScope & { id: string })[];
   }): Map<string, GatewayBudgetScopeReach> {
     const keys = this.keyReach(input.candidates, input.traceProjects);
     const reachableProjectIds = this.reachableProjectIds(keys);

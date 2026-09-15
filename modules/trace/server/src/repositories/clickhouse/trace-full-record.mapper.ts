@@ -171,7 +171,7 @@ export class TraceFullRecordMapper {
     attributes: NormalizedAttributes,
   ): Record<string, TraceRecordValue> | null {
     const metrics: Record<string, TraceRecordValue> = {};
-    const values: Array<[string, unknown]> = [
+    const values: [string, unknown][] = [
       [
         "prompt_tokens",
         attributes["gen_ai.usage.input_tokens"] ?? attributes["gen_ai.usage.prompt_tokens"],

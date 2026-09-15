@@ -142,11 +142,11 @@ export function settlementSummary(
  * belongs here, since nothing in this suite reaches one.
  */
 class SettlementAutomationService implements AutomationSettlementLedger {
-  readonly claims: Array<{ triggerId: string; traceId: string; projectId: string }> = [];
-  readonly lastRuns: Array<{ triggerId: string; projectId: string }> = [];
-  readonly capInputs: Array<Record<string, unknown>> = [];
-  readonly breachInputs: Array<Record<string, unknown>> = [];
-  readonly webhookDeliveries: Array<Record<string, unknown>> = [];
+  readonly claims: { triggerId: string; traceId: string; projectId: string }[] = [];
+  readonly lastRuns: { triggerId: string; projectId: string }[] = [];
+  readonly capInputs: Record<string, unknown>[] = [];
+  readonly breachInputs: Record<string, unknown>[] = [];
+  readonly webhookDeliveries: Record<string, unknown>[] = [];
   readonly claimed = new Set<string>();
   claimFailures = 0;
   activeTriggerReads = 0;
@@ -309,12 +309,12 @@ class SettlementClock implements AutomationClock {
 }
 
 class SettlementDelivery extends AutomationNotificationDelivery {
-  readonly legacyEmails: Array<Record<string, unknown>> = [];
-  readonly emails: Array<Record<string, unknown>> = [];
-  readonly slackWebhooks: Array<Record<string, unknown>> = [];
-  readonly legacySlackWebhooks: Array<Record<string, unknown>> = [];
-  readonly slackBots: Array<Record<string, unknown>> = [];
-  readonly webhooks: Array<{ eventId: string }> = [];
+  readonly legacyEmails: Record<string, unknown>[] = [];
+  readonly emails: Record<string, unknown>[] = [];
+  readonly slackWebhooks: Record<string, unknown>[] = [];
+  readonly legacySlackWebhooks: Record<string, unknown>[] = [];
+  readonly slackBots: Record<string, unknown>[] = [];
+  readonly webhooks: { eventId: string }[] = [];
 
   async sendLegacyEmail(input: Record<string, unknown>): Promise<void> {
     this.legacyEmails.push(input);
@@ -371,21 +371,21 @@ class SettlementEmailCapStore extends AutomationEmailCapRepository {
 }
 
 class SettlementMapper extends AutomationDatasetMapper {
-  map(input: { trace: TraceRecord }): Array<Record<string, string | number>> {
+  map(input: { trace: TraceRecord }): Record<string, string | number>[] {
     return [{ traceId: input.trace.trace_id }];
   }
 }
 
 class SettlementWriter extends AutomationPersistActionWriter {
-  readonly annotationWrites: Array<Record<string, unknown>> = [];
-  readonly datasetWrites: Array<{ datasetRecords: Array<{ id: string }> }> = [];
+  readonly annotationWrites: Record<string, unknown>[] = [];
+  readonly datasetWrites: { datasetRecords: { id: string }[] }[] = [];
   readonly errors = new Map<string, unknown>();
 
   async addToAnnotationQueue(input: Record<string, unknown>): Promise<void> {
     this.annotationWrites.push(input);
   }
 
-  async addToDataset(input: { datasetRecords: Array<{ id: string }> }): Promise<void> {
+  async addToDataset(input: { datasetRecords: { id: string }[] }): Promise<void> {
     const recordId = input.datasetRecords[0]?.id ?? "";
     const errorEntry = [...this.errors].find(([traceId]) => recordId.includes(traceId));
     const error = errorEntry?.[1];
@@ -396,7 +396,7 @@ class SettlementWriter extends AutomationPersistActionWriter {
 
 class SettlementObservability extends AutomationSettlementObservability {
   readonly overflows: number[] = [];
-  readonly captures: Array<{ error: Error; extra: Record<string, unknown> }> = [];
+  readonly captures: { error: Error; extra: Record<string, unknown> }[] = [];
 
   recordOverflow(flushed: number): void {
     this.overflows.push(flushed);

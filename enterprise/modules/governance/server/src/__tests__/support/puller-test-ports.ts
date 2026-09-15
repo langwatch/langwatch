@@ -59,7 +59,7 @@ export class FetchHttp implements GovernanceHttpClient {
 }
 
 export class TestObjectStorage implements GovernanceObjectStore {
-  objects: Array<{ key: string; body: string }> = [];
+  objects: { key: string; body: string }[] = [];
   lastList:
     | {
         bucket: string;

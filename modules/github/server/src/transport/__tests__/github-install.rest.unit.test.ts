@@ -60,10 +60,10 @@ function mount(
     session?: { user: { id: string } } | null;
   } = {},
 ) {
-  const recorded: Array<{ installationId: string; organizationId: string }> = [];
-  const webhookEvents: Array<{ action: string; installationId: string }> = [];
-  const memberChecks: Array<{ userId: string; organizationId: string }> = [];
-  const audits: Array<{ action: string }> = [];
+  const recorded: { installationId: string; organizationId: string }[] = [];
+  const webhookEvents: { action: string; installationId: string }[] = [];
+  const memberChecks: { userId: string; organizationId: string }[] = [];
+  const audits: { action: string }[] = [];
   const sessionReads = { count: 0 };
 
   const service: Partial<GithubApi> = {

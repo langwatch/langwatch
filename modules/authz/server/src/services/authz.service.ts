@@ -197,7 +197,7 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   async isOnEngine({ organizationId }: { organizationId: string }): Promise<boolean> {
-    return await this.options.isOnEngine(organizationId);
+    return this.options.isOnEngine(organizationId);
   }
 
   async findEngineCutoverAt({

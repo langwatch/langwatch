@@ -117,7 +117,7 @@ let cliApiKeyPromise: Promise<string> | null = null;
 
 /** Whether any team of this organization holds the test project. */
 function organizationHoldsProject(organization: {
-  teams?: Array<{ projects?: Array<{ id: string }> }>;
+  teams?: { projects?: { id: string }[] }[];
 }): boolean {
   return (organization.teams ?? []).some((team) =>
     (team.projects ?? []).some((project) => project.id === PROJECT_ID),
@@ -134,10 +134,10 @@ export function getCliApiKey(): Promise<string> {
     try {
       const cookie = await getSessionCookie();
       const organizations = await trpcQuery<
-        Array<{
+        {
           id: string;
-          teams?: Array<{ projects?: Array<{ id: string }> }>;
-        }>
+          teams?: { projects?: { id: string }[] }[];
+        }[]
       >({ cookie, path: "organization.getAll", input: {} });
       const organizationId =
         organizations.find(organizationHoldsProject)?.id ?? organizations[0]?.id;
@@ -489,7 +489,7 @@ export async function cancelOpenControlRequests(): Promise<void> {
     signal: AbortSignal.timeout(30_000),
   });
   if (!listed.ok) return;
-  const body = (await listed.json()) as { requests?: Array<{ id: string }> };
+  const body = (await listed.json()) as { requests?: { id: string }[] };
   for (const request of body.requests ?? []) {
     await fetch(
       `${APP_BASE}/api/v1/langy/control/requests/${encodeURIComponent(request.id)}/cancel`,
@@ -618,7 +618,7 @@ export async function startShareControl({
       // The selector paints before it listens, the way the approve prompt does.
       await sleep(500);
       sendKeys("Enter");
-      return await waitForText(/Allowed |Denied/, 60_000);
+      return waitForText(/Allowed |Denied/, 60_000);
     },
     disconnect: async () => {
       if (!isRunning()) return;
@@ -663,8 +663,8 @@ export interface PermissionAsk {
 /** One question card the panel showed, and what the fixture answered. */
 export interface QuestionAsk {
   waitId: string;
-  questions: Array<{ question: string; options?: Array<{ label: string }> }>;
-  answered: Array<{ question: string; selected: string[] }>;
+  questions: { question: string; options?: { label: string }[] }[];
+  answered: { question: string; selected: string[] }[];
   turnId: string;
 }
 
@@ -681,7 +681,7 @@ export interface PermissionPolicy {
 /** Picks the answer to one question card. Default: the first option. */
 export type QuestionAnswerPicker = (question: {
   question: string;
-  options?: Array<{ label: string }>;
+  options?: { label: string }[];
 }) => string[];
 
 /** One message in the shape the scenario judge reads. */
@@ -689,24 +689,22 @@ export type JudgeMessage =
   | { role: "assistant"; content: string }
   | {
       role: "assistant";
-      content: Array<
-        | { type: "text"; text: string }
+      content: (| { type: "text"; text: string }
         | {
             type: "tool-call";
             toolCallId: string;
             toolName: string;
             input: unknown;
-          }
-      >;
+          })[];
     }
   | {
       role: "tool";
-      content: Array<{
+      content: {
         type: "tool-result";
         toolCallId: string;
         toolName: string;
         output: { type: "text" | "error-text"; value: string };
-      }>;
+      }[];
     };
 
 /** What the watcher saw on the conversation, and what it answered. */
@@ -730,7 +728,7 @@ export interface ConversationWatcher {
    */
   leaveNextPermissionToTerminal: (match: RegExp) => void;
   /** `connected` and `disconnected` entries, in order. */
-  workspaceEvents: Array<{ state: string; name: string; root: string }>;
+  workspaceEvents: { state: string; name: string; root: string }[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
   /** The turns the panel started on its own, without a message from the test. */
@@ -767,7 +765,7 @@ export interface ConversationWatcher {
 export interface StoredMessage {
   id: string;
   role: string;
-  parts: Array<Record<string, unknown>>;
+  parts: Record<string, unknown>[];
 }
 
 /**
@@ -910,11 +908,11 @@ export function watchLangyConversation({
 }): ConversationWatcher {
   const permissions: PermissionAsk[] = [];
   const questions: QuestionAsk[] = [];
-  const workspaceEvents: Array<{
+  const workspaceEvents: {
     state: string;
     name: string;
     root: string;
-  }> = [];
+  }[] = [];
   const turnIds: string[] = [];
   const answeredWaits = new Set<string>();
   const watchedTurns = new Set<string>();
@@ -1045,16 +1043,16 @@ export function watchLangyConversation({
     currentTurnId: string | null;
     /** The last turn's failure, as the record stored it, or null. */
     lastError: string | null;
-    messages: Array<{
+    messages: {
       id: string;
       role: string;
-      parts: Array<Record<string, unknown>>;
-    }>;
+      parts: Record<string, unknown>[];
+    }[];
   } | null> => {
     const conversationId = adapter.state.conversationId;
     if (!conversationId) return null;
     const cookie = await getSessionCookie();
-    return await trpcQuery({
+    return trpcQuery({
       cookie,
       path: "langy.messages",
       input: { projectId: PROJECT_ID, conversationId },
@@ -1076,7 +1074,7 @@ export function watchLangyConversation({
     }
   })();
 
-  const messageText = (message: { role: string; parts: Array<Record<string, unknown>> }): string =>
+  const messageText = (message: { role: string; parts: Record<string, unknown>[] }): string =>
     message.parts
       .filter((part) => typeof part.text === "string")
       .map((part) => String(part.text))
@@ -1089,7 +1087,7 @@ export function watchLangyConversation({
    */
   const judgeMessagesOf = (message: {
     role: string;
-    parts: Array<Record<string, unknown>>;
+    parts: Record<string, unknown>[];
   }): JudgeMessage[] => {
     const calls = message.parts.filter(
       (part) =>
@@ -1240,7 +1238,7 @@ export interface LocalWorkspaceStatus {
 /** What the panel chip and the code access card read. */
 export async function getLocalWorkspace(conversationId: string): Promise<LocalWorkspaceStatus> {
   const cookie = await getSessionCookie();
-  return await trpcQuery<LocalWorkspaceStatus>({
+  return trpcQuery<LocalWorkspaceStatus>({
     cookie,
     path: "langy.getLocalWorkspace",
     input: { projectId: PROJECT_ID, conversationId },
@@ -1275,7 +1273,7 @@ export async function waitForPendingRequest({
   conversationId: string;
   timeoutMs?: number;
 }): Promise<{ id: string; expiresAt: string }> {
-  return await waitFor({
+  return waitFor({
     what: "the code access card's control request",
     timeoutMs,
     read: async () => (await getLocalWorkspace(conversationId)).pendingRequest,
@@ -1290,7 +1288,7 @@ export async function waitForConnectedWorkspace({
   conversationId: string;
   timeoutMs?: number;
 }): Promise<LocalWorkspaceStatus> {
-  return await waitFor({
+  return waitFor({
     what: "the folder to connect to the conversation",
     timeoutMs,
     read: async () => {
@@ -1306,7 +1304,7 @@ export async function waitForConnectedWorkspace({
 
 /** A free TCP port, so two runs never fight over one. */
 export async function freePort(): Promise<number> {
-  return await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
@@ -1432,12 +1430,12 @@ export async function readAgent(name: string): Promise<{
       (body as { data?: unknown[] }).data ??
       []);
   const named = (
-    rows as Array<{
+    rows as {
       id: string;
       name: string;
       parameters?: unknown;
       lastSeenAt?: string;
-    }>
+    }[]
   ).filter((agent) => agent.name === name);
   // A folder shared from another machine leaves its own row behind, so the
   // newest connection is the one this run is asserting about.

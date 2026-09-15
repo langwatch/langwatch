@@ -127,7 +127,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     const cursors: Record<string, string> = cursor
       ? (JSON.parse(cursor) as Record<string, string>)
       : {};
-    const nodes: Array<{ id: string; client: { scan: IORedis["scan"] } }> = isCluster(this.redis)
+    const nodes: { id: string; client: { scan: IORedis["scan"] } }[] = isCluster(this.redis)
       ? this.redis.nodes("master").map((node, index) => ({ id: String(index), client: node }))
       : [{ id: "0", client: this.redis }];
 

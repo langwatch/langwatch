@@ -185,7 +185,7 @@ function renderShell(): RecordingNavigation {
 /** Presses the header trigger and waits for the palette's own field. */
 async function openPalette(): Promise<HTMLElement> {
   fireEvent.click(await screen.findByLabelText("Open command bar"));
-  return await screen.findByPlaceholderText("Where would you like to go?");
+  return screen.findByPlaceholderText("Where would you like to go?");
 }
 
 beforeEach(() => {

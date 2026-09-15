@@ -16,7 +16,7 @@ import { createWorkerProcessDatabase } from "./support/worker-database.double.ts
  * and drives debit path into Governance commands.
  */
 
-const RECORDED: { governance: Array<{ command: string; data: unknown }>; absences: string[] } = {
+const RECORDED: { governance: { command: string; data: unknown }[]; absences: string[] } = {
   governance: [],
   absences: [],
 };
@@ -55,7 +55,7 @@ function instance(target: string) {
 function compose(
   source: Record<string, unknown> = {},
   substrates: {
-    instances?: Array<ReturnType<typeof instance>>;
+    instances?: ReturnType<typeof instance>[];
     awsClientConfig?: () => never;
     database?: object;
     redis?: object;
@@ -94,7 +94,7 @@ function compose(
 function frozenRoutingKeys(name: string): string[] {
   const registry = JSON.parse(
     readFileSync(new URL("../../features/job-registry.json", import.meta.url), "utf8"),
-  ) as { pipelines: Array<{ name: string; jobs: string[] }> };
+  ) as { pipelines: { name: string; jobs: string[] }[] };
   const pipeline = registry.pipelines.find((entry) => entry.name === name);
   if (!pipeline) throw new Error(`${name} is absent from the job registry`);
   return pipeline.jobs;
@@ -105,7 +105,7 @@ type BuiltDefinition = {
   foldProjections: Map<string, unknown>;
   stateProjections?: Map<string, unknown>;
   mapProjections: Map<string, unknown>;
-  commands: ReadonlyArray<{ name: string }>;
+  commands: readonly { name: string }[];
   foldSubscribers: Map<string, unknown>;
   mapSubscribers: Map<string, unknown>;
   eventSubscribers: Map<string, unknown>;
@@ -340,7 +340,7 @@ describe("given a webhook endpoint's last hop", () => {
   };
 
   function dispatcher(options: { awsClientConfig?: () => never } = {}) {
-    const sent: Array<Record<string, unknown>> = [];
+    const sent: Record<string, unknown>[] = [];
     const dispatch = dispatchWebhookThrough(
       {
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
@@ -457,7 +457,7 @@ describe("given the budget-change signal the gateway invalidates its bundles on"
     /** @scenario "Two debits inside one window emit a single budget-updated signal" */
     it("appends one budget-updated event rather than one per debit", async () => {
       reset();
-      const appended: Array<Record<string, unknown>> = [];
+      const appended: Record<string, unknown>[] = [];
       const claimed: string[] = [];
       const settlement = compose(
         {},
@@ -499,7 +499,7 @@ describe("given the budget-change signal the gateway invalidates its bundles on"
     /** @scenario "A process with no Redis emits a budget-updated signal for every debit" */
     it("emits for every debit where this process composed no dedupe store", async () => {
       reset();
-      const appended: Array<Record<string, unknown>> = [];
+      const appended: Record<string, unknown>[] = [];
       const settlement = compose({}, { database: gatewayDebitDatabase(appended) })
         .spend.buildProcessing()
         .processManagers.get("gatewayDebits") as unknown as {
@@ -524,7 +524,7 @@ describe("given the budget-change signal the gateway invalidates its bundles on"
 });
 
 /** One warn-on-breach organization budget, and a sink for the change events appended over it. */
-function gatewayDebitDatabase(appended: Array<Record<string, unknown>>) {
+function gatewayDebitDatabase(appended: Record<string, unknown>[]) {
   const now = new Date();
   return createWorkerProcessDatabase({
     virtualKeyScope: { findMany: async () => [] },

@@ -17,7 +17,7 @@ class FakeProjects implements LangyNavigateProject {
 }
 
 class FakeResources implements LangyNavigateResourceLocator {
-  readonly lookups: Array<{ kind: LangyNavigateResourceKind; resourceId: string }> = [];
+  readonly lookups: { kind: LangyNavigateResourceKind; resourceId: string }[] = [];
 
   constructor(private readonly answer: (kind: LangyNavigateResourceKind) => string | null) {
   }

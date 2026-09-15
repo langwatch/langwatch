@@ -22,7 +22,7 @@ interface StudioIsolatedErrorBoundaryProps {
    * otherwise, which is what a customer must never see internals through.
    */
   isDevelopment?: boolean;
-  resetKeys?: ReadonlyArray<unknown>;
+  resetKeys?: readonly unknown[];
   onError?: (error: Error, info: { componentStack?: string | null }) => void;
   children: React.ReactNode;
 }

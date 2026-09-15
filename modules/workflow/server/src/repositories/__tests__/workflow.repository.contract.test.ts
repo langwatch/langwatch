@@ -10,7 +10,7 @@ import type { WorkflowDsl } from "@langwatch/workflow-contract";
 import { MemoryWorkflowRepositories } from "../memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => WorkflowRepositories }> = [
+const backends: readonly { name: string; create: () => WorkflowRepositories }[] = [
   { name: "memory", create: () => MemoryWorkflowRepositories.create() },
 ];
 

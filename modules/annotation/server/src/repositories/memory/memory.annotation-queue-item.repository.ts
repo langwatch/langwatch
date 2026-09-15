@@ -162,7 +162,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
     projectId,
     userId,
   }: AnnotationQueueItemCaller): Promise<
-    ReadonlyArray<Readonly<{ id: string; name: string; slug: string; pendingCount: number }>>
+    readonly Readonly<{ id: string; name: string; slug: string; pendingCount: number }>[]
   > {
     return this.#database
       .queues()

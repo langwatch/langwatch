@@ -199,12 +199,12 @@ export class CostRollupComparatorService {
    * both were wrong, and disagree whenever one was merely refactored.
    */
   private refold(
-    events: Array<{
+    events: {
       type: string;
       tenantId: string;
       occurredAt: number;
       data: Record<string, unknown>;
-    }>,
+    }[],
   ): Map<string, GovernanceCostRollupState> {
     const projection = new GovernanceCostRollupFoldProjection({
       store: { store: async () => undefined, get: async () => null },

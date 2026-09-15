@@ -121,7 +121,7 @@ export type LogResultsRequest = {
   experiment_slug: string;
   name: string;
   run_id: string;
-  dataset: Array<{
+  dataset: {
     index: number;
     entry: unknown;
     duration: number;
@@ -130,8 +130,8 @@ export type LogResultsRequest = {
     target_id?: string | null;
     cost?: number | null;
     predicted?: Record<string, unknown> | null;
-  }>;
-  evaluations: Array<{
+  }[];
+  evaluations: {
     name: string;
     evaluator: string;
     trace_id: string | null; // null when no tracer configured (no-op)
@@ -145,7 +145,7 @@ export type LogResultsRequest = {
     cost?: number | null;
     duration?: number | null;
     target_id?: string | null;
-  }>;
+  }[];
   targets?: TargetInfo[];
   progress?: number;
   total?: number;

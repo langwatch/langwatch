@@ -12,10 +12,10 @@ export function ProjectComboboxPopup({
   showTeamHeaders,
   currentProjectId,
 }: {
-  visibleGroups: Array<{
+  visibleGroups: {
     team: ProjectPickGroup["team"];
     items: ProjectPickItem[];
-  }>;
+  }[];
   showTeamHeaders: boolean;
   currentProjectId: string;
 }) {

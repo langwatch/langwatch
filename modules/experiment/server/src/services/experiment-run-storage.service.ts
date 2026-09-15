@@ -192,7 +192,7 @@ export class ExperimentRunStorageService {
     experimentId: string | undefined;
     state: EvaluationsV3State;
     loadedEvaluators: LoadedEvaluators | undefined;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
   }): Promise<void> {
     if (event.type === "target_result") {
       this.rememberTargetResult(event);
@@ -317,7 +317,7 @@ export class ExperimentRunStorageService {
     experimentId: string;
     state: EvaluationsV3State;
     loadedEvaluators: LoadedEvaluators | undefined;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
   }): Promise<void> {
     const targetResultDispatch =
       event.type === "target_result" || event.type === "error"

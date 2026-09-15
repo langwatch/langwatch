@@ -164,7 +164,7 @@ function application(
     },
   });
 
-  const logged: Array<{ payload: Readonly<Record<string, unknown>>; message: string }> = [];
+  const logged: { payload: Readonly<Record<string, unknown>>; message: string }[] = [];
   const app = ProjectApp.create({
     dependencies: {
       apiKeys: Object.assign(new TestApiKeyService(), {

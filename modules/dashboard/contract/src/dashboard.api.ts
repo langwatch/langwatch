@@ -67,7 +67,7 @@ export interface DashboardApi {
   }): Promise<Graph>;
   batchUpdateGraphLayouts(input: {
     projectId: string;
-    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+    layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<{ success: true }>;
 
   /** The alert automations watching a set of charts, with their secrets stripped. */

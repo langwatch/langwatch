@@ -19,14 +19,14 @@ const logger = createLogger("langwatch:automation:evaluation-alert-trigger-match
 
 interface ActiveTraceTriggerReader {
   getActiveTraceTriggersForProject(projectId: string): Promise<
-    Array<{
+    {
       id: string;
       action: TriggerMatchRecordedEventData["action"];
       filters: Record<string, unknown>;
       filterQuery: string | null;
       traceDebounceMs: number;
       notificationCadence: TriggerMatchRecordedEventData["notificationCadence"];
-    }>
+    }[]
   >;
 }
 

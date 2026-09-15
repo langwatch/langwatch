@@ -185,7 +185,7 @@ async function rawRowCount(tenant: string): Promise<number> {
     query_params: { tenantId: tenant },
     format: "JSONEachRow",
   });
-  const rows = (await result.json()) as Array<{ N: unknown }>;
+  const rows = (await result.json()) as { N: unknown }[];
   return Number(rows[0]?.N ?? 0);
 }
 

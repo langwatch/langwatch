@@ -115,7 +115,7 @@ export interface FoldProjectionStore<State> {
   store(state: State, context: ProjectionStoreContext): Promise<void>;
 
   /** Optional batch store for persisting multiple fold states at once. */
-  storeBatch?(entries: Array<{ state: State; context: ProjectionStoreContext }>): Promise<void>;
+  storeBatch?(entries: { state: State; context: ProjectionStoreContext }[]): Promise<void>;
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
   tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;

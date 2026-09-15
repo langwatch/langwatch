@@ -60,7 +60,7 @@ describe("process-manager trace continuity", () => {
     producerTraceId: string;
   }> {
     const tracer = trace.getTracer("test");
-    return await tracer.startActiveSpan("command-handler", async (producer) => {
+    return tracer.startActiveSpan("command-handler", async (producer) => {
       try {
         const baggage = propagation.createBaggage({
           "langwatch.tenant": { value: "tenant_1" },

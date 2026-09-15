@@ -18,10 +18,10 @@ const ROW: AuthzAuditRow = {
 
 class InMemoryAuditTable {
   readonly rows = new Map<string, AuthzAuditInsert>();
-  readonly writes: Array<{
+  readonly writes: {
     data: AuthzAuditInsert[];
     skipDuplicates: boolean;
-  }> = [];
+  }[] = [];
 
   async createMany(args: {
     data: AuthzAuditInsert[];

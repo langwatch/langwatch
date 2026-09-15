@@ -57,7 +57,7 @@ export function ToolPairCard({
   const skill = useMemo(() => skillInvocationFromToolUse({ name, input }), [name, input]);
   const isSkill = skill !== null;
 
-  const argEntries = useMemo<Array<[string, unknown]> | null>(() => {
+  const argEntries = useMemo<[string, unknown][] | null>(() => {
     if (isRecord(input)) {
       return Object.entries(input);
     }
@@ -214,7 +214,7 @@ function ToolArgsBody({
   argEntries,
   fallbackJson,
 }: {
-  argEntries: Array<[string, unknown]> | null;
+  argEntries: [string, unknown][] | null;
   fallbackJson: string;
 }) {
   if (argEntries && argEntries.length > 0) {

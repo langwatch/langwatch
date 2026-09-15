@@ -29,7 +29,7 @@ const silentLogger = {
  */
 function recordingRuntime() {
   const registered: string[] = [];
-  const sent: Array<{ command: string; data: unknown }> = [];
+  const sent: { command: string; data: unknown }[] = [];
   const commands: Record<string, unknown> = {};
   const senderFor = (name: string) => ({
     send: (data: unknown) => {
@@ -38,7 +38,7 @@ function recordingRuntime() {
     },
   });
   const runtime = {
-    register: (definition: { metadata: { name: string }; commands: Array<{ name: string }> }) => {
+    register: (definition: { metadata: { name: string }; commands: { name: string }[] }) => {
       registered.push(definition.metadata.name);
       return {
         commands: Object.fromEntries(

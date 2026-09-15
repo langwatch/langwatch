@@ -125,7 +125,7 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
   const metric = register.getSingleMetric("es_map_projection_enqueue_total");
   if (!metric) return 0;
   const snapshot = (await metric.get()) as {
-    values: Array<{ labels: Record<string, string>; value: number }>;
+    values: { labels: Record<string, string>; value: number }[];
   };
   return snapshot.values
     .filter(

@@ -50,7 +50,7 @@ export interface ParseSdkInputs {
   scenarioActive?: boolean;
 }
 
-const LANGUAGE_RULES: ReadonlyArray<{ match: RegExp; label: string }> = [
+const LANGUAGE_RULES: readonly { match: RegExp; label: string }[] = [
   { match: /python/i, label: "Python" },
   { match: /typescript|^@?ts-|tsdk/i, label: "TypeScript" },
   { match: /node|nodejs|javascript|^@/i, label: "Node.js" },
@@ -62,7 +62,7 @@ const LANGUAGE_RULES: ReadonlyArray<{ match: RegExp; label: string }> = [
   { match: /\bphp\b/i, label: "PHP" },
 ];
 
-const FAMILY_RULES: ReadonlyArray<{ match: RegExp; label: string }> = [
+const FAMILY_RULES: readonly { match: RegExp; label: string }[] = [
   { match: /^langwatch/i, label: "LangWatch" },
   { match: /^@opentelemetry|^opentelemetry/i, label: "OpenTelemetry" },
   { match: /traceloop|openllmetry/i, label: "OpenLLMetry" },

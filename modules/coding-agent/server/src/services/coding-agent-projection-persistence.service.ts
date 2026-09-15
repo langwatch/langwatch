@@ -30,11 +30,11 @@ export class CodingAgentProjectionPersistenceService extends CodingAgentProjecti
   }
 
   storeSessionBatch(
-    rows: Array<{
+    rows: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     return this.repositories.sessions.upsertBatch(rows);
   }

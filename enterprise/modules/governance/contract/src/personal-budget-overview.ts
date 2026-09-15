@@ -24,7 +24,7 @@ export type GovernanceBudgetOverviewItem = {
   scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
   scopePhrase: string;
   resetsAt: string | null;
-  topModels?: Array<{ model: string; spentUsd: number }>;
+  topModels?: { model: string; spentUsd: number }[];
 };
 
 export type GovernanceBudgetOverviewForUser = {

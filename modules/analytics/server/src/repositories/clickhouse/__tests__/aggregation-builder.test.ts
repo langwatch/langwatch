@@ -428,7 +428,7 @@ describe("aggregation-builder", () => {
         "OccurredAt", // used only in period/date boundaries, not in outer aggregations
       ]);
       const { dedupSubstitutions } = __testOnly__ as unknown as {
-        dedupSubstitutions: () => Array<{ source: string }>;
+        dedupSubstitutions: () => { source: string }[];
       };
       const registered = new Set(
         dedupSubstitutions().flatMap(({ source: substitutionSource }) =>
@@ -1599,7 +1599,7 @@ describe("aggregation-builder", () => {
   });
 
   describe("mapEvalAggregationToOuter", () => {
-    const cases: Array<{ expression: string; expected: string }> = [
+    const cases: { expression: string; expected: string }[] = [
       { expression: "avgIf(toFloat64(es.Passed), cond)", expected: "avg" },
       { expression: "sumIf(es.Score, cond)", expected: "sum" },
       { expression: "minIf(es.Score, cond)", expected: "min" },

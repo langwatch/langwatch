@@ -12,7 +12,7 @@ import recordedNlpgoResponses from "./fixtures/nlpgo-recorded-responses.json";
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
 // (lw#3438: traced failures must always leave a span footprint.)
 const { withActiveSpanCalls } = vi.hoisted(() => {
-  const calls: Array<{
+  const calls: {
     name: string;
     options: { kind: number; attributes: Record<string, unknown> };
     span: {
@@ -22,7 +22,7 @@ const { withActiveSpanCalls } = vi.hoisted(() => {
       recordException: ReturnType<typeof vi.fn>;
       end: ReturnType<typeof vi.fn>;
     };
-  }> = [];
+  }[] = [];
   return { withActiveSpanCalls: calls };
 });
 

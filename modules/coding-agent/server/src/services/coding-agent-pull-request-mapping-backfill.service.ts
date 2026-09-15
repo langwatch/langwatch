@@ -32,7 +32,7 @@ export type CodingAgentBackfillProjects = {
     organizationId: string;
     page: number;
     limit: number;
-  }): Promise<{ data: ReadonlyArray<{ id: string }> }>;
+  }): Promise<{ data: readonly { id: string }[] }>;
 };
 
 /** Private installation follow-up that discovers Coding Agent's own session branches. */

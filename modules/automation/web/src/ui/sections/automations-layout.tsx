@@ -14,13 +14,13 @@ const SECTION_LABEL = "Automations";
 export type AutomationSection = "overview" | "automations" | "alerts" | "schedules";
 
 /** The four tabs, in the order the page has always listed them. */
-export const AUTOMATION_SECTIONS: ReadonlyArray<{
+export const AUTOMATION_SECTIONS: readonly {
   section: AutomationSection;
   label: string;
   /** Appended to the family's base path; empty for the overview. */
   suffix: string;
   icon: LucideIcon;
-}> = [
+}[] = [
   { section: "overview", label: "Overview", suffix: "", icon: Eye },
   { section: "automations", label: "Automations", suffix: "/automations", icon: Zap },
   { section: "alerts", label: "Alerts", suffix: "/alerts", icon: TrendingUp },

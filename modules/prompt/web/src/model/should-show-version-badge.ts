@@ -5,7 +5,7 @@ export function shouldShowVersionBadge({
 }: {
   isOutdated: boolean;
   configId: string | undefined;
-  allTabsData: Array<{ configId?: string; versionNumber?: number }>;
+  allTabsData: { configId?: string; versionNumber?: number }[];
 }): boolean {
   if (isOutdated) {
     return true;

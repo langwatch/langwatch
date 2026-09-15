@@ -62,7 +62,7 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
   return { type: "empty" };
 }
 
-function canonicalAttributes(attributes: unknown): Array<{ key: string; value: unknown }> {
+function canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {
   if (!Array.isArray(attributes)) return [];
   return attributes
     .filter(

@@ -38,7 +38,7 @@ export type AutomationDatasetHandover = {
 
 export type AutomationHostRecording = {
   navigations: string[];
-  queries: Array<{ next: AutomationQuery; replace: boolean }>;
+  queries: { next: AutomationQuery; replace: boolean }[];
   /**
    * RECORDED RATHER THAN SPELLED. The `drawer.` vocabulary is the composing
    * application's — its adapter writes `?drawer.open=<name>` plus one

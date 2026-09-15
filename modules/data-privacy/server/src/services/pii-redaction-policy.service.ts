@@ -64,7 +64,7 @@ const runGoogleDlpBatch = (
 ): Promise<(string | null)[]> =>
   Promise.all(
     texts.map(async (text) => {
-      return await transport.tryClearGoogleDlp({
+      return transport.tryClearGoogleDlp({
         text,
         piiRedactionLevel,
         exceptPatterns,
@@ -80,7 +80,7 @@ const batchClearPII = async (
   const { piiRedactionLevel, mainMethod, entities, exceptPatterns } = options;
 
   if (mainMethod === "google_dlp") {
-    return await runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
   }
 
   try {
@@ -137,7 +137,7 @@ export class PiiRedactionPolicyService {
    * or when Presidio is unreachable.
    */
   async clearBatch(texts: string[], options: PIICheckOptions): Promise<(string | null)[]> {
-    return await batchClearPII(this.deps.transport, texts, options);
+    return batchClearPII(this.deps.transport, texts, options);
   }
 
   /**

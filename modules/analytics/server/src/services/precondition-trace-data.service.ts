@@ -58,8 +58,8 @@ function buildPreconditionEvents(
   }
 
   return events.map((e) => {
-    const metrics: Array<{ key: string; value: number }> = [];
-    const eventDetails: Array<{ key: string; value: string }> = [];
+    const metrics: { key: string; value: number }[] = [];
+    const eventDetails: { key: string; value: string }[] = [];
 
     for (const [key, value] of Object.entries(e.attributes)) {
       if (key.startsWith("event.metrics.")) {

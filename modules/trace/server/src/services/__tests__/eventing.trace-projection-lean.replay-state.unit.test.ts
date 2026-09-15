@@ -42,10 +42,10 @@ function counterEvent(o: {
 }
 
 function spyStore() {
-  const writes: Array<{
+  const writes: {
     projection: StoredProjection<CounterState>;
     context: ProjectionStoreContext;
-  }> = [];
+  }[] = [];
   const store: StateProjectionStore<CounterState> = {
     tryLoad: vi.fn(async () => null),
     store: vi.fn(async (projection, context) => {

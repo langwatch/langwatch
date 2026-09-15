@@ -149,7 +149,7 @@ export class AgentClient {
   private connectTimer: NodeJS.Timeout | null = null;
   private watchdog: NodeJS.Timeout | null = null;
   private heartbeatIntervalMs = 10_000;
-  private closeWaiters: Array<() => void> = [];
+  private closeWaiters: (() => void)[] = [];
   private lastError: string | null = null;
   private failureNoticeAt: number | null = null;
   private gaveUp = false;

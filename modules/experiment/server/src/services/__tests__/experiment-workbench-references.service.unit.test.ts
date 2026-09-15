@@ -17,7 +17,7 @@ import {
 import { ExperimentWorkbenchReferencesService } from "../experiment-workbench-references.service.ts";
 
 type Answers = {
-  prompts?: Array<{ id: string; handle?: string | null }>;
+  prompts?: { id: string; handle?: string | null }[];
   agentExists?: boolean;
   datasetIds?: string[];
   evaluator?: "found" | "missing" | "down";

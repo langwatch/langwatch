@@ -44,7 +44,7 @@ export type TraceLogRecordReader = Readonly<{
     occurredAtMs?: number,
     limit?: number,
   ): Promise<
-    Array<{
+    {
       spanId: string;
       timeUnixMs: number;
       body: string;
@@ -52,7 +52,7 @@ export type TraceLogRecordReader = Readonly<{
       resourceAttributes: Record<string, string>;
       scopeName: string;
       scopeVersion: string | null;
-    }>
+    }[]
   >;
 }>;
 type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];

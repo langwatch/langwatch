@@ -578,8 +578,8 @@ export function makePlanProvider(plan: Partial<Plan> = {}): PlanProvider {
 
 /** Records every invite email this fake was asked to send, never actually sending anything. */
 export class FakeInviteMail implements OrganizationInviteMail {
-  readonly sentInvites: Array<{ email: string; acceptInviteUrl: string }> = [];
-  readonly sentReRequests: Array<{ adminEmail: string; invitedEmail: string }> = [];
+  readonly sentInvites: { email: string; acceptInviteUrl: string }[] = [];
+  readonly sentReRequests: { adminEmail: string; invitedEmail: string }[] = [];
 
   async sendInvite(input: Parameters<OrganizationInviteMail["sendInvite"]>[0]): Promise<void> {
     this.sentInvites.push({ email: input.email, acceptInviteUrl: input.acceptInviteUrl });

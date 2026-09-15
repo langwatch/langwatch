@@ -219,7 +219,7 @@ export class VirtualKeysApiService {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
-      headers: { ...this.headers(), ...(init?.headers ?? {}) },
+      headers: { ...this.headers(), ...init?.headers },
     });
     if (!response.ok) {
       let parsedBody: unknown;

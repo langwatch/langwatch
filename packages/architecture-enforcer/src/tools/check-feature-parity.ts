@@ -1219,6 +1219,7 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
     // Keep the type argument narrow and line-local so proximity remains a
     // lexical check rather than attempting to parse arbitrary TypeScript.
     const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/);
+
     return m !== null;
   }
 
@@ -2018,6 +2019,7 @@ interface ParityAnalysis {
  */
 function validateNoCrossListEntries(): string[] {
   const inert = new Set(LEGACY_INERT);
+
   return [
     { name: "LEGACY_UNBOUND", entries: LEGACY_UNBOUND },
     { name: "LEGACY_PARTIAL", entries: LEGACY_PARTIAL },

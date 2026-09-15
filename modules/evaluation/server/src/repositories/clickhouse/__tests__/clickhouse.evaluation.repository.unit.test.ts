@@ -72,7 +72,7 @@ function fixtureRow(overrides: Record<string, unknown> = {}): Record<string, unk
 
 type TestClient = EvaluationClickHouseClient & {
   queries: string[];
-  queryParams: Array<Record<string, unknown>>;
+  queryParams: Record<string, unknown>[];
   inserts: unknown[];
 };
 

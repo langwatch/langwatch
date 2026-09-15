@@ -319,7 +319,7 @@ export type GovernanceApiMap = {
       mutation: {
         input: {
           organizationId: string;
-          updates: Array<{ id: string; order: number }>;
+          updates: { id: string; order: number }[];
         };
         output: GovernanceAcknowledgement;
       };

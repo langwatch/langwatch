@@ -163,7 +163,7 @@ function organizationDirectory(options: {
       const settings = await organizations.getSettings({ organizationId });
       if (settings.supportContact) return settings.supportContact;
 
-      return await directory.findFirstAdminEmail(organizationId);
+      return directory.findFirstAdminEmail(organizationId);
     },
     getBudgetIncreaseRecipient: async ({ organizationId }) => {
       const adminEmail = await directory.findFirstAdminEmail(organizationId);

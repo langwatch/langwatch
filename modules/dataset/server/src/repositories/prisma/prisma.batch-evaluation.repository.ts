@@ -34,7 +34,7 @@ export class PrismaBatchEvaluationRepository
     projectId: string;
     experimentId: string;
   }): Promise<BatchEvaluationRecord[]> {
-    return await this.prisma.batchEvaluation.findMany({
+    return this.prisma.batchEvaluation.findMany({
       where: { projectId: input.projectId, experimentId: input.experimentId },
       include: { dataset: true },
     });

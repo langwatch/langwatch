@@ -626,7 +626,7 @@ const detectComparisonColumns = (
       /** Non-tie labels observed as winners, in first-seen order. */
       winningLabels: string[];
       sawSlotLabels: boolean;
-      verdicts: Array<{
+      verdicts: {
         rowIndex: number;
         rawLabel: string;
         reasoning: string | null;
@@ -637,7 +637,7 @@ const detectComparisonColumns = (
          * causes.
          */
         isUnsettled?: boolean;
-      }>;
+      }[];
     }
   >();
 

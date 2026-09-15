@@ -235,7 +235,7 @@ export const noopOnboardingDefaults = { seed: async () => {} };
  * probe test can assert whether it fired without a real outbound request.
  */
 export class TestModelProviderCatalog extends ModelProviderCatalog {
-  testConnectionCalls: Array<{ provider: string; customKeys: Record<string, unknown> }> = [];
+  testConnectionCalls: { provider: string; customKeys: Record<string, unknown> }[] = [];
   private readonly verdict: ModelProviderCredentialVerdict;
 
   constructor(verdict: ModelProviderCredentialVerdict = { state: "valid" } as never) {

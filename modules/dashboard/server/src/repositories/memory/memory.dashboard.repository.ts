@@ -246,7 +246,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
 
   async updateGraphLayouts(input: {
     projectId: string;
-    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+    layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<void> {
     for (const item of input.layouts) {
       this.#replaceChart(this.#requireChart(input.projectId, item.graphId, "builder"), item.layout);

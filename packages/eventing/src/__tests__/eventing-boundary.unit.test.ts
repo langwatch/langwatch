@@ -15,7 +15,7 @@ function productionSources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) return entry.name === "__tests__" ? [] : productionSources(path);
-    if (!/\.ts$/.test(entry.name) || /\.test\.ts$/.test(entry.name)) return [];
+    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) return [];
     return [path];
   });
 }

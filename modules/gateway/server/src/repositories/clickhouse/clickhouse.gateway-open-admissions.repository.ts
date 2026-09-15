@@ -77,6 +77,6 @@ export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmiss
       },
     });
 
-    return await result.json<OpenAdmission>();
+    return result.json<OpenAdmission>();
   }
 }

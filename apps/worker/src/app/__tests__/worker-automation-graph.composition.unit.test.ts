@@ -46,7 +46,7 @@ class RecordingMailer extends EmailDelivery {
 
 /** Records the Slack Web API call without making one. */
 class RecordingSlackApi implements SlackApiTransport {
-  readonly requests: Array<{ authorization: string; body: string }> = [];
+  readonly requests: { authorization: string; body: string }[] = [];
 
   async request(input: {
     headers: Record<string, string>;

@@ -41,7 +41,7 @@ const CADENCE_EXPLANATION =
 
 /** One flat select collapses frequency + minute interval: "every 15
  *  minutes" is one thought to an admin, not two controls. */
-const FREQUENCY_CHOICES: Array<{ value: string; label: string }> = [
+const FREQUENCY_CHOICES: { value: string; label: string }[] = [
   { value: "m5", label: "Every 5 minutes" },
   { value: "m10", label: "Every 10 minutes" },
   { value: "m15", label: "Every 15 minutes" },

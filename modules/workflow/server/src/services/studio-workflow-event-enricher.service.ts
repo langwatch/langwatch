@@ -149,8 +149,8 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
   private llmConfigs(
     event: WorkflowEvent,
     nodes: StudioWorkflow["nodes"],
-  ): Array<{ llm: LLMConfig; nodeName?: string }> {
-    const parameters: Array<{ llm: LLMConfig; nodeName?: string }> = nodes.flatMap((node) =>
+  ): { llm: LLMConfig; nodeName?: string }[] {
+    const parameters: { llm: LLMConfig; nodeName?: string }[] = nodes.flatMap((node) =>
       (node.data.parameters ?? []).flatMap((parameter) => {
         if (parameter.type !== "llm") {
           return [];

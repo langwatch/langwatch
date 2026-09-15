@@ -257,13 +257,13 @@ function strArray(value: unknown): string[] {
  * hands back something else should cost the screen a currency line, not the
  * whole read.
  */
-function currencyLines(value: unknown): Array<{
+function currencyLines(value: unknown): {
   currencyCode: string;
   amountNanoMinor: number;
   previousAmountNanoMinor: number | null;
   cellsWithoutAmount: number;
   cellsWithoutPreviousAmount: number;
-}> {
+}[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((line) => {
     if (!Array.isArray(line)) return [];
@@ -431,7 +431,7 @@ export class GovernanceCostRollupClickHouseRepository {
       query_params: { tenantid: tenantId, keys },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ RestatementKey?: unknown }>;
+    const rows = (await result.json()) as { RestatementKey?: unknown }[];
     return new Set(rows.map((r) => str(r.RestatementKey)));
   }
 
@@ -652,7 +652,7 @@ export class GovernanceCostRollupClickHouseRepository {
      */
     costSource?: string;
   }): Promise<
-    Array<{
+    {
       day: string;
       costSource: string;
       amountNanoUsd: number | null;
@@ -689,14 +689,14 @@ export class GovernanceCostRollupClickHouseRepository {
        * no earlier amount — either it did not exist on this day before the
        * revision, or its earlier figure was never stored in its own unit.
        */
-      byCurrency: Array<{
+      byCurrency: {
         currencyCode: string;
         amountNanoMinor: number;
         previousAmountNanoMinor: number | null;
         cellsWithoutAmount: number;
         cellsWithoutPreviousAmount: number;
-      }>;
-    }>
+      }[];
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -905,13 +905,13 @@ export class GovernanceCostRollupClickHouseRepository {
     /** Which lane. The lanes are never totalled together. */
     costSource: string;
   }): Promise<
-    Array<{
+    {
       currencyCode: string;
       /** Nano of this currency's own major unit. Null when it holds nothing. */
       amountNanoMinor: number | null;
       /** Cells of this currency holding no amount in any currency at all. */
       cellsWithoutAmount: number;
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -974,13 +974,13 @@ export class GovernanceCostRollupClickHouseRepository {
     /** Inclusive, `YYYY-MM-DD`. */
     toDay: string;
   }): Promise<
-    Array<{
+    {
       day: string;
       provider: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
       currenciesWithoutUsdAmount: string[];
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1061,13 +1061,13 @@ export class GovernanceCostRollupClickHouseRepository {
     toDay: string;
     provider: string;
   }): Promise<
-    Array<{
+    {
       model: string;
       agentId: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
       currenciesWithoutUsdAmount: string[];
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1152,7 +1152,7 @@ export class GovernanceCostRollupClickHouseRepository {
     /** Inclusive, `YYYY-MM-DD`. */
     toDay: string;
   }): Promise<
-    Array<{
+    {
       provider: string;
       /** Empty when the provider named nobody for the row's day. */
       rawActorId: string;
@@ -1161,7 +1161,7 @@ export class GovernanceCostRollupClickHouseRepository {
       amountNanoUsd: number | null;
       /** Cells of this group holding no USD figure. Above zero, withhold. */
       cellsWithoutAmount: number;
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1217,12 +1217,12 @@ export class GovernanceCostRollupClickHouseRepository {
     /** Inclusive, YYYY-MM-DD. */
     toDay: string;
   }): Promise<
-    Array<{
+    {
       provider: string;
       amountNanoUsd: number | null;
       cellsWithoutAmount: number;
       currenciesWithoutUsdAmount: string[];
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1313,13 +1313,13 @@ export class GovernanceCostRollupClickHouseRepository {
     /** Inclusive, `YYYY-MM-DD`. */
     toDay: string;
   }): Promise<
-    Array<{
+    {
       /** Empty when the provider's row named no model. */
       model: string;
       amountNanoUsd: number | null;
       /** Cells of this model holding no USD figure. Above zero, withhold. */
       cellsWithoutAmount: number;
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1434,7 +1434,7 @@ export class GovernanceCostRollupClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ LatestOccurredAt: unknown }>;
+    const rows = (await result.json()) as { LatestOccurredAt: unknown }[];
     const latest = int(rows[0]?.LatestOccurredAt);
     return latest > 0 ? latest : null;
   }
@@ -1458,13 +1458,13 @@ export class GovernanceCostRollupClickHouseRepository {
     day: string;
     eventTypes: readonly string[];
   }): Promise<
-    Array<{
+    {
       id: string;
       type: string;
       tenantId: string;
       occurredAt: number;
       data: Record<string, unknown>;
-    }>
+    }[]
   > {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -1493,7 +1493,7 @@ export class GovernanceCostRollupClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<Record<string, unknown>>;
+    const rows = (await result.json()) as Record<string, unknown>[];
     return rows.map((row) => ({
       id: String(row.LatestEventId ?? ""),
       type: String(row.LatestEventType ?? ""),
@@ -1525,7 +1525,7 @@ export class GovernanceCostRollupClickHouseRepository {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ LatestOccurredAt: unknown }>;
+    const rows = (await result.json()) as { LatestOccurredAt: unknown }[];
     const latest = int(rows[0]?.LatestOccurredAt);
     return latest > 0 ? latest : null;
   }

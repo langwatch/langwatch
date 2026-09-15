@@ -17,7 +17,7 @@ export abstract class EvaluationRunRepository {
     retentionDays?: number;
   }): Promise<void>;
   abstract upsertBatch(
-    input: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>,
+    input: { data: EvaluationRunData; tenantId: string; retentionDays?: number }[],
   ): Promise<void>;
   abstract tryFindByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   abstract findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;

@@ -12,11 +12,11 @@ export interface BackofficeProjectRef {
 export interface UserWithBackofficeIncludes {
   id: string;
   [key: string]: unknown;
-  orgMemberships: Array<{
+  orgMemberships: {
     organization: BackofficeOrganizationRef & {
-      teams: Array<{ projects: BackofficeProjectRef[] }>;
+      teams: { projects: BackofficeProjectRef[] }[];
     };
-  }>;
+  }[];
 }
 
 export type BackofficeUserRow = UserWithBackofficeIncludes & {

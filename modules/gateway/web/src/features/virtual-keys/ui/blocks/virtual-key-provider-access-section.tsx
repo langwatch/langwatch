@@ -37,7 +37,7 @@ export const ALL_PROVIDERS: ProviderAccessValue = {
 /** What the mutation should persist for this selection. */
 export function providerAccessToConfig(
   value: ProviderAccessValue,
-  eligible: Array<{ id: string }>,
+  eligible: { id: string }[],
 ): { providersAllowed: string[] | null; modelsAllowed: string[] | null } {
   const eligibleIds = new Set(eligible.map((e) => e.id));
   return {
@@ -51,7 +51,7 @@ export function providerAccessToConfig(
 /** Why the current selection cannot be saved, or null when it can. */
 export function providerAccessInvalidReason(
   value: ProviderAccessValue,
-  eligible: Array<{ id: string }>,
+  eligible: { id: string }[],
 ): string | null {
   if (value.allProviders) return null;
   const eligibleIds = new Set(eligible.map((e) => e.id));
@@ -87,8 +87,8 @@ export function VirtualKeyProviderAccessSection({
   scopes: VirtualKeyScopeEntry[];
   organizationId: string | undefined;
   organizationName?: string;
-  availableTeams: Array<{ id: string; name: string }>;
-  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
   providers: OrgModelProvider[];
   isLoading?: boolean;
 }) {

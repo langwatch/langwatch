@@ -21,7 +21,7 @@ type VirtualKeyRow = {
   name: string;
   status: string;
   displayPrefix: string;
-  scopes: Array<{ scopeType: string; scopeId: string }>;
+  scopes: { scopeType: string; scopeId: string }[];
   routingMode: string;
   routingPolicyId: string | null;
   traceProjectId: string | null;

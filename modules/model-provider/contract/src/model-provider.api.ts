@@ -46,7 +46,7 @@ export interface ModelProviderWriteRequest {
   readonly customKeys?: Record<string, unknown> | null;
   readonly customModels?: Model[] | null;
   readonly customEmbeddingsModels?: Model[] | null;
-  readonly extraHeaders?: Array<{ key: string; value: string }> | null;
+  readonly extraHeaders?: { key: string; value: string }[] | null;
   readonly routingHandle?: string | null;
   readonly langySkipPermissionsModels?: string[] | null;
   readonly scopes?: ModelDefaultScope[];

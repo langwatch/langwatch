@@ -11,12 +11,12 @@ import WorkflowsScreen from "../workflows.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    workflows: [] as Array<Record<string, unknown>>,
+    workflows: [] as Record<string, unknown>[],
     isLoading: false,
     related: {
-      evaluators: [] as Array<{ id: string; name: string }>,
-      agents: [] as Array<{ id: string; name: string }>,
-      monitors: [] as Array<{ id: string; name: string }>,
+      evaluators: [] as { id: string; name: string }[],
+      agents: [] as { id: string; name: string }[],
+      monitors: [] as { id: string; name: string }[],
     },
     relatedLoading: false,
   },

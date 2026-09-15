@@ -17,11 +17,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   /** Every `useQuery` the page issued this render, in call order. */
-  reads: [] as Array<{
+  reads: [] as {
     path: string;
     args: unknown;
     options: Record<string, unknown>;
-  }>,
+  }[],
   /**
    * Every read the page asked to run again, by procedure path — whether it
    * did so by invalidating the key or by refetching the query. The mechanism

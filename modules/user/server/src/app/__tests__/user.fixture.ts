@@ -35,7 +35,7 @@ export function createUserTestOrganizations(projectId = "project-1") {
 
 /** The avatar bytes, kept in the test rather than in an object store. */
 export class TestUserAvatarStorage implements UserAvatarStorage {
-  readonly stored: Array<{ projectId: string; userId: string }> = [];
+  readonly stored: { projectId: string; userId: string }[] = [];
 
   async store(input: {
     projectId: string;

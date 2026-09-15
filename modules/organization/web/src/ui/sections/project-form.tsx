@@ -200,7 +200,7 @@ function TeamSelectWithCreateButton({
 }: {
   control: Control<ProjectFormData>;
   teamCollection: ListCollection<{ label: string; value: string }>;
-  teamOptions: Array<{ label: string; value: string }>;
+  teamOptions: { label: string; value: string }[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
 

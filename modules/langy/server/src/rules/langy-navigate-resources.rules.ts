@@ -29,7 +29,7 @@ export type LangyNavigateResourceKind = (typeof LANGY_NAVIGATE_RESOURCE_KINDS)[n
  * (`prompt_version_` ids fall into `prompt_` and miss the prompt lookup,
  * correctly dropping.)
  */
-const RESOURCE_PREFIXES: ReadonlyArray<readonly [string, LangyNavigateResourceKind]> = [
+const RESOURCE_PREFIXES: readonly (readonly [string, LangyNavigateResourceKind])[] = [
   ["prompt_", "prompt"],
   ["dataset_", "dataset"],
   ["workflow_", "workflow"],

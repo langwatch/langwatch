@@ -105,10 +105,10 @@ describe("SerializedPromptConfigAdapter", () => {
     await adapter.call(defaultInput);
 
     const callArgs = mockGenerateText.mock.calls[0]![0];
-    const messages = callArgs.messages as Array<{
+    const messages = callArgs.messages as {
       role: string;
       content: string;
-    }>;
+    }[];
 
     expect(messages[0]).toEqual({
       role: "system",
@@ -182,10 +182,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{
+      const messages = callArgs.messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       expect(messages[0]).toEqual({
         role: "system",
@@ -210,10 +210,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{
+      const messages = callArgs.messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       expect(messages[1]).toEqual({
         role: "user",
@@ -238,10 +238,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(defaultInput);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as Array<{
+        const messages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         // System + the conversation. Before the fix the bare word "messages"
         // matched the history-suppression check and the model was told to
@@ -275,10 +275,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call({ ...defaultInput, threadId: "thread_abc" });
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as Array<{
+        const messages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         expect(messages[0]!.content).toBe("question: How are you?\nthread: thread_abc");
       });
@@ -309,10 +309,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(defaultInput);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as Array<{
+        const messages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         expect(messages[0]!.content).toBe("tier: [unbound input: customer_tier]");
       });
@@ -333,10 +333,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{
+      const messages = callArgs.messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       // Only system message - input.messages not appended because template handles it
       expect(messages).toHaveLength(1);
@@ -359,10 +359,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{
+      const messages = callArgs.messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       // System + template message only - input.messages not appended
       expect(messages).toHaveLength(2);
@@ -387,10 +387,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(defaultInput);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as Array<{
+        const messages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         // Only the system message. The template already carries the turn, so an
         // appended input.messages would show the model the same turn twice —
@@ -411,10 +411,10 @@ describe("SerializedPromptConfigAdapter", () => {
       await adapter.call(defaultInput);
 
       const callArgs = mockGenerateText.mock.calls[0]![0];
-      const messages = callArgs.messages as Array<{
+      const messages = callArgs.messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       // System + template message + input message
       expect(messages).toHaveLength(3);
@@ -444,10 +444,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(input);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const messages = callArgs.messages as Array<{
+        const messages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         expect(messages[0]).toEqual({
           role: "system",
@@ -481,10 +481,10 @@ describe("SerializedPromptConfigAdapter", () => {
         await adapter.call(defaultInput);
 
         const callArgs = mockGenerateText.mock.calls[0]![0];
-        const promptMessages = callArgs.messages as Array<{
+        const promptMessages = callArgs.messages as {
           role: string;
           content: string;
-        }>;
+        }[];
 
         const userMessage = promptMessages[1];
         expect(userMessage?.role).toBe("user");
@@ -512,10 +512,10 @@ describe("SerializedPromptConfigAdapter", () => {
 
       await adapter.call(defaultInput);
 
-      const promptMessages = mockGenerateText.mock.calls[0]![0].messages as Array<{
+      const promptMessages = mockGenerateText.mock.calls[0]![0].messages as {
         role: string;
         content: string;
-      }>;
+      }[];
 
       expect(promptMessages[0]?.content).toBe("You serve a platinum customer in eu-central.");
       expect(promptMessages[1]?.content).toBe("Tier: platinum");

@@ -85,7 +85,7 @@ export abstract class GatewayVirtualKeys {
   abstract findMetaByIds(input: {
     organizationId: string;
     ids: string[];
-  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>>;
+  }): Promise<{ id: string; name: string; displayPrefix: string }[]>;
   abstract findPageInOrganization(input: {
     organizationId: string;
     limit: number;

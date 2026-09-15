@@ -171,11 +171,11 @@ export class EvaluationRunClickHouseWriteRepository {
   }
 
   async upsertBatch(
-    entries: Array<{
+    entries: {
       data: EvaluationRunData;
       tenantId: string;
       retentionDays?: number;
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
 

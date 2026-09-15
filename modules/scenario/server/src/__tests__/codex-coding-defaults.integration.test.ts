@@ -337,10 +337,10 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
     } satisfies ScenarioPrefetchFixture;
   }
 
-  const cases: Array<{
+  const cases: {
     label: "workflow" | "code" | "http";
     agent: Agent;
-  }> = [
+  }[] = [
     { label: "workflow", agent: workflowAgent },
     { label: "code", agent: codeAgent },
     { label: "http", agent: httpAgent },

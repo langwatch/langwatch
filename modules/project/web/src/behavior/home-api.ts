@@ -39,19 +39,19 @@ type BorrowedProcedures = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
-          teams: Array<{
-            projects: Array<{
+          teams: {
+            projects: {
               id: string;
               name: string;
               slug: string;
               firstMessage?: boolean | null;
               apiKey?: string | null;
-            }>;
-          }>;
-        }>;
+            }[];
+          }[];
+        }[];
       };
     };
   };
@@ -92,13 +92,13 @@ type BorrowedProcedures = {
     getExternalSetSummaries: {
       query: {
         input: { projectId: string };
-        output: Array<{
+        output: {
           scenarioSetId: string;
           passedCount: number;
           failedCount: number;
           totalCount: number;
           lastRunTimestamp?: number | null;
-        }>;
+        }[];
       };
     };
   };
@@ -118,7 +118,7 @@ type BorrowedProcedures = {
           offset: number;
         };
         output: {
-          values: Array<{ value: string; count: number }>;
+          values: { value: string; count: number }[];
           totalDistinct: number;
         };
       };

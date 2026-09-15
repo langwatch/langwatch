@@ -254,10 +254,10 @@ export class ScimDirectoryService {
 
   private toScimGroup(
     group: ScimGroupRecord,
-    members: Array<{
+    members: {
       userId: string;
       user: { id: string; email: string | null; name: string | null };
-    }>,
+    }[],
     excludeMembers = false,
   ): ScimGroup {
     return {

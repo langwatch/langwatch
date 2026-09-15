@@ -291,7 +291,7 @@ describe("the CLI local control protocol, given the platform's contract module",
     });
 
     it("cancel, permission, policy and disconnect carry the same keys", () => {
-      const pairs: Array<[string, string]> = [
+      const pairs: [string, string][] = [
         ["LocalCancelFrame", "cancelFrameSchema"],
         ["LocalPermissionFrame", "permissionFrameSchema"],
         ["LocalPolicyFrame", "policyFrameSchema"],

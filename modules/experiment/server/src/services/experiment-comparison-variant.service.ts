@@ -109,7 +109,7 @@ export class ExperimentComparisonVariantService {
     targetId: string;
     evaluatorId: string;
     rowsInScope: number[];
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     skipReasons: ComparisonSkipReason[];
   }): void {
     for (const rowIndex of rowsInScope) {

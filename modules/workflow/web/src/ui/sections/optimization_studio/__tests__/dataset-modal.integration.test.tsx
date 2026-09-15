@@ -13,15 +13,15 @@ import "@testing-library/jest-dom/vitest";
 const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
   mockDatasets: {
-    current: [] as Array<{
+    current: [] as {
       id: string;
       name: string;
-      columnTypes: Array<{ name: string; type: string }>;
+      columnTypes: { name: string; type: string }[];
       updatedAt: Date;
       useS3: boolean;
       s3RecordCount: number | null;
       _count: { datasetRecords: number };
-    }>,
+    }[],
   },
 }));
 

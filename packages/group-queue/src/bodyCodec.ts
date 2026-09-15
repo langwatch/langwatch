@@ -67,9 +67,9 @@ export function detectCompression(buf: Buffer): CompressionCodec {
 export async function compress(data: Buffer | string, codec: CompressionCodec): Promise<Buffer> {
   switch (codec) {
     case "gzip":
-      return await gzipAsync(data);
+      return gzipAsync(data);
     case "zstd":
-      return await zstdCompressAsync(data);
+      return zstdCompressAsync(data);
     case "none":
       return Buffer.isBuffer(data) ? data : Buffer.from(data);
   }
@@ -79,9 +79,9 @@ export async function compress(data: Buffer | string, codec: CompressionCodec): 
 export async function decompress(buf: Buffer): Promise<Buffer> {
   switch (detectCompression(buf)) {
     case "gzip":
-      return await gunzipAsync(buf, GUNZIP_OPTS);
+      return gunzipAsync(buf, GUNZIP_OPTS);
     case "zstd":
-      return await zstdDecompressAsync(buf, ZSTD_OPTS);
+      return zstdDecompressAsync(buf, ZSTD_OPTS);
     case "none":
       return buf;
   }

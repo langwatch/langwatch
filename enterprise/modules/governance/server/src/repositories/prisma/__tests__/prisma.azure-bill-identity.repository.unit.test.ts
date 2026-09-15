@@ -6,7 +6,7 @@ import { azureBillSourceId, withAzureBillIdentity } from "../prisma.azure-bill-i
 
 const subscription = "aaaaaaaa-0000-4000-8000-000000000001";
 function clientWith(
-  history: Array<{ id: string; parserConfig: Record<string, unknown> }>,
+  history: { id: string; parserConfig: Record<string, unknown> }[],
 ) {
   return {
     ingestionSource: { findMany: vi.fn().mockResolvedValue(history) },

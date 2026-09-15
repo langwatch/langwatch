@@ -54,7 +54,7 @@ export class PromptCopyService {
       scope: source.scope,
     });
 
-    return await this.write.createPrompt({
+    return this.write.createPrompt({
       ...this.buildCreateParamsFromSource(source),
       projectId,
       handle,

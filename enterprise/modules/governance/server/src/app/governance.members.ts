@@ -85,11 +85,11 @@ export interface AnomalyAlertHttpClient {
 
 export type CliBudgetOverview = {
   gatewayAccess: boolean;
-  budgets: Array<{
+  budgets: {
     window: string;
     limitUsd: string;
     spentUsd: string;
-  }>;
+  }[];
 };
 
 export interface CliBudgetOverviewReader {
@@ -966,7 +966,7 @@ export interface QuarantineTraceActivityReader {
   findSpanCountsBySource(input: {
     tenantId: string;
     sinceMs: number;
-  }): Promise<Array<{ sourceId: string; spanCount: number }>>;
+  }): Promise<{ sourceId: string; spanCount: number }[]>;
 }
 
 export type AnomalySpendSourceFilter =

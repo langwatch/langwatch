@@ -145,7 +145,7 @@ export class BillableEventsQueryService {
   }: {
     organizationId: string;
     billingMonth: string;
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<{ projectId: string; count: number }[]> {
     const repository = this.repository;
     if (!repository) {
       logger.warn(
@@ -158,7 +158,7 @@ export class BillableEventsQueryService {
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
 
-    return await repository.findByProjectApprox({
+    return repository.findByProjectApprox({
       organizationId,
       startDate,
       endDate,
@@ -175,7 +175,7 @@ export class BillableEventsQueryService {
   }: {
     organizationId: string;
     billingMonth: string;
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<{ projectId: string; count: number }[]> {
     const repository = this.repository;
     if (!repository) {
       logger.warn(
@@ -188,7 +188,7 @@ export class BillableEventsQueryService {
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
 
-    return await repository.findByProject({
+    return repository.findByProject({
       organizationId,
       startDate,
       endDate,

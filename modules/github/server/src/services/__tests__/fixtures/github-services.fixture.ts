@@ -167,7 +167,7 @@ export class TestOrganizationService extends OrganizationService {
 }
 
 export class TestProjectService extends TestProjectApi {
-  readonly pullRequestActivity: Array<{ projectId: string; at: Instant }> = [];
+  readonly pullRequestActivity: { projectId: string; at: Instant }[] = [];
   pullRequestActivityError: Error | null = null;
 
   constructor(private readonly organizationId: string) {

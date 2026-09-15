@@ -85,7 +85,7 @@ describe("EventStoreClickHouse retention stamping", () => {
       expect(insertSpy).toHaveBeenCalledTimes(1);
       const insertCall = insertSpy.mock.calls[0]![0]!;
       expect(insertCall.table).toBe("event_log");
-      const values = insertCall.values as Array<{ _retention_days: number }>;
+      const values = insertCall.values as { _retention_days: number }[];
       expect(values).toHaveLength(2);
       expect(values[0]!._retention_days).toBe(30);
       expect(values[1]!._retention_days).toBe(30);
@@ -107,9 +107,9 @@ describe("EventStoreClickHouse retention stamping", () => {
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
-      const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+      const values = insertSpy.mock.calls[0]![0]!.values as {
         _retention_days: number;
-      }>;
+      }[];
       expect(values[0]!._retention_days).toBe(INJECTED_DEFAULT_RETENTION_DAYS);
     });
   });
@@ -142,7 +142,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
-      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      const values = insertSpy.mock.calls[0]![0]!.values as { _retention_days: number }[];
       expect(values[0]!._retention_days).toBe(0);
     });
 
@@ -165,7 +165,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
-      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      const values = insertSpy.mock.calls[0]![0]!.values as { _retention_days: number }[];
       expect(values[0]!._retention_days).toBe(63);
     });
 
@@ -187,7 +187,7 @@ describe("EventStoreClickHouse retention stamping", () => {
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
-      const values = insertSpy.mock.calls[0]![0]!.values as Array<{ _retention_days: number }>;
+      const values = insertSpy.mock.calls[0]![0]!.values as { _retention_days: number }[];
       expect(values[0]!._retention_days).toBe(30);
     });
   });
@@ -211,9 +211,9 @@ describe("EventStoreClickHouse retention stamping", () => {
 
       await store.storeEvents([makeEvent()], { tenantId }, aggregateType);
 
-      const values = insertSpy.mock.calls[0]![0]!.values as Array<{
+      const values = insertSpy.mock.calls[0]![0]!.values as {
         _retention_days: number;
-      }>;
+      }[];
       expect(values[0]!._retention_days).toBe(INJECTED_DEFAULT_RETENTION_DAYS);
     });
   });

@@ -43,10 +43,10 @@ export class PromptConverter {
       temperature?: number;
       maxTokens?: number;
     };
-    messages: Array<{
+    messages: {
       role: "system" | "user" | "assistant";
       content: string;
-    }>;
+    }[];
     response_format?: LocalResponseFormat;
     parameters?: RuntimeParameters;
   } {
@@ -107,7 +107,7 @@ export class PromptConverter {
    * Extracts the system prompt from messages array.
    * Used when converting to API format that separates system prompt from messages.
    */
-  static extractSystemPrompt(messages: Array<{ role: string; content: string }>): string {
+  static extractSystemPrompt(messages: { role: string; content: string }[]): string {
     return messages.find((m) => m.role === "system")?.content ?? "";
   }
 
@@ -116,14 +116,14 @@ export class PromptConverter {
    * Used when converting to API format that handles system prompt separately.
    */
   static filterNonSystemMessages(
-    messages: Array<{
+    messages: {
       role: "system" | "user" | "assistant";
       content: string;
-    }>,
-  ): Array<{ role: "user" | "assistant"; content: string }> {
-    return messages.filter((m) => m.role !== "system") as Array<{
+    }[],
+  ): { role: "user" | "assistant"; content: string }[] {
+    return messages.filter((m) => m.role !== "system") as {
       role: "user" | "assistant";
       content: string;
-    }>;
+    }[];
   }
 }

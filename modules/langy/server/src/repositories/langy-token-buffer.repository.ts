@@ -13,7 +13,7 @@ export interface LangyStreamRead {
  */
 export interface LangyStreamRedis {
   xadd(key: string, ...args: (string | number)[]): Promise<string | null>;
-  xrange(key: string, start: string, end: string): Promise<Array<[string, string[]]>>;
+  xrange(key: string, start: string, end: string): Promise<[string, string[]][]>;
   expire(key: string, seconds: number): Promise<number>;
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
@@ -21,7 +21,7 @@ export interface LangyStreamRedis {
   blocking?: {
     xread(
       ...args: (string | number)[]
-    ): Promise<Array<[string, Array<[string, string[]]>]>> | null | Promise<null>;
+    ): Promise<[string, [string, string[]][]][]> | null | Promise<null>;
   };
 }
 

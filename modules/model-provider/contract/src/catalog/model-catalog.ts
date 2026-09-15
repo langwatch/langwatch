@@ -123,7 +123,7 @@ export function getModelById(modelId: string): LLMModelEntry | undefined {
 export function getProviderModelOptions(
   provider: string,
   mode: "chat" | "embedding",
-): Array<{ value: string; label: string }> {
+): { value: string; label: string }[] {
   return Object.values(llmModels.models)
     .filter((model) => model.provider === provider && model.mode === mode)
     .map((model) => {

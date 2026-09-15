@@ -256,7 +256,7 @@ function deployment(access: OtlpAccess = {}) {
 
   const post = async (path: string, body: unknown, headers: Record<string, string> = {}) => {
     for (const family of mounted) {
-      return await family.request(path, {
+      return family.request(path, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Auth-Token": TOKEN, ...headers },
         body: JSON.stringify(body),

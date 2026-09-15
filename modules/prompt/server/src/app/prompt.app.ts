@@ -848,7 +848,7 @@ export class PromptApp implements PromptApi {
   /** Deletes a tag definition, cascading to its assignments. */
   async deleteTagForProject(input: { projectId: string; name: string }): Promise<PromptTag> {
     const organizationId = await this.#organizationOf(input.projectId);
-    return await this.deleteTagByName({ organizationId, name: input.name });
+    return this.deleteTagByName({ organizationId, name: input.name });
   }
 
   /** Points a tag at one prompt version, attributed to its caller. */

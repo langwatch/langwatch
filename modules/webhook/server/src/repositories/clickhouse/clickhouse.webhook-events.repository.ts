@@ -178,7 +178,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
       query_params: queryParams,
       format: "JSONEachRow",
     });
-    const rows = ((await result.json()) as Array<Record<string, unknown>>).map(mapSpendEventRow);
+    const rows = ((await result.json()) as Record<string, unknown>[]).map(mapSpendEventRow);
     const last = rows.at(-1);
     return {
       rows,
@@ -214,7 +214,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
       },
       format: "JSONEachRow",
     });
-    const row = ((await result.json()) as Array<Record<string, unknown>>)[0];
+    const row = ((await result.json()) as Record<string, unknown>[])[0];
     return row ? mapSpendEventRow(row) : null;
   }
 }

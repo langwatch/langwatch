@@ -83,7 +83,7 @@ export interface DashboardRepository {
   }): Promise<GraphRecord>;
   updateGraphLayouts(input: {
     projectId: string;
-    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+    layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<void>;
 
   findAllSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChartRecord[]>;

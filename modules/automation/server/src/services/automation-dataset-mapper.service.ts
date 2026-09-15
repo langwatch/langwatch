@@ -6,5 +6,5 @@ export abstract class AutomationDatasetMapper {
     trace: TraceRecord;
     mapping: DatasetActionParams["datasetMapping"]["mapping"];
     expansions: readonly string[];
-  }): Array<Record<string, string | number>>;
+  }): Record<string, string | number>[];
 }

@@ -46,14 +46,14 @@ export interface SuiteConfigFetcher {
   ): Promise<{
     simulatorModel: string | null;
     judgeModel: string | null;
-    targets?: Array<{
+    targets?: {
       type: "prompt" | "http" | "code" | "workflow" | "connected";
       referenceId: string;
       scenarioMappings?: Record<
         string,
         { type: "source"; sourceId: string; path: string[] } | { type: "value"; value: string }
       >;
-    }>;
+    }[];
   } | null>;
 }
 

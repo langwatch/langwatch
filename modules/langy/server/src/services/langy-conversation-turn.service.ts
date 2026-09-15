@@ -253,7 +253,7 @@ export class LangyConversationTurnService {
     projectId: string;
     conversationId: string;
     turnId: string;
-    items: Array<{ content: string; status: string }>;
+    items: { content: string; status: string }[];
   }): Promise<void> {
     await this.deps.commands.updatePlan({
       tenantId: projectId,

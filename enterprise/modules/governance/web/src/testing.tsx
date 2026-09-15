@@ -50,7 +50,7 @@ export type GovernanceQuery = Readonly<Record<string, string | undefined>>;
 /** Everything a screen wrote through the host, in the order it wrote it. */
 export type GovernanceHostRecording = {
   navigations: string[];
-  queries: Array<{ next: GovernanceQuery; replace: boolean }>;
+  queries: { next: GovernanceQuery; replace: boolean }[];
   successes: GovernanceSuccessNotice[];
   failures: GovernanceFailureNotice[];
 };

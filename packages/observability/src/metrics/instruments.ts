@@ -29,7 +29,7 @@ let generation = 0;
 let meter: { value: Meter; generation: number } | undefined;
 
 /** Observable gauges declared before a provider existed, awaiting activation. */
-const pendingObservations: Array<() => void> = [];
+const pendingObservations: (() => void)[] = [];
 let activated = false;
 
 function currentMeter(): Meter {

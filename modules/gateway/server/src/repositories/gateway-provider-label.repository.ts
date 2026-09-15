@@ -5,6 +5,6 @@
  */
 export abstract class GatewayProviderLabelRepository {
   abstract resolveProviderLabels(
-    budgets: Array<{ providerKey: string | null }>,
+    budgets: { providerKey: string | null }[],
   ): Promise<Map<string, string>>;
 }

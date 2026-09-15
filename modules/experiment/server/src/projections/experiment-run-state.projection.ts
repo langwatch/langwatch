@@ -58,11 +58,11 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
 // Keep in sync with the target-merging logic in the ClickHouse experiment_runs projection store.
 function mergeTargetsJson(
   existingJson: string,
-  incoming: Array<{ id: string; [k: string]: unknown }>,
+  incoming: { id: string; [k: string]: unknown }[],
 ): string {
   if (incoming.length === 0) return existingJson;
 
-  let existing: Array<{ id: string; [k: string]: unknown }> = [];
+  let existing: { id: string; [k: string]: unknown }[] = [];
   try {
     existing = JSON.parse(existingJson);
   } catch {

@@ -256,10 +256,10 @@ export function VirtualKeyEditDrawer({
   });
 
   const providers = (orgProvidersQuery.data ?? []) as OrgModelProvider[];
-  const policies = (policiesQuery.data ?? []) as Array<{
+  const policies = (policiesQuery.data ?? []) as {
     id: string;
     name: string;
-  }>;
+  }[];
   const eligible = useMemo(
     () =>
       resolveEligible({

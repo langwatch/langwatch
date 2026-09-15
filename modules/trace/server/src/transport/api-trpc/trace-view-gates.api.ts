@@ -60,11 +60,9 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
 }: {
   sessions: T[];
   protections: Protections;
-}): Array<
-  T & {
+}): (T & {
     codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
-  }
-> {
+  })[] {
   const contentVisible = TraceViewerProtectionsService.canReadCapturedContent(protections);
   return sessions.map((session) => {
     const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;

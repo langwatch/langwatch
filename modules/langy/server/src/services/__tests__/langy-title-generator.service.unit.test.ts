@@ -21,7 +21,7 @@ const CONVERSATION_ID = "conversation-1";
 
 /** The resolver, recording what the service asked it for. */
 class RecordingTitleModel implements LangyTitleModel {
-  readonly asked: Array<{ projectId: string; featureKey: string; fallbackModel: string }> = [];
+  readonly asked: { projectId: string; featureKey: string; fallbackModel: string }[] = [];
 
   constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {
   }
@@ -50,7 +50,7 @@ class UnconfiguredTitleModel implements LangyTitleModel {
   }
 }
 
-function messagesOf(records: Array<{ role: string; content: string }>): LangyTrustedMessageReader {
+function messagesOf(records: { role: string; content: string }[]): LangyTrustedMessageReader {
   return {
     getRecordsByConversation: async () =>
       records.map((record, index) => ({
@@ -62,7 +62,7 @@ function messagesOf(records: Array<{ role: string; content: string }>): LangyTru
 }
 
 function generatorOver(input: {
-  records: Array<{ role: string; content: string }>;
+  records: { role: string; content: string }[];
   models?: LangyTitleModel;
 }) {
   const models = input.models ?? new RecordingTitleModel();

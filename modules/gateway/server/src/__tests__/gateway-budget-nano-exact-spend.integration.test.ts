@@ -201,7 +201,7 @@ async function ledgerNanoFor(budgetId: string): Promise<number> {
     query_params: { tenantId: PROJECT_ID, budgetId },
     format: "JSONEachRow",
   });
-  const rows = (await result.json()) as Array<{ nano: string }>;
+  const rows = (await result.json()) as { nano: string }[];
   return Number(rows[0]?.nano ?? "0");
 }
 

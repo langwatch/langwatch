@@ -59,7 +59,7 @@ export function VirtualKeyRoutingSection({
 }: {
   value: VirtualKeyRoutingValue;
   onChange: (next: VirtualKeyRoutingValue) => void;
-  policies: Array<{ id: string; name: string }>;
+  policies: { id: string; name: string }[];
 }) {
   return (
     <VStack align="start" width="full" gap={1.5}>

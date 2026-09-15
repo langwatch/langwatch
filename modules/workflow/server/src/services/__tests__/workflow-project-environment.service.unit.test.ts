@@ -14,7 +14,7 @@ type ProjectSecretQuery = {
 
 function projectEnvironment(input: {
   apiKey: string;
-  projectSecrets: Array<{ name: string; encryptedValue: string }>;
+  projectSecrets: { name: string; encryptedValue: string }[];
 }) {
   const projectQueries: ProjectQuery[] = [];
   const projectSecretQueries: ProjectSecretQuery[] = [];

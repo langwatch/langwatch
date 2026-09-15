@@ -23,7 +23,7 @@ import { getLangWatchTracerFromProvider } from "../tracer";
 export class MockSpan implements Span {
   private _name: string;
   private _attributes: Record<string, AttributeValue> = {};
-  private _events: Array<{ name: string; attributes?: Attributes; timestamp?: number }> = [];
+  private _events: { name: string; attributes?: Attributes; timestamp?: number }[] = [];
   private _status?: SpanStatus;
   private _ended = false;
   private _links: Link[] = [];
@@ -139,7 +139,7 @@ export class MockSpan implements Span {
     return { ...this._attributes };
   }
 
-  get events(): Array<{ name: string; attributes?: Attributes; timestamp?: number }> {
+  get events(): { name: string; attributes?: Attributes; timestamp?: number }[] {
     return [...this._events];
   }
 
@@ -676,7 +676,7 @@ export const errorTestUtils = {
    * Tests partial failure scenarios
    */
   testPartialFailure: async <T>(
-    operations: Array<() => Promise<T>>,
+    operations: (() => Promise<T>)[],
     failureIndices: number[],
     expectedError: Error,
   ) => {

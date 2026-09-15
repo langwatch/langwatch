@@ -61,10 +61,10 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 
   async storeBatch(
-    entries: Array<{
+    entries: {
       state: CodingAgentSessionState;
       context: ProjectionStoreContext;
-    }>,
+    }[],
   ): Promise<void> {
     const persistable = entries.filter(({ state }) => hasPersistableSignal(state));
     const rows = persistable.map(({ state, context }) => this.toRow(state, context));

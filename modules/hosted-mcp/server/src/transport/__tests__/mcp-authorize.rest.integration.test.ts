@@ -96,7 +96,7 @@ async function approve(
     if (value === undefined) delete body[key];
   }
 
-  return await app.request("/api/mcp/authorize", {
+  return app.request("/api/mcp/authorize", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),

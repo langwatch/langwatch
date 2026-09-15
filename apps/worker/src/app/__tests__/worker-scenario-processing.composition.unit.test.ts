@@ -14,10 +14,10 @@ import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-
  */
 
 const RECORDED: {
-  broadcasts: Array<{ tenantId: string; event: string; eventType: string }>;
-  suite: Array<{ command: string; data: unknown }>;
+  broadcasts: { tenantId: string; event: string; eventType: string }[];
+  suite: { command: string; data: unknown }[];
   absences: string[];
-  commands: Array<{ name: string; data: unknown }>;
+  commands: { name: string; data: unknown }[];
 } = { broadcasts: [], suite: [], absences: [], commands: [] };
 
 function reset(): void {
@@ -69,7 +69,7 @@ function compose(overrides: { executionPool?: { submit(job: unknown): void } } =
 function frozenScenarioRoutingKeys(): string[] {
   const registry = JSON.parse(
     readFileSync(new URL("../../features/job-registry.json", import.meta.url), "utf8"),
-  ) as { pipelines: Array<{ name: string; jobs: string[] }> };
+  ) as { pipelines: { name: string; jobs: string[] }[] };
   const pipeline = registry.pipelines.find((entry) => entry.name === "simulation_processing");
   if (!pipeline) throw new Error("simulation_processing is absent from the job registry");
   return pipeline.jobs;
@@ -81,7 +81,7 @@ type BuiltDefinition = {
   foldProjections: Map<string, unknown>;
   stateProjections?: Map<string, unknown>;
   mapProjections: Map<string, unknown>;
-  commands: ReadonlyArray<{ name: string }>;
+  commands: readonly { name: string }[];
   foldSubscribers: Map<string, unknown>;
   mapSubscribers: Map<string, unknown>;
   eventSubscribers: Map<string, { handle: (event: never, ctx: never) => Promise<void> }>;
@@ -210,7 +210,7 @@ describe("given the simulation pipeline this process composes for itself", () =>
     /** @scenario "A worker holding an execution pool starts a queued run" */
     it("submits the queued run to that pool and reports no absence", async () => {
       reset();
-      const submitted: Array<{ scenarioRunId: string }> = [];
+      const submitted: { scenarioRunId: string }[] = [];
       const definition = compose({
         executionPool: {
           submit: (job) => submitted.push(job as { scenarioRunId: string }),

@@ -199,7 +199,7 @@ async function renderWorkbench(period: { startDate: string; endDate: string } = 
       <LangWatchQLWorkbench projectId="project-1" />
     </AnalyticsTestHarness>,
   );
-  return await screen.findByTestId("stub-monaco");
+  return screen.findByTestId("stub-monaco");
 }
 
 function typeSql(editor: HTMLElement, sql: string) {

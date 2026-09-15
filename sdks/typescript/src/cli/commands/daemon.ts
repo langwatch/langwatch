@@ -222,7 +222,7 @@ export async function daemonStatusCommand(options: { json?: boolean }): Promise<
           running: status !== null,
           supported: isDaemonSupported(),
           socketPath: identity.socketPath,
-          ...(status ?? {}),
+          ...status,
         },
         null,
         2,

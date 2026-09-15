@@ -353,10 +353,10 @@ export class PromptsApiService {
         temperature?: number;
         max_tokens?: number;
       };
-      messages: Array<{
+      messages: {
         role: "system" | "user" | "assistant";
         content: string;
-      }>;
+      }[];
       parameters?: RuntimeParameters;
     },
   ): Promise<{ created: boolean; prompt: PromptResponse }> {

@@ -93,7 +93,7 @@ class RecordingLangevals extends EvaluationLangevals {
 }
 
 class RecordingCosts extends EvaluationCostRecorder {
-  readonly written: Array<{ idempotencyKey: string; amount: number }> = [];
+  readonly written: { idempotencyKey: string; amount: number }[] = [];
 
   async recordCost(params: { idempotencyKey: string; amount: number }): Promise<string> {
     this.written.push({ idempotencyKey: params.idempotencyKey, amount: params.amount });
@@ -191,15 +191,15 @@ function processingOptions(
 }
 
 function executeHandler(definition: {
-  commands: Array<{ name: string; handlerInstance?: unknown }>;
-}): { handle(command: unknown): Promise<Array<{ type: string }>> } {
+  commands: { name: string; handlerInstance?: unknown }[];
+}): { handle(command: unknown): Promise<{ type: string }[]> } {
   const registered = definition.commands.find((entry) => entry.name === "executeEvaluation");
   if (!registered?.handlerInstance) {
     throw new Error("executeEvaluation is not registered with an instance");
   }
 
   return registered.handlerInstance as {
-    handle(command: unknown): Promise<Array<{ type: string }>>;
+    handle(command: unknown): Promise<{ type: string }[]>;
   };
 }
 

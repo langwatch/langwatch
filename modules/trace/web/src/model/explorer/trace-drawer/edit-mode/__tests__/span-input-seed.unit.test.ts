@@ -62,7 +62,7 @@ describe("given a span whose system prompt is recorded as content blocks", () =>
       params,
     }) as unknown as Pick<Span, "input" | "params">;
 
-  const cases: Array<[string, Record<string, unknown>]> = [
+  const cases: [string, Record<string, unknown>][] = [
     [
       "as an array of content blocks",
       {

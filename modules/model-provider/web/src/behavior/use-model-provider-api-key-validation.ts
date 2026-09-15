@@ -15,10 +15,10 @@ const describeRefusal = (domainError: SerializedHandledError): string => {
   return description ? `${title}. ${description}` : title;
 };
 
-type ProviderScopeSelection = Array<{
+type ProviderScopeSelection = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-}>;
+}[];
 
 /** An empty selection means "the handles already on the call", not "no scopes". */
 function scopesOrUndefined(

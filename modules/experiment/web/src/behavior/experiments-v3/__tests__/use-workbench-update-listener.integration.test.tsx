@@ -6,10 +6,10 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const sseCalls: Array<{
+const sseCalls: {
   input: unknown;
   options: { enabled: boolean; onData: (data: unknown) => void };
-}> = [];
+}[] = [];
 
 vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
   useSSESubscription: (

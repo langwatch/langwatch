@@ -166,7 +166,7 @@ export async function waitForAllActiveJobs({
 }: {
   redis: ReplayRedis;
   aggregates: DiscoveredAggregate[];
-  projections: Array<{ projectionName: string; kind: ProjectionKind }>;
+  projections: { projectionName: string; kind: ProjectionKind }[];
   maxWaitMs?: number;
 }): Promise<void> {
   if (aggregates.length === 0 || projections.length === 0) return;

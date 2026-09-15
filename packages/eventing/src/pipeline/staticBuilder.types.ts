@@ -117,13 +117,13 @@ export interface StaticPipelineDefinition<
   >;
 
   /** Command handlers registered in this pipeline */
-  commands: Array<{
+  commands: {
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed handler instance for DI; used instead of `new handlerClass()`. */
     handlerInstance?: import("../commands/command.ts").CommandHandler<any, EventType>;
     options?: CommandHandlerOptions;
-  }>;
+  }[];
 
   /** Subscribers attached to fold projections (post-fold side-effect handlers) */
   foldSubscribers: Map<

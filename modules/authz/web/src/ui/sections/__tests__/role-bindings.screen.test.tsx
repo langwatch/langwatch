@@ -7,7 +7,7 @@ import { FakeAuthzHost, renderWithAuthzHost } from "../../../testing.tsx";
 
 const { api, state } = vi.hoisted(() => {
   const state = {
-    bindings: [] as Array<Record<string, unknown>> | undefined,
+    bindings: [] as Record<string, unknown>[] | undefined,
     isLoading: false,
     lastQuery: null as { input: unknown; options: { enabled?: boolean } } | null,
   };

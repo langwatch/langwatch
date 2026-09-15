@@ -39,10 +39,10 @@ function applyCachedViewById(
 ): void {
   const raw = readUiStorage(`langwatch-saved-views-cache-${projectId}`);
   if (!raw) return;
-  const cached = JSON.parse(raw) as Array<{
+  const cached = JSON.parse(raw) as {
     id: string;
     filters?: Record<string, FilterParam>;
-  }>;
+  }[];
   const view = cached.find((v) => v.id === viewId);
   if (view?.filters) {
     applyCachedViewFilters(filters, view.filters);

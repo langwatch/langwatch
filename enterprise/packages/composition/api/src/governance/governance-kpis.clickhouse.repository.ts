@@ -161,10 +161,10 @@ export class AppGovernanceKpisAdapter implements AnomalySpendReader {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       currentSpend: number | string | null;
       baselineSpend: number | string | null;
-    }>;
+    }[];
     const row = rows[0];
     return {
       currentSpend: Number(row?.currentSpend ?? 0),

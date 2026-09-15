@@ -238,7 +238,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   .handle(async ({ app, input, scope, actor }) => {
     const caller: OrganizationCaller | null = callerOf(actor);
 
-    let teamsLeftWithoutAdmin: Array<{ id: string; name: string }> | undefined;
+    let teamsLeftWithoutAdmin: { id: string; name: string }[] | undefined;
     if (input.role !== undefined) {
       const result = await app.changeMemberRole(
         {

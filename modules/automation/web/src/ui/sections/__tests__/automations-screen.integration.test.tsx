@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const triggers = vi.hoisted(() => ({
-  rows: [] as Array<Record<string, unknown>>,
+  rows: [] as Record<string, unknown>[],
 }));
 
 vi.mock("../../../behavior/automation-api.ts", () => {

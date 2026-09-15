@@ -136,7 +136,7 @@ class ConnectionRateLimiter extends ModelProviderConnectionRateLimiter {
 }
 class Authorization extends AuthzService {
   canWriteResult = true;
-  writes: Array<{ actorId: string; scopeType: string; scopeId: string }> = [];
+  writes: { actorId: string; scopeType: string; scopeId: string }[] = [];
 
   check(): Promise<never> {
     return this.notUsed();
@@ -557,7 +557,7 @@ class Costs implements ModelCostRepository {
   }
 }
 class Catalog extends ModelProviderCatalog {
-  connectionChecks: Array<{ provider: string; customKeys: Record<string, unknown> }> = [];
+  connectionChecks: { provider: string; customKeys: Record<string, unknown> }[] = [];
   exists(providerName: string): boolean {
     return providerName === "openai";
   }
@@ -717,20 +717,20 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
     }
   }
   mergeHeaders(input: {
-    incoming: Array<{ key: string; value: string }>;
-    stored: Array<{ key: string; value: string }>;
+    incoming: { key: string; value: string }[];
+    stored: { key: string; value: string }[];
   }) {
     return input.incoming.length > 0 ? input.incoming : input.stored;
   }
-  maskHeaders(value: Array<{ key: string; value: string }>) {
+  maskHeaders(value: { key: string; value: string }[]) {
     return value.map(({ key }) => ({ key, value: "••••" }));
   }
 }
 class HeaderCredentialPolicy extends CredentialPolicy {
   mergeHeaders(input: {
-    incoming: Array<{ key: string; value: string }>;
-    stored: Array<{ key: string; value: string }>;
-  }): Array<{ key: string; value: string }> {
+    incoming: { key: string; value: string }[];
+    stored: { key: string; value: string }[];
+  }): { key: string; value: string }[] {
     const incomingKeys = new Set(input.incoming.map(({ key }) => key));
     return input.incoming.flatMap((header, index) => {
       if (header.value !== "••••") return [header];

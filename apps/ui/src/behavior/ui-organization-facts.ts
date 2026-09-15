@@ -21,10 +21,10 @@ export const UI_LITE_MEMBER_ROLE = "EXTERNAL";
 const PLAN_STALE_TIME_MS = 5 * 60_000;
 
 type ActivePlanRead = { activePlan?: { type?: string } };
-type OrganizationsRead = ReadonlyArray<{
+type OrganizationsRead = readonly {
   id: string;
-  members?: ReadonlyArray<{ role?: string }>;
-}>;
+  members?: readonly { role?: string }[];
+}[];
 
 /**
  * Whether this deployment is the hosted product — decides one menu

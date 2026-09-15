@@ -36,7 +36,7 @@ export abstract class AiToolCatalogRepository {
   abstract listConfiguredProvidersForOrganization(organizationId: string): Promise<string[]>;
   abstract listRoutingPolicyOptions(
     organizationId: string,
-  ): Promise<Array<{ id: string; name: string }>>;
+  ): Promise<{ id: string; name: string }[]>;
   abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
 }
 
@@ -47,9 +47,9 @@ export interface AiToolSlug {
 
 /** The model providers this deployment can offer a catalogue entry. */
 export interface AiToolProviderCatalog {
-  list(): Array<{
+  list(): {
     providerKey: string;
     displayName: string;
     type: string;
-  }>;
+  }[];
 }

@@ -323,7 +323,7 @@ export function deriveProjects(
     // all, so its own references are left as its owner wrote them.
     const build = join(member.directory, "tsconfig.build.json");
 
-    const kinds: ReadonlyArray<{ file: string; targets: string[] }> = [
+    const kinds: readonly { file: string; targets: string[] }[] = [
       ...(ownProducer === build || isGroupMember
         ? [{ file: build, targets: unique(buildTargets) }]
         : []),

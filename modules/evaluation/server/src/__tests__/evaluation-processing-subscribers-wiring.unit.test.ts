@@ -45,14 +45,14 @@ function completedEvent(): EvaluationCompletedEvent {
 }
 
 class TestAutomationEvaluationSubscriberService extends AutomationEvaluationSubscriberService {
-  readonly triggerMatchCalls: Array<{
+  readonly triggerMatchCalls: {
     event: EvaluationProcessingEvent;
     context: TriggerContext<EvaluationRunData>;
-  }> = [];
-  readonly graphActivityCalls: Array<{
+  }[] = [];
+  readonly graphActivityCalls: {
     event: EvaluationProcessingEvent;
     context: { tenantId: string };
-  }> = [];
+  }[] = [];
 
   async handleEvaluationTriggerMatch(
     event: EvaluationProcessingEvent,

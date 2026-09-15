@@ -15,11 +15,11 @@ const capabilities = [
     description:
       "Catch regressions early by re-running scenarios after every change, ensuring your agent never breaks existing behavior.",
   },
-] satisfies ReadonlyArray<{
+] satisfies readonly {
   icon: typeof FlaskConical;
   title: string;
   description: string;
-}>;
+}[];
 
 function ScenarioWelcomeContent({ onProceed }: { onProceed(): void }) {
   return (

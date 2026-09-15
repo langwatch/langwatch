@@ -46,6 +46,6 @@ class WorkerTraceSpanContentDropAdapter implements TraceSpanContentDrop {
   constructor(private readonly service: OtlpSpanContentDropService) {}
 
   async drop(span: OtlpSpan, projectId: string): Promise<TraceSpanContentDropResult> {
-    return await this.service.dropSpanContent({ span, projectId });
+    return this.service.dropSpanContent({ span, projectId });
   }
 }

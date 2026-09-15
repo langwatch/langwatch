@@ -32,13 +32,13 @@ export type WorkflowPanelMappingSource = {
   id: string;
   name: string;
   type: WorkflowComponentType | "dataset";
-  fields: Array<{ name: string; type: Field["type"] }>;
+  fields: { name: string; type: Field["type"] }[];
 };
 
 export type WorkflowOutputsProps = {
-  outputs: Array<{ identifier: string; type: Field["type"]; json_schema?: object }>;
+  outputs: { identifier: string; type: Field["type"]; json_schema?: object }[];
   onChange: (
-    outputs: Array<{ identifier: string; type: Field["type"]; json_schema?: object }>,
+    outputs: { identifier: string; type: Field["type"]; json_schema?: object }[],
   ) => void;
   canAddRemove?: boolean;
   readOnly?: boolean;

@@ -65,7 +65,7 @@ describe("ComposedWorkerReportTraceList", () => {
 
   describe("given a report whose author wrote no search query", () => {
     it("reads the whole window rather than a predicate that matches nothing", async () => {
-      const requests: Array<Record<string, unknown>> = [];
+      const requests: Record<string, unknown>[] = [];
       const getList = vi.fn(async (params: Record<string, unknown>) => {
         requests.push(params);
         return { items: [] };

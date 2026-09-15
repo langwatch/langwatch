@@ -59,28 +59,28 @@ const LANGY_RELEASE_FLAG = "release_langy_enabled";
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
 /** The organization graph, narrowed to what the navigation package reads. */
-type OrganizationsRead = ReadonlyArray<{
+type OrganizationsRead = readonly {
   id: string;
   name: string;
   /** The organization-wide presence kill switch; absent means never read. */
   presenceEnabled?: boolean;
-  members?: Array<{ role: string }>;
-  teams: Array<{
+  members?: { role: string }[];
+  teams: {
     id: string;
     name: string;
     isPersonal?: boolean | null;
     ownerUserId?: string | null;
-    members?: Array<{ userId: string }>;
-    projects: Array<{
+    members?: { userId: string }[];
+    projects: {
       id: string;
       name: string;
       slug: string;
       presenceEnabled?: boolean;
       lastCodingAgentSessionAt?: NavigationProject["lastCodingAgentSessionAt"];
       lastCodingAgentPullRequestAt?: NavigationProject["lastCodingAgentPullRequestAt"];
-    }>;
-  }>;
-}>;
+    }[];
+  }[];
+}[];
 
 /** Filter to the navigation package's vocabulary, dropping unused fields. */
 function toNavigationOrganizations(organizations: OrganizationsRead): NavigationOrganization[] {

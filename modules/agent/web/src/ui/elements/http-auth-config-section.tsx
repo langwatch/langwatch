@@ -7,7 +7,7 @@ export type AuthConfigSectionProps = {
   disabled?: boolean;
 };
 
-const AUTH_TYPE_OPTIONS: Array<{ value: HttpAuthType; label: string }> = [
+const AUTH_TYPE_OPTIONS: { value: HttpAuthType; label: string }[] = [
   { value: "none", label: "No Authentication" },
   { value: "bearer", label: "Bearer Token" },
   { value: "api_key", label: "API Key" },

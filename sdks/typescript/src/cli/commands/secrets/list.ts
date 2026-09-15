@@ -45,12 +45,12 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
       process.exit(1);
     }
 
-    const secrets = (await response.json()) as Array<{
+    const secrets = (await response.json()) as {
       id: string;
       name: string;
       createdAt: string;
       updatedAt: string;
-    }>;
+    }[];
 
     spinner.succeed(`Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`);
 

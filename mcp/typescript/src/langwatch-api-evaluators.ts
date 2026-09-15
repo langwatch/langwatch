@@ -13,8 +13,8 @@ export interface EvaluatorSummary {
   copiedFromEvaluatorId: string | null;
   createdAt: string;
   updatedAt: string;
-  fields: Array<{ identifier: string; type: string; optional?: boolean }>;
-  outputFields: Array<{ identifier: string; type: string; optional?: boolean }>;
+  fields: { identifier: string; type: string; optional?: boolean }[];
+  outputFields: { identifier: string; type: string; optional?: boolean }[];
   workflowName?: string;
   workflowIcon?: string;
 }

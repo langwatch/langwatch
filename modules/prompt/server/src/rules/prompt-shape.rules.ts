@@ -2,10 +2,10 @@
 
 /** Prepends the built-in "latest" tag when the current version is the latest for its prompt. */
 export function withLatestTag(params: {
-  tags: Array<{ name: string; versionId: string }>;
+  tags: { name: string; versionId: string }[];
   currentVersionId: string;
   latestVersionId: string;
-}): Array<{ name: string; versionId: string }> {
+}): { name: string; versionId: string }[] {
   if (!params.currentVersionId || params.currentVersionId !== params.latestVersionId) {
     return params.tags;
   }
@@ -16,12 +16,12 @@ export function withLatestTag(params: {
 /** System content lives in `prompt`, and is removed from `messages`. */
 export function normalizeSystemMessage(data: {
   prompt?: string;
-  messages?: Array<{ role: string; content: string }> | undefined;
-}): { prompt?: string; messages?: Array<{ role: string; content: string }> } {
+  messages?: { role: string; content: string }[] | undefined;
+}): { prompt?: string; messages?: { role: string; content: string }[] } {
   const messageSystemPrompt = data.messages?.find((msg) => msg.role === "system")?.content;
   const normalized: {
     prompt?: string;
-    messages?: Array<{ role: string; content: string }>;
+    messages?: { role: string; content: string }[];
   } = { ...data };
   if (messageSystemPrompt) {
     normalized.prompt = normalized.prompt ?? messageSystemPrompt;

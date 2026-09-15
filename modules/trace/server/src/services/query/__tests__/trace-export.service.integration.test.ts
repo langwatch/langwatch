@@ -118,10 +118,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
@@ -148,10 +148,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,
@@ -185,10 +185,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
@@ -216,10 +216,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ format: "json" }),
           protections: fullProtections,
@@ -265,10 +265,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full", format: "json" }),
           protections: fullProtections,
@@ -290,10 +290,10 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        const chunks: Array<{
+        const chunks: {
           chunk: string;
           progress: { exported: number; total: number };
-        }> = [];
+        }[] = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,

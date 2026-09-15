@@ -2209,11 +2209,11 @@ function traceAttributeSource(attributeKey: string): string {
  * transformMetricForDedup. Composite expressions come first, longest first,
  * so every term of a composite metric is rewritten against its CTE column.
  */
-function dedupSubstitutions(): Array<{
+function dedupSubstitutions(): {
   source: string;
   cteColumn: string;
   bare?: boolean;
-}> {
+}[] {
   const ts = tableAliases.trace_summaries;
   return [
     // Attribute-map reads before the bare columns, for the same reason the
@@ -2279,7 +2279,7 @@ function dedupSubstitutions(): Array<{
  * to the cross-trace aggregation used in the outer query.
  */
 function mapEvalAggregationToOuter(selectExpression: string): string | null {
-  const mappings: Array<{ pattern: RegExp; outer: string }> = [
+  const mappings: { pattern: RegExp; outer: string }[] = [
     { pattern: /\bavgIf\s*\(/, outer: "avg" },
     { pattern: /\bsumIf\s*\(/, outer: "sum" },
     { pattern: /\bminIf\s*\(/, outer: "min" },

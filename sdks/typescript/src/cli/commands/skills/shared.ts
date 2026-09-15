@@ -139,5 +139,5 @@ export const confirmForcedOverwrite = async (
       { clobbers: clobbers.map((clobber) => clobber.path) },
     );
   }
-  return await confirm("Overwrite these files?");
+  return confirm("Overwrite these files?");
 };

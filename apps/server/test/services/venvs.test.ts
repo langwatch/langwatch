@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const execCalls: Array<{ bin: string; args: string[] }> = [];
+const execCalls: { bin: string; args: string[] }[] = [];
 
 vi.mock("../../src/services/_pipe-to-bus.ts", () => ({
   execAndPipe: vi.fn(async (_bus: unknown, _name: string, bin: string, args: string[]) => {

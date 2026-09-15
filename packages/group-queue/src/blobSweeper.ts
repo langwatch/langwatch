@@ -49,7 +49,7 @@ export interface BlobSweepTally extends Record<BlobSweepOutcome, number> {
 }
 
 export interface BlobSweepReport {
-  queues: Array<{ queueName: string } & BlobSweepTally>;
+  queues: ({ queueName: string } & BlobSweepTally)[];
   totals: BlobSweepTally;
   dryRun: boolean;
   durationMs: number;

@@ -20,7 +20,7 @@ const STORED_ROW = {
   resolvedAt: null,
 };
 
-function databaseHolding(rows: Array<typeof STORED_ROW>) {
+function databaseHolding(rows: typeof STORED_ROW[]) {
   const queries: unknown[] = [];
 
   return {

@@ -23,7 +23,7 @@ export class PrismaDatasetRecordContentRepository
    * gets full entities with the timestamps the database assigned.
    */
   async createMany(input: {
-    records: Array<{ id: string; entry: unknown }>;
+    records: { id: string; entry: unknown }[];
     datasetId: string;
     projectId: string;
   }): Promise<DatasetRecord[]> {

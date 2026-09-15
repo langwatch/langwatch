@@ -191,7 +191,7 @@ export async function seedSpans(
   const spanAttributes = generateAttributes(attributeKeys, attributeValueSize);
   spanAttributes["langwatch.span.type"] = "llm";
 
-  const spanRows: Array<Record<string, unknown>> = [];
+  const spanRows: Record<string, unknown>[] = [];
   let spanIndex = 0;
   for (let trace = 0; trace < traceCount; trace++) {
     const traceId = traceIds[trace];
@@ -263,7 +263,7 @@ async function insertInBatches({
 }: {
   client: ClickHouseClient;
   table: string;
-  rows: Array<Record<string, unknown>>;
+  rows: Record<string, unknown>[];
   batchSize?: number;
 }): Promise<void> {
   for (let offset = 0; offset < rows.length; offset += batchSize) {

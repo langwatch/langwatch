@@ -38,7 +38,7 @@ export function buildDedupedRunItemsWhere({
 }
 
 export function computeOccurredAtRangeForRuns(
-  runs: Array<{ CreatedAt: string; UpdatedAt: string }>,
+  runs: { CreatedAt: string; UpdatedAt: string }[],
 ): { minOccurredAt: string; maxOccurredAt: string; minMs: number } {
   if (runs.length === 0) {
     throw new Error("computeOccurredAtRangeForRuns called with no runs; caller must guard");

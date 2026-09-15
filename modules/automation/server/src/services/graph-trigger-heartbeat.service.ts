@@ -359,9 +359,9 @@ export class GraphTriggerHeartbeatService {
         query_params: { tenantId: projectId, startMs },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{
+      const rows = (await result.json()) as {
         lastMs: string | number | null;
-      }>;
+      }[];
       const row = rows[0];
       if (!row || row.lastMs === null || row.lastMs === undefined) {
         return { projectId, source, lastOccurredAtMs: null };

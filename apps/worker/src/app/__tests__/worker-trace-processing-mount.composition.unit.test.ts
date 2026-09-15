@@ -522,7 +522,7 @@ describe("given the trace pipeline this process composes for itself", () => {
         new URL("../../features/job-registry.json", import.meta.url),
       );
       const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
-        pipelines: Array<{ name: string; jobs: string[] }>;
+        pipelines: { name: string; jobs: string[] }[];
       };
       const frozen = registry.pipelines.find((entry) => entry.name === "trace_processing")!.jobs;
 

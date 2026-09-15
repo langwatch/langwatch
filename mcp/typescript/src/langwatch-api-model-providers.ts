@@ -13,7 +13,7 @@ export interface ModelProviderEntry {
   customEmbeddingsModels?: unknown[] | null;
   disabledByDefault?: boolean;
   deploymentMapping?: unknown;
-  extraHeaders?: Array<{ key: string; value: string }> | null;
+  extraHeaders?: { key: string; value: string }[] | null;
 }
 
 // --- Model Provider API functions ---

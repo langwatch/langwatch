@@ -7,7 +7,7 @@ export type ApiSchemaOutput<TSchema extends ApiSchema> = StandardSchemaV1.InferO
 export type ApiSchemaIssue = Readonly<{
   code?: string;
   message: string;
-  path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }>;
+  path?: readonly (PropertyKey | { readonly key: PropertyKey })[];
 }>;
 
 export type ApiSchemaError = Error & {

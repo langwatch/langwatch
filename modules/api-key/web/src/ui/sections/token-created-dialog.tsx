@@ -108,7 +108,7 @@ export function TokenCreatedDialog({
   newToken: string | null;
   projectId?: string;
   endpoint: string;
-  orgProjects: Array<{ id: string; name: string }>;
+  orgProjects: { id: string; name: string }[];
   onClose: () => void;
 }) {
   const host = useApiKeyHost();

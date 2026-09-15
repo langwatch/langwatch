@@ -33,7 +33,7 @@ export type PromptUpdateInput = Omit<UpdatePromptCommand, "data"> & {
 
 type VersionedPromptMapper = (
   config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
-  tags: Array<{ name: string; versionId: string }>,
+  tags: { name: string; versionId: string }[],
 ) => VersionedPrompt;
 
 export type CreatePromptParams = {
@@ -141,10 +141,10 @@ export class PromptWriteService {
     });
     params.prompt = normalizedCreate.prompt;
     params.messages = normalizedCreate.messages as unknown as
-      | Array<{
+      | {
           role: "user" | "assistant" | "system";
           content: string;
-        }>
+        }[]
       | undefined;
 
     if (!normalizedCreate.prompt && !params.prompt) {
@@ -282,10 +282,10 @@ export class PromptWriteService {
       const normalizedUpdate = normalizeSystemMessage(configDataUpdates);
       configDataUpdates.prompt = normalizedUpdate.prompt;
       configDataUpdates.messages = normalizedUpdate.messages as unknown as
-        | Array<{
+        | {
             role: "user" | "assistant" | "system";
             content: string;
-          }>
+          }[]
         | undefined;
     }
 
@@ -329,7 +329,7 @@ export class PromptWriteService {
       organizationId,
     });
 
-    return await this.read.getPromptByIdOrHandle({
+    return this.read.getPromptByIdOrHandle({
       idOrHandle: newVersion.configId,
       projectId: params.projectId,
       organizationId,
@@ -426,7 +426,7 @@ export class PromptWriteService {
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
-    return await this.repository.checkModifyPermission({
+    return this.repository.checkModifyPermission({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,
       organizationId,

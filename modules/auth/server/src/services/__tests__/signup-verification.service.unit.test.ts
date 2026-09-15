@@ -16,9 +16,9 @@ const NOW = Temporal.Instant.from("2026-08-24T12:00:00.000Z");
 const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
 
 function makeService({ registered = false }: { registered?: boolean } = {}) {
-  const issued: Array<{ identifier: string; token: string; expires: Instant }> = [];
-  const sent: Array<{ email: string; verificationUrl: string }> = [];
-  const created: Array<{ email: string; passwordHash: string }> = [];
+  const issued: { identifier: string; token: string; expires: Instant }[] = [];
+  const sent: { email: string; verificationUrl: string }[] = [];
+  const created: { email: string; passwordHash: string }[] = [];
   /** Addresses a spent link proved. The whole job of a link now. */
   const confirmed: string[] = [];
   let addressIsTaken = registered;

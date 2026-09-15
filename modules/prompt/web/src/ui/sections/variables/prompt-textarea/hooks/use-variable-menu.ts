@@ -71,14 +71,12 @@ export const useVariableMenu = ({
       source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
     );
 
-    const options: Array<
-      | {
+    const options: (| {
           type: "field";
           source: AvailableSource;
           field: { name: string; type: FieldType };
         }
-      | { type: "create"; name: string }
-    > = [];
+      | { type: "create"; name: string })[] = [];
 
     // Add fields FIRST
     filteredSources.forEach((source) => {

@@ -44,18 +44,18 @@ export abstract class GatewayInternalStore {
    * per request.
    */
   abstract findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
-    Array<{
+    {
       id: string;
       organizationId: string;
       principalUserId: string | null;
       lastUsedAt: Instant | null;
-    }>
+    }[]
   >;
 
   /** The team each named project belongs to, for the same batch join. */
   abstract findProjectTeams(
     projectIds: readonly string[],
-  ): Promise<Array<{ id: string; teamId: string }>>;
+  ): Promise<{ id: string; teamId: string }[]>;
 
   /**
    * Advance `lastUsedAt` on the keys a drain batch admitted.

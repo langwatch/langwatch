@@ -49,7 +49,7 @@ export function extractGroupTotals(
   buckets: AnalyticsTimeseriesBucket[],
   bucketKey: string,
   groupBy: string,
-): Array<{ label: string; value: number }> {
+): { label: string; value: number }[] {
   const totals = new Map<string, number>();
   for (const bucket of buckets) {
     const groups = groupsOf(bucket, groupBy);

@@ -336,7 +336,7 @@ describe("given a cumulative series long enough to span several rollup buckets",
       const counting: MetricClickHouseClient = {
         query: async (args) => {
           reads += 1;
-          return await delegate.query(args);
+          return delegate.query(args);
         },
         insert: async (args) => await delegate.insert(args),
       };

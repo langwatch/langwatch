@@ -471,7 +471,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (rows as Array<{ min_score: number | null; max_score: number | null }>)[0];
+      const row = (rows as { min_score: number | null; max_score: number | null }[])[0];
       if (!row || row.min_score === null || row.max_score === null) {
         return [];
       }
@@ -638,7 +638,7 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
       `;
     },
     extractResults: (rows: unknown[]) => {
-      const row = (rows as Array<{ min_value: number | null; max_value: number | null }>)[0];
+      const row = (rows as { min_value: number | null; max_value: number | null }[])[0];
       if (!row || row.min_value === null || row.max_value === null) {
         return [];
       }

@@ -153,7 +153,7 @@ export type GatewayConfigPayload = {
     tpm: number | null;
     rpd: number | null;
   };
-  budgets: Array<{
+  budgets: {
     id: string;
     scope:
       | "organization"
@@ -188,8 +188,8 @@ export type GatewayConfigPayload = {
     spent_micro_usd: number;
     resets_at: number;
     on_breach: "block" | "warn";
-  }>;
-  cache_rules: Array<{
+  }[];
+  cache_rules: {
     id: string;
     priority: number;
     matchers: {
@@ -205,7 +205,7 @@ export type GatewayConfigPayload = {
       ttl?: number;
       salt?: string;
     };
-  }>;
+  }[];
   /**
    * ADR-061 mirror tier. Present and non-skip only for Langy virtual keys, so the gateway never
    * mirrors ordinary customer traffic. Read here rather than from a client header to decide
@@ -297,7 +297,7 @@ export function resolvePolicySideOfBundle(
       ? Object.fromEntries(
           Object.entries(aliasesRaw as Record<string, unknown>).filter(
             ([, v]) => typeof v === "string",
-          ) as Array<[string, string]>,
+          ) as [string, string][],
         )
       : {};
 

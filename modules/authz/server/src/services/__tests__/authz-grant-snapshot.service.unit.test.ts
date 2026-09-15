@@ -13,7 +13,7 @@ type Options = {
 };
 
 function snapshotWith(options: Options = {}) {
-  const collected: Array<{ principalId: string; organizationId: string }> = [];
+  const collected: { principalId: string; organizationId: string }[] = [];
   let nextEpoch = options.epoch === undefined ? 1 : options.epoch;
 
   const collector = {

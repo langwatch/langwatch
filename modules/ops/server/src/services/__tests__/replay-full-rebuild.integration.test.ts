@@ -43,7 +43,7 @@ class MemoryEventSource implements ReplayEventSource {
 
   async discoverAffectedAggregates(input: {
     tenantId?: string;
-  }): Promise<Array<DiscoveredAggregate & { eventTypes: string[] }>> {
+  }): Promise<(DiscoveredAggregate & { eventTypes: string[] })[]> {
     return this.matching(input.tenantId).map((event) => ({
       tenantId: event.tenantId,
       aggregateType: event.aggregateType,

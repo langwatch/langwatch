@@ -107,7 +107,7 @@ export class SystemMigrationsService {
   }
 
   /** Organizations matching what the operator typed, for the enrollment picker. */
-  async searchOrganizations(args: { query: string }): Promise<Array<{ id: string; name: string }>> {
+  async searchOrganizations(args: { query: string }): Promise<{ id: string; name: string }[]> {
     return this.enrollment.searchOrganizations(args);
   }
 

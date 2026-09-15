@@ -28,7 +28,7 @@ export type UiCliDeviceApproval = {
   organizationId: string;
   projectId?: string;
   keySelection?: {
-    bindings: Array<{ scopeType: string; scopeId: string }>;
+    bindings: { scopeType: string; scopeId: string }[];
     permissions: string[];
   };
 };

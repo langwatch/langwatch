@@ -25,7 +25,7 @@ class TestCodingAgentApi {
   }
 
   readonly sessionsById = new Map<string, CodingAgentSession | null>();
-  readonly sessionLookupInputs: Array<{ projectId: string; sessionId: string }> = [];
+  readonly sessionLookupInputs: { projectId: string; sessionId: string }[] = [];
   tracePullRequestLinks: CodingAgentTracePullRequestLink[] = [];
   readonly tracePullRequestInputs: unknown[] = [];
 

@@ -65,7 +65,7 @@ function stateWith({
 }
 
 /** Every error the pane handed its renderer, in order. */
-const rendered: Array<{ error: unknown; fallbackTitle: string }> = [];
+const rendered: { error: unknown; fallbackTitle: string }[] = [];
 
 function renderPane(state: LangWatchQLRequestState, chartSlot?: ReactNode) {
   rendered.length = 0;

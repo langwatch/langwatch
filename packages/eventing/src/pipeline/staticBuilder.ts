@@ -73,12 +73,12 @@ export class PipelineBuilder<
     }
   >();
   private stateProjections = new Map<string, StateProjectionDefinition<any, EventType>>();
-  private commands: Array<{
+  private commands: {
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
     handlerInstance?: any;
     options?: CommandHandlerOptions;
-  }> = [];
+  }[] = [];
   private foldSubscribers = new Map<
     string,
     {

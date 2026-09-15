@@ -388,7 +388,7 @@ export interface DynamicPrefixDef {
   description: string;
 }
 
-export const DYNAMIC_PREFIXES: ReadonlyArray<DynamicPrefixDef> = [
+export const DYNAMIC_PREFIXES: readonly DynamicPrefixDef[] = [
   {
     prefix: "trace.attribute.",
     label: "Trace attribute",
@@ -419,7 +419,7 @@ export const SCENARIO_FIELDS: ReadonlySet<string> = new Set([
   "scenarioStatus",
 ]);
 
-export const FIELD_NAMES: ReadonlyArray<string> = Object.keys(SEARCH_FIELDS);
+export const FIELD_NAMES: readonly string[] = Object.keys(SEARCH_FIELDS);
 
 const HAS_NONE_VALUES: string[] = [
   "error",

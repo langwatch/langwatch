@@ -222,7 +222,7 @@ interface GroupedSection {
   groupId: FacetGroupDef["id"] | "other";
   label: string;
   first: boolean;
-  rows: Array<{ row: SuggestionRow; flatIndex: number }>;
+  rows: { row: SuggestionRow; flatIndex: number }[];
 }
 
 const FACET_GROUP_LABEL = new Map(FACET_GROUPS.map((g) => [g.id, g.label] as const));
@@ -237,7 +237,7 @@ function groupRows(items: SuggestionRow[]): GroupedSection[] {
     {
       groupId: FacetGroupDef["id"] | "other";
       label: string;
-      rows: Array<{ row: SuggestionRow; flatIndex: number }>;
+      rows: { row: SuggestionRow; flatIndex: number }[];
     }
   >();
   for (let i = 0; i < items.length; i++) {

@@ -33,11 +33,11 @@ vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
 type StoreMockState = {
   evaluators: EvaluatorConfig[];
   activeDatasetId: string;
-  datasets: Array<{
+  datasets: {
     id: string;
     name: string;
-    columns: Array<{ id: string; name: string; type: string }>;
-  }>;
+    columns: { id: string; name: string; type: string }[];
+  }[];
   removeEvaluator: ReturnType<typeof vi.fn>;
   updateEvaluator: ReturnType<typeof vi.fn>;
   setEvaluatorMapping: ReturnType<typeof vi.fn>;

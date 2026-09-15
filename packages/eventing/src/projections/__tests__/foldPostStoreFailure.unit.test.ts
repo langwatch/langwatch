@@ -113,7 +113,7 @@ describe("fold failures after the state was stored", () => {
       context: unknown,
     ) => Promise<void>;
 
-    return await onEventBatch("counter", options.batch, { tenantId }).catch(
+    return onEventBatch("counter", options.batch, { tenantId }).catch(
       (error: unknown) => error,
     );
   }
@@ -130,7 +130,7 @@ describe("fold failures after the state was stored", () => {
       context: unknown,
     ) => Promise<void>;
 
-    return await onEvent("counter", options.event, { tenantId }).catch((error: unknown) => error);
+    return onEvent("counter", options.event, { tenantId }).catch((error: unknown) => error);
   }
 
   describe("when a subscriber throws after the fold state was stored", () => {

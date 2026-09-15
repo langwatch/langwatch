@@ -35,7 +35,7 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findScopeOrganizationId(): Promise<string | null> {
     return this.organizationId;
   }
-  async listScopeProjects(): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
+  async listScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [];
   }
 }

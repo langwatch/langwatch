@@ -62,7 +62,7 @@ export class PrismaUserCredentialRepository
   async findAuth0DatabaseAccount(input: {
     userId: string;
   }): Promise<{ providerAccountId: string } | null> {
-    return await this.prisma.account.findFirst({
+    return this.prisma.account.findFirst({
       where: {
         userId: input.userId,
         provider: AUTH0_PROVIDER,
@@ -73,7 +73,7 @@ export class PrismaUserCredentialRepository
   }
 
   async findLinkedAccounts(input: { userId: string }): Promise<UserLinkedAccount[]> {
-    return await this.prisma.account.findMany({
+    return this.prisma.account.findMany({
       where: { userId: input.userId },
       select: { id: true, provider: true, providerAccountId: true },
     });
@@ -83,7 +83,7 @@ export class PrismaUserCredentialRepository
     // Serializable isolation prevents the read of the account count from being
     // a stale snapshot if a concurrent unlink commits between this
     // transaction's count and its delete.
-    return await this.#database.$transaction(
+    return this.#database.$transaction(
       async (transaction) => {
         const accountCount = await transaction.account.count({ where: { userId: input.userId } });
         if (accountCount <= 1) return "last_account" as const;

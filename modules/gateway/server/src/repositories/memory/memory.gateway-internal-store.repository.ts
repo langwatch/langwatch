@@ -10,10 +10,8 @@ import { GatewayInternalStore } from "../gateway-internal-store.repository.ts";
 export interface MemoryGatewayInternalStoreSeed {
   virtualKeys?: readonly VirtualKeyWithScopes[];
   budgets?: readonly GatewayBudget[];
-  bucketBoundaries?: ReadonlyArray<
-    Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">
-  >;
-  projects?: ReadonlyArray<{ id: string; teamId: string; organizationId: string }>;
+  bucketBoundaries?: readonly Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">[];
+  projects?: readonly { id: string; teamId: string; organizationId: string }[];
 }
 
 /**
@@ -28,10 +26,8 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
 
   #virtualKeys: VirtualKeyWithScopes[];
   #budgets: GatewayBudget[];
-  #bucketBoundaries: Array<
-    Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">
-  >;
-  #projects: Array<{ id: string; teamId: string; organizationId: string }>;
+  #bucketBoundaries: Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">[];
+  #projects: { id: string; teamId: string; organizationId: string }[];
 
   private constructor(seed: MemoryGatewayInternalStoreSeed) {
     super();
@@ -69,12 +65,12 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
   }
 
   async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
-    Array<{
+    {
       id: string;
       organizationId: string;
       principalUserId: string | null;
       lastUsedAt: Instant | null;
-    }>
+    }[]
   > {
     return this.#virtualKeys
       .filter((key) => virtualKeyIds.includes(key.id))
@@ -88,7 +84,7 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
 
   async findProjectTeams(
     projectIds: readonly string[],
-  ): Promise<Array<{ id: string; teamId: string }>> {
+  ): Promise<{ id: string; teamId: string }[]> {
     return this.#projects
       .filter((project) => projectIds.includes(project.id))
       .map((project) => ({ id: project.id, teamId: project.teamId }));

@@ -22,11 +22,11 @@ export interface FindByTraceIdOptions {
 export abstract class TraceSummaryRepository {
   abstract upsert(data: TraceSummaryData, tenantId: string, retentionDays?: number): Promise<void>;
   abstract upsertBatch?(
-    entries: Array<{
+    entries: {
       data: TraceSummaryData;
       tenantId: string;
       retentionDays?: number;
-    }>,
+    }[],
   ): Promise<void>;
   abstract tryFindByTraceId(
     trace: { tenantId: string; traceId: string },

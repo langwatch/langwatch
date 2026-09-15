@@ -78,12 +78,12 @@ export const SPAN_SUBFIELDS: SpanSubfield[] = [
  * @param spanNames - Dynamic span names extracted from project traces
  * @returns Array of span field children with nested subfields
  */
-export function buildSpanFieldChildren(spanNames: Array<{ key: string; label: string }>): Array<{
+export function buildSpanFieldChildren(spanNames: { key: string; label: string }[]): {
   name: string;
   label: string;
   type: "dict";
   children: SpanSubfield[];
-}> {
+}[] {
   return [
     {
       name: "*",
@@ -118,12 +118,12 @@ export const RESERVED_METADATA_KEYS = [
  * @returns Array of metadata field children
  */
 export function buildMetadataFieldChildren(
-  metadataKeys: Array<{ key: string; label: string }>,
-): Array<{
+  metadataKeys: { key: string; label: string }[],
+): {
   name: string;
   label: string;
   type: "str" | "dict" | "list";
-}> {
+}[] {
   // Determine type based on key name (labels is a list, others are strings)
   const getTypeForKey = (key: string): "str" | "list" => {
     return key === "labels" ? "list" : "str";
@@ -951,12 +951,13 @@ export const monitorMappingsSchema = z.preprocess((value) => {
 // so the persist layer never writes the `{}` shape that triggers the
 // `Object.values(undefined)` crash in evaluator code paths.
 export const coerceMonitorMappings = (value: unknown): MappingState => {
-  if (
+  const looksLikeMappingState =
     value !== null &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    "mapping" in (value as object)
-  ) {
+    "mapping" in (value as object);
+
+  if (looksLikeMappingState) {
     const parsed = mappingStateSchema.safeParse(value);
     if (parsed.success) return parsed.data;
   }
@@ -1035,6 +1036,21 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   }
 };
 
+function isExpandedColumnValue(
+  source_: (typeof TRACE_MAPPINGS)[keyof typeof TRACE_MAPPINGS] | undefined,
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>,
+  value: unknown,
+): value is unknown[] {
+  const isExpandableColumn = !!(
+    source_ &&
+    "expandable_by" in source_ &&
+    source_.expandable_by &&
+    expansions.has(source_.expandable_by)
+  );
+
+  return isExpandableColumn && Array.isArray(value);
+}
+
 export const mapTraceToDatasetEntry = (
   trace: TraceWithAnnotations,
   mapping: Record<
@@ -1079,13 +1095,7 @@ export const mapTraceToDatasetEntry = (
         // list. A column that already reads as one value, the annotations
         // read as a single text, is that value; indexing it would take its
         // first character.
-        if (
-          source_ &&
-          "expandable_by" in source_ &&
-          source_?.expandable_by &&
-          expansions.has(source_?.expandable_by) &&
-          Array.isArray(value)
-        ) {
+        if (isExpandedColumnValue(source_, expansions, value)) {
           value = value[0];
         }
 
@@ -1139,10 +1149,10 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   if (Array.isArray(subject) && type === "string[]") {
     return subject.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
   }
-  if (
-    typeof subject === "string" &&
-    (type === "object" || type === "string[]" || type === "array")
-  ) {
+  const isEncodedStringToStructuredType =
+    typeof subject === "string" && (type === "object" || type === "string[]" || type === "array");
+
+  if (isEncodedStringToStructuredType) {
     try {
       const parsed = JSON.parse(subject);
       if (!Array.isArray(parsed) && typeof parsed === "object") {
@@ -1182,19 +1192,19 @@ export type TraceAvailableSource = {
   id: string;
   name: string;
   type: "dataset";
-  fields: Array<{
+  fields: {
     name: string;
     label?: string;
     type: "str" | "dict" | "list";
-    children?: Array<{
+    children?: {
       name: string;
       label?: string;
       type: "str" | "dict" | "list";
       children?: SpanSubfield[];
-    }>;
+    }[];
     isComplete?: boolean;
     isCompleteLabel?: string;
-  }>;
+  }[];
 };
 
 /**
@@ -1234,8 +1244,8 @@ export const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
  * @param metadataKeys - Dynamic metadata keys extracted from project traces
  */
 export function getTraceAvailableSources(
-  spanNames: Array<{ key: string; label: string }>,
-  metadataKeys: Array<{ key: string; label: string }>,
+  spanNames: { key: string; label: string }[],
+  metadataKeys: { key: string; label: string }[],
 ): TraceAvailableSource[] {
   // Filter out "threads" from trace-level sources - it's confusing at trace level
   // (threads is for getting all traces in a thread, which is a thread-level concept)

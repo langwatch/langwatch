@@ -252,18 +252,20 @@ export class CanonicalLogAdapter implements LogPreparer {
           throw new Error("bytesValue is not valid base64");
         }
       }
-      const bytes =
-        raw instanceof Uint8Array
-          ? raw
-          : typeof raw === "string"
-            ? Buffer.from(raw, "base64")
-            : CanonicalLogAdapter.isRecord(raw)
-              ? Buffer.from(
-                  Object.entries(raw)
-                    .sort(([left], [right]) => Number(left) - Number(right))
-                    .map(([, byte]) => Number(byte)),
-                )
-              : null;
+      let bytes: Uint8Array | Buffer | null;
+      if (raw instanceof Uint8Array) {
+        bytes = raw;
+      } else if (typeof raw === "string") {
+        bytes = Buffer.from(raw, "base64");
+      } else if (CanonicalLogAdapter.isRecord(raw)) {
+        bytes = Buffer.from(
+          Object.entries(raw)
+            .sort(([left], [right]) => Number(left) - Number(right))
+            .map(([, byte]) => Number(byte)),
+        );
+      } else {
+        bytes = null;
+      }
       if (!bytes) throw new Error("bytesValue is malformed");
       return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
     }
@@ -284,7 +286,7 @@ export class CanonicalLogAdapter implements LogPreparer {
     return { type: "kvlist", value: CanonicalLogAdapter.canonicalAttributes(list.values) };
   }
 
-  private static canonicalAttributes(attributes: unknown): Array<{ key: string; value: unknown }> {
+  private static canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {
     if (!Array.isArray(attributes)) return [];
     return attributes
       .map((raw) => {
@@ -414,12 +416,14 @@ export class CanonicalLogAdapter implements LogPreparer {
   } {
     const { wireTraceId, wireSpanId, attributes } = args;
     const eventName = args.eventName;
-    const providerKind: LogProviderKind =
-      args.scopeName === CLAUDE_CODE_EVENT_SCOPE
-        ? "claude_code"
-        : eventName.startsWith(CODEX_EVENT_NAME_PREFIX)
-          ? "codex"
-          : "generic";
+    let providerKind: LogProviderKind;
+    if (args.scopeName === CLAUDE_CODE_EVENT_SCOPE) {
+      providerKind = "claude_code";
+    } else if (eventName.startsWith(CODEX_EVENT_NAME_PREFIX)) {
+      providerKind = "codex";
+    } else {
+      providerKind = "generic";
+    }
     if (
       CanonicalLogAdapter.validTraceId(wireTraceId) &&
       CanonicalLogAdapter.validSpanId(wireSpanId)
@@ -530,12 +534,14 @@ export class CanonicalLogAdapter implements LogPreparer {
       log.observedTimeUnixNano,
       "observedTimeUnixNano",
     );
-    const effectiveTimestamp =
-      timeUnixNano !== "0"
-        ? timeUnixNano
-        : observedTimeUnixNano !== "0"
-          ? observedTimeUnixNano
-          : String(BigInt(args.acceptedAt) * 1_000_000n);
+    let effectiveTimestamp: string;
+    if (timeUnixNano !== "0") {
+      effectiveTimestamp = timeUnixNano;
+    } else if (observedTimeUnixNano !== "0") {
+      effectiveTimestamp = observedTimeUnixNano;
+    } else {
+      effectiveTimestamp = String(BigInt(args.acceptedAt) * 1_000_000n);
+    }
     const flags = CanonicalLogAdapter.uint32Number(log.flags, "flags");
     const severityNumber = Number(
       CanonicalLogAdapter.integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),

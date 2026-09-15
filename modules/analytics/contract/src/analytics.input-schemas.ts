@@ -133,11 +133,11 @@ export type TimeseriesResult = AnalyticsTimeseriesResult;
  * Filter data result for dropdown options
  */
 export interface FilterDataResult {
-  options: Array<{
+  options: {
     field: string;
     label: string;
     count: number;
-  }>;
+  }[];
 }
 
 /**

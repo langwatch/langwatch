@@ -730,7 +730,7 @@ export class AutomationApp implements AutomationApi {
   /** Every suppression in the project, each row with its automation's name. */
   getAllEnriched(input: {
     projectId: string;
-  }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
+  }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
     return this.#automation.getAllEnriched(input);
   }
 

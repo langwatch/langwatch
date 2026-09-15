@@ -256,12 +256,12 @@ type DatasetMigrationMetadata = {
   rowCount: number;
   sizeBytes: number;
   chunkCount: number;
-  chunkOffsets: Array<{
+  chunkOffsets: {
     index: number;
     startRow: number;
     endRow: number;
     byteSize: number;
-  }>;
+  }[];
 };
 
 function increment(summary: DatasetMigrationSummary, outcome: DatasetMigrationOutcome): void {

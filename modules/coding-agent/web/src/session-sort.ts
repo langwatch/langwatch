@@ -42,7 +42,7 @@ export interface SortableSessionRow {
   /** Null when this reader may not price the project. */
   costUsd: number | null;
   /** Every pull request the session drove, by number ascending. */
-  pullRequests: ReadonlyArray<{ number: number }>;
+  pullRequests: readonly { number: number }[];
 }
 
 /**

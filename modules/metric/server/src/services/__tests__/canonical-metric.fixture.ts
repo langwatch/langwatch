@@ -61,7 +61,7 @@ export function gaugeMetric({
   dataPoints,
 }: {
   name?: string;
-  dataPoints: Array<Record<string, unknown>>;
+  dataPoints: Record<string, unknown>[];
 }) {
   return { name, gauge: { dataPoints } };
 }

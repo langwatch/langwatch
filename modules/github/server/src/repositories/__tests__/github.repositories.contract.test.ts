@@ -18,7 +18,7 @@ const at = (iso: string): Instant => Temporal.Instant.from(iso);
 const NOW = at("2026-01-01T12:00:00Z");
 const MINUTE = 60_000;
 
-const backends: ReadonlyArray<Readonly<{ name: string; create: () => GithubRepositories }>> = [
+const backends: readonly Readonly<{ name: string; create: () => GithubRepositories }>[] = [
   { name: "memory", create: () => MemoryGithubRepositories.create() },
 ];
 

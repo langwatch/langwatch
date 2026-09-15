@@ -79,12 +79,12 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         scopeType: true,
         scopeId: true,
       },
-    })) as Array<{
+    })) as {
       role: CollectedBinding["role"];
       customRoleId: string | null;
       scopeType: CollectedBinding["scopeType"];
       scopeId: string;
-    }>;
+    }[];
     return rows.map((row) => ({ ...row, viaGroupId: null }));
   }
 
@@ -120,13 +120,13 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         scopeId: true,
         groupId: true,
       },
-    })) as Array<{
+    })) as {
       role: CollectedBinding["role"];
       customRoleId: string | null;
       scopeType: CollectedBinding["scopeType"];
       scopeId: string;
       groupId: string | null;
-    }>;
+    }[];
     return rows.map(({ groupId, ...row }) => ({ ...row, viaGroupId: groupId }));
   }
 
@@ -145,12 +145,12 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         scopeType: true,
         scopeId: true,
       },
-    })) as Array<{
+    })) as {
       role: CollectedBinding["role"];
       customRoleId: string | null;
       scopeType: CollectedBinding["scopeType"];
       scopeId: string;
-    }>;
+    }[];
     return rows.map((row) => ({ ...row, viaGroupId: null }));
   }
 
@@ -185,12 +185,12 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         assignedRoleId: true,
         team: { select: { isPersonal: true } },
       },
-    })) as Array<{
+    })) as {
       teamId: string;
       role: LegacyTeamMembership["role"];
       assignedRoleId: string | null;
       team: { isPersonal: boolean };
-    }>;
+    }[];
     return rows.map((row) => ({
       teamId: row.teamId,
       role: row.role,
@@ -243,7 +243,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
   }: {
     projectId: string;
     tokens: readonly string[];
-    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    links: readonly { kind: ShareableResourceKind; id: string }[];
   }): Promise<ShareLinkRow[]> {
     const rows = (await this.database.shareLink.findMany({
       where: {
@@ -263,7 +263,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
         maxViews: true,
         viewCount: true,
       },
-    })) as Array<Omit<ShareLinkRow, "expiresAt"> & { expiresAt: Date | null }>;
+    })) as (Omit<ShareLinkRow, "expiresAt"> & { expiresAt: Date | null })[];
 
     return rows.map((row) => ({
       ...row,

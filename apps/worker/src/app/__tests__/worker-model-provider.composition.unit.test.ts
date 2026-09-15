@@ -22,7 +22,7 @@ import { createWorkerTopicClusteringExecution } from "../worker-topic-clustering
  */
 
 class RecordingAbsence extends WorkerModelProviderAbsenceReport {
-  readonly gateway: Array<"no-encryption" | "no-tenancy"> = [];
+  readonly gateway: ("no-encryption" | "no-tenancy")[] = [];
   translation = 0;
   connectionWindows = 0;
 

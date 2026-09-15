@@ -63,12 +63,12 @@ type BorrowedProcedures = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           pricingModel: PricingModel | null;
-          teams: Array<{ id: string; projects: Array<{ id: string }> }>;
-        }>;
+          teams: { id: string; projects: { id: string }[] }[];
+        }[];
       };
     };
 
@@ -81,11 +81,11 @@ type BorrowedProcedures = {
     createInvites: {
       mutation: {
         input: OrganizationScope & {
-          invites: Array<{
+          invites: {
             email: string;
             role: OrganizationUserRole;
-            teams?: Array<{ teamId: string; role: TeamUserRole }>;
-          }>;
+            teams?: { teamId: string; role: TeamUserRole }[];
+          }[];
         };
         output: unknown;
       };

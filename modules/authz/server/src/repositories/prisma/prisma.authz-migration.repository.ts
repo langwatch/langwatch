@@ -225,11 +225,11 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<Array<{ userId: string; groupId: string }>> {
+  }): Promise<{ userId: string; groupId: string }[]> {
     return (await this.database.groupMembership.findMany({
       where: { group: { organizationId } },
       select: { userId: true, groupId: true },
-    })) as Array<{ userId: string; groupId: string }>;
+    })) as { userId: string; groupId: string }[];
   }
 
   async findShareLinkRows({

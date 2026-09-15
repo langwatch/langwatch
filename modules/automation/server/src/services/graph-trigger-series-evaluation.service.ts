@@ -104,7 +104,7 @@ export class GraphTriggerSeriesEvaluationService {
   }
 
   private aggregate(
-    points: Array<{ value: number }>,
+    points: { value: number }[],
     plan: GraphEvaluationPlan,
     bucketCount: number,
   ): number {

@@ -194,7 +194,7 @@ describe("compat binding mapping", () => {
 
   describe("when the grant is beyond the legacy tables' vocabulary", () => {
     it("returns null for resource and platform scopes, collectives, and lite-member", () => {
-      const beyond: Array<Partial<GrantFact>> = [
+      const beyond: Partial<GrantFact>[] = [
         {
           scope: { type: "RESOURCE", id: "trace_t1" },
           principal: { type: "anyone", id: null },
@@ -283,7 +283,7 @@ describe("compat share link mapping", () => {
 
   describe("when the grant is not a share link the legacy table can hold", () => {
     it("returns null for other scopes, other principals, and missing terms", () => {
-      const beyond: Array<Partial<GrantFact>> = [
+      const beyond: Partial<GrantFact>[] = [
         // Not the resource tier at all.
         { scope: { type: "TEAM", id: "team_client_a" } },
         { scope: { type: "PLATFORM", id: "platform" } },

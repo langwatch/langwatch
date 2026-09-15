@@ -34,7 +34,7 @@ export function GovernanceSummaryBar({
   items,
   testId,
 }: {
-  items: ReadonlyArray<GovernanceSummaryBarItem>;
+  items: readonly GovernanceSummaryBarItem[];
   testId?: string;
 }) {
   // No figures, no card. An empty bordered strip reads as a component that

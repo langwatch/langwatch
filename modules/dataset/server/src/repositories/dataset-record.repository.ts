@@ -10,7 +10,7 @@ export interface DatasetRecordRepository {
   createMany(input: {
     datasetId: string;
     projectId: string;
-    entries: Array<DatasetRecordInput & { id: string }>;
+    entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]>;
   update(input: {
     id: string;

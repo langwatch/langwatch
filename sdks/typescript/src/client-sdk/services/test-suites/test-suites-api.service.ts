@@ -89,9 +89,7 @@ export class TestSuitesApiService {
 
   /** The project's test suites. Archived suites are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<TestSuite[]> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", {
-      ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
-    });
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", (options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}));
     return unwrapApiResult({
       operation: "list test suites",
       data,

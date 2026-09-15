@@ -391,7 +391,7 @@ export class LocalControlSessionCoreService {
    * it lapsed while the connection was open (`PresenceHeartbeat`).
    */
   async heartbeat(session: ControlSession): Promise<PresenceHeartbeat> {
-    return await this.presence.heartbeat({
+    return this.presence.heartbeat({
       conversationId: session.conversationId,
       projectId: session.projectId,
       userId: session.userId,

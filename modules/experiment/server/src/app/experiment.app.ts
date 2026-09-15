@@ -149,7 +149,7 @@ export type ExperimentModelCosts = Readonly<{
 export type ExperimentPeople = Readonly<{
   namesOf(
     ids: readonly string[],
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>>;
+  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]>;
 }>;
 
 /** What the process composes this feature's application from. */
@@ -659,7 +659,7 @@ export class ExperimentApp implements ExperimentApi {
   /** The display names behind the author ids on a version history. */
   resolveAuthorNames(
     authorIds: readonly string[],
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>> {
+  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]> {
     if (authorIds.length === 0) return Promise.resolve([]);
 
     return this.#dependencies.people.namesOf(authorIds);

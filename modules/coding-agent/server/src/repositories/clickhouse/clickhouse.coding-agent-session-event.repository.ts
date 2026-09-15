@@ -519,7 +519,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     repositoryName: string;
     branches: string[];
     fromMs: number;
-  }): Promise<Array<{ tenantId: string; sessionId: string }>> {
+  }): Promise<{ tenantId: string; sessionId: string }[]> {
     if (tenantIds.length === 0 || branches.length === 0) return [];
     for (const tenantId of tenantIds) {
       EventUtils.validateTenantId(

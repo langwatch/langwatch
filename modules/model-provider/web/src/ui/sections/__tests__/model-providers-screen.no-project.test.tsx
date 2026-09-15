@@ -13,7 +13,7 @@ import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../tes
 
 const { mockState, mockDeleteProvider, mockTestConnection } = vi.hoisted(() => ({
   mockState: {
-    providers: [] as Array<Record<string, unknown>>,
+    providers: [] as Record<string, unknown>[],
   },
   mockDeleteProvider: vi.fn(),
   mockTestConnection: vi.fn(),
@@ -71,7 +71,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
   return {
     ...actual,
     ScopeFilter: () => <div data-testid="scope-filter" />,
-    ProviderScopeChips: ({ scopes }: { scopes?: Array<{ scopeType: string; name?: string }> }) => (
+    ProviderScopeChips: ({ scopes }: { scopes?: { scopeType: string; name?: string }[] }) => (
       <div
         data-testid="provider-scope-chips"
         data-scopes={(scopes ?? [])

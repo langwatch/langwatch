@@ -85,16 +85,16 @@ let saveExperimentMutateCall:
       projectId: string;
       experimentId: undefined;
       state: {
-        targets: Array<{
+        targets: {
           id: string;
           type: string;
           promptId?: string;
           localPromptConfig?: {
             llm: { model: string };
-            messages: Array<{ role: string; content: string }>;
+            messages: { role: string; content: string }[];
           };
           mappings?: Record<string, Record<string, FieldMapping>>;
-        }>;
+        }[];
       };
     }
   | undefined;

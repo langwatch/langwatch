@@ -6,14 +6,14 @@ export function findPersonalProject({
   organizationId,
 }: {
   organizations:
-    | Array<{
+    | {
         id: string;
-        teams?: Array<{
+        teams?: {
           isPersonal?: boolean | null;
           ownerUserId?: string | null;
-          projects?: Array<{ id: string; slug: string }> | null;
-        }> | null;
-      }>
+          projects?: { id: string; slug: string }[] | null;
+        }[] | null;
+      }[]
     | undefined;
   userId: string | null | undefined;
   /** The organization the caller is showing. Nothing resolves without it. */

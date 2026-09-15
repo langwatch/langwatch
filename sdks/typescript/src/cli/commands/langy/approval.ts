@@ -25,7 +25,7 @@ export interface BoxCard<T> {
   description: string;
   /** The line above the options. */
   question: string;
-  options: Array<BoxOption<T>>;
+  options: BoxOption<T>[];
   /** The keys the footer names. */
   hint: string;
   /** The patterns a session grant would cover, named under the options. */
@@ -186,7 +186,7 @@ export function renderBox<T>({
   const inner = box - 2;
   const textWidth = inner - 4;
 
-  const body: Array<{ text: string; painted?: string }> = [];
+  const body: { text: string; painted?: string }[] = [];
   const plain = (text: string, painted?: string): void => {
     body.push(painted === undefined ? { text } : { text, painted });
   };

@@ -22,10 +22,10 @@ type VirtualKeyWithScopes = {
   createdAt: Instant;
   updatedAt: Instant;
   lastUsedAt: Instant | null;
-  scopes: Array<{
+  scopes: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
 };
 
 export type GovernanceVirtualKey = {
@@ -35,7 +35,7 @@ export type GovernanceVirtualKey = {
     description: string;
     principalUserId: string;
     actorUserId: string;
-    scopes: Array<{ scopeType: "PROJECT"; scopeId: string }>;
+    scopes: { scopeType: "PROJECT"; scopeId: string }[];
     routingPolicyId: string | null;
   }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
   revoke(input: {
@@ -46,7 +46,7 @@ export type GovernanceVirtualKey = {
 };
 
 export type GovernanceModelProviderCatalog = {
-  list(): Array<{ providerKey: string; displayName: string; type: string }>;
+  list(): { providerKey: string; displayName: string; type: string }[];
 };
 
 export type GovernanceOrganizationContact = {
@@ -112,11 +112,11 @@ export class AppAiToolProviderCatalog implements AiToolProviderCatalog {
     return new AppAiToolProviderCatalog(providers);
   }
 
-  list(): Array<{
+  list(): {
     providerKey: string;
     displayName: string;
     type: string;
-  }> {
+  }[] {
     return this.providers.list();
   }
 }

@@ -40,7 +40,7 @@ function makeService({
   appended,
   backendRunner,
 }: {
-  appended: Array<{ actionId: string }>;
+  appended: { actionId: string }[];
   backendRunner?: (args: { kind: string }) => Promise<unknown>;
 }) {
   return LangyUiActionService.create({
@@ -86,7 +86,7 @@ afterAll(async () => {
 describe("LangyUiActionService against real Redis", () => {
   /** @scenario Agent invokes a workbench action and the attached browser applies it live */
   it("returns the completion a concurrent claim and complete deliver", async () => {
-    const appended: Array<{ actionId: string }> = [];
+    const appended: { actionId: string }[] = [];
     const service = makeService({ appended });
 
     const dispatch = service.dispatch({
@@ -125,7 +125,7 @@ describe("LangyUiActionService against real Redis", () => {
 
   /** @scenario With two tabs open, only the claiming tab executes */
   it("lets exactly one of two concurrent claims through", async () => {
-    const appended: Array<{ actionId: string }> = [];
+    const appended: { actionId: string }[] = [];
     const service = makeService({ appended });
 
     const dispatch = service
@@ -161,7 +161,7 @@ describe("LangyUiActionService against real Redis", () => {
 
   /** @scenario With no browser attached the same verb executes on the backend transparently */
   it("falls back to the backend when the real claim window lapses unclaimed", async () => {
-    const appended: Array<{ actionId: string }> = [];
+    const appended: { actionId: string }[] = [];
     let pendingAtRunnerTime: string | null = "unread";
     const service = makeService({
       appended,

@@ -12,7 +12,7 @@ import { LangySessionKeyReapService } from "../langy-session-key-reap.service.ts
 import { Temporal, type Instant } from "@langwatch/time";
 
 class ReapRepository extends LangySessionKeyReapRepository {
-  readonly calls: Array<{ name: string; now: Instant }> = [];
+  readonly calls: { name: string; now: Instant }[] = [];
 
   constructor(private readonly count = 0) {
     super();

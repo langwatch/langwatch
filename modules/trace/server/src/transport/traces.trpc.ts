@@ -109,7 +109,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       (await app.readTopics({ projectId: input.projectId })).map((topic) => [topic.id, topic]),
     );
 
-    const mapBuckets = (buckets: Array<{ key: string; count: number }>, includeParent = false) => {
+    const mapBuckets = (buckets: { key: string; count: number }[], includeParent = false) => {
       return buckets.reduce(
         (acc, bucket) => {
           const topic = topicsMap[bucket.key];

@@ -88,7 +88,7 @@ describe.skipIf(!DB_URL)("Feature: The prompt list reports live copy counts", ()
   });
 
   async function createSourcePrompt(handle: string) {
-    return await service.createPrompt({
+    return service.createPrompt({
       projectId: sourceProjectId,
       organizationId,
       handle,
@@ -98,7 +98,7 @@ describe.skipIf(!DB_URL)("Feature: The prompt list reports live copy counts", ()
   }
 
   async function listSourceProjectPrompts() {
-    return await service.getAllPrompts({ projectId: sourceProjectId, organizationId });
+    return service.getAllPrompts({ projectId: sourceProjectId, organizationId });
   }
 
   describe("given a prompt with a copy in each of two other projects", () => {

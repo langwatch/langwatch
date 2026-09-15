@@ -8,7 +8,7 @@ import { tryCreateWorkerTenantBroadcast } from "../worker-tenant-broadcast.compo
  * it holds none.
  */
 class FakeRedis {
-  readonly published: Array<[string, string]> = [];
+  readonly published: [string, string][] = [];
 
   async publish(channel: string, message: string): Promise<number> {
     this.published.push([channel, message]);

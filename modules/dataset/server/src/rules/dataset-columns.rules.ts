@@ -12,7 +12,7 @@ export function assertKnownColumns({
 }: {
   datasetName: string;
   columns: string[];
-  entries: ReadonlyArray<Record<string, unknown>>;
+  entries: readonly Record<string, unknown>[];
 }): void {
   const valid = new Set(columns);
   for (const entry of entries) {

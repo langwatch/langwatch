@@ -163,7 +163,7 @@ describe("EntryPointPropertiesPanel", () => {
           (u) => Array.isArray(u.data.outputs) && u.data.outputs.length === 1,
         );
         expect(update).toBeTruthy();
-        expect((update!.data.outputs as Array<{ identifier: string }>)[0]!.identifier).toBe(
+        expect((update!.data.outputs as { identifier: string }[])[0]!.identifier).toBe(
           "query",
         );
         // setNode merges data shallowly - dataset is not part of the

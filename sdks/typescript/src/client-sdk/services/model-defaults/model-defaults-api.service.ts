@@ -15,7 +15,7 @@ export interface ModelDefaultScopeRef {
 export interface ConfigRow {
   id: string;
   config: Record<string, string>;
-  scopes: Array<{ type: ModelDefaultScopeType; id: string; name: string }>;
+  scopes: { type: ModelDefaultScopeType; id: string; name: string }[];
   createdAt: string;
   updatedAt: string;
 }

@@ -39,7 +39,7 @@ let capturedCalls: FetchCall[] = [];
 let warnings: string[] = [];
 let errors: string[] = [];
 /** What Graph answers each successive /users call with. */
-let usersReplies: Array<{ status: number; body: unknown }> = [];
+let usersReplies: { status: number; body: unknown }[] = [];
 
 function captured(args: unknown[]): string {
   return args

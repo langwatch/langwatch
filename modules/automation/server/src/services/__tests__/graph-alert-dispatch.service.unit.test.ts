@@ -30,7 +30,7 @@ function dispatcherWith(
   } = {},
 ) {
   const recorded: Recorded = { claimed: [], emailed: [] };
-  const capCalls: Array<Record<string, unknown>> = [];
+  const capCalls: Record<string, unknown>[] = [];
 
   const service = GraphAlertDispatchService.create({
     persistence: {

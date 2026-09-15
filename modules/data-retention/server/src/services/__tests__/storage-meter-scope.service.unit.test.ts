@@ -20,7 +20,7 @@ const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 class StubDirectory implements DataRetentionDirectoryReader {
   constructor(
     private readonly lineage: RetentionProjectLineage | null,
-    private readonly scopeProjects: ReadonlyArray<{ id: string; teamId: string }>,
+    private readonly scopeProjects: readonly { id: string; teamId: string }[],
   ) {}
   async findProjectLineage(): Promise<RetentionProjectLineage | null> {
     return this.lineage;
@@ -31,7 +31,7 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findScopeOrganizationId(): Promise<string | null> {
     return this.lineage?.organizationId ?? null;
   }
-  async listScopeProjects(): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
+  async listScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return this.scopeProjects;
   }
 }

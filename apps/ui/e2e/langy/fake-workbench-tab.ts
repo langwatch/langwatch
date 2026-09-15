@@ -17,13 +17,13 @@ import { getSessionCookie } from "./trpc";
 
 export interface FakeWorkbenchTab {
   /** Every `ui` entry this tab SAW, claimed or not. */
-  readonly seenActions: ReadonlyArray<{ actionId: string; kind: string }>;
+  readonly seenActions: readonly { actionId: string; kind: string }[];
   /** Every action this tab claimed and carried out, in order. */
-  readonly claimedActions: ReadonlyArray<ObservedAction>;
+  readonly claimedActions: readonly ObservedAction[];
   /** Every action this tab saw and did NOT claim, with how long it waited. */
-  readonly droppedActions: ReadonlyArray<ObservedAction>;
+  readonly droppedActions: readonly ObservedAction[];
   /** Every run this tab started, in order. */
-  readonly runs: ReadonlyArray<FakeTabRun>;
+  readonly runs: readonly FakeTabRun[];
   /** The live store, projected the way `workbench.getState` answers. */
   state(): ReturnType<typeof readLiveWorkbench>;
   /** The version this tab holds, as the last save left it. */
@@ -193,7 +193,7 @@ function buildTabFacade({
       // Settled in waves: a claimed action can start a run, and the run's
       // drain is only tracked once the handler reaches it.
       while (inFlight.size > 0) {
-        await Promise.allSettled([...inFlight]);
+        await Promise.allSettled(inFlight);
       }
       useEvaluationsV3Store.getState().reset();
       openTab = null;

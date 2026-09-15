@@ -151,7 +151,7 @@ export interface SpendFilterOptions {
   status?: SpendEventStatus;
 }
 
-const FILTER_PARAMS: ReadonlyArray<[keyof SpendFilterOptions, string]> = [
+const FILTER_PARAMS: readonly [keyof SpendFilterOptions, string][] = [
   ["projectId", "project_id"],
   ["teamId", "team_id"],
   ["externalId", "external_id"],
@@ -296,7 +296,7 @@ export class SpendEventsApiService {
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
+        ...init?.headers,
       },
     });
     if (!response.ok) {

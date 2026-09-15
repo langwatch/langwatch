@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:task:virtual-key-config-backfill");
 export type LegacyVirtualKeyConfig = Readonly<{
   modelAliases: Record<string, string>;
   policyRules: BackfillJsonObject | undefined;
-  guardrails: Readonly<Record<Direction, ReadonlyArray<{ id: string; evaluator: string }>>>;
+  guardrails: Readonly<Record<Direction, readonly { id: string; evaluator: string }[]>>;
   requestFailOpen: boolean;
   responseFailOpen: boolean;
 }>;
@@ -178,7 +178,7 @@ async function mintGuardrails({
   virtualKey: VirtualKeyRow;
   config: LegacyVirtualKeyConfig;
 }): Promise<{
-  attachments: Array<{ direction: Direction; guardrailIds: string[] }>;
+  attachments: { direction: Direction; guardrailIds: string[] }[];
   minted: number;
   skipped: boolean;
 }> {
@@ -191,7 +191,7 @@ async function mintGuardrails({
     return { attachments: [], minted: 0, skipped: true };
   }
 
-  const attachments: Array<{ direction: Direction; guardrailIds: string[] }> = [];
+  const attachments: { direction: Direction; guardrailIds: string[] }[] = [];
   let minted = 0;
   for (const direction of DIRECTIONS) {
     const refs = config.guardrails[direction];
@@ -248,7 +248,7 @@ function readLegacyConfig(raw: BackfillJsonObject): LegacyVirtualKeyConfig {
 }
 
 /** Only refs carrying both an evaluator id and its name are migratable. */
-function refsOf(value: BackfillJsonValue | undefined): Array<{ id: string; evaluator: string }> {
+function refsOf(value: BackfillJsonValue | undefined): { id: string; evaluator: string }[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
     const ref = objectOf(entry);

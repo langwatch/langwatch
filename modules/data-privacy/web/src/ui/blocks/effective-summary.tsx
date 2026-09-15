@@ -71,7 +71,7 @@ export function EffectiveSummary({
         }`
       : ""
   }`;
-  const effectiveRows: Array<{ term: string; value: string }> = [
+  const effectiveRows: { term: string; value: string }[] = [
     ...CONTENT_CATEGORIES.map((category) => ({
       term: CATEGORY_LABELS[category],
       value: DISPOSITION_LABELS[effective.categories[category].disposition],

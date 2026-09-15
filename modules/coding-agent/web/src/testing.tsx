@@ -18,7 +18,7 @@ export type CodingAgentQuery = Readonly<Record<string, string | undefined>>;
 /** Everything a table wrote through the host, in the order it wrote it. */
 export type CodingAgentHostRecording = {
   navigations: string[];
-  queries: Array<{ next: CodingAgentQuery; replace: boolean }>;
+  queries: { next: CodingAgentQuery; replace: boolean }[];
   successes: CodingAgentNotice[];
   failures: CodingAgentFailure[];
 };

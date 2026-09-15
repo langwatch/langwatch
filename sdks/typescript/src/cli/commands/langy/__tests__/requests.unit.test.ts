@@ -41,8 +41,8 @@ const requestNamed = (id: string, title: string): ControlRequest => ({
 /** A fetch that answers each route from a table and records what it was sent. */
 const fakeFetch = (
   answers: Record<string, { status?: number; body: unknown }>,
-): { impl: typeof fetch; calls: Array<{ url: string; init?: RequestInit }> } => {
-  const calls: Array<{ url: string; init?: RequestInit }> = [];
+): { impl: typeof fetch; calls: { url: string; init?: RequestInit }[] } => {
+  const calls: { url: string; init?: RequestInit }[] = [];
   const impl = (async (url: string, init?: RequestInit) => {
     calls.push({ url, ...(init === undefined ? {} : { init }) });
     const key = Object.keys(answers).find((entry) => url.endsWith(entry));
@@ -185,7 +185,7 @@ describe("given the share-control command", () => {
       const log = vi.spyOn(console, "log").mockImplementation((text) => {
         printed.push(String(text));
       });
-      const asked: Array<Record<string, unknown>> = [];
+      const asked: Record<string, unknown>[] = [];
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);
         return { action: "approve" };
@@ -202,7 +202,7 @@ describe("given the share-control command", () => {
       expect(printed.join("\n")).toContain("Instrument tracing in acme-app");
       expect(printed.join("\n")).toContain("ACME Shop");
       expect(printed.join("\n")).toContain("/work/acme");
-      const choices = asked[0]!.choices as Array<{ title: string }>;
+      const choices = asked[0]!.choices as { title: string }[];
       expect(choices.map((entry) => entry.title)).toEqual(["Approve", "Cancel"]);
       expect(choice).toEqual({ action: "approve", request });
     });
@@ -266,7 +266,7 @@ describe("given the share-control command", () => {
   describe("when two conversations asked", () => {
     /** @scenario "Several open requests become a picker" */
     it("lists both with their titles and projects and asks which one", async () => {
-      const asked: Array<Record<string, unknown>> = [];
+      const asked: Record<string, unknown>[] = [];
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);
         return options.name === "requestId"
@@ -280,10 +280,10 @@ describe("given the share-control command", () => {
       ];
       const choice = await chooseRequest({ requests, root: "/work/acme", ask });
 
-      const picker = asked[0]!.choices as Array<{
+      const picker = asked[0]!.choices as {
         title: string;
         description: string;
-      }>;
+      }[];
       expect(picker.map((entry) => entry.title)).toEqual([
         "Instrument tracing",
         "Fix the refund scenario",
@@ -295,7 +295,7 @@ describe("given the share-control command", () => {
     /** @scenario "Several open requests become a picker" */
     it("says how long ago each conversation asked", async () => {
       const now = Date.parse("2026-01-01T12:00:00.000Z");
-      const asked: Array<Record<string, unknown>> = [];
+      const asked: Record<string, unknown>[] = [];
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);
         return options.name === "requestId"
@@ -315,7 +315,7 @@ describe("given the share-control command", () => {
       ];
       await chooseRequest({ requests, root: "/work/acme", ask, now });
 
-      const picker = asked[0]!.choices as Array<{ description: string }>;
+      const picker = asked[0]!.choices as { description: string }[];
       expect(picker[0]!.description).toBe("project ACME Shop, asked just now");
       expect(picker[1]!.description).toBe(
         "project ACME Shop, asked 3 minutes ago",
@@ -327,7 +327,7 @@ describe("given the share-control command", () => {
     /** @scenario "One conversation is listed once" */
     it("keeps the newest request and never asks which one", async () => {
       const now = Date.parse("2026-01-01T12:00:00.000Z");
-      const asked: Array<Record<string, unknown>> = [];
+      const asked: Record<string, unknown>[] = [];
       const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);

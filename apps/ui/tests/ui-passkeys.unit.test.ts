@@ -135,7 +135,7 @@ describe("given a rename and a removal", () => {
 
 describe("given a reader linking an additional sign-in method", () => {
   function stubFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
-    const calls: Array<[string, RequestInit | undefined]> = [];
+    const calls: [string, RequestInit | undefined][] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string, init?: RequestInit) => {

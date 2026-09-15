@@ -155,7 +155,7 @@ export type GatewaySpendApp = Readonly<{
     tenantIds: string[];
     virtualKeyId?: string;
     budgetRepository: GatewayBudgetSpend;
-  }): Promise<Array<Record<string, unknown>>>;
+  }): Promise<Record<string, unknown>[]>;
 
   /**
    * The application's own refusal for "the store these figures live in is not

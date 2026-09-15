@@ -261,12 +261,12 @@ export const AI_TOOL_STARTER_TILES: readonly AiToolStarterTile[] = [
 ];
 
 export type AiToolCliCatalog = {
-  tools: Array<{ slug: string; displayName: string }>;
-  providers: Array<{
+  tools: { slug: string; displayName: string }[];
+  providers: {
     providerKey: string;
     displayName: string;
     configured: boolean;
-  }>;
+  }[];
   configuredProviderKeys: string[];
 };
 

@@ -28,7 +28,7 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
    */
   async pruneDeliveries({ now = new Date() }: { now?: Date } = {}): Promise<number> {
     const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
-    return await this.prisma.$executeRaw`
+    return this.prisma.$executeRaw`
       DELETE FROM "WebhookEndpointDelivery"
       WHERE "firedAt" < ${before}
       -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
@@ -43,7 +43,7 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
   async pruneExpiredIdempotencyReceipts({
     now = new Date(),
   }: { now?: Date } = {}): Promise<number> {
-    return await this.prisma.$executeRaw`
+    return this.prisma.$executeRaw`
       DELETE FROM "IdempotencyReceipt"
       WHERE "expiresAt" < ${now}
       -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)

@@ -87,7 +87,7 @@ vi.mock("../../../behavior/data-privacy-api.ts", () => ({
 }));
 
 class TestPrivacyHost extends DataPrivacyHostApi {
-  readonly writes: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly writes: Readonly<Record<string, string | undefined>>[] = [];
   readonly successes: PrivacySuccessNotice[] = [];
   readonly failures: PrivacyFailureNotice[] = [];
 

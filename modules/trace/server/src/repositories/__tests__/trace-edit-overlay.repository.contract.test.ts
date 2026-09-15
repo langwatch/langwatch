@@ -10,7 +10,7 @@ import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { MemoryTraceEditOverlayRepository } from "../memory/memory.trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayRepository } from "../trace-edit-overlay.repository.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => TraceEditOverlayRepository }> = [
+const backends: readonly { name: string; create: () => TraceEditOverlayRepository }[] = [
   { name: "memory", create: () => MemoryTraceEditOverlayRepository.create() },
 ];
 

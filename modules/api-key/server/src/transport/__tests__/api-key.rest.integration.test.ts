@@ -477,7 +477,7 @@ describe("the api-keys REST family", () => {
         organizationId: ORGANIZATION_ID,
       });
       expect(listAll).not.toHaveBeenCalled();
-      const body = (await response.json()) as { data: Array<Record<string, unknown>> };
+      const body = (await response.json()) as { data: Record<string, unknown>[] };
       expect(body.data).toEqual([
         {
           id: "api-key-1",

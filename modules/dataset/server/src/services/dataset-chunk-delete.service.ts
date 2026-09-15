@@ -221,10 +221,10 @@ export class DatasetChunkDeleteService {
     chunkCount: number;
   }): Promise<{
     deleted: number;
-    pendingRewrites: Array<{ index: number; kept: unknown[] }>;
+    pendingRewrites: { index: number; kept: unknown[] }[];
   } | null> {
     const removedIds = new Set<string>();
-    const pendingRewrites: Array<{ index: number; kept: unknown[] }> = [];
+    const pendingRewrites: { index: number; kept: unknown[] }[] = [];
     let deleted = 0;
     for (const index of hint.affectedIndices) {
       if (index >= chunkCount) {
@@ -293,7 +293,7 @@ export class DatasetChunkDeleteService {
     // recompute. Used on a legacy/no-offset dataset, or when the fast path
     // bailed on a hint discrepancy. Measures unaffected chunks from their actual
     // bytes, so this path also self-heals any pre-existing counter drift.
-    const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
+    const perChunk: { rowCount: number; byteSize: number }[] = [];
     let deleted = 0;
     for (let index = 0; index < chunkCount; index++) {
       const rows = await storage.readChunk({
@@ -344,7 +344,7 @@ export class DatasetChunkDeleteService {
     tx: DatasetContentRepository;
     datasetId: string;
     projectId: string;
-    perChunk: Array<{ rowCount: number; byteSize: number }>;
+    perChunk: { rowCount: number; byteSize: number }[];
   }): Promise<void> {
     const { offsets, rowCount, sizeBytes } = recomputeOffsets(perChunk);
     let keptChunkCount = perChunk.length;

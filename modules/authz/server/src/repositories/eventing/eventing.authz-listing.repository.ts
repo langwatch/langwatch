@@ -266,7 +266,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         },
         select: GRANT_ROW_SELECT,
         orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
-      })) as Array<StoredHeadRow<GrantListRow>>
+      })) as StoredHeadRow<GrantListRow>[]
     ).map(headRow<GrantListRow>);
     const grants = this.listableGrants(rows).filter(
       ({ row }) =>
@@ -318,10 +318,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const memberships = (await this.database.groupMembership.findMany({
       where: { userId, group: { organizationId: { in: [...orgIds] } } },
       select: { groupId: true, group: { select: { organizationId: true } } },
-    })) as Array<{
+    })) as {
       groupId: string;
       group: { organizationId: string };
-    }>;
+    }[];
     const groupIdsByOrg = new Map<string, Set<string>>();
     for (const membership of memberships) {
       const orgId = membership.group.organizationId;
@@ -368,7 +368,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       (await liveRoles(this.database).findMany({
         where: { organizationId, kind: USER_CREATED_ROLE_KIND },
         orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      })) as Array<StoredHeadRow<RoleHeadRow>>
+      })) as StoredHeadRow<RoleHeadRow>[]
     ).map(headRow<RoleHeadRow>);
     return roles.map((role) => this.toCustomRoleShape(role));
   }
@@ -395,7 +395,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
         },
         select: GRANT_ROW_SELECT,
         orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
-      })) as Array<StoredHeadRow<GrantListRow>>
+      })) as StoredHeadRow<GrantListRow>[]
     ).map(headRow<GrantListRow>);
   }
 
@@ -413,7 +413,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     const roles = (
       (await liveRoles(this.database).findMany({
         where: { id: { in: [...roleIds] }, organizationId },
-      })) as Array<StoredHeadRow<RoleHeadRow>>
+      })) as StoredHeadRow<RoleHeadRow>[]
     ).map(headRow<RoleHeadRow>);
     return roles.map((role) => this.toCustomRoleShape(role));
   }
@@ -499,8 +499,8 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }: {
     userId: string;
     groupIds: readonly string[];
-  }): Array<Record<string, unknown>> {
-    const principals: Array<Record<string, unknown>> = [
+  }): Record<string, unknown>[] {
+    const principals: Record<string, unknown>[] = [
       { principalType: "USER", principalId: userId },
     ];
     if (groupIds.length > 0) {

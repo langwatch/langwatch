@@ -237,7 +237,7 @@ export interface GovernanceApi {
    * is equally absent and is not archived at all.
    */
   ingestionSourceLiveTraceProjectIds(
-    sources: ReadonlyArray<{ traceProjectId?: string | null }>,
+    sources: readonly { traceProjectId?: string | null }[],
     organizationId: string,
   ): Promise<Set<string>>;
   findIngestionSourceByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null>;
@@ -318,7 +318,7 @@ export interface GovernanceApi {
   aiToolListProviderOptionsForAdmin(input: AiToolOrganizationInput): Promise<AiToolProviderOption[]>;
   aiToolListRoutingPolicyOptionsForAdmin(
     input: AiToolOrganizationInput,
-  ): Promise<Array<{ id: string; name: string }>>;
+  ): Promise<{ id: string; name: string }[]>;
   aiToolReorder(input: ReorderAiToolEntriesInput): Promise<void>;
   aiToolResolvePolicyOverrides(
     input: AiToolMemberInput,

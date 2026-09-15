@@ -609,7 +609,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
   describe("when the restricted identity attempts to write or change the schema", () => {
     /** @scenario "Writes, DDL, and temporary objects are rejected by the restricted identity itself" */
     it("rejects every write, DDL, and temporary-object statement by grants", async () => {
-      const rejected: Array<[string, string]> = [
+      const rejected: [string, string][] = [
         ["INSERT", `INSERT INTO ${database}.traces VALUES ('tenant-b','x','m',1)`],
         ["ALTER", `ALTER TABLE ${database}.traces DELETE WHERE 1`],
         ["CREATE TABLE", `CREATE TABLE ${database}.evil (x UInt8) ENGINE = Memory`],
@@ -667,7 +667,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
   describe("when the restricted identity attempts to reach outside the LangWatchQL schema", () => {
     /** @scenario "Table functions are rejected for the restricted identity by grants" */
     it("rejects the table functions that reach external systems", async () => {
-      const rejected: Array<[string, string]> = [
+      const rejected: [string, string][] = [
         ["url", `SELECT * FROM url('http://example.invalid/', 'CSV', 'a String')`],
         ["s3", `SELECT * FROM s3('http://example.invalid/f.csv', 'CSV', 'a String')`],
         ["remote", `SELECT * FROM remote('127.0.0.1', 'system', 'one', 'u', 'p')`],
@@ -690,7 +690,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
      */
     /** @scenario "Table functions that read no data remain available" */
     it("still allows the table functions that read no data", async () => {
-      const allowed: Array<[string, string]> = [
+      const allowed: [string, string][] = [
         ["numbers", "SELECT count() AS value FROM numbers(5)"],
         ["values", "SELECT count() AS value FROM values('x UInt8', 1, 2)"],
         ["view", "SELECT count() AS value FROM view(SELECT 1 AS x)"],

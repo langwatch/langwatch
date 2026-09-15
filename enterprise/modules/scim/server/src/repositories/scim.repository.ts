@@ -108,7 +108,7 @@ export abstract class ScimRepository extends ScimGrantRepository {
     startIndex: number;
     count: number;
   }): Promise<{
-    rows: Array<ScimGroupRecord & { members: ScimGroupMembershipRecord[] }>;
+    rows: (ScimGroupRecord & { members: ScimGroupMembershipRecord[] })[];
     total: number;
   }>;
   abstract createGroup(input: {

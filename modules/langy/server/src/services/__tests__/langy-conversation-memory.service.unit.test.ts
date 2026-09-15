@@ -21,7 +21,7 @@ type Digest = {
 
 /** One assistant turn carrying the tool-call parts it produced. */
 const assistantTurn = (
-  parts: Array<{ digest?: Digest; state?: string }>,
+  parts: { digest?: Digest; state?: string }[],
   id = "message-1",
 ): LangyMessageRow => ({
   id,

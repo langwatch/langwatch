@@ -35,7 +35,7 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
 
   async findScopeRows(input: {
     organizationId: string;
-    scopes: ReadonlyArray<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: readonly { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<AuthzBindingScopeRow[]> {
     return this.memory.scopes
       .filter(
@@ -49,7 +49,7 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
   async findGroupMembers(input: {
     organizationId: string;
     groupIds: readonly string[];
-  }): Promise<Array<{ groupId: string; userId: string }>> {
+  }): Promise<{ groupId: string; userId: string }[]> {
     return this.memory.groupMemberships
       .filter(
         (row) =>

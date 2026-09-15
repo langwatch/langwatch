@@ -74,7 +74,7 @@ export class MetricRequestCollectionService {
     metricRequest: DeepPartial<IExportMetricsServiceRequest>;
     piiRedactionLevel: string;
   }): Promise<MetricRequestCollectionResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "MetricRequestCollectionService.handleOtlpMetricRequest",
       {
         kind: ApiSpanKind.PRODUCER,

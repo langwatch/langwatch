@@ -198,7 +198,7 @@ export class EventSourcing {
   }
 
   /** Returns the static definitions captured during register() calls. */
-  get definitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>> {
+  get definitions(): readonly StaticPipelineDefinition<any, any, any>[] {
     return this._definitions;
   }
 

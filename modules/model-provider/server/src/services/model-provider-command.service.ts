@@ -403,7 +403,7 @@ export class ModelProviderCommandService {
   private headersForWrite(
     input: ModelProviderWriteInput,
     existing: ModelProvider | null,
-  ): Array<{ key: string; value: string }> {
+  ): { key: string; value: string }[] {
     if (input.extraHeaders === undefined) {
       return existing?.extraHeaders ?? [];
     }

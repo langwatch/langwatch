@@ -80,7 +80,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   }
 
   async handle(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "EventingRecordSpanAdapter.handle",
       {
         kind: SpanKind.INTERNAL,

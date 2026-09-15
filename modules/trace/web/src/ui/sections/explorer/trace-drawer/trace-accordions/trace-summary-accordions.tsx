@@ -385,11 +385,9 @@ interface TraceSectionContext {
   capturedAttributes: Record<string, unknown> | undefined;
   capturedInput: string | null | undefined;
   capturedOutput: string | null | undefined;
-  emptyCards: Array<"evals" | "events" | "prompts">;
+  emptyCards: ("evals" | "events" | "prompts")[];
   errorSpans: ReturnType<typeof rankedErrorSpans>;
-  evalsForList: Array<
-    ReturnType<typeof useTraceEvaluations>["rich"][number] & { spanName?: string }
-  >;
+  evalsForList: (ReturnType<typeof useTraceEvaluations>["rich"][number] & { spanName?: string })[];
   evalsLoading: boolean;
   hasAttributes: boolean;
   hasEvalsContent: boolean;
@@ -712,8 +710,8 @@ function emptySignalCards({
   evalsEmpty: boolean;
   eventsEmpty: boolean;
   promptsEmpty: boolean;
-}): Array<"evals" | "events" | "prompts"> {
-  const cards: Array<"evals" | "events" | "prompts"> = [];
+}): ("evals" | "events" | "prompts")[] {
+  const cards: ("evals" | "events" | "prompts")[] = [];
   if (evalsEmpty) cards.push("evals");
   if (eventsEmpty) cards.push("events");
   if (promptsEmpty) cards.push("prompts");
@@ -735,10 +733,8 @@ function traceSectionIds({
   hasEventsContent: boolean;
   hasIO: boolean;
   showOther: boolean;
-}): Array<"io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"> {
-  const list: Array<
-    "io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other"
-  > = [];
+}): ("io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other")[] {
+  const list: ("io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other")[] = [];
   if (hasError && !hasIO) list.push("exceptions");
   list.push("io");
   if (hasError && hasIO) list.push("exceptions");

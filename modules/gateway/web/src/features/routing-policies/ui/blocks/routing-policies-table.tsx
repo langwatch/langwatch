@@ -17,14 +17,14 @@ export interface RoutingPolicyRow {
   modelProviderIds: unknown;
   modelAliases: unknown;
   defaultModel: string | null;
-  scopes: Array<{ scopeType: string; scopeId: string }>;
+  scopes: { scopeType: string; scopeId: string }[];
 }
 
-const SCOPE_LEVELS: Array<{
+const SCOPE_LEVELS: {
   level: RoutingPolicyScopeLevel;
   label: string;
   subtitle: string;
-}> = [
+}[] = [
   {
     level: "organization",
     label: "Organization",

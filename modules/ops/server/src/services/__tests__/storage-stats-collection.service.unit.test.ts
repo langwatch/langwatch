@@ -40,8 +40,8 @@ class RecordingMetrics implements StorageStatsMetrics {
 
 /** Answers each system-table query from a script, by the table it names. */
 function clientReturning(script: {
-  parts?: Array<Record<string, string>>;
-  disks?: Array<Record<string, string>>;
+  parts?: Record<string, string>[];
+  disks?: Record<string, string>[];
   refuse?: boolean;
 }): StorageStatsClickHouseClient {
   return {

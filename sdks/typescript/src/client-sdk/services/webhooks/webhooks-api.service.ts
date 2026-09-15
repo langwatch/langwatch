@@ -219,7 +219,7 @@ export class WebhooksApiService {
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
+        ...init?.headers,
       },
     });
     if (!response.ok) {

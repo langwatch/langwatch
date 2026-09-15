@@ -43,10 +43,10 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
   }
 
   async storeBatch(
-    entries: Array<{
+    entries: {
       state: TraceAnalyticsData;
       context: ProjectionStoreContext;
-    }>,
+    }[],
   ): Promise<void> {
     const batchRows = entries
       .map(({ state, context }) => this.toRow(state, context))

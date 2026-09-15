@@ -20,7 +20,7 @@ import {
 } from "@langwatch/langy-server/streaming/langy-frame-auth";
 
 interface Vectors {
-  vectors: Array<LangyFrameSigned & { name: string; runToken: string; mac: string }>;
+  vectors: (LangyFrameSigned & { name: string; runToken: string; mac: string })[];
   fieldShift: {
     runToken: string;
     a: LangyFrameSigned & { mac: string };

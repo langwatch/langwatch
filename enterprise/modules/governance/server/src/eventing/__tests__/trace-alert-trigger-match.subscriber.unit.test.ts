@@ -35,7 +35,7 @@ class ManyTriggers implements TraceAlertTriggerReader {
 }
 
 class RecordingMatchCommands implements TraceAlertTriggerMatchChannel {
-  readonly sent: Array<Parameters<TraceAlertTriggerMatchChannel["send"]>[0]> = [];
+  readonly sent: Parameters<TraceAlertTriggerMatchChannel["send"]>[0][] = [];
 
   send(input: Parameters<TraceAlertTriggerMatchChannel["send"]>[0]): Promise<void> {
     this.sent.push(input);

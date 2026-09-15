@@ -298,7 +298,7 @@ export class ApiKeyCliService {
 
   private async resolveCliScopeSummary(input: {
     organizationId: string;
-    bindings: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+    bindings: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
     permissions: readonly string[];
   }): Promise<CliKeyScopeSummary> {
     const permissions = [...new Set(input.permissions)].sort();

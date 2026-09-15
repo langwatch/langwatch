@@ -68,7 +68,7 @@ export type ConnectedCellExecutionInput = {
   cell: ExecutionCell;
   projectId: string;
   agent: TypedAgent;
-  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  datasetColumns?: { id: string; name: string; type: string }[];
   loadedEvaluators?: LoadedEvaluators;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;

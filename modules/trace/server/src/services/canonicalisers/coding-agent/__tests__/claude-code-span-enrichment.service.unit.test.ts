@@ -170,7 +170,7 @@ describe("computeClaudeSpanEnrichment", () => {
       const contentOf = (spanId: string): string => {
         const input = result.get(spanId)?.input;
         expect(input?.type).toBe("chat_messages");
-        const messages = (input as { value: Array<{ content: string }> }).value;
+        const messages = (input as { value: { content: string }[] }).value;
         return messages.map((m) => m.content).join(" ");
       };
       expect(contentOf("span-1")).toContain("first");
@@ -206,7 +206,7 @@ describe("computeClaudeSpanEnrichment", () => {
 
       const contentOf = (spanId: string): string => {
         const input = result.get(spanId)?.input as {
-          value: Array<{ content: string }>;
+          value: { content: string }[];
         };
         return input.value.map((m) => m.content).join(" ");
       };
@@ -275,7 +275,7 @@ describe("computeClaudeSpanEnrichment", () => {
       // Input: POSITIONAL — span-A (array index 0) pairs with the earliest body
       // (agent B's), so the transcript crosses. Documented limitation.
       const inputOf = (spanId: string): string =>
-        (result.get(spanId)?.input as { value: Array<{ content: string }> }).value
+        (result.get(spanId)?.input as { value: { content: string }[] }).value
           .map((m) => m.content)
           .join(" ");
       expect(inputOf("span-A")).toContain("AGENT_B_PROMPT");
@@ -443,7 +443,7 @@ describe("computeClaudeSpanEnrichment", () => {
 
       expect(enrichment?.output).toEqual({ type: "text", value: "hello!" });
       expect(enrichment?.input?.type).toBe("chat_messages");
-      const messages = (enrichment?.input as { value: Array<{ role: string; content: string }> })
+      const messages = (enrichment?.input as { value: { role: string; content: string }[] })
         .value;
       expect(messages).toEqual([
         { role: "system", content: "You are helpful" },
@@ -775,12 +775,12 @@ describe("computeClaudeSpanEnrichment repeated system prompts", () => {
       const result = computeClaudeSpanEnrichment({ spans, logs });
       const first = (
         result.get("span-1")?.input as {
-          value: Array<{ role: string; content: string }>;
+          value: { role: string; content: string }[];
         }
       ).value;
       const second = (
         result.get("span-2")?.input as {
-          value: Array<{ role: string; content: string }>;
+          value: { role: string; content: string }[];
         }
       ).value;
 
@@ -820,7 +820,7 @@ describe("computeClaudeSpanEnrichment repeated system prompts", () => {
       expect(
         (
           result.get("span-2")?.input as {
-            value: Array<{ role: string; content: string }>;
+            value: { role: string; content: string }[];
           }
         ).value[0],
       ).toEqual({ role: "system", content: "prompt B" });
@@ -867,14 +867,14 @@ describe("computeClaudeSpanEnrichment when spans carry no query_source", () => {
 
       const first = result.get("span-1")?.input;
       expect(first?.type).toBe("chat_messages");
-      expect((first as { value: Array<{ role: string; content: string }> }).value[0]).toEqual({
+      expect((first as { value: { role: string; content: string }[] }).value[0]).toEqual({
         role: "system",
         content: "You are Claude Code",
       });
 
       const second = result.get("span-2")?.input;
       expect(second?.type).toBe("chat_messages");
-      expect((second as { value: Array<{ role: string; content: string }> }).value).toContainEqual({
+      expect((second as { value: { role: string; content: string }[] }).value).toContainEqual({
         role: "user",
         content: "two",
       });
@@ -913,14 +913,14 @@ describe("computeClaudeSpanEnrichment when spans carry no query_source", () => {
       expect(
         (
           result.get("main-1")?.input as {
-            value: Array<{ role: string; content: string }>;
+            value: { role: string; content: string }[];
           }
         ).value,
       ).toContainEqual({ role: "user", content: "real turn" });
       expect(
         (
           result.get("util-1")?.input as {
-            value: Array<{ role: string; content: string }>;
+            value: { role: string; content: string }[];
           }
         ).value,
       ).toContainEqual({ role: "user", content: "autosuggest probe" });

@@ -36,7 +36,7 @@ export const formatTable = ({
   colorMap = {},
   emptyMessage = "No data found",
 }: {
-  data: Array<Record<string, string>>;
+  data: Record<string, string>[];
   headers: string[];
   colorMap?: ColumnColorMap;
   emptyMessage?: string;

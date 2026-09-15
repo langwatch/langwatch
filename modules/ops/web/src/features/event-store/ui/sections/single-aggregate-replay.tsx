@@ -10,7 +10,7 @@ export function SingleAggregateReplay({
   projections,
   onReplayStarted,
 }: {
-  projections: Array<{ projectionName: string }>;
+  projections: { projectionName: string }[];
   onReplayStarted: () => void;
 }) {
   const showErrorToast = useShowErrorToast();

@@ -33,10 +33,10 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
 }
 
 class RecordingDiagnostics implements ApiKeyDiagnostics {
-  readonly warnings: Array<{
+  readonly warnings: {
     context: Record<string, unknown>;
     message: string;
-  }> = [];
+  }[] = [];
 
   warn(context: Record<string, unknown>, message: string): void {
     this.warnings.push({ context, message });

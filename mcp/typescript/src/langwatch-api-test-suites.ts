@@ -31,7 +31,7 @@ export interface TestSuite {
 }
 
 export interface TestSuiteDetail extends TestSuite {
-  scenarios: Array<{ id: string; name: string }>;
+  scenarios: { id: string; name: string }[];
 }
 
 export interface TestSuiteArchiveResponse {

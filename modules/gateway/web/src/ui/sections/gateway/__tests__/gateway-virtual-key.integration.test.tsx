@@ -59,7 +59,7 @@ const { detail, policy, usageInputs } = vi.hoisted(() => ({
   policy: {
     current: { data: undefined as unknown, isError: false },
   },
-  usageInputs: [] as Array<Record<string, unknown>>,
+  usageInputs: [] as Record<string, unknown>[],
 }));
 
 const usageSummary = {

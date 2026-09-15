@@ -18,21 +18,21 @@ export type SchedulerAuditDatabase = {
         userId: true;
       };
     }): Promise<
-      Array<{
+      {
         id: string;
         createdAt: Date;
         action: string;
         targetId: string | null;
         projectId: string | null;
         userId: string | null;
-      }>
+      }[]
     >;
   };
   user: {
     findMany(input: {
       where: { id: { in: string[] } };
       select: { id: true; name: true; email: true };
-    }): Promise<Array<{ id: string; name: string | null; email: string | null }>>;
+    }): Promise<{ id: string; name: string | null; email: string | null }[]>;
   };
 };
 

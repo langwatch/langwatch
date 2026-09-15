@@ -8,8 +8,8 @@ import type { ObjectStore } from "../tieredBlobStore.ts";
 export class InMemoryJobBlobStore implements JobBlobStore {
   readonly store = new Map<string, Buffer>();
   /** TTLs observed per call, so tests can pin which backstop each tier passes. */
-  readonly putTtls: Array<number | undefined> = [];
-  readonly getTtls: Array<number | undefined> = [];
+  readonly putTtls: (number | undefined)[] = [];
+  readonly getTtls: (number | undefined)[] = [];
   async put({
     id,
     data,

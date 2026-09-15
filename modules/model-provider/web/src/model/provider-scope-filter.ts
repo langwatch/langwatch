@@ -19,7 +19,7 @@ import {
 export type { ScopeFilterValue, ScopeHierarchy };
 
 /** A row the filter narrows: anything that attaches to one or more scopes. */
-type RowWithScopes = { scopes?: Array<{ scopeType: string; scopeId: string }> };
+type RowWithScopes = { scopes?: { scopeType: string; scopeId: string }[] };
 
 /** The current team and project the two ambient filter kinds resolve against. */
 export type AmbientScope = {

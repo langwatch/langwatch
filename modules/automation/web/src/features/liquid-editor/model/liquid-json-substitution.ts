@@ -5,7 +5,7 @@ export interface LiquidSubstitutionResult {
   /** Same-length copy of the source with Liquid spans neutralised. */
   substituted: string;
   /** The original spans we replaced — for debugging / position lookups. */
-  liquidRanges: Array<{ start: number; end: number; kind: "output" | "tag" }>;
+  liquidRanges: { start: number; end: number; kind: "output" | "tag" }[];
 }
 
 function fill(span: string, char: string): string {

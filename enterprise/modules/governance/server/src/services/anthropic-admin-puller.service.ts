@@ -502,7 +502,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     if (!response.ok) {
       throw await AnthropicAdminPullerAdapter.fetchPageError(response, config.report);
     }
-    return await response.json();
+    return response.json();
   }
 
   /**

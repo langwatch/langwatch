@@ -70,7 +70,7 @@ async function dohHasAnswer(endpoint: string, host: string): Promise<boolean> {
   if (!res.ok) return false;
   const data = (await res.json()) as {
     Status?: number;
-    Answer?: Array<{ data?: string }>;
+    Answer?: { data?: string }[];
   };
   return data.Status === 0 && (data.Answer?.length ?? 0) > 0;
 }

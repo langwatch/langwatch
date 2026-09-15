@@ -942,8 +942,8 @@ export function ProposalCard({
   );
 }
 
-function extractProposals(message: UIMessage): Array<{ id: string; proposal: LangyProposal }> {
-  const result: Array<{ id: string; proposal: LangyProposal }> = [];
+function extractProposals(message: UIMessage): { id: string; proposal: LangyProposal }[] {
+  const result: { id: string; proposal: LangyProposal }[] = [];
   for (const part of message.parts) {
     if (!part.type?.startsWith("tool-")) continue;
     const output = (part as { output?: unknown }).output;

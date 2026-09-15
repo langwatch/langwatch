@@ -19,11 +19,11 @@ export const TEAM_ROLE_PRIORITY = {
 
 export type TeamMembershipPlan = {
   bindingIdsToRemove: string[];
-  bindingsToChange: Array<{
+  bindingsToChange: {
     bindingId: string;
     role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
     customRoleId: string | null;
-  }>;
+  }[];
   membersToAdd: OrganizationTeamMemberInput[];
 };
 

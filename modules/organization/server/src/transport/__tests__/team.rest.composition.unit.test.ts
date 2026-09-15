@@ -370,7 +370,7 @@ describe("given the teams REST family over the application the composition build
 
       expect(response.status).toBe(200);
       const body = (await response.json()) as {
-        data: Array<{ id: string }>;
+        data: { id: string }[];
         pagination: { page: number; limit: number; total: number };
       };
       expect(body.data.map((team) => team.id).sort()).toEqual([PERSONAL_TEAM_ID, SHARED_TEAM_ID]);
@@ -397,7 +397,7 @@ describe("given the teams REST family over the application the composition build
     it("never lists a team belonging to another organization", async () => {
       const { send } = mountTeamsRestApplication(application().app);
 
-      const body = (await (await send("/api/teams")).json()) as { data: Array<{ id: string }> };
+      const body = (await (await send("/api/teams")).json()) as { data: { id: string }[] };
 
       expect(body.data.map((team) => team.id)).not.toContain(OTHER_TEAM_ID);
     });
@@ -406,7 +406,7 @@ describe("given the teams REST family over the application the composition build
     it("never lists a team that has been archived", async () => {
       const { send } = mountTeamsRestApplication(application().app);
 
-      const body = (await (await send("/api/teams")).json()) as { data: Array<{ id: string }> };
+      const body = (await (await send("/api/teams")).json()) as { data: { id: string }[] };
 
       expect(body.data.map((team) => team.id)).not.toContain(ARCHIVED_TEAM_ID);
     });
@@ -759,7 +759,7 @@ describe("given the teams REST family over the application the composition build
       const response = await send(`/api/teams/${SHARED_TEAM_ID}/projects`);
 
       expect(response.status).toBe(200);
-      const body = (await response.json()) as { data: Array<{ id: string }> };
+      const body = (await response.json()) as { data: { id: string }[] };
       expect(body.data.map((project) => project.id)).toEqual(["project_1"]);
     });
 

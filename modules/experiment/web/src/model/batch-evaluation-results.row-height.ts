@@ -2,10 +2,10 @@ export type RowHeight = "s" | "m" | "l";
 
 export const DEFAULT_ROW_HEIGHT: RowHeight = "m";
 
-export const ROW_HEIGHT_OPTIONS: ReadonlyArray<{
+export const ROW_HEIGHT_OPTIONS: readonly {
   value: RowHeight;
   label: string;
-}> = [
+}[] = [
   { value: "s", label: "Small" },
   { value: "m", label: "Medium" },
   { value: "l", label: "Large" },

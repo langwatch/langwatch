@@ -12,7 +12,7 @@ import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-con
 
 const scripted: {
   component: StudioServerEvent[];
-  dispatched: Array<{ type: string; payload: Record<string, any> }>;
+  dispatched: { type: string; payload: Record<string, any> }[];
 } = { component: [], dispatched: [] };
 
 const resetBoundary = () => {

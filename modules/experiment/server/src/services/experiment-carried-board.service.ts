@@ -154,7 +154,7 @@ export class ExperimentCarriedBoardService {
     runId: string;
     experimentId: string;
     cells: CarriedOverCell[];
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     evaluatorNameFor: (evaluatorId: string) => string | null;
     occurredAt: number;
   }): {
@@ -210,7 +210,7 @@ export class ExperimentCarriedBoardService {
     runId: string;
     experimentId: string;
     cells: CarriedOverCell[];
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     state: EvaluationsV3State;
     loadedEvaluators?: LoadedEvaluators;
   }): Promise<void> {

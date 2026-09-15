@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { BillingRepositories } from "../billing.repositories.ts";
 import { MemoryBillingRepositories } from "../memory/memory.billing.repositories.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => BillingRepositories }> = [
+const backends: readonly { name: string; create: () => BillingRepositories }[] = [
   { name: "memory", create: () => MemoryBillingRepositories.create() },
 ];
 

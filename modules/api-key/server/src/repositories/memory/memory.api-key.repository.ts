@@ -168,7 +168,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   async findLiveChildren(input: {
     parentApiKeyId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string }>> {
+  }): Promise<{ id: string }[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
@@ -190,7 +190,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
 
   async findElapsedLoginKeys(input: {
     now: Instant;
-  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>> {
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     const now = toDate(input.now);
     return this.#list(
       (key) =>

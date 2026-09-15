@@ -108,7 +108,7 @@ function serviceWith({
   >;
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
-  migrations?: Array<ReturnType<typeof migrationOf>>;
+  migrations?: ReturnType<typeof migrationOf>[];
   runTargetedPass?: ReturnType<typeof targetedPassStub>;
   privateDataplaneOrganizationIds?: string[];
 }) {

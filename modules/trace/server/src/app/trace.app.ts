@@ -217,7 +217,7 @@ export type TracesV2SpanReader = Readonly<{
   getSpanSummaryByTraceId(params: ByTrace): Promise<SpanSummaryRow[]>;
   getLangwatchSignalsByTraceId(
     params: ByTrace,
-  ): Promise<Array<{ spanId: string; signals: SpanLangwatchSignals["signals"] }>>;
+  ): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
   getSpanResourcesByTraceId(params: ByTrace): Promise<SpanResourceInfo[]>;
   getTraceEventsByTraceId(params: ByTrace): Promise<DerivedTraceEvent[]>;
   getTraceEventRollupsByTraceIds(params: {
@@ -323,7 +323,7 @@ export type TraceEditOverlayStore = Readonly<{
 export type TracesTopicReader = Readonly<{
   getAll(
     input: Readonly<{ projectId: string }>,
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string; parentId: string | null }>>>;
+  ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]>;
 }>;
 
 /** The read side of the process's broadcast fabric. */
@@ -607,7 +607,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     userId: string;
     projectId: string;
     traceIds: readonly string[];
-  }): Promise<ReadonlyArray<Trace>> {
+  }): Promise<readonly Trace[]> {
     return this.readForViewer(input);
   }
 
@@ -809,7 +809,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   /** The project's topic tree. */
   readTopics(
     input: Readonly<{ projectId: string }>,
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string; parentId: string | null }>>> {
+  ): Promise<readonly Readonly<{ id: string; name: string; parentId: string | null }>[]> {
     return this.#dependencies.topics.getAll(input);
   }
 
@@ -1054,7 +1054,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
-  }): Promise<Array<{ spanId: string; signals: SpanLangwatchSignals["signals"] }>> {
+  }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]> {
     return this.#dependencies.traces.spans.getLangwatchSignalsByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,

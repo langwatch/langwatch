@@ -18,7 +18,7 @@ class RecordingTelemetry implements StoredObjectOwnerLookupTelemetry {
     operation: (span: StoredObjectOwnerLookupSpan) => Promise<Result>,
   ): Promise<Result> {
     this.inputIds.push(input.id);
-    return await operation({
+    return operation({
       setAttribute: (name, value) => this.attributes.set(name, value),
     });
   }
@@ -26,7 +26,7 @@ class RecordingTelemetry implements StoredObjectOwnerLookupTelemetry {
 
 class TestInstanceDirectory extends StoredObjectOwnerInstanceDirectory {
   async listInstances() {
-    return await resolveInstances();
+    return resolveInstances();
   }
 }
 

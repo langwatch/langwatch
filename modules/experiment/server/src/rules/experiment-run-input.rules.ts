@@ -63,8 +63,8 @@ export type OrchestratorInput = {
   workflowVersionId?: string; // For ES storage
   scope: ExecutionScope;
   state: EvaluationsV3State;
-  datasetRows: Array<Record<string, unknown>>;
-  datasetColumns: Array<{ id: string; name: string; type: string }>;
+  datasetRows: Record<string, unknown>[];
+  datasetColumns: { id: string; name: string; type: string }[];
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   ports: ExperimentRunCollaborators;
@@ -111,7 +111,7 @@ export interface ConnectedCellInput {
   cell: ExecutionCell;
   projectId: string;
   agent: TypedAgent;
-  datasetColumns?: Array<{ id: string; name: string; type: string }>;
+  datasetColumns?: { id: string; name: string; type: string }[];
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;

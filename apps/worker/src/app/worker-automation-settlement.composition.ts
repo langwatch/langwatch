@@ -414,7 +414,7 @@ class WorkerAutomationDatasetMapper extends AutomationDatasetMapper {
     trace: TraceRecord;
     mapping: DatasetActionParams["datasetMapping"]["mapping"];
     expansions: readonly string[];
-  }): Array<Record<string, string | number>> {
+  }): Record<string, string | number>[] {
     const trace = traceSchema.parse(input.trace);
     const expansions = new Set(
       input.expansions.filter(

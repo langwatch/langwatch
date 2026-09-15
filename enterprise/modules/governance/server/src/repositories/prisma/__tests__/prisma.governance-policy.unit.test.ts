@@ -9,7 +9,7 @@ class PolicyHarness {
     >["policy"],
   ) {}
 
-  static create(tiles: Array<{ config: unknown }>): PolicyHarness {
+  static create(tiles: { config: unknown }[]): PolicyHarness {
     const findMany = vi.fn().mockResolvedValue(tiles);
     const database = {
       aiToolEntry: {

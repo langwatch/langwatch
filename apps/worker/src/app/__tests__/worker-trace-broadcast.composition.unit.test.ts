@@ -15,7 +15,7 @@ import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composi
  */
 
 class FakeRedis {
-  readonly published: Array<[string, string]> = [];
+  readonly published: [string, string][] = [];
 
   async publish(channel: string, message: string): Promise<number> {
     this.published.push([channel, message]);

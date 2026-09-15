@@ -68,7 +68,7 @@ export async function withSourceCredentials<T>(params: {
   const parserConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
   const { credentials: sealed, ...config } = parserConfig;
 
-  return await use({
+  return use({
     sourceId: source.id,
     sourceType: source.sourceType,
     config,

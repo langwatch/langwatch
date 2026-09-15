@@ -7,11 +7,11 @@ import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { queryCalls, mockSession } = vi.hoisted(() => ({
-  queryCalls: [] as Array<{
+  queryCalls: [] as {
     path: string;
     input: unknown;
     options: { enabled?: boolean } | undefined;
-  }>,
+  }[],
   mockSession: {
     current: null as { user: { id: string } } | null,
   },

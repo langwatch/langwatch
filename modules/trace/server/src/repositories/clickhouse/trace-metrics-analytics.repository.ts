@@ -146,11 +146,11 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   }
 
   override async upsertBatch(
-    entries: Array<{
+    entries: {
       row: TraceAnalyticsRow;
       retentionDays?: number;
       appliedEventIds?: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
 

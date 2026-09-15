@@ -109,16 +109,14 @@ export function EvaluatorSelection({
 
   const availableEvaluatorsPerCategory: Record<
     string,
-    Array<
-      [
+    [
         string,
         EvaluatorDefinition & {
           beta?: boolean;
           missingEnvVars?: string[];
           unavailable?: { reason: string; howToEnable: string };
         },
-      ]
-    >
+      ][]
   > = {};
 
   for (const category of categories) {

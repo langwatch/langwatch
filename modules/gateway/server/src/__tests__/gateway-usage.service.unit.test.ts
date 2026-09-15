@@ -29,7 +29,7 @@ function mockProjects(): GatewayUsageProjects {
  * let a mis-scoped read look correct here.
  */
 function mockVirtualKeys(
-  virtualKeys: Array<{ id: string; name: string; displayPrefix: string; organizationId?: string }>,
+  virtualKeys: { id: string; name: string; displayPrefix: string; organizationId?: string }[],
   belongingTo = "org_01",
 ): GatewayUsageVirtualKeys {
   return {
@@ -95,7 +95,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpend {
 }
 
 function service(
-  virtualKeys: Array<{ id: string; name: string; displayPrefix: string }>,
+  virtualKeys: { id: string; name: string; displayPrefix: string }[],
   traces: TraceStub[],
 ): GatewayUsageService {
   return GatewayUsageService.create({

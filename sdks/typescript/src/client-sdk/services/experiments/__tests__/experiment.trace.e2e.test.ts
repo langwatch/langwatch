@@ -53,9 +53,9 @@ describe("Target Trace Isolation", () => {
     const { provider } = setupTestTracer();
     tracerProvider = provider;
 
-    const capturedBodies: Array<{
-      dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { index: number; target_id: string; trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
       const urlStr =
@@ -135,9 +135,9 @@ describe("Target Trace Isolation", () => {
     const { provider } = setupTestTracer();
     tracerProvider = provider;
 
-    const capturedBodies: Array<{
-      dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { index: number; target_id: string; trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
       const urlStr =
@@ -197,9 +197,9 @@ describe("Target Trace Isolation", () => {
   });
 
   it("sends null trace_id when no tracer is configured (no-op tracer)", async () => {
-    const capturedBodies: Array<{
-      dataset: Array<{ trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
       const urlStr =
@@ -289,9 +289,9 @@ describe("Target Trace Isolation", () => {
   });
 
   it("skips iteration trace when evaluation uses targets", async () => {
-    const capturedBodies: Array<{
-      dataset: Array<{ target_id?: string }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { target_id?: string }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
       const urlStr =

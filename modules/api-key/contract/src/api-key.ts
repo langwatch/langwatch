@@ -185,7 +185,7 @@ export type CliKeyScopeSummary = z.infer<typeof cliKeyScopeSummarySchema>;
 export type ApiKeySelectionInput = {
   userId: string;
   organizationId: string;
-  bindings: Array<ApiKeyScope & { role: "CUSTOM" }>;
+  bindings: (ApiKeyScope & { role: "CUSTOM" })[];
   permissions: string[];
 };
 export type ApiKeyListInput = { userId: string; organizationId: string };

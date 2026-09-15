@@ -14,7 +14,7 @@ interface UseSuiteRunFreshnessOptions {
   startDateMs: number;
   endDateMs?: number;
   /** Currently loaded runs — their statuses drive the polling cadence. */
-  runs: ReadonlyArray<Pick<ScenarioRunData, "status">>;
+  runs: readonly Pick<ScenarioRunData, "status">[];
   enabled: boolean;
   /** While the SSE stream is connected, the probe stops polling. */
   sseConnected: boolean;

@@ -108,7 +108,7 @@ export class FoldAccumulator {
     if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
 
     // Group by tenant so each CH INSERT targets a single tenant
-    const byTenant = new Map<string, Array<{ state: any; context: ProjectionStoreContext }>>();
+    const byTenant = new Map<string, { state: any; context: ProjectionStoreContext }[]>();
 
     for (const scopedKey of this.touchedKeys) {
       const tenantId = this.keyTenantIds.get(scopedKey)!;

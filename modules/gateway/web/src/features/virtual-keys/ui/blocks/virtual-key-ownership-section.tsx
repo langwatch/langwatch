@@ -31,8 +31,8 @@ export type VirtualKeyOwnership = {
 export type OwnershipContext = {
   organizationId: string;
   organizationName?: string;
-  availableTeams: Array<{ id: string; name: string }>;
-  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
   /** The caller's personal workspace project, once resolved. */
   personalProjectId: string | null;
 };
@@ -112,11 +112,11 @@ function projectName(
   return p.name.split(" · ")[0] ?? p.name;
 }
 
-const KIND_OPTIONS: Array<{
+const KIND_OPTIONS: {
   kind: VirtualKeyOwnershipKind;
   label: string;
   icon: React.ReactElement;
-}> = [
+}[] = [
   { kind: "PROJECT", label: "Project", icon: <Folder size={14} aria-hidden /> },
   {
     kind: "PERSONAL",
@@ -270,10 +270,10 @@ export function VirtualKeyOwnershipReadOnly({
   viewTracesHref,
   ctx,
 }: {
-  scopes: Array<{
+  scopes: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   principal?: { name?: string | null; email?: string | null };
   /** The key's stored destination. Null only for keys that predate it. */
   traceProjectId: string | null;

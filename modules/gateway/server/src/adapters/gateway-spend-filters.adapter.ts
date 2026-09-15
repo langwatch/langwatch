@@ -67,7 +67,7 @@ const metadataPair = z
 /** The parsed shape of {@link spendFilterQueryShape}. */
 export type SpendFilterQuery = z.infer<z.ZodObject<typeof spendFilterQueryShape>>;
 
-const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
+const IN_COLUMNS: readonly (readonly [keyof SpendFilters, string])[] = [
   ["virtualKeyIds", "VirtualKeyId"],
   ["endUserIds", "EndUserId"],
   ["principalUserIds", "PrincipalUserId"],

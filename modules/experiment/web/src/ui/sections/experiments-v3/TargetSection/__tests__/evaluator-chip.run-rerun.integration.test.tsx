@@ -53,7 +53,7 @@ async function openMenu(props: {
   );
 
   await userEvent.click(screen.getByRole("button"));
-  return await screen.findByRole("menu");
+  return screen.findByRole("menu");
 }
 
 /** The menu item by its label, or null when the menu does not carry one. */

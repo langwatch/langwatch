@@ -54,7 +54,7 @@ export class InviteService {
   }: {
     inviteEmail: string;
     sessionEmail: string;
-    matchable: Array<{ identifierId: string; value: string }> | null;
+    matchable: { identifierId: string; value: string }[] | null;
   }): { matches: boolean; viaIdentifierId: string | null } {
     if (matchable === null) {
       return {
@@ -101,19 +101,19 @@ export class InviteService {
     role: OrganizationUserRole;
     teamIds: string;
     teamAssignments: unknown;
-  }): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
-    let memberships: Array<{
+  }): { teamId: string; role: TeamUserRole; customRoleId?: string }[] {
+    let memberships: {
       teamId: string;
       role: TeamUserRole;
       customRoleId?: string;
-    }>;
+    }[];
 
     if (teamAssignments && Array.isArray(teamAssignments)) {
-      const assignments = teamAssignments as unknown as Array<{
+      const assignments = teamAssignments as unknown as {
         teamId: string;
         role: TeamUserRole;
         customRoleId?: string;
-      }>;
+      }[];
       memberships = assignments.map((a) => ({
         teamId: a.teamId,
         role: a.role,
@@ -160,10 +160,10 @@ export class InviteService {
     customRoleMap,
     isViewOnlyCustomRole,
   }: {
-    invites: Array<{
+    invites: {
       role: OrganizationUserRole;
-      teams?: Array<{ customRoleId?: string }>;
-    }>;
+      teams?: { customRoleId?: string }[];
+    }[];
     customRoleMap: Map<string, string[]>;
     /**
      * The lite-seat rule, from whichever vertical owns it. Passed rather than imported: it is
@@ -280,8 +280,7 @@ export class InviteService {
   }
 
   async listInvites({ organizationId }: { organizationId: string }): Promise<
-    Array<
-      OrganizationInvite & {
+    (OrganizationInvite & {
         inviteUrl: string;
         displayStatus: InviteDisplayStatus;
         requestedByUser: {
@@ -289,8 +288,7 @@ export class InviteService {
           name: string | null;
           email: string | null;
         } | null;
-      }
-    >
+      })[]
   > {
     const invites = await this.invites.findListableInvites({ organizationId });
 
@@ -325,7 +323,7 @@ export class InviteService {
     // Collect all invited team IDs from either format
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-        const assignments = invite.teamAssignments as Array<{ teamId: string }>;
+        const assignments = invite.teamAssignments as { teamId: string }[];
 
         return assignments.map((a) => a.teamId).filter(Boolean);
       }

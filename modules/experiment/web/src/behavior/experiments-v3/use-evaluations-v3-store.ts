@@ -1226,7 +1226,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           targetMetadata:
             (persistedResults.targetMetadata as Record<
               string,
-              Array<{ cost?: number; duration?: number; traceId?: string }>
+              { cost?: number; duration?: number; traceId?: string }[]
             >) ?? {},
           evaluatorResults:
             (persistedResults.evaluatorResults as Record<string, Record<string, unknown[]>>) ?? {},

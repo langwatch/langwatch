@@ -37,7 +37,7 @@ class SilentRevocationTelemetry extends AuthzRevocationTelemetry {
 }
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
-  constructor(private readonly sent: Array<{ verb: string; data: unknown }>) {
+  constructor(private readonly sent: { verb: string; data: unknown }[]) {
     super();
   }
 
@@ -76,7 +76,7 @@ export function harness({
   dispatcher?: AuthzGrantsCommandDispatcher;
   epoch?: AuthzEpochRepository;
 }) {
-  const sent: Array<{ verb: string; data: unknown }> = [];
+  const sent: { verb: string; data: unknown }[] = [];
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue(null),

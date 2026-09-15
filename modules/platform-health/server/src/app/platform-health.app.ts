@@ -28,7 +28,7 @@ export type PlatformHealthInfrastructure = Readonly<{
       projectId: string;
       triggerId: string;
       limit: number;
-    }): Promise<ReadonlyArray<{ firedAt: Instant }>>;
+    }): Promise<readonly { firedAt: Instant }[]>;
   }>;
   workflowExists(input: { workflowId: string; projectId: string }): Promise<boolean>;
   resolveProjectByApiKey(token: string): Promise<{ id: string } | null>;

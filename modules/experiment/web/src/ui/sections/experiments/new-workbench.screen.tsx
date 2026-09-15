@@ -21,7 +21,7 @@ function toSavedDatasetReference(dataset: {
   id: string;
   name: string;
   columnTypes: DatasetColumns;
-  datasetRecords: Array<{ id: string; entry: unknown }>;
+  datasetRecords: { id: string; entry: unknown }[];
 }): DatasetReference {
   const columns: DatasetColumn[] = dataset.columnTypes.map((col, index) => ({
     id: `${col.name}_${index}`,

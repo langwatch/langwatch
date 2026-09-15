@@ -28,7 +28,7 @@ function spanWith(attributes: Record<string, unknown>) {
 }
 
 const contextsIn = (attributes: Record<string, unknown>) =>
-  attributes[CANONICAL] as Array<Record<string, unknown>>;
+  attributes[CANONICAL] as Record<string, unknown>[];
 
 describe("generateDocumentId", () => {
   describe("when content is a plain string", () => {

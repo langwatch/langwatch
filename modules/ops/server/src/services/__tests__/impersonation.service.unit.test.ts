@@ -47,12 +47,12 @@ class InMemoryImpersonationRepository extends ImpersonationRepository {
 }
 
 class RecordingAuditSink extends AdminAuditSink {
-  readonly entries: Array<{
+  readonly entries: {
     userId: string;
     action: string;
     args: Record<string, unknown>;
     req: unknown;
-  }> = [];
+  }[] = [];
 
   record(entry: (typeof this.entries)[number]): Promise<void> {
     this.entries.push(entry);

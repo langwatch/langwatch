@@ -94,7 +94,7 @@ export interface LangyFrameDedupRepository {
 export interface LangyResourceLinksRepository {
   remember(input: {
     conversationId: string;
-    links: Array<{ id: string; href: string }>;
+    links: { id: string; href: string }[];
   }): Promise<void>;
   resolve(input: { conversationId: string; id: string }): Promise<string | null>;
 }

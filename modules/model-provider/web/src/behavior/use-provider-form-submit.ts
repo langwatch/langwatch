@@ -60,10 +60,10 @@ export type FormSnapshot = {
    * canonical shape the tRPC layer consumes; `scopeType`/`scopeId`
    * remain for transitional compat.
    */
-  scopes?: Array<{
+  scopes?: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
 };
@@ -345,11 +345,11 @@ function roleWrites({
   projectTopicClusteringModel: string | null;
   targetScopes: ProviderScope[];
 }): RoleWrite[] {
-  const roles: Array<{
+  const roles: {
     label: string;
     model: string | null;
     role: "DEFAULT" | "FAST" | "EMBEDDINGS";
-  }> = [
+  }[] = [
     { label: "Default", model: projectDefaultModel, role: "DEFAULT" },
     { label: "Fast", model: projectTopicClusteringModel, role: "FAST" },
     { label: "Embeddings", model: projectEmbeddingsModel, role: "EMBEDDINGS" },

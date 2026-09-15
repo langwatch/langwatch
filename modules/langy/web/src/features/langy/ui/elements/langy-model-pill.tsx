@@ -46,12 +46,12 @@ interface ModelItem {
   profile: ReturnType<typeof profileLangyModel>;
 }
 
-const MODEL_GROUPS: Array<{
+const MODEL_GROUPS: {
   id: LangyModelGroup;
   label: string;
   hint: string;
   icon: typeof Zap;
-}> = [
+}[] = [
   { id: "quick", label: "Quick", hint: "Fast, lighter work", icon: Zap },
   {
     id: "balanced",
@@ -82,7 +82,7 @@ const MODEL_GROUPS: Array<{
 /** `MODEL_GROUPS`, each carrying the "more" items in its group, groups with none dropped. */
 function groupModelsByGroup<T extends { profile: { group: LangyModelGroup } }>(
   items: T[],
-): Array<(typeof MODEL_GROUPS)[number] & { items: T[] }> {
+): ((typeof MODEL_GROUPS)[number] & { items: T[] })[] {
   return MODEL_GROUPS.map((group) => ({
     ...group,
     items: items.filter((item) => item.profile.group === group.id),

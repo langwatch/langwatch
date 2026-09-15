@@ -12,7 +12,7 @@ import {
 } from "./trace-edit-overlay.contract.ts";
 
 function buildChildrenIndex(
-  links: ReadonlyArray<{ id: string; parentId?: string | null }>,
+  links: readonly { id: string; parentId?: string | null }[],
 ): Map<string, string[]> {
   const childrenByParent = new Map<string, string[]>();
   for (const link of links) {
@@ -34,7 +34,7 @@ export function expandDeletedSpanIds({
   links,
   deletedSpanIds,
 }: {
-  links: ReadonlyArray<{ id: string; parentId?: string | null }>;
+  links: readonly { id: string; parentId?: string | null }[];
   deletedSpanIds: readonly string[];
 }): Set<string> {
   const deleted = new Set(deletedSpanIds);
@@ -62,7 +62,7 @@ export function countRemovedSpans({
   links,
   deletedSpanIds,
 }: {
-  links: ReadonlyArray<{ id: string; parentId?: string | null }>;
+  links: readonly { id: string; parentId?: string | null }[];
   deletedSpanIds: readonly string[];
 }): number {
   const deleted = expandDeletedSpanIds({ links, deletedSpanIds });

@@ -23,14 +23,14 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
 
   const spinner = createSpinner("Fetching monitors...").start();
 
-  let monitors: Array<{
+  let monitors: {
     id: string;
     name: string;
     checkType: string;
     enabled: boolean;
     executionMode: string;
     sample: number;
-  }>;
+  }[];
   try {
     const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
       headers: buildAuthHeaders({ apiKey }),
@@ -42,14 +42,14 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
       process.exit(1);
     }
 
-    monitors = (await response.json()) as Array<{
+    monitors = (await response.json()) as {
       id: string;
       name: string;
       checkType: string;
       enabled: boolean;
       executionMode: string;
       sample: number;
-    }>;
+    }[];
 
     spinner.succeed(`Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`);
   } catch (error) {

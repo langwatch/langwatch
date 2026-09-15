@@ -44,7 +44,7 @@ export function HeroLeadPill({
 }: {
   label: string;
   /** One tile per route the menu opens with, in the menu's own order. */
-  glyphs: ReadonlyArray<HeroLeadPillGlyph>;
+  glyphs: readonly HeroLeadPillGlyph[];
   /**
    * Lead with it rather than tuck it away: the filled control the eye lands
    * on, instead of a quiet outline at the end of a row.

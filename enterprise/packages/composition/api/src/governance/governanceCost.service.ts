@@ -309,11 +309,11 @@ export interface GovernanceCostSummaryDto {
   /** What the provider billed, pulled from their own reporting. */
   billed: GovernanceCostLaneDto;
   /** Pulled rollup costs by provider, regardless of person attribution. */
-  providers: Array<{
+  providers: {
     provider: string;
     amountUsd: number | null;
     cellsWithoutAmount: number;
-  }>;
+  }[];
   /** What the gateway metered as it served the traffic. */
   gateway: GovernanceCostLaneDto;
   /**

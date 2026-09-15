@@ -102,7 +102,7 @@ describe("Langy process trace continuity", () => {
     handle: (event: any, context: any) => Promise<void>;
   }): Promise<{ producerTraceId: string }> {
     const tracer = trace.getTracer("test");
-    return await tracer.startActiveSpan("langy.queue.consume", async (producer) => {
+    return tracer.startActiveSpan("langy.queue.consume", async (producer) => {
       try {
         await subscriber.handle(
           agentTurnAcceptedEvent({

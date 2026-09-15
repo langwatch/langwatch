@@ -64,7 +64,7 @@ class FakeProjectLookup extends McpProjectLookup {
 /** The grant behind an OAuth bearer, answered by whatever a test set. */
 class FakeSessionGrant extends McpSessionGrant {
   granted = true;
-  readonly asked: Array<{ userId: string; projectId: string }> = [];
+  readonly asked: { userId: string; projectId: string }[] = [];
   stillGranted(input: { userId: string; projectId: string }): Promise<boolean> {
     this.asked.push(input);
     return Promise.resolve(this.granted);
@@ -1458,7 +1458,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolsRes.status).toBe(200);
       const toolsBody = toolsRes.json() as Record<string, unknown>;
       const result = toolsBody.result as Record<string, unknown>;
-      const tools = result.tools as Array<{ name: string }>;
+      const tools = result.tools as { name: string }[];
       const toolNames = tools.map((t) => t.name);
 
       // Observability tools
@@ -1522,7 +1522,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolRes.status).toBe(200);
       const body = toolRes.json() as Record<string, unknown>;
       const result = body.result as Record<string, unknown>;
-      const content = result.content as Array<{ type: string; text: string }>;
+      const content = result.content as { type: string; text: string }[];
 
       // These config errors indicate AsyncLocalStorage context loss
       expect(content[0]?.text).not.toContain("Config not initialized");
@@ -1596,7 +1596,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolRes.status).toBe(200);
       const body = toolRes.json() as Record<string, unknown>;
       const result = body.result as Record<string, unknown>;
-      const content = result.content as Array<{ type: string; text: string }>;
+      const content = result.content as { type: string; text: string }[];
 
       expect(content[0]?.text).not.toContain("Config not initialized");
       expect(content[0]?.text).not.toContain("LANGWATCH_API_KEY is required");
@@ -1652,7 +1652,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolRes.status).toBe(200);
       const body = toolRes.json() as Record<string, unknown>;
       const result = body.result as Record<string, unknown>;
-      const content = result.content as Array<{ type: string; text: string }>;
+      const content = result.content as { type: string; text: string }[];
       expect(content).toBeDefined();
       expect(content[0]?.text.length).toBeGreaterThan(0);
       expect(content[0]?.text.toLowerCase()).toContain("langwatch");
@@ -1710,7 +1710,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(toolRes.status).toBe(200);
       const body = toolRes.json() as Record<string, unknown>;
       const result = body.result as Record<string, unknown>;
-      const content = result.content as Array<{ type: string; text: string }>;
+      const content = result.content as { type: string; text: string }[];
       expect(content).toBeDefined();
       expect(content[0]?.text.length).toBeGreaterThan(100);
       // The result should NOT be an error — in production this was returning

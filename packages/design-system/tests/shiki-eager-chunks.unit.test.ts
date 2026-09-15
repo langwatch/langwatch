@@ -65,7 +65,7 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
   describe("given a Shiki core / engine package", () => {
     // Every alternation in shikiChunking.ts's SHIKI_CORE regex must stay eager
     // to avoid the boot-cycle white-screen.
-    const corePkgPaths: Array<[string, string]> = [
+    const corePkgPaths: [string, string][] = [
       ["@shikijs/core", "/repo/node_modules/@shikijs/core/dist/index.mjs"],
       ["@shikijs/engine-oniguruma", "/repo/node_modules/@shikijs/engine-oniguruma/dist/index.mjs"],
       ["shiki", "/repo/node_modules/shiki/dist/index.mjs"],

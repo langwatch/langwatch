@@ -18,7 +18,7 @@ export interface WholeCallAudioCollaborators {
     getNormalizedSpansByTraceId(input: {
       tenantId: string;
       traceId: string;
-    }): Promise<ReadonlyArray<{ spanAttributes: Record<string, unknown> }>>;
+    }): Promise<readonly { spanAttributes: Record<string, unknown> }[]>;
   };
 }
 

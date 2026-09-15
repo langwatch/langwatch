@@ -9,12 +9,12 @@ import type {
 
 interface ChartTooltipProps {
   active?: boolean;
-  payload?: ReadonlyArray<Payload<ValueType, NameType>>;
+  payload?: readonly Payload<ValueType, NameType>[];
   label?: string | number;
   formatter?: Formatter<ValueType, NameType>;
   labelFormatter?: (
     label: string | number | undefined,
-    payload: ReadonlyArray<Payload<ValueType, NameType>>,
+    payload: readonly Payload<ValueType, NameType>[],
   ) => React.ReactNode;
   separator?: string;
 }

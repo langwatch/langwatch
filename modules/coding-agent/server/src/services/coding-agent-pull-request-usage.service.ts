@@ -238,7 +238,7 @@ export class CodingAgentPullRequestUsageService {
   contributorsSummary(
     sessions: readonly CodingAgentSessionBranchRecord[],
     projects: Record<string, CodingAgentContributorProject>,
-  ): Array<CodingAgentContributor & { sessionsCount: number }> {
+  ): (CodingAgentContributor & { sessionsCount: number })[] {
     const grouped = new Map<string, CodingAgentContributor & { sessionsCount: number }>();
     for (const session of sessions) {
       const current = grouped.get(session.tenantId);

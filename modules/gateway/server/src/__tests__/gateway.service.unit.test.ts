@@ -177,7 +177,7 @@ function serviceOverCatalogues({
   guardrails,
 }: {
   cacheRules: unknown[];
-  guardrails: Array<{ id: string }>;
+  guardrails: { id: string }[];
 }): GatewayService {
   const projects = new TestProjectApi();
   const cacheRuleRepository = new EmptyCacheRuleRepository();

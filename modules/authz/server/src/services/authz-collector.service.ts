@@ -199,7 +199,7 @@ export class AuthzCollectorService {
       return [];
     }
 
-    const links: Array<{ kind: ShareableResourceKind; id: string }> = [
+    const links: { kind: ShareableResourceKind; id: string }[] = [
       { kind: scope.kind, id: scope.id },
     ];
     if (scope.parents) {
@@ -440,8 +440,8 @@ export class AuthzCollectorService {
   }
 
   private dedupeCustomRoleIds(
-    bindings: ReadonlyArray<{ customRoleId: string | null }>,
-    legacyRows: ReadonlyArray<{ customRoleId: string | null }>,
+    bindings: readonly { customRoleId: string | null }[],
+    legacyRows: readonly { customRoleId: string | null }[],
   ): string[] {
     return Array.from(
       new Set(

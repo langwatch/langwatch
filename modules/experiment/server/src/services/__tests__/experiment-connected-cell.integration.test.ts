@@ -10,7 +10,7 @@ import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 const scripted = vi.hoisted(() => ({
   component: [] as StudioServerEvent[],
-  dispatched: [] as Array<{ type: string; payload: Record<string, any> }>,
+  dispatched: [] as { type: string; payload: Record<string, any> }[],
 }));
 
 import type { EvaluationsV3State, TargetConfig } from "@langwatch/experiment-contract";

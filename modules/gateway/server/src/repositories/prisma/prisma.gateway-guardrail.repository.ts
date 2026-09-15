@@ -39,7 +39,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
     ids: string[];
     direction: GatewayGuardrailDirection;
   }): Promise<GatewayGuardrailCheckRow[]> {
-    return await this.database.gatewayGuardrail.findMany({
+    return this.database.gatewayGuardrail.findMany({
       where: { id: { in: ids }, projectId, archivedAt: null, direction },
       select: { id: true, name: true, evaluatorId: true, failureMode: true },
     });

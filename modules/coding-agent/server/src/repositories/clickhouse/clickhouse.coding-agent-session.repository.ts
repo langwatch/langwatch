@@ -754,11 +754,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   async upsertBatch(
-    entries: Array<{
+    entries: {
       row: CodingAgentSessionRow;
       retentionDays?: number;
       appliedEventIds?: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     const [first] = entries;
     if (!first) return;

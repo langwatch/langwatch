@@ -10,7 +10,7 @@ export interface PromptRef {
   versionId: string;
   handle: string | null;
   model?: string;
-  inputs: Array<{ identifier: string; type: string }>;
+  inputs: { identifier: string; type: string }[];
 }
 
 export interface GeneratorOptions {

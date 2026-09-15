@@ -74,7 +74,7 @@ export abstract class GatewayGovernanceBudgetStore {
     tenantIds: string[],
     targets: BudgetSpendTarget[],
     now: Instant,
-  ): Promise<Array<{ budgetId: string; spentUsd: string }>>;
+  ): Promise<{ budgetId: string; spentUsd: string }[]>;
 }
 
 export abstract class GatewayBudgetChangeEventDedupe {

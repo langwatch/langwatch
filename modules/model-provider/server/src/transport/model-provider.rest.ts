@@ -30,8 +30,8 @@ type PublishedProvider = {
   provider: string;
   enabled: boolean;
   customKeys: Record<string, unknown> | null;
-  customModels: Array<{ id: string; label: string; type: string }>;
-  customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
+  customModels: { id: string; label: string; type: string }[];
+  customEmbeddingsModels: { id: string; label: string; type: string }[];
   models?: string[] | null;
   embeddingsModels?: string[] | null;
 };

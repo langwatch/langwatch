@@ -146,7 +146,7 @@ export abstract class GatewayBudgetRepository {
     input: GatewayBudgetResolutionTarget,
   ): Promise<GatewayResolvedBudget[]>;
   abstract resolveScopeTargets(
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],

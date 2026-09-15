@@ -22,15 +22,15 @@ export type CreatePromptEditorCallbacksParams = {
       promptVersionId?: string;
       promptVersionNumber?: number;
       localPromptConfig?: LocalPromptConfig;
-      inputs?: Array<{ identifier: string; type: Field["type"] }>;
+      inputs?: { identifier: string; type: Field["type"] }[];
       // json_schema must survive here: the comparison config derives its
       // selectable output fields (e.g. "answer", "next_step") from a variant's
       // json_schema output. Dropping it collapses the field picker to nothing.
-      outputs?: Array<{
+      outputs?: {
         identifier: string;
         type: Field["type"];
         json_schema?: Field["json_schema"];
-      }>;
+      }[];
     },
   ) => void;
   setTargetMapping: (
@@ -41,7 +41,7 @@ export type CreatePromptEditorCallbacksParams = {
   ) => void;
   removeTargetMapping: (targetId: string, datasetId: string, inputIdentifier: string) => void;
   getActiveDatasetId: () => string;
-  getDatasets: () => Array<{ id: string }>;
+  getDatasets: () => { id: string }[];
 };
 
 /**
@@ -54,7 +54,7 @@ export type SavedPromptData = {
   name: string;
   versionId?: string;
   version?: number;
-  inputs?: Array<{ identifier: string; type: string }>;
+  inputs?: { identifier: string; type: string }[];
   outputs?: PromptOutputField[];
 };
 
@@ -64,7 +64,7 @@ export type SavedPromptData = {
 export type LoadedVersionData = {
   version: number;
   versionId: string;
-  inputs?: Array<{ identifier: string; type: string }>;
+  inputs?: { identifier: string; type: string }[];
   outputs?: PromptOutputField[];
 };
 

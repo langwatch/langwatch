@@ -219,7 +219,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
    */
   async resolveScopeTargetsBatch(
     prisma: GatewayBudgetScopeTargetDatabase,
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],

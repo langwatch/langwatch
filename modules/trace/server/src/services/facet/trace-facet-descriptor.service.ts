@@ -50,7 +50,7 @@ export class TraceFacetDescriptorService {
     discreteByKey: Map<string, DiscreteFacetResult>,
   ): Promise<FacetDescriptor | null> {
     if (isExpressionCategorical(def)) {
-      return await this.materializeCategorical(def, params, batchByTable, standaloneByKey);
+      return this.materializeCategorical(def, params, batchByTable, standaloneByKey);
     }
 
     if (def.kind === "range") {

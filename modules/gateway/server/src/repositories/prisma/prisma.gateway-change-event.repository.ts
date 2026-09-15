@@ -54,14 +54,14 @@ export class PrismaGatewayChangeEventsRepository implements GatewayChangeEvents 
     limit = 500,
   ): Promise<{
     currentRevision: bigint;
-    events: Array<{
+    events: {
       revision: bigint;
       kind: GatewayChangeEventKind;
       virtualKeyId: string | null;
       budgetId: string | null;
       modelProviderId: string | null;
       projectId: string | null;
-    }>;
+    }[];
   }> {
     const events = await this.prisma.gatewayChangeEvent.findMany({
       where: { organizationId, revision: { gt: since } },

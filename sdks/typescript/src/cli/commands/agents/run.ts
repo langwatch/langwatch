@@ -71,7 +71,7 @@ export function buildRelayBody({
     typeof input.params === "object" && input.params !== null
       ? (input.params as Record<string, string | number | boolean>)
       : undefined;
-  if (inputParams || params) body.params = { ...(inputParams ?? {}), ...(params ?? {}) };
+  if (inputParams || params) body.params = { ...inputParams, ...params };
   return body;
 }
 

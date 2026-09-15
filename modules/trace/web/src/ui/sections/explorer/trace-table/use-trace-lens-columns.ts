@@ -21,7 +21,7 @@ const FALLBACK_COL_MIN_SIZE_PX = 100;
 const EMPTY_NAMES: Map<string, string> = new Map();
 
 interface TraceLensColumns {
-  columns: Array<ColumnDef<TraceListItem, unknown>>;
+  columns: ColumnDef<TraceListItem, unknown>[];
   registry: Registry<TraceListItem>;
   minWidth: string;
 }
@@ -44,7 +44,7 @@ export function useTraceLensColumns({
   // columnSizingStore) still wins for the rendered width.
   const timeFormat = useTimeFormatStore((s) => s.format);
   const columns = useMemo(() => {
-    const defs: Array<ColumnDef<TraceListItem, unknown>> = [traceSelectColumnDef];
+    const defs: ColumnDef<TraceListItem, unknown>[] = [traceSelectColumnDef];
     for (const id of logicalColumnIds) {
       const parsed = parseEvalColumnId(id);
       if (parsed) {

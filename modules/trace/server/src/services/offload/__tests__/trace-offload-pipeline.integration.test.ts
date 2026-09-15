@@ -142,7 +142,7 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
  * format that NormalizedSpan.spanAttributes uses. */
 function extractSpanAttrs(event: Event): Record<string, string> {
   const data = event.data as {
-    span?: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+    span?: { attributes?: { key: string; value: { stringValue?: string } }[] };
   };
   const attrs: Record<string, string> = {};
   for (const attr of data?.span?.attributes ?? []) {

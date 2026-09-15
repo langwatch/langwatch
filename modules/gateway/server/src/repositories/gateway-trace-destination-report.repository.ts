@@ -13,7 +13,7 @@ export type TraceDestinationKeyRow = Readonly<{
   id: string;
   organizationId: string;
   traceProjectId: string | null;
-  scopes: ReadonlyArray<Readonly<{ scopeType: string; scopeId: string }>>;
+  scopes: readonly Readonly<{ scopeType: string; scopeId: string }>[];
 }>;
 
 /**

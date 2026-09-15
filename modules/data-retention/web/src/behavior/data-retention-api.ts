@@ -16,15 +16,15 @@ type BorrowedProcedures = {
     getAll: {
       query: {
         input: { isDemo?: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
-            projects: Array<{ id: string; name: string }>;
-          }>;
-        }>;
+            projects: { id: string; name: string }[];
+          }[];
+        }[];
       };
     };
   };

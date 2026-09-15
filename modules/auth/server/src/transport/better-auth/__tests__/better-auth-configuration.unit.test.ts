@@ -12,7 +12,7 @@ type PasswordVerifier = (input: { password: string; hash: string }) => Promise<b
 
 const optionsOf = () =>
   betterAuthTransportFor().options as {
-    plugins?: Array<{ id?: string }>;
+    plugins?: { id?: string }[];
     account?: { accountLinking?: { enabled?: boolean; allowDifferentEmails?: boolean } };
     emailAndPassword?: { password?: { verify?: PasswordVerifier } };
   };

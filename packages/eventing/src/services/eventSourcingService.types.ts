@@ -84,11 +84,11 @@ export interface EventSourcingServiceOptions<
   /**
    * Command handler registrations for this pipeline.
    */
-  commandRegistrations?: Array<{
+  commandRegistrations?: {
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
-  }>;
+  }[];
   /**
    * Subscribers (post-fold side-effect handlers) for this pipeline.
    *
@@ -96,17 +96,17 @@ export interface EventSourcingServiceOptions<
    * `for…of` — and a caller assembling its list with `as const` should not
    * have to widen it back to satisfy a parameter nothing writes to.
    */
-  foldSubscribers?: ReadonlyArray<{
+  foldSubscribers?: readonly {
     foldName: string;
     definition: SubscriberDispatchDefinition<EventType>;
-  }>;
+  }[];
   /**
    * Subscribers (post-map side-effect handlers) for this pipeline.
    */
-  mapSubscribers?: ReadonlyArray<{
+  mapSubscribers?: readonly {
     mapName: string;
     definition: SubscriberDispatchDefinition<EventType>;
-  }>;
+  }[];
   /** Live event-only consumers, independent of projection state. */
   subscribers?: EventSubscriberDefinition<EventType>[];
   /**

@@ -31,7 +31,7 @@ const opaqueRedirect = (): Response =>
 
 /** A transport answering each call from the script, in order. */
 const scripted = (...responses: Response[]) => {
-  const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+  const calls: { input: RequestInfo | URL; init?: RequestInit }[] = [];
   const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ input, init });
     const next = responses.shift();

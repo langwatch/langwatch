@@ -195,7 +195,7 @@ export type BudgetLedgerLine = {
 export type BudgetDetail = {
   budget: GatewayBudgetWithSeats;
   scopeTarget: BudgetScopeTargetInfo;
-  recentLedger: Array<{
+  recentLedger: {
     id: string;
     virtualKeyId: string;
     amountUsd: Prisma.Decimal;
@@ -203,7 +203,7 @@ export type BudgetDetail = {
     status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
     occurredAt: Instant;
     virtualKey: { name: string; displayPrefix: string } | null;
-  }>;
+  }[];
   /** False when spend could not be totalled, so `spentUsd` is not real spend. */
   spendAvailable: boolean;
   /** True when no active key can produce traffic this budget matches. */
@@ -232,28 +232,28 @@ export type BudgetCheckInput = {
 
 export type BudgetCheckResult = {
   decision: BudgetCheckDecision;
-  warnings: Array<{ scope: string; pctUsed: number; limitUsd: string }>;
+  warnings: { scope: string; pctUsed: number; limitUsd: string }[];
   blockReason: string | null;
-  blockedBy: Array<{
+  blockedBy: {
     budgetId: string;
     scope: string;
     scopeId: string;
     window: string;
     limitUsd: string;
     spentUsd: string;
-  }>;
+  }[];
   /**
    * Raw per-scope ledger used by the gateway's `Checker.ApplyLive` to
    * reconcile near-limit cached preview against live DB state (contract §4.4).
    * Includes every applicable budget, not just those in warn/block.
    */
-  scopes: Array<{
+  scopes: {
     scope: string;
     scopeId: string;
     window: string;
     spentUsd: string;
     limitUsd: string;
-  }>;
+  }[];
 };
 
 /**
@@ -323,7 +323,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   async resolveScopeTargets(
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
     projects: ProjectIdentity[],
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
@@ -356,7 +356,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
+    return this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
   }
 
   async listForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
@@ -372,7 +372,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
+    return this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
   }
 
   /**
@@ -589,7 +589,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
+    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
   }
 
   /**
@@ -623,7 +623,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: args.limit,
     });
-    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), args);
+    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), args);
   }
 
   /** As listWithHealth, for the budgets that apply to one project. */
@@ -642,7 +642,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
+    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
   }
 
   private async decorateWithHealth(

@@ -144,7 +144,7 @@ export const assertReady = (
  * after a delete so the offset index stays authoritative (I-COUNT).
  */
 export const recomputeOffsets = (
-  chunks: Array<{ rowCount: number; byteSize: number }>,
+  chunks: { rowCount: number; byteSize: number }[],
 ): { offsets: ChunkOffset[]; rowCount: number; sizeBytes: number } => {
   const offsets: ChunkOffset[] = [];
   let startRow = 0;

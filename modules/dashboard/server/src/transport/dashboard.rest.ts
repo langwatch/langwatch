@@ -59,7 +59,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .handle(async ({ app, input, scope }) => {
     const created = await app.create({ projectId: scope.id, name: input.name });
 
-    return await withLink(app, scope.id, created);
+    return withLink(app, scope.id, created);
   })
 
   // Registered before /:id so "reorder" is not read as an id. Reordering
@@ -103,7 +103,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
       name: input.name,
     });
 
-    return await withLink(app, scope.id, renamed);
+    return withLink(app, scope.id, renamed);
   })
 
   // Hard delete with cascade — deliberately stays at `:manage`.

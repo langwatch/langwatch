@@ -46,7 +46,7 @@ export interface UsageLimitEmailData {
   currentMonthMessagesCount: number;
   maxMonthlyUsageLimit: number;
   crossedThreshold: number;
-  projectUsageData: Array<{ id: string; name: string; messageCount: number }>;
+  projectUsageData: { id: string; name: string; messageCount: number }[];
   actionUrl: string;
   logoUrl: string;
   severity: string;

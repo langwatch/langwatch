@@ -32,7 +32,7 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly successes: AnalyticsSuccessNotice[] = [];
   readonly failures: AnalyticsFailureNotice[] = [];
   readonly navigations: string[] = [];
-  readonly queries: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queries: Readonly<Record<string, string | undefined>>[] = [];
 
   constructor(private readonly options: StubAnalyticsHostOptions = {}) {
     super();

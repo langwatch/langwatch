@@ -46,10 +46,10 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
   }
 
   async storeBatch(
-    entries: Array<{
+    entries: {
       state: EvaluationAnalyticsData;
       context: ProjectionStoreContext;
-    }>,
+    }[],
   ): Promise<void> {
     const batchRows = entries
       .map(({ state, context }) => this.toRow(state, context))

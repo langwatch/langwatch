@@ -171,15 +171,15 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
           clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
         }),
       ]);
-      const topDocs = (await topDocsResult.json()) as Array<{
+      const topDocs = (await topDocsResult.json()) as {
         documentId: string;
         count: string | number;
         traceId: string;
         content?: string;
-      }>;
-      const totals = (await totalResult.json()) as Array<{
+      }[];
+      const totals = (await totalResult.json()) as {
         total: string | number;
-      }>;
+      }[];
       const total = totals[0]?.total ?? 0;
       return {
         topDocuments: topDocs.map((doc) => ({
@@ -217,13 +217,13 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
         format: "JSONEachRow",
         clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
       });
-      const rows = (await result.json()) as Array<{
+      const rows = (await result.json()) as {
         trace_id: string;
         event_id: string;
         started_at: string | number;
         event_type: string;
         attributes: Record<string, string>;
-      }>;
+      }[];
       return {
         events: rows.map((row) => toFeedbackEvent(row, input.projectId)),
       };
@@ -256,8 +256,8 @@ function toFeedbackEvent(
   },
   projectId: string,
 ) {
-  const metrics: Array<{ key: string; value: number }> = [];
-  const eventDetails: Array<{ key: string; value: string }> = [];
+  const metrics: { key: string; value: number }[] = [];
+  const eventDetails: { key: string; value: string }[] = [];
   const metricKeys: Record<string, string> = {
     vote: "vote",
     "metrics.vote": "vote",

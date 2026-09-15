@@ -38,10 +38,10 @@ export const ADD_AGENT_HREF = "/governance/agents?add=1";
 export const ADD_TOOL_HREF = "/governance/inventory?tab=catalog&add=1";
 
 /** The vendors the "Add source" pill leads with, in menu order. */
-export const LEAD_SOURCE_VENDORS: ReadonlyArray<{
+export const LEAD_SOURCE_VENDORS: readonly {
   sourceType: SourceType;
   label: string;
-}> = [
+}[] = [
   { sourceType: "anthropic_admin", label: "Anthropic" },
   { sourceType: "openai_admin", label: "OpenAI" },
   { sourceType: "copilot_studio_dataverse", label: "Microsoft Copilot" },
@@ -51,12 +51,12 @@ export const addSourceHref = (sourceType: SourceType) =>
   `${INVENTORY_SOURCES_HREF}&add=${sourceType}`;
 
 /** The three quick-add chips: department, agent, tool — every one adds. */
-const LEAD_CHIPS: ReadonlyArray<{
+const LEAD_CHIPS: readonly {
   key: string;
   label: string;
   href: string;
   icon: React.ReactNode;
-}> = [
+}[] = [
   {
     key: "department",
     label: "Add department",

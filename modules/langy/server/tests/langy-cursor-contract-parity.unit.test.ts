@@ -34,7 +34,7 @@ describe("the projection cursor's time base", () => {
 });
 
 describe("the framework comparator and the shared package comparator", () => {
-  const cases: Array<[string, Event, Event]> = [
+  const cases: [string, Event, Event][] = [
     ["time-ordered", event({ createdAt: 1 }), event({ createdAt: 2 })],
     ["same-millisecond id tie-break", event({ id: "2AAAa" }), event({ id: "2AAAb" })],
     [

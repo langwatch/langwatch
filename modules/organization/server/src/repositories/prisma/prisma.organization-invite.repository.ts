@@ -44,7 +44,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
       throw new Error("This orchestration requires a root Prisma client, not a transaction client");
     }
 
-    return await this.root.$transaction(
+    return this.root.$transaction(
       (client) => write(new PrismaOrganizationInviteRepository(client, null)),
       options ? { timeout: options.timeoutMs, maxWait: options.maxWaitMs } : undefined,
     );
@@ -101,7 +101,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<Array<{ id: string; permissions: unknown }>> {
+  }): Promise<{ id: string; permissions: unknown }[]> {
     return this.prisma.customRole.findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
@@ -130,7 +130,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
   tryFindPersonalTeamInScopes({
     scopes,
   }: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null> {
     return PrismaPersonalTeamScopeRepository.create().tryFindPersonalTeamInScopes({
       client: this.prisma,

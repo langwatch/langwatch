@@ -311,7 +311,7 @@ const getGroupValueForRow = (row: ComparisonRow, groupBy: string): string => {
 const bucketRowsByGroup = (
   rows: ComparisonRow[],
   groupBy: string,
-): Array<{ value: string; rows: ComparisonRow[] }> => {
+): { value: string; rows: ComparisonRow[] }[] => {
   const buckets = new Map<string, ComparisonRow[]>();
   for (const row of rows) {
     const value = getGroupValueForRow(row, groupBy);

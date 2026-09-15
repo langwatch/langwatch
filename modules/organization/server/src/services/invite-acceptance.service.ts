@@ -130,7 +130,7 @@ export class InviteAcceptanceService {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
-    return await this.invites.hasMembership({ userId, organizationId });
+    return this.invites.hasMembership({ userId, organizationId });
   }
 
   /** The ORGANIZATION-scoped grant an invitation carries, replacing whatever stood before it. */

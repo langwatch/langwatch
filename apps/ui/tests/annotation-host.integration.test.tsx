@@ -9,7 +9,7 @@ import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const toasts = vi.hoisted(() => ({ created: [] as Array<Record<string, unknown>> }));
+const toasts = vi.hoisted(() => ({ created: [] as Record<string, unknown>[] }));
 const graph = vi.hoisted(() => ({ data: [] as unknown[] }));
 
 vi.mock("@langwatch/design-system/toaster", () => ({

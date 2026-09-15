@@ -3,8 +3,8 @@
  * Extracts path, code, and message for consistent logging.
  */
 export function mapZodIssuesToLogContext(
-  issues: Array<{ path: PropertyKey[]; code: string; message: string }>,
-): Array<{ path: string; code: string; message: string }> {
+  issues: { path: PropertyKey[]; code: string; message: string }[],
+): { path: string; code: string; message: string }[] {
   return issues.map((issue) => ({
     path: issue.path.map(String).join("."),
     code: issue.code,
@@ -21,14 +21,12 @@ export interface ZodIssue {
 }
 
 export interface ZodErrorStructure {
-  issues: Array<
-    ZodIssue & {
-      unionErrors?: Array<{
+  issues: (ZodIssue & {
+      unionErrors?: {
         issues: ZodIssue[];
         name: string;
-      }>;
-    }
-  >;
+      }[];
+    })[];
 }
 
 /**

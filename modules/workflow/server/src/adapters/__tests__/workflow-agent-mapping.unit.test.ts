@@ -60,7 +60,7 @@ function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
 function buildAgentApi({
   agents,
 }: {
-  agents: Array<{ id: string; config: Record<string, unknown> }>;
+  agents: { id: string; config: Record<string, unknown> }[];
 }) {
   const updatedConfigs: Record<string, Record<string, unknown>> = {};
 
@@ -82,7 +82,7 @@ function buildUnwiredDSL({
   wiredIdentifiers,
   output,
 }: {
-  entryOutputs: Array<{ identifier: string; type: "str" }>;
+  entryOutputs: { identifier: string; type: "str" }[];
   wiredIdentifiers: string[];
   output: string;
 }) {
@@ -406,7 +406,7 @@ describe("WorkflowAgentMappingAdapter", () => {
             id: "end",
             type: "end",
             position: { x: 0, y: 0 },
-            data: { name: "End", inputs: [] as Array<unknown> },
+            data: { name: "End", inputs: [] as unknown[] },
           },
         ],
         edges: [

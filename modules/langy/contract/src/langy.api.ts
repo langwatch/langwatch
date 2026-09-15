@@ -135,7 +135,7 @@ export interface LangyApi {
     projectId: string;
     conversationId: string;
     turnId: string;
-    items: Array<{ content: string; status: string }>;
+    items: { content: string; status: string }[];
   }): Promise<void>;
 }
 

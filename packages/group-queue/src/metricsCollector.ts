@@ -254,7 +254,7 @@ export class GroupQueueMetricsCollector {
   }: {
     groupIds: string[];
     keyPrefix: string;
-  }): Promise<Array<{ groupId: string; depth: number }>> {
+  }): Promise<{ groupId: string; depth: number }[]> {
     if (groupIds.length === 0) return [];
 
     const pipeline = this.params.redisConnection.pipeline();
@@ -295,7 +295,7 @@ export class GroupQueueMetricsCollector {
  */
 function minDueMs(
   seed: number | null,
-  headResults: Array<[unknown, unknown]>,
+  headResults: [unknown, unknown][],
   nowMs: number,
 ): number | null {
   return headResults

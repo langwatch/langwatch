@@ -7,7 +7,7 @@ export type TraceQueryFieldValuesInput = TraceQueryFieldCatalogueInput & {
 };
 
 export type TraceQueryFieldValuesResult = {
-  values: Array<{ value: string }>;
+  values: { value: string }[];
 };
 
 /** Composition port for the existing Trace facet read during its migration. */

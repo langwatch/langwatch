@@ -423,7 +423,7 @@ function TeamSelect({
 
 function getFilteredTeamRoles(
   orgRole: OrganizationUserRole,
-  customRoles: Array<{ id: string; name: string; description?: string | null }>,
+  customRoles: { id: string; name: string; description?: string | null }[],
   isInviterAdmin: boolean,
 ): RoleOption[] {
   const baseRoles = Object.values(teamRolesOptions);

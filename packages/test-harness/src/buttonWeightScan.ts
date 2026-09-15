@@ -144,8 +144,8 @@ function isFilled({
  */
 function filledButtonSpans(
   source: SourceFile,
-): Array<{ tag: string; from: number; to: number }> {
-  const spans: Array<{ tag: string; from: number; to: number }> = [];
+): { tag: string; from: number; to: number }[] {
+  const spans: { tag: string; from: number; to: number }[] = [];
   const text = source.getText();
 
   const tagOf = (node: { tagName: Node }): string =>

@@ -57,7 +57,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
     const [instances, outbox] = await Promise.all([
       this.prisma.$queryRaw<
-        Array<{ processName: string; instances: number; overdueWakes: number }>
+        { processName: string; instances: number; overdueWakes: number }[]
       >(Prisma.sql`
         -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
         SELECT "processName",
@@ -67,13 +67,13 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         GROUP BY "processName"
       `),
       this.prisma.$queryRaw<
-        Array<{
+        {
           processName: string;
           pendingMessages: number;
           overduePending: number;
           lapsedLeases: number;
           deadMessages: number;
-        }>
+        }[]
       >(Prisma.sql`
         -- @tenancy: cross-tenant ops fleet counts; the surface is ops-gated
         SELECT "processName",
@@ -144,7 +144,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
     const [rows, totals] = await Promise.all([
       this.prisma.$queryRaw<
-        Array<{
+        {
           processName: string;
           projectId: string;
           processKey: string;
@@ -152,7 +152,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
           revision: number;
           nextWakeAt: Date | null;
           updatedAt: Date;
-        }>
+        }[]
       >(Prisma.sql`
         -- @tenancy: cross-tenant ops listing; rows carry their project identity
         SELECT "processName", "projectId", "processKey", "tenantId",
@@ -165,7 +165,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         LIMIT ${params.pageSize}
         OFFSET ${(params.page - 1) * params.pageSize}
       `),
-      this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+      this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
         -- @tenancy: cross-tenant ops listing; rows carry their project identity
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerInstance"
@@ -184,13 +184,13 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         rows.map((r) => Prisma.sql`(${r.processName}, ${r.projectId}, ${r.processKey})`),
       );
       const outbox = await this.prisma.$queryRaw<
-        Array<{
+        {
           processName: string;
           projectId: string;
           processKey: string;
           pending: number;
           dead: number;
-        }>
+        }[]
       >(Prisma.sql`
         -- @tenancy: scoped to the page's (processName, projectId, processKey) tuples above
         SELECT "processName", "projectId", "processKey",
@@ -230,12 +230,12 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
   async findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]> {
     const rows = await this.prisma.$queryRaw<
-      Array<{
+      {
         processName: string;
         projectId: string;
         processKey: string;
         nextWakeAt: Date;
-      }>
+      }[]
     >(Prisma.sql`
       -- @tenancy: cross-tenant ops listing; rows carry their project identity
       SELECT "processName", "projectId", "processKey", "nextWakeAt"
@@ -308,8 +308,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
 
     const [rows, totals] = await Promise.all([
       this.prisma.$queryRaw<
-        Array<
-          Omit<
+        (Omit<
             DeadOutboxMessageView,
             "nextAttemptAt" | "leasedUntil" | "createdAt" | "updatedAt"
           > & {
@@ -318,8 +317,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
             createdAt: Date;
             updatedAt: Date;
             traceCarrier: unknown;
-          }
-        >
+          })[]
       >(Prisma.sql`
         -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
         SELECT "id", "processName", "projectId", "processKey", "messageKey",
@@ -333,7 +331,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         LIMIT ${params.pageSize}
         OFFSET ${(params.page - 1) * params.pageSize}
       `),
-      this.prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+      this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
         -- @tenancy: cross-tenant ops dead-letter read; the surface is ops-gated
         SELECT COUNT(*)::int AS "total"
         FROM "ProcessManagerOutbox"
@@ -369,7 +367,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
    */
   async countDeadByProcessName(): Promise<DeadLetterCount[]> {
     const rows = await this.prisma.$queryRaw<
-      Array<{ processName: string; count: number; oldestUpdatedAt: Date }>
+      { processName: string; count: number; oldestUpdatedAt: Date }[]
     >(Prisma.sql`
       -- @tenancy: cross-tenant ops dead-letter totals; the surface is ops-gated
       SELECT "processName",
@@ -490,7 +488,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       : Prisma.empty;
     // Raw, like the fleet-wide reads: a dead-letter sweep has no single
     // project to name for the tenancy guard, and the surface is ops-gated.
-    return await this.prisma.$executeRaw(Prisma.sql`
+    return this.prisma.$executeRaw(Prisma.sql`
       -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'pending',
@@ -524,7 +522,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     const nameFilter = params.processName
       ? Prisma.sql`AND "processName" = ${params.processName}`
       : Prisma.empty;
-    return await this.prisma.$executeRaw(Prisma.sql`
+    return this.prisma.$executeRaw(Prisma.sql`
       -- @tenancy: cross-tenant ops dead-letter recovery; the surface is ops-gated
       UPDATE "ProcessManagerOutbox"
       SET "status" = 'discarded',

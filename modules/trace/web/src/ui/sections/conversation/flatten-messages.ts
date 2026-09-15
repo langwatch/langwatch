@@ -42,7 +42,7 @@ function readReasoning(msg: FlattenableMessage): string | undefined {
  */
 function readToolCalls(
   msg: FlattenableMessage,
-): Array<{ id?: string; function?: { name?: string; arguments?: string } }> {
+): { id?: string; function?: { name?: string; arguments?: string } }[] {
   const raw = msg as Record<string, unknown>;
   const calls = raw.tool_calls ?? raw.toolCalls;
   return Array.isArray(calls) ? calls : [];

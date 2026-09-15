@@ -32,7 +32,7 @@ export type HttpTestPanelProps = {
   disabled?: boolean;
   url?: string;
   method?: string;
-  headers?: Array<{ key: string; value: string }>;
+  headers?: { key: string; value: string }[];
   outputPath?: string;
   bodyTemplate?: string;
   explainError?: HttpTestErrorExplanation;

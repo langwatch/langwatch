@@ -17,9 +17,9 @@ export interface RunResultsDraft {
   /** `${rowIndex}:${targetId}` for every cell the run started. */
   startedCells: Set<string>;
   targetOutputs: Record<string, unknown[]>;
-  targetMetadata: Record<string, Array<TargetRowMetadata | null | undefined>>;
+  targetMetadata: Record<string, (TargetRowMetadata | null | undefined)[]>;
   evaluatorResults: Record<string, Record<string, unknown[]>>;
-  errors: Record<string, Array<string | null | undefined>>;
+  errors: Record<string, (string | null | undefined)[]>;
 }
 
 /**
@@ -223,7 +223,7 @@ const overlayRows = <T>(into: Record<string, T[]>, from: Record<string, T[]>): v
 };
 
 const clearRow = <T>(
-  record: Record<string, Array<T | undefined>>,
+  record: Record<string, (T | undefined)[]>,
   key: string,
   rowIndex: number,
 ): void => {

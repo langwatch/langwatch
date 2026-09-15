@@ -405,7 +405,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
     }
     if (jobs > 0) await redis.zadd(`${prefix}ready`, 1, "g");
     await redis.set(`${prefix}stats:total-pending`, String(counter));
-    return await (by ?? repo).tryReconcileTotalPending(queue);
+    return (by ?? repo).tryReconcileTotalPending(queue);
   };
 
   describe("given one instance reconciled a queue and measured a drift", () => {

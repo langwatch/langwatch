@@ -139,7 +139,7 @@ const datasetEdge = ({
   nodeId: string;
   inputField: string;
   columnName: string;
-  datasetColumns: Array<{ id: string; name: string; type: string }>;
+  datasetColumns: { id: string; name: string; type: string }[];
 }): StudioEdge => {
   const columnId = datasetColumns.find((column) => column.name === columnName)?.id ?? columnName;
   return {
@@ -218,7 +218,7 @@ export const buildEvaluatorCellWorkflow = ({
  * Builds an entry node containing the dataset row data.
  */
 const buildEntryNode = (
-  columns: Array<{ id: string; name: string; type: string }>,
+  columns: { id: string; name: string; type: string }[],
   datasetEntry: Record<string, unknown>,
 ): StudioNode<Entry> => {
   const outputs: Field[] = columns.map((col) => ({
@@ -905,10 +905,10 @@ const buildEvaluatorNodes = (
   cell: ExecutionCell,
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): {
-  evaluatorNodes: Array<StudioNode<Evaluator>>;
+  evaluatorNodes: StudioNode<Evaluator>[];
   evaluatorNodeIds: Record<string, string>;
 } => {
-  const evaluatorNodes: Array<StudioNode<Evaluator>> = [];
+  const evaluatorNodes: StudioNode<Evaluator>[] = [];
   const evaluatorNodeIds: Record<string, string> = {};
 
   evaluatorConfigs.forEach((evaluator, index) => {
@@ -1016,7 +1016,7 @@ const buildEdges = (
   evaluatorConfigs: EvaluatorConfig[],
   evaluatorNodeIds: Record<string, string>,
   cell: ExecutionCell,
-  datasetColumns: Array<{ id: string; name: string; type: string }>,
+  datasetColumns: { id: string; name: string; type: string }[],
 ): StudioEdge[] => {
   const edges: StudioEdge[] = [];
   const datasetId = cell.datasetEntry._datasetId as string | undefined;

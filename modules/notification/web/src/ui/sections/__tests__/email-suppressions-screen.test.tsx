@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, calls } = vi.hoisted(() => ({
   state: {
-    rows: [] as Array<Record<string, unknown>>,
+    rows: [] as Record<string, unknown>[],
     isLoading: false,
     isError: false,
   },

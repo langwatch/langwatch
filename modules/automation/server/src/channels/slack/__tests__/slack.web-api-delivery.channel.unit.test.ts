@@ -24,7 +24,7 @@ const PAYLOAD = {
 function transportAnswering(
   answer: { status: number; body: string } | (() => { status: number; body: string }),
 ) {
-  const requests: Array<Parameters<SlackApiTransport["request"]>[0]> = [];
+  const requests: Parameters<SlackApiTransport["request"]>[0][] = [];
 
   const transport: SlackApiTransport = {
     request: async (input) => {
@@ -76,7 +76,7 @@ describe("SlackWebApiDeliveryAdapter.post", () => {
 
         await post(transport);
 
-        const sent = JSON.parse(requests[0]!.body) as { blocks: Array<{ type: string }> };
+        const sent = JSON.parse(requests[0]!.body) as { blocks: { type: string }[] };
         expect(sent.blocks.map(({ type }) => type)).toEqual(["section", "image"]);
       });
     });

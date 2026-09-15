@@ -79,7 +79,7 @@ describe("LangyTurnStopService.stopTurn", () => {
       expect(mocks.finalizeTurn).toHaveBeenCalledTimes(1);
       const call = mocks.finalizeTurn.mock.calls[0]![0] as {
         outcome: string;
-        parts: Array<{ text?: string }>;
+        parts: { text?: string }[];
       };
       expect(call.outcome).toBe("stopped");
       // The partial answer is the joined durable delta tail, preserved verbatim.

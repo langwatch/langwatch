@@ -32,7 +32,7 @@ export async function pinToolToProject({
     deviceLabel: deviceLabelForThisMachine(),
   });
   cfg.tool_project_keys = {
-    ...(cfg.tool_project_keys ?? {}),
+    ...cfg.tool_project_keys,
     [tool]: {
       secret: minted.token,
       project_id: minted.project.id,
@@ -60,7 +60,7 @@ export function pinToolToKey({
   endpoint?: string;
 }): void {
   cfg.tool_project_keys = {
-    ...(cfg.tool_project_keys ?? {}),
+    ...cfg.tool_project_keys,
     [tool]: {
       secret: key,
       ...(endpoint ? { endpoint } : {}),

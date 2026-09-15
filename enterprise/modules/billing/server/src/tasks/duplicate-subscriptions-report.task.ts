@@ -15,16 +15,16 @@ const logger = createLogger("langwatch:task:duplicate-subscriptions-report");
 export type DuplicateSubscriptionsReport = Readonly<{
   activeSubscriptions: number;
   organizationsHoldingOne: number;
-  duplicates: ReadonlyArray<{
+  duplicates: readonly {
     organizationId: string;
     rows: readonly SubscriptionReportRow[];
     /** The row plan resolution picks, under the product's own ordering. */
     winnerId: string;
     plans: readonly string[];
-  }>;
+  }[];
   pendingSubscriptions: number;
   organizationsWithPending: number;
-  pendingByPlan: ReadonlyArray<{ plan: string; count: number }>;
+  pendingByPlan: readonly { plan: string; count: number }[];
   oldestPending: Instant | null;
 }>;
 

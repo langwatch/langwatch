@@ -11,10 +11,10 @@ const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 
 let mockTriggerRow: Record<string, unknown> | null = null;
-let mockRecentFires: Array<Record<string, unknown>> = [];
+let mockRecentFires: Record<string, unknown>[] = [];
 const mockGraphRow: Record<string, unknown> | null = null;
-const mockDatasets: Array<Record<string, unknown>> = [];
-let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
+const mockDatasets: Record<string, unknown>[] = [];
+let mockWebhookDeliveries: Record<string, unknown>[] = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),

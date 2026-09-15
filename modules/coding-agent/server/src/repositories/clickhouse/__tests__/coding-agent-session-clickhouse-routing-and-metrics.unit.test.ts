@@ -28,7 +28,7 @@ function chTime(ms: number): string {
  * NAMED — what the real client routes by — beside the tenant list the statement
  * scoped itself to.
  */
-function recordingClient(rows: Array<Record<string, unknown>>): {
+function recordingClient(rows: Record<string, unknown>[]): {
   client: ClickHouseQueryClient;
   named: () => string[];
   scopedTo: () => string[][];
@@ -160,7 +160,7 @@ function version({
   };
 }
 
-function listClient(rows: Array<Record<string, unknown>>): ClickHouseQueryClient {
+function listClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return {
     query: async () => ({ rows }),
   } as unknown as ClickHouseQueryClient;

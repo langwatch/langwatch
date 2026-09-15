@@ -250,7 +250,7 @@ export interface ExperimentApi {
   /** The display names behind the author ids on a version history. */
   resolveAuthorNames(
     authorIds: readonly string[],
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>>;
+  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]>;
 
   // ── The project's live-update channel ──────────────────────────────
 

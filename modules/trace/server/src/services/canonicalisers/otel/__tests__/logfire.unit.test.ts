@@ -9,7 +9,7 @@ import { createExtractorContext, parseJsonStringAttrs } from "../../__tests__/te
 
 function createLogfireContext(
   attrs: Record<string, unknown>,
-  events: Array<{ name: string; attributes: Record<string, unknown> }> = [],
+  events: { name: string; attributes: Record<string, unknown> }[] = [],
 ): ExtractorContext {
   const normalizedEvents = events.map((e) => ({
     name: e.name,

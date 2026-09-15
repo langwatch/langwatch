@@ -148,7 +148,7 @@ describe("buildGraphAlertTemplateContext", () => {
   });
 
   describe("operatorLabel derivation", () => {
-    const cases: Array<{ operator: string; label: string }> = [
+    const cases: { operator: string; label: string }[] = [
       { operator: "gt", label: "is greater than" },
       { operator: "gte", label: "is greater than or equal to" },
       { operator: "lt", label: "is less than" },

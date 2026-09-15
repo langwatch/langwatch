@@ -47,7 +47,7 @@ export function createMemoryStorage(): PromptBrowserStorage {
 }
 
 export class FakePromptHost extends PromptHostApi {
-  readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queryWrites: Readonly<Record<string, string | undefined>>[] = [];
   readonly navigations: string[] = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: PromptSuccessNotice[] = [];

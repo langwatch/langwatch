@@ -69,11 +69,11 @@ export interface CreateInvitesInviteInput {
   email: string;
   role: OrganizationUserRole;
   teamIds?: string;
-  teams?: Array<{
+  teams?: {
     teamId: string;
     role: TeamUserRole | string;
     customRoleId?: string;
-  }>;
+  }[];
 }
 
 /** The validated team side of one requested invite. */

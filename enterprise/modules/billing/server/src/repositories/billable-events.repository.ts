@@ -11,8 +11,8 @@ export abstract class BillableEventsRepository {
   ): Promise<number>;
   abstract findByProjectApprox(
     input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<Array<{ projectId: string; count: number }>>;
+  ): Promise<{ projectId: string; count: number }[]>;
   abstract findByProject(
     input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<Array<{ projectId: string; count: number }>>;
+  ): Promise<{ projectId: string; count: number }[]>;
 }

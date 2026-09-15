@@ -20,7 +20,7 @@ type TeamMemberRow = {
  * them. Printed straight through, that reads as the same person joining the
  * team twice, and a count of people that is not a count of people.
  */
-const membersByPerson = (rows: TeamMemberRow[]): Array<TeamMemberRow & { roles: string[] }> => {
+const membersByPerson = (rows: TeamMemberRow[]): (TeamMemberRow & { roles: string[] })[] => {
   const byUser = new Map<string, TeamMemberRow & { roles: string[] }>();
   for (const row of rows) {
     const key = row.userId ?? `${row.email ?? ""}|${row.name ?? ""}`;

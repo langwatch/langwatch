@@ -29,7 +29,7 @@ interface SpanPlan {
   /** Preview/regular attributes with reserved keys removed. */
   cleanedAttrs: NormalizedAttributes;
   /** Which fetch key fills which attribute key. */
-  refs: Array<{ attrKey: string; fetchKey: string }>;
+  refs: { attrKey: string; fetchKey: string }[];
   /** False when the span had no eventrefs (returned untouched). */
   hadRefs: boolean;
 }

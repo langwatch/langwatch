@@ -51,7 +51,7 @@ export class MailerAdapter extends EmailDelivery {
       logger.error("No email sending method available. Skipping email sending.");
       throw new Error("No email sending method available. Skipping email sending.");
     }
-    return await provider.send({ content, defaultFrom: this.configuration.defaultFrom });
+    return provider.send({ content, defaultFrom: this.configuration.defaultFrom });
   }
 
   close(): Promise<void> {

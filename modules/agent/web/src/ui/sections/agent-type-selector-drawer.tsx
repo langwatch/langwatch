@@ -18,12 +18,12 @@ export type AgentTypeSelectorDrawerProps = {
   onConnectFromCode?: () => void;
 };
 
-const agentTypes: Array<{
+const agentTypes: {
   type: AgentType;
   icon: typeof Code;
   title: string;
   description: string;
-}> = [
+}[] = [
   {
     type: "http",
     icon: Globe,

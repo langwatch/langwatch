@@ -13,11 +13,11 @@ type Binding = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string
 function serviceWith(options: {
   key?: { id: string; roleBindings: Binding[] } | null;
   organizationWide?: boolean;
-  candidates?: Array<{ id: string; teamId: string }>;
+  candidates?: { id: string; teamId: string }[];
   hasMore?: boolean;
   viewable?: string[];
 }) {
-  const asked: Array<Record<string, unknown>> = [];
+  const asked: Record<string, unknown>[] = [];
   const service = ApiKeyVisibilityService.create({
     repository: {
       findByIdInOrganization: async (input: Record<string, unknown>) => {

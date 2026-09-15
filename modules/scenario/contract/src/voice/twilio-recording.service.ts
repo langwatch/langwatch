@@ -76,7 +76,7 @@ export async function resolveTwilioRecordingWavUrl({
   if (!response.ok) return null;
 
   const body = (await response.json().catch(() => null)) as {
-    recordings?: Array<{ uri?: unknown }>;
+    recordings?: { uri?: unknown }[];
   } | null;
   const uri = body?.recordings?.[0]?.uri;
   if (typeof uri !== "string" || uri.length === 0) return null;

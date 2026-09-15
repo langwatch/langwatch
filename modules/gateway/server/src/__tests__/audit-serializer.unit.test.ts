@@ -21,7 +21,7 @@ describe("serializeRowForAudit", () => {
         history: [{ at: new Date("2026-01-01"), revision: 5n }],
       };
       const out = serializeRowForAudit(row) as {
-        history: Array<{ revision: unknown }>;
+        history: { revision: unknown }[];
       };
       expect(out.history[0]?.revision).toBe("5");
     });

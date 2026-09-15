@@ -52,11 +52,11 @@ export class DefaultGovernanceAiToolCatalogService {
     );
   }
 
-  static listStarterPackTiles(): Array<{
+  static listStarterPackTiles(): {
     slug: string;
     displayName: string;
     type: AiToolEntry["type"];
-  }> {
+  }[] {
     return AI_TOOL_STARTER_TILES.map((tile) => ({
       slug: tile.slug,
       displayName: tile.displayName,
@@ -172,7 +172,7 @@ export class DefaultGovernanceAiToolCatalogService {
 
   listRoutingPolicyOptionsForAdmin(
     input: AiToolOrganizationInput,
-  ): Promise<Array<{ id: string; name: string }>> {
+  ): Promise<{ id: string; name: string }[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
 
     return this.repository.listRoutingPolicyOptions(parsed.organizationId);

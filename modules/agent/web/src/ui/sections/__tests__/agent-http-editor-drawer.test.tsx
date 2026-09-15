@@ -97,12 +97,12 @@ describe("AgentHttpEditorDrawer", () => {
   });
 
   it("uses default scenario mappings when a stored agent has an empty mapping", async () => {
-    const updates: Array<{
+    const updates: {
       id: string;
       projectId: string;
       name: string;
       config: AgentWithFields["config"];
-    }> = [];
+    }[] = [];
     let closeCount = 0;
     const onUpdate: AgentHttpEditorDrawerProps["onUpdate"] = async (input) => {
       updates.push(input);

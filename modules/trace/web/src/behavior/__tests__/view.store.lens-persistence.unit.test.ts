@@ -12,7 +12,7 @@ async function freshStore() {
   // else, so the fresh module graph gets one before the store reads from it.
   const { BrowserUiStorage, setUiStorage } = await import("@langwatch/ui-host/storage");
   setUiStorage(new BrowserUiStorage());
-  return await import("../view.store.ts");
+  return import("../view.store.ts");
 }
 
 describe("viewStore last-used lens persistence", () => {

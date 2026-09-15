@@ -11,7 +11,7 @@ type FindManyArgs = {
   select: Record<string, unknown>;
 };
 
-function repositoryOver(rows: Array<Record<string, unknown>>) {
+function repositoryOver(rows: Record<string, unknown>[]) {
   const calls: FindManyArgs[] = [];
   const database = {
     workflowVersion: {

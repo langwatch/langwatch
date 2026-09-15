@@ -227,7 +227,7 @@ export function replayTurnProjection(records: LangyDevLogRecord[]): LangyTurnPro
 /** The stream-lane subset — what the three wire views partition. */
 export function streamRecords(
   records: LangyDevLogRecord[],
-): Array<Extract<LangyDevLogRecord, { lane: "stream" }>> {
+): Extract<LangyDevLogRecord, { lane: "stream" }>[] {
   return records.filter(
     (record): record is Extract<LangyDevLogRecord, { lane: "stream" }> => record.lane === "stream",
   );

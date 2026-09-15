@@ -212,7 +212,7 @@ export function restAddressInventory(): RestAddress[] {
  * the generic parameters a family happens to carry.
  */
 export type MountedRouteTable = Readonly<{
-  routes: ReadonlyArray<{ method: string; path: string }>;
+  routes: readonly { method: string; path: string }[];
 }>;
 
 /**

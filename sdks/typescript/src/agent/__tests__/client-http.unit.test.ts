@@ -40,13 +40,13 @@ class FakeHttpPlatform {
   willHoldFrames = false;
   /** How many polls arrived, counted before the answer is chosen. */
   polls = 0;
-  private readonly waitingPolls: Array<(frames: Json[]) => void> = [];
+  private readonly waitingPolls: ((frames: Json[]) => void)[] = [];
   private readonly queuedFrames: Json[] = [];
   private readonly heldFrames: ServerResponse[] = [];
-  private readonly requestWaiters: Array<{
+  private readonly requestWaiters: {
     match: (seen: Seen) => boolean;
     resolve: (seen: Seen) => void;
-  }> = [];
+  }[] = [];
   private nextToken = 1;
 
   private constructor(
@@ -207,7 +207,7 @@ class FakeHttpPlatform {
 }
 
 const recordingLogger = () => {
-  const calls: Array<[string, string]> = [];
+  const calls: [string, string][] = [];
   const log = (level: string) => (message: string) => {
     calls.push([level, message]);
   };

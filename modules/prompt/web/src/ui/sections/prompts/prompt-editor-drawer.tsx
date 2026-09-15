@@ -60,14 +60,14 @@ export type PromptEditorDrawerProps = {
     name: string;
     version?: number;
     versionId?: string;
-    inputs?: Array<{ identifier: string; type: string }>;
+    inputs?: { identifier: string; type: string }[];
     // json_schema flows to the target so structured outputs stay field-selectable
     // in the comparison config — see promptEditorCallbacks.onSave.
-    outputs?: Array<{
+    outputs?: {
       identifier: string;
       type: string;
       json_schema?: object | null;
-    }>;
+    }[];
   }) => void;
   /** If provided, loads an existing prompt for editing */
   promptId?: string;
@@ -111,8 +111,8 @@ export type PromptEditorDrawerProps = {
   onVersionChange?: (prompt: {
     version: number;
     versionId: string;
-    inputs?: Array<{ identifier: string; type: string }>;
-    outputs?: Array<{ identifier: string; type: string }>;
+    inputs?: { identifier: string; type: string }[];
+    outputs?: { identifier: string; type: string }[];
   }) => void;
   /** When true, renders form content without Drawer shell (for embedding in external drawer) */
   headless?: boolean;

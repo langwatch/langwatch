@@ -350,7 +350,7 @@ export function EvaluationsV3Table({
     | {
         name: string;
         columnTypes: { name: string; type: DatasetColumnType }[];
-        datasetRecords: Array<{ id?: string } & Record<string, string>>;
+        datasetRecords: ({ id?: string } & Record<string, string>)[];
       }
     | undefined
   >(undefined);
@@ -543,7 +543,7 @@ export function EvaluationsV3Table({
       name: string;
       version?: number;
       versionId?: string;
-      inputs?: Array<{ identifier: string; type: string }>;
+      inputs?: { identifier: string; type: string }[];
       outputs?: PromptOutputField[];
     }) => {
       // Convert prompt to TargetConfig format (prompt type)

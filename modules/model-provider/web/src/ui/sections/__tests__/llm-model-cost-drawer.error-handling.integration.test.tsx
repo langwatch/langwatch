@@ -28,7 +28,7 @@ const { mockCreateOrUpdateMutate, mockMutationError, mockCosts, mockCloseDrawer 
           projectId: "proj-1",
           updatedAt: new Date(),
         },
-      ] as Array<Record<string, unknown>>,
+      ] as Record<string, unknown>[],
     },
   }),
 );

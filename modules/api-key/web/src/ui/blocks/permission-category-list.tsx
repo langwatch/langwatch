@@ -49,7 +49,7 @@ function PermissionRow({
   const isDisabled = !canRead && !canWrite;
   const isActive = value !== "none";
 
-  const options: Array<{ value: PermissionSelection; label: string }> = [];
+  const options: { value: PermissionSelection; label: string }[] = [];
   if (canRead) options.push({ value: "read", label: "Read" });
   if (canWrite) options.push({ value: "write", label: "Write" });
   options.push({ value: "none", label: "None" });

@@ -62,7 +62,7 @@ export type CarriedOverCell = {
   error?: string;
   domainError?: SerializedHandledError;
   /** Verdicts on this cell, by evaluator id. */
-  evaluatorResults: Array<{ evaluatorId: string; result: unknown }>;
+  evaluatorResults: { evaluatorId: string; result: unknown }[];
 };
 
 export const carriedOverCellSchema = z.object({
@@ -108,7 +108,7 @@ export type ExecutionRequest = {
    */
   carriedOverCells?: CarriedOverCell[];
   /** Inline row data to evaluate instead of a saved or attached dataset. */
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
   dataset_id?: string;
   /** Constant inputs applied to every row, overriding entry fields. */
@@ -356,12 +356,12 @@ export type ExecutionCell = {
    * execution in config variant order. Two candidates (pairwise) is not special.
    */
   comparison?: {
-    candidates: Array<{
+    candidates: {
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
-    }>;
+    }[];
   };
 };
 
@@ -371,7 +371,7 @@ export type ExecutionCell = {
 export type WorkflowBuilderInput = {
   projectId: string;
   cell: ExecutionCell;
-  datasetColumns: Array<{ id: string; name: string; type: string }>;
+  datasetColumns: { id: string; name: string; type: string }[];
 };
 
 /**

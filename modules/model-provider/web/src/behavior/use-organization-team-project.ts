@@ -16,11 +16,11 @@ export type OrganizationTeamProjectReading = {
     | {
         id: string;
         name: string;
-        teams: Array<{
+        teams: {
           id: string;
           name: string;
-          projects: Array<{ id: string; name: string }>;
-        }>;
+          projects: { id: string; name: string }[];
+        }[];
       }
     | undefined;
   team: { id: string; name: string } | undefined;

@@ -13,11 +13,11 @@ export interface ProjectPickGroup {
     label: string;
     canCreateProject?: boolean;
   };
-  projects: Array<{
+  projects: {
     projectId: string;
     label: string;
     href: string;
-  }>;
+  }[];
 }
 
 export interface ProjectPickItem {

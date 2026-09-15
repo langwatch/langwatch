@@ -115,7 +115,7 @@ export class ExperimentRunOrchestratorService {
   /** Generates all cells to execute for the scope. See {@link ExperimentCellPlanService}. */
   static generateCells = (
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
-    datasetRows: Array<Record<string, unknown>>,
+    datasetRows: Record<string, unknown>[],
     scope: ExecutionScope,
     options: { seedTargetOutputs?: Record<string, SeededTargetOutput> } = {},
   ): ExecutionCell[] =>
@@ -134,7 +134,7 @@ export class ExperimentRunOrchestratorService {
     seedTargetOutputs,
   }: {
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     scope: ExecutionScope;
     seedTargetOutputs?: Record<string, SeededTargetOutput>;
   }): number => cellPlan.countScopedCells({ state, datasetRows, scope, seedTargetOutputs });
@@ -154,7 +154,7 @@ export class ExperimentRunOrchestratorService {
     options: {
       storage: Pick<ExperimentRunStorageService, "hasProduced">;
       rowsThisRunOwns: Set<number>;
-      datasetRows: Array<Record<string, unknown>>;
+      datasetRows: Record<string, unknown>[];
     },
   ): EvaluationV3Event | null {
     const { storage, rowsThisRunOwns, datasetRows } = options;
@@ -208,7 +208,7 @@ export class ExperimentRunOrchestratorService {
     scopedRowIndices,
   }: {
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     completedTargetOutputs: Map<string, SeededTargetOutput>;
     completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
     loadedPrompts?: Map<string, VersionedPrompt>;
@@ -247,7 +247,7 @@ export class ExperimentRunOrchestratorService {
     cell: ExecutionCell,
     projectId: string,
     ports: ExperimentRunCollaborators,
-    datasetColumns: Array<{ id: string; name: string; type: string }>,
+    datasetColumns: { id: string; name: string; type: string }[],
     loadedData: LoadedCellData,
     workflows: WorkflowService,
     resultMapperConfig?: ResultMapperConfig,
@@ -279,7 +279,7 @@ export class ExperimentRunOrchestratorService {
     cell: ExecutionCell;
     projectId: string;
     workflowDsl: StudioWorkflow;
-    datasetColumns?: Array<{ id: string; name: string; type: string }>;
+    datasetColumns?: { id: string; name: string; type: string }[];
     loadedEvaluators?: LoadedEvaluators;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;

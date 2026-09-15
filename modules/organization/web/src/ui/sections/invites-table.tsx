@@ -12,7 +12,7 @@ type OrganizationInvite = RouterOutputs["organization"]["getOrganizationPendingI
 interface InvitesTableProps {
   invites: OrganizationInvite[];
   isAdmin: boolean;
-  teams: Array<{ id: string; name: string; slug: string }>;
+  teams: { id: string; name: string; slug: string }[];
   onViewInviteLink: (inviteCode: string, email: string) => void;
   onResendInvite: (inviteId: string) => void;
   onRevokeInvite: (inviteId: string) => void;
@@ -185,7 +185,7 @@ const InviteRowActions = ({
 
 interface TeamIdsDisplayProps {
   teamIds: string;
-  teams: Array<{ id: string; name: string; slug: string }>;
+  teams: { id: string; name: string; slug: string }[];
 }
 
 const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {

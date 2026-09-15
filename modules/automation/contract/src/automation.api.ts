@@ -144,7 +144,7 @@ export interface AutomationApi {
   /** Every suppression for a project, each carrying the trigger name it names. */
   getAllEnriched(input: {
     projectId: string;
-  }): Promise<Array<EmailSuppression & { triggerName: string | null }>>;
+  }): Promise<(EmailSuppression & { triggerName: string | null })[]>;
   /**
    * The platform's own address for one automation resource, built from the
    * project's slug and the path the caller already resolved. The REST

@@ -22,7 +22,7 @@ function renderTable({
   columns,
   ...props
 }: {
-  rows: Array<{ id?: string; isSelected?: boolean } & Record<string, unknown>>;
+  rows: ({ id?: string; isSelected?: boolean } & Record<string, unknown>)[];
   columns: DatasetColumns;
   isSelectable?: boolean;
   onToggleRow?: (rowIndex: number, isSelected: boolean) => void;

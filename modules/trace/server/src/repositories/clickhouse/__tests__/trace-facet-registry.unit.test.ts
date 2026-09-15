@@ -211,7 +211,7 @@ describe("Map-keys discovery facets", () => {
   // `.keys` subcolumn. Probing the empty-map short-circuit against the whole
   // Map (`length(<Map>)`) instead of `<Map>.keys` forces ClickHouse to read
   // the heavy values column and trips MEMORY_LIMIT_EXCEEDED on busy tenants.
-  const MAP_KEY_FACETS: Array<{ key: string; map: string }> = [
+  const MAP_KEY_FACETS: { key: string; map: string }[] = [
     { key: "spanAttributeKeys", map: "SpanAttributes" },
     { key: "metadataKeys", map: "Attributes" },
     // metadata-scoped sibling — same `Attributes` map, `metadata.` prefix.

@@ -205,20 +205,20 @@ export type PromptApiMap = {
     getAll: {
       query: {
         input: { isDemo?: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
-            members?: Array<{
+            members?: {
               userId: string;
               role: string;
               assignedRole?: { permissions?: unknown } | null;
-            }>;
-            projects: Array<{ id: string; name: string; slug: string; apiKey?: string }>;
-          }>;
-        }>;
+            }[];
+            projects: { id: string; name: string; slug: string; apiKey?: string }[];
+          }[];
+        }[];
       };
     };
   };

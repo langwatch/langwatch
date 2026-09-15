@@ -66,7 +66,7 @@ describe("scopeChipDetail", () => {
      * @scenario "Budget list Scope column renders the shared scope chip on one line"
      */
     it("names its own kind rather than falling back to Project", () => {
-      const cases: Array<[Parameters<typeof scopeChipTooltip>[0], string]> = [
+      const cases: [Parameters<typeof scopeChipTooltip>[0], string][] = [
         [{ scopeType: "ORGANIZATION", name: "ACME" }, "Organization: ACME"],
         [{ scopeType: "TEAM", name: "Platform" }, "Team: Platform"],
         [{ scopeType: "PROJECT", name: "Web App" }, "Project: Web App"],

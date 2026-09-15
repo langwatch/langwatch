@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpManagedProviderCredentialsChannel } from "../http.managed-provider-credentials.channel.ts";
 
 const sts = vi.hoisted(() => ({
-  clients: [] as Array<{
+  clients: [] as {
     region: string;
     credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
-  }>,
-  assumed: [] as Array<{ clientIndex: number; roleArn: string }>,
+  }[],
+  assumed: [] as { clientIndex: number; roleArn: string }[],
   proxyReturnsCredentials: true,
 }));
 

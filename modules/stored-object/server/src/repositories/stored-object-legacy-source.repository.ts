@@ -20,5 +20,5 @@ export abstract class StoredObjectLegacySource {
     projectId: string;
     afterId?: string;
     limit: number;
-  }): Promise<ReadonlyArray<LegacyStoredObjectRow>>;
+  }): Promise<readonly LegacyStoredObjectRow[]>;
 }

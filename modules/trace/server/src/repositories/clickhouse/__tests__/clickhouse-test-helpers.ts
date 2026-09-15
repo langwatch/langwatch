@@ -28,11 +28,11 @@ export function clientReturning(record: Record<string, unknown>): TraceClickHous
   };
 }
 
-export function orderingClient(rows: Array<Record<string, unknown>>): {
+export function orderingClient(rows: Record<string, unknown>[]): {
   client: TraceClickHouseWriteClient;
-  seen: Array<{ query: string; query_params?: Record<string, unknown> }>;
+  seen: { query: string; query_params?: Record<string, unknown> }[];
 } {
-  const seen: Array<{ query: string; query_params?: Record<string, unknown> }> = [];
+  const seen: { query: string; query_params?: Record<string, unknown> }[] = [];
   const orderedRows = [...rows].sort((left, right) => {
     const lastEventDifference =
       Number(right.LastEventOccurredAt) - Number(left.LastEventOccurredAt);
@@ -68,9 +68,9 @@ export function orderingClient(rows: Array<Record<string, unknown>>): {
 
 export function capturingInsertClient(): {
   client: TraceClickHouseWriteClient;
-  inserts: Array<{ clickhouse_settings?: Record<string, number> }>;
+  inserts: { clickhouse_settings?: Record<string, number> }[];
 } {
-  const inserts: Array<{ clickhouse_settings?: Record<string, number> }> = [];
+  const inserts: { clickhouse_settings?: Record<string, number> }[] = [];
   return {
     client: {
       async insert(input): Promise<undefined> {

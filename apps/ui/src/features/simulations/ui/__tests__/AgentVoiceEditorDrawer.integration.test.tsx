@@ -71,7 +71,7 @@ let mockAgentById: {
 } | null = null;
 
 /** The provider rows the project appears to have. */
-let mockProviders: Array<Record<string, unknown>> = [];
+let mockProviders: Record<string, unknown>[] = [];
 
 const createMock = vi.fn();
 const updateMock = vi.fn();

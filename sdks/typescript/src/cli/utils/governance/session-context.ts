@@ -109,13 +109,13 @@ interface OtlpLogRecord {
 
 /** One OTLP/HTTP JSON logs request, carrying exactly one record. */
 export interface OtlpLogsPayload {
-  resourceLogs: Array<{
+  resourceLogs: {
     resource: { attributes: OtlpKeyValue[] };
-    scopeLogs: Array<{
+    scopeLogs: {
       scope: { name: string; version: string };
       logRecords: OtlpLogRecord[];
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 /** A URL with an explicit scheme, as opposed to the scp-like ssh shorthand. */

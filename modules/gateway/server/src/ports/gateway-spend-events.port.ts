@@ -57,11 +57,11 @@ export interface SpendSummaryRow {
 
 export abstract class GatewaySpendEvents {
   abstract upsertFromFold(
-    entries: Array<{
+    entries: {
       tenantId: string;
       gatewayRequestId: string;
       state: GatewaySpendState;
-    }>,
+    }[],
   ): Promise<void>;
 
   abstract tryReadForFold(input: {

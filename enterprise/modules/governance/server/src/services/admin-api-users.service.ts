@@ -197,7 +197,7 @@ export async function listAnthropicPeople(params: {
   apiKey: string;
   signal?: AbortSignal;
 }): Promise<PeopleListing> {
-  return await listAdminApiPeople({
+  return listAdminApiPeople({
     baseUrl: ANTHROPIC_USERS_URL,
     headers: {
       "x-api-key": params.apiKey,
@@ -213,7 +213,7 @@ export async function listOpenAiPeople(params: {
   apiKey: string;
   signal?: AbortSignal;
 }): Promise<PeopleListing> {
-  return await listAdminApiPeople({
+  return listAdminApiPeople({
     baseUrl: OPENAI_USERS_URL,
     headers: { Authorization: `Bearer ${params.apiKey}` },
     cursorParam: "after",

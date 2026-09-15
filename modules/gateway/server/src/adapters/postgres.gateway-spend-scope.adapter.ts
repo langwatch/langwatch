@@ -19,7 +19,7 @@ const PROJECT_CACHE_TTL_MS = 30_000;
 const PROJECT_CACHE_MAX_ORGS = 512;
 
 interface CachedProjects {
-  projects: Array<{ id: string; teamId: string }>;
+  projects: { id: string; teamId: string }[];
   expiresAtMs: number;
 }
 
@@ -45,7 +45,7 @@ export class GatewaySpendScopeAdapter {
   }: {
     organizationId: string;
     nowMs: number;
-  }): Promise<Array<{ id: string; teamId: string }>> {
+  }): Promise<{ id: string; teamId: string }[]> {
     const projectCache = this.projectCache;
     const prisma = this.database;
     const cached = projectCache.get(organizationId);

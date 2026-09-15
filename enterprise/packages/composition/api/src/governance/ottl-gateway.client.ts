@@ -46,12 +46,12 @@ import {
 
 interface RawValidateResponse {
   ok: boolean;
-  errors?: Array<{
+  errors?: {
     statement_index?: number;
     line?: number;
     col?: number;
     message?: string;
-  }>;
+  }[];
 }
 
 interface RawTransformResponse {
@@ -61,12 +61,12 @@ interface RawTransformResponse {
   /** Backward-compat: original sergey contract used `payload_proto_b64`.
    *  Read either field, but prefer `payload_b64`. */
   payload_proto_b64?: string;
-  errors?: Array<{
+  errors?: {
     statement_index?: number;
     line?: number;
     col?: number;
     message?: string;
-  }>;
+  }[];
 }
 
 /**

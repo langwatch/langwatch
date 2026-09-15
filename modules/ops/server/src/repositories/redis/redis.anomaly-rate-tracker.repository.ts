@@ -126,7 +126,7 @@ export class RedisAnomalyRateTrackerRepository extends AnomalyRateTrackerReposit
   }
 
   async listActiveTenants(): Promise<string[]> {
-    return await this.redis.smembers(RedisAnomalyRateTrackerRepository.activeSet);
+    return this.redis.smembers(RedisAnomalyRateTrackerRepository.activeSet);
   }
 
   async findCachedBaseline(tenantId: string): Promise<number | null> {

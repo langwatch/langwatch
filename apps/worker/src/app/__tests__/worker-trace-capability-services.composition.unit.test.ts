@@ -238,7 +238,7 @@ describe("createWorkerTraceCapabilityServices", () => {
       it("answers an empty resolution when the read throws", async () => {
         const fake = fakeDatabase();
         fake.projectFindUnique.mockRejectedValueOnce(new Error("connection reset"));
-        const captured: Array<Record<string, unknown>> = [];
+        const captured: Record<string, unknown>[] = [];
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,

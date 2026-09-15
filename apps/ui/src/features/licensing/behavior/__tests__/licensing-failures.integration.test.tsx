@@ -60,7 +60,7 @@ function limitRefusal(limitType: string): Error {
  * is what a reader would have seen, not what a stub decided to record.
  */
 function recordingToaster() {
-  const created: Array<{ title: string }> = [];
+  const created: { title: string }[] = [];
   const feedback = BrowserUiFeedback.create({
     create: (notice: { title: string }) => void created.push(notice),
     dismiss: () => undefined,

@@ -40,7 +40,7 @@ type DatasetRecordServiceOptions = {
   assertKnownColumns: (input: {
     datasetName: string;
     columns: string[];
-    entries: ReadonlyArray<Record<string, unknown>>;
+    entries: readonly Record<string, unknown>[];
   }) => void;
   generateId: () => string;
 };

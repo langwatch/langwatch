@@ -133,9 +133,9 @@ export function createDefaultPromptFormValues(
  * @param traceId - The trace ID to assign to messages
  */
 function addIdToMessages(
-  messages: Array<ChatMessage>,
+  messages: ChatMessage[],
   traceId: string,
-): Array<ChatMessage & { id: string }> {
+): (ChatMessage & { id: string })[] {
   return messages.map((message) => ({
     ...message,
     id: traceId,

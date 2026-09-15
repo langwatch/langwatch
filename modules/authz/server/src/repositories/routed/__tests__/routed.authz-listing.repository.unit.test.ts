@@ -126,7 +126,7 @@ describe("RoutedAuthzListingRepository", () => {
       userId: "alice",
     });
     expect(
-      (rows as unknown as Array<{ organizationId: string; head: string }>).map(
+      (rows as unknown as { organizationId: string; head: string }[]).map(
         ({ organizationId, head }) => ({ organizationId, head }),
       ),
     ).toEqual([

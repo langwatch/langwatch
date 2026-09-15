@@ -31,13 +31,13 @@ class TransformError extends Error {
 class FakeBackend implements LangyUiActionBackend {
   version = 4;
   staleSaves = 0;
-  readonly saves: Array<{
+  readonly saves: {
     expectedVersion: number;
     actor: LangyBackendActor;
     commitMessage: string;
-  }> = [];
+  }[] = [];
   runResult: LangyBackendRunResult = { started: true, runId: "run-1", total: 1 };
-  readonly runs: Array<{ target: string; payload: unknown; actor: LangyBackendActor }> = [];
+  readonly runs: { target: string; payload: unknown; actor: LangyBackendActor }[] = [];
 
   async project({ payload }: { payload: unknown }) {
     return {

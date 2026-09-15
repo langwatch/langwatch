@@ -79,7 +79,7 @@ describe("ClickHouseExperimentRunRepository", () => {
   it("uses the injected tuple wrapper for exact experiment/run pairs", async () => {
     const tupleParam = vi.fn((values: string[]) => ({ tuple: values }));
     const queries: string[] = [];
-    const queryParams: Array<Record<string, unknown>> = [];
+    const queryParams: Record<string, unknown>[] = [];
     const results = [
       [
         {

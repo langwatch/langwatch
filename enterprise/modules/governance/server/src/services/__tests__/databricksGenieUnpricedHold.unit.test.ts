@@ -146,7 +146,7 @@ async function pull({
   warehouseId?: string;
   cursor?: string | null;
 }) {
-  return await new DatabricksGeniePullerAdapter().runOnce(
+  return new DatabricksGeniePullerAdapter().runOnce(
     { cursor, credentials: { token: "dapi-fixture" } },
     {
       adapter: "databricks_genie",

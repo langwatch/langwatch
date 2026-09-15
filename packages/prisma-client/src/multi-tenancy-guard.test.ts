@@ -1017,7 +1017,7 @@ describe("project-tenancy regime partition", () => {
   });
 
   it("keeps the hand-listed buckets and SCOPED_MODELS pairwise disjoint", () => {
-    const buckets: Array<[string, readonly string[]]> = [
+    const buckets: [string, readonly string[]][] = [
       ["GLOBAL_MODELS", GLOBAL_MODELS],
       ["RELATIONAL_PARENT_SCOPED", RELATIONAL_PARENT_SCOPED],
       ["LICENSE_COUNTED_PROJECT_MODELS", LICENSE_COUNTED_PROJECT_MODELS],

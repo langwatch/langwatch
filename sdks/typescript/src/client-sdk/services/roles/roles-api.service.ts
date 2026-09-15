@@ -34,13 +34,13 @@ export interface UpdateRoleInput {
 }
 
 export interface PermissionCatalog {
-  resources: Array<{
+  resources: {
     resource: string;
     /** True when the resource only takes effect at organization scope. */
     organizationExclusive: boolean;
     actions: string[];
     permissions: string[];
-  }>;
+  }[];
   actions: string[];
 }
 

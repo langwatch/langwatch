@@ -18,7 +18,7 @@ export class PrismaDataPrivacyPolicyRepository
 
   async findForProjectChain(input: {
     organizationId: string;
-    scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
+    scopes: Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">[];
   }): Promise<DataPrivacyRow[]> {
     const pairs = [
       ...new Map(

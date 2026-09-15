@@ -26,7 +26,7 @@ export type RecordedDrawerOpen = {
 };
 
 export class FakeModelProviderHost extends ModelProviderHostApi {
-  readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queryWrites: Readonly<Record<string, string | undefined>>[] = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: ModelProviderSuccessNotice[] = [];
   readonly failures: ModelProviderFailureNotice[] = [];

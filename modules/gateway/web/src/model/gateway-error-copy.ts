@@ -3,7 +3,7 @@
  * speaks in stable `snake_case:` prefixes so scripts can match on them;
  * people get the sentence that says what to do instead.
  */
-const ERROR_COPY: Array<{ code: string; copy: string }> = [
+const ERROR_COPY: { code: string; copy: string }[] = [
   {
     code: "trace_project_required",
     copy: "This key needs a project for its traces and costs to land in. Pick one under Ownership.",

@@ -190,10 +190,10 @@ function FormatGlyph({ format }: { format: Exclude<AttributeFormat, "leaf"> }) {
  */
 type OverridableFormat = Exclude<AttributeFormat, "leaf" | "json-string">;
 
-const OVERRIDE_OPTIONS: ReadonlyArray<{
+const OVERRIDE_OPTIONS: readonly {
   value: OverridableFormat;
   label: string;
-}> = [
+}[] = [
   { value: "chat", label: "Chat" },
   { value: "json", label: "JSON" },
   { value: "text", label: "Text" },

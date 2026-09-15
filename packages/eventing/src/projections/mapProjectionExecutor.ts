@@ -45,7 +45,7 @@ export class MapProjectionExecutor {
     projection: MapProjectionDefinition<Record, E>,
     events: readonly E[],
     contexts: readonly ProjectionStoreContext[],
-  ): Promise<Array<{ event: E; record: Record }>> {
+  ): Promise<{ event: E; record: Record }[]> {
     if (events.length !== contexts.length) {
       throw new Error("Map projection batch events and contexts must align");
     }
@@ -63,12 +63,12 @@ export class MapProjectionExecutor {
     projection: MapProjectionDefinition<Record, E>,
     events: readonly E[],
     contexts: readonly ProjectionStoreContext[],
-  ): Promise<Array<{ event: E; record: Record; context: ProjectionStoreContext }>> {
-    const mapped: Array<{
+  ): Promise<{ event: E; record: Record; context: ProjectionStoreContext }[]> {
+    const mapped: {
       event: E;
       record: Record;
       context: ProjectionStoreContext;
-    }> = [];
+    }[] = [];
     for (let index = 0; index < events.length; index++) {
       const event = events[index]!;
       const context = contexts[index]!;
@@ -87,7 +87,7 @@ export class MapProjectionExecutor {
   /** Persists a mapped batch, via `bulkAppend` when the store exposes one. */
   private async persistMappedBatch<Record, E extends Event>(
     projection: MapProjectionDefinition<Record, E>,
-    mapped: Array<{ event: E; record: Record; context: ProjectionStoreContext }>,
+    mapped: { event: E; record: Record; context: ProjectionStoreContext }[],
   ): Promise<void> {
     if (projection.store.bulkAppend) {
       const first = mapped[0]!.context;

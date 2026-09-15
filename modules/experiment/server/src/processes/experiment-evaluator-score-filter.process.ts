@@ -46,7 +46,7 @@ export const shouldStripScore = (evaluatorType: string): boolean => {
  * @returns Set of evaluator IDs that should have scores stripped
  */
 export const buildStripScoreEvaluatorIds = (
-  evaluators: Array<{ id: string; evaluatorType: string }>,
+  evaluators: { id: string; evaluatorType: string }[],
 ): Set<string> => {
   const stripScoreIds = new Set<string>();
 

@@ -58,7 +58,7 @@ const readByRow = ({
   rows: BatchResultRow[];
   variantId: string;
   metric: "cost" | "duration";
-}): Array<number | null> =>
+}): (number | null)[] =>
   rows.map((row) => {
     const target = row.targets[variantId];
     const value = target ? target[metric] : null;
@@ -74,8 +74,8 @@ const pairedDifferenceCI = ({
   b,
   seed,
 }: {
-  a: Array<number | null>;
-  b: Array<number | null>;
+  a: (number | null)[];
+  b: (number | null)[];
   seed: number;
 }): [number, number] | null => {
   const differences: number[] = [];
@@ -101,7 +101,7 @@ const pairedDifferenceCIs = ({
   valuesByRow,
 }: {
   variantIds: string[];
-  valuesByRow: Record<string, Array<number | null>>;
+  valuesByRow: Record<string, (number | null)[]>;
 }): Record<string, Record<string, [number, number]>> => {
   const byVariant: Record<string, Record<string, [number, number]>> = {};
   for (const variantId of variantIds) {
@@ -140,8 +140,8 @@ export function computeVariantMetrics({
 }): Record<string, VariantMetrics> {
   const result: Record<string, VariantMetrics> = {};
 
-  const costByRow: Record<string, Array<number | null>> = {};
-  const durationByRow: Record<string, Array<number | null>> = {};
+  const costByRow: Record<string, (number | null)[]> = {};
+  const durationByRow: Record<string, (number | null)[]> = {};
   for (const variantId of variantIds) {
     costByRow[variantId] = readByRow({ rows, variantId, metric: "cost" });
     durationByRow[variantId] = readByRow({

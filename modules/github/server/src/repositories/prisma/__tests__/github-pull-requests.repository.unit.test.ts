@@ -138,7 +138,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
 
       await repository.upsertPullRequests({ pullRequests: [pullRequest()] } as never);
       const guard = whereOf(calls, "githubPullRequest.updateMany") as {
-        OR: Array<Record<string, unknown>>;
+        OR: Record<string, unknown>[];
       };
 
       expect(guard.OR).toContainEqual({ prUpdatedAt: null });

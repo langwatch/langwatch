@@ -288,7 +288,7 @@ describe("result-parsing", () => {
      * The parser nests values as: bucket[groupBy][groupKey][seriesName]
      */
     function simulateGroupedParsing(
-      rows: Array<Record<string, unknown>>,
+      rows: Record<string, unknown>[],
       series: AnalyticsSeries[],
       groupBy: string | undefined,
     ) {

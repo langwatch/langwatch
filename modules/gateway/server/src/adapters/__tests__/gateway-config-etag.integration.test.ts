@@ -48,7 +48,7 @@ async function loadVk(): Promise<VirtualKeyWithScopes> {
 }
 
 async function etag() {
-  return await GatewayConfigAssemblyAdapter.create({ prisma }).versionToken(await loadVk());
+  return GatewayConfigAssemblyAdapter.create({ prisma }).versionToken(await loadVk());
 }
 
 describe.skipIf(!databaseUrl)("provider credential rotation reaches the gateway", () => {

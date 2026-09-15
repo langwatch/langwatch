@@ -216,7 +216,7 @@ describe("listSimulationRunsCommand()", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(String(mockFetch.mock.calls[1]?.[0])).toContain("cursor=cursor-1");
       const data = result?.data as {
-        runs: Array<{ scenarioRunId: string }>;
+        runs: { scenarioRunId: string }[];
         scanned: number;
       };
       expect(data.runs).toHaveLength(1);

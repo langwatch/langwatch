@@ -22,7 +22,7 @@ interface FetchCall {
 }
 
 let capturedCalls: FetchCall[] = [];
-let responseQueue: Array<{ status: number; body: unknown }> = [];
+let responseQueue: { status: number; body: unknown }[] = [];
 let warnings: string[] = [];
 let errors: string[] = [];
 
@@ -49,7 +49,7 @@ let transcripts: TranscriptTable | null = null;
  * here too.
  */
 interface TranscriptTable {
-  rows: Array<Record<string, unknown>>;
+  rows: Record<string, unknown>[];
   /**
    * What the server hands back per page, independently of `$top`. A page ending
    * part-way through a group of same-instant rows is the whole point: it is
@@ -1206,14 +1206,14 @@ describe("given an Azure bill that does not fit in one reply", () => {
       token: string;
       window: { fromDay: string; toDay: string };
       options: { signal?: AbortSignal; deadlineMs?: number };
-    }): Promise<Array<{ day: string; costMinor: string }> | null>;
+    }): Promise<{ day: string; costMinor: string }[] | null>;
   }
 
   async function readTheBill(
     options: { signal?: AbortSignal; deadlineMs?: number } = {},
   ) {
     const adapter = await newAdapter();
-    return await (adapter as unknown as PageWalk).fetchAzureCostPages({
+    return (adapter as unknown as PageWalk).fetchAzureCostPages({
       subscriptionId: "sub-1",
       token: "token-xyz",
       window: { fromDay: "2026-08-01", toDay: "2026-08-02" },
@@ -1488,7 +1488,7 @@ describe("given a subscription billing both AI services and unrelated infrastruc
         readAtMs: number | null;
         deepReadDay: string | null;
       };
-    }): Promise<{ events: Array<{ target: string }> }>;
+    }): Promise<{ events: { target: string }[] }>;
   }
 
   /** A bill naming one AI line and one that is plainly not. */

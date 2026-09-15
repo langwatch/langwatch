@@ -117,7 +117,7 @@ export class ProcessManagerService<State> {
       processKey: envelope.processKey,
     };
 
-    return await this.inEvolveSpan({
+    return this.inEvolveSpan({
       inputKind: "event",
       // Intentionally retain this opaque operational ID for event-delivery diagnostics.
       logContext: {
@@ -152,7 +152,7 @@ export class ProcessManagerService<State> {
           existing === null &&
           this.isTransientEvolution(evolution)
         ) {
-          return await this.appendIntents({
+          return this.appendIntents({
             ref,
             tenantId: envelope.tenantId,
             userId: envelope.userId,
@@ -162,7 +162,7 @@ export class ProcessManagerService<State> {
           });
         }
 
-        return await this.commitEvolution({
+        return this.commitEvolution({
           ref,
           tenantId: envelope.tenantId,
           userId: envelope.userId,
@@ -178,7 +178,7 @@ export class ProcessManagerService<State> {
   async handleWake(params: { wake: DueWake; now: number }): Promise<HandleResult> {
     const { wake, now } = params;
 
-    return await this.inEvolveSpan({
+    return this.inEvolveSpan({
       inputKind: "wake",
       logContext: {
         processKey: wake.ref.processKey,
@@ -207,7 +207,7 @@ export class ProcessManagerService<State> {
           ref: wake.ref,
         });
 
-        return await this.commitEvolution({
+        return this.commitEvolution({
           ref: wake.ref,
           tenantId: existing.tenantId,
           userId: existing.userId,
@@ -239,7 +239,7 @@ export class ProcessManagerService<State> {
       processKey: signal.processKey,
     };
 
-    return await this.inEvolveSpan({
+    return this.inEvolveSpan({
       inputKind: "signal",
       logContext: {
         processKey: ref.processKey,
@@ -572,7 +572,7 @@ export class ProcessManagerService<State> {
     attributes: Attributes;
     run: () => Promise<T>;
   }): Promise<T> {
-    return await this.tracer.startActiveSpan(
+    return this.tracer.startActiveSpan(
       `process ${this.definition.name} evolve`,
       { kind: SpanKind.INTERNAL, attributes: params.attributes },
       (span) => this.runEvolveSpanBody(params, span),

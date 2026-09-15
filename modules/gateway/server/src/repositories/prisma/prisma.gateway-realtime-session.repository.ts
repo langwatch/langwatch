@@ -40,7 +40,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     staleBefore: Instant;
     closeReason: string;
   }): Promise<ReserveResult> {
-    return await this.database.$transaction(async (tx) => {
+    return this.database.$transaction(async (tx) => {
       // An advisory lock names no table and reads no row, so the raw-query
       // tenancy guard has nothing to check and is opted out of by name. The
       // lock key carries the tenancy itself: it is the project and the key

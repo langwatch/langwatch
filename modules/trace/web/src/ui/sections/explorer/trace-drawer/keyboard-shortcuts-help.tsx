@@ -18,11 +18,11 @@ type GroupAccent = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 
 export interface ShortcutGroup {
   title: string;
-  items: Array<{
+  items: {
     keys: string[];
     label: string;
     detail?: string;
-  }>;
+  }[];
   icon?: IconType;
   accent?: GroupAccent;
 }

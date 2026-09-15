@@ -24,6 +24,10 @@
   "rules": {
     "complexity": ["error", { "max": 25 }],
     "no-nested-ternary": "error",
+    // The house writes T[]: 14,836 annotations already use it against 2,477
+    // in the Array<T> form, and oxlint fixes the difference, parenthesising
+    // unions correctly. One sweep clears it and new code stays consistent.
+    "typescript/array-type": ["error", { "default": "array" }],
 
     // Vitest's `expect` takes a second argument — `expect(actual, message)` is
     // in its own types as `<T>(actual: T, message?: string): Assertion<T>` —

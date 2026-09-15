@@ -52,7 +52,7 @@ function budget(overrides: Record<string, unknown> = {}) {
 }
 
 /** The rendered table, with colour codes stripped. */
-async function renderedTable(rows: Array<Record<string, unknown>>): Promise<string> {
+async function renderedTable(rows: Record<string, unknown>[]): Promise<string> {
   // `list()` walks the endpoint's pages to exhaustion, so what it hands the
   // command is the whole listing as a plain array, with no cursor left to
   // carry and no envelope to unwrap.

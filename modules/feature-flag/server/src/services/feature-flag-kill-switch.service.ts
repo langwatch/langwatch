@@ -20,7 +20,7 @@ export class EventingKillSwitchAdapter extends KillSwitch {
       (query.customKey as FeatureFlagKey | undefined) ??
       generateKillSwitchKey(query.aggregateType, query.componentType, query.componentName);
 
-    return await this.featureFlags.isEnabled(key, {
+    return this.featureFlags.isEnabled(key, {
       kind: "project",
       projectId: query.tenantId,
     });

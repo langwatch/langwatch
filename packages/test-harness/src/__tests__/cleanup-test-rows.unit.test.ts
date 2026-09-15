@@ -10,7 +10,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "../cleanup-test-rows.ts";
 
 function recordingPrisma() {
-  const calls: Array<{ model: string; where: unknown }> = [];
+  const calls: { model: string; where: unknown }[] = [];
   const handler: ProxyHandler<Record<string, unknown>> = {
     get(_target, model: string) {
       return {

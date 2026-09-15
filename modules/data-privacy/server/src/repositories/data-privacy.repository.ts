@@ -9,7 +9,7 @@ import type {
 export interface DataPrivacyPolicyRepository {
   findForProjectChain(input: {
     organizationId: string;
-    scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
+    scopes: Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">[];
   }): Promise<DataPrivacyRow[]>;
   findAllInOrganization(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
   upsertForScope(input: {

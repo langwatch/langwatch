@@ -277,7 +277,7 @@ export class TraceDiscoverService {
 
   private async computeDiscover(params: DiscoverParams): Promise<FacetDescriptor[]> {
     const { batched, standalone } = partitionFacetRegistry();
-    const taskTimings: Array<{ label: string; durationMs: number }> = [];
+    const taskTimings: { label: string; durationMs: number }[] = [];
     const startedAt = nowInstant().epochMilliseconds;
     const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
       const t0 = nowInstant().epochMilliseconds;
@@ -410,7 +410,7 @@ export class TraceDiscoverService {
     params: DiscoverParams;
     totalMs: number;
     taskCount: number;
-    taskTimings: Array<{ label: string; durationMs: number }>;
+    taskTimings: { label: string; durationMs: number }[];
   }): void {
     if (totalMs <= 1500) {
       return;

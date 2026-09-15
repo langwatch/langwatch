@@ -438,11 +438,11 @@ describe("prefetchWithFixture", () => {
         dsl: { spec_version: "1.5", nodes: [], edges: [] },
       };
 
-      const cases: Array<{
+      const cases: {
         label: "http" | "code" | "workflow";
         target: TargetConfig;
         agent: typeof httpAgent | typeof codeAgent | typeof workflowAgent;
-      }> = [
+      }[] = [
         {
           label: "http",
           target: { type: "http", referenceId: "agent_http" },
@@ -1603,7 +1603,7 @@ describe("prefetchWithFixture", () => {
         if (result.data.adapterData.type !== "workflow") {
           throw new Error("expected a workflow adapter");
         }
-        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
         const signatureNode = nodes.find(
           (n) => (n as { type?: unknown }).type === "signature",
         ) as Record<string, unknown> | undefined;
@@ -1611,7 +1611,7 @@ describe("prefetchWithFixture", () => {
         expect(signatureNode).toBeDefined();
 
         const data = signatureNode?.data as Record<string, unknown> | undefined;
-        const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
+        const parameters = data?.parameters as Record<string, unknown>[] | undefined;
         const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
 
         expect(llmParam).toBeDefined();
@@ -1982,12 +1982,12 @@ describe("prefetchWithFixture", () => {
         if (result.data.adapterData.type !== "workflow") {
           throw new Error("expected a workflow adapter");
         }
-        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
         const signatureNode = nodes.find(
           (n) => (n as { type?: unknown }).type === "signature",
         ) as Record<string, unknown> | undefined;
         const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-          | Array<Record<string, unknown>>
+          | Record<string, unknown>[]
           | undefined;
         const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
         const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
@@ -2056,12 +2056,12 @@ describe("prefetchWithFixture", () => {
         if (result.data.adapterData.type !== "workflow") {
           throw new Error("expected a workflow adapter");
         }
-        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
         const signatureNode = nodes.find(
           (n) => (n as { type?: unknown }).type === "signature",
         ) as Record<string, unknown> | undefined;
         const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-          | Array<Record<string, unknown>>
+          | Record<string, unknown>[]
           | undefined;
         const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
         const value = llmParam?.value as Record<string, unknown> | undefined;

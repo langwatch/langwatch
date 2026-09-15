@@ -9,7 +9,7 @@ import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 import type { RunSnippetDataSource } from "../../../model/run-via-api/run-snippets.ts";
 
-const ITEMS: Array<{ value: RunSnippetDataSource; label: string }> = [
+const ITEMS: { value: RunSnippetDataSource; label: string }[] = [
   { value: "attached", label: "Attached dataset" },
   { value: "inline", label: "Inline data" },
   { value: "dataset_id", label: "Dataset id" },

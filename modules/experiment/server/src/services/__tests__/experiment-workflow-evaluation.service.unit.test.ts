@@ -235,10 +235,10 @@ describe("WorkflowEvaluationService.triggerEvaluationForRest", () => {
       expect(outcome.ok).toBe(true);
       const call = findOrCreateForWorkflow.mock.calls[0]?.[0] as {
         workbenchState: {
-          targets: Array<{
-            inputs: Array<{ identifier: string }>;
+          targets: {
+            inputs: { identifier: string }[];
             mappings: Record<string, Record<string, unknown>>;
-          }>;
+          }[];
         };
       };
       const target = call.workbenchState.targets[0]!;

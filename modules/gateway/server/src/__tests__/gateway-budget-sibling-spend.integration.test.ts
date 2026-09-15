@@ -501,7 +501,7 @@ describe.skipIf(!databaseUrl || !chUrl)("sibling budgets on one virtual key", ()
           const budget = toBudgetRow(
             await prisma.gatewayBudget.findUniqueOrThrow({ where: { id } }),
           );
-          return await chRepo.getBucketSpendBreakdownForBudget({
+          return chRepo.getBucketSpendBreakdownForBudget({
             budget,
             tenantIds: [PROJECT_ID],
             boundaries: [],

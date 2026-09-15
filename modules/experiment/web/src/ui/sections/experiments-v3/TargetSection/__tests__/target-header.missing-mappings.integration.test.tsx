@@ -60,7 +60,7 @@ const createClassifierTarget = ({
   mappedFields,
   hasLocalPromptConfig = true,
 }: {
-  messages: Array<{ role: "system" | "user"; content: string }>;
+  messages: { role: "system" | "user"; content: string }[];
   mappedFields: string[];
   hasLocalPromptConfig?: boolean;
 }): TargetConfig => {

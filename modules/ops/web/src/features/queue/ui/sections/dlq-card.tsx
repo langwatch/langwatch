@@ -20,7 +20,7 @@ function ProcessOutboxDeadRow({
   total,
   hasQueueGroups,
 }: {
-  byProcess: Array<{ processName: string; count: number }>;
+  byProcess: { processName: string; count: number }[];
   total: number;
   hasQueueGroups: boolean;
 }) {

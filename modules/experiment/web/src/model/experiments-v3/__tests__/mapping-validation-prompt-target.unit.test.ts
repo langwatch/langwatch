@@ -22,7 +22,7 @@ describe("mappingValidation", () => {
         ...overrides,
       }) as TargetConfig;
 
-    const draftWith = (messages: Array<{ role: "system" | "user"; content: string }>) => ({
+    const draftWith = (messages: { role: "system" | "user"; content: string }[]) => ({
       llm: { model: "gpt-5-mini" },
       messages,
       inputs: [

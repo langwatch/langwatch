@@ -11,7 +11,7 @@ import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service.t
  */
 
 function span(
-  attributes: Array<{ key: string; value: { stringValue?: string; doubleValue?: number } }> = [],
+  attributes: { key: string; value: { stringValue?: string; doubleValue?: number } }[] = [],
   name = "test-span",
 ): OtlpSpan {
   return {

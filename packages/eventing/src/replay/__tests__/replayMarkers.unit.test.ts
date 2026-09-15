@@ -29,7 +29,7 @@ function createRedisMock() {
 
   const redis = {
     pipeline: () => {
-      const pipelineOps: Array<() => void> = [];
+      const pipelineOps: (() => void)[] = [];
 
       const pipe = {
         hset: (key: string, field: string, value: string) => {

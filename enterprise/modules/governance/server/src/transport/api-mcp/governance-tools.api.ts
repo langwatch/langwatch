@@ -10,7 +10,7 @@ type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
   // need the second `extra` parameter.
   args: any,
-) => Promise<{ content: Array<{ type: "text"; text: string }> }>;
+) => Promise<{ content: { type: "text"; text: string }[] }>;
 
 /**
  * Structural shape we use from the McpServer instance returned by

@@ -320,7 +320,7 @@ export class CodingAgentPullRequestShareService {
     for (const field of COUNTER_FIELDS) {
       const amount = Math.max(0, Math.floor(session[field]));
       const floors = new Map<string, number>();
-      const remainders: Array<{ key: string; remainder: number }> = [];
+      const remainders: { key: string; remainder: number }[] = [];
       let handedOut = 0;
 
       for (const key of keys) {

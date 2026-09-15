@@ -144,7 +144,7 @@ export interface SetupObservabilityOptions {
    * Resource detectors for automatic detection of runtime environment
    * attributes.
    */
-  resourceDetectors?: Array<ResourceDetector>;
+  resourceDetectors?: ResourceDetector[];
 
   /**
    * Custom resource configuration for the entity being monitored

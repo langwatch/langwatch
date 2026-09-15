@@ -186,7 +186,7 @@ export function MemberDetailDialog({
       // Apply org role first — it has license/plan checks that should block the
       // whole save if they fail. Bindings then run as a single transactional
       // batch so they cannot leave a partial state behind.
-      let teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
+      let teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
       if (roleChanged) {
         const roleResult = await updateOrgRole.mutateAsync({
           organizationId,

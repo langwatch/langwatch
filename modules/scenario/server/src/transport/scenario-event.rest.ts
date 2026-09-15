@@ -270,7 +270,7 @@ export function createScenarioEventsRest(options: {
           throw new Error("A validated scenario-event archive has no scope");
         }
 
-        return await archiveScenarioSetRuns({
+        return archiveScenarioSetRuns({
           simulations: simulations(),
           projectId: scope.id,
           scenarioSetId,
@@ -306,10 +306,10 @@ async function dispatchSimulationEvent(
     const messages = event.messages ?? [];
     await simulations.messageSnapshot({
       ...basePayload,
-      messages: messages as Array<{
+      messages: messages as {
         trace_id?: string;
         [key: string]: unknown;
-      }>,
+      }[],
       traceIds: messages
         .map((m: { trace_id?: string }) => m.trace_id)
         .filter((id): id is string => typeof id === "string"),

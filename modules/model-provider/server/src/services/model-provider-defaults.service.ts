@@ -149,8 +149,8 @@ export class ModelProviderDefaultsService {
   /** Every scope the caller can reach, by id, for labelling a snapshot. */
   private scopeNames(available: {
     organization: { id: string; name: string } | null;
-    teams: Array<{ id: string; name: string }>;
-    projects: Array<{ id: string; name: string }>;
+    teams: { id: string; name: string }[];
+    projects: { id: string; name: string }[];
   }): Map<string, string> {
     return new Map([
       ...(available.organization

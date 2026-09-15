@@ -18,9 +18,9 @@ export class CachedLuaScript {
   async run(
     redis: IORedis | Cluster,
     numKeys: number,
-    ...keysAndArgs: Array<string | number>
+    ...keysAndArgs: (string | number)[]
   ): Promise<unknown> {
-    return await this.runCancellable(redis, null, numKeys, ...keysAndArgs);
+    return this.runCancellable(redis, null, numKeys, ...keysAndArgs);
   }
 
   /**
@@ -31,7 +31,7 @@ export class CachedLuaScript {
     redis: IORedis | Cluster,
     isCancelled: (() => boolean) | null,
     numKeys: number,
-    ...keysAndArgs: Array<string | number>
+    ...keysAndArgs: (string | number)[]
   ): Promise<unknown> {
     try {
       return await redis.evalsha(this.sha, numKeys, ...keysAndArgs);
@@ -51,7 +51,7 @@ export class CachedLuaScript {
   queue(
     pipeline: ChainableCommander,
     numKeys: number,
-    ...keysAndArgs: Array<string | number>
+    ...keysAndArgs: (string | number)[]
   ): void {
     pipeline.evalsha(this.sha, numKeys, ...keysAndArgs);
   }

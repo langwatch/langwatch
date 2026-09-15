@@ -50,7 +50,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectory {
   async findPersonProfile(
     userId: string,
   ): Promise<{ name: string | null; email: string | null } | null> {
-    return await this.database.user.findUnique({
+    return this.database.user.findUnique({
       where: { id: userId },
       select: { name: true, email: true },
     });
@@ -85,7 +85,7 @@ export class PrismaGovernanceDirectoryRepository extends GovernanceDirectory {
     slug: string;
     organizationId: string;
   }): Promise<(GovernanceDirectoryProject & { apiKey: string }) | null> {
-    return await this.database.project.findFirst({
+    return this.database.project.findFirst({
       where: { slug, archivedAt: null, team: { organizationId } },
       select: { ...PROJECT_SELECT, apiKey: true },
     });

@@ -129,7 +129,7 @@ function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
 
   const conversations: Record<
     string,
-    Array<{ conversation_id: string; title: string; created_timestamp: number }>
+    { conversation_id: string; title: string; created_timestamp: number }[]
   > = {
     "space-alpha": [
       { conversation_id: "conv-alpha-1", title: "Top products", created_timestamp: alphaMs },
@@ -149,7 +149,7 @@ function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
     ],
   };
 
-  const messages: Record<string, Array<ReturnType<typeof message>>> = {
+  const messages: Record<string, ReturnType<typeof message>[]> = {
     "conv-alpha-1": [
       message({
         id: "msg-alpha-1",
@@ -394,7 +394,7 @@ function genieConfig(params: {
   });
 }
 
-let closers: Array<() => Promise<void>> = [];
+let closers: (() => Promise<void>)[] = [];
 afterEach(async () => {
   await Promise.all(closers.map((close) => close()));
   closers = [];

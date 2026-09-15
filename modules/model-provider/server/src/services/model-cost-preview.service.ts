@@ -39,7 +39,7 @@ export type ModelCostPreviewSpanReader = Readonly<{
     tenantId: string;
     fromMs: number;
     limit: number;
-  }): Promise<Array<{ model: string; spanCount: number; lastSeenMs: number }>>;
+  }): Promise<{ model: string; spanCount: number; lastSeenMs: number }[]>;
   getRecentSpansByModels(input: {
     tenantId: string;
     models: string[];
@@ -47,7 +47,7 @@ export type ModelCostPreviewSpanReader = Readonly<{
     perModelLimit: number;
     limit: number;
   }): Promise<
-    Array<{
+    {
       traceId: string;
       spanId: string;
       spanName: string;
@@ -58,7 +58,7 @@ export type ModelCostPreviewSpanReader = Readonly<{
       cacheCreationTokens: number | null;
       cacheCreation1hTokens: number | null;
       startTimeMs: number;
-    }>
+    }[]
   >;
 }>;
 

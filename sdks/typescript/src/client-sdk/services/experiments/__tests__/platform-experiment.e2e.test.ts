@@ -75,7 +75,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
         return;
       }
 
-      const progressUpdates: Array<{ completed: number; total: number }> = [];
+      const progressUpdates: { completed: number; total: number }[] = [];
 
       await langwatch.experiments.run(testSlug, {
         timeout: 300000,

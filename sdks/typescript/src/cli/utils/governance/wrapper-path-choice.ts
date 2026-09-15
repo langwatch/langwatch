@@ -357,7 +357,7 @@ export async function resolveWrapperPath(
   // Remember the choice so subsequent runs don't prompt.
   const next: GovernanceConfig = {
     ...cfg,
-    tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: chosen },
+    tool_mode: { ...cfg.tool_mode, [tool]: chosen },
   };
   try {
     saveImpl(next);

@@ -53,7 +53,7 @@ export const workflowTrpcTransport = defineTrpcRouter(WorkflowApi, workflowTrpc)
   .handle(async ({ app, input, actor }) => {
     const dsl = await app.prepareStudioDsl({ projectId: input.projectId, dsl: input.dsl });
 
-    return await app.create(
+    return app.create(
       {
         projectId: input.projectId,
         dsl,
@@ -83,7 +83,7 @@ export const workflowTrpcTransport = defineTrpcRouter(WorkflowApi, workflowTrpc)
       });
     }
 
-    return await app.copy(
+    return app.copy(
       {
         sourceWorkflowId: input.workflowId,
         targetProjectId: input.projectId,

@@ -161,11 +161,11 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     keys,
   }: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
+    }[];
   }): Promise<GithubPullRequestRow[]> {
     if (keys.length === 0) {
       return [];

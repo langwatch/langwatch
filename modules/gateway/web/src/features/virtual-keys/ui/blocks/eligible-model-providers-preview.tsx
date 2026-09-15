@@ -60,8 +60,8 @@ export function EligibleModelProvidersPreview({
   scopes: VirtualKeyScopeEntry[];
   organizationId: string | undefined;
   organizationName?: string;
-  availableTeams: Array<{ id: string; name: string }>;
-  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
   isLoading?: boolean;
   providers: OrgModelProvider[];
   /**
@@ -250,8 +250,8 @@ export function EligibleModelProvidersSummary({
   scopes: VirtualKeyScopeEntry[];
   organizationId: string | undefined;
   organizationName?: string;
-  availableTeams: Array<{ id: string; name: string }>;
-  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
   isLoading?: boolean;
   providers: OrgModelProvider[];
   /** The key's own provider allowlist; see the preview's own prop. */

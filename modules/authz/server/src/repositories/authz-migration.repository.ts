@@ -124,7 +124,7 @@ export abstract class AuthzMigrationRepository {
 
   abstract findGroupMemberships(args: {
     organizationId: string;
-  }): Promise<Array<{ userId: string; groupId: string }>>;
+  }): Promise<{ userId: string; groupId: string }[]>;
 
   abstract findGrantHeadRows(args: { organizationId: string }): Promise<GrantHeadRow[]>;
 

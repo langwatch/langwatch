@@ -23,7 +23,7 @@ export class PrismaAuthDirectoryRepository extends AuthDirectory {
   async tryFindPerson(
     userId: string,
   ): Promise<{ id: string; email: string | null; name: string | null } | null> {
-    return await this.database.user.findUnique({
+    return this.database.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, name: true },
     });
@@ -32,7 +32,7 @@ export class PrismaAuthDirectoryRepository extends AuthDirectory {
   async tryFindOrganization(
     organizationId: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {
-    return await this.database.organization.findUnique({
+    return this.database.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true, slug: true },
     });
@@ -67,7 +67,7 @@ export class PrismaAuthDirectoryRepository extends AuthDirectory {
     projectId: string;
     organizationId: string;
   }): Promise<AuthDirectoryProject | null> {
-    return await this.database.project.findFirst({
+    return this.database.project.findFirst({
       where: { id: projectId, archivedAt: null, team: { organizationId } },
       select: {
         id: true,

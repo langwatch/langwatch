@@ -17,7 +17,7 @@ export class MemoryDatasetRecordContentRepository implements DatasetRecordConten
   }
 
   async createMany(input: {
-    records: Array<{ id: string; entry: unknown }>;
+    records: { id: string; entry: unknown }[];
     datasetId: string;
     projectId: string;
   }): Promise<DatasetRecord[]> {

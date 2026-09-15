@@ -393,7 +393,7 @@ const DynamicZodForm = ({
     ) {
       const isSelectLiteral = (value: z.util.Literal): value is string | number =>
         typeof value === "string" || typeof value === "number";
-      const options: Array<{ value: string | number }> =
+      const options: { value: string | number }[] =
         fieldSchema_ instanceof z.ZodUnion
           ? fieldSchema_.options.flatMap((option) =>
               option instanceof z.ZodLiteral

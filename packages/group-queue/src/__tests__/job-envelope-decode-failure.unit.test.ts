@@ -79,7 +79,7 @@ describe("jobEnvelope decode failures", () => {
     // Each is a distinct throw site in splitEnvelope/decodeJobEnvelope.
     // Prefix must be a REAL one ("GQ1|"/"GQ2|") or isEnvelope() is false and the
     // value takes the bare-JSON path instead of the envelope path under test.
-    const cases: Array<{ name: string; value: string }> = [
+    const cases: { name: string; value: string }[] = [
       { name: "no header length delimiter", value: "GQ2|" + "x".repeat(20) },
       { name: "a non-numeric header length", value: "GQ2|abc|{}" },
       { name: "a zero header length", value: "GQ2|0|{}" },
@@ -279,7 +279,7 @@ describe("jobEnvelope decode failures", () => {
     });
 
     describe("given a value it cannot read", () => {
-      const junk: Array<{ name: string; value: string }> = [
+      const junk: { name: string; value: string }[] = [
         { name: "bare JSON", value: JSON.stringify({ a: 1 }) },
         { name: "an empty string", value: "" },
         { name: "a truncated envelope", value: "GQ2:" },

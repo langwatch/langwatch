@@ -127,11 +127,11 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
-    return await this.plans.getActivePlan(organizationId);
+    return this.plans.getActivePlan(organizationId);
   }
 
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    return await this.plans.getSelfHostedPlan(organizationId);
+    return this.plans.getSelfHostedPlan(organizationId);
   }
 
   async validateAndStoreLicense({

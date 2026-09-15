@@ -355,13 +355,13 @@ export type EvaluationResults = {
    */
   runningEvaluators?: Set<string>;
   // Per-row results - arrays can have holes (undefined) for rows not yet executed
-  targetOutputs: Record<string, Array<unknown>>;
+  targetOutputs: Record<string, unknown[]>;
   // Per-row metadata - arrays can have holes (undefined/null) for rows not yet executed
-  targetMetadata: Record<string, Array<TargetRowMetadata | null | undefined>>;
+  targetMetadata: Record<string, (TargetRowMetadata | null | undefined)[]>;
   // Evaluator results nested by target - arrays can have holes
-  evaluatorResults: Record<string, Record<string, Array<unknown>>>;
+  evaluatorResults: Record<string, Record<string, unknown[]>>;
   // Per-row errors - arrays can have holes (undefined) for rows without errors
-  errors: Record<string, Array<string | null | undefined>>;
+  errors: Record<string, (string | null | undefined)[]>;
 };
 
 // ============================================================================

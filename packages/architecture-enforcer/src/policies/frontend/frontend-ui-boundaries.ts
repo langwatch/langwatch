@@ -109,7 +109,7 @@ function isScreenPortableTransport(specifier: string): boolean {
   return /^@tanstack\/react-query(?:\/|$)/.test(specifier) || specifier === "@langwatch/api/web";
 }
 
-const BROWSER_CAPABILITY_IMPORTS: ReadonlyArray<readonly [RegExp, string]> = [
+const BROWSER_CAPABILITY_IMPORTS: readonly (readonly [RegExp, string])[] = [
   [/^@tanstack\/react-query(?:\/|$)/, "React Query directly"],
   [/^@trpc\/(?:client|react-query)(?:\/|$)/, "tRPC transport directly"],
   [/^(?:axios|ky|wretch)(?:\/|$)/, "an HTTP client directly"],
@@ -120,7 +120,7 @@ const BROWSER_CAPABILITY_IMPORTS: ReadonlyArray<readonly [RegExp, string]> = [
   [/^(?:next-auth|better-auth)(?:\/|$)/, "session implementation directly"],
 ];
 
-const BROWSER_CAPABILITY_SOURCE: ReadonlyArray<readonly [RegExp, string]> = [
+const BROWSER_CAPABILITY_SOURCE: readonly (readonly [RegExp, string])[] = [
   [/\bAppRouter\b/, "AppRouter"],
   // Not `a.fetch(...)`: a tRPC utils client, a repository port and a queue
   // client all name a method `fetch`, and calling one is not reaching for the

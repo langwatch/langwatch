@@ -113,7 +113,7 @@ export class GdprUserDataEraseRepository {
 
   findProjectsUnderTeams(
     teamIds: string[],
-  ): Promise<Array<{ id: string; name: string; slug: string; teamId: string | null }>> {
+  ): Promise<{ id: string; name: string; slug: string; teamId: string | null }[]> {
     if (teamIds.length === 0) return Promise.resolve([]);
     return this.database.project.findMany({
       where: { teamId: { in: teamIds } },

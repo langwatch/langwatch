@@ -118,7 +118,7 @@ export class ApiKeysApiService {
   private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
-      headers: { ...this.headers(), ...(init?.headers ?? {}) },
+      headers: { ...this.headers(), ...init?.headers },
     });
     if (!response.ok) {
       let parsedBody: unknown;

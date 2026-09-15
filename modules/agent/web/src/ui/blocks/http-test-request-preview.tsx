@@ -9,7 +9,7 @@ export function HttpTestRequestPreview({
 }: {
   url?: string;
   method?: string;
-  headers?: Array<{ key: string; value: string }>;
+  headers?: { key: string; value: string }[];
   body: string;
 }) {
   return (

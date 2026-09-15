@@ -465,11 +465,11 @@ export async function resolveWrapperMode(
   // next run instead of getting silently pinned forever.
   const next: GovernanceConfig = { ...cfg };
   if (forcedMode === undefined) {
-    next.tool_mode = { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" };
+    next.tool_mode = { ...cfg.tool_mode, [tool]: "ingestion" };
   }
   if (minted) {
     next.default_personal_ingest_keys = {
-      ...(cfg.default_personal_ingest_keys ?? {}),
+      ...cfg.default_personal_ingest_keys,
       [sourceType]: { secret: token },
     };
   }

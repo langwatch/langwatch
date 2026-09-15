@@ -36,7 +36,7 @@ export interface SystemMigrationEnrollmentStore {
   isEnrolled(args: { organizationId: string; migrationName: string }): Promise<boolean>;
   countEnrolledByMigration(): Promise<Map<string, number>>;
   countOrganizations(): Promise<number>;
-  searchOrganizations(args: { query: string }): Promise<Array<{ id: string; name: string }>>;
+  searchOrganizations(args: { query: string }): Promise<{ id: string; name: string }[]>;
   create(args: {
     organizationId: string;
     migrationName: string;
@@ -52,7 +52,7 @@ export interface SystemMigrationEnrollmentStore {
      *  false at the repository, so a caller that says nothing gets the safe
      *  pool rather than the wide one. */
     includeEnterprise?: boolean;
-  }): Promise<Array<{ id: string; name: string }>>;
+  }): Promise<{ id: string; name: string }[]>;
   createMany(args: {
     organizationIds: string[];
     migrationName: string;
@@ -83,7 +83,7 @@ export interface SystemMigrationStateReader {
 export type SystemMigrationsServiceDependencies = {
   state: SystemMigrationStateReader;
   /** Every registered migration's listing-facing declaration, cutover last. */
-  migrations: () => Array<{
+  migrations: () => {
     name: string;
     title: string;
     description: string;
@@ -97,7 +97,7 @@ export type SystemMigrationsServiceDependencies = {
     enrolledAutomatically: boolean;
     /** Organization or user axis; omitted means organization. See ADR-101 §6. */
     tenant?: "organization" | "user";
-  }>;
+  }[];
   /** Read per call, so the answer is never a boot-time capture. */
   isSaaS: () => boolean;
   enrollments: SystemMigrationEnrollmentStore;

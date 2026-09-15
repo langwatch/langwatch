@@ -24,7 +24,7 @@ export class CodingAgentSessionListPullRequestService {
   async findForProject(input: {
     projectId: string;
     sessions: CodingAgentSession[];
-  }): Promise<Map<string, Array<{ number: number; url: string; title: string }>>> {
+  }): Promise<Map<string, { number: number; url: string; title: string }[]>> {
     const drives = this.listBranchDrives(input.sessions);
     if (drives.length === 0) {
       return new Map();
@@ -70,7 +70,7 @@ export class CodingAgentSessionListPullRequestService {
 
   private uniqueBranchKeys(
     drives: readonly ListBranchDrive[],
-  ): Array<{ repositoryHost: string; repositoryFullName: string; headBranch: string }> {
+  ): { repositoryHost: string; repositoryFullName: string; headBranch: string }[] {
     const keys = new Map<
       string,
       { repositoryHost: string; repositoryFullName: string; headBranch: string }
@@ -89,7 +89,7 @@ export class CodingAgentSessionListPullRequestService {
   private linkedPullRequests(
     drives: readonly ListBranchDrive[],
     candidates: readonly GithubPullRequest[],
-  ): Map<string, Array<{ number: number; url: string; title: string }>> {
+  ): Map<string, { number: number; url: string; title: string }[]> {
     const found = new Map<string, Map<number, { number: number; url: string; title: string }>>();
     const byRepository = new Map<string, ListBranchDrive[]>();
     for (const drive of drives) {

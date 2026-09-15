@@ -70,12 +70,12 @@ export interface RunPlanRunResult {
     scenarios: string[];
     targets: string[];
   };
-  items: Array<{
+  items: {
     scenarioRunId: string;
     scenarioId: string;
     target: RunPlanTargetWire;
     name: string | null;
-  }>;
+  }[];
   runPlanId: string;
   planName: string;
   /** True when this run created the plan, false when it joined an existing one. */

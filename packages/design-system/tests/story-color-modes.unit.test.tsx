@@ -47,7 +47,7 @@ beforeAll(() => {
 
 afterEach(() => cleanup());
 
-function composedFor(mode: "light" | "dark"): Array<[string, ComponentType]> {
+function composedFor(mode: "light" | "dark"): [string, ComponentType][] {
   return Object.entries(stories).flatMap(([file, module]) => {
     const composed = composeStories(
       module as never,

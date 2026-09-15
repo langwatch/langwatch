@@ -188,7 +188,7 @@ describe("given the fleet's queue-metrics writer", () => {
   describe("when this process holds the queue's Redis", () => {
     /** @scenario "The worker publishes the operations snapshot the dashboard reads" */
     it("claims the shared writer lease on the snapshot store's own keys", async () => {
-      const commands: Array<{ command: string; args: unknown[] }> = [];
+      const commands: { command: string; args: unknown[] }[] = [];
       const recordingRedis = new Proxy(
         {},
         {

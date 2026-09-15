@@ -36,7 +36,7 @@ export class MemoryDataPrivacyPolicyRepository implements DataPrivacyPolicyRepos
 
   async findForProjectChain(input: {
     organizationId: string;
-    scopes: Array<Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">>;
+    scopes: Pick<DataPrivacyRow, "scopeType" | "scopeId" | "personalOnly">[];
   }): Promise<DataPrivacyRow[]> {
     return this.#rows
       .filter(

@@ -139,7 +139,7 @@ export class RelayClient {
   private connectTimer: NodeJS.Timeout | null = null;
   private watchdog: NodeJS.Timeout | null = null;
   private heartbeatIntervalMs = PRESENCE_HEARTBEAT_MS;
-  private closeWaiters: Array<() => void> = [];
+  private closeWaiters: (() => void)[] = [];
   private lastError: string | null = null;
 
   constructor(config: RelayClientConfig) {

@@ -2448,7 +2448,7 @@ export const builtInPresets: Preset[] = [
 ];
 
 function evaluationEvents(
-  evals: Array<{ name: string; score: number; label: string; passed: boolean }>,
+  evals: { name: string; score: number; label: string; passed: boolean }[],
 ): SpanEvent[] {
   return evals.map((ev, i) => ({
     name: "langwatch.evaluation.custom",

@@ -27,11 +27,11 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
   }
 
   async upsertBatch(
-    rows: Array<{
+    rows: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     for (const entry of rows) {
       await this.upsert(entry.row, entry.retentionDays, entry.appliedEventIds);

@@ -17,22 +17,22 @@ export type ExperimentRunSummary = {
     finishedAt?: number;
     stoppedAt?: number;
   };
-  targets?: Array<{
+  targets?: {
     targetId: string;
     name: string;
     passed: number;
     failed: number;
     avgLatency: number;
     totalCost: number;
-  }>;
-  evaluators?: Array<{
+  }[];
+  evaluators?: {
     evaluatorId: string;
     name: string;
     passed: number;
     failed: number;
     passRate: number;
     avgScore?: number;
-  }>;
+  }[];
   totalPassed?: number;
   totalFailed?: number;
   passRate?: number;
@@ -68,7 +68,7 @@ export type RunWithResultsOptions = {
   /**
    * Inline rows to evaluate. Mutually exclusive with `datasetId`.
    */
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   /**
    * Id of a saved dataset to evaluate. Mutually exclusive with `data`.
    */

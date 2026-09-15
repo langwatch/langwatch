@@ -45,7 +45,7 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
     ScopeChipPicker: ({
       onChange,
     }: {
-      onChange: (next: Array<{ scopeType: string; scopeId: string }>) => void;
+      onChange: (next: { scopeType: string; scopeId: string }[]) => void;
     }) => (
       <button
         type="button"

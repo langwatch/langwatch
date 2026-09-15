@@ -11,7 +11,7 @@ import { z } from "zod";
 type Recorded = RecordCapturedSpanInput;
 
 function harness() {
-  const dispatched: Array<{ projectId: string; headers: Record<string, string> }> = [];
+  const dispatched: { projectId: string; headers: Record<string, string> }[] = [];
   const recorded: Recorded[] = [];
 
   const caller = createHttpProxyCaller({

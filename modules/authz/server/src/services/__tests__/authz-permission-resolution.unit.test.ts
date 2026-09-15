@@ -26,7 +26,7 @@ type World = {
   bindings?: CollectedBinding[];
   groupBindings?: CollectedBinding[];
   legacyTeams?: LegacyTeamMembership[];
-  customRoles?: Array<{ id: string; permissions: unknown }>;
+  customRoles?: { id: string; permissions: unknown }[];
   projectKnown?: boolean;
   demoProjectId?: string;
 };
@@ -189,11 +189,11 @@ describe("given a project-scoped permission check", () => {
   });
 
   describe("when the team role decides the outcome", () => {
-    const cases: Array<{
+    const cases: {
       role: CollectedBinding["role"];
       permission: AuthzPermission;
       permitted: boolean;
-    }> = [
+    }[] = [
       { role: "ADMIN", permission: "analytics:view", permitted: true },
       { role: "ADMIN", permission: "datasets:manage", permitted: true },
       { role: "ADMIN", permission: "team:manage", permitted: true },

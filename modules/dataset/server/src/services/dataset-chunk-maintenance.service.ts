@@ -52,7 +52,7 @@ export class DatasetChunkMaintenanceService {
       const current = await tx.getOne({ id: datasetId, projectId });
 
       const chunkCount = current.chunkCount ?? 0;
-      const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
+      const perChunk: { rowCount: number; byteSize: number }[] = [];
       for (let index = 0; index < chunkCount; index++) {
         // `readChunk` throws `MissingChunkError` if a chunk the count claims is
         // gone — corruption, not emptiness. Propagate it (loud) rather than mask it.
@@ -163,7 +163,7 @@ export class DatasetChunkMaintenanceService {
         fromIndex: meta.chunkCount,
       });
 
-      return await tx.updateContent({
+      return tx.updateContent({
         id: dataset.id,
         projectId,
         content: {

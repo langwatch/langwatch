@@ -12,8 +12,8 @@ const service = ModelCostPreviewService.create({
 });
 
 function fakeReader(overrides: {
-  stats?: Array<{ model: string; spanCount: number; lastSeenMs: number }>;
-  spans?: Array<{
+  stats?: { model: string; spanCount: number; lastSeenMs: number }[];
+  spans?: {
     traceId: string;
     spanId: string;
     spanName: string;
@@ -24,7 +24,7 @@ function fakeReader(overrides: {
     cacheCreationTokens: number | null;
     cacheCreation1hTokens: number | null;
     startTimeMs: number;
-  }>;
+  }[];
   tenantIdsSeen: string[];
 }): ModelCostPreviewSpanReader {
   return {

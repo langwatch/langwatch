@@ -81,14 +81,14 @@ export class PrismaDatasetContentRepository implements DatasetContentRepository 
       throw new Error("withDatasetLock cannot nest: this repository is already transactional");
     }
 
-    return await this.root.$transaction(
+    return this.root.$transaction(
       async (client) => {
         // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock returns void,
         // which $queryRaw cannot deserialize. The lock is held for the whole
         // transaction, which is what serializes the mutation.
         await client.$executeRaw`-- @tenancy: advisory-lock helper, key is dataset-bounded
 SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
-        return await mutate(new PrismaDatasetContentRepository(client, null));
+        return mutate(new PrismaDatasetContentRepository(client, null));
       },
       {
         timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -102,7 +102,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    */
   async findOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
     const client = this.prisma;
-    return await client.dataset.findFirst({
+    return client.dataset.findFirst({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -117,7 +117,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    */
   async getOne(input: { id: string; projectId: string }): Promise<DatasetRow> {
     const client = this.prisma;
-    return await client.dataset.findFirstOrThrow({
+    return client.dataset.findFirstOrThrow({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -134,7 +134,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     excludeId?: string;
   }): Promise<DatasetRow | null> {
     const client = this.prisma;
-    return await client.dataset.findFirst({
+    return client.dataset.findFirst({
       where: {
         slug: input.slug,
         projectId: input.projectId,
@@ -148,7 +148,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    */
   async create(input: CreateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
-    return await client.dataset.create({
+    return client.dataset.create({
       data: input as Prisma.DatasetUncheckedCreateInput,
     });
   }
@@ -161,7 +161,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   async update(input: UpdateDatasetInput): Promise<DatasetRow> {
     const client = this.prisma;
 
-    return await client.dataset.update({
+    return client.dataset.update({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -182,7 +182,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   }): Promise<DatasetRow> {
     const { chunkOffsets, columnTypes, ...scalars } = input.content;
 
-    return await this.update({
+    return this.update({
       id: input.id,
       projectId: input.projectId,
       data: {
@@ -275,7 +275,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     projectId: string;
     olderThan: Instant;
   }): Promise<DatasetRow[]> {
-    return await this.prisma.dataset.findMany({
+    return this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
         status: "processing",
@@ -295,7 +295,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     projectId: string;
     stagingKey: string;
   }): Promise<DatasetRow | null> {
-    return await this.prisma.dataset.findFirst({
+    return this.prisma.dataset.findFirst({
       where: {
         projectId: input.projectId,
         stagingKey: input.stagingKey,
@@ -314,7 +314,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
     projectId: string;
     olderThan: Instant;
   }): Promise<DatasetRow[]> {
-    return await this.prisma.dataset.findMany({
+    return this.prisma.dataset.findMany({
       where: {
         projectId: input.projectId,
         status: "uploading",
@@ -327,8 +327,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
-  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
-    return await this.prisma.dataset.findMany({
+  async findAllSlugs(input: { projectId: string }): Promise<{ slug: string }[]> {
+    return this.prisma.dataset.findMany({
       where: { projectId: input.projectId },
       select: { slug: true },
     });
@@ -338,7 +338,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
    * Lists non-archived datasets for a project with pagination and record counts.
    */
   async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
-    datasets: Array<DatasetRow & { _count: { datasetRecords: number } }>;
+    datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }> {
     const where = { projectId: input.projectId, archivedAt: null };
@@ -366,7 +366,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   private async attachRecordCounts<T extends CountableDataset>(
     projectId: string,
     datasets: T[],
-  ): Promise<Array<T & { _count: { datasetRecords: number } }>> {
+  ): Promise<(T & { _count: { datasetRecords: number } })[]> {
     const datasetIds = datasets.filter(storesRowsInRecordsTable).map((dataset) => dataset.id);
 
     const grouped =

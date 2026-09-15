@@ -67,7 +67,7 @@ export type BudgetOverviewItem = ApplicableBudget & {
    * items, and only when the caller asked for them, so lightweight surfaces skip the extra
    * ClickHouse read.
    */
-  topModels?: Array<{ model: string; spentUsd: number }>;
+  topModels?: { model: string; spentUsd: number }[];
 };
 
 export type BudgetOverviewForUser = {
@@ -85,7 +85,7 @@ type PersonalVirtualKeyReader = {
   listActiveForPrincipal(input: {
     userId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string }>>;
+  }): Promise<{ id: string }[]>;
 };
 
 /**
@@ -320,7 +320,7 @@ export class BudgetOverviewService {
   private async loadTopModels(input: {
     personalProjectId: string | null;
     userId: string;
-  }): Promise<Array<{ model: string; spentUsd: number }>> {
+  }): Promise<{ model: string; spentUsd: number }[]> {
     if (!input.personalProjectId || !this.personalUsage) {
       return [];
     }

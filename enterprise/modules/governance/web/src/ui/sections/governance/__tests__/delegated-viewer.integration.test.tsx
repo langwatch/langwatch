@@ -100,7 +100,7 @@ import UserDetailPage from "../governance-user.screen.tsx";
 import UsersListPage from "../governance-users.screen.tsx";
 
 /** Every page the Governance section navigation lists, plus its drill-ins. */
-const GOVERNANCE_PAGES: Array<[string, React.ComponentType]> = [
+const GOVERNANCE_PAGES: [string, React.ComponentType][] = [
   ["/governance", GovernanceOverviewPage],
   // The inventory carries both the Sources tab (the old catalog page) and
   // the Catalog tab (the old tool-catalog page) — one entry covers both.

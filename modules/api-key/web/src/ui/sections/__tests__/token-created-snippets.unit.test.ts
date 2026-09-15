@@ -128,7 +128,7 @@ describe("given the token-created-snippets feature is implemented", () => {
       },
     } as const satisfies Record<string, Record<(typeof COMBOS)[number]["label"], string>>;
 
-    for (const key of Object.keys(EXPECTED) as Array<keyof typeof EXPECTED>) {
+    for (const key of Object.keys(EXPECTED) as (keyof typeof EXPECTED)[]) {
       for (const combo of COMBOS) {
         /** @scenario An assistant with an install command shows a terminal snippet */
         it(`builds ${key}'s command exactly, ${combo.label}`, () => {

@@ -10,7 +10,7 @@ import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../model-providers-screen.tsx";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const { mockState } = vi.hoisted(() => ({
-  mockState: { providers: [] as Array<Record<string, unknown>> },
+  mockState: { providers: [] as Record<string, unknown>[] },
 }));
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({

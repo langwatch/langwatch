@@ -148,7 +148,7 @@ export interface OrganizationSeatLicense {
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: ReadonlyArray<{ role: string; customRoleId?: string }> | undefined;
+    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
 }

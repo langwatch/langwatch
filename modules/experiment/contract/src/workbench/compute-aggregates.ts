@@ -59,7 +59,7 @@ export type TargetAggregate = {
 export const computeTargetAggregates = (
   targetId: string,
   results: EvaluationResults,
-  evaluators: Array<{ id: string }>,
+  evaluators: { id: string }[],
   rowCount: number,
 ): TargetAggregate => {
   const targetOutputs = results.targetOutputs[targetId] ?? [];

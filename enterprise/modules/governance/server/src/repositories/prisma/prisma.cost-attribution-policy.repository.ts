@@ -10,7 +10,7 @@ type CostAttributionPrismaClient = {
         archivedAt: null;
       };
       select: { config: true };
-    }): Promise<Array<{ config: unknown }>>;
+    }): Promise<{ config: unknown }[]>;
   };
 };
 

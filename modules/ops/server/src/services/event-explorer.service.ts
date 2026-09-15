@@ -27,14 +27,14 @@ export class EventExplorerService {
     since: string;
     tenantIds: string[];
   }): Promise<{
-    projections: Array<{
+    projections: {
       projectionName: string;
       aggregateCount: number;
-      tenantBreakdown: Array<{
+      tenantBreakdown: {
         tenantId: string;
         aggregateCount: number;
-      }>;
-    }>;
+      }[];
+    }[];
   }> {
     const allProjections = this.introspection.projections();
     const selected = allProjections.filter((p) =>
@@ -54,7 +54,7 @@ export class EventExplorerService {
       tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,
     });
 
-    const byAggregateType = new Map<string, Array<{ tenantId: string; aggregateCount: number }>>();
+    const byAggregateType = new Map<string, { tenantId: string; aggregateCount: number }[]>();
     for (const row of rows) {
       const list = byAggregateType.get(row.aggregateType) ?? [];
       list.push({
@@ -64,14 +64,14 @@ export class EventExplorerService {
       byAggregateType.set(row.aggregateType, list);
     }
 
-    const projections: Array<{
+    const projections: {
       projectionName: string;
       aggregateCount: number;
-      tenantBreakdown: Array<{
+      tenantBreakdown: {
         tenantId: string;
         aggregateCount: number;
-      }>;
-    }> = [];
+      }[];
+    }[] = [];
 
     for (const projection of selected) {
       const tenantBreakdown = byAggregateType.get(projection.aggregateType) ?? [];
@@ -103,12 +103,12 @@ export class EventExplorerService {
     tenantId: string;
     limit: number;
   }): Promise<
-    Array<{
+    {
       eventId: string;
       eventType: string;
       eventTimestamp: string;
       payload: unknown;
-    }>
+    }[]
   > {
     const rows = await this.repo.findEventsByAggregate(params);
 

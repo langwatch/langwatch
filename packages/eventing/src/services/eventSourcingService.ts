@@ -17,7 +17,7 @@ import type {
 import { QueueManager } from "./queues/queueManager.ts";
 
 /** Flattens an AggregateError's members into loggable `{message, stack}` shapes. */
-function extractSubErrors(error: unknown): Array<{ message: string; stack?: string } | string> {
+function extractSubErrors(error: unknown): ({ message: string; stack?: string } | string)[] {
   if (!(error instanceof AggregateError)) return [];
   return error.errors.map((e: unknown) =>
     e instanceof Error
@@ -388,7 +388,7 @@ export class EventSourcingService<
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "EventSourcingService.storeEvents",
       {
         kind: SpanKind.INTERNAL,
@@ -571,7 +571,7 @@ export class EventSourcingService<
     context: EventStoreReadContext<EventType>,
     options?: { key?: string },
   ): Promise<boolean> {
-    return await this.router.hasProjectionByName(projectionName, aggregateId, context, options);
+    return this.router.hasProjectionByName(projectionName, aggregateId, context, options);
   }
 
   /**

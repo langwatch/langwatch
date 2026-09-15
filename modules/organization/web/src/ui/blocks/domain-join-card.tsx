@@ -3,11 +3,11 @@ import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useState } from "react";
 
 /** Domain join settings: auto/request/off onboarding. Copy says what, not how. */
-const OPTIONS: Array<{
+const OPTIONS: {
   value: DomainJoinSetting;
   label: string;
   help: string;
-}> = [
+}[] = [
   {
     value: "off",
     label: "Nobody",

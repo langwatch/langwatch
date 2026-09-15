@@ -126,7 +126,7 @@ function makeRedis(
       return [nextCursor, page];
     }),
     pipeline: vi.fn(() => {
-      const cmds: Array<{ op: "zrange" | "hlen"; key: string }> = [];
+      const cmds: { op: "zrange" | "hlen"; key: string }[] = [];
       const chain = {
         zrange: (key: string) => {
           cmds.push({ op: "zrange", key });

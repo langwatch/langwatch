@@ -7,7 +7,7 @@ const producer = () =>
   EvaluationProcessingProducerAdapter.createPipeline({
     processName: "langwatch-api",
   }) as unknown as {
-    metadata: { name: string; commands: ReadonlyArray<{ name: string }> };
+    metadata: { name: string; commands: readonly { name: string }[] };
     foldProjections: Map<
       string,
       { definition: { store: { store(state: unknown, context: unknown): Promise<void> } } }
@@ -26,12 +26,12 @@ const consumer = () =>
       handleEvaluationGraphTriggerActivity: async () => undefined,
     },
   } as never) as unknown as {
-    metadata: { name: string; commands: ReadonlyArray<{ name: string }> };
+    metadata: { name: string; commands: readonly { name: string }[] };
   };
 
 describe("given a process that only SENDS evaluation commands", () => {
   it("builds the same pipeline the consumer registers, not a producer's subset", () => {
-    const names = (definition: { metadata: { commands: ReadonlyArray<{ name: string }> } }) =>
+    const names = (definition: { metadata: { commands: readonly { name: string }[] } }) =>
       definition.metadata.commands.map((command) => command.name).sort();
 
     expect(producer().metadata.name).toBe("evaluation_processing");

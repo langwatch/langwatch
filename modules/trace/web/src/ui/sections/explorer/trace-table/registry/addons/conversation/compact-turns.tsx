@@ -53,7 +53,7 @@ interface CompactTurnsProps {
   density: DensityTokens;
   /** Visible cells of the conversation row, used to align turn cells under
    *  the same columns the group header shows. */
-  cells: Array<Cell<ConversationGroup, unknown>>;
+  cells: Cell<ConversationGroup, unknown>[];
 }
 
 export const CompactTurns: React.FC<CompactTurnsProps> = ({
@@ -124,7 +124,7 @@ interface ConversationTurnRowProps {
   trace: TraceListItem;
   prevTrace?: TraceListItem;
   turnIndex: number;
-  cells: Array<Cell<ConversationGroup, unknown>>;
+  cells: Cell<ConversationGroup, unknown>[];
   railColor: RowStyle["borderColor"];
   density: DensityTokens;
 }

@@ -301,10 +301,10 @@ export class AuthzBindingWriterService {
     scopes,
   }: {
     organizationId: string;
-    scopes: ReadonlyArray<{
+    scopes: readonly {
       scopeType: RoleBindingScopeType;
       scopeId: string;
-    }>;
+    }[];
   }): Promise<AuthzBindingScopeRow[]> {
     if (scopes.length === 0) {
       return [];
@@ -397,7 +397,7 @@ export class AuthzBindingWriterService {
     scopeRows,
   }: {
     organizationRole: OrganizationRole | null;
-    bindings: ReadonlyArray<Pick<AuthzBindingWrite, "role" | "scopeType" | "scopeId">>;
+    bindings: readonly Pick<AuthzBindingWrite, "role" | "scopeType" | "scopeId">[];
     scopeRows: readonly AuthzBindingScopeRow[];
   }): void {
     if (organizationRole !== "EXTERNAL") {

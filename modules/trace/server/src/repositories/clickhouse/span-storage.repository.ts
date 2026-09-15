@@ -502,8 +502,8 @@ function mapEventRow(row: EventRow): ElasticSearchEvent {
   const startedAt =
     typeof row.started_at === "string" ? parseInt(row.started_at, 10) : row.started_at;
 
-  const metrics: Array<{ key: string; value: number }> = [];
-  const eventDetails: Array<{ key: string; value: string }> = [];
+  const metrics: { key: string; value: number }[] = [];
+  const eventDetails: { key: string; value: string }[] = [];
 
   for (const [key, value] of Object.entries(row.attributes)) {
     const isMetricKey =
@@ -963,14 +963,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as Array<{
+        const rows = (await result.json()) as {
           SpanId: string;
           ParentSpanId: string | null;
           StartTimeMs: number;
           ResourceAttributes: Record<string, string>;
           ScopeName: string | null;
           ScopeVersion: string | null;
-        }>;
+        }[];
 
         return rows.map((row) => ({
           spanId: row.SpanId,
@@ -1023,9 +1023,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       query_params: sinceMs !== undefined ? { tenantId, traceId, sinceMs } : { tenantId, traceId },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       occurredAtMs: string | number | null;
-    }>;
+    }[];
     const raw = rows[0]?.occurredAtMs;
     if (raw === null || raw === undefined) return undefined;
     // `min` over no matching rows yields the epoch default (0); treat that — and
@@ -1429,10 +1429,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as Array<{
+        const rows = (await result.json()) as {
           SpanId: string;
           Signals: string[];
-        }>;
+        }[];
 
         const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
         return rows
@@ -1503,9 +1503,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         ]);
 
         const pageRows = (await pageResult.json()) as FullSpanRow[];
-        const countRows = (await countResult.json()) as Array<{
+        const countRows = (await countResult.json()) as {
           Total: number | string;
-        }>;
+        }[];
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {

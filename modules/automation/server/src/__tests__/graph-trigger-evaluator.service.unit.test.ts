@@ -144,8 +144,8 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
    *  per-recipient idempotency digest is keyed on. */
   allRows: OpenGraphTriggerSent[] = [];
   claimCalls = 0;
-  deleteCalls: Array<{ id: string; projectId: string }> = [];
-  resolveCalls: Array<{ id: string; projectId: string; now: Instant }> = [];
+  deleteCalls: { id: string; projectId: string }[] = [];
+  resolveCalls: { id: string; projectId: string; now: Instant }[] = [];
 
   async findOpenForGraphAlert(params: {
     triggerId: string;
@@ -603,7 +603,7 @@ describe("evaluateGraphTrigger", () => {
       const arg = harness.dispatch.mock.calls[0]?.[0] as {
         context: {
           previousValue: number | null;
-          history: Array<{ timestamp: string; value: number }>;
+          history: { timestamp: string; value: number }[];
         };
       };
       // previousValue is the aggregate over the window preceding the alert

@@ -13,9 +13,7 @@ const OTHER_INSTALLATION = "43";
 const SCOPE = "scope-a";
 const OTHER_SCOPE = "scope-b";
 
-const backends: ReadonlyArray<
-  Readonly<{ name: string; create: () => GithubTokenCacheRepository }>
-> = [
+const backends: readonly Readonly<{ name: string; create: () => GithubTokenCacheRepository }>[] = [
   {
     name: "memory",
     create: () => MemoryGithubTokenCacheRepository.create({ memory: MemoryGithubDatabase.create() }),

@@ -448,9 +448,9 @@ export class QueueRedisRepository extends QueueRepository {
   }: {
     pipeline: ChainableCommander;
     rerun: (index: number) => Promise<unknown>;
-  }): Promise<Array<[Error | null, unknown]>> {
+  }): Promise<[Error | null, unknown][]> {
     const results = (await pipeline.exec()) ?? [];
-    return await Promise.all(
+    return Promise.all(
       results.map(async (result, index): Promise<[Error | null, unknown]> => {
         if (!isNoScriptResult(result)) return result;
         try {
@@ -605,7 +605,7 @@ export class QueueRedisRepository extends QueueRepository {
 
     const pipelineResults = await pipeline.exec();
 
-    const firstJobIds: Array<{ groupId: string; jobId: string | null }> = [];
+    const firstJobIds: { groupId: string; jobId: string | null }[] = [];
     for (let i = 0; i < allGroupIds.length; i++) {
       const base = i * CMDS_PER_GROUP;
       const oldestArr = (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
@@ -942,7 +942,7 @@ export class QueueRedisRepository extends QueueRepository {
     const results = await pipeline.exec();
 
     const depths = new Map<string, number>();
-    const headGroups: Array<{ tenantId: string; groupId: string }> = [];
+    const headGroups: { tenantId: string; groupId: string }[] = [];
     for (let i = 0; i < tenantIds.length; i++) {
       const tenantId = tenantIds[i]!;
       const depth = Number(results?.[i * 2]?.[1] ?? 0) || 0;
@@ -969,7 +969,7 @@ export class QueueRedisRepository extends QueueRepository {
     headGroups,
   }: {
     prefix: string;
-    headGroups: Array<{ tenantId: string; groupId: string }>;
+    headGroups: { tenantId: string; groupId: string }[];
   }): Promise<Map<string, number>> {
     const ageMs = new Map<string, number>();
     if (headGroups.length === 0) return ageMs;

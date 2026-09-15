@@ -294,7 +294,7 @@ export class PrismaDashboardRepository
 
   async updateGraphLayouts(input: {
     projectId: string;
-    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+    layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<void> {
     await this.transaction(async (transaction) => {
       for (const item of input.layouts) {

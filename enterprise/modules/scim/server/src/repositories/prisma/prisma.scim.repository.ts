@@ -56,7 +56,7 @@ type ScimIdentityDatabase = {
     findMany(input: {
       where: { userId: string };
       select: { connectionId: true };
-    }): Promise<Array<{ connectionId: string }>>;
+    }): Promise<{ connectionId: string }[]>;
     upsert(input: {
       where: {
         connectionId_externalId: { connectionId: string; externalId: string };
@@ -168,7 +168,7 @@ export class PrismaScimRepository extends ScimRepository {
     startIndex: number;
     count: number;
   }): Promise<{
-    rows: Array<ScimGroupRecord & { members: ScimGroupMembershipRecord[] }>;
+    rows: (ScimGroupRecord & { members: ScimGroupMembershipRecord[] })[];
     total: number;
   }> {
     const where = {
@@ -223,7 +223,7 @@ export class PrismaScimRepository extends ScimRepository {
     });
   }
   async listGroupMemberIds(input: { groupId: string }): Promise<string[]> {
-    const rows: Array<{ userId: string }> = await this.prisma.groupMembership.findMany({
+    const rows: { userId: string }[] = await this.prisma.groupMembership.findMany({
       where: { groupId: input.groupId },
       select: { userId: true },
     });

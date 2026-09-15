@@ -1638,7 +1638,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     if (pieces.length === 0) {
       return { heldAt: chunk, unreadable: false };
     }
-    return await this.walkPaidGenieBillPieces({
+    return this.walkPaidGenieBillPieces({
       config,
       token,
       options,
@@ -2196,7 +2196,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     budget: RunBudget;
     space: GenieSpace;
   }): Promise<PagedRead<z.infer<typeof conversationSchema>> | null> {
-    return await this.isolate({
+    return this.isolate({
       what: "conversations",
       context: { spaceId: space.space_id },
       run: () =>
@@ -2256,7 +2256,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       };
     }
 
-    return await this.discoverSpaces({ config, token, options, budget });
+    return this.discoverSpaces({ config, token, options, budget });
   }
 
   /** Every Genie space the credential can enumerate. */
@@ -3142,7 +3142,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         path,
       });
     }
-    return await response.json();
+    return response.json();
   }
 
   private async get({
@@ -3182,7 +3182,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         path,
       });
     }
-    return await response.json();
+    return response.json();
   }
 
   /**
@@ -3782,7 +3782,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     resumeSpaceId: string | null;
     resumeFingerprint: string | null;
   }): {
-    ordered: Array<z.infer<typeof spaceSchema>>;
+    ordered: z.infer<typeof spaceSchema>[];
     startAt: number;
     resumable: boolean;
     fingerprint: string;
@@ -3830,7 +3830,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     conversations: PagedRead<z.infer<typeof conversationSchema>>;
     resumeConversationId: string | null;
   }): {
-    ordered: Array<z.infer<typeof conversationSchema>>;
+    ordered: z.infer<typeof conversationSchema>[];
     startAt: number;
     resumable: boolean;
   } {

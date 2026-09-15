@@ -1759,7 +1759,7 @@ export class GroupStagingScripts {
    *   jobs (`""` where nothing displaced) — see {@link stage} for lease timing.
    */
   async stageBatch(
-    jobs: Array<{
+    jobs: {
       stagedJobId: string;
       groupId: string;
       dispatchAfterMs: number;
@@ -1769,7 +1769,7 @@ export class GroupStagingScripts {
       shouldExtend?: boolean;
       shouldReplace?: boolean;
       shouldSurviveDispatch?: boolean;
-    }>,
+    }[],
   ): Promise<{
     newStagedCount: number;
     orphanedValues: string[];

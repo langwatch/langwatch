@@ -293,12 +293,12 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   assertOrganizationExists(organizationId: string): Promise<void>;
   /** Provider row id to its display label, for a whole page in one read. */
   resolveProviderLabels(
-    budgets: ReadonlyArray<{ providerKey: string | null }>,
+    budgets: readonly { providerKey: string | null }[],
   ): Promise<Map<string, string>>;
   /** The groups a per-member budget can target, with their sizes. */
   listGroupTargets(
     organizationId: string,
-  ): Promise<ReadonlyArray<{ id: string; name: string; memberCount: number }>>;
+  ): Promise<readonly { id: string; name: string; memberCount: number }[]>;
   /**
    * How many members a per-member GROUP allowance currently covers, batched
    * over however many GROUP rows a response carries.
@@ -314,7 +314,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   resolveVirtualKeyNames(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
-  }): Promise<ReadonlyArray<{ id: string; name: string }>>;
+  }): Promise<readonly { id: string; name: string }[]>;
   /** Whether a user belongs to this organization. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
   /**
@@ -646,7 +646,7 @@ export class GatewayApp implements GatewayApi {
     tenantIds: string[];
     virtualKeyId?: string;
     budgetRepository: GatewayBudgetSpend;
-  }): Promise<Array<Record<string, unknown>>> {
+  }): Promise<Record<string, unknown>[]> {
     const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
 
     return GatewayEndUserCapsAdapter.create({
@@ -724,7 +724,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   listBudgetScopeTargets(
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ) {
     return this.#dependencies.budgetDecisions.resolveScopeTargets(budgets, organizationId);
@@ -906,14 +906,14 @@ export class GatewayApp implements GatewayApi {
   }
 
   resolveProviderLabels(
-    budgets: ReadonlyArray<{ providerKey: string | null }>,
+    budgets: readonly { providerKey: string | null }[],
   ): Promise<Map<string, string>> {
     return this.#dependencies.resolveProviderLabels(budgets);
   }
 
   listGroupTargets(
     organizationId: string,
-  ): Promise<ReadonlyArray<{ id: string; name: string; memberCount: number }>> {
+  ): Promise<readonly { id: string; name: string; memberCount: number }[]> {
     return this.#dependencies.listGroupTargets(organizationId);
   }
 
@@ -926,7 +926,7 @@ export class GatewayApp implements GatewayApi {
   resolveVirtualKeyNames(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
-  }): Promise<ReadonlyArray<{ id: string; name: string }>> {
+  }): Promise<readonly { id: string; name: string }[]> {
     return this.#dependencies.resolveVirtualKeyNames(input);
   }
 

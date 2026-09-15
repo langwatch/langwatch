@@ -27,7 +27,7 @@ export type GatewayUsageVirtualKeys = {
   findMetaByIds(input: {
     organizationId: string;
     ids: string[];
-  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>>;
+  }): Promise<{ id: string; name: string; displayPrefix: string }[]>;
 };
 
 export type UsageWindow = { fromDate: Instant; toDate: Instant };
@@ -37,19 +37,19 @@ export type UsageSummary = {
   totalRequests: number;
   blockedRequests: number;
   avgUsdPerRequest: string;
-  byVirtualKey: Array<{
+  byVirtualKey: {
     virtualKeyId: string;
     name: string;
     displayPrefix: string;
     totalUsd: string;
     requests: number;
-  }>;
-  byModel: Array<{
+  }[];
+  byModel: {
     model: string;
     totalUsd: string;
     requests: number;
-  }>;
-  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+  }[];
+  byDay: { day: string; totalUsd: string; requests: number }[];
 };
 
 // Scoped-to-one-VK version for the detail page. Omits the per-VK
@@ -59,13 +59,13 @@ export type VirtualKeyUsageSummary = {
   totalRequests: number;
   blockedRequests: number;
   avgUsdPerRequest: string;
-  byModel: Array<{
+  byModel: {
     model: string;
     totalUsd: string;
     requests: number;
-  }>;
-  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
-  recentDebits: Array<{
+  }[];
+  byDay: { day: string; totalUsd: string; requests: number }[];
+  recentDebits: {
     id: string;
     occurredAt: string;
     model: string;
@@ -75,7 +75,7 @@ export type VirtualKeyUsageSummary = {
     tokensOutput: number;
     durationMs: number | null;
     status: string;
-  }>;
+  }[];
 };
 
 const RECENT_DEBITS_LIMIT = 20;
@@ -314,7 +314,7 @@ export class GatewayUsageService {
   private topEntries(
     map: Map<string, { totalUsd: bigint; requests: number }>,
     limit = 10,
-  ): Array<[string, { totalUsd: bigint; requests: number }]> {
+  ): [string, { totalUsd: bigint; requests: number }][] {
     return [...map.entries()]
       .sort((a, b) => compareBigInt(b[1].totalUsd, a[1].totalUsd) || a[0].localeCompare(b[0]))
       .slice(0, limit);
@@ -322,7 +322,7 @@ export class GatewayUsageService {
 
   private sortedDays(
     map: Map<string, { totalUsd: bigint; requests: number }>,
-  ): Array<{ day: string; totalUsd: string; requests: number }> {
+  ): { day: string; totalUsd: string; requests: number }[] {
     return [...map.entries()]
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([day, { totalUsd, requests }]) => ({

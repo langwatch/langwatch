@@ -93,7 +93,7 @@ const availableScopes: RetentionAvailableScopes = {
 };
 
 class TestRetentionHost extends DataRetentionHostApi {
-  readonly writes: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly writes: Readonly<Record<string, string | undefined>>[] = [];
   readonly successes: RetentionSuccessNotice[] = [];
   readonly failures: RetentionFailureNotice[] = [];
 

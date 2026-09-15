@@ -10,7 +10,7 @@ import {
 // to get tags since the mutation response doesn't include them.
 export async function handleUpdatePrompt(params: {
   idOrHandle: string;
-  messages?: Array<{ role: string; content: string }>;
+  messages?: { role: string; content: string }[];
   model?: string;
   commitMessage: string;
   tags?: string[];

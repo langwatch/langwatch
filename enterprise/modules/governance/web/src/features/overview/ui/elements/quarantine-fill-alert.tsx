@@ -5,10 +5,10 @@ export type QuarantineFillStats = {
   exceeded: boolean;
   rate: number;
   windowSeconds: number;
-  perSource: Array<{
+  perSource: {
     ingestionSourceId: string | null;
     spanCount: number;
-  }>;
+  }[];
 };
 
 /** Enterprise attribution warning copy and presentation, independent of RPC. */

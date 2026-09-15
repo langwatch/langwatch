@@ -38,7 +38,7 @@ const TEMPLATE_ID = `tmpl-ikc-${suffix}`;
 const SOURCE = "claude_cowork";
 
 type McpTool = (args: Record<string, unknown>) => Promise<{
-  content: Array<{ text: string }>;
+  content: { text: string }[];
 }>;
 
 /** The MCP surface under test, invoked the way the server would. */

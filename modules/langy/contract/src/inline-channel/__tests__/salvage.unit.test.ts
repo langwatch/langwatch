@@ -21,7 +21,7 @@ describe("salvageJsonText", () => {
 
   describe("given mechanically damaged documents", () => {
     // The repair table: [name, damaged input, expected repaired value].
-    const repairs: Array<[string, string, unknown]> = [
+    const repairs: [string, string, unknown][] = [
       ["unclosed object", '{"a": 1', { a: 1 }],
       ["unclosed array", '{"a": [1, 2', { a: [1, 2] }],
       ["deeply unclosed nesting", '{"a": {"b": [{"c": 1', { a: { b: [{ c: 1 }] } }],
@@ -49,7 +49,7 @@ describe("salvageJsonText", () => {
   });
 
   describe("given content that is not damaged JSON at all", () => {
-    const garbage: Array<[string, string]> = [
+    const garbage: [string, string][] = [
       ["prose", "here is your chart"],
       ["unquoted object key", "{a: 1}"],
       ["unquoted word value mid-document", '{"a": yes}'],

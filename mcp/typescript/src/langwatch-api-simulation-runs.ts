@@ -18,7 +18,7 @@ export interface SimulationRunSummary {
     /** One result per evaluator that ran after the conversation. */
     evaluations?: SimulationRunEvaluation[];
   } | null;
-  messages?: Array<{ role: string; content: string }>;
+  messages?: { role: string; content: string }[];
   /** Why the run was started, as given when it was queued. Null without one. */
   note?: string | null;
   timestamp: number;

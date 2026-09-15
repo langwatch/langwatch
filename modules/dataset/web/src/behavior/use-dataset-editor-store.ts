@@ -29,7 +29,7 @@ export type EditorRecord = { id: string } & Record<string, string>;
 export function rekeyEditorRecords(
   records: EditorRecord[],
   prevColumns: EditorColumn[],
-  nextColumns: Array<{ name: string }>,
+  nextColumns: { name: string }[],
 ): EditorRecord[] {
   const prevNames = prevColumns.map((c) => c.name);
   const nextNames = nextColumns.map((c) => c.name);

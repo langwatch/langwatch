@@ -88,7 +88,7 @@ export class TraceSummaryService {
     }
 
     if (options?.full && this.fullResolutionDeps) {
-      return await this.withFullIO(tenantId, result);
+      return this.withFullIO(tenantId, result);
     }
 
     return result;

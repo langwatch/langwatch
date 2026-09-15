@@ -120,7 +120,7 @@ export class VirtualKeyService {
   async resolveNames(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     const rows = await this.repository.findMetaByIds({
       organizationId: input.organizationId,
       ids: [...input.virtualKeyIds],

@@ -341,7 +341,7 @@ function ProviderCredentialsArea({
 
 /** Azure's own gateway toggle; every other provider has nothing to switch. */
 type OrganizationTeams = {
-  teams?: Array<{ id: string; name: string; projects: Array<{ id: string; name: string }> }>;
+  teams?: { id: string; name: string; projects: { id: string; name: string }[] }[];
 };
 
 function availableTeamsOf(organization: OrganizationTeams | undefined) {

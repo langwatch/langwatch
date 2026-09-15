@@ -286,7 +286,7 @@ describe("entitlement app installation", () => {
   describe("given a plan resolved for the operator behind a request", () => {
     /** @scenario "An impersonating operator is resolved through the user directory" */
     it("looks the impersonator's address up before the sources see it", async () => {
-      const seen: Array<string | null | undefined> = [];
+      const seen: (string | null | undefined)[] = [];
       const app = createEntitlementTestApp({
         members: {
           baseline: free,

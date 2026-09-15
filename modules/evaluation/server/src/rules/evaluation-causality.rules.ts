@@ -78,10 +78,10 @@ export function tryExtractParentTraceForNlpgo(
  */
 export function maxCausalityDepthOfSpans(
   spans:
-    | Array<{
+    | {
         params?: Record<string, unknown> | null;
         attributes?: Record<string, unknown> | null;
-      }>
+      }[]
     | undefined
     | null,
 ): number {

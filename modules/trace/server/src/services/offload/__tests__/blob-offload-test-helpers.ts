@@ -77,7 +77,7 @@ export async function insertEventLogRow({
 export function extractSpanAttrs(event: Event): Record<string, string> {
   const data = event.data as {
     span?: {
-      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
+      attributes?: { key: string; value: { stringValue?: string } }[];
     };
   };
   const attrs: Record<string, string> = {};

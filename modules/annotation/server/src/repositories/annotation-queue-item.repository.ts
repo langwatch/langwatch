@@ -59,7 +59,7 @@ export interface AnnotationQueueItemRepository {
   listMemberQueuePendingCounts(
     input: AnnotationQueueItemCaller,
   ): Promise<
-    ReadonlyArray<Readonly<{ id: string; name: string; slug: string; pendingCount: number }>>
+    readonly Readonly<{ id: string; name: string; slug: string; pendingCount: number }>[]
   >;
   deleteQueueItems(input: DeleteAnnotationQueueItemsInput): Promise<number>;
   markQueueItemDone(input: MarkAnnotationQueueItemDoneInput): Promise<AnnotationQueueItem>;

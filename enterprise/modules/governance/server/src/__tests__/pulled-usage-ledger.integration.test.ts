@@ -93,7 +93,7 @@ class SuiteProjectService extends TestProjectApi {
   override async listTraceDestinations(
     projectIds: string[],
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return await prisma.project.findMany({
+    return prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
     });
@@ -175,7 +175,7 @@ function checkTeamRequest(projectedCostUsd: number | string) {
  *  matters: a view that stopped populating it would leave every calendar-window
  *  budget reading zero while the Decimal audit column still looked healthy. */
 async function rollupRows(): Promise<
-  Array<{ Scope: string; BudgetId: string; SpendUSD: string; SpendNanoUSD: string }>
+  { Scope: string; BudgetId: string; SpendUSD: string; SpendNanoUSD: string }[]
 > {
   const result = await clickhouse.query({
     query: `SELECT Scope,
@@ -188,7 +188,7 @@ async function rollupRows(): Promise<
     query_params: { app: APP_PROJECT_ID, gov: GOV_PROJECT_ID },
     format: "JSONEachRow",
   });
-  return await result.json();
+  return result.json();
 }
 
 let clickHouseUrl: string | null = null;

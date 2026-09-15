@@ -67,10 +67,10 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 /** Returns the list of standard roles at or below the given role in the hierarchy, plus "None". */
-export function rolesAtOrBelow(role: string): Array<{ label: string; value: string }> {
+export function rolesAtOrBelow(role: string): { label: string; value: string }[] {
   const idx = STANDARD_ROLES.indexOf(role as (typeof STANDARD_ROLES)[number]);
   if (idx === -1) return [];
-  const roles: Array<{ label: string; value: string }> = STANDARD_ROLES.slice(idx).map((r) => ({
+  const roles: { label: string; value: string }[] = STANDARD_ROLES.slice(idx).map((r) => ({
     label: ROLE_LABELS[r] ?? r,
     value: r,
   }));
@@ -162,11 +162,11 @@ function scopeTypeLabel(scopeType: string, count: number): string {
 
 /** One-line summary of a role-binding set for table display. */
 export function roleSummary(
-  bindings: Array<{
+  bindings: {
     role: string;
     scopeType: string;
     scopeId: string;
-  }>,
+  }[],
 ): string {
   if (bindings.length === 0) return "No permissions";
 
@@ -204,7 +204,7 @@ export function findBindingAtScope<T extends { scopeType: string; scopeId: strin
   scopeType: string;
   scopeId: string;
   organizationId: string;
-  orgProjects: Array<{ id: string; teamId: string }>;
+  orgProjects: { id: string; teamId: string }[];
 }): T | undefined {
   if (!bindings) return undefined;
 
@@ -232,9 +232,9 @@ export function deriveBindingRole({
   permissionMode: string;
   scopeType: string;
   scopeId: string;
-  myBindings: Array<{ scopeType: string; scopeId: string; role: ApiKeyRole }> | undefined;
+  myBindings: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;
   organizationId: string;
-  orgProjects: Array<{ id: string; teamId: string }>;
+  orgProjects: { id: string; teamId: string }[];
   isServiceKey: boolean;
 }): ApiKeyRole {
   if (permissionMode !== "all") return "CUSTOM";
@@ -265,8 +265,8 @@ export function scopeLabel({
 }
 
 export function bindingsToScopes(
-  roleBindings: Array<{ scopeType: string; scopeId: string }>,
-): Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }> {
+  roleBindings: { scopeType: string; scopeId: string }[],
+): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[] {
   return roleBindings.map((rb) => ({
     scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
     scopeId: rb.scopeId,
@@ -275,7 +275,7 @@ export function bindingsToScopes(
 
 export function bindingsToPermissionMode(apiKey: {
   permissionMode: string;
-  roleBindings: Array<{ role: string }>;
+  roleBindings: { role: string }[];
 }): "all" | "restricted" {
   const mode = apiKey.permissionMode as PermissionMode;
   if (mode === "readonly" || mode === "restricted") return "restricted";
@@ -290,17 +290,17 @@ export function bindingsToPermissionMode(apiKey: {
 export function bindingsToSelections(
   apiKey: {
     permissionMode: string;
-    roleBindings: Array<{
+    roleBindings: {
       role: string;
       customRoleId: string | null;
       customRolePermissions: string[] | null;
-    }>;
+    }[];
   },
   deps: {
-    permissionCategories: ReadonlyArray<{
+    permissionCategories: readonly {
       key: string;
       accessLevels: readonly string[];
-    }>;
+    }[];
     selectionsFromPermissions: (perms: string[]) => Record<string, string>;
     getTeamRolePermissions: (role: string) => string[];
   },
@@ -355,11 +355,11 @@ export function getUserPermissionsAtScope({
   isServiceKey,
   getTeamRolePermissions: getRolePerms = teamRolePermissions,
 }: {
-  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
   scopeType: string;
   scopeId: string;
   organizationId: string;
-  orgProjects: Array<{ id: string; teamId: string }>;
+  orgProjects: { id: string; teamId: string }[];
   isServiceKey: boolean;
   getTeamRolePermissions?: (role: string) => string[];
 }): string[] {
@@ -410,10 +410,10 @@ export function getUserPermissionsAcrossScopes({
   isServiceKey,
   getTeamRolePermissions: getRolePerms = teamRolePermissions,
 }: {
-  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
-  scopes: Array<{ scopeType: string; scopeId: string }>;
+  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
+  scopes: { scopeType: string; scopeId: string }[];
   organizationId: string;
-  orgProjects: Array<{ id: string; teamId: string }>;
+  orgProjects: { id: string; teamId: string }[];
   isServiceKey: boolean;
   getTeamRolePermissions?: (role: string) => string[];
 }): string[] {

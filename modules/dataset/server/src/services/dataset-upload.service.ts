@@ -79,7 +79,7 @@ export class DatasetUploadAdapter implements DatasetUpload {
       format: detectFileFormat(input.filename),
     });
     const expected = new Set(
-      (dataset.columnTypes as Array<{ name: string }>).map((column) => column.name),
+      (dataset.columnTypes as { name: string }[]).map((column) => column.name),
     );
     const uploaded = new Set(headers);
     const missing = headers.filter((header) => !expected.has(header));

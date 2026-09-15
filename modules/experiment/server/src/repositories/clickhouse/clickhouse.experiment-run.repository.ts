@@ -544,7 +544,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     projectId: string,
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
-    return await this.options.workflowVersions.findByIds({ projectId, versionIds });
+    return this.options.workflowVersions.findByIds({ projectId, versionIds });
   }
 
   private async enrichItemCosts(

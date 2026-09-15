@@ -92,7 +92,7 @@ export class GatewayApplicableBudgetsService {
         : null
       : await decidedTraceProject({ projects, draft });
 
-    return await this.resolveApplicableBudgetsForTarget(
+    return this.resolveApplicableBudgetsForTarget(
       {
         organizationId: draft.organizationId,
         virtualKeyId: draft.virtualKeyId,

@@ -7,17 +7,17 @@ export function LeftPanel({
   selectedProjection,
   onSelectProjection,
 }: {
-  projections: Array<{
+  projections: {
     projectionName: string;
     pipelineName: string;
     aggregateType: string;
-  }>;
-  eventSubscribers: Array<{
+  }[];
+  eventSubscribers: {
     subscriberName: string;
     pipelineName: string;
     aggregateType: string;
     eventTypes: readonly string[];
-  }>;
+  }[];
   selectedProjection: string | null;
   onSelectProjection: (name: string | null) => void;
 }) {

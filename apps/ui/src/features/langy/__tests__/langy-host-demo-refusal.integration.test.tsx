@@ -12,10 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const DEMO_SLUG = "demo";
 
 const graph = vi.hoisted(() => ({
-  data: [] as Array<{
+  data: [] as {
     id: string;
-    teams: Array<{ projects: Array<{ id: string; slug: string; name: string }> }>;
-  }>,
+    teams: { projects: { id: string; slug: string; name: string }[] }[];
+  }[],
 }));
 
 vi.mock("@langwatch/langy-web/langy", async () => {

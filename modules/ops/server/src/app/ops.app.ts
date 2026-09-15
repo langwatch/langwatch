@@ -1520,7 +1520,7 @@ export interface UsageStatsProjectDatabase {
     findMany(input: {
       where: { team: { organizationId: string } };
       select: { id: true };
-    }): Promise<Array<{ id: string }>>;
+    }): Promise<{ id: string }[]>;
   };
   annotation: UsageStatsCountDelegate;
   annotationQueue: UsageStatsCountDelegate;

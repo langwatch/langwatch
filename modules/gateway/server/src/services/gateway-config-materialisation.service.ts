@@ -130,7 +130,7 @@ export class GatewayConfigMaterialiserService {
    * drifting apart is what lets a 304 confirm a stale bundle.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return await this.assembly.versionToken(vk);
+    return this.assembly.versionToken(vk);
   }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {

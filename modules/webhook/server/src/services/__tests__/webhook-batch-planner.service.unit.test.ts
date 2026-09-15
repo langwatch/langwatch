@@ -59,7 +59,7 @@ function plan(
 }
 
 function envelopeIdsIn(message: { payload: unknown }): string[] {
-  const payload = message.payload as { envelopes: Array<{ id: string }> };
+  const payload = message.payload as { envelopes: { id: string }[] };
   return payload.envelopes.map((envelope) => envelope.id);
 }
 

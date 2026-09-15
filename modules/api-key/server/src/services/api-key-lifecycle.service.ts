@@ -263,7 +263,7 @@ export class ApiKeyLifecycleService {
     callerUserId: string | null;
     cause: ApiKeyRevocationCause;
   }): Promise<void> {
-    let children: Array<{ id: string }>;
+    let children: { id: string }[];
     try {
       children = await this.repository.findLiveChildren({ parentApiKeyId, organizationId });
     } catch (err) {

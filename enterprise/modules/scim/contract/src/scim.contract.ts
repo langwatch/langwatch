@@ -13,11 +13,11 @@ export interface ScimUser {
     givenName: string;
     familyName: string;
   };
-  emails: Array<{
+  emails: {
     primary: boolean;
     value: string;
     type: string;
-  }>;
+  }[];
   active: boolean;
   meta: {
     resourceType: "User";
@@ -120,10 +120,10 @@ export interface ScimGroup {
   /** The identity provider's identifier, scoped to its SSO connection. */
   externalId?: string;
   displayName: string;
-  members?: Array<{
+  members?: {
     value: string;
     display?: string;
-  }>;
+  }[];
   meta: {
     resourceType: "Group";
     created: string;

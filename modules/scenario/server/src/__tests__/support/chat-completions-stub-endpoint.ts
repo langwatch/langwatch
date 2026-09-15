@@ -17,7 +17,7 @@ export type EndpointRule =
 
 export interface StubEndpoint {
   url: string;
-  bodies: () => Array<Record<string, unknown>>;
+  bodies: () => Record<string, unknown>[];
   close: () => Promise<void>;
 }
 
@@ -123,7 +123,7 @@ function responseFor(
  * refuses reasoning even when it is off.
  */
 export async function startEndpoint(rule: EndpointRule = "accept"): Promise<StubEndpoint> {
-  const bodies: Array<Record<string, unknown>> = [];
+  const bodies: Record<string, unknown>[] = [];
 
   const server: Server = createServer((req, res) => {
     let raw = "";

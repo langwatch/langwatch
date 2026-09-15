@@ -28,7 +28,7 @@ export class StubAnnotationHost extends AnnotationHostApi {
   readonly successes: AnnotationSuccessNotice[] = [];
   readonly failures: AnnotationFailureNotice[] = [];
   readonly navigations: string[] = [];
-  readonly queries: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queries: Readonly<Record<string, string | undefined>>[] = [];
 
   constructor(private readonly options: StubAnnotationHostOptions = {}) {
     super();

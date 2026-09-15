@@ -26,10 +26,10 @@ const HIERARCHY = {
 function configRow(params: {
   id: string;
   config: Record<string, string>;
-  scopes: Array<{
+  scopes: {
     type: "ORGANIZATION" | "TEAM" | "PROJECT";
     id: string;
-  }>;
+  }[];
   createdAt?: string;
 }): ConfigRow {
   return {

@@ -46,7 +46,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
   async createMany(input: {
     datasetId: string;
     projectId: string;
-    entries: Array<DatasetRecordInput & { id: string }>;
+    entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
     const now = this.#database.now();
 

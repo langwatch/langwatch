@@ -121,7 +121,7 @@ class MemoryRecordRepository implements DatasetRecordRepository {
   async createMany(input: {
     datasetId: string;
     projectId: string;
-    entries: Array<Record<string, unknown> & { id: string }>;
+    entries: (Record<string, unknown> & { id: string })[];
   }): Promise<DatasetRecord[]> {
     this.records = input.entries.map((entry) => ({
       id: entry.id,
@@ -291,7 +291,7 @@ describe("DatasetService", () => {
   it("enqueues normalization after upload finalization through the queue port", async () => {
     const repository = new MemoryDatasetRepository();
     const records = new MemoryRecordRepository();
-    const queueCalls: Array<{ projectId: string; datasetId: string }> = [];
+    const queueCalls: { projectId: string; datasetId: string }[] = [];
     class Uploads implements DatasetUpload {
       async finalizeUpload(
         input: FinalizeUploadInput,

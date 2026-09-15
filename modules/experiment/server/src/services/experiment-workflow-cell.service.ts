@@ -260,7 +260,7 @@ export class ExperimentWorkflowCellService {
   }: {
     cell: ExecutionCell;
     projectId: string;
-    datasetColumns: Array<{ id: string; name: string; type: string }>;
+    datasetColumns: { id: string; name: string; type: string }[];
     loadedEvaluators?: LoadedEvaluators;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;
@@ -299,7 +299,7 @@ export class ExperimentWorkflowCellService {
     cell: ExecutionCell;
     projectId: string;
     workflowDsl: StudioWorkflow;
-    datasetColumns?: Array<{ id: string; name: string; type: string }>;
+    datasetColumns?: { id: string; name: string; type: string }[];
     loadedEvaluators?: LoadedEvaluators;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;

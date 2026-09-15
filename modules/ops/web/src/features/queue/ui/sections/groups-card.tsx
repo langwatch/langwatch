@@ -86,7 +86,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   );
 
   const allGroups = useMemo(() => {
-    const groups: Array<GroupInfo & { queueName: string }> = [];
+    const groups: (GroupInfo & { queueName: string })[] = [];
     if (groupsQuery.data && primaryQueue) {
       for (const g of groupsQuery.data.groups) {
         groups.push({ ...g, queueName: primaryQueue });
@@ -253,12 +253,12 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
     },
   });
 
-  const statusButtons: Array<{
+  const statusButtons: {
     value: StatusFilter;
     label: string;
     count: number;
     color: string;
-  }> = [
+  }[] = [
     { value: "all", label: "All", count: counts.all, color: "gray" },
     { value: "ok", label: "OK", count: counts.ok, color: "green" },
     { value: "blocked", label: "Blocked", count: counts.blocked, color: "red" },

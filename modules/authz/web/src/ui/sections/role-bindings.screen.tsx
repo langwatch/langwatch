@@ -35,7 +35,7 @@ import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
 const SCOPE_TIERS = roleBindingScopeTypeSchema.enum;
 
-const FILTERS: ReadonlyArray<{ label: string; value: BindingScopeFilter }> = [
+const FILTERS: readonly { label: string; value: BindingScopeFilter }[] = [
   { label: "All", value: "ALL" },
   { label: scopeLabel(SCOPE_TIERS.ORGANIZATION), value: SCOPE_TIERS.ORGANIZATION },
   { label: scopeLabel(SCOPE_TIERS.TEAM), value: SCOPE_TIERS.TEAM },

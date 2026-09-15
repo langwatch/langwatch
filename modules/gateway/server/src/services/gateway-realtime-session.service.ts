@@ -116,7 +116,7 @@ export class GatewayRealtimeSessionService {
     vendorConversationId: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<boolean> {
-    return await params.collaborators.sessions.correlate({
+    return params.collaborators.sessions.correlate({
       sessionId: params.sessionId,
       projectId: params.projectId,
       vendorConversationId: params.vendorConversationId,
@@ -131,7 +131,7 @@ export class GatewayRealtimeSessionService {
     reason: string;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): Promise<boolean> {
-    return await params.collaborators.sessions.release({
+    return params.collaborators.sessions.release({
       sessionId: params.sessionId,
       projectId: params.projectId,
       status: params.status,
@@ -348,7 +348,7 @@ export class GatewayRealtimeSessionService {
   }): Promise<number> {
     const now = params.now ?? nowInstant();
 
-    return await params.collaborators.sessions.expireStale({
+    return params.collaborators.sessions.expireStale({
       ...(params.virtualKeyId ? { virtualKeyId: params.virtualKeyId } : {}),
       now,
       staleBefore: now.subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS }),

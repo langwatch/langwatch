@@ -67,8 +67,8 @@ export class PrismaSavedViewRepository
   async findByIds(input: {
     ids: string[];
     projectId: string;
-  }): Promise<Array<{ id: string; userId: string | null }>> {
-    return await this.prisma.savedView.findMany({
+  }): Promise<{ id: string; userId: string | null }[]> {
+    return this.prisma.savedView.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, userId: true },
     });
@@ -136,7 +136,7 @@ export class PrismaSavedViewRepository
   }
 
   async count(input: { projectId: string; userId?: string; kind?: string }): Promise<number> {
-    return await this.prisma.savedView.count({
+    return this.prisma.savedView.count({
       where: {
         projectId: input.projectId,
         ...(input.kind ? { kind: input.kind } : {}),

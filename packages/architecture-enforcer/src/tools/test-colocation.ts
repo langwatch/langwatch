@@ -23,7 +23,7 @@ export type TestColocationPlan = {
    * These are LEFT ALONE: a test moved to a guessed home is worse than a test
    * that stayed put, because the guess looks deliberate afterwards.
    */
-  unresolved: Array<{ file: string; reason: string }>;
+  unresolved: { file: string; reason: string }[];
   /** Two files that would land on one path, which no move should do. */
   collisions: string[];
   /** New content, keyed by absolute path, for every file whose imports change. */
@@ -215,7 +215,7 @@ export function rewriteRelativeSpecifiers(input: {
 }): string {
   const { from, to, source, moved } = input;
   const sourceFile = ts.createSourceFile(from, source, ts.ScriptTarget.Latest, true);
-  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  const replacements: { start: number; end: number; text: string }[] = [];
 
   for (const literal of moduleSpecifierNodes(sourceFile)) {
     const target = relativeModuleTarget(from, literal.text);
@@ -301,11 +301,11 @@ function planPackage(
   packageName: string,
   exportsMap: Record<string, unknown> | undefined,
   helperDestinations: ReadonlyMap<string, string>,
-): { moves: TestMove[]; unresolved: Array<{ file: string; reason: string }> } {
+): { moves: TestMove[]; unresolved: { file: string; reason: string }[] } {
   const testsRoot = `${packageRoot}/tests`;
   const sourceRoot = resolve(`${packageRoot}/src`);
   const moves: TestMove[] = [];
-  const unresolved: Array<{ file: string; reason: string }> = [];
+  const unresolved: { file: string; reason: string }[] = [];
 
   for (const file of walkFiles(testsRoot, (path) => SOURCE_FILE.test(path))) {
     const mirrorPath = workspacePath(testsRoot, file);
@@ -408,10 +408,10 @@ function helperDestinationsFor(moves: TestMove[], testsRoot: string): Map<string
 /** Every package's moves and unresolved files, in the two-pass helper-placement scheme. */
 function planEveryPackage(root: string): {
   moves: TestMove[];
-  unresolved: Array<{ file: string; reason: string }>;
+  unresolved: { file: string; reason: string }[];
 } {
   const moves: TestMove[] = [];
-  const unresolved: Array<{ file: string; reason: string }> = [];
+  const unresolved: { file: string; reason: string }[] = [];
 
   for (const { root: packageRoot, name, exportsMap } of packagesWithMirroredTests(root)) {
     // Two passes: the first resolves the tests, the second places any helper

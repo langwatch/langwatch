@@ -71,13 +71,13 @@ export class ExperimentWorkbenchReferencesService {
       case "prompt":
         return prompts.some((prompt) => prompt.id === id || prompt.handle === id);
       case "agent":
-        return await this.references.agents.exists({ id, projectId });
+        return this.references.agents.exists({ id, projectId });
       case "dataset":
         return (
           (await this.references.dataset.getByIds({ projectId, datasetIds: [id] })).length === 1
         );
       case "evaluator":
-        return await this.references.evaluators
+        return this.references.evaluators
           .getById({ id, projectId })
           .then(() => true)
           .catch((error: unknown) => {
@@ -88,7 +88,7 @@ export class ExperimentWorkbenchReferencesService {
             throw error;
           });
       case "workflow":
-        return await this.references.workflows
+        return this.references.workflows
           .getById({ id, projectId })
           .then(() => true)
           .catch((error: unknown) => {

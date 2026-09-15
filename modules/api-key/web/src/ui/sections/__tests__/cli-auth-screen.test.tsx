@@ -17,7 +17,7 @@ import CliAuthScreen from "../cli-auth-screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    bindings: [] as Array<{ scopeType: string; scopeId: string; role: string }>,
+    bindings: [] as { scopeType: string; scopeId: string; role: string }[],
     bindingsLoading: false,
     firstMessage: void 0 as boolean | undefined,
   },
@@ -48,8 +48,8 @@ vi.mock("@langwatch/authz-web/surfaces/scope-picker", () => ({
     value,
     onChange,
   }: {
-    value: Array<{ scopeType: string; scopeId: string }>;
-    onChange: (next: Array<{ scopeType: string; scopeId: string }>) => void;
+    value: { scopeType: string; scopeId: string }[];
+    onChange: (next: { scopeType: string; scopeId: string }[]) => void;
   }) => (
     <div>
       <span data-testid="selected-scopes">

@@ -57,11 +57,11 @@ export type MigrationPlan = {
   foreignSchemeRows: number;
   foreignSchemes: string[];
   excludedProjects: string[];
-  blockingDatasets: Array<{
+  blockingDatasets: {
     id: string;
     status: string;
     reason: DatasetBlockerReason;
-  }>;
+  }[];
 };
 
 /**

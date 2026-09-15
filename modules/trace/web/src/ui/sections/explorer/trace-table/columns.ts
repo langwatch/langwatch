@@ -476,7 +476,7 @@ const traceColumnDefsByString = traceColumnDefs as Record<
   ColumnDef<TraceListItem, any> | undefined
 >;
 
-export function buildTraceColumns(ids: string[]): Array<ColumnDef<TraceListItem, any>> {
+export function buildTraceColumns(ids: string[]): ColumnDef<TraceListItem, any>[] {
   return ids
     .map((id) => traceColumnDefsByString[id])
     .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
@@ -491,7 +491,7 @@ export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, unknown>
   return traceColumnDefsByString[id];
 }
 
-export function buildConversationColumns(ids: string[]): Array<ColumnDef<ConversationGroup, any>> {
+export function buildConversationColumns(ids: string[]): ColumnDef<ConversationGroup, any>[] {
   return ids
     .map((id) => conversationColumnDefs[id])
     .filter((def): def is ColumnDef<ConversationGroup, any> => Boolean(def));
@@ -500,7 +500,7 @@ export function buildConversationColumns(ids: string[]): Array<ColumnDef<Convers
 export function buildGroupColumns(
   ids: string[],
   groupBy: "service" | "model" | "user",
-): Array<ColumnDef<TraceGroup, any>> {
+): ColumnDef<TraceGroup, any>[] {
   const defs = buildGroupColumnDefs(groupBy);
   return ids.map((id) => defs[id]).filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
 }

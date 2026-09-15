@@ -42,11 +42,11 @@ type BudgetCreateDrawerProps = {
 type ScopeKind = "ORGANIZATION" | "GROUP" | "TEAM" | "PROJECT" | "PRINCIPAL" | "VIRTUAL_KEY";
 type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
-const KIND_OPTIONS: Array<{
+const KIND_OPTIONS: {
   kind: ScopeKind;
   label: string;
   icon: React.ReactElement;
-}> = [
+}[] = [
   {
     kind: "ORGANIZATION",
     label: "Organization",
@@ -203,7 +203,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
     clearRefusal();
   };
 
-  const targetOptions: Array<{ id: string; name: string }> | null =
+  const targetOptions: { id: string; name: string }[] | null =
     scopeKind === "ORGANIZATION"
       ? null
       : scopeKind === "GROUP"

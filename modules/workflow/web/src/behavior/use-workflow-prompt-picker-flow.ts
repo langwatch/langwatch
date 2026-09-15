@@ -11,8 +11,8 @@ export type PromptSelection = {
   name: string;
   version?: number;
   versionId?: string;
-  inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
+  inputs?: { identifier: string; type: string }[];
+  outputs?: { identifier: string; type: string }[];
 };
 
 export type PromptPickerCallbacks = {

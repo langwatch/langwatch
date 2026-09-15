@@ -17,7 +17,7 @@ export class PrismaExperimentPeopleRepository implements ExperimentPeople {
 
   async namesOf(
     ids: readonly string[],
-  ): Promise<ReadonlyArray<Readonly<{ id: string; name: string | null }>>> {
+  ): Promise<readonly Readonly<{ id: string; name: string | null }>[]> {
     if (ids.length === 0) return [];
     return this.database.user.findMany({
       where: { id: { in: [...ids] } },

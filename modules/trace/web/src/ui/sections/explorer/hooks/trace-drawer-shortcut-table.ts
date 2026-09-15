@@ -250,7 +250,7 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
 
 export interface HelpGroup {
   title: ShortcutGroupTitle;
-  items: Array<{ keys: string[]; label: string; detail?: string }>;
+  items: { keys: string[]; label: string; detail?: string }[];
 }
 
 const HELP_GROUP_ORDER: ShortcutGroupTitle[] = [

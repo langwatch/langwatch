@@ -87,7 +87,7 @@ export class LangyMessageService {
       throw new LangyConversationNotFoundError(params.conversationId);
     }
 
-    return await this.repository.findAllByConversation({
+    return this.repository.findAllByConversation({
       conversationId: params.conversationId,
       projectId: params.projectId,
     });

@@ -62,8 +62,8 @@ export class ClaudeCodeRequestService {
     return out;
   }
 
-  private buildInputMessages(parsed: RequestBody): Array<{ role: string; content: string }> | null {
-    const out: Array<{ role: string; content: string }> = [];
+  private buildInputMessages(parsed: RequestBody): { role: string; content: string }[] | null {
+    const out: { role: string; content: string }[] = [];
 
     if (parsed.system !== void 0) {
       const systemText = contentToText(parsed.system);
@@ -127,7 +127,7 @@ export class ClaudeCodeRequestService {
    */
   tryBuildInputMessagesFromRequestBody(
     raw: unknown,
-  ): Array<{ role: string; content: string }> | null {
+  ): { role: string; content: string }[] | null {
     const parsed = this.tryParseRequestBody(raw);
     if (parsed !== null) {
       return this.buildInputMessages(parsed);
@@ -137,7 +137,7 @@ export class ClaudeCodeRequestService {
   }
 
   deriveClaudeRequestBody(raw: unknown): {
-    messages: Array<{ role: string; content: string }> | null;
+    messages: { role: string; content: string }[] | null;
     toolResults: Map<string, string>;
   } {
     const parsed = this.tryParseRequestBody(raw);

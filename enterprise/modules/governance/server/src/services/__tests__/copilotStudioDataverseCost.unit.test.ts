@@ -48,7 +48,7 @@ let capturedCalls: FetchCall[] = [];
 let warnings: string[] = [];
 let errors: string[] = [];
 /** What the cost endpoint answers with, per call. */
-let costReplies: Array<{ status: number; body: unknown }> = [];
+let costReplies: { status: number; body: unknown }[] = [];
 /** What the transcript read answers with, so a run can fail after the cost read. */
 let transcriptStatus = 200;
 /**
@@ -56,7 +56,7 @@ let transcriptStatus = 200;
  * as neither an event nor a position — the one way a run reports an error
  * WITHOUT throwing, which is the case the cursor comparison turns on.
  */
-let transcriptRows: Array<Record<string, unknown>> | null = null;
+let transcriptRows: Record<string, unknown>[] | null = null;
 
 function captured(args: unknown[]): string {
   return args
@@ -177,9 +177,9 @@ async function runPull({
 }
 
 const costCalls = () => capturedCalls.filter((c) => c.url.includes(COST_HOST));
-const costEvents = (events: Array<{ action: string }>) =>
+const costEvents = (events: { action: string }[]) =>
   events.filter((event) => event.action === "cost_report");
-const conversationEvents = (events: Array<{ action: string }>) =>
+const conversationEvents = (events: { action: string }[]) =>
   events.filter((event) => event.action !== "cost_report");
 
 describe("the Azure cost read inside the Dataverse source", () => {

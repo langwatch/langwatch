@@ -510,7 +510,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     // Cross-tenant by design: this is the delivery sweep's entry point, so
     // it uses the raw-SQL tenancy opt-out the guard sanctions for
     // system-owned maintenance scans.
-    const rows = await this.prisma.$queryRaw<Array<{ organizationId: string }>>`
+    const rows = await this.prisma.$queryRaw<{ organizationId: string }[]>`
       SELECT DISTINCT "organizationId"
       FROM "WebhookEndpoint"
       WHERE "status" = 'ACTIVE'::"WebhookEndpointStatus"
@@ -690,7 +690,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     /** Resume after this row: the previous page's last (firedAt, id). */
     cursor?: { firedAt: Instant; id: string };
   }): Promise<{
-    deliveries: Array<{
+    deliveries: {
       id: string;
       dispatchId: string;
       attempt: number;
@@ -700,7 +700,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
       latencyMs: number | null;
       error: string | null;
       firedAt: Instant;
-    }>;
+    }[];
     nextCursor: { firedAt: Instant; id: string } | null;
   }> {
     await this.getEndpoint(params);
@@ -769,7 +769,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
    *  sweep, so it clears both channels' rows from the one table. */
   async pruneDeliveries(now: Instant = nowInstant()): Promise<number> {
     if (this.deps.pruneDeliveries) {
-      return await this.deps.pruneDeliveries(now);
+      return this.deps.pruneDeliveries(now);
     }
     const result = await this.prisma.webhookEndpointDelivery.deleteMany({
       where: {

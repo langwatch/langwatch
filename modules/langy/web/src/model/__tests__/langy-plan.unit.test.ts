@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { cleanPlanContent, langyPlan, normalisePlanStatus, parseTodoList } from "../langy-plan.ts";
 
 /** A `todowrite` snapshot part carrying a whole-list rewrite. */
-function todo(todos: Array<{ content: string; status: string }>): {
+function todo(todos: { content: string; status: string }[]): {
   type: string;
   input: unknown;
 } {
@@ -247,7 +247,7 @@ describe("langyPlan", () => {
     });
 
     it("reads every synonym the same way, whatever its case or spacing", () => {
-      const cases: Array<[string, string]> = [
+      const cases: [string, string][] = [
         ["done", "completed"],
         ["Complete", "completed"],
         ["FINISHED", "completed"],

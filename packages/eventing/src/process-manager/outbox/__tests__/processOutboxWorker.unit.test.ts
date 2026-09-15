@@ -191,7 +191,7 @@ describe("ProcessOutboxWorker", () => {
 
   it("resumes draining when an abandoned drain finally settles", async () => {
     vi.useFakeTimers();
-    const releases: Array<() => void> = [];
+    const releases: (() => void)[] = [];
     const runOnce = vi.fn().mockImplementation(
       () =>
         new Promise<void>((resolve) => {

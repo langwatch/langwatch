@@ -285,7 +285,7 @@ const normalizeOtlpAttributeValue = (
   }
 
   if (Array.isArray(v)) {
-    const out: Array<string | boolean | number | bigint> = [];
+    const out: (string | boolean | number | bigint)[] = [];
 
     for (const item of v) {
       if (item instanceof Uint8Array) {

@@ -36,11 +36,11 @@ export async function createApiKey(data: {
   name: string;
   description?: string;
   expiresAt?: string;
-  bindings?: Array<{
+  bindings?: {
     role: "ADMIN" | "MEMBER" | "VIEWER";
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   projectIds?: string[];
 }): Promise<ApiKeyCreateResponse> {
   return makeRequest("POST", "/api/v1/api-keys", data) as Promise<ApiKeyCreateResponse>;

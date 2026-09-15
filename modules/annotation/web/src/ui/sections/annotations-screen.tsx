@@ -234,7 +234,7 @@ function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
 function groupByTrace(
   annotations: readonly AnnotationWithUser[],
   traces: readonly AnnotationTrace[],
-): Array<{ traceId: string; trace?: AnnotationTrace; annotations: AnnotationWithUser[] }> {
+): { traceId: string; trace?: AnnotationTrace; annotations: AnnotationWithUser[] }[] {
   const traceById = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
   const grouped = new Map<

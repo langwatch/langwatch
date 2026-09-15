@@ -387,7 +387,7 @@ describe("SuiteService", () => {
     expect(execution.execute).not.toHaveBeenCalled();
   });
 
-  const dynamicScopes: Array<{ scope: SuiteScope; membership: string[] }> = [
+  const dynamicScopes: { scope: SuiteScope; membership: string[] }[] = [
     { scope: { mode: "all" }, membership: ["scenario_2", "scenario_1"] },
     { scope: { mode: "test_suites", testSuiteIds: ["test_suite_1"] }, membership: ["scenario_1"] },
     { scope: { mode: "labels", labels: ["smoke"] }, membership: ["scenario_1"] },

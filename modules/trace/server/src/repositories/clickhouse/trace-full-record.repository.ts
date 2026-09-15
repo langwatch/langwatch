@@ -216,11 +216,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     tenantId: string,
     rows: StoredSpanRow[],
   ): Promise<
-    Array<{
+    {
       row: StoredSpanRow;
       attributes: NormalizedSpan["spanAttributes"];
       recalled: boolean;
-    }>
+    }[]
   > {
     const plans = rows.map((row) => ({
       row,
@@ -267,7 +267,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
 
   private static eventReferences(
     attributes: NormalizedSpan["spanAttributes"],
-  ): Array<{ attrKey: string; eventId: string; field: string }> {
+  ): { attrKey: string; eventId: string; field: string }[] {
     const prefix = EVENTREF_ATTR_PREFIX;
     return Object.entries(attributes).flatMap(([key, value]) => {
       if (!key.startsWith(prefix)) return [];

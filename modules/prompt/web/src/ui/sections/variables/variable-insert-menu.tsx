@@ -153,14 +153,12 @@ export const VariableInsertMenu = ({
 
   // Flatten for keyboard navigation - fields FIRST, then "create" LAST
   const flattenedOptions = useMemo(() => {
-    const options: Array<
-      | {
+    const options: (| {
           type: "field";
           source: AvailableSource;
           field: { name: string; type: FieldType };
         }
-      | { type: "create"; name: string }
-    > = [];
+      | { type: "create"; name: string })[] = [];
 
     // Add fields FIRST
     filteredSources.forEach((source) => {

@@ -68,7 +68,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
       updatedAt: Date;
       actorLabel?: "user" | "langy" | "api";
       runId?: string;
-      versions: Array<{ version: number; autoSaved: boolean; state: unknown }>;
+      versions: { version: number; autoSaved: boolean; state: unknown }[];
     }
   >();
 

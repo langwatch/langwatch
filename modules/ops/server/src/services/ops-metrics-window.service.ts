@@ -46,8 +46,7 @@ export interface PersistedMetricsState {
       latencyP99Ms: number;
     }
   >;
-  peakJobNames: Array<
-    [
+  peakJobNames: [
       string,
       {
         completedPerSec: number;
@@ -55,8 +54,7 @@ export interface PersistedMetricsState {
         latencyP50Ms: number;
         latencyP99Ms: number;
       },
-    ]
-  >;
+    ][];
   throughputBuffer: ThroughputPoint[];
   latestTotalCompleted: number;
   latestTotalFailed: number;

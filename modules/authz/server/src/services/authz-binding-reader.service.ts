@@ -170,7 +170,7 @@ export class AuthzBindingReaderService {
     bindings,
   }: {
     organizationId: string;
-    bindings: ReadonlyArray<Pick<AuthzAccessBinding, "scopeType" | "scopeId">>;
+    bindings: readonly Pick<AuthzAccessBinding, "scopeType" | "scopeId">[];
   }): Promise<{ names: Map<string, string>; personalIds: Set<string> }> {
     const rows = await this.options.bindings.findScopeRows({
       organizationId,

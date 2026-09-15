@@ -5,7 +5,7 @@ import type { EvaluationClickHouseClient, EvaluationClickHouseQuery } from "../e
 describe("ClickHouseMonitorPerformanceRepository", () => {
   /** @scenario "Monitor performance uses the same capability" */
   it("keeps the trace-anchored analytics envelope and query safety settings", async () => {
-    const requests: Array<Record<string, unknown>> = [];
+    const requests: Record<string, unknown>[] = [];
     const query = vi.fn(async (request: EvaluationClickHouseQuery) => {
       requests.push(request);
       return {

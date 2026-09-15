@@ -245,13 +245,13 @@ async function openAddress(address: string, component: string): Promise<string> 
 /**
  * The addresses, as the product writes them.
  */
-const OPENINGS: ReadonlyArray<{
+const OPENINGS: readonly {
   what: string;
   drawer: string;
   address: string;
   component: string;
   carries?: readonly string[];
-}> = [
+}[] = [
   {
     what: "the agent type selector picking a code agent",
     drawer: "agentCodeEditor",

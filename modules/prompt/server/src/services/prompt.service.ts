@@ -60,10 +60,10 @@ export type VersionedPrompt = Pick<
   prompt: string;
   projectId: string;
   organizationId: string;
-  messages: Array<{
+  messages: {
     role: LatestConfigVersionSchema["configData"]["messages"][number]["role"];
     content: string;
-  }>;
+  }[];
   authorId: string | null;
   author?: {
     id: string;
@@ -86,7 +86,7 @@ export type VersionedPrompt = Pick<
    * responses, these are the tags that resolve to the latest/requested version specifically
    * — not the entire prompt's tag set.
    */
-  tags: Array<{ name: string; versionId: string }>;
+  tags: { name: string; versionId: string }[];
   parameters: Record<string, unknown>;
 };
 
@@ -259,7 +259,7 @@ export class PromptService {
     ids: string[];
     projectId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     return this.repository.findNamesByIds(input);
   }
 
@@ -302,7 +302,7 @@ export class PromptService {
   /** The repository row in the `VersionedPrompt` shape the API and the service layer return. */
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
-    tags: Array<{ name: string; versionId: string }>,
+    tags: { name: string; versionId: string }[],
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 

@@ -77,7 +77,7 @@ function foldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData 
 function spanEvent(
   options: {
     spanName?: string;
-    attributes?: Array<{ key: string; value: unknown }>;
+    attributes?: { key: string; value: unknown }[];
   } = {},
 ): TraceProcessingEvent {
   return {
@@ -284,7 +284,7 @@ describe("createEvaluationTriggerSubscriber", () => {
       ])("treats %s as depth zero", (_shape, spanAttributes) => {
         expect(
           detectCausalityLoop({
-            spanAttributes: spanAttributes as Array<{ key: string; value: unknown }> | null,
+            spanAttributes: spanAttributes as { key: string; value: unknown }[] | null,
           }),
         ).toBeNull();
       });

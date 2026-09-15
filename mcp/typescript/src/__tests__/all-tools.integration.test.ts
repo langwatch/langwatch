@@ -524,7 +524,7 @@ function createMockServer(): Server {
         const parsed = JSON.parse(body) as {
           commitMessage?: string;
           model?: string;
-          messages?: Array<{ role: string; content: string }>;
+          messages?: { role: string; content: string }[];
           tags?: string[];
         };
         const newVersionId = "ver_p1v4";

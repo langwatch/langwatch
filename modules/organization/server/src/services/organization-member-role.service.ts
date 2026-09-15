@@ -41,7 +41,7 @@ async function collectCustomRolePermissions({
 }: {
   repository: OrganizationMembershipRepository;
   organizationId: string;
-  currentTeamBindings: Array<{ customRoleId: string | null }>;
+  currentTeamBindings: { customRoleId: string | null }[];
 }): Promise<string[] | undefined> {
   const customRoleIds = currentTeamBindings
     .map((binding) => binding.customRoleId)
@@ -171,12 +171,12 @@ export class OrganizationMemberRoleService {
     organizationId: string;
     userId: string;
     role: OrganizationUserRole;
-    teamRoleUpdates?: Array<{
+    teamRoleUpdates?: {
       teamId: string;
       userId: string;
       role: string;
       customRoleId?: string;
-    }>;
+    }[];
     /** Null when the actor is a service credential; self checks never match. */
     currentUserId: string | null;
     planUser?: OrganizationPlanUser;
@@ -237,7 +237,7 @@ export class OrganizationMemberRoleService {
       user: params.planUser,
     });
 
-    return await this.updateMemberRole({
+    return this.updateMemberRole({
       organizationId,
       userId,
       role,
@@ -257,13 +257,13 @@ export class OrganizationMemberRoleService {
     organizationId: string;
     userId: string;
     role: OrganizationUserRole;
-    teamRoleUpdates?: Array<{
+    teamRoleUpdates?: {
       teamId: string;
       userId: string;
       role: string;
       customRoleId?: string;
-    }>;
-    currentMemberships: Array<{ teamId: string; role: TeamUserRole }>;
+    }[];
+    currentMemberships: { teamId: string; role: TeamUserRole }[];
     organizationTeamIds: string[];
     currentUserId: string | null;
   }): Promise<UpdateMemberRoleResult> {
@@ -280,7 +280,7 @@ export class OrganizationMemberRoleService {
     const organizationTeamIdSet = new Set(organizationTeamIds);
 
     const requestedTeamRoleUpdates = (teamRoleUpdates ?? []).reduce<
-      Array<{ teamId: string; role: TeamRoleValue; customRoleId?: string }>
+      { teamId: string; role: TeamRoleValue; customRoleId?: string }[]
     >((acc, update) => {
       if (update.userId !== userId) {
         throw new TeamRoleUpdateRejectedError("Team role update user must match target member", {
@@ -310,7 +310,7 @@ export class OrganizationMemberRoleService {
         newOrganizationRole: role,
       });
 
-    return await this.repo.updateMemberRole({
+    return this.repo.updateMemberRole({
       organizationId,
       userId,
       role,

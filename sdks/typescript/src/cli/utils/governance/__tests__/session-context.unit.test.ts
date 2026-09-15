@@ -21,7 +21,7 @@ const repository = { host: "github.com", owner: "langwatch", name: "langwatch" }
 
 describe("parseGitRemoteUrl", () => {
   describe("given the shapes an origin remote actually takes", () => {
-    const parsed: Array<[string, ReturnType<typeof parseGitRemoteUrl>]> = [
+    const parsed: [string, ReturnType<typeof parseGitRemoteUrl>][] = [
       [
         "git@github.com:langwatch/langwatch.git",
         { host: "github.com", owner: "langwatch", name: "langwatch" },

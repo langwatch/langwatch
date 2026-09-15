@@ -97,7 +97,7 @@ export const chartGridCardHeightPx = (rowSpan: number): number =>
  * the grid is empty.
  */
 export const chartGridBottomRow = (
-  cards: ReadonlyArray<{ gridRow: number; rowSpan: number }>,
+  cards: readonly { gridRow: number; rowSpan: number }[],
 ): number =>
   cards.reduce(
     (bottom, card) => Math.max(bottom, card.gridRow + card.rowSpan),

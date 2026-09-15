@@ -22,7 +22,7 @@ export class ModelProviderAuthorizationService {
   }
 
   async canRead(actorId: string, scope: ModelDefaultScope): Promise<boolean> {
-    return await this.permits(
+    return this.permits(
       actorId,
       scope,
       ModelProviderAuthorizationService.readPermission(scope.scopeType),
@@ -30,7 +30,7 @@ export class ModelProviderAuthorizationService {
   }
 
   async canWrite(actorId: string, scope: ModelDefaultScope): Promise<boolean> {
-    return await this.permits(
+    return this.permits(
       actorId,
       scope,
       ModelProviderAuthorizationService.writePermission(scope.scopeType),
@@ -61,7 +61,7 @@ export class ModelProviderAuthorizationService {
       return decision.outcome === "allowed";
     }
 
-    return await this.authz.hasApiKeyPermission({
+    return this.authz.hasApiKeyPermission({
       apiKeyId: apiKey.apiKeyId,
       userId: apiKey.userId,
       organizationId: apiKey.organizationId,

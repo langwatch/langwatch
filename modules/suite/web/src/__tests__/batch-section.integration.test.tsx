@@ -18,7 +18,7 @@ vi.mock("../ui/sections/scenario-run-content.tsx", () => ({
     scenarioRuns,
     viewMode,
   }: {
-    scenarioRuns: Array<{ scenarioRunId: string }>;
+    scenarioRuns: { scenarioRunId: string }[];
     viewMode: string;
   }) => (
     <div data-testid="scenario-run-content" data-view-mode={viewMode}>

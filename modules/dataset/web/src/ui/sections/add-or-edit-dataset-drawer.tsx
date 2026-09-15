@@ -62,7 +62,7 @@ export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
 ];
 
 /** The column vocabulary the picker offers, in the order the platform drawer did. */
-const COLUMN_TYPE_LABELS: ReadonlyArray<[DatasetColumnType, string]> = [
+const COLUMN_TYPE_LABELS: readonly [DatasetColumnType, string][] = [
   ["string", "string"],
   ["number", "number"],
   ["boolean", "boolean"],

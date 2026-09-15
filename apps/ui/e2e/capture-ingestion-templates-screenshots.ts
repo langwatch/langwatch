@@ -29,7 +29,7 @@ void (async () => {
   });
   const page = await context.newPage();
 
-  const captures: Array<{ filename: string; capture: () => Promise<void> }> = [
+  const captures: { filename: string; capture: () => Promise<void> }[] = [
     {
       filename: "me-settings-personal-otlp-panel.png",
       capture: async () => {

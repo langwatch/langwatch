@@ -65,11 +65,11 @@ export const WEEKDAYS = [
 ] as const;
 
 /** Day-of-week chips in Mon-first reading order, mapped to cron dow numbers. */
-export const WEEKDAY_OPTIONS: Array<{
+export const WEEKDAY_OPTIONS: {
   value: number;
   short: string;
   long: string;
-}> = [
+}[] = [
   { value: 1, short: "Mon", long: "Monday" },
   { value: 2, short: "Tue", long: "Tuesday" },
   { value: 3, short: "Wed", long: "Wednesday" },
@@ -245,7 +245,7 @@ export function supportedTimezones(): string[] {
  * first "/"), so a 400-entry native select reads as a tidy continent list.
  * Single-segment zones (UTC, GMT) collect under "General".
  */
-export function groupTimezones(zones: string[]): Array<{ region: string; zones: string[] }> {
+export function groupTimezones(zones: string[]): { region: string; zones: string[] }[] {
   const groups = new Map<string, string[]>();
   for (const zone of zones) {
     const slash = zone.indexOf("/");

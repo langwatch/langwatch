@@ -29,8 +29,8 @@ type SignatureNode = {
   type: string;
   data: {
     parameters?: SignatureParam[];
-    inputs?: Array<{ identifier: string; type: string; value?: unknown }>;
-    outputs?: Array<{ identifier: string; type: string }>;
+    inputs?: { identifier: string; type: string; value?: unknown }[];
+    outputs?: { identifier: string; type: string }[];
   };
 };
 
@@ -98,10 +98,10 @@ function addStaticInput(sig: SignatureNode, identifier: string, value: string): 
 
 function buildAdapter(workflow: WorkflowDsl): SerializedWorkflowAgentAdapter {
   const entry = (
-    workflow.nodes as Array<{
+    workflow.nodes as {
       id: string;
-      data: { outputs?: Array<{ identifier: string; type: string }> };
-    }>
+      data: { outputs?: { identifier: string; type: string }[] };
+    }[]
   ).find((n) => n.id === "entry");
   const messagesType = entry?.data.outputs?.find((f) => f.identifier === "messages")?.type ?? "str";
   const config: WorkflowAgentData = {

@@ -20,12 +20,12 @@ export const evaluatorCategoryNames: Record<EvaluatorCategoryId, string> = {
   safety: "Safety",
 };
 
-const evaluatorCategories: ReadonlyArray<{
+const evaluatorCategories: readonly {
   id: EvaluatorCategoryId;
   icon: LucideIcon;
   title: string;
   description: string;
-}> = [
+}[] = [
   {
     id: "expected_answer",
     icon: CheckSquare,

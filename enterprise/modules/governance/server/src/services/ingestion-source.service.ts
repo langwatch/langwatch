@@ -357,7 +357,7 @@ export class IngestionSourceService {
    * three mean the puller has stopped routing.
    */
   async liveTraceProjectIds(
-    sources: ReadonlyArray<{ traceProjectId?: string | null }>,
+    sources: readonly { traceProjectId?: string | null }[],
     organizationId: string,
   ): Promise<Set<string>> {
     const wanted = [

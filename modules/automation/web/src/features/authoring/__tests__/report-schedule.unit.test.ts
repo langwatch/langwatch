@@ -56,7 +56,7 @@ describe("reportSchedule", () => {
   });
 
   describe("given partsFromCron", () => {
-    const roundTrips: Array<[string, ScheduleParts]> = [
+    const roundTrips: [string, ScheduleParts][] = [
       ["0 9 * * *", { frequency: "daily", hour: 9, minute: 0, dayOfWeek: 1, dayOfMonth: 1 }],
       [
         "30 8 * * 5",

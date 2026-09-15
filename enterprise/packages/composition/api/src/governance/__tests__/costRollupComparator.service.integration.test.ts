@@ -254,7 +254,7 @@ async function appendPulled({
  * retraction entirely, which is the thing under test.
  */
 async function writePulledSummary(
-  events: Array<{ type: string; data: Record<string, unknown> }>,
+  events: { type: string; data: Record<string, unknown> }[],
 ): Promise<void> {
   const projection = new GovernanceCostRollupFoldProjection({
     store: { store: async () => undefined, get: async () => null },

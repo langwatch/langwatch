@@ -112,9 +112,9 @@ function mount({
   apiKeyUserId: string | null;
   reach?: { key: readonly string[]; holder: readonly string[] };
 }) {
-  const audits: Array<Record<string, unknown>> = [];
+  const audits: Record<string, unknown>[] = [];
   const callers: CodingAgentScopeCaller[] = [];
-  const reads: Array<{ permittedProjectIds: readonly string[] }> = [];
+  const reads: { permittedProjectIds: readonly string[] }[] = [];
   const getPullRequestUsage = vi.fn<
     (input: { permittedProjectIds: readonly string[] }) => Promise<CodingAgentPullRequestUsage>
   >(async (input) => {

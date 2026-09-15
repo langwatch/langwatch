@@ -16,11 +16,11 @@ const { state } = vi.hoisted(() => ({
   state: {
     planType: "ENTERPRISE" as string,
     planLoading: false,
-    auditLogs: [] as Array<Record<string, unknown>>,
+    auditLogs: [] as Record<string, unknown>[],
     totalCount: 0,
     isLoading: false,
-    members: [] as Array<Record<string, unknown>>,
-    fetchPages: [] as Array<{ auditLogs: Array<Record<string, unknown>>; totalCount: number }>,
+    members: [] as Record<string, unknown>[],
+    fetchPages: [] as { auditLogs: Record<string, unknown>[]; totalCount: number }[],
     fetchRejectsWith: void 0 as unknown,
   },
 }));

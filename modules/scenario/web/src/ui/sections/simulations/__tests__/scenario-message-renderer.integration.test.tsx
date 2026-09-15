@@ -381,10 +381,10 @@ describe("<ScenarioMessageRenderer/>", () => {
   // ------------------------------------------------------------------------- #4698 —
   // text-first part ordering + audio-only + assistant=left.
   describe("when an assistant voice turn carries audio + a sibling text transcript (#4698)", () => {
-    const orderings: Array<{
+    const orderings: {
       label: string;
       parts: unknown[];
-    }> = [
+    }[] = [
       {
         label: "text-first [text, input_audio] (production SDK ordering)",
         parts: [

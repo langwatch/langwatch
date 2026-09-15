@@ -9,7 +9,7 @@ import { MemoryCodingAgentRepositories } from "../memory/memory.coding-agent.rep
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { session, sessionEventRecord } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => CodingAgentRepositories }> = [
+const backends: readonly { name: string; create: () => CodingAgentRepositories }[] = [
   { name: "memory", create: () => MemoryCodingAgentRepositories.create() },
 ];
 

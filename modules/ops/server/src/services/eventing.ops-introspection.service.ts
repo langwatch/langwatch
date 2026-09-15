@@ -15,11 +15,11 @@ type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
  * during boot and an explorer may be built before the last one lands.
  */
 export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospection {
-  private constructor(private readonly definitions: () => ReadonlyArray<AnyPipelineDefinition>) {
+  private constructor(private readonly definitions: () => readonly AnyPipelineDefinition[]) {
   }
 
   static create(
-    definitions: () => ReadonlyArray<AnyPipelineDefinition>,
+    definitions: () => readonly AnyPipelineDefinition[],
   ): EventingOpsIntrospectionAdapter {
     return new EventingOpsIntrospectionAdapter(definitions);
   }

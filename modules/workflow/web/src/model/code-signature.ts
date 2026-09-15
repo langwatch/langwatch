@@ -25,7 +25,7 @@ const typesMap: Record<Field["type"], string> = {
 /** Rewrite entrypoint signature to match declared inputs (__call__/__forward in sync). */
 export const rewriteCodeSignature = (
   code: string,
-  inputs: Array<{ identifier: string; type: string }>,
+  inputs: { identifier: string; type: string }[],
 ): string => {
   if (inputs.length === 0) return code;
 

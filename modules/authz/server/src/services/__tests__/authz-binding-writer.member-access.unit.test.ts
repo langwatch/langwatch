@@ -111,7 +111,7 @@ class MemberAccessStore {
       findScopeRows: async ({
         scopes,
       }: {
-        scopes: ReadonlyArray<{ scopeType: string; scopeId: string }>;
+        scopes: readonly { scopeType: string; scopeId: string }[];
       }) =>
         SCOPES.filter((scope) =>
           scopes.some((asked) => asked.scopeType === scope.type && asked.scopeId === scope.id),

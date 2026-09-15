@@ -81,17 +81,17 @@ function toArray<T>(payload: unknown): T[] {
 }
 
 export async function listDatasets(): Promise<
-  Array<{ id: string; name: string; recordCount: number }>
+  { id: string; name: string; recordCount: number }[]
 > {
   return toArray(await lwGet("/api/dataset"));
 }
 
-export async function listAgents(): Promise<Array<{ id: string; name: string }>> {
+export async function listAgents(): Promise<{ id: string; name: string }[]> {
   return toArray(await lwGet("/api/v1/agents"));
 }
 
 export async function listEvaluators(): Promise<
-  Array<{ id: string; name: string; config?: { evaluatorType?: string } }>
+  { id: string; name: string; config?: { evaluatorType?: string } }[]
 > {
   return toArray(await lwGet("/api/evaluators"));
 }
@@ -172,17 +172,17 @@ export async function resetEvaluationResources(): Promise<void> {
   }
 }
 
-export async function listScenarios(): Promise<Array<{ id: string; name: string }>> {
+export async function listScenarios(): Promise<{ id: string; name: string }[]> {
   return toArray(await lwGet("/api/scenarios"));
 }
 
 export async function listPrompts(): Promise<
-  Array<{ id: string; name?: string; handle?: string }>
+  { id: string; name?: string; handle?: string }[]
 > {
   return toArray(await lwGet("/api/prompts"));
 }
 
-export async function listMonitors(): Promise<Array<{ id: string; name?: string }>> {
+export async function listMonitors(): Promise<{ id: string; name?: string }[]> {
   return toArray(await lwGet("/api/monitors"));
 }
 
@@ -214,11 +214,11 @@ export async function deleteMonitor(id: string): Promise<void> {
   );
 }
 
-export async function listDashboards(): Promise<Array<{ id: string; name?: string }>> {
+export async function listDashboards(): Promise<{ id: string; name?: string }[]> {
   return toArray(await lwGet("/api/dashboards"));
 }
 
-export async function listWorkflows(): Promise<Array<{ id: string; name?: string }>> {
+export async function listWorkflows(): Promise<{ id: string; name?: string }[]> {
   return toArray(await lwGet("/api/workflows"));
 }
 
@@ -260,13 +260,13 @@ export async function traceExists(traceId: string): Promise<boolean> {
 }
 
 export async function listAnnotations(): Promise<
-  Array<{ id: string; traceId?: string; comment?: string }>
+  { id: string; traceId?: string; comment?: string }[]
 > {
   return toArray(await lwGet("/api/annotations"));
 }
 
 export async function listTriggers(): Promise<
-  Array<{ id: string; name?: string; active?: boolean }>
+  { id: string; name?: string; active?: boolean }[]
 > {
   return toArray(await lwGet("/api/triggers"));
 }

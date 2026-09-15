@@ -65,10 +65,10 @@ export class AdminBackofficeService {
   private async updateUser(input: AdminOperationInput): Promise<AdminOperationResult> {
     const data = { ...input.params.data };
     let handledSideEffect = false;
-    const sideEffectAudits: Array<{
+    const sideEffectAudits: {
       action: string;
       payload: Record<string, unknown>;
-    }> = [];
+    }[] = [];
 
     if ("deactivatedAt" in data) {
       const value = data.deactivatedAt;

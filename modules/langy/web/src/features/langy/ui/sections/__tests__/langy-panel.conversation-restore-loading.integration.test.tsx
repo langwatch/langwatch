@@ -50,7 +50,7 @@ const resolveHistory = () =>
 interface EngineMessage {
   id: string;
   role: string;
-  parts: Array<{ type: string; text?: string }>;
+  parts: { type: string; text?: string }[];
 }
 const engine: {
   messages: EngineMessage[];

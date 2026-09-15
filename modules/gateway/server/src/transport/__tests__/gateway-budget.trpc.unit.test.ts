@@ -109,7 +109,7 @@ function budgetRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-let bucketRows: Array<{ ScopeId: string; SpentNanoUSD: string }> = [];
+let bucketRows: { ScopeId: string; SpentNanoUSD: string }[] = [];
 
 const clickHouseQuery = vi.fn(async (input: { sql: string }) => {
   // The per-budget rollup totals (BudgetId, Scope, ScopeId) are never
@@ -138,7 +138,7 @@ const virtualKeyFindMany = vi.fn(async (args: { where: { id?: { in: string[] } }
 });
 
 /** A fake Prisma client answering the budget row, its bucket boundaries and its scope anchor. */
-function fakePrisma(budgets: Array<Record<string, unknown>>): PrismaClient {
+function fakePrisma(budgets: Record<string, unknown>[]): PrismaClient {
   return {
     organization: { findUnique: async () => ({ id: ORG_ID }) },
     gatewayBudget: { findMany: async () => budgets },
@@ -151,7 +151,7 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
   return overrides as ProjectApi;
 }
 
-function callerFor(budgets: Array<Record<string, unknown>>) {
+function callerFor(budgets: Record<string, unknown>[]) {
   const app = GatewayApp.create({
     dependencies: {
       webhooks: peer("webhooks"),

@@ -95,10 +95,10 @@ export class OrganizationGroupBindingService {
 
   async assertGroupScopes(
     organizationId: string,
-    bindings: Array<{
+    bindings: {
       scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
       scopeId: string;
-    }>,
+    }[],
   ): Promise<void> {
     for (const binding of bindings) {
       const scope = await this.authz.tryResolveScope(
@@ -168,7 +168,7 @@ export class OrganizationGroupBindingService {
   }
 
   groupBindingsByGroup(
-    bindings: Array<{
+    bindings: {
       id: string;
       groupId: string | null;
       role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -176,7 +176,7 @@ export class OrganizationGroupBindingService {
       customRole: { name: string } | null;
       scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
       scopeId: string;
-    }>,
+    }[],
   ): Map<string, OrganizationGroupBinding[]> {
     const result = new Map<string, OrganizationGroupBinding[]>();
     for (const binding of bindings) {

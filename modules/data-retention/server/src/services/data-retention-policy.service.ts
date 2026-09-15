@@ -224,7 +224,7 @@ export class DataRetentionPolicyService {
     const userId = input.actor.userId;
     const { scopeType, scopeId } = input.scope;
     if (scopeType === "ORGANIZATION") {
-      return await this.options.permissions.canManageOrganization({
+      return this.options.permissions.canManageOrganization({
         userId,
         organizationId: scopeId,
       });

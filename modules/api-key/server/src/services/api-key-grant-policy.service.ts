@@ -29,7 +29,7 @@ export class ApiKeyGrantPolicyService {
   async assertSelectionWithinCeiling(input: {
     userId: string;
     organizationId: string;
-    bindings: Array<ApiKeyScope & { role: "CUSTOM" }>;
+    bindings: (ApiKeyScope & { role: "CUSTOM" })[];
     permissions: string[];
   }): Promise<void> {
     await this.ensureCallerIsOrgMember(input);

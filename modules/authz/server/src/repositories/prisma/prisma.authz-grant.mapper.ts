@@ -148,9 +148,7 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
   CompatShareLinkRowShape["visibility"] | undefined
 > = Object.fromEntries(
   (
-    Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as Array<
-      [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]]
-    >
+    Object.entries(SHARE_VISIBILITY_BY_PRINCIPAL) as [LedgerPrincipalType, CompatShareLinkRowShape["visibility"]][]
   ).map(([principalType, visibility]) => [PRINCIPAL_TO_DB[principalType], visibility]),
 );
 

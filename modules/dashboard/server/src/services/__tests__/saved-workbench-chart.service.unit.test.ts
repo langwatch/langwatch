@@ -78,7 +78,7 @@ function dashboardRecord(): DashboardRecord & { graphs: GraphRecord[] } {
  * It implements exactly the slice of the repository this service names.
  */
 class FakeRepository implements SavedWorkbenchChartRepository {
-  readonly calls: Array<{ method: string; input: unknown }> = [];
+  readonly calls: { method: string; input: unknown }[] = [];
 
   constructor(
     private readonly answers: {

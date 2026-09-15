@@ -7,7 +7,7 @@ import { type LedgerEventRow } from "../app/gateway.members.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 
 function mockChRepoWithEvents(
-  events: Array<Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">>,
+  events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],
 ): GatewayBudgetClickHouseRepository {
   const fullEvents: LedgerEventRow[] = events.map((e) => ({
     id: e.id,

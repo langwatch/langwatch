@@ -83,7 +83,7 @@ vi.mock("@langwatch/design-system/select", () => {
     ...rest
   }: {
     children: ReactNode;
-    collection: { items: Array<{ label: string; value: string }> };
+    collection: { items: { label: string; value: string }[] };
     value: string[];
     onValueChange: (details: { value: string[] }) => void;
     "aria-label"?: string;

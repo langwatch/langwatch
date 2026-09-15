@@ -10,7 +10,7 @@ import { type RunInputsBody, runsSavedDataset } from "../types.ts";
 describe("runsSavedDataset", () => {
   describe("given run inputs that replace or override the dataset", () => {
     describe("when the run decides whether to write its cells back", () => {
-      const overrides: Array<{ name: string; inputs: RunInputsBody }> = [
+      const overrides: { name: string; inputs: RunInputsBody }[] = [
         { name: "inline rows", inputs: { data: [{ input: "hi" }] } },
         { name: "no rows at all", inputs: { data: [] } },
         { name: "another saved dataset", inputs: { dataset_id: "dataset_1" } },
@@ -32,7 +32,7 @@ describe("runsSavedDataset", () => {
 
   describe("given run inputs that leave the dataset alone", () => {
     describe("when the run decides whether to write its cells back", () => {
-      const saved: Array<{ name: string; inputs?: RunInputsBody }> = [
+      const saved: { name: string; inputs?: RunInputsBody }[] = [
         { name: "no body at all", inputs: undefined },
         { name: "an empty body", inputs: {} },
         { name: "a row subset", inputs: { row_indices: [0, 2] } },

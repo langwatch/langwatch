@@ -11,7 +11,7 @@ import { MemoryStoredObjectBlobRepository } from "../memory/memory.stored-object
 import { MemoryStoredObjectBlobStore } from "../memory/memory-stored-object-blob.store.ts";
 import type { StoredObjectStorageDriver } from "../stored-object-blob.repository.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => StoredObjectStorageDriver }> = [
+const backends: readonly { name: string; create: () => StoredObjectStorageDriver }[] = [
   { name: "memory", create: () => MemoryStoredObjectBlobRepository.create() },
 ];
 

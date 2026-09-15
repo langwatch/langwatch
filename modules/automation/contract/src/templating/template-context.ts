@@ -285,7 +285,7 @@ export function buildGraphAlertTemplateContext({
   reason: GraphAlertTemplateContext["reason"];
   /** Recent buckets around the alert window (chronological). Optional so
    *  callers without timeseries access (preview, test-fire) can omit it. */
-  history?: Array<{ timestamp: Instant | string; value: number }>;
+  history?: { timestamp: Instant | string; value: number }[];
   /** Aggregated value over the window preceding the alert window. */
   previousValue?: number | null;
   /** Incident window appended to `graph.url` as `startDate`/`endDate`. */

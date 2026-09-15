@@ -63,12 +63,12 @@ function fragmentOf(address: string): string {
 type OrganizationGraphEntry = {
   id: string;
   name: string;
-  teams: Array<{
+  teams: {
     id: string;
     name: string;
     isPersonal?: boolean | null;
     ownerUserId?: string | null;
-    projects: Array<{
+    projects: {
       id: string;
       name: string;
       slug: string;
@@ -76,8 +76,8 @@ type OrganizationGraphEntry = {
       isPersonal?: boolean | null;
       ownerUserId?: string | null;
       kind?: string | null;
-    }>;
-  }>;
+    }[];
+  }[];
 };
 
 /** Maps one team's projects to the CLI project picker's project shape. */

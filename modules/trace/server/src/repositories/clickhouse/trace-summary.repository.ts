@@ -187,11 +187,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   }
 
   async upsertBatch(
-    entries: Array<{
+    entries: {
       data: TraceSummaryData;
       tenantId: string;
       retentionDays?: number;
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -310,10 +310,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
       );
 
-      return await this.queryByTraceId(tenantId, traceId);
+      return this.queryByTraceId(tenantId, traceId);
     }
 
-    return await this.queryByTraceId(tenantId, traceId, {
+    return this.queryByTraceId(tenantId, traceId, {
       fromMs: resolved.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
       toMs: resolved.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
     });
@@ -334,7 +334,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     // round-trip is exact: fromMs/toMs are integers, so their mean and
     // half-difference are exactly representable and reconstruct the bounds.
     if (options?.window) {
-      return await this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
+      return this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
     }
 
     // Two-stage read: hinted window for partition pruning, fallback unbounded.
@@ -349,13 +349,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         isEmpty: (result) => result === null,
         run: async (window) => {
           if (window) {
-            return await this.queryByTraceId(tenantId, traceId, {
+            return this.queryByTraceId(tenantId, traceId, {
               fromMs: window.fromMs,
               toMs: window.toMs,
             });
           }
 
-          return await this.#findByResolvedOccurredAt({ tenantId, traceId, hasHint, options });
+          return this.#findByResolvedOccurredAt({ tenantId, traceId, hasHint, options });
         },
       });
     } catch (error) {
@@ -391,10 +391,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       query_params: { tenantId, traceId },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       rowCount: string | number;
       occurredAtMs: string | number | null;
-    }>;
+    }[];
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount = typeof rowCountRaw === "string" ? Number(rowCountRaw) : (rowCountRaw ?? NaN);
@@ -651,7 +651,7 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null> {
-    return await this.repository.tryFindByTraceId(
+    return this.repository.tryFindByTraceId(
       { tenantId: input.tenantId, traceId: input.traceId },
       { window: input.window },
     );

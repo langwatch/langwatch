@@ -36,7 +36,7 @@ export type RecordedGatewayDrawerOpen = {
 /** Everything a screen wrote through the host, in the order it wrote it. */
 export type GatewayHostRecording = {
   navigations: string[];
-  queries: Array<{ next: GatewayQuery; replace: boolean }>;
+  queries: { next: GatewayQuery; replace: boolean }[];
   /**
    * RECORDED RATHER THAN SPELLED. The `drawer.` vocabulary is the composing
    * application's — its adapter writes `?drawer.open=<name>` plus one

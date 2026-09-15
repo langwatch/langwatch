@@ -196,8 +196,8 @@ export class AuthzIdDecisionsService {
     principal: AuthzPrincipalRef;
     permission: AuthzPermission;
     organizationId: string;
-    teams: ReadonlyArray<{ teamId: string }>;
-    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+    teams: readonly { teamId: string }[];
+    projects: readonly { projectId: string; teamId?: string | undefined }[];
   }): Promise<{
     teams: Map<string, boolean>;
     projects: Map<string, boolean>;
@@ -231,8 +231,8 @@ export class AuthzIdDecisionsService {
     principal: AuthzPrincipalRef;
     permissions: readonly AuthzPermission[];
     organizationId: string;
-    teams: ReadonlyArray<{ teamId: string }>;
-    projects: ReadonlyArray<{ projectId: string; teamId?: string | undefined }>;
+    teams: readonly { teamId: string }[];
+    projects: readonly { projectId: string; teamId?: string | undefined }[];
   }): Promise<{
     byPermission: Map<
       AuthzPermission,

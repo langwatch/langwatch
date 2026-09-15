@@ -675,7 +675,7 @@ export async function postSessionContext({
   }
 }
 
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+function firstNonEmpty(...values: (string | undefined)[]): string | undefined {
   for (const value of values) {
     const trimmed = value?.trim();
     if (trimmed) return trimmed;

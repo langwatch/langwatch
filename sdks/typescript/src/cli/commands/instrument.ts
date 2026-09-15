@@ -122,7 +122,7 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
     // The personal path can mint on first use; persist the cache like
     // the wrapper does so later runs reuse it.
     cfg.default_personal_ingest_keys = {
-      ...(cfg.default_personal_ingest_keys ?? {}),
+      ...cfg.default_personal_ingest_keys,
       [sourceType]: { secret: credential.token, prefix: credential.prefix },
     };
     try {

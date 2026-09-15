@@ -38,7 +38,7 @@ export class PrismaGatewayBudgetScopeReachRepository {
 
   private async listGroupIds(
     organizationId: string,
-    principalUserIds: Array<string | null>,
+    principalUserIds: (string | null)[],
   ): Promise<Map<string, string[]>> {
     const ids = [...new Set(principalUserIds.filter((id): id is string => id !== null))];
     const groupsByPrincipal = new Map<string, string[]>();

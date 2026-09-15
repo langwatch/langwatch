@@ -703,11 +703,11 @@ describe("AuthzGrantsService.offboard", () => {
   });
 });
 
-const COMPATIBILITY_CALLS: ReadonlyArray<{
+const COMPATIBILITY_CALLS: readonly {
   method: CompatibilityMethod;
   input: unknown;
   output: unknown;
-}> = [
+}[] = [
   {
     method: "attachBindings",
     input: {

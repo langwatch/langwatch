@@ -20,8 +20,8 @@ export type ApiKeyHostScope = {
 // ui-screen-closure finding.
 export type ApiKeyAvailableScopes = {
   organization: { id: string; name: string } | null;
-  teams: Array<{ id: string; name: string }>;
-  projects: Array<{ id: string; name: string; teamId?: string | null }>;
+  teams: { id: string; name: string }[];
+  projects: { id: string; name: string; teamId?: string | null }[];
 };
 
 // CLI authorize organization graph: wider than visible scopes (adds ownerUserId, kind, slug),
@@ -107,7 +107,7 @@ export type CliDeviceApproval = {
   organizationId: string;
   projectId?: string;
   keySelection?: {
-    bindings: Array<{ scopeType: string; scopeId: string }>;
+    bindings: { scopeType: string; scopeId: string }[];
     permissions: string[];
   };
 };

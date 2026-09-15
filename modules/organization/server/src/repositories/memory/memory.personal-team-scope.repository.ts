@@ -11,13 +11,13 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
   }
 
   async tryFindPersonalTeamInScopes(input: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null> {
     return this.findMatching(input.scopes, () => true);
   }
 
   async tryFindForeignPersonalTeamInScopes(input: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
     ownerUserId: string | null;
   }): Promise<{ name: string } | null> {
     return this.findMatching(
@@ -27,7 +27,7 @@ export class MemoryPersonalTeamScopeRepository implements PersonalTeamScopeReade
   }
 
   private findMatching(
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>,
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
     matchesOwner: (ownerUserId: string | null) => boolean,
   ): { name: string } | null {
     for (const scope of scopes) {

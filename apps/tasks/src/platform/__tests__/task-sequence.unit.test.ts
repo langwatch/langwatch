@@ -43,7 +43,7 @@ describe("given several tasks in one invocation", () => {
   describe("when one task carries arguments", () => {
     /** @scenario "Arguments still reach a single named task" */
     it("hands them to it untouched", async () => {
-      const seen: Array<readonly string[]> = [];
+      const seen: (readonly string[])[] = [];
 
       await runTasksInOrder({
         names: ["process-manager-purge"],

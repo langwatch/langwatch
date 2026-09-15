@@ -258,7 +258,7 @@ describe("DatasetNormalizeAdapter", () => {
       expect(update.data.rowCount).toBe(6);
       expect(update.data.chunkCount).toBeGreaterThan(1);
       // Metadata persisted; NO `jsonl` payload anywhere in what the handler kept.
-      const offsets = update.data.chunkOffsets as Array<Record<string, unknown>>;
+      const offsets = update.data.chunkOffsets as Record<string, unknown>[];
       expect(offsets).toHaveLength(update.data.chunkCount);
       for (const offset of offsets) {
         expect(offset).not.toHaveProperty("jsonl");
@@ -430,10 +430,10 @@ describe("DatasetNormalizeAdapter", () => {
       // The stored row's keys are rewritten so they match columnTypes. Each
       // line is wrapped as { id, entry } so a later edit/delete can target the
       // row by id.
-      const pushed = writeChunks.mock.calls[0]![0].records as Array<{
+      const pushed = writeChunks.mock.calls[0]![0].records as {
         id: string;
         entry: Record<string, unknown>;
-      }>;
+      }[];
       expect(pushed).toHaveLength(1);
       expect(pushed[0]!.id).toMatch(/^record_/);
       expect(pushed[0]!.entry).toEqual({ id_: "x", b: "y" });

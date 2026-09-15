@@ -11,7 +11,7 @@ import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
 /** A project's stored run environment, as the memory tier holds it. */
 export type StoredEnvironmentRow = {
   apiKey: string;
-  secrets: Array<{ name: string; encryptedValue: string }>;
+  secrets: { name: string; encryptedValue: string }[];
 };
 
 export class WorkflowMemoryStore {

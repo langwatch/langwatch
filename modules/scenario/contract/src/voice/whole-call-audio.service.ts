@@ -28,7 +28,7 @@ export interface WholeCallAudioInfrastructure {
   readSpanAttributes(input: {
     projectId: string;
     traceId: string;
-  }): Promise<ReadonlyArray<Readonly<Record<string, unknown>>>>;
+  }): Promise<readonly Readonly<Record<string, unknown>>[]>;
 }
 
 /** A non-empty string attribute, or null. Guards against the empty string a

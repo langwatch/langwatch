@@ -32,12 +32,12 @@ export type RecordedDrawerOpen = {
 export type RecordedCopy = { text: string; succeeded: ApiKeySuccessNotice };
 
 export class FakeApiKeyHost extends ApiKeyHostApi {
-  readonly queryWrites: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queryWrites: Readonly<Record<string, string | undefined>>[] = [];
   readonly drawerOpens: RecordedDrawerOpen[] = [];
   readonly successes: ApiKeySuccessNotice[] = [];
   readonly failures: ApiKeyFailureNotice[] = [];
   readonly copies: RecordedCopy[] = [];
-  readonly navigations: Array<{ kind: "navigate" | "replace"; to: string }> = [];
+  readonly navigations: { kind: "navigate" | "replace"; to: string }[] = [];
   readonly leadSources: string[] = [];
   readonly lookups: string[] = [];
   readonly approvals: CliDeviceApproval[] = [];

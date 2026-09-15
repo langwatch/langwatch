@@ -224,7 +224,7 @@ function expectationOf(issue: ZodIssue, input: unknown): Record<string, unknown>
 }
 
 /** The value at a zod issue path, or undefined when the path cannot be walked. */
-function valueAt(input: unknown, path: ReadonlyArray<PropertyKey>): unknown {
+function valueAt(input: unknown, path: readonly PropertyKey[]): unknown {
   let current = input;
 
   for (const key of path) {

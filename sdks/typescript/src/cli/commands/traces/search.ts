@@ -98,7 +98,7 @@ export const searchTracesCommand = async (
     await events.flush();
   }
 
-  const traces = result.traces as Array<Record<string, unknown>>;
+  const traces = result.traces as Record<string, unknown>[];
   const matched = result.pagination.totalHits;
 
   // Rendering stays OUTSIDE the search try: a printResult rejection (invalid
@@ -174,7 +174,7 @@ const printTable = ({
   matched,
 }: {
   events: CommandEvents;
-  traces: Array<Record<string, unknown>>;
+  traces: Record<string, unknown>[];
   matched: number;
 }): void => {
   console.log();

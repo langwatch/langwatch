@@ -201,14 +201,14 @@ function groupProjectOptions({
   availableProjects,
 }: {
   projectOptions: ScopeOption[];
-  availableTeams: Array<{ id: string; name: string }> | undefined;
-  availableProjects: Array<{ id: string; teamId?: string }> | undefined;
+  availableTeams: { id: string; name: string }[] | undefined;
+  availableProjects: { id: string; teamId?: string }[] | undefined;
 }): {
-  teamGroups: Array<{
+  teamGroups: {
     teamId: string;
     teamName: string;
     projects: ScopeOption[];
-  }>;
+  }[];
   orphanProjects: ScopeOption[];
 } {
   const teamNameById = new Map((availableTeams ?? []).map((t) => [t.id, t.name] as const));
@@ -243,7 +243,7 @@ export function collapseRedundantScopes(
   prev: ScopeChipPickerEntry[],
   context: {
     organizationId: string | undefined;
-    availableProjects: Array<{ id: string; teamId?: string }>;
+    availableProjects: { id: string; teamId?: string }[];
   },
 ): ScopeChipPickerEntry[] {
   const prevKey = new Set(prev.map(entryKey));
@@ -359,8 +359,8 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
    *  caller passing `ModelProviderScopeType` entries gets the same narrow
    *  type back from `onChange` - DEPARTMENT only flows where a caller opts
    *  in by passing wider entries + `allowedScopeTypes`. */
-  value: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>;
-  onChange: (next: Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>) => void;
+  value: { scopeType: T; scopeId: string; personalOnly?: boolean }[];
+  onChange: (next: { scopeType: T; scopeId: string; personalOnly?: boolean }[]) => void;
   organizationId: string | undefined;
   organizationName?: string;
   teamId?: string | undefined;
@@ -368,12 +368,12 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   projectId?: string;
   projectName?: string;
   /** Teams the caller can pick. Falls back to `[{id:teamId, name:teamName}]`. */
-  availableTeams?: Array<{ id: string; name: string }>;
+  availableTeams?: { id: string; name: string }[];
   /** Projects the caller can pick. Falls back to `[{id:projectId, name:projectName}]`. */
-  availableProjects?: Array<{ id: string; name: string; teamId?: string }>;
+  availableProjects?: { id: string; name: string; teamId?: string }[];
   /** Departments the caller can pick. Only consulted when DEPARTMENT is in
    *  `allowedScopeTypes`. Sourced from `api.departments.list`. */
-  availableDepartments?: Array<{ id: string; name: string }>;
+  availableDepartments?: { id: string; name: string }[];
   /** Which scope kinds to offer. Defaults to ORGANIZATION/TEAM/PROJECT (the
    *  model-provider triad). The tile catalog passes
    *  `["ORGANIZATION", "DEPARTMENT"]` to offer org-wide or per-department
@@ -424,7 +424,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   // which kinds can ever be emitted, so the cast back to T on emit is sound.
   const value = inputValue as ScopeChipPickerEntry[];
   const onChange = (next: ScopeChipPickerEntry[]) =>
-    inputOnChange(next as Array<{ scopeType: T; scopeId: string; personalOnly?: boolean }>);
+    inputOnChange(next as { scopeType: T; scopeId: string; personalOnly?: boolean }[]);
 
   const allowed = useMemo<Set<ScopeChipPickerScopeType>>(
     () => new Set((allowedScopeTypes ?? DEFAULT_SCOPE_TYPES) as ScopeChipPickerScopeType[]),
@@ -555,12 +555,12 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
 
   // Quick-pick row + collapsible-multi mode. See `showQuickPicks` prop.
   const quickPicks = useMemo(() => {
-    const out: Array<{
+    const out: {
       key: "ORGANIZATION" | "TEAM" | "PROJECT";
       label: string;
       icon: React.ReactElement;
       scope: ScopeChipPickerEntry;
-    }> = [];
+    }[] = [];
     if (currentOrganizationId && allowed.has("ORGANIZATION")) {
       out.push({
         key: "ORGANIZATION",

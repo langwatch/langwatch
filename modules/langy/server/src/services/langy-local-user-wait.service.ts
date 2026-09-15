@@ -219,7 +219,7 @@ export class UserWaitService {
     waitId: string;
     userId: string;
     decision?: "allow_once" | "allow_pattern" | "deny";
-    answers?: Array<{ question: string; selected: string[]; other?: string }>;
+    answers?: { question: string; selected: string[]; other?: string }[];
     /** Where the answer was given. The card in the panel unless said otherwise. */
     source?: LangyPermissionAnswerSource;
     /** What a terminal grant covers, when the terminal named it. */
@@ -375,11 +375,11 @@ export class UserWaitService {
       ...(wait.source ? { source: wait.source } : {}),
       ...(wait.answers
         ? {
-            answers: wait.answers as Array<{
+            answers: wait.answers as {
               question: string;
               selected: string[];
               other?: string;
-            }>,
+            }[],
           }
         : {}),
     });

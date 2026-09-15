@@ -412,7 +412,7 @@ describe("given the saved dataset's record count", () => {
     it("renders a single page, no pager, and never requests page 0", async () => {
       // total 0 -> server totalPages 0. The page must floor at 1: requesting
       // page 0 would fail the server's positive() guard and break the editor.
-      const requested: Array<number | undefined> = [];
+      const requested: (number | undefined)[] = [];
       const stable = {
         data: {
           id: "empty",

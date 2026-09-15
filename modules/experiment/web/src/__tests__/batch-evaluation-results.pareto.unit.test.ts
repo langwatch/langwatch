@@ -93,7 +93,7 @@ const differenceInterval = (
 /** One variant's interval against each opponent, keyed by opponent id. */
 const pairIntervals = (
   mine: number | null | undefined,
-  others: Array<[string, number | null | undefined]>,
+  others: [string, number | null | undefined][],
 ): Record<string, [number, number]> => {
   const out: Record<string, [number, number]> = {};
   for (const [id, theirs] of others) {

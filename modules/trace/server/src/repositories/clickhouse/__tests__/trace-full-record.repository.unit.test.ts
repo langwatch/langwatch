@@ -24,7 +24,7 @@ class TenantClickHouseResolver extends TraceClickHouse {
 }
 
 class Payloads extends TracePayloadReaderRepository {
-  readonly calls: Array<{ tenantId: string; traceId: string }> = [];
+  readonly calls: { tenantId: string; traceId: string }[] = [];
 
   constructor(private readonly value: string | null) {
     super();

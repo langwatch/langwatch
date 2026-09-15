@@ -10,7 +10,7 @@ const destination = {
 };
 
 function repositoryWithQueries(options: {
-  findFirst: Array<typeof destination | null>;
+  findFirst: (typeof destination | null)[];
   alternatives?: number;
   paths?: { id: string; name: string; team: { name: string; organization: { name: string } } }[];
 }) {

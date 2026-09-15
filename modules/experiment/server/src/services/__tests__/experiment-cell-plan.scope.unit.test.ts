@@ -90,7 +90,7 @@ const comparisonTarget = {
 
 const plan = (
   state: PlanState,
-  datasetRows: Array<Record<string, unknown>>,
+  datasetRows: Record<string, unknown>[],
   scope: ExecutionScope,
 ) => cellPlan.generateCells({ state, datasetRows, scope });
 

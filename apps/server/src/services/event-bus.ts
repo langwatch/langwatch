@@ -4,7 +4,7 @@ import type { RuntimeEvent } from "../shared/runtime-contract.ts";
 // runtime.events() once.
 export class EventBus implements AsyncIterable<RuntimeEvent> {
   private readonly buffer: RuntimeEvent[] = [];
-  private readonly waiters: Array<(result: IteratorResult<RuntimeEvent>) => void> = [];
+  private readonly waiters: ((result: IteratorResult<RuntimeEvent>) => void)[] = [];
   private readonly taps = new Set<(event: RuntimeEvent) => void>();
   private done = false;
 

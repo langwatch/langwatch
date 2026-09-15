@@ -282,7 +282,7 @@ function ControlSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  options: ReadonlyArray<{ value: string; label: string }>;
+  options: readonly { value: string; label: string }[];
 }) {
   const collection = useMemo(
     () => createListCollection({ items: [...options] }),

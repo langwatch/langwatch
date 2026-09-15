@@ -7,7 +7,7 @@ import { goErrorEnvelopeSchema } from "./rules/scenario-generate-nlpgo-error.rul
 const MAX_DETAIL_LENGTH = 2_000;
 
 /** Lines we strip from the rendered surface (still preserved on the raw payload). */
-const NOISE_PATTERNS: ReadonlyArray<RegExp> = [
+const NOISE_PATTERNS: readonly RegExp[] = [
   /^AI SDK Warning .*$/gm,
   /^OTEL .*flushed.*$/gm,
   /^Flushing OTEL traces\.\.\.$/gm,

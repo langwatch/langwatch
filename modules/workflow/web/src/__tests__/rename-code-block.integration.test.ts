@@ -19,8 +19,8 @@ function makeCodeNode({
   id: string;
   name: string;
   code: string;
-  inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
+  inputs?: { identifier: string; type: string }[];
+  outputs?: { identifier: string; type: string }[];
 }): Node {
   return {
     id,

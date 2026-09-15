@@ -170,7 +170,7 @@ const verdictsOf = ({
 }: {
   run: FakeTabRun;
   evaluatorId: string;
-}): Array<{ rowIndex: number; result: Record<string, unknown> }> =>
+}): { rowIndex: number; result: Record<string, unknown> }[] =>
   run.events
     .filter(
       (event): event is Extract<EvaluationV3Event, { type: "evaluator_result" }> =>

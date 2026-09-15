@@ -23,7 +23,7 @@ export type RunHistoryFilterValues = {
 };
 
 type RunHistoryFiltersProps = {
-  scenarioOptions: Array<{ id: string; name: string }>;
+  scenarioOptions: { id: string; name: string }[];
   filters: RunHistoryFilterValues;
   onFiltersChange: (filters: RunHistoryFilterValues) => void;
   groupBy?: RunGroupType;

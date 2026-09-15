@@ -75,7 +75,7 @@ export class MonitorPerformanceService {
       : { sum: bucket.scoreSum, count: bucket.scoreCount };
   }
 
-  private average(totals: Array<{ sum: number; count: number }>): number | null {
+  private average(totals: { sum: number; count: number }[]): number | null {
     const sum = totals.reduce((value, total) => value + total.sum, 0);
     const count = totals.reduce((value, total) => value + total.count, 0);
 

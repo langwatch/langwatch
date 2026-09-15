@@ -11,7 +11,7 @@ type Recorded = {
   created: Blob[];
   revoked: string[];
   /** What was true about the anchor at the moment it was clicked. */
-  atClick: Array<{ href: string; download: string | null; attached: boolean; revoked: number }>;
+  atClick: { href: string; download: string | null; attached: boolean; revoked: number }[];
 };
 
 let recorded: Recorded;

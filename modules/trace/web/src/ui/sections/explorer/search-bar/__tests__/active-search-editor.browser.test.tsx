@@ -570,7 +570,7 @@ describe("SearchBar in real Chromium", () => {
 
       await userEvent.click(editor);
       await userEvent.keyboard("status:error[Enter]");
-      const expectations: Array<{ char: string; afterText: string }> = [
+      const expectations: { char: string; afterText: string }[] = [
         { char: "A", afterText: "status:error\u00A0A" },
         { char: "N", afterText: "status:error\u00A0AN" },
         { char: "D", afterText: "status:error\u00A0AND" },

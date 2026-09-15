@@ -346,7 +346,7 @@ export class LangWatchQLService {
       throw new LangWatchQLUnavailableError();
     }
 
-    return await this.executeValidated({
+    return this.executeValidated({
       executor,
       project,
       sql,

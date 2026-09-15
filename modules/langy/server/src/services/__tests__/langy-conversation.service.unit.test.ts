@@ -1036,7 +1036,7 @@ describe("LangyConversationService", () => {
     const partKinds = (recordAgentResponse: ReturnType<typeof vi.fn>): string[] => {
       const [call] = recordAgentResponse.mock.calls;
       const { parts } = (call?.[0] ?? { parts: [] }) as {
-        parts: Array<{ type: string; text?: string }>;
+        parts: { type: string; text?: string }[];
       };
       return parts.map((part) => (part.type === "text" ? `text:${part.text}` : part.type));
     };

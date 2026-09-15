@@ -73,7 +73,7 @@ function toPersonalWorkspaceTeams(
   teams: {
     id: string;
     name: string;
-    projects: Array<{ id: string; name: string; slug: string }>;
+    projects: { id: string; name: string; slug: string }[];
   }[],
 ): readonly PersonalTeam[] {
   return teams.map((team) => ({

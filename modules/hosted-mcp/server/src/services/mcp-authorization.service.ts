@@ -109,7 +109,7 @@ export class McpAuthorizationService {
       return { kind: "unregistered-redirect" };
     }
 
-    return await this.#approveVerifiedClient(request);
+    return this.#approveVerifiedClient(request);
   }
 
   /**

@@ -47,16 +47,16 @@ function makeRow(state: CodingAgentSessionState): CodingAgentSessionRow {
 
 /** Fake persistence port capturing writes and answering the read-back query. */
 class FakePersistence implements CodingAgentProjectionPersistence {
-  upsertCalls: Array<{
+  upsertCalls: {
     row: CodingAgentSession;
     retentionDays: number;
     appliedEventIds: readonly string[];
-  }> = [];
-  batchEntries: Array<{
+  }[] = [];
+  batchEntries: {
     row: CodingAgentSession;
     retentionDays: number;
     appliedEventIds: readonly string[];
-  }> = [];
+  }[] = [];
   withApplied: { row: CodingAgentSession; appliedEventIds: string[] } | null = null;
   lastFindParams:
     | { tenantId: string; sessionId: string; window?: { fromMs: number; toMs: number } }
@@ -71,11 +71,11 @@ class FakePersistence implements CodingAgentProjectionPersistence {
   }
 
   async storeSessionBatch(
-    entries: Array<{
+    entries: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     this.batchEntries.push(...entries);
   }

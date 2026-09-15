@@ -50,7 +50,7 @@ export interface SavedViewRepository {
   findByIds(input: {
     ids: string[];
     projectId: string;
-  }): Promise<Array<{ id: string; userId: string | null }>>;
+  }): Promise<{ id: string; userId: string | null }[]>;
   create(input: CreateSavedViewInput): Promise<SavedViewRecord>;
   createMany(input: { views: CreateSavedViewInput[] }): Promise<void>;
   update(input: UpdateSavedViewInput): Promise<SavedViewRecord>;

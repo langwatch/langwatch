@@ -221,7 +221,7 @@ export class TraceService {
   async tryGetSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
     const parsed = traceSummaryLookupInputSchema.parse(input);
 
-    return await this.composition.summaryReader.tryGetSummary({
+    return this.composition.summaryReader.tryGetSummary({
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
     });

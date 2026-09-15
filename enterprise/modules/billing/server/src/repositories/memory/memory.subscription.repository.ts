@@ -150,7 +150,7 @@ export class MemorySubscriptionRepository extends SubscriptionRepository {
   async migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<Array<{ stripeSubscriptionId: string | null }>> {
+  }): Promise<{ stripeSubscriptionId: string | null }[]> {
     const organization = this.store.organizations.get(input.organizationId);
     if (organization) organization.pricingModel = "SEAT_EVENT";
 

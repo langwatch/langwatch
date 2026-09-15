@@ -82,7 +82,7 @@ class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
 }
 
 class CapturingSummaryReader extends TraceSummaryReaderRepository {
-  readonly calls: Array<{ tenantId: string; traceId: string }> = [];
+  readonly calls: { tenantId: string; traceId: string }[] = [];
 
   async tryGetSummary(input: { tenantId: string; traceId: string }): Promise<null> {
     this.calls.push(input);

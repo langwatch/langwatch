@@ -637,12 +637,12 @@ function VirtualKeysPage() {
 }
 
 function GatewayCapabilityPreview() {
-  const rows: Array<{
+  const rows: {
     icon: React.ReactNode;
     label: string;
     defaultValue: string;
     detail: string;
-  }> = [
+  }[] = [
     {
       icon: <Zap size={14} />,
       label: "Cache control",

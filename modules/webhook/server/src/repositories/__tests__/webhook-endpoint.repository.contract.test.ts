@@ -35,7 +35,7 @@ class PassthroughSecrets implements WebhookSecret {
 
 const at = (iso: string): Instant => Temporal.Instant.from(iso);
 
-const backends: ReadonlyArray<Readonly<{ name: string; create: () => WebhookEndpointRuntime }>> = [
+const backends: readonly Readonly<{ name: string; create: () => WebhookEndpointRuntime }>[] = [
   {
     name: "memory",
     create: () =>

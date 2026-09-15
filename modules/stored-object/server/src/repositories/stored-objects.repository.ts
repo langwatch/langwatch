@@ -12,7 +12,7 @@ export abstract class StoredObjectsRepository {
 
   abstract findAllByProject(params: {
     projectId: string;
-  }): Promise<Array<{ id: string; storage_uri: string }>>;
+  }): Promise<{ id: string; storage_uri: string }[]>;
 
   /** A stable id-ordered page of the project's live rows. */
   abstract findLiveRowsByProjectPage(params: {

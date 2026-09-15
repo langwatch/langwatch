@@ -30,14 +30,14 @@ function bucketTime(ts: number): number {
  * seconds apart used to pay full compute twice, their timestamps differing by sub-minute drift.
  * Ordered by ascending duration, each entry taking the windows shorter than its `maxSpanMs`.
  */
-const DISCOVER_WINDOW_PRESETS: ReadonlyArray<{
+const DISCOVER_WINDOW_PRESETS: readonly {
   /** Window spans up to this size snap to `bucketMs`. */
   maxSpanMs: number;
   /** Bucket the `to` timestamp to a multiple of this size. */
   bucketMs: number;
   /** Stable label that goes into the cache key. */
   label: string;
-}> = [
+}[] = [
   { maxSpanMs: 65 * 60_000, bucketMs: 60_000, label: "1h" }, // up to 1h: 1-min bucket
   { maxSpanMs: 6 * 3_600_000, bucketMs: 5 * 60_000, label: "6h" }, // up to 6h: 5-min bucket
   { maxSpanMs: 25 * 3_600_000, bucketMs: 30 * 60_000, label: "24h" }, // up to 24h: 30-min bucket

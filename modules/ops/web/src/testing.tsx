@@ -20,7 +20,7 @@ export type OpsQuery = Readonly<Record<string, string | undefined>>;
 /** Everything a surface wrote through the host, in the order it wrote it. */
 export type OpsHostRecording = {
   navigations: string[];
-  queries: Array<{ next: OpsQuery; replace: boolean }>;
+  queries: { next: OpsQuery; replace: boolean }[];
   successes: OpsSuccessNotice[];
   failures: OpsFailureNotice[];
 };

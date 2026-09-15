@@ -122,13 +122,13 @@ export class ClaudeCodeTruncatedRequestService {
   /** Every message that closed before the cut, in order. */
   private salvagedHistoryMessages(
     messages: SalvagedValue | null,
-  ): Array<{ role: string; content: string }> {
+  ): { role: string; content: string }[] {
     const parsed = this.salvagedArray(messages);
     if (!Array.isArray(parsed)) {
       return [];
     }
 
-    const out: Array<{ role: string; content: string }> = [];
+    const out: { role: string; content: string }[] = [];
     for (const entry of parsed) {
       if (!isRecord(entry)) {
         continue;
@@ -321,7 +321,7 @@ export class ClaudeCodeTruncatedRequestService {
    * system/tools values, keeps partial system text that identifies session context.
    * @internal exported for unit testing
    */
-  trySalvage(raw: string): Array<{ role: string; content: string }> | null {
+  trySalvage(raw: string): { role: string; content: string }[] | null {
     const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
 
     const system = this.salvageTopLevelValue(trimmed, "system");

@@ -217,11 +217,11 @@ export async function deriveTraceDropPrivacy(
 
 export function mapSpanToDetail(
   span: Span,
-  rawEvents: Array<{
+  rawEvents: {
     name: string;
     timeUnixMs: number;
     attributes: Record<string, unknown>;
-  }>,
+  }[],
   spanDisplay: TraceSpanDisplay,
 ): SpanDetail {
   let status: SpanDetail["status"] = "unset";
@@ -332,7 +332,7 @@ export type V2Protections = {
   capturedInputVisibleTo?: string | null;
   capturedOutputVisibleTo?: string | null;
   contentCategories?: Record<ContentCategory, CategoryVisibility>;
-  hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
+  hiddenAttributes?: { pattern: string; visibleTo: string }[];
 };
 
 /**
@@ -385,10 +385,10 @@ export function contentSearchTermsForViewer({
 function hiddenCategoryAttributeRules(
   protections: V2Protections,
   contentPrivacy: TraceContentPrivacy,
-): Array<{ pattern: string; visibleTo: string }> {
+): { pattern: string; visibleTo: string }[] {
   const cats = protections.contentCategories;
   if (!cats) return [];
-  const rules: Array<{ pattern: string; visibleTo: string }> = [];
+  const rules: { pattern: string; visibleTo: string }[] = [];
   for (const category of ["system", "tools"] as const) {
     if (!cats[category].canSee) {
       for (const key of contentPrivacy.contentKeyCatalog[category]) {
@@ -519,7 +519,7 @@ function redactHiddenAttributes<T extends RedactableV2Dto>(
 
   // Span-detail events carry their own attribute records (list-item events
   // do not, hence the localized cast instead of a constraint field).
-  const events = (dto as { events?: Array<{ attributes?: Record<string, unknown> }> }).events;
+  const events = (dto as { events?: { attributes?: Record<string, unknown> }[] }).events;
   if (!events?.some((event) => event.attributes)) return;
 
   (redacted as Record<string, unknown>).events = events.map((event) =>

@@ -130,7 +130,7 @@ export async function genieGet(params: {
       path,
     });
   }
-  return await response.json();
+  return response.json();
 }
 
 /**

@@ -162,7 +162,7 @@ export class TriggerSettlement {
   static pagePersistMatches({
     matches,
   }: {
-    matches: Array<{ traceId: string; settleWindowBucket: string }>;
+    matches: { traceId: string; settleWindowBucket: string }[];
   }): PersistPage[] {
     // Byte order, not localeCompare: the page key must never depend on the
     // process locale or ICU version.
@@ -187,16 +187,16 @@ export class TriggerSettlement {
     at: number,
   ): {
     state: SettlementState;
-    boundaries: Array<{ key: number; traceIds: string[] }>;
+    boundaries: { key: number; traceIds: string[] }[];
     persistPages: PersistPage[];
     nextBoundary: number | null;
   } {
     const remaining: SettlementState["pendingMatches"] = {};
     const notifyByBoundary = new Map<number, string[]>();
-    const settledMatches: Array<{
+    const settledMatches: {
       traceId: string;
       settleWindowBucket: string;
-    }> = [];
+    }[] = [];
     for (const [traceId, match] of Object.entries(state.pendingMatches)) {
       if (match.dispatchDueAt > at) {
         remaining[traceId] = match;

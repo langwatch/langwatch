@@ -597,7 +597,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     transaction: Prisma.TransactionClient,
     input: ScenarioWriteInput,
     current: Scenario,
-  ): Promise<Array<string | null | undefined>> {
+  ): Promise<(string | null | undefined)[]> {
     const touched = input.testSuiteId === void 0 ? [] : [current.testSuiteId, input.testSuiteId];
     const testSuites = await this.lockTestSuites(transaction, input.projectId, touched);
     const targetTestSuiteId = input.testSuiteId;
@@ -718,7 +718,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   private async lockTestSuites(
     transaction: Prisma.TransactionClient,
     projectId: string,
-    testSuiteIds: Array<string | null | undefined>,
+    testSuiteIds: (string | null | undefined)[],
   ): Promise<Map<string, SimulationSuite>> {
     const ids = [
       ...new Set(
@@ -746,7 +746,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   private async reconcileLockedTestSuites(
     transaction: Prisma.TransactionClient,
     projectId: string,
-    testSuiteIds: Array<string | null | undefined>,
+    testSuiteIds: (string | null | undefined)[],
   ): Promise<void> {
     const ids = [
       ...new Set(

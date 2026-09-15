@@ -280,7 +280,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
       const evaluation = await langwatch.experiments.init(`test-withTarget-${Date.now()}`);
       const dataset = [{ question: "What is AI?" }];
 
-      const results: Array<{ target: string; duration: number; spanId: string }> = [];
+      const results: { target: string; duration: number; spanId: string }[] = [];
 
       await evaluation.run(dataset, async () => {
         const gpt4Result = await evaluation.withTarget(
@@ -481,12 +481,12 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         { question: "Question C" },
       ];
 
-      const results: Array<{
+      const results: {
         index: number;
         target: string;
         question: string;
         response: string;
-      }> = [];
+      }[] = [];
 
       await evaluation.run(
         dataset,
@@ -572,14 +572,14 @@ describe("Evaluation Unit", () => {
     it("sends correct entry data for each target in concurrent execution", async () => {
       // This test verifies the fix for the race condition where concurrent
       // withTarget() calls would capture wrong item data due to shared state
-      const capturedBodies: Array<{
-        dataset: Array<{
+      const capturedBodies: {
+        dataset: {
           index: number;
           target_id: string;
           entry: unknown;
           predicted: unknown;
-        }>;
-      }> = [];
+        }[];
+      }[] = [];
 
       // Mock fetch to capture API calls
       const originalFetch = globalThis.fetch;

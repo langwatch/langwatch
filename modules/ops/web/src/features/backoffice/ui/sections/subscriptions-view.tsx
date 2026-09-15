@@ -69,11 +69,11 @@ const statusColor: Record<SubscriptionStatus, string> = {
  * Every numeric limit the server stores on a subscription, rendered as its own
  * form field. Kept as a table so adding/removing a limit is a one-line change.
  */
-const LIMIT_FIELDS: Array<{
+const LIMIT_FIELDS: {
   key: keyof AdminSubscription;
   label: string;
   group: "Members" | "Resources" | "Evaluation" | "Observability" | "Analytics";
-}> = [
+}[] = [
   { key: "maxMembers", label: "Max members", group: "Members" },
   { key: "maxMembersLite", label: "Max lite members", group: "Members" },
   { key: "maxTeams", label: "Max teams", group: "Members" },

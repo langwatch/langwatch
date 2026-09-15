@@ -90,13 +90,13 @@ export interface StoredRoutingPolicy {
   defaultModel: string | null;
   policyRules: unknown;
   isDefault: boolean;
-  scopes: Array<{ scopeType: string; scopeId: string }>;
+  scopes: { scopeType: string; scopeId: string }[];
 }
 
 export function routingPolicyToFormValues(policy: StoredRoutingPolicy): RoutingPolicyFormValues {
   const aliases = readStringRecord(policy.modelAliases);
   const tiers = { complex: "", reasoning: "", fast: "" };
-  const nameMappings: Array<{ from: string; to: string }> = [];
+  const nameMappings: { from: string; to: string }[] = [];
   for (const [from, to] of Object.entries(aliases)) {
     if (isModelTier(from)) {
       tiers[from] = to;

@@ -12,7 +12,7 @@ import { resetSharedClient, sharedClientForTests } from "../client";
 import { connectAgent, normalizeReply, type AgentCall, type ConnectedAgent } from "../define";
 
 const recordingLogger = (): Logger & { lines: (level: string, pattern: RegExp) => string[] } => {
-  const calls: Array<[string, string]> = [];
+  const calls: [string, string][] = [];
   const log = (level: string) => (message: string) => {
     calls.push([level, message]);
   };

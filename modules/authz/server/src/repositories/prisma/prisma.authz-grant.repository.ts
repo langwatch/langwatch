@@ -28,7 +28,7 @@ type PrismaAuthzGrantDatabase = {
   };
   team: {
     findUnique(args: unknown): Promise<{ organizationId: string } | null>;
-    findMany(args: unknown): Promise<Array<{ id: string; name: string }>>;
+    findMany(args: unknown): Promise<{ id: string; name: string }[]>;
   };
   project: {
     findUnique(args: unknown): Promise<{
@@ -36,7 +36,7 @@ type PrismaAuthzGrantDatabase = {
     } | null>;
   };
   apiKey: {
-    findMany(args: unknown): Promise<Array<{ id: string; name: string }>>;
+    findMany(args: unknown): Promise<{ id: string; name: string }[]>;
   };
 };
 
@@ -102,7 +102,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     return this.prisma.apiKey.findMany({
       where: { userId, organizationId, revokedAt: null },
       select: { id: true, name: true },
@@ -115,7 +115,7 @@ export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     return this.prisma.team.findMany({
       where: { organizationId, isPersonal: true, ownerUserId: userId },
       select: { id: true, name: true },

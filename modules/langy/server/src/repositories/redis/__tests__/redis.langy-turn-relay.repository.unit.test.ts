@@ -108,7 +108,7 @@ function fakeResourceLinks() {
       links,
     }: {
       conversationId: string;
-      links: Array<{ id: string; href: string }>;
+      links: { id: string; href: string }[];
     }) {
       const map = byConversation.get(conversationId) ?? new Map();
       for (const { id, href } of links) map.set(id, href);

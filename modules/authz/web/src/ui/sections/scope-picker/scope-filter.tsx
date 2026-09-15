@@ -8,8 +8,8 @@ import { useState } from "react";
 /** The organization, teams and projects a reader may narrow the page to. */
 export interface AvailableScopes {
   organization?: { id: string; name: string } | null;
-  teams: Array<{ id: string; name: string }>;
-  projects: Array<{ id: string; name: string; teamId?: string | null }>;
+  teams: { id: string; name: string }[];
+  projects: { id: string; name: string; teamId?: string | null }[];
 }
 
 /**

@@ -25,7 +25,7 @@ import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts
 import { useRollingWindow } from "../../../behavior/use-rolling-window.ts";
 import { api, type RouterOutputs } from "../../../behavior/gateway-api.ts";
 
-const PRESETS: Array<{ label: string; days: number }> = [
+const PRESETS: { label: string; days: number }[] = [
   { label: "Last 24h", days: 1 },
   { label: "Last 7 days", days: 7 },
   { label: "Last 30 days", days: 30 },

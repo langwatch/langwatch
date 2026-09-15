@@ -192,7 +192,7 @@ describe("given a code agent node in a workflow", () => {
 
       // The mutation got the edited code.
       const mutateInput = mockMutate.mock.calls.at(-1)![0] as {
-        config: { parameters: Array<{ identifier: string; value: unknown }> };
+        config: { parameters: { identifier: string; value: unknown }[] };
       };
       expect(mutateInput.config.parameters.find((p) => p.identifier === "code")?.value).toBe(
         "print('v2 edited')",
@@ -234,7 +234,7 @@ describe("given a code agent node in a workflow", () => {
       fireEvent.click(footer.getByTestId("agent-save-button"));
 
       const mutateInput = mockMutate.mock.calls.at(-1)![0] as {
-        config: { inputs: Array<{ identifier: string }> };
+        config: { inputs: { identifier: string }[] };
       };
       expect(mutateInput.config.inputs.map((i) => i.identifier)).toEqual(["input", "context"]);
     });

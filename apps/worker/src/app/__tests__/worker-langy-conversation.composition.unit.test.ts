@@ -19,8 +19,8 @@ import { createWorkerProcessDatabase } from "./support/worker-database.double.ts
  */
 
 const RECORDED: {
-  published: Array<{ channel: string; message: string }>;
-  inserted: Array<{ table: string; values: readonly unknown[]; settings: unknown }>;
+  published: { channel: string; message: string }[];
+  inserted: { table: string; values: readonly unknown[]; settings: unknown }[];
   absences: string[];
 } = { published: [], inserted: [], absences: [] };
 
@@ -120,7 +120,7 @@ function compose(
 function frozenLangyRoutingKeys(): string[] {
   const registry = JSON.parse(
     readFileSync(new URL("../../features/job-registry.json", import.meta.url), "utf8"),
-  ) as { pipelines: Array<{ name: string; jobs: string[] }> };
+  ) as { pipelines: { name: string; jobs: string[] }[] };
   const pipeline = registry.pipelines.find(
     (entry) => entry.name === "langy_conversation_processing",
   );
@@ -133,7 +133,7 @@ function registeredKeys(definition: {
   foldProjections: Map<string, unknown>;
   stateProjections?: Map<string, unknown>;
   mapProjections: Map<string, unknown>;
-  commands: ReadonlyArray<{ name: string }>;
+  commands: readonly { name: string }[];
   foldSubscribers: Map<string, unknown>;
   mapSubscribers: Map<string, unknown>;
   eventSubscribers: Map<string, unknown>;

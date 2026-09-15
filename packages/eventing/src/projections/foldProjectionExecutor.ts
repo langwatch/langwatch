@@ -176,7 +176,7 @@ export class FoldProjectionExecutor {
       miss?: "absent" | "undecodable";
     }> => {
       if (store.getWithApplied) {
-        return await store.getWithApplied(key, readContext);
+        return store.getWithApplied(key, readContext);
       }
       // A get()-only store has no way to say "found but refused", so its null
       // is always an absent miss; stamping it keeps the miss kind uniform for

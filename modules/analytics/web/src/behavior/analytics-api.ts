@@ -229,7 +229,7 @@ type BorrowedProcedures = {
     };
     batchUpdateLayouts: {
       mutation: {
-        input: ProjectScope & { layouts: Array<{ graphId: string } & Record<string, unknown>> };
+        input: ProjectScope & { layouts: ({ graphId: string } & Record<string, unknown>)[] };
         output: { success: true };
       };
     };
@@ -261,7 +261,7 @@ type BorrowedProcedures = {
     };
     batchUpdateLayouts: {
       mutation: {
-        input: ProjectScope & { layouts: Array<{ graphId: string } & Record<string, unknown>> };
+        input: ProjectScope & { layouts: ({ graphId: string } & Record<string, unknown>)[] };
         output: { success: true };
       };
     };

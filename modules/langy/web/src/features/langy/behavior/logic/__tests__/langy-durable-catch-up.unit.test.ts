@@ -62,11 +62,11 @@ function utilsWith({
  * is what a run against its own ceiling looks like from the client's side.
  */
 function utilsWithPages(
-  pages: Array<{
+  pages: {
     events?: unknown[];
     cursor: { acceptedAt: number; eventId: string };
     truncated: boolean;
-  }>,
+  }[],
 ) {
   let call = 0;
   const fetch = vi.fn().mockImplementation(() => {

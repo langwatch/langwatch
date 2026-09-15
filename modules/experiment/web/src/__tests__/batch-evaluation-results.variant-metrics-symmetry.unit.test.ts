@@ -10,7 +10,7 @@ import type { BatchResultRow } from "../ui/sections/batch-evaluation-results.typ
  */
 
 const rowsWith = (
-  perVariant: Record<string, Array<{ cost: number; duration: number }>>,
+  perVariant: Record<string, { cost: number; duration: number }[]>,
 ): BatchResultRow[] => {
   const ids = Object.keys(perVariant);
   const length = Math.max(...ids.map((id) => perVariant[id]!.length));

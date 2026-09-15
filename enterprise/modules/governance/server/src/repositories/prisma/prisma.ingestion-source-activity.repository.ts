@@ -133,7 +133,7 @@ interface SpendOverTimeBucket {
    * array when nothing spent on this day across any group; the bucket
    * is still emitted so the chart's X axis has no gaps.
    */
-  points: Array<{
+  points: {
     /**
      * Stable group identifier - teamId, user_id, or model name. Used
      * for color-derivation (name-hash) + click-through scope params.
@@ -142,7 +142,7 @@ interface SpendOverTimeBucket {
     /** Human-readable label for legend / tooltip. */
     label: string;
     spendUsd: string;
-  }>;
+  }[];
 }
 
 interface SpendOverTimeResult {
@@ -425,11 +425,11 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       thisSpend: number | string | null;
       prevSpend: number | string | null;
       thisUsers: number | string | null;
-    }>;
+    }[];
     const row = rows[0];
     const thisSpend = Number(row?.thisSpend ?? 0);
     const prevSpend = Number(row?.prevSpend ?? 0);
@@ -541,13 +541,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       actor: string;
       spendUsdStr: string;
       requests: string;
       lastActivityMs: string;
       mostUsedTarget: string | null;
-    }>;
+    }[];
     return rows.map((r) => ({
       actor: r.actor,
       spendUsd: r.spendUsdStr,
@@ -634,13 +634,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       projectId: string;
       actor: string;
       spendUsdStr: string;
       requests: string;
       lastActivityMs: string;
-    }>;
+    }[];
 
     const acc = new Map<
       string,
@@ -823,13 +823,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       format: "JSONEachRow",
     });
 
-    const sourceRows = (await result.json()) as Array<{
+    const sourceRows = (await result.json()) as {
       sourceId: string;
       thisSpendStr: string;
       prevSpendStr: string;
       thisRequests: string;
       lastActivityMs: string;
-    }>;
+    }[];
     if (sourceRows.length === 0) return [];
 
     const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
@@ -1004,18 +1004,18 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       bucketMs: string;
       groupKey: string | null;
       spendUsdStr: string;
-    }>;
+    }[];
 
     let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: Array<{
+    let rolledRows: {
       bucketMs: number;
       key: string;
       spendNanoUsd: bigint;
-    }>;
+    }[];
 
     if (input.groupBy === "team") {
       const sourceIds = Array.from(

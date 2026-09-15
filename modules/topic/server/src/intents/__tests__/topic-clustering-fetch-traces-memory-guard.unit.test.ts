@@ -10,10 +10,10 @@ import type { TopicClusteringClickHouse } from "../../app/topic.members.ts";
 describe("topicClustering page fetch memory guard", () => {
   describe("when the page of traces is fetched", () => {
     async function capturePageFetchQuery() {
-      const captured: Array<{
+      const captured: {
         query: string;
         clickhouse_settings?: Record<string, unknown>;
-      }> = [];
+      }[] = [];
       const clickhouse: TopicClusteringClickHouse = {
         query: async (params) => {
           captured.push(params);

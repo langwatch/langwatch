@@ -62,7 +62,7 @@ function governanceProjectPrisma() {
   };
 }
 
-const userSortCases: Array<[SpendSortField, SortDir, string]> = [
+const userSortCases: [SpendSortField, SortDir, string][] = [
   ["spend", "asc", "sum(spendUsd) ASC"],
   ["spend", "desc", "sum(spendUsd) DESC"],
   ["requests", "asc", "count() ASC"],
@@ -71,7 +71,7 @@ const userSortCases: Array<[SpendSortField, SortDir, string]> = [
   ["lastActivity", "desc", "max(occurredAt) DESC"],
 ];
 
-const timeSeriesGroupCases: Array<[Extract<SpendOverTimeGroupBy, "user" | "model">, string]> = [
+const timeSeriesGroupCases: [Extract<SpendOverTimeGroupBy, "user" | "model">, string][] = [
   ["user", "ts.Attributes[{userKey:String}] AS groupKey"],
   ["model", "arrayElement(ts.Models, 1) AS groupKey"],
 ];

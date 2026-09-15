@@ -5,5 +5,5 @@ export async function visitContentPartAsync<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): Promise<R | undefined> {
-  return await dispatchContentPart(part, visitor);
+  return dispatchContentPart(part, visitor);
 }

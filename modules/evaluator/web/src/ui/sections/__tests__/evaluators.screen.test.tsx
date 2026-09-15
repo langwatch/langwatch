@@ -12,11 +12,11 @@ import EvaluatorsScreen from "../evaluators.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    evaluators: [] as Array<Record<string, unknown>>,
+    evaluators: [] as Record<string, unknown>[],
     isLoading: false,
     related: {
       workflow: null as { id: string; name: string } | null,
-      monitors: [] as Array<{ id: string; name: string }>,
+      monitors: [] as { id: string; name: string }[],
     },
     relatedLoading: false,
   },

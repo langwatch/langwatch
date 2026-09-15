@@ -52,7 +52,7 @@ export type OnboardingApiMap = {
     getTeamsWithMembers: {
       query: {
         input: { organizationId: string };
-        output: Array<{ id: string; name: string; projects: Array<{ id: string }> }>;
+        output: { id: string; name: string; projects: { id: string }[] }[];
       };
     };
   };
@@ -98,7 +98,7 @@ export type OnboardingApiMap = {
          * the explorer's full type (`@langwatch/trace-contract`'s) is not
          * restated here.
          */
-        output: { groups?: Array<Array<{ trace_id?: string }>> };
+        output: { groups?: { trace_id?: string }[][] };
       };
     };
   };
@@ -111,23 +111,23 @@ export type OnboardingApiMap = {
     getAll: {
       query: {
         input: { isDemo?: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           primaryIntent: string | null;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
             isPersonal?: boolean | null;
-            projects: Array<{
+            projects: {
               id: string;
               name: string;
               slug: string;
               apiKey?: string | null;
               createdAt?: TimeInput | null;
-            }>;
-          }>;
-        }>;
+            }[];
+          }[];
+        }[];
       };
     };
   };

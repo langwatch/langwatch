@@ -11,9 +11,7 @@ import { MemoryGithubInstallNonceRepository } from "../memory/memory.github-inst
 const NONCE = "nonce-one";
 const OTHER_NONCE = "nonce-two";
 
-const backends: ReadonlyArray<
-  Readonly<{ name: string; create: () => GithubInstallNonceRepository }>
-> = [
+const backends: readonly Readonly<{ name: string; create: () => GithubInstallNonceRepository }>[] = [
   {
     name: "memory",
     create: () =>

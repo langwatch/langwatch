@@ -291,7 +291,7 @@ export const DEFAULT_COUNTRIES = [
   ...rest,
 ] as const satisfies readonly CountryMapCode[];
 
-export function splitByPopularity(codes: ReadonlyArray<CountryCode>): {
+export function splitByPopularity(codes: readonly CountryCode[]): {
   popular: CountryCode[];
   others: CountryCode[];
 } {

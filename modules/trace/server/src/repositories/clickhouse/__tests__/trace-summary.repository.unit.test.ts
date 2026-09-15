@@ -24,8 +24,8 @@ const heavyRow = {
 
 function makeRepo(responder: (sql: string) => unknown[]) {
   const queries: string[] = [];
-  const parameters: Array<Record<string, unknown>> = [];
-  const resolvedFor: Array<string | undefined> = [];
+  const parameters: Record<string, unknown>[] = [];
+  const resolvedFor: (string | undefined)[] = [];
   const client = {
     query: vi.fn(
       async ({

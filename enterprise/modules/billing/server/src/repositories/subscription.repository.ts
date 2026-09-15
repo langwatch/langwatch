@@ -52,7 +52,7 @@ export abstract class SubscriptionRepository {
   abstract migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<Array<{ stripeSubscriptionId: string | null }>>;
+  }): Promise<{ stripeSubscriptionId: string | null }[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

@@ -211,7 +211,7 @@ export class UsageWarningService {
   }: {
     organizationId: string;
     crossedThreshold: number;
-  }): Promise<Array<{ id: string; name: string; messageCount: number }> | null> {
+  }): Promise<{ id: string; name: string; messageCount: number }[] | null> {
     const projects = await this.organizations.findProjectsWithName(organizationId);
     const counts = await this.usageCounts.getCountByProjects({
       organizationId,
@@ -251,7 +251,7 @@ export class UsageWarningService {
   }: {
     organizationId: string;
     organizationName: string;
-    deliverableAdmins: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+    deliverableAdmins: { user: { id: string; name: string | null; email: string | null } }[];
     emailContext: UsageLimitEmailData;
     currentMonthMessagesCount: number;
     maxMonthlyUsageLimit: number;

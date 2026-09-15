@@ -8,7 +8,7 @@ import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organiz
 const ORGANIZATION_ID = "org_acme";
 
 function purgingPrisma() {
-  const deletions: Array<{ model: string; where: Record<string, unknown> }> = [];
+  const deletions: { model: string; where: Record<string, unknown> }[] = [];
   const deleteManyFor = (model: string) =>
     vi.fn(({ where }: { where: Record<string, unknown> }) => {
       deletions.push({ model, where });

@@ -186,7 +186,7 @@ describe("resolveWrapperPath", () => {
         // subscription (OTLP) first and pre-selected as the default.
         const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
           message: string;
-          choices: Array<{ title: string; value: string; description?: string }>;
+          choices: { title: string; value: string; description?: string }[];
           initial: number;
         };
         expect(promptArg.message).toBe("How should `langwatch claude` run?");
@@ -380,7 +380,7 @@ describe("resolveWrapperPath", () => {
         env: {},
       });
       const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
-        choices: Array<{ value: string; description: string }>;
+        choices: { value: string; description: string }[];
         initial: number;
       };
       const values = promptArg.choices.map((c) => c.value);

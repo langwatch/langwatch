@@ -17,7 +17,7 @@ function fakeInfrastructure({
   spansByTrace = {},
 }: {
   traceIds?: string[];
-  spansByTrace?: Record<string, Array<Record<string, unknown>>>;
+  spansByTrace?: Record<string, Record<string, unknown>[]>;
 }): WholeCallAudioInfrastructure {
   return {
     loadRunTraceIds: vi.fn(async () => traceIds),

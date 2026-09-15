@@ -25,7 +25,7 @@ export class MemoryTraceSummaryRepository extends TraceSummaryRepository {
   }
 
   async upsertBatch(
-    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
+    entries: { data: TraceSummaryData; tenantId: string; retentionDays?: number }[],
   ): Promise<void> {
     for (const entry of entries) await this.upsert(entry.data, entry.tenantId);
   }

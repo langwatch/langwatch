@@ -11,7 +11,7 @@ function unavailable(): never {
 }
 
 class TestEvaluations {
-  readonly lookups: Array<{ tenantId: string; traceId: string }> = [];
+  readonly lookups: { tenantId: string; traceId: string }[] = [];
   runs: EvaluationRunData[] = [];
 
   validateTemplateDraft(): never {
@@ -67,12 +67,12 @@ class TestTraces extends TraceService {
 
   classification = { evaluations: false, events: false, spans: false };
   readonly classifications: string[] = [];
-  readonly eventRequests: Array<{
+  readonly eventRequests: {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
     foldVersion?: number;
-  }> = [];
+  }[] = [];
   events: DerivedTraceEvent[] = [];
 
   getById(): never {
@@ -120,21 +120,21 @@ class TestFilterEvaluator extends AutomationSettlementFilterEvaluator {
   filterQueryResult = true;
   traceFilterResult = true;
   evaluationFilterResult = true;
-  filterQueryCalls: Array<{
+  filterQueryCalls: {
     query: string;
     foldState: TraceSummaryData;
     evaluations: EvaluationRunData[] | null;
     events: DerivedTraceEvent[] | null;
-  }> = [];
-  traceFilterCalls: Array<{
+  }[] = [];
+  traceFilterCalls: {
     filters: Record<string, unknown>;
     foldState: TraceSummaryData;
     events: DerivedTraceEvent[] | null;
-  }> = [];
-  evaluationFilterCalls: Array<{
+  }[] = [];
+  evaluationFilterCalls: {
     filters: Record<string, unknown>;
     evaluations: EvaluationRunData[];
-  }> = [];
+  }[] = [];
 
   matchesFilterQuery(input: {
     query: string;

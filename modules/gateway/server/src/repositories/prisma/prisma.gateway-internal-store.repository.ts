@@ -75,12 +75,12 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
   }
 
   async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
-    Array<{
+    {
       id: string;
       organizationId: string;
       principalUserId: string | null;
       lastUsedAt: Instant | null;
-    }>
+    }[]
   > {
     const rows = await this.database.virtualKey.findMany({
       where: { id: { in: [...virtualKeyIds] } },
@@ -98,7 +98,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
     }));
   }
 
-  findProjectTeams(projectIds: readonly string[]): Promise<Array<{ id: string; teamId: string }>> {
+  findProjectTeams(projectIds: readonly string[]): Promise<{ id: string; teamId: string }[]> {
     return this.database.project.findMany({
       where: { id: { in: [...projectIds] } },
       select: { id: true, teamId: true },

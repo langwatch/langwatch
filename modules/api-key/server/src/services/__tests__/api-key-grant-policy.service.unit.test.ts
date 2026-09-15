@@ -13,18 +13,18 @@ type Fakes = {
   can?: boolean;
   allow?: (permission: string) => boolean;
   permissionsAsked?: string[];
-  userBindings?: Array<{ scopeType: string; scopeId: string; role: string }>;
-  scopeBindings?: Array<{ apiKeyId: string; role: string }>;
-  customRoles?: Array<{ id: string; permissions: unknown }>;
+  userBindings?: { scopeType: string; scopeId: string; role: string }[];
+  scopeBindings?: { apiKeyId: string; role: string }[];
+  customRoles?: { id: string; permissions: unknown }[];
   team?: "found" | "missing";
   project?: { archivedAt?: Date | null; team: { id: string; organizationId: string } };
   personalOwner?: string | null;
   attached?: { attached: string[]; duplicates: string[] };
-  calls?: Array<Record<string, unknown>>;
+  calls?: Record<string, unknown>[];
 };
 
 function policyWith(fakes: Fakes = {}) {
-  const calls: Array<Record<string, unknown>> = [];
+  const calls: Record<string, unknown>[] = [];
   const service = ApiKeyGrantPolicyService.create({
     authz: {
       hasPermission: async () => true,
@@ -156,7 +156,7 @@ describe("ApiKeyGrantPolicyService", () => {
     // something weak and a user holding only `project:view` could mint an
     // admin key, with every check still passing.
     describe("given each role", () => {
-      const expected: Array<[ApiKeyScope["role"], ApiKeyScope["scopeType"], string]> = [
+      const expected: [ApiKeyScope["role"], ApiKeyScope["scopeType"], string][] = [
         ["ADMIN", "ORGANIZATION", "organization:manage"],
         ["ADMIN", "PROJECT", "project:manage"],
         ["MEMBER", "ORGANIZATION", "organization:view"],

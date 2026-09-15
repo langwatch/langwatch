@@ -39,7 +39,7 @@ function stubDatabase({
   enrollments,
   memberships,
 }: {
-  enrollments: Array<{ organizationId: string; migrationName: string }>;
+  enrollments: { organizationId: string; migrationName: string }[];
   memberships: Record<string, string[]>;
 }) {
   const findFirst = vi.fn(

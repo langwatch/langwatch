@@ -52,11 +52,8 @@ export function resolveConversationKey(attrs: Record<string, unknown>): string |
 
 /**
  * The conversation key off one SPAN's attributes: the detected agent's own
- * `sessionKeyFromSpan` hook first, the shared candidate order otherwise.
- * Span callers use this; log and metric callers keep
- * {@link resolveConversationKey} — no agent's events need the override, and
- * consulting the hook there would hand it attributes it never claimed to
- * understand.
+ * `sessionKeyFromSpan` hook first, the shared candidate order otherwise. Log and metric
+ * callers instead keep {@link resolveConversationKey} — no agent's events need the override.
  */
 export function resolveSpanConversationKey({
   agent,
@@ -72,11 +69,9 @@ export function resolveSpanConversationKey({
 }
 
 /**
- * The canonical event, from whatever the agent called it.
- *
- * Some agents namespace their event names (`claude_code.tool_result`,
- * `codex.tool_result`) and some do not (opencode emits a bare `tool_result`),
- * so the prefix is stripped before matching rather than enumerated per agent.
+ * The canonical event, from whatever the agent called it. Some agents namespace their event
+ * names (`claude_code.tool_result`, `codex.tool_result`) and some don't (opencode emits a
+ * bare `tool_result`), so the prefix is stripped before matching rather than enumerated.
  */
 export function normalizeEventName(
   rawEventName: string | null | undefined,
@@ -94,10 +89,9 @@ export function normalizeEventName(
 }
 
 /**
- * The canonical vocabulary every agent shares: identity mappings for the
- * canonical names themselves, plus spellings not attributable to a single
- * vendor. Vendor-specific aliases live on the agent definitions and are
- * merged in below.
+ * The canonical vocabulary every agent shares: identity mappings for the canonical names
+ * themselves, plus spellings not attributable to a single vendor. Vendor-specific aliases
+ * live on the agent definitions and are merged in below.
  */
 const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   user_prompt: "user_prompt",
@@ -146,11 +140,9 @@ const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
 };
 
 /**
- * The canonical metric, from whatever the agent called it.
- *
- * The agent prefix is the only difference for the metrics we care about
- * (`claude_code.lines_of_code.count` vs `opencode.lines_of_code.count`), so it
- * is stripped and the remainder matched — the same trick the event names use.
+ * The canonical metric, from whatever the agent called it. The agent prefix is the only
+ * difference for the metrics we care about (`claude_code.lines_of_code.count` vs
+ * `opencode.lines_of_code.count`), so it's stripped and the remainder matched.
  */
 export function normalizeMetricName(
   rawMetricName: string | null | undefined,
@@ -176,7 +168,7 @@ const BASE_METRIC_ALIASES: Readonly<Record<string, CodingAgentMetric>> = {
  */
 export function mergeAliasTables<Value>(
   base: Readonly<Record<string, Value>>,
-  perAgent: ReadonlyArray<Readonly<Record<string, Value>> | undefined>,
+  perAgent: readonly (Readonly<Record<string, Value>> | undefined)[],
 ): Readonly<Record<string, Value>> {
   const merged: Record<string, Value> = { ...base };
   for (const table of perAgent) {
@@ -207,10 +199,8 @@ const METRIC_ALIASES = mergeAliasTables(
 );
 
 /**
- * Is this metric from a coding agent at all?
- *
- * Was `startsWith("claude_code.")` — which would have dropped every opencode and
- * Codex metric at the gate, after all the trouble of normalizing them.
+ * Is this metric from a coding agent at all? Checks across every registered agent, not just
+ * Claude's own prefix, so opencode and Codex metrics aren't dropped at the gate.
  */
 export function isCodingAgentMetricName(metricName: string): boolean {
   return (
@@ -333,19 +323,16 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
 ];
 
 /**
- * The companion event a LangWatch-installed hook emits, carrying the session's
- * repository, branch and worktree identity. Fully qualified on the wire, under
- * the `langwatch.coding_agent.hook` instrumentation scope: it belongs to
- * LangWatch, and imitating a vendor's scope to sneak past detection would make
- * every downstream reader unable to tell the two apart.
+ * The companion event a LangWatch-installed hook emits, carrying the session's repository,
+ * branch and worktree identity. Fully qualified under `langwatch.coding_agent.hook` — it
+ * belongs to LangWatch, and imitating a vendor's scope would blur the two apart.
  */
 export const SESSION_CONTEXT_EVENT_NAME = "langwatch.session_context";
 
 /**
- * The fact key the generated conversation title rides on. Derived rather than
- * lifted for claude (parsed out of a response body by the dispatcher), and
- * carried as a wire attribute by the codex harvest's session-context record,
- * which is why the key is also in the lifted vocabulary above.
+ * The fact key the generated conversation title rides on: derived for claude (parsed from a
+ * response body by the dispatcher), but carried as a wire attribute by codex's session-context
+ * record — which is why the key is also in the lifted vocabulary above.
  */
 export const SESSION_TITLE_FACT_KEY = "langwatch.session.title";
 
@@ -366,11 +353,9 @@ export const WITHHELD_PROMPT_TEXT = "[REDACTED]";
 const MAX_PROMPT_TITLE_CHARS = 120;
 
 /**
- * A session name out of a prompt's text, or null when the prompt cannot name
- * one: withheld text, an empty string, or a machine-injected turn (agents
- * deliver notifications and context as user turns wrapped in tags, and a
- * session named `<task-notification>` names nothing). The name is the
- * prompt's first line, whitespace collapsed, capped.
+ * A session name out of a prompt's text, or null when it can't name one: withheld text, an
+ * empty string, or a machine-injected turn (agents wrap notifications as user turns, and a
+ * session named `<task-notification>` names nothing). Otherwise the first line, capped.
  */
 export function sessionTitleFromPrompt(text: string): string | null {
   const trimmed = text.trim();
@@ -434,12 +419,9 @@ function stripAgentPrefix(name: string): string {
 }
 
 /**
- * The token bucket, from any agent's spelling.
- *
- * Deliberately SHARED rather than per-agent: the spellings overlap and
- * folding them in one place is what keeps a new agent's `cacheRead` /
- * `cache_read` / `cached_input` from silently mispricing a session — which
- * does not throw, and is worse than throwing.
+ * The token bucket, from any agent's spelling. Deliberately SHARED rather than per-agent:
+ * folding overlapping spellings in one place keeps a new agent's `cacheRead` / `cache_read`
+ * from silently mispricing a session — which doesn't throw, and is worse than throwing.
  */
 export function normalizeTokenType(rawType: string | null | undefined): TokenType | null {
   if (!rawType) return null;
@@ -485,10 +467,9 @@ export function normalizeTokenType(rawType: string | null | undefined): TokenTyp
 }
 
 /**
- * The tool that ran: the attribute when the agent carries one, else whatever
- * a registered definition can read off the span name (opencode encodes the
- * tool there). Reading only the attribute loses every opencode tool; reading
- * only the span name loses everyone else's.
+ * The tool that ran: the attribute when the agent carries one, else whatever a registered
+ * definition reads off the span name (opencode encodes it there). Reading only the attribute
+ * loses every opencode tool; reading only the span name loses everyone else's.
  */
 export function resolveToolName({
   spanName,
@@ -510,12 +491,9 @@ export function resolveToolName({
 }
 
 /**
- * `mcp__<server>__<tool>` — the naming convention MCP tools follow.
- *
- * This is how MCP usage actually reaches us. The `mcp_server.name` /
- * `mcp_tool.name` attributes exist, but on METRIC records (which carry no trace
- * id), not on the tool span — so reading them off the span found nothing on real
- * sessions, and a session that had plainly called an MCP server reported none.
+ * `mcp__<server>__<tool>` — the naming convention MCP tools follow. This is how MCP usage
+ * actually reaches us: the `mcp_server.name` / `mcp_tool.name` attributes live on METRIC
+ * records, not the tool span, so reading them off the span finds nothing on real sessions.
  */
 export function parseMcpToolName(
   toolName: string | null | undefined,

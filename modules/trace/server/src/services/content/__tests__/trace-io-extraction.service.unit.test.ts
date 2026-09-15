@@ -494,10 +494,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "thinking",
           thinking: "Let me think about this carefully.",
@@ -526,10 +526,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "tool_use",
           id: "toolu_01",
@@ -560,10 +560,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           tool_use_id: "toolu_01",
           type: "tool_result",
@@ -594,10 +594,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "thinking",
           thinking: "hmm",
@@ -626,10 +626,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "text",
           text: "what is the weather like today?",
@@ -660,10 +660,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "text",
           // Original text preserved verbatim.
@@ -693,10 +693,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         // We only unwrap when the inner type differs from "text" — preserves
         // user-pasted JSON content that happens to look chat-shaped.
         expect(messages[0]!.content[0]).toEqual({
@@ -727,10 +727,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content[0]).toEqual({
           type: "text",
           text: '{"type":"thinking","thinking":"unterminated…',
@@ -763,10 +763,10 @@ describe("TraceIOExtractionService", () => {
         const result = service.tryExtractRichIOFromSpan(span, "input");
 
         expect(result).not.toBeNull();
-        const messages = result!.raw as Array<{
+        const messages = result!.raw as {
           role: string;
-          content: Array<Record<string, unknown>>;
-        }>;
+          content: Record<string, unknown>[];
+        }[];
         expect(messages[0]!.content).toEqual([
           { type: "thinking", thinking: "should I…" },
           { type: "text", text: "Sure, I can help." },
@@ -867,7 +867,7 @@ describe("TraceIOExtractionService", () => {
       it("keeps parsed messages (developer role intact) as the raw value for the message views", () => {
         const input = service.tryExtractFirstInput(makeTurnSpans());
 
-        const messages = input!.raw as Array<{ role: string }>;
+        const messages = input!.raw as { role: string }[];
         expect(Array.isArray(messages)).toBe(true);
         expect(messages[0]!.role).toBe("developer");
         expect(messages[messages.length - 1]!.role).toBe("user");

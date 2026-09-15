@@ -18,7 +18,7 @@ import {
 export interface PhoneNumberInputProps {
   value?: string;
   defaultCountry?: CountryCode;
-  allowedCountries?: ReadonlyArray<CountryCode>;
+  allowedCountries?: readonly CountryCode[];
   groupFrequentlyUsedCountries?: boolean;
   autoDetectDefaultCountry?: boolean;
   onChange?: (

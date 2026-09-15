@@ -34,7 +34,7 @@ const scenarioRow = (overrides: Record<string, unknown> = {}) => ({
  * A transaction that answers every read the write path makes, and records the
  * two calls the recompute is: what it asked for, and what it wrote back.
  */
-function transactionDouble(members: Array<{ id: string }>) {
+function transactionDouble(members: { id: string }[]) {
   const scenarioFindMany = vi.fn(async () => members);
   const suiteUpdate = vi.fn(async () => ({}));
   const executeRaw = vi.fn(async () => 0);

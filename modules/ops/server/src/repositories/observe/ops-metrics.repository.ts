@@ -5,11 +5,11 @@
  */
 export type OpsLatencyHistograms = {
   /** Every queue's most recent 60 minute buckets. */
-  minute: Array<Record<string, string>>;
+  minute: Record<string, string>[];
   /** Per queue, that queue's most recent 168 hour buckets, newest first. */
-  hourByQueue: Array<Array<Record<string, string>>>;
+  hourByQueue: Record<string, string>[][];
   /** One cumulative hash per queue. */
-  allTime: Array<Record<string, string>>;
+  allTime: Record<string, string>[];
 };
 
 export type OpsQueueTotals = { completed: number; failed: number };

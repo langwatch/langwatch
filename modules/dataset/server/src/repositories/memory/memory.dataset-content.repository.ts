@@ -55,7 +55,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
       throw new Error("withDatasetLock cannot nest: this repository is already transactional");
     }
 
-    return await mutate(new MemoryDatasetContentRepository(this.#database, true));
+    return mutate(new MemoryDatasetContentRepository(this.#database, true));
   }
 
   async findOne(input: { id: string; projectId: string }): Promise<DatasetRow | null> {
@@ -153,7 +153,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     projectId: string;
     statusError: string;
   }): Promise<number> {
-    return await this.#guardedWrite(input, "processing", {
+    return this.#guardedWrite(input, "processing", {
       status: "failed",
       statusError: input.statusError,
     });
@@ -169,7 +169,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async markProcessingRedriven(input: { id: string; projectId: string }): Promise<number> {
-    return await this.#guardedWrite(input, "processing", { statusError: null });
+    return this.#guardedWrite(input, "processing", { statusError: null });
   }
 
   async findStaleProcessing(input: {
@@ -224,7 +224,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
       );
   }
 
-  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
+  async findAllSlugs(input: { projectId: string }): Promise<{ slug: string }[]> {
     return this.#database
       .datasets()
       .filter((row) => row.projectId === input.projectId)
@@ -232,7 +232,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
-    datasets: Array<DatasetRow & { _count: { datasetRecords: number } }>;
+    datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }> {
     const matching = this.#database

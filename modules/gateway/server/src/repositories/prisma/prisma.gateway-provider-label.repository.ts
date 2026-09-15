@@ -11,7 +11,7 @@ export class PrismaGatewayProviderLabelRepository extends GatewayProviderLabelRe
   }
 
   async resolveProviderLabels(
-    budgets: Array<{ providerKey: string | null }>,
+    budgets: { providerKey: string | null }[],
   ): Promise<Map<string, string>> {
     const ids = [
       ...new Set(budgets.map((b) => b.providerKey).filter((k): k is string => Boolean(k))),

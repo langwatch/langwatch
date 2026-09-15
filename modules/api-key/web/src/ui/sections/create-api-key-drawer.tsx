@@ -42,7 +42,7 @@ import {
 import type { Instant } from "@langwatch/time";
 
 type MyBindings = {
-  data: Array<{ scopeType: string; scopeId: string; role: ApiKeyRole }> | undefined;
+  data: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;
   isLoading: boolean;
 };
 

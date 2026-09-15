@@ -66,7 +66,7 @@ export type ModelProviderEditorValue = {
   routingHandle?: string | null;
   enabled: boolean;
   customKeys?: Record<string, unknown> | null;
-  extraHeaders?: Array<{ key: string; value: string }> | null;
+  extraHeaders?: { key: string; value: string }[] | null;
   customModels?: CustomModelEntry[] | null;
   customEmbeddingsModels?: CustomModelEntry[] | null;
   deploymentMapping?: Record<string, string> | null;

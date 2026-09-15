@@ -15,16 +15,14 @@ export type ProjectApiMap = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: Array<
-          ProjectHostOrganization & {
+        output: (ProjectHostOrganization & {
             slug: string;
-            teams: Array<{
+            teams: {
               id: string;
               name: string;
               projects: ProjectHostProject[];
-            }>;
-          }
-        >;
+            }[];
+          })[];
       };
     };
 

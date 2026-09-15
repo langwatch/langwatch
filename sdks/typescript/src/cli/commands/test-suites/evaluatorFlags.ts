@@ -37,7 +37,7 @@ const newAttachmentId = (): string =>
 
 /** The input specs of a saved evaluator, as the mapping rules read them. */
 const inputsOf = (evaluator: {
-  fields: Array<{ identifier: string; optional?: boolean }>;
+  fields: { identifier: string; optional?: boolean }[];
 }): EvaluatorInputSpec[] =>
   evaluator.fields.map((field) => ({
     id: field.identifier,

@@ -90,12 +90,12 @@ const scopeRank = (scopeType?: string): number =>
  * serve them.
  */
 export const providersWithoutRegistryModels = (
-  rows: Array<{
+  rows: {
     provider: string;
     enabled: boolean;
     scopeType?: string | undefined;
     embeddingsUnsupported?: boolean | undefined;
-  }>,
+  }[],
   mode: "chat" | "embedding",
 ): Set<string> => {
   const unavailable = new Set<string>();

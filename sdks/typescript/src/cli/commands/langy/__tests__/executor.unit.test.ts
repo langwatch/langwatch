@@ -321,7 +321,7 @@ describe("given the environment a command runs with", () => {
    * The rule, as a table: a name on the list, a name in a family named by its
    * prefix or by its suffix, and the veto that reads last and wins.
    */
-  const variables: Array<[string, boolean]> = [
+  const variables: [string, boolean][] = [
     ["PATH", true],
     ["HOME", true],
     ["SHELL", true],

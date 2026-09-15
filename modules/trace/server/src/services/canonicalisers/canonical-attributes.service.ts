@@ -86,8 +86,8 @@ export class CanonicalAttributeStore {
     return null;
   }
 
-  takeByPrefix(prefix: string): Array<{ key: string; value: unknown }> {
-    const results: Array<{ key: string; value: unknown }> = [];
+  takeByPrefix(prefix: string): { key: string; value: unknown }[] {
+    const results: { key: string; value: unknown }[] = [];
     for (const [key, value] of this.map) {
       if (key.startsWith(prefix)) {
         results.push({ key, value });

@@ -78,7 +78,7 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
  * actually crossed the socket for heap assertions. */
 function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: number }) {
   let refusedOnce = false;
-  const spanReadSettings: Array<Record<string, unknown>> = [];
+  const spanReadSettings: Record<string, unknown>[] = [];
   const served = { spanRowsServed: 0 };
 
   mockClickHouseQuery.mockImplementation(

@@ -261,7 +261,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
     if (!(await this.onLedger(organizationId))) {
-      return await this.attachBindingsImperatively({
+      return this.attachBindingsImperatively({
         organizationId,
         fresh,
         duplicates,
@@ -681,7 +681,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (sibling) throw new DuplicateBindingError();
 
     if (!(await this.onLedger(organizationId))) {
-      return await this.changeBindingRoleImperatively({
+      return this.changeBindingRoleImperatively({
         organizationId,
         bindingId,
         role,
@@ -1118,7 +1118,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }): Promise<void> {
     const occurredAtMs = this.now();
     if (!(await this.onLedger(organizationId))) {
-      return await this.defineRoleImperatively({
+      return this.defineRoleImperatively({
         organizationId,
         roleId,
         name,

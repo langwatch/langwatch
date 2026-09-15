@@ -100,7 +100,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as Array<{
+        const rows = (await result.json()) as {
           TraceId: string;
           SpanId: string;
           TimeUnixMs: number;
@@ -109,7 +109,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
           ResourceAttributes: Record<string, string>;
           ScopeName: string | null;
           ScopeVersion: string | null;
-        }>;
+        }[];
 
         if (rows.length > limit) {
           rows.length = limit;

@@ -105,7 +105,7 @@ async function runListr({
   // Each pass runs the still-unfinished predeps concurrently in a fresh
   // listr instance so the user sees a clean redraw on retry.
   while (remaining.length > 0) {
-    const failed: Array<{ predep: Predep; error: Error }> = [];
+    const failed: { predep: Predep; error: Error }[] = [];
     const tasks = new Listr(
       remaining.map((p) => ({
         title: p.label,
@@ -154,7 +154,7 @@ async function runListr({
 }
 
 async function promptOnFailure(
-  failed: Array<{ predep: Predep; error: Error }>,
+  failed: { predep: Predep; error: Error }[],
   continuousIntegration: boolean,
 ): Promise<"retry" | "skip" | "abort"> {
   console.error("");

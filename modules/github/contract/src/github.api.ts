@@ -68,7 +68,7 @@ export interface GithubApi {
   applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean>;
   findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{ repositoryHost: string; repositoryFullName: string; headBranch: string }>;
+    keys: readonly { repositoryHost: string; repositoryFullName: string; headBranch: string }[];
   }): Promise<readonly GithubPullRequest[]>;
   findAllByBranches(input: {
     organizationId: string;

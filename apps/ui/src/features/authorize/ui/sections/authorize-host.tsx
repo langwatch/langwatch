@@ -28,9 +28,9 @@ import { copyProjectApiKeyToClipboard } from "../../behavior/authorize-copy-to-c
  */
 type OrganizationGraphEntry = {
   id: string;
-  teams: Array<{
-    projects: Array<{ id: string; name: string; apiKey?: string | null }>;
-  }>;
+  teams: {
+    projects: { id: string; name: string; apiKey?: string | null }[];
+  }[];
 };
 
 /** The address without its query string or fragment. */

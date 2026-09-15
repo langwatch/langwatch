@@ -20,7 +20,7 @@ const writtenFile = async (args: { fields: string[]; rows: (string | number)[][]
   lastBlob = undefined;
   downloadCsv({ ...args, fileName: "f.csv" });
 
-  return await lastBlob!.text();
+  return lastBlob!.text();
 };
 
 describe("the file downloadCsv actually writes", () => {

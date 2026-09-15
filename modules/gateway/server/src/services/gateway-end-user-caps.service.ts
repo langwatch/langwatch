@@ -36,7 +36,7 @@ export class GatewayEndUserCapsService {
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-  }): Promise<Array<Record<string, unknown>>> {
+  }): Promise<Record<string, unknown>[]> {
     const templates = await this.budgets.findAttributedUserTemplates({
       organizationId: input.organizationId,
       ...(input.virtualKeyId ? { virtualKeyId: input.virtualKeyId } : {}),

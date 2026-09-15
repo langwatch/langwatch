@@ -42,9 +42,9 @@ function makeRepository(client: ClickHouseQueryClient) {
  * a `length(<column>)`, or a `+`-separated sum of columns.
  */
 function applyOrderBy(
-  rows: Array<Record<string, unknown>>,
+  rows: Record<string, unknown>[],
   query: string,
-): Array<Record<string, unknown>> {
+): Record<string, unknown>[] {
   const clause = /ORDER BY([\s\S]*?)LIMIT/i.exec(query)?.[1];
   if (clause === undefined) return [...rows];
 
@@ -89,7 +89,7 @@ function evaluate(row: Record<string, unknown>, expression: string): number | st
  * emitted `ORDER BY … LIMIT 1` to the candidate rows, rather than replaying
  * whichever row the fixture pushed first.
  */
-function orderingClient(rows: Array<Record<string, unknown>>): ClickHouseQueryClient {
+function orderingClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
   return {
     query: async (request: { sql: string }) => ({
       rows: applyOrderBy(rows, request.sql).slice(0, 1),
@@ -266,7 +266,7 @@ function inScope(
  * the repository sent, rather than replaying the fixture: a passthrough mock
  * would not catch windowing the inner dedup subquery (ADR-071 consequence-4).
  */
-function listClient(rows: Array<Record<string, unknown>>): {
+function listClient(rows: Record<string, unknown>[]): {
   client: ClickHouseQueryClient;
   lastQuery: () => string;
 } {
@@ -409,7 +409,7 @@ describe("CodingAgentSessionClickHouseRepository list-read dedup scope", () => {
         // Cutting the page to `limit` in ClickHouse would hand the caller 25
         // sessions for a 50-session page — and through getUsageTotals, 25
         // sessions' cost silently missing.
-        const rows: Array<Record<string, unknown>> = [];
+        const rows: Record<string, unknown>[] = [];
         for (let index = 0; index < 60; index++) {
           const startedAtMs = WINDOW_FROM + index * 60_000;
           const updatedAtMs = WINDOW_FROM + index * 60_000;

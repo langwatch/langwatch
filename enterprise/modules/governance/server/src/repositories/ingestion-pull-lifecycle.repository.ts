@@ -15,18 +15,18 @@ export type IngestionPullLifecycleDatabase = {
     findMany(input: {
       where: { kind: string; archivedAt: null };
       select: { id: true };
-    }): Promise<Array<{ id: string }>>;
+    }): Promise<{ id: string }[]>;
   };
   processManagerInstance: {
     findMany(input: {
       where: { processName: string; projectId: { in: string[] } };
       select: { processKey: true };
-    }): Promise<Array<{ processKey: string }>>;
+    }): Promise<{ processKey: string }[]>;
   };
   ingestionSource: {
     findMany(input: {
       where: {
-        OR: Array<{ pullSchedule: { not: null } } | { id: { in: string[] } }>;
+        OR: ({ pullSchedule: { not: null } } | { id: { in: string[] } })[];
       };
     }): Promise<IngestionPullLifecycleSource[]>;
   };

@@ -27,7 +27,7 @@ export class GatewayWirePaginationAdapter {
   private constructor() {}
 
   /** Opaque page cursor: base64url of the sort key's values. */
-  encodePageCursor(values: Array<string | number>): string {
+  encodePageCursor(values: (string | number)[]): string {
     return Buffer.from(values.join(CURSOR_SEPARATOR), "utf8").toString("base64url");
   }
 
@@ -53,7 +53,7 @@ export class GatewayWirePaginationAdapter {
    * (a,b,c)>(x,y,z) has no Prisma spelling, so it expands to one branch per
    * column, each pinning earlier columns to equality; a unique last column means no row repeats.
    */
-  keysetAfter(columns: KeysetColumn[]): Array<Record<string, unknown>> {
+  keysetAfter(columns: KeysetColumn[]): Record<string, unknown>[] {
     return columns.map((column, index) => {
       const branch: Record<string, unknown> = {};
       for (const earlier of columns.slice(0, index)) {
@@ -72,7 +72,7 @@ export class GatewayWirePaginationAdapter {
   nextPageCursor<T>(
     rows: T[],
     limit: number,
-    keyOf: (row: T) => Array<string | number>,
+    keyOf: (row: T) => (string | number)[],
   ): string | null {
     const last = rows[rows.length - 1];
     return rows.length === limit && last ? this.encodePageCursor(keyOf(last)) : null;

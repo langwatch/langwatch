@@ -20,7 +20,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1", slug: "acme" } }),
 }));
 
-const toasts: Array<{ title?: string }> = [];
+const toasts: { title?: string }[] = [];
 vi.mock("@langwatch/ui-host/toaster", () => ({
   toaster: { create: (toast: { title?: string }) => toasts.push(toast) },
 }));

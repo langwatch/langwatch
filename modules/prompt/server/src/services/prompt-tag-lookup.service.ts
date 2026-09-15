@@ -132,8 +132,8 @@ export class PromptTagLookupService {
   async getTagsByVersionIds(params: {
     versionIds: string[];
     projectId: string;
-  }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
-    const map = new Map<string, Array<{ name: string; versionId: string }>>();
+  }): Promise<Map<string, { name: string; versionId: string }[]>> {
+    const map = new Map<string, { name: string; versionId: string }[]>();
 
     if (params.versionIds.length === 0) {
       return map;

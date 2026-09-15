@@ -34,13 +34,13 @@ export const listTriggersCommand = async (): Promise<CommandResult | void> => {
       process.exit(1);
     }
 
-    const triggers = (await response.json()) as Array<{
+    const triggers = (await response.json()) as {
       id: string;
       name: string;
       action: string;
       active: boolean;
       alertType: string | null;
-    }>;
+    }[];
 
     spinner.succeed(`Found ${triggers.length} trigger${triggers.length !== 1 ? "s" : ""}`);
 

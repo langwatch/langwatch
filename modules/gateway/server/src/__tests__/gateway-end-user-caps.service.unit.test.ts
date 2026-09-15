@@ -28,11 +28,11 @@ function template(over: Record<string, unknown> = {}) {
 }
 
 function capsWith(options: {
-  templates?: Array<ReturnType<typeof template>>;
-  boundaries?: Array<{ budgetId: string; bucketScopeId: string; periodStartedAt: Instant | null }>;
-  spends?: Array<{ budgetId: string; spentUsd: string }>;
+  templates?: ReturnType<typeof template>[];
+  boundaries?: { budgetId: string; bucketScopeId: string; periodStartedAt: Instant | null }[];
+  spends?: { budgetId: string; spentUsd: string }[];
 }) {
-  const asked: Array<Record<string, unknown>> = [];
+  const asked: Record<string, unknown>[] = [];
   const service = GatewayEndUserCapsService.create({
     budgets: {
       findAttributedUserTemplates: async (input: Record<string, unknown>) => {
@@ -47,7 +47,7 @@ function capsWith(options: {
     spend: {
       getSpendForTargetsAcrossTenants: async (
         tenantIds: string[],
-        targets: Array<Record<string, unknown>>,
+        targets: Record<string, unknown>[],
       ) => {
         asked.push({ method: "spend", tenantIds, targets });
         return options.spends ?? [];
@@ -59,9 +59,9 @@ function capsWith(options: {
 }
 
 /** The bucket targets the ledger was asked about. */
-function spendTargets(asked: Array<Record<string, unknown>>): Array<{ scopeId: string }> {
+function spendTargets(asked: Record<string, unknown>[]): { scopeId: string }[] {
   const call = asked.find((entry) => entry.method === "spend");
-  return (call?.targets ?? []) as Array<{ scopeId: string }>;
+  return (call?.targets ?? []) as { scopeId: string }[];
 }
 
 const forEndUser = (service: GatewayEndUserCapsService, over: Record<string, unknown> = {}) =>

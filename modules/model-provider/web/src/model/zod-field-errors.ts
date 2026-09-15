@@ -3,8 +3,8 @@
  * Extracts path, code, and message for consistent logging.
  */
 export function mapZodIssuesToLogContext(
-  issues: Array<{ path: PropertyKey[]; code: string; message: string }>,
-): Array<{ path: string; code: string; message: string }> {
+  issues: { path: PropertyKey[]; code: string; message: string }[],
+): { path: string; code: string; message: string }[] {
   return issues.map((issue) => ({
     path: issue.path.map(String).join("."),
     code: issue.code,
@@ -17,7 +17,7 @@ export function mapZodIssuesToLogContext(
  * same field win, which is how the custom-model dialogs have always read them.
  */
 export function fieldErrorsFromZodIssues(
-  issues: ReadonlyArray<{ path: PropertyKey[]; message: string }>,
+  issues: readonly { path: PropertyKey[]; message: string }[],
 ): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
   for (const issue of issues) {
@@ -39,14 +39,12 @@ export interface ZodIssue {
 }
 
 export interface ZodErrorStructure {
-  issues: Array<
-    ZodIssue & {
-      unionErrors?: Array<{
+  issues: (ZodIssue & {
+      unionErrors?: {
         issues: ZodIssue[];
         name: string;
-      }>;
-    }
-  >;
+      }[];
+    })[];
 }
 
 /**

@@ -50,7 +50,7 @@ export class AppGovernanceTraceActivityAdapter {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ hit: number }>;
+    const rows = (await result.json()) as { hit: number }[];
     return rows.length > 0;
   }
 
@@ -64,7 +64,7 @@ export class AppGovernanceTraceActivityAdapter {
   async findSpanCountsBySource(input: {
     tenantId: string;
     sinceMs: number;
-  }): Promise<Array<{ sourceId: string; spanCount: number }>> {
+  }): Promise<{ sourceId: string; spanCount: number }[]> {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -87,10 +87,10 @@ export class AppGovernanceTraceActivityAdapter {
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       sourceId: string;
       spanCount: number | string;
-    }>;
+    }[];
     return rows.map((r) => ({
       sourceId: r.sourceId,
       spanCount: Number(r.spanCount ?? 0),

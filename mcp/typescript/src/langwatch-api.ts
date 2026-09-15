@@ -43,7 +43,7 @@ export interface TraceDetailResponse {
   error?: Record<string, unknown>;
   ascii_tree?: string;
   evaluations?: EvaluationSummary[];
-  spans?: Array<{
+  spans?: {
     span_id: string;
     name?: string;
     type?: string;
@@ -58,7 +58,7 @@ export interface TraceDetailResponse {
       tokens_estimated?: boolean;
       cost?: number;
     };
-  }>;
+  }[];
 }
 
 export interface AnalyticsBucket {
@@ -84,7 +84,7 @@ export interface PromptTag {
   versionId: string;
 }
 
-export type PromptFieldList = Array<{ identifier: string; type: string }>;
+export type PromptFieldList = { identifier: string; type: string }[];
 
 /**
  * A single versioned prompt payload.
@@ -96,7 +96,7 @@ export interface PromptVersion {
   model?: string;
   /** Legacy single-text prompt body. */
   prompt?: string;
-  messages?: Array<{ role: string; content: string }>;
+  messages?: { role: string; content: string }[];
   temperature?: number;
   maxTokens?: number;
   responseFormat?: Record<string, unknown> | null;
@@ -333,12 +333,12 @@ export async function getTraceById(
 
 /** Fetches analytics timeseries data for the given metrics and date range. */
 export async function getAnalyticsTimeseries(params: {
-  series: Array<{
+  series: {
     metric: string;
     aggregation: string;
     key?: string;
     subkey?: string;
-  }>;
+  }[];
   startDate: number;
   endDate: number;
   timeZone?: string;
@@ -384,7 +384,7 @@ export async function getPromptVersions(idOrHandle: string): Promise<PromptVersi
 /** Creates a new prompt. */
 export async function createPrompt(data: {
   handle: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: { role: string; content: string }[];
   model: string;
   tags?: string[];
 }): Promise<PromptMutationResponse> {
@@ -395,7 +395,7 @@ export async function createPrompt(data: {
 export async function updatePrompt(
   idOrHandle: string,
   data: {
-    messages?: Array<{ role: string; content: string }>;
+    messages?: { role: string; content: string }[];
     model?: string;
     commitMessage: string;
     tags?: string[];

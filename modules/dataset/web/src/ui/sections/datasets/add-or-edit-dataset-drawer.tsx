@@ -35,7 +35,7 @@ export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
     // IDs are optional for new records - backend generates them with nanoid()
-    datasetRecords?: Array<{ id?: string } & Record<string, unknown>>;
+    datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
   };
   open?: boolean;
   onClose?: () => void;

@@ -410,7 +410,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async tryFindPersonalTeamInScopes(params: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null> {
     const teamIds = params.scopes
       .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
@@ -446,7 +446,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     teamIds: string[];
-  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>> {
+  }): Promise<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }[]> {
     return this.memory.teamUsers
       .filter((row) => row.userId === userId && teamIds.includes(row.teamId))
       .filter((row) => this.memory.teams.get(row.teamId)?.organizationId === organizationId)
@@ -479,7 +479,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     row.role = role;
     row.updatedAt = new Date();
 
-    const teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
+    const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     for (const update of effectiveTeamRoleUpdates) {
       const teamUser = this.memory.teamUsers.find(
         (candidate) => candidate.teamId === update.teamId && candidate.userId === userId,

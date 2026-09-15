@@ -126,7 +126,7 @@ export type TeamWithRoleBindings = TeamWithProjects & {
    * Shown under the team, not the project, because that's where a reader
    * looks for "who can see this"; names the project each one reaches.
    */
-  projectOnlyAccess: Array<TeamAccessRow & { projectName: string }>;
+  projectOnlyAccess: (TeamAccessRow & { projectName: string })[];
   directMembers: TeamAccessRow[];
   /** Who reaches each project, by project id. */
   projectAccess: Record<string, ProjectAccessRow[]>;
@@ -152,7 +152,7 @@ export type OrganizationMemberWithTeams = {
     /** When the ACCOUNT was deactivated, which outlives one organization. */
     deactivatedAt?: User["deactivatedAt"];
   };
-  teamMemberships?: Array<{ teamId: string; role: TeamUserRole; team: { name: string } }>;
+  teamMemberships?: { teamId: string; role: TeamUserRole; team: { name: string } }[];
 };
 
 /** The organization the members page renders, with its people. */
@@ -261,17 +261,17 @@ export type OrganizationApiMap = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           slug: string;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
             slug: string;
-            projects: Array<{ id: string; name: string; slug: string }>;
-          }>;
-        }>;
+            projects: { id: string; name: string; slug: string }[];
+          }[];
+        }[];
       };
     };
 
@@ -308,16 +308,16 @@ export type OrganizationApiMap = {
       mutation: {
         input: {
           organizationId: string;
-          invites: Array<{
+          invites: {
             email: string;
             role: OrganizationUserRole;
-            teams?: Array<{ teamId: string; role: TeamRoleValue; customRoleId?: string | null }>;
-          }>;
+            teams?: { teamId: string; role: TeamRoleValue; customRoleId?: string | null }[];
+          }[];
         };
-        output: Array<{
+        output: ({
           invite: OrganizationInviteReading;
           emailNotSent?: boolean;
-        } | null>;
+        } | null)[];
       };
     };
 
@@ -358,7 +358,7 @@ export type OrganizationApiMap = {
          * saying "three teams" without which three is one an administrator
          * cannot act on.
          */
-        output: { teamsLeftWithoutAdmin?: Array<{ id: string; name: string }> };
+        output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
       };
     };
   };
@@ -400,7 +400,7 @@ export type OrganizationApiMap = {
         input: {
           organizationId: string;
           name: string;
-          members: Array<{ userId: string; role: TeamRoleValue }>;
+          members: { userId: string; role: TeamRoleValue }[];
         };
         output: TeamReading;
       };
@@ -411,7 +411,7 @@ export type OrganizationApiMap = {
         input: {
           teamId: string;
           name: string;
-          members: Array<{ userId: string; role: TeamRoleValue }>;
+          members: { userId: string; role: TeamRoleValue }[];
         };
         output: TeamReading;
       };
@@ -545,20 +545,20 @@ export type OrganizationApiMap = {
           organizationId: string;
           userId: string;
           /** The rows that stay, with whatever role they now hold. */
-          bindings?: Array<{
+          bindings?: {
             id?: string;
             role: TeamRoleValue;
             customRoleId?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
-          }>;
+          }[];
           /** The rows the sheet added, which have no id yet. */
-          bindingsToCreate?: Array<{
+          bindingsToCreate?: {
             role: TeamRoleValue;
             customRoleId?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
-          }>;
+          }[];
           bindingIdsToDelete?: string[];
         };
         output: unknown;
@@ -570,37 +570,37 @@ export type OrganizationApiMap = {
     listAll: {
       query: {
         input: { organizationId: string };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           scimSource: string | null;
           memberCount: number;
-          bindings: Array<{
+          bindings: {
             role: TeamRoleValue;
             customRoleName?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
             scopeName?: string | null;
-          }>;
-        }>;
+          }[];
+        }[];
       };
     };
     /** The groups one person is in, and what each of them grants. */
     listForMember: {
       query: {
         input: { organizationId: string; userId: string };
-        output: Array<{
+        output: {
           id: string;
           name: string;
-          bindings: Array<{
+          bindings: {
             id: string;
             role: TeamRoleValue;
             customRoleName?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
             scopeName?: string | null;
-          }>;
-        }>;
+          }[];
+        }[];
       };
     };
     getById: {
@@ -610,13 +610,13 @@ export type OrganizationApiMap = {
           id: string;
           name: string;
           scimSource: string | null;
-          members: Array<{
+          members: {
             userId: string;
             name: string | null;
             email: string | null;
             image?: string | null;
-          }>;
-          bindings: Array<{
+          }[];
+          bindings: {
             id: string;
             role: TeamRoleValue;
             customRoleId?: string | null;
@@ -624,7 +624,7 @@ export type OrganizationApiMap = {
             scopeType: RoleBindingScopeType;
             scopeId: string;
             scopeName?: string | null;
-          }>;
+          }[];
         };
       };
     };
@@ -635,12 +635,12 @@ export type OrganizationApiMap = {
           organizationId: string;
           name: string;
           memberIds?: string[];
-          bindings?: Array<{
+          bindings?: {
             role: TeamRoleValue;
             customRoleId?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
-          }>;
+          }[];
         };
         output: { id: string };
       };
@@ -671,12 +671,12 @@ export type OrganizationApiMap = {
           rename?: { name: string } | null;
           bindingIdsToDelete: string[];
           /** The rows the sheet added, which have no id yet. */
-          bindingsToCreate: Array<{
+          bindingsToCreate: {
             role: TeamRoleValue;
             customRoleId?: string | null;
             scopeType: RoleBindingScopeType;
             scopeId: string;
-          }>;
+          }[];
           memberUserIdsToAdd: string[];
           memberUserIdsToRemove: string[];
         };

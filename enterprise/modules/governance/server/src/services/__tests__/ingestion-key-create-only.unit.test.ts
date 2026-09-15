@@ -92,7 +92,7 @@ class LedgerIssuer implements IngestionKeyIssuer {
     return Promise.resolve({ token: `ik-lw-${id}-token`, apiKey: { id } });
   }
 
-  readonly revokedWith: Array<{ id: string; cause: string | undefined }> = [];
+  readonly revokedWith: { id: string; cause: string | undefined }[] = [];
 
   revoke(input: { id: string; cause?: string }): Promise<void> {
     this.revokedWith.push({ id: input.id, cause: input.cause });

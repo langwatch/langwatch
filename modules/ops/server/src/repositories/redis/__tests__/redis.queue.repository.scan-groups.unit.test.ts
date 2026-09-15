@@ -12,7 +12,7 @@ const PREFIX = `${QUEUE_NAME}:gq:`;
  */
 class FakeRedis {
   readonly strings = new Map<string, string>();
-  readonly zsets = new Map<string, Array<{ member: string; score: number }>>();
+  readonly zsets = new Map<string, { member: string; score: number }[]>();
   readonly sets = new Map<string, string[]>();
   readonly hashes = new Map<string, Map<string, string>>();
 
@@ -21,7 +21,7 @@ class FakeRedis {
   }
 
   private static flat(
-    entries: Array<{ member: string; score: number }>,
+    entries: { member: string; score: number }[],
     shouldIncludeScores: boolean,
   ): string[] {
     return entries.flatMap((e) => (shouldIncludeScores ? [e.member, String(e.score)] : [e.member]));
@@ -83,7 +83,7 @@ class FakeRedis {
   }
 
   pipeline() {
-    const commands: Array<() => Promise<unknown>> = [];
+    const commands: (() => Promise<unknown>)[] = [];
     const chain = {
       zcard: (key: string) => {
         commands.push(() => this.zcard(key));
@@ -115,7 +115,7 @@ class FakeRedis {
         return chain;
       },
       exec: async () => {
-        const results: Array<[null, unknown]> = [];
+        const results: [null, unknown][] = [];
         for (const run of commands) {
           results.push([null, await run()]);
         }

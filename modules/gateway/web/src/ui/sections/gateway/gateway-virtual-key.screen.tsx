@@ -235,10 +235,10 @@ function VirtualKeyDetailPage() {
   const guardrailAttachments = useMemo(
     () =>
       ((vk?.config as { guardrailAttachments?: unknown } | null)?.guardrailAttachments ??
-        []) as Array<{
+        []) as {
         direction: "pre" | "post" | "stream_chunk";
         guardrailIds: string[];
-      }>,
+      }[],
     [vk?.config],
   );
 
@@ -677,9 +677,9 @@ type VkUsageData = {
   totalRequests: number;
   blockedRequests: number;
   avgUsdPerRequest: string;
-  byModel: Array<{ model: string; totalUsd: string; requests: number }>;
-  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
-  recentDebits: Array<{
+  byModel: { model: string; totalUsd: string; requests: number }[];
+  byDay: { day: string; totalUsd: string; requests: number }[];
+  recentDebits: {
     id: string;
     occurredAt: string;
     model: string;
@@ -689,7 +689,7 @@ type VkUsageData = {
     tokensOutput: number;
     durationMs: number | null;
     status: string;
-  }>;
+  }[];
 };
 
 function UsageSection({

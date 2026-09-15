@@ -173,7 +173,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
         user: { orgMemberships: { some: { organizationId } } },
       },
       include: { user: true, customRole: true },
-    })) as Array<{
+    })) as {
       userId: string | null;
       role: AuthzTeamMemberBinding["role"];
       customRoleId: string | null;
@@ -182,7 +182,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
       updatedAt: Date;
       user: AuthzAccessUser | null;
       customRole: AuthzCustomRole | null;
-    }>;
+    }[];
 
     for (const binding of bindings) {
       // The query filters userId non-null and includes user, but Prisma's
@@ -237,11 +237,9 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
         group: { select: { organizationId: true } },
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    })) as Array<
-      AuthzBindingForSynthesis & {
+    })) as (AuthzBindingForSynthesis & {
         group: { organizationId: string } | null;
-      }
-    >;
+      })[];
 
     return bindings
       .filter(
@@ -282,8 +280,8 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
   }: {
     userId: string;
     groupIds: readonly string[];
-  }): Array<Record<string, unknown>> {
-    const principals: Array<Record<string, unknown>> = [{ userId }];
+  }): Record<string, unknown>[] {
+    const principals: Record<string, unknown>[] = [{ userId }];
     if (groupIds.length > 0) {
       principals.push({ groupId: { in: [...groupIds] } });
     }

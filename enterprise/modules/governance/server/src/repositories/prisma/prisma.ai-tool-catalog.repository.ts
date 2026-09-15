@@ -256,7 +256,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
       existing.map((row) => [fingerprint(row.type, row.displayName), row]),
     );
     const create: AiToolStarterTile[] = [];
-    const update: Array<{ id: string; iconAsset: string }> = [];
+    const update: { id: string; iconAsset: string }[] = [];
     let skipped = 0;
     for (const tile of input.tiles) {
       const match = byFingerprint.get(fingerprint(tile.type, tile.displayName));
@@ -326,7 +326,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`ai-tool-default-catalog:${input
 
   async listRoutingPolicyOptions(
     organizationId: string,
-  ): Promise<Array<{ id: string; name: string }>> {
+  ): Promise<{ id: string; name: string }[]> {
     return this.database.routingPolicy.findMany({
       where: {
         organizationId,

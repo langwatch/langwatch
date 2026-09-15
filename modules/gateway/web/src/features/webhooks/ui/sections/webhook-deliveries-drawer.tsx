@@ -213,7 +213,7 @@ function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView 
   // each, so Load more APPENDS below what the reader already scanned and a
   // background refetch of the current page replaces its own slot instead of
   // duplicating it. A fresh endpoint starts the accumulation over.
-  const [pages, setPages] = useState<Array<{ key: string; rows: DeliveryView[] }>>([]);
+  const [pages, setPages] = useState<{ key: string; rows: DeliveryView[] }[]>([]);
   useEffect(() => {
     setCursor(undefined);
     setPages([]);

@@ -46,7 +46,7 @@ function canonicalExemplars(exemplars: unknown): unknown[] {
   });
 }
 
-function uniqueKeys(attributes: Array<{ key: string }>): string[] {
+function uniqueKeys(attributes: { key: string }[]): string[] {
   return [...new Set(attributes.map((attribute) => attribute.key))];
 }
 

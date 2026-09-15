@@ -7,7 +7,7 @@ import { QueueRedisRepository } from "../queue.repository.ts";
  * when a node has no cached copy of the script (restart, SCRIPT FLUSH, or the
  * first call against a fresh cluster node).
  */
-function pipelineReturning(results: Array<[Error | null, unknown]>): ChainableCommander {
+function pipelineReturning(results: [Error | null, unknown][]): ChainableCommander {
   return { exec: async () => results } as unknown as ChainableCommander;
 }
 

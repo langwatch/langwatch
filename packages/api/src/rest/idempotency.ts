@@ -409,7 +409,7 @@ export async function withIdempotency({
 async function readResponseBytes(response: Response): Promise<string> {
   if (response.body === null) return "";
 
-  return await response.clone().text();
+  return response.clone().text();
 }
 
 /** A running claim's liveness reporting, for as long as its handler runs. */
@@ -700,7 +700,7 @@ async function readExistingReceipt({
       throw new IdempotencyConflictError("in_progress");
     }
 
-    return await takeOverClaim({ receipts, existing, now });
+    return takeOverClaim({ receipts, existing, now });
   }
 
   const serializedBody = readStoredBody({ receipt: existing, cipher });

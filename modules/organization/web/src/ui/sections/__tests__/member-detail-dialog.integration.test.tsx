@@ -31,7 +31,7 @@ const {
   mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
   mockToasterCreate: vi.fn(),
   mockListForUserData: {
-    current: [] as Array<{
+    current: [] as {
       id: string;
       role: string;
       customRoleId: string | null;
@@ -39,10 +39,10 @@ const {
       scopeType: RoleBindingScopeType;
       scopeId: string;
       scopeName: string | null;
-    }>,
+    }[],
   },
   mockListForMemberData: {
-    current: [] as Array<unknown>,
+    current: [] as unknown[],
   },
 }));
 

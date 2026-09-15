@@ -27,10 +27,10 @@ const liquid = new Liquid({
 export class Prompt {
   // === Core functionality (required) ===
   public readonly model!: string;
-  public readonly messages!: Array<{
+  public readonly messages!: {
     role: "user" | "assistant" | "system";
     content: string;
-  }>;
+  }[];
 
   // === Optional core fields ===
   public readonly prompt?: string;

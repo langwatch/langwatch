@@ -3,7 +3,7 @@ type ChatRole = "system" | "user" | "assistant" | "tool";
 interface ChatMessage {
   role?: ChatRole | string;
   content?: unknown;
-  tool_calls?: Array<{ function?: { name?: string } }>;
+  tool_calls?: { function?: { name?: string } }[];
 }
 
 export interface ParsedIO {

@@ -252,7 +252,7 @@ describe("the identifier backfill pass", () => {
 
       expect(outcome.status).toBe("migrated");
       expect(outcome.report).toMatchObject({ kind: "parity" });
-      const diffs = (outcome.report as { diffs: Array<{ kind: string }> }).diffs;
+      const diffs = (outcome.report as { diffs: { kind: string }[] }).diffs;
       expect(diffs.length).toBeGreaterThan(0);
       expect(diffs[0]?.kind).toBe("identifier_missing");
       // A held user's `Account` rows are still authoritative, so their
@@ -315,7 +315,7 @@ describe("the identifier backfill pass", () => {
       const outcome = await service.migrateUser({ userId: USER });
 
       expect(outcome.status).toBe("migrated");
-      const diffs = (outcome.report as { diffs: Array<{ kind: string; identifierId: string }> })
+      const diffs = (outcome.report as { diffs: { kind: string; identifierId: string }[] })
         .diffs;
       expect(diffs).toContainEqual(
         expect.objectContaining({

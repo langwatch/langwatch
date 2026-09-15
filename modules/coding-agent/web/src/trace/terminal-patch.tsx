@@ -66,8 +66,8 @@ export const TerminalPatch = memo(function TerminalPatch({
  * exist in the new file). One linear pass per hunk, memoised because the
  * render maps over the same hunk once per line.
  */
-const newLineNumberCache = new WeakMap<PatchHunk, Array<number | null>>();
-function newLineNumbers(hunk: PatchHunk): Array<number | null> {
+const newLineNumberCache = new WeakMap<PatchHunk, (number | null)[]>();
+function newLineNumbers(hunk: PatchHunk): (number | null)[] {
   const cached = newLineNumberCache.get(hunk);
   if (cached) return cached;
 

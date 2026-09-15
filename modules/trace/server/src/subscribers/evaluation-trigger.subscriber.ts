@@ -184,7 +184,7 @@ const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
  * Exported so the guard can be pinned directly.
  */
 export function detectCausalityLoop(params: {
-  spanAttributes: Array<{ key: string; value: unknown }> | undefined | null;
+  spanAttributes: { key: string; value: unknown }[] | undefined | null;
 }): TraceEvaluationLoopBlockReason | null {
   const depth = extractCausalityDepthFromOtlpAttrs(params.spanAttributes);
   if (depth >= 1) return "depth_direct";
@@ -209,7 +209,7 @@ function readNumericAttrValue(value: unknown): number | undefined {
 }
 
 function extractCausalityDepthFromOtlpAttrs(
-  attrs: Array<{ key: string; value: unknown }> | undefined | null,
+  attrs: { key: string; value: unknown }[] | undefined | null,
 ): number {
   if (!Array.isArray(attrs)) return 0;
   for (const attr of attrs) {

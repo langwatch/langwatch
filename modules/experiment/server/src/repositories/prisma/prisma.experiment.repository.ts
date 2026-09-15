@@ -164,7 +164,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return rows.map((row) => row.slug);
   }
 
-  async findDraftNames(input: { projectId: string }): Promise<Array<{ name: string | null }>> {
+  async findDraftNames(input: { projectId: string }): Promise<{ name: string | null }[]> {
     return this.database.experiment.findMany({
       where: {
         projectId: input.projectId,
@@ -345,7 +345,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     actor: WorkbenchActor;
     commitMessage?: string;
   }): Promise<WorkbenchWriteResult> {
-    return await this.database.$transaction(async (transaction) => {
+    return this.database.$transaction(async (transaction) => {
       const row = await transaction.experiment.findFirst({
         where: { id: input.id, projectId: input.projectId, archivedAt: null },
         select: { id: true, slug: true, type: true, workbenchVersion: true },
@@ -353,7 +353,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
       if (!row) throw new ExperimentNotFoundError(input.id);
       if (row.type !== "EVALUATIONS_V3") throw new ExperimentTypeMismatchError();
       if (input.expectedVersion !== undefined && input.expectedVersion !== row.workbenchVersion) {
-        return await this.staleWorkbenchWrite(transaction, input.projectId, row.id);
+        return this.staleWorkbenchWrite(transaction, input.projectId, row.id);
       }
       const nextVersion = row.workbenchVersion + 1;
       const updated = await transaction.experiment.updateMany({
@@ -370,7 +370,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
         },
       });
       if (updated.count === 0) {
-        return await this.staleWorkbenchWrite(transaction, input.projectId, row.id);
+        return this.staleWorkbenchWrite(transaction, input.projectId, row.id);
       }
       const rolling = await transaction.experimentVersion.findFirst({
         where: { projectId: input.projectId, experimentId: row.id, autoSaved: true },
@@ -471,7 +471,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     take: number;
     beforeCounterVersion?: number;
   }): Promise<WorkbenchVersionSummary[]> {
-    return await this.database.experimentVersion.findMany({
+    return this.database.experimentVersion.findMany({
       where: {
         projectId: input.projectId,
         experimentId: input.experimentId,

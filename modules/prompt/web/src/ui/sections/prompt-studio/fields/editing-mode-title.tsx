@@ -15,7 +15,7 @@ export type PromptEditingMode = "prompt" | "messages";
  * Returns "messages" if there are messages beyond just system + optional user with {{input}}.
  */
 export const getDefaultEditingMode = (
-  messages: Array<{ role: string; content?: string }>,
+  messages: { role: string; content?: string }[],
 ): PromptEditingMode => {
   // Find system and non-system messages
   const _systemMessages = messages.filter((m) => m.role === "system");

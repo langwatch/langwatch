@@ -272,7 +272,7 @@ describe("LangyConversationTurnFoldProjection", () => {
   });
 
   describe("given the agent updates its plan", () => {
-    const planUpdated = (items: Array<{ content: string; status: string }>, occurredAt: number) =>
+    const planUpdated = (items: { content: string; status: string }[], occurredAt: number) =>
       event("PLAN_UPDATED", LANGY_CONVERSATION_EVENT_VERSIONS.PLAN_UPDATED, { items }, occurredAt);
 
     it("starts with no plan", () => {

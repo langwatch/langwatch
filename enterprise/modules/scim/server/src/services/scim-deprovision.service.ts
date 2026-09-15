@@ -12,8 +12,8 @@ const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;
 
 export type ScimRemovalManifest = {
-  ownedApiKeys: Array<{ id: string; name: string }>;
-  personalTeams: Array<{ id: string; name: string }>;
+  ownedApiKeys: { id: string; name: string }[];
+  personalTeams: { id: string; name: string }[];
 };
 
 /** Removes all authority through authz's transactional offboarding proof. */

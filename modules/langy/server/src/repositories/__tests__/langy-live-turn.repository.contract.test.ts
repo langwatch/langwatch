@@ -15,7 +15,7 @@ import {
 } from "../langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../memory/memory.langy.repositories.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => LangyRepositories }> = [
+const backends: readonly { name: string; create: () => LangyRepositories }[] = [
   { name: "memory", create: () => MemoryLangyRepositories.create() },
 ];
 

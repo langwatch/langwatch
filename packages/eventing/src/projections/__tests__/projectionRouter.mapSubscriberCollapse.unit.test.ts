@@ -68,7 +68,7 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
     map: (event: Event) => unknown = (event) => ({
       recordFor: event.id,
     }),
-  ): Promise<Array<{ event: Event; foldState: unknown }>> {
+  ): Promise<{ event: Event; foldState: unknown }[]> {
     const send = vi.fn().mockResolvedValue(undefined);
     const queueManager = createMockQueueManager({
       hasProjectionSubscriberQueues: true,

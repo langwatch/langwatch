@@ -37,7 +37,7 @@ export class FilterService {
   }
 
   async getFilterOptions(input: GetFilterOptionsInput): Promise<FilterOption[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "FilterService.getFilterOptions",
       {
         attributes: {

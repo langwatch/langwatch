@@ -34,7 +34,7 @@ function fakeRepository(record: DatasetMutationRecord) {
         mutate: (tx: DatasetContentRepository) => Promise<T>,
       ): Promise<T> => {
         locks.push(datasetId);
-        return await mutate(make(true));
+        return mutate(make(true));
       },
     }) as unknown as DatasetContentRepository;
 

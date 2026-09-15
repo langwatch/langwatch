@@ -111,7 +111,7 @@ describe("alert-default Slack rendering", () => {
         },
       });
       const payload = slack.payload as {
-        blocks: Array<Record<string, unknown>>;
+        blocks: Record<string, unknown>[];
       };
       expect(payload.blocks.length).toBeGreaterThan(0);
       const serialized = JSON.stringify(payload.blocks);

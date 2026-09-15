@@ -22,7 +22,7 @@ function PromptSaveHarness({
   initialMessages,
   onMutationFire,
 }: {
-  initialMessages: Array<{ role: "system" | "user"; content: string }>;
+  initialMessages: { role: "system" | "user"; content: string }[];
   onMutationFire: (call: MutationCall) => void;
 }) {
   const { methods } = usePromptConfigForm({

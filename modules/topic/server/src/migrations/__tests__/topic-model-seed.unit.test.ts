@@ -80,7 +80,7 @@ const guardedPrismaStub = ({
   topicsByProject: Record<string, ReturnType<typeof topicRow>[]>;
   ownedProjectIds?: Set<string>;
 }) => {
-  const pageArgs: Array<{ where?: Record<string, unknown> }> = [];
+  const pageArgs: { where?: Record<string, unknown> }[] = [];
   let pageIndex = 0;
 
   const prisma = {

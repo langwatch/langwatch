@@ -28,11 +28,11 @@ const CONVERSATION = {
 
 /** A socket the test drives: it records what the CLI sent and pushes frames back. */
 class FakeSocket implements SocketLike {
-  readonly sent: Array<Record<string, unknown>> = [];
+  readonly sent: Record<string, unknown>[] = [];
   closedWith: number | null = null;
-  private messageListeners: Array<(data: string) => void> = [];
-  private closeListeners: Array<(code: number) => void> = [];
-  private openListeners: Array<() => void> = [];
+  private messageListeners: ((data: string) => void)[] = [];
+  private closeListeners: ((code: number) => void)[] = [];
+  private openListeners: (() => void)[] = [];
 
   send(data: string): void {
     this.sent.push(JSON.parse(data) as Record<string, unknown>);
@@ -70,7 +70,7 @@ class FakeSocket implements SocketLike {
     for (const listener of this.messageListeners) listener(text);
   }
 
-  sentOf(type: string): Array<Record<string, unknown>> {
+  sentOf(type: string): Record<string, unknown>[] {
     return this.sent.filter((frame) => frame.type === type);
   }
 }

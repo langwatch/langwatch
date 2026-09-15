@@ -44,12 +44,12 @@ class MemoryLicenseRepository implements LicenseStorage {
 }
 
 class MemoryLicenseRetention implements LicenseRetention {
-  rules: Array<{ scopeType: string; scopeId: string; category: string }> = [];
-  readonly written: Array<{
+  rules: { scopeType: string; scopeId: string; category: string }[] = [];
+  readonly written: {
     organizationId: string;
     category: string;
     retentionDays: number;
-  }> = [];
+  }[] = [];
   failListing = false;
 
   async listOrganizationRules() {

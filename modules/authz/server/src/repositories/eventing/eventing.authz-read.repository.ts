@@ -104,7 +104,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     const memberships = (await this.database.groupMembership.findMany({
       where: { userId, group: { organizationId } },
       select: { groupId: true },
-    })) as Array<{ groupId: string }>;
+    })) as { groupId: string }[];
     if (memberships.length === 0) return [];
     // One read for every group, not one per group: the grant carries the group
     // it names, which is the `viaGroupId` the collector needs stamped on each
@@ -122,7 +122,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeId: true,
         principalId: true,
       },
-    })) as Array<BindingGrantRow & { principalId: string }>;
+    })) as (BindingGrantRow & { principalId: string })[];
     return this.collectBindings({
       rows,
       viaGroupId: (row) => row.principalId,
@@ -176,12 +176,12 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         assignedRoleId: true,
         team: { select: { isPersonal: true } },
       },
-    })) as Array<{
+    })) as {
       teamId: string;
       role: LegacyTeamMembership["role"];
       assignedRoleId: string | null;
       team: { isPersonal: boolean };
-    }>;
+    }[];
     return rows.map((row) => ({
       teamId: row.teamId,
       role: row.role,
@@ -211,7 +211,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         ...this.roleKindFence(apiKeyId),
       },
       select: { id: true, permissions: true, kind: true },
-    })) as Array<{ id: string; permissions: unknown; kind: string }>;
+    })) as { id: string; permissions: unknown; kind: string }[];
     const systemRoleIds = rows
       .filter((row) => row.kind === SYSTEM_API_KEY_ROLE_KIND)
       .map((row) => row.id);
@@ -245,7 +245,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }: {
     projectId: string;
     tokens: readonly string[];
-    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    links: readonly { kind: ShareableResourceKind; id: string }[];
     organizationId?: string;
   }): Promise<ShareLinkRow[]> {
     if (tokens.length === 0 || links.length === 0) return [];
@@ -279,7 +279,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     organizationId: string;
     projectId: string;
     tokens: readonly string[];
-    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    links: readonly { kind: ShareableResourceKind; id: string }[];
   }): Promise<ShareLinkGrantCandidateRow[]> {
     return (
       (await liveGrants(this.database).findMany({
@@ -302,7 +302,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
           expiresAt: true,
           maxViews: true,
         },
-      })) as Array<Omit<ShareLinkGrantCandidateRow, "expiresAt"> & { expiresAt: unknown }>
+      })) as (Omit<ShareLinkGrantCandidateRow, "expiresAt"> & { expiresAt: unknown })[]
     ).map((row) => ({ ...row, expiresAt: findStoredInstant(row.expiresAt) }));
   }
 
@@ -320,7 +320,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     const usages = (await this.database.grantUsage.findMany({
       where: { organizationId, grantId: { in: [...grantIds] } },
       select: { grantId: true, viewCount: true },
-    })) as Array<{ grantId: string; viewCount: number }>;
+    })) as { grantId: string; viewCount: number }[];
     return new Map(usages.map((usage) => [usage.grantId, usage.viewCount]));
   }
 
@@ -394,11 +394,11 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
       },
       select: { roleKey: true, principalType: true, principalId: true },
-    })) as Array<{
+    })) as {
       roleKey: string | null;
       principalType: string;
       principalId: string | null;
-    }>;
+    }[];
     const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
       const role = this.tryBindingRole(holder.roleKey);

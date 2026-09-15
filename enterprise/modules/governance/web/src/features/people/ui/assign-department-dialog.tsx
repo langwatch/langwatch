@@ -38,7 +38,7 @@ export function AssignDepartmentDialog({
   /** `null` closes the dialog: there is no member to assign. */
   userId: string | null;
   currentDepartmentId: string | null;
-  departments: ReadonlyArray<{ id: string; name: string }>;
+  departments: readonly { id: string; name: string }[];
   open: boolean;
   onClose: () => void;
   onAssigned: () => Promise<void>;

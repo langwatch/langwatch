@@ -18,7 +18,7 @@ class FixedTenantResolver implements QuarantineTenantResolver {
 }
 
 class StubTraceActivityReader implements QuarantineTraceActivityReader {
-  constructor(private readonly rows: Array<{ sourceId: string; spanCount: number }>) {}
+  constructor(private readonly rows: { sourceId: string; spanCount: number }[]) {}
 
   async findSpanCountsBySource() {
     return this.rows;

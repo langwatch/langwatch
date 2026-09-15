@@ -67,6 +67,6 @@ export class LangyNavigateFallbackService {
       return null;
     }
 
-    return await this.resources.tryLocate({ projectId, kind, resourceId }).catch(() => null);
+    return this.resources.tryLocate({ projectId, kind, resourceId }).catch(() => null);
   }
 }

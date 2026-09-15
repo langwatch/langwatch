@@ -272,10 +272,10 @@ export function nodeDataToLocalPromptConfig(
   // Build messages: system message from instructions + other messages
   const instructions = (parametersMap.instructions?.value as string) ?? "";
   const otherMessages = Array.isArray(parametersMap.messages?.value)
-    ? (parametersMap.messages.value as Array<{
+    ? (parametersMap.messages.value as {
         role: string;
         content: string;
-      }>)
+      }[])
     : [];
 
   const messages: LocalPromptConfig["messages"] = [

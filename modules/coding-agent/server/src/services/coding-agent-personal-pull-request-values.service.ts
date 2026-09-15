@@ -87,7 +87,7 @@ export class CodingAgentPersonalPullRequestValuesService {
     sessions: readonly CodingAgentPersonalSession[];
     repoCovered: boolean;
     nonBillableAgents: ReadonlySet<string>;
-  }): Array<{
+  }): {
     repositoryHost: string;
     repositoryFullName: string;
     headBranch: string;
@@ -99,7 +99,7 @@ export class CodingAgentPersonalPullRequestValuesService {
     billedCostUsd: number;
     nonBilledCostUsd: number;
     repoCovered: boolean;
-  }> {
+  }[] {
     const byBranch = new Map<string, CodingAgentPersonalSession[]>();
     for (const session of input.sessions) {
       const rows = byBranch.get(session.headBranch) ?? [];

@@ -57,7 +57,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 let capturedCalls: FetchCall[] = [];
 let warnings: string[] = [];
 /** What Graph answers the licence read with, per call. */
-let graphReplies: Array<{ status: number; body: unknown }> = [];
+let graphReplies: { status: number; body: unknown }[] = [];
 /**
  * Whether the environment will sign this run in. The token endpoint answers
  * per audience, which is the only way to break the conversation half while
@@ -71,7 +71,7 @@ let transcriptStatus = 200;
  * can make no conversation progress WITHOUT failing — the only way to watch
  * the licence half decide the cursor on its own.
  */
-let transcriptRows: Array<Record<string, unknown>> | null = null;
+let transcriptRows: Record<string, unknown>[] | null = null;
 
 function captured(args: unknown[]): string {
   return args
@@ -516,7 +516,7 @@ describe("the seat licence read inside the Dataverse source", () => {
       // The run's position was thrown away, so the next run asks again.
       const second = await runPull({});
 
-      const ids = (events: Array<{ source_event_id: string }>) =>
+      const ids = (events: { source_event_id: string }[]) =>
         events.map((event) => event.source_event_id).sort();
       expect(ids(seatEvents(first.events))).toEqual(
         ids(seatEvents(second.events)),

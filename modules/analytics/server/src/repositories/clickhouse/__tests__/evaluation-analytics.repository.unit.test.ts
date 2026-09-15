@@ -131,7 +131,7 @@ describe("AnalyticsEvaluationRepository", () => {
   });
 
   it("reads the newest row and records bounded-read outcomes", async () => {
-    const metrics: Array<{ outcome: string }> = [];
+    const metrics: { outcome: string }[] = [];
     const client = clientReturning([
       {
         TenantId: row.tenantId,

@@ -135,7 +135,7 @@ function buildApp(): void {
 }
 
 async function get(path: string): Promise<Response> {
-  return await app.fetch(new Request(`http://api.test${path}`));
+  return app.fetch(new Request(`http://api.test${path}`));
 }
 
 function spendRow(requestId: string, overrides: Partial<SpendEventRow> = {}): SpendEventRow {
@@ -318,7 +318,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
         const firstResponse = await get(`/api/gateway/v1/spend-events?limit=2&${window}`);
         expect(firstResponse.status).toBe(200);
         const first = (await firstResponse.json()) as {
-          data: Array<{ id: string }>;
+          data: { id: string }[];
           next_cursor: string | null;
         };
         expect(first.data).toHaveLength(2);
@@ -341,7 +341,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
           );
           expect(response.status).toBe(200);
           const page = (await response.json()) as {
-            data: Array<{ id: string }>;
+            data: { id: string }[];
             next_cursor: string | null;
           };
           seen.push(...page.data.map((event) => event.id));
@@ -369,7 +369,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
         // Envelope ids are family-suffixed, so the fence must assert on the
         // raw join key or it can never fail.
         const body = (await response.json()) as {
-          data: Array<{ data: { gateway_request_id: string } }>;
+          data: { data: { gateway_request_id: string } }[];
         };
         expect(body.data.map((event) => event.data.gateway_request_id)).not.toContain(
           `${ns}-foreign`,
@@ -414,13 +414,13 @@ describe.skipIf(!databaseUrl || !chUrl)(
 
         expect(response.status).toBe(200);
         const body = (await response.json()) as {
-          data: Array<{
+          data: {
             key: string;
             event_count: number;
             settled_count: number;
             usage: { input_tokens: number };
             cost: { total_usd: string; nano_usd: number };
-          }>;
+          }[];
         };
         const row = body.data.find((candidate) => candidate.key === endUser)!;
         expect(row).toBeDefined();
@@ -456,7 +456,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
           const response = await get(`/api/gateway/v1/spend-summaries?${query.toString()}`);
           expect(response.status).toBe(200);
           return (await response.json()) as {
-            data: Array<{ key: string }>;
+            data: { key: string }[];
             next_cursor: string | null;
           };
         };
@@ -496,7 +496,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
         );
 
         expect(response.status).toBe(200);
-        const body = (await response.json()) as { data: Array<{ key: string }> };
+        const body = (await response.json()) as { data: { key: string }[] };
         expect(body.data.map((row) => row.key)).toEqual([`${ns}-vkf-user-a`]);
       });
     });
@@ -617,12 +617,12 @@ describe.skipIf(!databaseUrl || !chUrl)(
         expect(response.status).toBe(200);
         const body = (await response.json()) as {
           data: {
-            caps: Array<{
+            caps: {
               budget_id: string;
               anchor_id: string;
               limit_usd: string;
               spent_usd: string;
-            }>;
+            }[];
           };
         };
         const cap = body.data.caps.find((candidate) => candidate.budget_id === template.id);

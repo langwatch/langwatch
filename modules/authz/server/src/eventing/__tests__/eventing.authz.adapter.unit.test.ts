@@ -66,7 +66,7 @@ type EventEmitter = {
 };
 
 async function emit(handler: EventEmitter, data: unknown): Promise<Event[]> {
-  return await handler.handle({
+  return handler.handle({
     tenantId: createTenantId(ORGANIZATION_ID),
     aggregateId: "ignored-by-handler",
     type: "test.command",

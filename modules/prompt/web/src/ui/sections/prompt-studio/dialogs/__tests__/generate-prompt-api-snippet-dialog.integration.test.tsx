@@ -44,7 +44,7 @@ async function openDialog({ apiKey }: { apiKey?: string }) {
 
   fireEvent.click(screen.getByRole("button", { name: "API" }));
 
-  return await screen.findByRole("dialog");
+  return screen.findByRole("dialog");
 }
 
 describe("the prompt API snippet dialog", () => {

@@ -23,7 +23,7 @@ export type BudgetOverviewItemView = {
   providerLabel: string | null;
   isPerMember: boolean;
   resetsAt: string | null;
-  topModels?: Array<{ model: string; spentUsd: number }>;
+  topModels?: { model: string; spentUsd: number }[];
 };
 
 const WINDOW_PHRASE: Record<string, string> = {

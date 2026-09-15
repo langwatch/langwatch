@@ -110,7 +110,7 @@ describe("createLangyChatTransport", () => {
       );
 
       const [, input] = mutation.mock.calls[0]!;
-      expect((input as { messages: Array<{ role: string }> }).messages).toEqual([
+      expect((input as { messages: { role: string }[] }).messages).toEqual([
         { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
       ]);
     });
@@ -140,7 +140,7 @@ describe("createLangyChatTransport", () => {
       );
 
       const [, input] = mutation.mock.calls[0]!;
-      expect((input as { messages: Array<{ id: string }> }).messages).toEqual([
+      expect((input as { messages: { id: string }[] }).messages).toEqual([
         { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
       ]);
     });
@@ -482,7 +482,7 @@ describe("createLangyChatTransport", () => {
 
     /** Read every chunk the transport enqueues, until the stream closes. */
     function collect(stream: ReadableStream<{ type: string; id?: string }>) {
-      const chunks: Array<{ type: string; id?: string }> = [];
+      const chunks: { type: string; id?: string }[] = [];
       const reader = stream.getReader();
       const done = (async () => {
         for (;;) {

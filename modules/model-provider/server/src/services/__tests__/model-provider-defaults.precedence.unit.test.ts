@@ -21,7 +21,7 @@ type Config = {
   createdAt: Date;
   updatedAt?: Date;
   authorId: string | null;
-  scopes: Array<{ scopeType: "PROJECT" | "TEAM" | "ORGANIZATION"; scopeId: string }>;
+  scopes: { scopeType: "PROJECT" | "TEAM" | "ORGANIZATION"; scopeId: string }[];
 };
 
 function config(

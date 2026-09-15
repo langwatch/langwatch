@@ -39,7 +39,7 @@ interface ChatMessageLike {
    * part is `{ type: "text" | "blob" | "reasoning" | ..., content? | text? }`.
    */
   parts?: unknown;
-  tool_calls?: Array<{ function?: { name?: string } }>;
+  tool_calls?: { function?: { name?: string } }[];
 }
 
 /**

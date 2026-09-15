@@ -23,7 +23,7 @@ let openedDrawerParams: Record<string, any> = {};
 // What agents.getAll reports for this project, i.e. the fields the API derived
 // from each agent's linked workflow.
 const agentsOnServer = {
-  data: [] as Array<Record<string, unknown>>,
+  data: [] as Record<string, unknown>[],
 };
 
 vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({

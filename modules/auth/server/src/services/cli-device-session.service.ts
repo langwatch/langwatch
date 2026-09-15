@@ -264,7 +264,7 @@ export class CliDeviceSessionService {
       return null;
     }
 
-    return await this.tryFindDeviceCode(deviceCode);
+    return this.tryFindDeviceCode(deviceCode);
   }
 
   /**
@@ -501,8 +501,8 @@ export class CliDeviceSessionService {
   async endSession(input: {
     refreshToken?: string | undefined;
     accessToken?: string | undefined;
-  }): Promise<Array<CliRefreshTokenRecord | CliAccessTokenRecord>> {
-    const records: Array<CliRefreshTokenRecord | CliAccessTokenRecord> = [];
+  }): Promise<(CliRefreshTokenRecord | CliAccessTokenRecord)[]> {
+    const records: (CliRefreshTokenRecord | CliAccessTokenRecord)[] = [];
     for (const [token, keyFor] of [
       [input.refreshToken, cliRefreshTokenKey],
       [input.accessToken, cliAccessTokenKey],

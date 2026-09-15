@@ -69,11 +69,11 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       },
     });
 
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       aggregateType: string;
       tenantId: string;
       aggregateCount: string;
-    }>;
+    }[];
 
     return rows.map((row) => ({
       aggregateType: row.aggregateType,
@@ -150,13 +150,13 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       },
     });
 
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       aggregateId: string;
       aggregateType: string;
       tenantId: string;
       eventCount: string;
       lastEventTime: string;
-    }>;
+    }[];
 
     return rows.map((row) => ({
       aggregateId: row.aggregateId,

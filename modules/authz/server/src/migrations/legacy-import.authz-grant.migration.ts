@@ -531,7 +531,7 @@ class AuthzBindingCoverageMapper {
   static create({
     groupMemberships,
   }: {
-    groupMemberships: Array<{ userId: string; groupId: string }>;
+    groupMemberships: { userId: string; groupId: string }[];
   }): BindingCoverage {
     const groupsByUser = new Map<string, Set<string>>();
     for (const membership of groupMemberships) {
@@ -580,7 +580,7 @@ export class AuthzExpectedFactsMapper {
       shareLinkRows: ShareLinkFactRow[];
       externalMembers: ExternalMemberFact[];
       credentials: ProjectCredentialFact[];
-      groupMemberships: Array<{ userId: string; groupId: string }>;
+      groupMemberships: { userId: string; groupId: string }[];
     };
   }): ExpectedFacts {
     const roles = inventory.roleRows
@@ -1082,7 +1082,7 @@ export class AuthzMigrationProofMapper {
     fact: GrantFact;
     head: GrantHeadRow;
   }): AuthzEngineDiff[] {
-    const compared: Array<[string, string | null, string | null]> = [
+    const compared: [string, string | null, string | null][] = [
       ["principalType", PRINCIPAL_TO_DB[fact.principal.type], head.principalType],
       ["principalId", fact.principal.id, head.principalId],
       ["roleKey", fact.roleKey, head.roleKey],
@@ -1112,7 +1112,7 @@ export class AuthzMigrationProofMapper {
     role: RoleFact;
     head: RoleHeadRow;
   }): AuthzEngineDiff[] {
-    const compared: Array<[string, string | null, string | null]> = [
+    const compared: [string, string | null, string | null][] = [
       ["name", role.name, head.name],
       ["description", role.description ?? null, head.description],
       [
@@ -1157,7 +1157,7 @@ export class AuthzMigrationProofMapper {
       organizationId,
       projectId: row.projectId,
     });
-    const compared: Array<[string, string | null, string | null]> = [
+    const compared: [string, string | null, string | null][] = [
       ["token", this.tokenFingerprint(row.token), this.tokenFingerprint(head.token)],
       ["kind", row.resourceType, (head.resourceKind ?? "").toUpperCase() || null],
       ["resourceId", row.resourceId, head.resourceId],

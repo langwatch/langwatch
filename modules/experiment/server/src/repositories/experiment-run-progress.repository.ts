@@ -7,22 +7,22 @@ import type { EvaluationV3Event, ExecutionSummary } from "@langwatch/experiment-
  */
 export type ExperimentRunProgressSummary = ExecutionSummary & {
   /** Extended summary for CI output */
-  targets?: Array<{
+  targets?: {
     targetId: string;
     name: string;
     passed: number;
     failed: number;
     avgLatency: number;
     totalCost: number;
-  }>;
-  evaluators?: Array<{
+  }[];
+  evaluators?: {
     evaluatorId: string;
     name: string;
     passed: number;
     failed: number;
     passRate: number;
     avgScore?: number;
-  }>;
+  }[];
   totalPassed?: number;
   totalFailed?: number;
   passRate?: number;

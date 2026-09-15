@@ -34,10 +34,10 @@ const OTHER_EVENT_TYPE = "lw.obs.trace.span_received" as const;
  * merging with an existing row instead of rebuilding).
  */
 function spyStore(seed?: StoredProjection<CounterState>) {
-  const writes: Array<{
+  const writes: {
     projection: StoredProjection<CounterState>;
     context: ProjectionStoreContext;
-  }> = [];
+  }[] = [];
   const store: StateProjectionStore<CounterState> = {
     tryLoad: vi.fn(async () => seed ?? null),
     store: vi.fn(async (projection, context) => {

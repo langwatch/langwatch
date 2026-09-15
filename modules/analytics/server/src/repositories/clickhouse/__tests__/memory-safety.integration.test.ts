@@ -51,7 +51,7 @@ const TIME_BUDGET_MS = 5_000;
  * Metrics that need a key supply one, so the case exercises the keyed shape
  * rather than the builder's fallback.
  */
-const REPRESENTATIVE_METRICS: Array<{ label: string; series: AnalyticsSeries[] }> = [
+const REPRESENTATIVE_METRICS: { label: string; series: AnalyticsSeries[] }[] = [
   {
     label: "metadata.trace_id (cardinality)",
     series: [{ metric: "metadata.trace_id", aggregation: "cardinality" }],
@@ -170,7 +170,7 @@ async function runWithinBudget({
   }
 }
 
-function currentPeriodValue(rows: Array<Record<string, unknown>>): number {
+function currentPeriodValue(rows: Record<string, unknown>[]): number {
   const currentRow = rows.find((row) => row.period === "current");
   expect(currentRow).toBeDefined();
   const metricKey = Object.keys(currentRow ?? {}).find((key) => key !== "period" && key !== "date");

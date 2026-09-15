@@ -6,7 +6,7 @@ import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useTraceHeader } from "../use-trace-header.ts";
 
 const headerData: { traceId?: string; timestamp?: number } = {};
-const capturedHeaderInputs: Array<{ full?: boolean }> = [];
+const capturedHeaderInputs: { full?: boolean }[] = [];
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {

@@ -107,10 +107,10 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
     scopes,
   }: {
     organizationId: string;
-    scopes: ReadonlyArray<{
+    scopes: readonly {
       scopeType: RoleBindingScopeType;
       scopeId: string;
-    }>;
+    }[];
   }): Promise<AuthzBindingScopeRow[]> {
     const idsOfType = (scopeType: RoleBindingScopeType) => [
       ...new Set(
@@ -179,7 +179,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
   }: {
     organizationId: string;
     groupIds: readonly string[];
-  }): Promise<Array<{ groupId: string; userId: string }>> {
+  }): Promise<{ groupId: string; userId: string }[]> {
     if (groupIds.length === 0) {
       return [];
     }
@@ -327,7 +327,7 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
   }: {
     organizationId: string;
     roleIds: readonly string[];
-  }): Promise<Array<{ id: string; permissions: unknown }>> {
+  }): Promise<{ id: string; permissions: unknown }[]> {
     if (roleIds.length === 0) {
       return [];
     }

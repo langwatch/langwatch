@@ -48,7 +48,7 @@ async function startEchoingModel(): Promise<StubModel> {
       requestBytes.push(Buffer.byteLength(raw));
       const body = JSON.parse(raw) as {
         model: string;
-        messages: Array<{ role: string; content: string }>;
+        messages: { role: string; content: string }[];
       };
       const systemPrompt = body.messages.find((m) => m.role === "system")?.content ?? "";
       systemPrompts.push(systemPrompt);

@@ -33,7 +33,7 @@ class FakeRepository extends GatewayTraceDestinationReportRepository {
     private readonly rows: {
       projects: TraceDestinationProjectRow[];
       keys: TraceDestinationKeyRow[];
-      organizations: Array<{ id: string }>;
+      organizations: { id: string }[];
     },
   ) {
     super();
@@ -60,7 +60,7 @@ function fakeRepository({
 }: {
   projects: TraceDestinationProjectRow[];
   keys: TraceDestinationKeyRow[];
-  organizations?: Array<{ id: string }>;
+  organizations?: { id: string }[];
 }): GatewayTraceDestinationReportRepository {
   return new FakeRepository({ projects, keys, organizations });
 }

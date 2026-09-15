@@ -5,7 +5,7 @@ import type { DatasetRecord } from "@langwatch/dataset-contract";
  */
 export interface DatasetRecordContentRepository {
   createMany(input: {
-    records: Array<{ id: string; entry: unknown }>;
+    records: { id: string; entry: unknown }[];
     datasetId: string;
     projectId: string;
   }): Promise<DatasetRecord[]>;

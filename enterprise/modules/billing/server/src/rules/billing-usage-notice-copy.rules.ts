@@ -16,7 +16,7 @@ type ConfirmedNotification = Extract<SubscriptionNotificationPayload, { type: "c
 type CancelledNotification = Extract<SubscriptionNotificationPayload, { type: "cancelled" }>;
 
 export type HubspotFormBody = {
-  fields: Array<{ objectTypeId: string; name: string; value: string | undefined }>;
+  fields: { objectTypeId: string; name: string; value: string | undefined }[];
   context: { pageUri: string; pageName: string };
 };
 

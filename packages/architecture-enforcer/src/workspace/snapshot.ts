@@ -21,21 +21,21 @@ import type {
 
 const FEATURE_ROLES = new Set<FeaturePackageRole>(["contract", "server", "web"]);
 
-const APPLICATION_PACKAGES: ReadonlyArray<{
+const APPLICATION_PACKAGES: readonly {
   role: ApplicationPackageRole;
   path: string;
   name: string;
-}> = [
+}[] = [
   { role: "ui", path: "ui", name: "@langwatch/ui" },
   { role: "api", path: "api", name: "@langwatch/platform-api" },
   { role: "worker", path: "worker", name: "@langwatch/worker" },
   { role: "server", path: "server", name: "@langwatch/server" },
 ];
 
-const ENTERPRISE_COMPOSITION_PACKAGES: ReadonlyArray<{
+const ENTERPRISE_COMPOSITION_PACKAGES: readonly {
   role: EnterpriseCompositionRole;
   name: string;
-}> = [
+}[] = [
   { role: "api", name: "@langwatch/enterprise-api" },
   { role: "worker", name: "@langwatch/enterprise-worker" },
 ];

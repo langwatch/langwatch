@@ -130,7 +130,7 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     // full miss path (including that accounting) for this same delivery —
     // counting again on the retry would double-count one logical read.
     if (context.bypassReadCache) {
-      return await this.readDurable(aggregateId, context);
+      return this.readDurable(aggregateId, context);
     }
 
     const cached = await this.readCached(aggregateId, context);

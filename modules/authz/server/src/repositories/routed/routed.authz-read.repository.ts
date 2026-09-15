@@ -107,7 +107,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
   async findShareLinks(args: {
     projectId: string;
     tokens: readonly string[];
-    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    links: readonly { kind: ShareableResourceKind; id: string }[];
   }): Promise<ShareLinkRow[]> {
     const lineage = await this.repositories.legacy.findProjectLineage({
       projectId: args.projectId,

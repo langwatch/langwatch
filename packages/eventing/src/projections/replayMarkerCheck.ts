@@ -38,7 +38,7 @@ export interface ReplayMarkerChecker {
 interface ReplayMarkerPipeline {
   hget(key: string, field: string): ReplayMarkerPipeline;
   get(key: string): ReplayMarkerPipeline;
-  exec(): Promise<Array<[Error | null, unknown]> | null>;
+  exec(): Promise<[Error | null, unknown][] | null>;
 }
 interface ReplayMarkerRedis {
   pipeline(): ReplayMarkerPipeline;

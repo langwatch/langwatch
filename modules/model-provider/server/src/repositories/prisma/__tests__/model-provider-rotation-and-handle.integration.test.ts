@@ -74,7 +74,7 @@ function row(overrides: Partial<ModelProvider> & { id: string }): ModelProvider 
 
 /** Change-feed rows an organization produced, newest last. */
 async function changeEvents(organizationId: string) {
-  return await prisma.gatewayChangeEvent.findMany({
+  return prisma.gatewayChangeEvent.findMany({
     where: { organizationId },
     orderBy: { revision: "asc" },
     select: { kind: true, modelProviderId: true },

@@ -12,7 +12,7 @@ import { StatStrip } from "../ui/sections/stat-strip.tsx";
 // the navigation badge uses; the strip itself is otherwise snapshot-driven.
 const outboxDeadQuery = vi.fn(() => ({
   data: [{ processName: "webhookDelivery", count: 94, oldestUpdatedAt: 0 }] as
-    | Array<{ processName: string; count: number; oldestUpdatedAt: number }>
+    | { processName: string; count: number; oldestUpdatedAt: number }[]
     | undefined,
 }));
 vi.mock("../../../behavior/ops-api.ts", () => ({

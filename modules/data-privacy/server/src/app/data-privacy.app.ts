@@ -38,11 +38,11 @@ export type DataPrivacyProjectLineage = Readonly<{
 /** One organization's scope targets, as the settings page lists them. */
 export type DataPrivacyOrganizationDirectory = Readonly<{
   /** Archived departments stay in the list so existing rules keep a name. */
-  departments: ReadonlyArray<{ id: string; name: string; archived: boolean }>;
-  teams: ReadonlyArray<{ id: string; name: string }>;
-  projects: ReadonlyArray<{ id: string; name: string; teamId: string }>;
+  departments: readonly { id: string; name: string; archived: boolean }[];
+  teams: readonly { id: string; name: string }[];
+  projects: readonly { id: string; name: string; teamId: string }[];
   /** The custom RBAC groups a `restrict` rule may name as its audience. */
-  groups: ReadonlyArray<{ id: string; name: string }>;
+  groups: readonly { id: string; name: string }[];
 }>;
 
 /**

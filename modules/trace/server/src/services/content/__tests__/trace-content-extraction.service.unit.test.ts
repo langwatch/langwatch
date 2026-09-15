@@ -419,10 +419,10 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       );
       const rewritten = rewrittenEvent as {
         message: {
-          content: Array<{
+          content: {
             type: string;
             image_url: { url: string; detail?: string };
-          }>;
+          }[];
         };
       };
       expect(rewritten.message.content[0]).toEqual({
@@ -727,10 +727,10 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       // Second message's audio part is now a URL reference.
       const secondMsg = rewritten.messages[1] as {
         role: string;
-        content: Array<{
+        content: {
           type: string;
           source: { type: string; value: string };
-        }>;
+        }[];
       };
       expect(secondMsg.role).toBe("assistant");
       expect(secondMsg.content).toHaveLength(1);

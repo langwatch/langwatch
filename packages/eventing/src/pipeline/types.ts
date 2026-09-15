@@ -23,28 +23,28 @@ export interface PipelineMetadata {
   name: string;
   aggregateType: AggregateType;
   allowedEventTypes: readonly string[];
-  projections: Array<{
+  projections: {
     name: string;
     handlerClassName: string;
-  }>;
-  mapProjections: Array<{
-    name: string;
-    handlerClassName: string;
-    eventTypes?: string[];
-  }>;
-  stateProjections?: Array<{
+  }[];
+  mapProjections: {
     name: string;
     handlerClassName: string;
     eventTypes?: string[];
-  }>;
-  commands: Array<{
+  }[];
+  stateProjections?: {
     name: string;
     handlerClassName: string;
-  }>;
-  subscribers?: Array<{
+    eventTypes?: string[];
+  }[];
+  commands: {
+    name: string;
+    handlerClassName: string;
+  }[];
+  subscribers?: {
     name: string;
     eventTypes?: string[];
-  }>;
+  }[];
 }
 
 export interface EventSourcingPipelineDefinition<
@@ -58,22 +58,22 @@ export interface EventSourcingPipelineDefinition<
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   stateProjections?: StateProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
-  foldSubscribers?: Array<{
+  foldSubscribers?: {
     foldName: string;
     definition: SubscriberDispatchDefinition<EventType>;
-  }>;
-  mapSubscribers?: Array<{
+  }[];
+  mapSubscribers?: {
     mapName: string;
     definition: SubscriberDispatchDefinition<EventType>;
-  }>;
+  }[];
   subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
-  commandRegistrations?: Array<{
+  commandRegistrations?: {
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
-  }>;
+  }[];
   globalRegistry?: ProjectionRegistry<Event>;
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;

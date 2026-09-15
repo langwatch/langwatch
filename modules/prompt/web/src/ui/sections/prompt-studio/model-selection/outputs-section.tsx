@@ -50,7 +50,7 @@ export type OutputsSectionProps = {
 // Constants
 // ============================================================================
 
-const ALL_OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
+const ALL_OUTPUT_TYPE_OPTIONS: { value: OutputType; label: string }[] = [
   { value: "str", label: TYPE_LABELS.str ?? "Text" },
   { value: "float", label: TYPE_LABELS.float ?? "Number" },
   { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
@@ -263,7 +263,7 @@ type OutputRowProps = {
   onUpdate: (updates: Partial<Output>) => boolean;
   onRemove: () => void;
   onEditJsonSchema: () => void;
-  typeOptions: Array<{ value: OutputType; label: string }>;
+  typeOptions: { value: OutputType; label: string }[];
 };
 
 const OutputRow = ({

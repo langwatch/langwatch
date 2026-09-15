@@ -45,7 +45,7 @@ export async function ingestListCommand(options: { all?: boolean; json?: boolean
   }
 
   // Stable formatted table. No external table dep — keep deps tight.
-  const cols: Array<keyof (typeof sources)[number]> = [
+  const cols: (keyof (typeof sources)[number])[] = [
     "name",
     "sourceType",
     "status",

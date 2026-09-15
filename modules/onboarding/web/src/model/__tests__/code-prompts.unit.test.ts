@@ -49,7 +49,7 @@ function longestAtTokenComponent(text: string): AtTokenProbe {
 }
 
 describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
-  const prompts: Array<{ name: string; text: string }> = [
+  const prompts: { name: string; text: string }[] = [
     { name: "PROMPT_TRACING", text: PROMPT_TRACING },
     { name: "PROMPT_EXPERIMENTS", text: PROMPT_EXPERIMENTS },
     {

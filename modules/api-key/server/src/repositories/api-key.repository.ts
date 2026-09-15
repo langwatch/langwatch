@@ -86,7 +86,7 @@ export abstract class ApiKeyRepository {
   abstract findLiveChildren(input: {
     parentApiKeyId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string }>>;
+  }): Promise<{ id: string }[]>;
   /**
    * Whether one key is still usable, by id, without its bindings.
    *
@@ -106,7 +106,7 @@ export abstract class ApiKeyRepository {
    */
   abstract findElapsedLoginKeys(input: {
     now: Instant;
-  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>>;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]>;
   /**
    * Moves a live CLI login key's expiry with its session, so a session
    * nothing keeps refreshing is still retired by the hourly sweep rather

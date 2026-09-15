@@ -37,10 +37,10 @@ function splitColumnsAround({
   colCount: number;
   contentBoundary: number;
   claimedIndices: number[];
-}): Array<{ span: number; role: "content" | "filler" }> {
+}): { span: number; role: "content" | "filler" }[] {
   const claims = new Set(claimedIndices);
   const boundary = Math.min(Math.max(contentBoundary, 0), colCount);
-  const segments: Array<{ span: number; role: "content" | "filler" }> = [];
+  const segments: { span: number; role: "content" | "filler" }[] = [];
   if (boundary > 0) segments.push({ span: boundary, role: "content" });
   let span = 0;
   for (let i = boundary; i < colCount; i++) {

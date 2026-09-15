@@ -152,7 +152,7 @@ export interface TraceApi {
     userId: string;
     projectId: string;
     traceIds: readonly string[];
-  }): Promise<ReadonlyArray<Trace>>;
+  }): Promise<readonly Trace[]>;
   writeSuggestion(input: {
     projectId: string;
     traceId: string;
@@ -186,7 +186,7 @@ export interface TraceApi {
     occurredAtMs?: number,
     limit?: number,
   ): Promise<
-    ReadonlyArray<{
+    readonly {
       spanId: string;
       timeUnixMs: number;
       body: string;
@@ -194,7 +194,7 @@ export interface TraceApi {
       resourceAttributes: Record<string, string>;
       scopeName: string;
       scopeVersion: string | null;
-    }>
+    }[]
   >;
   readSpanSummaries(input: {
     projectId: string;
@@ -240,7 +240,7 @@ export interface TraceApi {
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
-  }): Promise<Array<{ spanId: string; signals: SpanLangwatchSignals["signals"] }>>;
+  }): Promise<{ spanId: string; signals: SpanLangwatchSignals["signals"] }[]>;
   readSpanResources(input: {
     projectId: string;
     traceId: string;
@@ -292,13 +292,11 @@ export interface TraceApi {
     protections: unknown;
   }): Promise<unknown>;
   readTopics(input: { projectId: string }): Promise<
-    ReadonlyArray<
-      Readonly<{
+    readonly Readonly<{
         id: string;
         name: string;
         parentId: string | null;
-      }>
-    >
+      }>[]
   >;
   getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
   cleanupTenantEmitter(tenantId: string): void;

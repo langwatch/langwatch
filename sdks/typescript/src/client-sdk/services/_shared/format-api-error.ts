@@ -21,7 +21,7 @@ function isGeneric(s: string): boolean {
   return GENERIC_MESSAGES.has(s.trim().toLowerCase());
 }
 
-function firstMeaningful(...candidates: Array<unknown>): string | undefined {
+function firstMeaningful(...candidates: unknown[]): string | undefined {
   for (const c of candidates) {
     if (typeof c === "string" && !isGeneric(c)) return c;
   }

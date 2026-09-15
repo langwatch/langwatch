@@ -82,9 +82,7 @@ export class RunPlansApiService {
 
   /** The project's run plans. Archived plans are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<RunPlan[]> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/run-plans", {
-      ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
-    });
+    const { data, error, response } = await this.apiClient.GET("/api/v1/run-plans", (options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}));
     return unwrapApiResult({
       operation: "list run plans",
       data,

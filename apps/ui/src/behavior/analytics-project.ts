@@ -3,9 +3,9 @@
 import type { AnalyticsHostProject } from "@langwatch/analytics-web/analytics";
 
 type Organization = {
-  teams: ReadonlyArray<{
-    projects: ReadonlyArray<{ id: string; slug: string; name: string; firstMessage?: unknown }>;
-  }>;
+  teams: readonly {
+    projects: readonly { id: string; slug: string; name: string; firstMessage?: unknown }[];
+  }[];
 };
 
 export function resolveAnalyticsProject({

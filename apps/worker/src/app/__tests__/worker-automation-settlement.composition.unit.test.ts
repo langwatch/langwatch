@@ -42,26 +42,26 @@ const ENVIRONMENT = {
 
 const RECORDED: {
   absences: string[];
-  mail: Array<{ to: string; bcc: string[] | undefined; subject: string; html: string }>;
-  claims: Array<{ triggerId: string; traceId: string; projectId: string }>;
-  lastRunAt: Array<{ triggerId: string; projectId: string }>;
-  datasetAppends: Array<{
+  mail: { to: string; bcc: string[] | undefined; subject: string; html: string }[];
+  claims: { triggerId: string; traceId: string; projectId: string }[];
+  lastRunAt: { triggerId: string; projectId: string }[];
+  datasetAppends: {
     slugOrId: string;
     projectId: string;
-    entries: Array<Record<string, unknown>>;
-  }>;
-  annotatorChecks: Array<{ projectId: string; queueIds: string[]; userIds: string[] }>;
-  existenceChecks: Array<{ projectId: string; traceIds: string[] }>;
-  queueItems: Array<{
+    entries: Record<string, unknown>[];
+  }[];
+  annotatorChecks: { projectId: string; queueIds: string[]; userIds: string[] }[];
+  existenceChecks: { projectId: string; traceIds: string[] }[];
+  queueItems: {
     projectId: string;
     traceIds: string[];
     queueIds: string[];
     userIds: string[];
     createdByUserId: string;
-  }>;
-  breaches: Array<{ cap: number; count: number; skipped: number }>;
-  pauses: Array<{ triggerId: string; projectId: string; pausedReason: unknown }>;
-  trafficReads: Array<{ tenantId: unknown }>;
+  }[];
+  breaches: { cap: number; count: number; skipped: number }[];
+  pauses: { triggerId: string; projectId: string; pausedReason: unknown }[];
+  trafficReads: { tenantId: unknown }[];
   captured: string[];
 } = {
   breaches: [],
@@ -210,7 +210,7 @@ function prismaDouble(trigger: TriggerRow) {
       },
     },
     triggerSent: {
-      createMany: async (input: { data: Array<Record<string, string>> }) => {
+      createMany: async (input: { data: Record<string, string>[] }) => {
         for (const row of input.data) {
           RECORDED.claims.push(
             row as unknown as { triggerId: string; traceId: string; projectId: string },
@@ -417,7 +417,7 @@ type ComposeOverrides = {
   /** The attributes the settled fold state carries, for legacy filter matching. */
   summaryAttributes?: Record<string, string>;
   /** The evaluation runs this process's own storage answers for the trace. */
-  evaluationRuns?: Array<Record<string, unknown>>;
+  evaluationRuns?: Record<string, unknown>[];
   /** Runaway containment, and how much traffic the project itself carried. */
   containment?: {
     projectTraces24h: number;
@@ -554,7 +554,7 @@ function recordingDatasets() {
     batchCreateRecords: async (input: {
       slugOrId: string;
       projectId: string;
-      entries: Array<Record<string, unknown>>;
+      entries: Record<string, unknown>[];
     }) => {
       RECORDED.datasetAppends.push(input);
       return [];
@@ -630,7 +630,7 @@ function tryDelivery(config: ReturnType<typeof resolveWorkerConfig>, wanted: boo
 function frozenAutomationRoutingKeys(): string[] {
   const registry = JSON.parse(
     readFileSync(new URL("../../features/job-registry.json", import.meta.url), "utf8"),
-  ) as { pipelines: Array<{ name: string; jobs: string[] }> };
+  ) as { pipelines: { name: string; jobs: string[] }[] };
   const pipeline = registry.pipelines.find((entry) => entry.name === "automations");
   if (!pipeline) throw new Error("automations is absent from the job registry");
   return pipeline.jobs;
@@ -642,7 +642,7 @@ type BuiltDefinition = {
   foldProjections: Map<string, unknown>;
   stateProjections?: Map<string, unknown>;
   mapProjections: Map<string, unknown>;
-  commands: ReadonlyArray<{ name: string }>;
+  commands: readonly { name: string }[];
   foldSubscribers: Map<string, unknown>;
   mapSubscribers: Map<string, unknown>;
   eventSubscribers: Map<string, unknown>;

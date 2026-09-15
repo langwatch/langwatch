@@ -11,7 +11,7 @@ import type {
  * concat of [projectId, userId, conversationId, turnId, frameNonce, payload] via HMAC-SHA256. */
 
 /** The fixed field order the signing input concatenates. Order is part of the contract. */
-const SIGNED_FIELDS: Array<keyof LangyFrameSigned> = [
+const SIGNED_FIELDS: (keyof LangyFrameSigned)[] = [
   "projectId",
   "userId",
   "conversationId",

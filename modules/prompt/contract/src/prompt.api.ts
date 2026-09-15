@@ -154,7 +154,7 @@ export interface PromptApi {
     ids: string[];
     projectId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>>;
+  }): Promise<{ id: string; name: string }[]>;
   getExistingIds(input: {
     ids: string[];
     projectId: string;

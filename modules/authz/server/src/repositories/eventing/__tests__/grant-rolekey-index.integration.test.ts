@@ -155,7 +155,7 @@ describe.skipIf(!DB_URL)("given an organization holding many live grants", () =>
       expect(holderQuery, "the holder lookup should have run").toBeDefined();
 
       const explained = await prisma.$queryRawUnsafe<
-        Array<{ "QUERY PLAN": PlanNode[] | Array<{ Plan: PlanNode }> }>
+        { "QUERY PLAN": PlanNode[] | { Plan: PlanNode }[] }[]
       >(`EXPLAIN (ANALYZE, FORMAT JSON) ${holderQuery!.sql}`, ...holderQuery!.params);
 
       const root = explained[0]!["QUERY PLAN"][0] as { Plan: PlanNode };

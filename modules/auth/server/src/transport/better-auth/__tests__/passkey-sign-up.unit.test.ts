@@ -16,7 +16,7 @@ const verification: SignUpVerification = { requestVerification };
 
 /** Records the announcements without letting one fail the ceremony. */
 class SilentAnnouncements extends BetterAuthAnnouncements {
-  readonly tracked: Array<{ userId: string; event: string }> = [];
+  readonly tracked: { userId: string; event: string }[] = [];
 
   trackServerEvent(input: { userId: string; event: string }): void {
     this.tracked.push({ userId: input.userId, event: input.event });

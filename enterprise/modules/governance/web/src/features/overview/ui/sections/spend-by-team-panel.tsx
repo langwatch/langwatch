@@ -3,11 +3,11 @@ import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 export function SpendByTeamBar({
   teams,
 }: {
-  teams: Array<{
+  teams: {
     teamId: string | null;
     teamName: string;
     spendUsd: string;
-  }>;
+  }[];
 }) {
   return <EnterpriseSpendByTeamBar teams={teams} colorForLabel={getHexColorForString} />;
 }

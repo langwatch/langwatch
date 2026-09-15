@@ -12,11 +12,11 @@ export abstract class CodingAgentSessionRepository {
   ): Promise<void>;
 
   abstract upsertBatch(
-    rows: Array<{
+    rows: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>,
+    }[],
   ): Promise<void>;
 
   abstract findBySessionId(input: {

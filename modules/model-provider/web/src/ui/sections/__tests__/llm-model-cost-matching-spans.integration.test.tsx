@@ -10,12 +10,12 @@ const { mockPreviewState, mockPreviewQueryInputs } = vi.hoisted(() => ({
     current: null as null | {
       windowDays: number;
       totalMatchedSpans: number;
-      matchedModels: Array<{
+      matchedModels: {
         model: string;
         spanCount: number;
         lastSeenMs: number;
-      }>;
-      sampleSpans: Array<{
+      }[];
+      sampleSpans: {
         traceId: string;
         spanId: string;
         spanName: string;
@@ -26,14 +26,14 @@ const { mockPreviewState, mockPreviewQueryInputs } = vi.hoisted(() => ({
         cacheCreationTokens: number | null;
         startTimeMs: number;
         exampleCost: number | null;
-      }>;
-      unmatchedModels: Array<{ model: string; spanCount: number }>;
+      }[];
+      unmatchedModels: { model: string; spanCount: number }[];
     },
   },
-  mockPreviewQueryInputs: [] as Array<{
+  mockPreviewQueryInputs: [] as {
     input: Record<string, unknown>;
     enabled: boolean | undefined;
-  }>,
+  }[],
 }));
 
 vi.mock("@langwatch/ui-drawer", () => ({

@@ -457,7 +457,7 @@ export interface LangyUi {
   reconnected: () => void;
   disconnected: (input: { reason: string }) => void;
   leaving: () => void;
-  backgroundKept: (input: Array<{ pid: number; logPath: string }>) => void;
+  backgroundKept: (input: { pid: number; logPath: string }[]) => void;
   note: (text: string) => void;
   /** Holds transcript lines back while a question owns the bottom of the screen. */
   hold: () => void;

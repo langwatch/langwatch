@@ -54,10 +54,10 @@ describe("HaystackCanonicaliserService", () => {
 
       extractor.apply(ctx);
 
-      const contexts = ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as Array<{
+      const contexts = ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as {
         content: string;
         document_id?: string;
-      }>;
+      }[];
       expect(contexts[0]!.document_id).toBe("my-doc-id");
     });
 

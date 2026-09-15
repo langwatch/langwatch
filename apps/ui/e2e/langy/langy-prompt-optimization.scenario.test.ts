@@ -269,7 +269,7 @@ describe("Langy prompt optimization: the improvement loop", () => {
         method: "GET",
         path: "/api/experiments?pageSize=20",
       });
-      const experiments: Array<{ slug: string }> = list?.experiments ?? [];
+      const experiments: { slug: string }[] = list?.experiments ?? [];
       expect(
         experiments.length,
         `the experiments list came back empty or in an unexpected shape: ${JSON.stringify(list).slice(0, 300)}`,

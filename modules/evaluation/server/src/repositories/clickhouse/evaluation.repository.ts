@@ -44,11 +44,11 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   }
 
   upsertBatch(
-    input: Array<{
+    input: {
       data: EvaluationRunData;
       tenantId: string;
       retentionDays?: number;
-    }>,
+    }[],
   ): Promise<void> {
     return this.writer.upsertBatch(input);
   }

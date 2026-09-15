@@ -42,11 +42,11 @@ vi.mock("@langwatch/ui-drawer", () => ({
 }));
 
 const chatRef = {
-  messages: [] as Array<{
+  messages: [] as {
     id: string;
     role: string;
-    parts: Array<{ type: string; text: string }>;
-  }>,
+    parts: { type: string; text: string }[];
+  }[],
   sendMessage: vi.fn(),
   stop: vi.fn(),
   status: "ready" as "ready" | "submitted" | "streaming" | "error",

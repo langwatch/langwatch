@@ -162,7 +162,7 @@ describe("redactV2Content", () => {
       expect((out.params as { model: string }).model).toBe("gpt-5-mini");
       const event = (
         out as unknown as {
-          events: Array<{ attributes: Record<string, unknown> }>;
+          events: { attributes: Record<string, unknown> }[];
         }
       ).events[0]!;
       expect(event.attributes["app.billing.plan"]).toBe("[REDACTED] (visible to Admins)");
@@ -322,7 +322,7 @@ describe("redactV2Content", () => {
       );
 
       const parsed = JSON.parse(out.input!) as {
-        value: Array<{ role: string }>;
+        value: { role: string }[];
       };
       expect(parsed.value.map((m) => m.role)).toEqual(["user", "assistant"]);
       expect(out.input).not.toContain("secret instructions");
@@ -375,10 +375,10 @@ describe("redactV2Content", () => {
         },
       );
 
-      const parsed = JSON.parse(out.input!) as Array<{
+      const parsed = JSON.parse(out.input!) as {
         role: string;
         tool_calls?: unknown;
-      }>;
+      }[];
       expect(parsed.map((m) => m.role)).toEqual(["user", "assistant"]);
       expect(parsed[1]!.tool_calls).toBeUndefined();
       expect(out.input).not.toContain("tool result");
@@ -411,7 +411,7 @@ describe("redactV2Content", () => {
 
       const paramsMessages = (
         out.params as {
-          gen_ai: { input: { messages: Array<{ role: string }> } };
+          gen_ai: { input: { messages: { role: string }[] } };
         }
       ).gen_ai.input.messages;
       expect(paramsMessages.map((m) => m.role)).toEqual(["user", "assistant"]);

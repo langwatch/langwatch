@@ -139,7 +139,7 @@ export const getSimulationRunCommand = async (
         error?: string | null;
         evaluations?: SimulationRunEvaluation[];
       } | null;
-      messages: Array<{ role: string; content: string }>;
+      messages: { role: string; content: string }[];
       timestamp: number;
       updatedAt: number;
       durationInMs: number;

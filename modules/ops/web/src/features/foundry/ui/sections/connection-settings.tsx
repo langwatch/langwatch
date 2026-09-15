@@ -108,14 +108,14 @@ function ProjectList({
   selectedId,
   onSelect,
 }: {
-  projects: Array<{
+  projects: {
     id: string;
     name: string;
     slug: string;
     apiKey: string;
     orgName: string;
     teamName: string;
-  }>;
+  }[];
   selectedId: string | undefined;
   onSelect: (project: { id: string; apiKey: string }) => void;
 }) {

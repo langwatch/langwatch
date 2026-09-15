@@ -187,7 +187,7 @@ export function checkEvaluatorRequiredFields({
   expectedOutput,
 }: {
   evaluatorType: string;
-  spans: Array<{ type: string; model?: string | null }>;
+  spans: { type: string; model?: string | null }[];
   expectedOutput?: { value: string } | null;
 }): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);

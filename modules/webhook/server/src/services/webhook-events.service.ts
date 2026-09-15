@@ -19,7 +19,7 @@ export type WebhookProjectReader = {
       where: { team: { organizationId: string } };
       select: { id: true };
       orderBy: { id: "asc" };
-    }): Promise<Array<{ id: string }>>;
+    }): Promise<{ id: string }[]>;
   };
 };
 

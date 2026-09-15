@@ -10,10 +10,10 @@ interface Item {
 }
 
 export interface SegmentedControlProps extends SegmentGroup.RootProps {
-  items: Array<string | Item>;
+  items: (string | Item)[];
 }
 
-function normalize(items: Array<string | Item>): Item[] {
+function normalize(items: (string | Item)[]): Item[] {
   return items.map((item) => (typeof item === "string" ? { value: item, label: item } : item));
 }
 

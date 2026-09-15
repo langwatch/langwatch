@@ -52,9 +52,9 @@ const FOREIGN_VK_ID = `vk-ingest-foreign-${suffix}`;
 const SECRET = "0123456789abcdef0123456789abcdef";
 
 /** Every admission the route appended, in order, as the pipeline saw it. */
-let appended: Array<Record<string, unknown>> = [];
+let appended: Record<string, unknown>[] = [];
 /** Every confirmation the route appended, which the seam now enriches too. */
-let appendedConfirms: Array<Record<string, unknown>> = [];
+let appendedConfirms: Record<string, unknown>[] = [];
 
 /** A flat price, because what is under test is the join, not the rating. */
 class FlatRating implements GatewaySpendRating {
@@ -68,9 +68,9 @@ let app: ReturnType<typeof mountGatewayInternalRest>;
 
 function buildApp(): void {
   store = PrismaGatewayInternalStoreRepository.create({ database: prisma });
-  const record = (into: Array<Record<string, unknown>>) => ({
+  const record = (into: Record<string, unknown>[]) => ({
     sendBatch: (payloads: unknown[]) => {
-      into.push(...(payloads as Array<Record<string, unknown>>));
+      into.push(...(payloads as Record<string, unknown>[]));
       return Promise.resolve();
     },
     send: (payload: unknown) => {

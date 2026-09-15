@@ -6,7 +6,7 @@ import {
 
 const MIGRATION = "authz-grants-genesis-import";
 
-function organizations(count: number): Array<{ id: string; name: string }> {
+function organizations(count: number): { id: string; name: string }[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `org_${index}`,
     name: `Org ${index}`,
@@ -19,7 +19,7 @@ function serviceWith({
   privateDataplaneOrganizationIds = [],
   migrationNames = [MIGRATION],
 }: {
-  eligible?: Array<{ id: string; name: string }>;
+  eligible?: { id: string; name: string }[];
   isSaaS?: boolean;
   privateDataplaneOrganizationIds?: string[];
   /** Registered migrations, in the order they run per organization. */

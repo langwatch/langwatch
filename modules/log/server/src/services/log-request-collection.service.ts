@@ -71,7 +71,7 @@ export class LogRequestCollectionService {
     logRequest: DeepPartial<IExportLogsServiceRequest>;
     piiRedactionLevel: string;
   }): Promise<LogRequestCollectionResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "LogRequestCollectionService.handleOtlpLogRequest",
       {
         kind: ApiSpanKind.PRODUCER,

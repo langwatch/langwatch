@@ -9,11 +9,11 @@ import {
 import { backfillVirtualKeyConfig } from "../virtual-key-config-backfill.task.ts";
 
 function fakeRepository(virtualKeys: VirtualKeyRow[]) {
-  const updates: Array<{
+  const updates: {
     id: string;
     config: BackfillJsonObject;
     routingPolicyId: string | null;
-  }> = [];
+  }[] = [];
   let guardrailCount = 0;
   const mintRoutingPolicy = vi.fn(async (input: MintRoutingPolicyInput) => input.id);
   const mintGuardrail = vi.fn(async (_input: MintGuardrailInput) => {

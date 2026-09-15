@@ -87,13 +87,13 @@ async function lockActiveAdmins({
 }: {
   tx: Prisma.TransactionClient;
   organizationId: string;
-}): Promise<Array<{ userId: string }>> {
+}): Promise<{ userId: string }[]> {
   // `role::text` rather than a cast to the enum type: the type name would have
   // to be schema-qualified to be safe, and the comparison runs over one
   // organization's memberships either way. `ORDER BY` fixes the order rows are
   // locked in, so two callers racing over the same set queue behind each other
   // instead of deadlocking on a half-acquired one.
-  return tx.$queryRaw<Array<{ userId: string }>>`
+  return tx.$queryRaw<{ userId: string }[]>`
     SELECT "userId" FROM "OrganizationUser"
     WHERE "organizationId" = ${organizationId}
       AND "role"::text = ${OrganizationUserRole.ADMIN}
@@ -276,7 +276,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   ) {}
 
   tryFindPersonalTeamInScopes(params: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null> {
     return personalTeamScope.tryFindPersonalTeamInScopes({
       client: this.prisma,
@@ -296,8 +296,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     teamIds: string[];
-  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>> {
-    return await this.prisma.roleBinding.findMany({
+  }): Promise<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }[]> {
+    return this.prisma.roleBinding.findMany({
       where: {
         organizationId,
         userId,
@@ -447,7 +447,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult> {
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Deterministic answer for the common case; the catch inside
       // `createProvisionedOrganization` still covers the race where two
       // provisioning runs claim one slug.
@@ -1034,7 +1034,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     // Teams whose only team-scoped admin this seat change corrected away. Not a
     // failure, and not silent either: the caller reports them to whoever made
     // the decision.
-    const teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
+    const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     // The seat change reads and corrects every scope the seat caps; the
     // corrections are collected here and emitted as commands once the
     // membership transaction has committed.

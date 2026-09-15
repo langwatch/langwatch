@@ -524,7 +524,7 @@ async function runSuite(params: {
   });
   const idempotencyKey = input.idempotencyKey ?? `api-${randomUUID()}`;
 
-  return await scheduleRun({ app, input, projectId, idempotencyKey, actor }).catch(
+  return scheduleRun({ app, input, projectId, idempotencyKey, actor }).catch(
     (error: unknown) => refuseRun(error),
   );
 }

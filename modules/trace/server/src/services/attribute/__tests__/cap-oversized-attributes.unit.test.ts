@@ -174,9 +174,9 @@ describe("capOversizedAttributes with copilot content-capture payloads", () => {
     expect(cappedCount).toBe(1);
     const eventAttr = (
       span as unknown as {
-        events: Array<{
-          attributes: Array<{ value: { stringValue: string } }>;
-        }>;
+        events: {
+          attributes: { value: { stringValue: string } }[];
+        }[];
       }
     ).events[0]!.attributes[0]!;
     expect(eventAttr.value.stringValue).toMatch(/^\[truncated: \d+ bytes/);

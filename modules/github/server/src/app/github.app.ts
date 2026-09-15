@@ -484,7 +484,7 @@ export class GithubApp implements GithubApiContract {
   }
   findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{ repositoryHost: string; repositoryFullName: string; headBranch: string }>;
+    keys: readonly { repositoryHost: string; repositoryFullName: string; headBranch: string }[];
   }): Promise<readonly GithubPullRequest[]> {
     return this.#service.findForBranches(input);
   }

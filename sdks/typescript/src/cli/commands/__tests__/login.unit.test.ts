@@ -247,7 +247,7 @@ describe("loginCommand", () => {
         await loginCommand({});
 
         const firstCall = promptsMock.mock.calls[0]![0] as {
-          choices: Array<{ value: string }>;
+          choices: { value: string }[];
         };
         expect(firstCall.choices.map((c) => c.value)).toEqual(["cloud", "self-hosted"]);
       });
@@ -287,7 +287,7 @@ describe("loginCommand", () => {
         await loginCommand({});
 
         const call = promptsMock.mock.calls[0]![0] as {
-          choices: Array<{ value: string; title: string }>;
+          choices: { value: string; title: string }[];
           initial?: number;
         };
         expect(call.choices.map((c) => c.value)).toEqual(["keep", "self-hosted", "cloud"]);

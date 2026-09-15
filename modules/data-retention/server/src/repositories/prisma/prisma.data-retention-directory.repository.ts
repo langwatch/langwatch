@@ -112,7 +112,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
   }: {
     organizationId: string;
     scope: ScopeAssignment;
-  }): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
+  }): Promise<readonly { id: string; teamId: string }[]> {
     // The organization constraint is what makes a foreign scopeId resolve to
     // nothing, whichever tier the scope names.
     const where =
@@ -122,7 +122,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
           ? { teamId: scope.scopeId, team: { organizationId }, archivedAt: null }
           : { team: { organizationId }, archivedAt: null };
 
-    return await this.database.project.findMany({
+    return this.database.project.findMany({
       where,
       select: { id: true, teamId: true },
     });

@@ -85,11 +85,11 @@ const copyEvaluationsV3Experiment = async ({
   if (copyDatasets && Array.isArray(workbenchState.datasets)) {
     const datasetIdMap: Record<string, string> = {};
 
-    for (const entry of workbenchState.datasets as Array<{
+    for (const entry of workbenchState.datasets as {
       id: string;
       type: string;
       datasetId?: string;
-    }>) {
+    }[]) {
       if (entry.type === "saved" && entry.datasetId) {
         try {
           const newDataset = await app.copyDataset({
@@ -106,11 +106,11 @@ const copyEvaluationsV3Experiment = async ({
       }
     }
 
-    for (const entry of workbenchState.datasets as Array<{
+    for (const entry of workbenchState.datasets as {
       id: string;
       type: string;
       datasetId?: string;
-    }>) {
+    }[]) {
       const mapped = entry.datasetId ? datasetIdMap[entry.datasetId] : undefined;
       if (entry.type === "saved" && mapped) {
         entry.datasetId = mapped;
@@ -387,7 +387,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
     const dsl = workflow?.currentVersion?.dsl as StudioWorkflow | undefined;
     const evaluator = dsl?.nodes.find((node) => node.type === "evaluator");
     const evaluatorData = evaluator?.data as
-      | { evaluator?: string; parameters?: ReadonlyArray<{ identifier: string; value: unknown }> }
+      | { evaluator?: string; parameters?: readonly { identifier: string; value: unknown }[] }
       | undefined;
 
     if (!workbenchState || !dsl || !evaluatorData?.evaluator) {
@@ -422,12 +422,12 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
   .withPermission("experiments:view")
   .handle(async ({ app, input }) => {
     if (input.experimentId) {
-      return await app
+      return app
         .getById({ projectId: input.projectId, id: input.experimentId })
         .catch(mapExperimentError);
     }
     if (input.experimentSlug) {
-      return await app
+      return app
         .getBySlug({ projectId: input.projectId, slug: input.experimentSlug })
         .catch(mapExperimentError);
     }
@@ -572,7 +572,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
     // V3 experiments have no workflow; their state lives in workbenchState.
     if (experiment.type === "EVALUATIONS_V3") {
-      return await copyEvaluationsV3Experiment({
+      return copyEvaluationsV3Experiment({
         app,
         experiment,
         targetProjectId: input.projectId,

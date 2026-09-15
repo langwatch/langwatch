@@ -11,9 +11,7 @@ import { MemoryGithubPullRequestStatusCacheRepository } from "../memory/memory.g
 const ORGANIZATION = "organization-1";
 const REF = { repositoryHost: "github.com", repositoryFullName: "acme/widgets", prNumber: 7 };
 
-const backends: ReadonlyArray<
-  Readonly<{ name: string; create: () => GithubPullRequestStatusCacheRepository }>
-> = [
+const backends: readonly Readonly<{ name: string; create: () => GithubPullRequestStatusCacheRepository }>[] = [
   {
     name: "memory",
     create: () =>

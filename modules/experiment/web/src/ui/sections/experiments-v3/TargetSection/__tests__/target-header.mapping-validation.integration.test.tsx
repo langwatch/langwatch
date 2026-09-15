@@ -57,7 +57,7 @@ import {
 const createTestDataset = (
   id: string = DEFAULT_TEST_DATA_ID,
   name = "Test Data",
-  columns: Array<{ name: string; type: "string" | "number" | "boolean" }> = [
+  columns: { name: string; type: "string" | "number" | "boolean" }[] = [
     { name: "input", type: "string" },
     { name: "expected_output", type: "string" },
   ],
@@ -70,7 +70,7 @@ const createTestDataset = (
 
 const createTestTarget = (
   id: string,
-  inputs: Array<{ identifier: string; type: string }> = [{ identifier: "question", type: "str" }],
+  inputs: { identifier: string; type: string }[] = [{ identifier: "question", type: "str" }],
   mappings: TargetConfig["mappings"] = {},
 ): TargetConfig => ({
   id,
@@ -1199,7 +1199,7 @@ const createTestEvaluator = ({
 }: {
   id: string;
   evaluatorType: string;
-  inputs: Array<{ identifier: string; type: string }>;
+  inputs: { identifier: string; type: string }[];
   mappings?: EvaluatorConfig["mappings"];
 }): EvaluatorConfig => ({
   id,

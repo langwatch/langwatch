@@ -77,10 +77,10 @@ export type VirtualKeySnakeDto = {
    * the shape the public REST surface publishes, and every enum it carries is
    * lowercase there.
    */
-  scopes: Array<{
+  scopes: {
     scope_type: "organization" | "team" | "project";
     scope_id: string;
-  }>;
+  }[];
   routing_policy_id: string | null;
   routing_mode: "none" | "fallback_all" | "policy";
   config: unknown;

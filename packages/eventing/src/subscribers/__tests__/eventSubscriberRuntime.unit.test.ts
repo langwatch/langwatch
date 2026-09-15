@@ -105,7 +105,7 @@ describe("event-subscriber runtime boundary", () => {
       const registry = new Map<string, JobRegistryEntry>();
       const globalQueue = createMemoryGlobalQueue(registry);
 
-      const handled: Array<{ event: Event; context: unknown }> = [];
+      const handled: { event: Event; context: unknown }[] = [];
       const subscriber: EventSubscriberDefinition<Event> = {
         name: "conversationProcess",
         eventTypes: [],

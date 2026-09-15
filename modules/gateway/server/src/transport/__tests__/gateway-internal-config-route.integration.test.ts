@@ -76,7 +76,7 @@ class SuiteProjectService extends TestProjectApi {
   override async findTraceDestination(
     projectId: string,
   ): ReturnType<ProjectApi["findTraceDestination"]> {
-    return await prisma.project.findUnique({
+    return prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
     });
@@ -85,7 +85,7 @@ class SuiteProjectService extends TestProjectApi {
   override async listTraceDestinations(
     projectIds: string[],
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return await prisma.project.findMany({
+    return prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
     });

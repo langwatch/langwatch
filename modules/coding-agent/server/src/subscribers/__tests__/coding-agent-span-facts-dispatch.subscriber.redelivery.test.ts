@@ -192,12 +192,12 @@ function makeSubscriber(
   // `tenantId` is recorded on purpose: it is the predicate that scopes the
   // claim-check read, and a regression that dropped or crossed it would be
   // invisible to a recorder that only kept trace/span.
-  const reads: Array<{
+  const reads: {
     tenantId: string;
     traceId: string;
     spanId: string;
     occurredAtMs: number;
-  }> = [];
+  }[] = [];
   class TestTraceProcessing implements CodingAgentTraceProcessor {
     normalizeSpan(input: {
       tenantId: string;

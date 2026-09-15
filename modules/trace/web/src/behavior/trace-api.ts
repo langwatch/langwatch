@@ -634,28 +634,28 @@ export type TraceApiMap = {
     getAll: {
       query: {
         input: { isDemo?: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           slug?: string;
           presenceEnabled?: boolean;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
             slug?: string;
             isPersonal?: boolean;
             ownerUserId?: string | null;
-            members?: Array<{ userId: string }>;
-            projects: Array<{
+            members?: { userId: string }[];
+            projects: {
               id: string;
               name: string;
               slug: string;
               apiKey?: string;
               firstMessage?: boolean;
               presenceEnabled?: boolean;
-            }>;
-          }>;
-        }>;
+            }[];
+          }[];
+        }[];
       };
     };
 

@@ -13,11 +13,11 @@ import OnlineEvaluationsScreen from "../online-evaluations.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    monitors: [] as Array<Record<string, unknown>>,
+    monitors: [] as Record<string, unknown>[],
     monitorsLoading: false,
-    performance: [] as Array<Record<string, unknown>>,
+    performance: [] as Record<string, unknown>[],
     performanceError: false,
-    experiments: [] as Array<Record<string, unknown>>,
+    experiments: [] as Record<string, unknown>[],
   },
 }));
 

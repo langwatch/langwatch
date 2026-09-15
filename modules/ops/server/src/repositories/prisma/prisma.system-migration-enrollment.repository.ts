@@ -118,7 +118,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
     query,
   }: {
     query: string;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     return this.prisma.organization.findMany({
       where: {
         OR: [{ name: { contains: query, mode: "insensitive" } }, { id: query }],
@@ -141,7 +141,7 @@ export class PrismaSystemMigrationEnrollmentRepository {
     enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
     includeEnterprise?: boolean;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     // Enrollment table has no Organization relation; enrolled ids read first.
     // Enrolled set is the small side of this join.
     const enrolled = await this.prisma.systemMigrationEnrollment.findMany({

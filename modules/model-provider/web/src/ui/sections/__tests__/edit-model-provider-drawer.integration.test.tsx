@@ -14,7 +14,7 @@ const { mockUpdate, mockValidateApiKey, mockProviders, mockCloseDrawer } = vi.ho
   mockValidateApiKey: vi.fn().mockResolvedValue({ valid: true }),
   mockCloseDrawer: vi.fn(),
   mockProviders: {
-    current: [] as Array<Record<string, unknown>>,
+    current: [] as Record<string, unknown>[],
   },
 }));
 

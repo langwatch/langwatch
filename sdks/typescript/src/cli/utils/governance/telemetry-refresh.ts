@@ -483,7 +483,7 @@ export async function refreshTelemetryWiringForLogin(
       });
       if (key.minted) {
         cfg.default_personal_ingest_keys = {
-          ...(cfg.default_personal_ingest_keys ?? {}),
+          ...cfg.default_personal_ingest_keys,
           [sourceType]: { secret: key.token, prefix: key.prefix },
         };
         mintedAny = true;

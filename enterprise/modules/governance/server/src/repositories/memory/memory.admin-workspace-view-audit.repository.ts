@@ -14,13 +14,13 @@ let sequence = 0;
  */
 export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
   private readonly targets = new Map<string, AdminWorkspaceTarget>();
-  private readonly rows: Array<{
+  private readonly rows: {
     actorUserId: string;
     targetKind: string;
     targetId: string;
     createdAtMs: number;
     row: AdminWorkspaceAuditRow;
-  }> = [];
+  }[] = [];
 
   static create(): MemoryAdminWorkspaceViewAuditRepository {
     return new MemoryAdminWorkspaceViewAuditRepository();

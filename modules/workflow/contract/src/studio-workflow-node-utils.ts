@@ -106,13 +106,13 @@ export const getEntryInputs = (
 export const getMappingSurfaceInputs = (
   edges: StudioEdge[],
   nodes: StudioNode[],
-): Array<{
+): {
   identifier: string;
   type: Field["type"];
   optional?: boolean;
-}> => {
+}[] => {
   const entryNode = nodes.find((node) => node.type === "entry" || node.id === "entry");
-  const declaredOutputs: Array<Pick<Field, "identifier" | "type">> = Array.isArray(
+  const declaredOutputs: Pick<Field, "identifier" | "type">[] = Array.isArray(
     entryNode?.data?.outputs,
   )
     ? entryNode.data.outputs

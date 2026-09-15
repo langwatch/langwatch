@@ -32,7 +32,7 @@ type Frame = Record<string, unknown> & { type: string };
 
 class Connection {
   readonly frames: Frame[] = [];
-  private readonly waiters: Array<{ type: string | undefined; resolve: (frame: Frame) => void }> =
+  private readonly waiters: { type: string | undefined; resolve: (frame: Frame) => void }[] =
     [];
 
   constructor(
@@ -80,7 +80,7 @@ class Connection {
 
 class FakePlatform {
   readonly connections: Connection[] = [];
-  private readonly waiters: Array<(connection: Connection) => void> = [];
+  private readonly waiters: ((connection: Connection) => void)[] = [];
 
   private constructor(
     readonly server: WebSocketServer,
@@ -133,7 +133,7 @@ class FakePlatform {
 }
 
 const recordingLogger = () => {
-  const calls: Array<[string, string]> = [];
+  const calls: [string, string][] = [];
   const log = (level: string) => (message: string) => {
     calls.push([level, message]);
   };

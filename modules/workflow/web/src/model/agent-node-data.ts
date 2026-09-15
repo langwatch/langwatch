@@ -121,7 +121,7 @@ export function buildAgentParameters(agent: TypedAgent): Field[] {
       if (config.headers && typeof config.headers === "object") {
         const headers = Array.isArray(config.headers)
           ? Object.fromEntries(
-              (config.headers as Array<{ key: string; value: string }>)
+              (config.headers as { key: string; value: string }[])
                 .filter((h) => h.key)
                 .map((h) => [h.key, h.value]),
             )
@@ -133,7 +133,7 @@ export function buildAgentParameters(agent: TypedAgent): Field[] {
     case "code": {
       // Code agents store their code in the parameters
       const existingParams = config.parameters as
-        | Array<{ identifier: string; type: string; value: unknown }>
+        | { identifier: string; type: string; value: unknown }[]
         | undefined;
       const codeParam = existingParams?.find((p) => p.identifier === "code");
       if (codeParam) {

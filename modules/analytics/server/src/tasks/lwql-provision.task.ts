@@ -99,7 +99,7 @@ async function planBackfillFromCurrentState({
     query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
     format: "JSONEachRow",
   });
-  const existingRows = (await existingResult.json()) as Array<Record<string, string>>;
+  const existingRows = (await existingResult.json()) as Record<string, string>[];
   // `noUncheckedIndexedAccess` types the lookup as `string | undefined` even
   // though every row genuinely carries this column (it is the only thing the
   // query selects) — filtered, not defaulted, so a row that somehow lacked it

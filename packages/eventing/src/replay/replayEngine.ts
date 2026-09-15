@@ -57,11 +57,11 @@ interface SelectedProjections {
   eventTypesByProjection: Map<string, Set<string>>;
   projectionByName: Map<string, RegisteredFoldProjection>;
   mapProjectionByName: Map<string, RegisteredMapProjection>;
-  allProjectionsToPause: Array<RegisteredFoldProjection | RegisteredMapProjection>;
-  pausedProjectionEntries: Array<{
+  allProjectionsToPause: (RegisteredFoldProjection | RegisteredMapProjection)[];
+  pausedProjectionEntries: {
     projectionName: string;
     kind: ProjectionKind;
-  }>;
+  }[];
 }
 
 /** Index the selected fold + map projections every phase needs to consult. */
@@ -497,7 +497,7 @@ export async function optimizeTouchedTables({
   log,
 }: {
   ctx: ReplayContext;
-  projections: Array<{ targetTable?: string }>;
+  projections: { targetTable?: string }[];
   touchedTenants: Set<string>;
   concurrency: number;
   log: ReplayLogWriter;
@@ -531,7 +531,7 @@ export async function optimizeTouchedTables({
 interface BatchGroups {
   projNames: string[];
   aggKeysByProjection: Map<string, string[]>;
-  byTenant: Map<string, Array<{ key: string; aggregateId: string; aggregateType: string }>>;
+  byTenant: Map<string, { key: string; aggregateId: string; aggregateType: string }[]>;
   batchAggregates: DiscoveredAggregate[];
 }
 

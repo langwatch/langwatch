@@ -14,7 +14,7 @@ type MutationOptions = {
 
 const { api, state } = vi.hoisted(() => {
   const state = {
-    roles: [] as Array<Record<string, unknown>>,
+    roles: [] as Record<string, unknown>[],
     rolesLoading: false,
     detail: null as Record<string, unknown> | null,
     detailError: null as unknown,

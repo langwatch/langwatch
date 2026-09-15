@@ -22,7 +22,7 @@ export type ClaimArbitration<T extends CredentialClaim> =
  * `undefined`) are kinds that inspected the request and abstained.
  */
 export function arbitrateClaims<T extends CredentialClaim>(
-  claims: ReadonlyArray<T | null | undefined>,
+  claims: readonly (T | null | undefined)[],
 ): ClaimArbitration<T> {
   const present = claims.filter((claim): claim is T => claim != null);
   const first = present[0];

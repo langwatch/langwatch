@@ -88,14 +88,14 @@ export type GetDatasetApiResponse = {
   createdAt?: string;
   updatedAt?: string;
   platformUrl?: string;
-  data: Array<{
+  data: {
     id: string;
     datasetId: string;
     projectId: string;
     entry: Record<string, unknown>;
     createdAt: string;
     updatedAt: string;
-  }>;
+  }[];
 };
 
 /**

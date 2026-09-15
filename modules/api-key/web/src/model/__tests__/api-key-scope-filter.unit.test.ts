@@ -33,7 +33,7 @@ const KEYS = [
   },
 ];
 
-const idsOf = (rows: Array<{ id: string }>) => rows.map((row) => row.id);
+const idsOf = (rows: { id: string }[]) => rows.map((row) => row.id);
 
 describe("given keys bound at every scope level", () => {
   describe('when the filter is "All you can see"', () => {

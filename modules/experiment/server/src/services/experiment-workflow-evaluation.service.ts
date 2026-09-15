@@ -141,7 +141,7 @@ export class WorkflowEvaluationService {
     projectSlug: string;
     workflowId: string;
     versionId?: string;
-    data?: Array<Record<string, unknown>>;
+    data?: Record<string, unknown>[];
     datasetId?: string;
     parameters?: WorkflowEvaluationParameters;
     rowIndices?: number[];

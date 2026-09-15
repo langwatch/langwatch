@@ -132,11 +132,11 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 
 // useChat — controllable surface for messages + sendMessage spy.
 const chatRef = {
-  messages: [] as Array<{
+  messages: [] as {
     id: string;
     role: string;
-    parts: Array<{ type: string; text: string }>;
-  }>,
+    parts: { type: string; text: string }[];
+  }[],
   sendMessage: vi.fn(),
   stop: vi.fn(),
   status: "ready" as "ready" | "submitted" | "streaming" | "error",
@@ -282,7 +282,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
       data:
         | {
             pages: Awaited<ReturnType<typeof resolveListPage>>[];
-            pageParams: Array<ListCursor | undefined>;
+            pageParams: (ListCursor | undefined)[];
           }
         | undefined;
       error: unknown;
@@ -576,7 +576,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 interface UIMessageLike {
   id: string;
   role: string;
-  parts?: Array<{ type: string; text?: string }>;
+  parts?: { type: string; text?: string }[];
 }
 
 /** Build a list row, taking an ISO date purely as an ordering key. */

@@ -66,7 +66,7 @@ const firstUnder = <T extends OrderableRow>(rows: T[], orderBy: OrderByClause[])
   return ordered[0] ?? null;
 };
 
-const dbHolding = (rows: Array<OrderableRow & { plan: string; status: string }>): PrismaClient =>
+const dbHolding = (rows: (OrderableRow & { plan: string; status: string })[]): PrismaClient =>
   ({
     subscription: {
       findFirst: vi.fn(async (query?: { orderBy?: OrderByClause[] }) =>

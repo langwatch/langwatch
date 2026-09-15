@@ -53,7 +53,7 @@ const describeError = (error: unknown): string =>
  * slot for — an image turn loaded from a trace — so it is left out rather than
  * stringified into the prompt.
  */
-function toWireHistory(messages: PlaygroundMessage[]): Array<{ role: string; content: string }> {
+function toWireHistory(messages: PlaygroundMessage[]): { role: string; content: string }[] {
   return messages
     .filter((message) => typeof message.content === "string")
     .map((message) => ({

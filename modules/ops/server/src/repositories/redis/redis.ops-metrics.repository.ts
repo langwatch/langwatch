@@ -26,7 +26,7 @@ const HOUR_BUCKETS = 168;
  */
 const KNOWN_PIPELINE_PATH_LIMIT = 9999;
 
-type PipelineResults = Array<[Error | null, unknown]>;
+type PipelineResults = [Error | null, unknown][];
 
 function hashAt(results: PipelineResults, index: number): Record<string, string> {
   return (results[index]?.[1] as Record<string, string>) ?? {};
@@ -63,9 +63,9 @@ export class RedisOpsMetricsRepository extends OpsMetricsRepository {
     }
 
     const results = ((await pipeline.exec()) ?? []) as PipelineResults;
-    const minute: Array<Record<string, string>> = [];
-    const hourByQueue: Array<Array<Record<string, string>>> = [];
-    const allTime: Array<Record<string, string>> = [];
+    const minute: Record<string, string>[] = [];
+    const hourByQueue: Record<string, string>[][] = [];
+    const allTime: Record<string, string>[] = [];
     const perQueue = MINUTE_BUCKETS + HOUR_BUCKETS + 1;
     for (let q = 0; q < queueNames.length; q++) {
       const base = q * perQueue;
@@ -73,7 +73,7 @@ export class RedisOpsMetricsRepository extends OpsMetricsRepository {
         minute.push(hashAt(results, base + i));
       }
 
-      const hours: Array<Record<string, string>> = [];
+      const hours: Record<string, string>[] = [];
       for (let i = 0; i < HOUR_BUCKETS; i++) {
         hours.push(hashAt(results, base + MINUTE_BUCKETS + i));
       }

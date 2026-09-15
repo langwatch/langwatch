@@ -357,7 +357,7 @@ class ModelProviderWorkflowLlmParameters implements WorkflowLlmParameters {
       projectId: input.projectId,
     });
 
-    return await Promise.all(
+    return Promise.all(
       input.models.map(async (model) => {
         const provider = model.split("/")[0]!;
         const modelProvider = providers[provider];
@@ -700,7 +700,7 @@ export class WorkflowApp implements WorkflowApi {
 
     if (previousDsl === nextDsl) return "no changes";
 
-    return await this.#members.commitMessages.generate({
+    return this.#members.commitMessages.generate({
       projectId: input.projectId,
       previousDsl,
       nextDsl,

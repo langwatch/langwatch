@@ -98,7 +98,7 @@ export interface WebhookEndpointRuntime {
     limit?: number;
     cursor?: { firedAt: Instant; id: string };
   }): Promise<{
-    deliveries: Array<{
+    deliveries: {
       id: string;
       dispatchId: string;
       attempt: number;
@@ -108,7 +108,7 @@ export interface WebhookEndpointRuntime {
       latencyMs: number | null;
       error: string | null;
       firedAt: Instant;
-    }>;
+    }[];
     nextCursor: { firedAt: Instant; id: string } | null;
   }>;
   health(input: {

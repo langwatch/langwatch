@@ -193,7 +193,7 @@ describe("the projects REST family over the application the composition builds",
       const response = await send("/api/projects");
 
       expect(response.status).toBe(200);
-      const body = (await response.json()) as { data: Array<{ id: string }> };
+      const body = (await response.json()) as { data: { id: string }[] };
       expect(body.data.map((row) => row.id)).toEqual(["project_1"]);
     });
   });

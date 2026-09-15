@@ -195,7 +195,7 @@ function attachData(overrides?: Record<string, unknown>) {
 }
 
 async function counterValue(counter: {
-  get: () => Promise<{ values: Array<{ value: number }> }>;
+  get: () => Promise<{ values: { value: number }[] }>;
 }): Promise<number> {
   const metric = await counter.get();
   return metric.values.reduce((sum, sample) => sum + sample.value, 0);

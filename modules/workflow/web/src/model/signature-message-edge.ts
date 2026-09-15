@@ -1,11 +1,11 @@
 type MessageParam = {
   identifier: string;
   type: string;
-  value: Array<{ role: string; content: string }> | string;
+  value: { role: string; content: string }[] | string;
 };
 
 type ComputeMessageEdgeUpdateParams = {
-  formMessages: Array<{ role: string; content?: string }>;
+  formMessages: { role: string; content?: string }[];
   nodeParameters: MessageParam[];
   formIndex: number;
   newContent: string;
@@ -14,7 +14,7 @@ type ComputeMessageEdgeUpdateParams = {
 type ComputeMessageEdgeUpdateResult = {
   parameterToUpdate: "instructions" | "messages";
   messagesIndex?: number;
-  newValue: string | Array<{ role: string; content: string }>;
+  newValue: string | { role: string; content: string }[];
 };
 
 /** The form includes its system message; DSL messages store it as instructions. */

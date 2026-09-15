@@ -214,11 +214,11 @@ export class GithubFeatureService implements GithubApi {
 
   findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
+    }[];
   }): Promise<readonly GithubPullRequest[]> {
     return this.mapping.findForBranches(input);
   }

@@ -254,7 +254,7 @@ export class OpsDashboardViewService {
   }
 
   /** The blocked groups' errors, clustered by normalized message, worst first. */
-  private static topErrorsOf(fullQueues: QueueInfo[]): Array<{
+  private static topErrorsOf(fullQueues: QueueInfo[]): {
     normalizedMessage: string;
     sampleMessage: string;
     sampleStack: string | null;
@@ -262,7 +262,7 @@ export class OpsDashboardViewService {
     pipelineName: string | null;
     queueName: string;
     sampleGroupIds: string[];
-  }> {
+  }[] {
     const errorMap = new Map<
       string,
       {

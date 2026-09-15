@@ -10,11 +10,11 @@ import { PersonalSidebarLinks } from "./PersonalSidebar.integration.test.tsx";
 
 type Org = {
   id: string;
-  teams: Array<{
+  teams: {
     isPersonal: boolean;
     ownerUserId: string | null;
-    projects: Array<{ id: string; slug: string }>;
-  }>;
+    projects: { id: string; slug: string }[];
+  }[];
 };
 
 const state: {

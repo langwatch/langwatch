@@ -70,7 +70,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
   }: {
     organizationId: string;
     ids: string[];
-  }): Promise<Array<{ id: string; name: string; displayPrefix: string }>> {
+  }): Promise<{ id: string; name: string; displayPrefix: string }[]> {
     if (ids.length === 0) return [];
 
     return this.client().virtualKey.findMany({
@@ -304,7 +304,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
   }: {
     routingPolicyId: string;
   }): Promise<{ organizationId: string } | null> {
-    return await this.prisma.routingPolicy.findUnique({
+    return this.prisma.routingPolicy.findUnique({
       where: { id: routingPolicyId },
       select: { organizationId: true },
     });
@@ -488,7 +488,7 @@ async function toVirtualKeyRecordOf<Row extends StoredKeyMoments>(
 /** A read that hands back many keys, mapped onto instants. */
 async function toVirtualKeyRecordsFrom<Row extends StoredKeyMoments>(
   query: PromiseLike<Row[]>,
-): Promise<Array<Omit<Row, keyof StoredKeyMoments> & KeyMoments>> {
+): Promise<(Omit<Row, keyof StoredKeyMoments> & KeyMoments)[]> {
   return (await query).map(toVirtualKeyRecord);
 }
 

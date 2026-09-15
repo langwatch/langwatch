@@ -378,7 +378,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       // is what decides this; the record only decides whether we can act yet.
       if (scenarioId) {
         if (!scenario) return null;
-        return await updateExisting({
+        return updateExisting({
           projectId,
           scenarioId: scenario.id,
           data,
@@ -386,7 +386,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
 
-      return await createScenario({ projectId, data, skipTransition, models });
+      return createScenario({ projectId, data, skipTransition, models });
     },
     [project?.id, scenarioId, scenario, updateExisting, createScenario],
   );

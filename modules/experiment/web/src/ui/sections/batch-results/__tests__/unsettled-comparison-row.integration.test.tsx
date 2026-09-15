@@ -242,7 +242,7 @@ describe("given a win-rate chart over decided and unsettled rows", () => {
 
     const chartData = JSON.parse(
       screen.getByTestId("bar-chart").getAttribute("data-chart") ?? "[]",
-    ) as Array<{ name: string; wins: number }>;
+    ) as { name: string; wins: number }[];
 
     const tieBar = chartData.find((entry) => entry.name === "Tie");
     expect(tieBar?.wins ?? 0).toBe(0);

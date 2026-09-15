@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const { mockState, mockDelete, mockRefetch } = vi.hoisted(() => ({
-  mockState: { costs: [] as Array<Record<string, unknown>> },
+  mockState: { costs: [] as Record<string, unknown>[] },
   mockDelete: vi.fn(),
   mockRefetch: vi.fn(),
 }));

@@ -356,7 +356,7 @@ function* documentedOperations(document: OpenApiDocument): Generator<{
  */
 function operationsOf(
   item: Record<string, unknown>,
-): Array<[string, { security?: unknown; "x-access-policy"?: AccessPolicyExtension }]> {
+): [string, { security?: unknown; "x-access-policy"?: AccessPolicyExtension }][] {
   return Object.entries(item).filter(
     (entry): entry is [string, { security?: unknown; "x-access-policy"?: AccessPolicyExtension }] =>
       isHttpMethod(entry[0]) && !!entry[1] && typeof entry[1] === "object",
@@ -405,8 +405,7 @@ function hoistEmbeddedJsonSchemaDefinitions(document: OpenApiDocument): OpenApiD
     components: {
       ...(document.components as Record<string, unknown> | undefined),
       schemas: {
-        ...((document.components as { schemas?: Record<string, unknown> } | undefined)?.schemas ??
-          {}),
+        ...(document.components as { schemas?: Record<string, unknown> } | undefined)?.schemas,
         ...schemas,
       },
     },

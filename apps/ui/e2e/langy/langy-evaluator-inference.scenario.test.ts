@@ -212,10 +212,10 @@ describe("Langy prompt optimization: choosing the evaluator from the data", () =
       const comparisons = [
         ...after.state.targets.map((target) => target.comparison),
         ...after.state.evaluators.map((evaluator) => evaluator.comparison),
-      ].filter(Boolean) as Array<{
+      ].filter(Boolean) as {
         variants: string[];
         hasGoldenAnswer?: boolean;
-      }>;
+      }[];
       const goldenFree = comparisons.find(
         (comparison) => comparison.variants.length >= 2 && comparison.hasGoldenAnswer === false,
       );

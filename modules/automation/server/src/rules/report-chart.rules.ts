@@ -26,7 +26,7 @@ export interface ReportGraphInput {
     | "donnut"
     | "summary"
     | "monitor_graph";
-  series?: Array<AnalyticsSeries & { name?: string }>;
+  series?: (AnalyticsSeries & { name?: string })[];
   groupBy?: string;
   timeScale?: "full" | number;
 }
@@ -115,7 +115,7 @@ export function pieSegments({
   seriesInputs: AnalyticsSeries[];
   names: ReportGraphInput["series"];
   groupBy?: string;
-}): Array<{ label: string; value: number }> {
+}): { label: string; value: number }[] {
   if (groupBy) {
     return extractGroupTotals(buckets, bucketKeys[0]!, groupBy).filter(
       (segment) => segment.value > 0,

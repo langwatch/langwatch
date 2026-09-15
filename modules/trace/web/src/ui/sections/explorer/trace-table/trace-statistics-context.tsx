@@ -41,7 +41,7 @@ function percentile(sorted: number[], p: number): number {
   return sorted[lo]! * (1 - frac) + sorted[hi]! * frac;
 }
 
-function positiveSorted(values: Array<number | null | undefined>): number[] {
+function positiveSorted(values: (number | null | undefined)[]): number[] {
   return values.filter((v): v is number => typeof v === "number" && v > 0).sort((a, b) => a - b);
 }
 

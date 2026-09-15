@@ -558,8 +558,8 @@ function deviceFlowWorld(
     /** Whether the identity read answers at all, for the release-on-failure path. */
     personExists: boolean;
     store: InMemoryDeviceSessionStore;
-    mintedKeys: Array<{ deviceLabel: string; userId: string }>;
-    revokedForLogout: Array<{ apiKeyId: string; userId: string }>;
+    mintedKeys: { deviceLabel: string; userId: string }[];
+    revokedForLogout: { apiKeyId: string; userId: string }[];
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,

@@ -76,12 +76,12 @@ class FixedLicenseUsage implements LicenseUsage {
 }
 
 class MemoryLicenseRetention implements LicenseRetention {
-  rules: Array<{ scopeType: string; scopeId: string; category: string }> = [];
-  readonly written: Array<{
+  rules: { scopeType: string; scopeId: string; category: string }[] = [];
+  readonly written: {
     organizationId: string;
     category: string;
     retentionDays: number;
-  }> = [];
+  }[] = [];
   failListing = false;
 
   async listOrganizationRules() {
@@ -99,7 +99,7 @@ class MemoryLicenseRetention implements LicenseRetention {
 }
 
 class RecordingLicenseLogger implements LicenseLogger {
-  readonly errors: Array<{ fields: Record<string, unknown>; message: string }> = [];
+  readonly errors: { fields: Record<string, unknown>; message: string }[] = [];
 
   error(fields: Record<string, unknown>, message: string): void {
     this.errors.push({ fields, message });

@@ -52,7 +52,7 @@ function makeService(failure: LedgerFailure) {
     findByIdInOrganization: vi.fn(async () => existing),
   } as unknown as ApiKeyRepository;
 
-  const grantCalls: Array<Record<string, unknown>> = [];
+  const grantCalls: Record<string, unknown>[] = [];
   const dependencies = {
     authz: {
       hasPermission: async () => true,

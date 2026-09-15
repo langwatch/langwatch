@@ -100,7 +100,7 @@ type BillingSourceRow = {
  */
 function prismaWithGovProject(
   id: string | null,
-  sources: Array<SourceRow | BillingSourceRow> = [],
+  sources: (SourceRow | BillingSourceRow)[] = [],
 ) {
   return {
     project: { findFirst: vi.fn().mockResolvedValue(id ? { id } : null) },

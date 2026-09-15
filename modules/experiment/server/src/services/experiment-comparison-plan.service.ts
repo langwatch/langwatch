@@ -63,7 +63,7 @@ export class ExperimentComparisonPlanService {
     skipReasons,
   }: {
     state: Pick<EvaluationsV3State, "targets" | "evaluators">;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     rowsInScope: number[];
     datasetId: string;
     completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
@@ -233,7 +233,7 @@ export class ExperimentComparisonPlanService {
     skipReasons,
   }: {
     state: Pick<EvaluationsV3State, "targets">;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     rowsInScope: number[];
     datasetId: string;
     completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
@@ -316,7 +316,7 @@ export class ExperimentComparisonPlanService {
     target: TargetConfig;
     cfg: ComparisonEvaluatorConfig;
     rowIndex: number;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     datasetId: string;
     variantIds: string[];
     variantDisplayNames: string[];
@@ -382,7 +382,7 @@ export class ExperimentComparisonPlanService {
     scopedRowIndices,
   }: {
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
     completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
     /** Rows this run is scoped to; omit to mean every row. Required, not defaulted. */

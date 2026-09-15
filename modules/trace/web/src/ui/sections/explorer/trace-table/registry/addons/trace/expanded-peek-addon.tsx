@@ -151,7 +151,7 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
 // (indent cycles, label widths vary) so a low-spanCount trace doesn't
 // land on a row of identical-width bars. The list is sampled by index
 // modulo length when scaled up, keeping the visual rhythm.
-const PEEK_SKELETON_SHAPES: ReadonlyArray<{ indent: number; name: string }> = [
+const PEEK_SKELETON_SHAPES: readonly { indent: number; name: string }[] = [
   { indent: 0, name: "62%" },
   { indent: 1, name: "48%" },
   { indent: 2, name: "55%" },

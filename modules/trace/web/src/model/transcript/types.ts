@@ -18,12 +18,12 @@ export type MediaPartData =
 
 export interface ChatMessage {
   role: string;
-  content: string | null | Array<Record<string, unknown> | string>;
-  tool_calls?: Array<{
+  content: string | null | (Record<string, unknown> | string)[];
+  tool_calls?: {
     function: { name: string; arguments: string };
     id: string;
     type: string;
-  }>;
+  }[];
   // OpenAI o-series reasoning models surface chain-of-thought here. Anthropic
   // uses `thinking`. Treat both as the same "reasoning" concept.
   reasoning_content?: string | null;

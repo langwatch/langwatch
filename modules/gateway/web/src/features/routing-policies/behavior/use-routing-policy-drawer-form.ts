@@ -122,13 +122,13 @@ function useProviderOptions({
   selectedIds,
 }: {
   providers:
-    | Array<{
+    | {
         id?: string | null;
         name?: string | null;
         provider: string;
         disabledAt?: Instant | string | null;
         healthStatus?: string | null;
-      }>
+      }[]
     | undefined;
   selectedIds: string[];
 }) {

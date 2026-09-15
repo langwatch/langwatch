@@ -791,7 +791,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * logs each failure individually. Avoids paying one serial PG round trip
    * per payload/sibling inside the worker slot on large coalesced batches.
    */
-  private async runAuditAll(ops: Array<() => Promise<unknown> | undefined>): Promise<void> {
+  private async runAuditAll(ops: (() => Promise<unknown> | undefined)[]): Promise<void> {
     if (!this.auditAdapter || ops.length === 0) return;
     const results = await Promise.allSettled(ops.map((op) => Promise.resolve(op())));
     for (const result of results) {

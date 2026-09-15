@@ -16,7 +16,7 @@ export class LangyResourceLinksRedisRepository implements LangyResourceLinksRepo
 
   async remember(input: {
     conversationId: string;
-    links: Array<{ id: string; href: string }>;
+    links: { id: string; href: string }[];
   }): Promise<void> {
     if (input.links.length === 0) return;
     const key = `langy:navlink:${input.conversationId}`;

@@ -113,7 +113,7 @@ describe("the options a permission ask offers", () => {
     });
   });
 
-  const limits: Array<[number, string]> = [
+  const limits: [number, string][] = [
     [30, "Stops after 30 seconds if it has not finished."],
     [60, "Stops after 1 minute if it has not finished."],
     [300, "Stops after 5 minutes if it has not finished."],
@@ -198,7 +198,7 @@ describe("the box the selector draws", () => {
       );
     });
 
-    const sentences: Array<[string, string[], string | null]> = [
+    const sentences: [string, string[], string | null][] = [
       [
         "one pattern",
         [".venv/bin/python -c"],
@@ -320,7 +320,7 @@ describe("given a permission selector open in the terminal", () => {
   });
 
   describe("when a digit is pressed", () => {
-    const digits: Array<[string, "allow_pattern" | "allow_once" | "deny"]> = [
+    const digits: [string, "allow_pattern" | "allow_once" | "deny"][] = [
       ["1", "allow_pattern"],
       ["2", "allow_once"],
       ["3", "deny"],
@@ -441,7 +441,7 @@ describe("createTerminalApprovals", () => {
 });
 
 describe("the card a file call produces", () => {
-  const titles: Array<[LocalCall["tool"], string]> = [
+  const titles: [LocalCall["tool"], string][] = [
     ["local_bash", "Langy wants to run in acme"],
     ["local_edit", "Langy wants to change a file in acme"],
     ["local_read", "Langy wants to read a file in acme"],

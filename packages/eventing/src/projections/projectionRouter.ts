@@ -737,7 +737,7 @@ export class ProjectionRouter<
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "ProjectionRouter.dispatch",
       {
         kind: SpanKind.INTERNAL,

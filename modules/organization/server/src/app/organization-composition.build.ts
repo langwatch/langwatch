@@ -1,5 +1,5 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
 import {
@@ -14,8 +14,9 @@ import {
 } from "@langwatch/enterprise-plan-gate";
 import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-client/generated";
+import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -92,7 +93,7 @@ class EntitlementOrganizationSeatLicense {
     currentRole: string;
     userPermissions: string[] | undefined;
     role: string;
-    teamRoleUpdates?: ReadonlyArray<{ role: string; customRoleId?: string }> | undefined;
+    teamRoleUpdates?: readonly { role: string; customRoleId?: string }[] | undefined;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
     const plan = await this.activePlan(input.organizationId, input.user);
@@ -216,7 +217,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     throttle: InviteSendThrottleService;
     baseHost: string;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
-    prisma: PrismaClient;
+    userDirectory: PrismaOrganizationUserDirectoryRepository;
     logger: Pick<Logger, "warn">;
   }): InviteServiceOrganizationInvitations {
     return new InviteServiceOrganizationInvitations(options);
@@ -229,7 +230,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
       throttle: InviteSendThrottleService;
       baseHost: string;
       identity: Pick<IdentityApi, "verifiedEmailsOf">;
-      prisma: PrismaClient;
+      userDirectory: PrismaOrganizationUserDirectoryRepository;
       logger: Pick<Logger, "warn">;
     },
   ) {}
@@ -337,12 +338,8 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     );
   }
 
-  async findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
-    const user = await this.options.prisma.user.findUnique({
-      where: { email: input.email },
-      select: { id: true },
-    });
-    return user?.id ?? null;
+  findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
+    return this.options.userDirectory.findUserIdByEmail(input);
   }
 }
 
@@ -474,25 +471,17 @@ function organizationCeremony(options: { projects: ProjectApi }): OrganizationCe
  */
 function organizationDirectory(options: {
   identity: Pick<IdentityApi, "verifiedEmailsOf">;
-  prisma: PrismaClient;
+  userDirectory: PrismaOrganizationUserDirectoryRepository;
 }): OrganizationDirectory {
   return {
     findVerifiedEmail: async ({ userId }) => {
       const verified = await options.identity.verifiedEmailsOf({ userId });
       if (verified !== null) return verified[0]?.value ?? null;
-      const row = await options.prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true, emailVerified: true },
-      });
-      return row?.emailVerified ? (row.email ?? null) : null;
+      return options.userDirectory.findLegacyVerifiedEmail(userId);
     },
     // Names only: the local part of a requester's address is not the
     // organization's business until they are a member of it.
-    listUserNames: ({ userIds }) =>
-      options.prisma.user.findMany({
-        where: { id: { in: [...userIds] } },
-        select: { id: true, name: true },
-      }),
+    listUserNames: ({ userIds }) => options.userDirectory.listUserNames(userIds),
   };
 }
 
@@ -502,7 +491,7 @@ function organizationDirectory(options: {
  * stay uncomposed — their absence is supported: invitations still write and carry an accept URL.
  */
 function organizationInvitations(input: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   logger: Logger;
   baseHost: string;
@@ -531,14 +520,14 @@ function organizationInvitations(input: {
     throttle,
     baseHost: input.baseHost,
     identity: input.identity,
-    prisma: input.prisma,
+    userDirectory: PrismaOrganizationUserDirectoryRepository.create(input.prisma),
     logger: input.logger,
   });
 }
 
 /** What this process hands `ServerOrganizationApp` at boot. */
 export function buildOrganizationInfrastructure(input: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   encryption: { encrypt(value: string): string; decrypt(value: string): string };
   logger: Logger;
   redis: RedisConnection;
@@ -583,7 +572,10 @@ export function buildOrganizationInfrastructure(input: {
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals: organizationSignals(logger),
     ceremony: organizationCeremony({ projects: dependencies.projects }),
-    directory: organizationDirectory({ identity: dependencies.identity, prisma }),
+    directory: organizationDirectory({
+      identity: dependencies.identity,
+      userDirectory: PrismaOrganizationUserDirectoryRepository.create(prisma),
+    }),
     demoProject: config.demoProject,
   };
 }

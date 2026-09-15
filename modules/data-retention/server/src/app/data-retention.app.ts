@@ -59,13 +59,13 @@ export type RetentionProjectLineage = Readonly<{
 
 /** One organization's scope targets, as the settings page lists them. */
 export type RetentionOrganizationDirectory = Readonly<{
-  teams: ReadonlyArray<{ id: string; name: string }>;
+  teams: readonly { id: string; name: string }[];
   /**
    * Archived projects stay in the list so an existing rule that targets one
    * still resolves a NAME; the picker drops them, which is a filter the
    * snapshot applies rather than one this read makes.
    */
-  projects: ReadonlyArray<{ id: string; name: string; teamId: string; archived: boolean }>;
+  projects: readonly { id: string; name: string; teamId: string; archived: boolean }[];
 }>;
 
 /**
@@ -96,7 +96,7 @@ export interface DataRetentionDirectoryReader {
   listScopeProjects(input: {
     organizationId: string;
     scope: ScopeAssignment;
-  }): Promise<ReadonlyArray<{ id: string; teamId: string }>>;
+  }): Promise<readonly { id: string; teamId: string }[]>;
 }
 
 export type DataRetentionInfrastructure = Readonly<{

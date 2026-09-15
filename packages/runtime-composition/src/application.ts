@@ -621,7 +621,7 @@ function declaredTransportsOf(
 function dependenciesFor(
   declaration: DeclaredFeature,
   role: ServerRole,
-): ReadonlyArray<readonly [string, TokenIdentity]> {
+): readonly (readonly [string, TokenIdentity])[] {
   const always = Object.entries(declaration.dependencies);
   const transport = role === "api" ? Object.entries(declaration.transportDependencies) : [];
   return [...always, ...transport];

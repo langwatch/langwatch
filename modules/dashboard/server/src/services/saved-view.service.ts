@@ -61,7 +61,7 @@ export class SavedViewService {
       }
     }
 
-    return await this.#repository.findAll({ projectId, userId, kind });
+    return this.#repository.findAll({ projectId, userId, kind });
   }
 
   /**
@@ -89,7 +89,7 @@ export class SavedViewService {
     const lastView = await this.#repository.findLast({ projectId, kind: input.kind });
     const newOrder = (lastView?.order ?? -1) + 1;
 
-    return await this.#repository.create({
+    return this.#repository.create({
       id: input.id ?? generate(SAVED_VIEW_KSUID_RESOURCE).toString(),
       projectId,
       userId: input.userId,
@@ -114,7 +114,7 @@ export class SavedViewService {
   }): Promise<SavedViewRecord> {
     await this.#reachable({ projectId, viewId, userId });
 
-    return await this.#repository.delete({ id: viewId, projectId });
+    return this.#repository.delete({ id: viewId, projectId });
   }
 
   /** Renames a view, under the same ownership rule. */
@@ -131,7 +131,7 @@ export class SavedViewService {
   }): Promise<SavedViewRecord> {
     await this.#reachable({ projectId, viewId, userId });
 
-    return await this.#repository.update({ id: viewId, projectId, data: { name } });
+    return this.#repository.update({ id: viewId, projectId, data: { name } });
   }
 
   /**

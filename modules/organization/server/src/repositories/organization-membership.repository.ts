@@ -226,12 +226,12 @@ export interface UpdateMemberRoleInput {
   organizationId: string;
   userId: string;
   role: OrganizationUserRole;
-  effectiveTeamRoleUpdates: Array<{
+  effectiveTeamRoleUpdates: {
     teamId: string;
     role: string;
     customRoleId?: string;
     origin: TeamRoleUpdateOrigin;
-  }>;
+  }[];
   /**
    * Null when the actor is a service credential rather than a person. Only
    * self-comparisons read this, and a service credential is never the target
@@ -244,7 +244,7 @@ export interface UpdateMemberRoleInput {
  * What the seat change did that the admin who made it would not otherwise see.
  */
 export interface UpdateMemberRoleResult {
-  teamsLeftWithoutAdmin: Array<{ id: string; name: string }>;
+  teamsLeftWithoutAdmin: { id: string; name: string }[];
 }
 
 /**
@@ -352,7 +352,7 @@ export abstract class OrganizationMembershipRepository {
    * PROJECT scopes resolve to the same private space.
    */
   abstract tryFindPersonalTeamInScopes(params: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null>;
 
   /**
@@ -366,7 +366,7 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string;
     userId: string;
     teamIds: string[];
-  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>>;
+  }): Promise<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }[]>;
 
   /**
    * The stored `permissions` value of each named custom role. A Json column,

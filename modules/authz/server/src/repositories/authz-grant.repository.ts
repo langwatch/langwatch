@@ -110,9 +110,9 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
   abstract findOwnedApiKeys(args: {
     userId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>>;
+  }): Promise<{ id: string; name: string }[]>;
   abstract findPersonalTeams(args: {
     userId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string; name: string }>>;
+  }): Promise<{ id: string; name: string }[]>;
 }

@@ -53,7 +53,7 @@ function request(overrides: Partial<WebhookDispatchRequest> = {}): WebhookDispat
 
 /** A fake queue client that records what it was asked to send. */
 function fakeQueue(behavior?: { rejectWith?: unknown }) {
-  const sent: Array<Record<string, unknown>> = [];
+  const sent: Record<string, unknown>[] = [];
   const client = {
     send: vi.fn(async (command: { input: Record<string, unknown> }) => {
       if (behavior?.rejectWith) throw behavior.rejectWith;

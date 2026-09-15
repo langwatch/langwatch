@@ -74,7 +74,7 @@ export class EventingClickHouseEventStore<
     attributes: Record<string, string | number>,
     fn: () => Promise<T>,
   ): Promise<T> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       name,
       { kind: SpanKind.INTERNAL, attributes },
       async () => fn(),

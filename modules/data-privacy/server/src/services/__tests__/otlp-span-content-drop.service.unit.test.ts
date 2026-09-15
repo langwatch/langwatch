@@ -29,7 +29,7 @@ function resolverOf(
 
 function policy(
   categories: Partial<Record<ContentCategory, Disposition>> = {},
-  rules: Array<{ pattern: string; disposition: "drop" | "restrict" }> = [],
+  rules: { pattern: string; disposition: "drop" | "restrict" }[] = [],
 ): ResolvedDataPrivacy {
   const customAttributes: ResolvedDataPrivacy["customAttributes"] = rules.map((rule) => ({
     ...rule,
@@ -50,8 +50,8 @@ function policy(
 }
 
 function span(
-  attributes: Array<{ key: string; value: { stringValue?: string } }>,
-  events: Array<{ attributes: Array<{ key: string; value: { stringValue?: string } }> }> = [],
+  attributes: { key: string; value: { stringValue?: string } }[],
+  events: { attributes: { key: string; value: { stringValue?: string } }[] }[] = [],
 ): OtlpSpan {
   return {
     traceId: "trace-1",

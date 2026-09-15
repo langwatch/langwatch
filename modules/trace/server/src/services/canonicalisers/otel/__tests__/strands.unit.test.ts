@@ -12,7 +12,7 @@ import { createExtractorContext } from "../../__tests__/test-helpers.ts";
  */
 function createStrandsContext(
   attrs: Record<string, unknown>,
-  events: Array<{ name: string; attributes: Record<string, unknown> }>,
+  events: { name: string; attributes: Record<string, unknown> }[],
   spanOverrides?: Partial<ExtractorContext["span"]>,
 ): ExtractorContext {
   const normalizedEvents = events.map((e) => ({
@@ -227,7 +227,7 @@ describe("StrandsCanonicaliserService", () => {
 
       extractor.apply(ctx);
 
-      const [message] = ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] as Array<{ role: string }>;
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] as { role: string }[];
       expect(message?.role).toBe("customrole");
     });
   });
@@ -251,7 +251,7 @@ describe("StrandsCanonicaliserService", () => {
 
       extractor.apply(ctx);
 
-      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{ content: unknown }>;
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as { content: unknown }[];
       expect(message?.content).toBe(expected);
     });
 
@@ -265,7 +265,7 @@ describe("StrandsCanonicaliserService", () => {
 
       extractor.apply(ctx);
 
-      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as Array<{ content: unknown }>;
+      const [message] = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as { content: unknown }[];
       expect(message?.content).toBe("preferred");
     });
   });

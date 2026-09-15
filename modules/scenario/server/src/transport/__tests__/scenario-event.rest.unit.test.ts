@@ -194,7 +194,7 @@ describe("the scenario-events REST declaration", () => {
     it("limits archive deletion concurrency to eight runs", async () => {
       let active = 0;
       let maximumActive = 0;
-      const pending: Array<() => void> = [];
+      const pending: (() => void)[] = [];
       const deleteRun = vi.fn(
         () =>
           new Promise<void>((resolve) => {
@@ -404,7 +404,7 @@ describe("the scenario-events REST declaration", () => {
   });
 });
 
-function releasePending(pending: Array<() => void>): void {
+function releasePending(pending: (() => void)[]): void {
   const releases = pending.splice(0);
   for (const release of releases) release();
 }

@@ -218,7 +218,7 @@ describe("given the fold-time cost estimate over the platform's model catalog", 
 describe("given the lean projection payload transform", () => {
   const overBudget = "x".repeat(IO_PREVIEW_BYTES + 1024);
 
-  function spanReceivedEvent(attributes: Array<{ key: string; value: { stringValue: string } }>) {
+  function spanReceivedEvent(attributes: { key: string; value: { stringValue: string } }[]) {
     return {
       id: "evt_1",
       type: "lw.obs.trace.span_received",
@@ -253,7 +253,7 @@ describe("given the lean projection payload transform", () => {
       ]);
 
       const leaned = TraceProjectionLeanService.leanForProjection(event) as unknown as {
-        data: { span: { attributes: Array<{ key: string; value: { stringValue: string } }> } };
+        data: { span: { attributes: { key: string; value: { stringValue: string } }[] } };
       };
       const attrs = Object.fromEntries(
         leaned.data.span.attributes.map((a) => [a.key, a.value.stringValue]),
@@ -278,7 +278,7 @@ describe("given the lean projection payload transform", () => {
       TraceProjectionLeanService.leanForProjection(event);
 
       const original = event as unknown as {
-        data: { span: { attributes: Array<{ value: { stringValue: string } }> } };
+        data: { span: { attributes: { value: { stringValue: string } }[] } };
       };
       expect(original.data.span.attributes[0]!.value.stringValue).toBe(overBudget);
       expect(original.data.span.attributes).toHaveLength(1);

@@ -73,10 +73,10 @@ export type GatewayVirtualKeySnakeDto = {
   trace_project_archived: boolean;
   external_id: string | null;
   metadata: Record<string, string>;
-  scopes: Array<{
+  scopes: {
     scope_type: "organization" | "team" | "project";
     scope_id: string;
-  }>;
+  }[];
   routing_policy_id: string | null;
   routing_mode: "none" | "fallback_all" | "policy";
   config: unknown;
@@ -215,7 +215,7 @@ export interface GatewayApi {
   listBudgetsWithHealth(organizationId: string): Promise<GatewayBudgetListWithHealth>;
   listProjectBudgetsWithHealth(projectId: string): Promise<GatewayBudgetListWithHealth>;
   listBudgetScopeTargets(
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
   findBudgetDetail(input: {
@@ -246,9 +246,9 @@ export interface GatewayApi {
   }): Promise<GatewayBudgetScopeReachResult>;
   /** Provider row id to its display label, for a whole page in one read. */
   resolveProviderLabels(
-    budgets: ReadonlyArray<{ providerKey: string | null }>,
+    budgets: readonly { providerKey: string | null }[],
   ): Promise<Map<string, string>>;
-  listGroupTargets(organizationId: string): Promise<ReadonlyArray<GatewayGroupTarget>>;
+  listGroupTargets(organizationId: string): Promise<readonly GatewayGroupTarget[]>;
   /** Member count per-GROUP allowance covers, batched over a page. */
   groupMemberCounts(
     budgets: readonly { scopeType: string; scopeId: string }[],

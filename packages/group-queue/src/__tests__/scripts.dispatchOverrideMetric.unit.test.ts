@@ -33,7 +33,7 @@ async function overrideCount(): Promise<number> {
 }
 
 async function dispatch(scripts: GroupStagingScripts) {
-  return await scripts.dispatchBatch({
+  return scripts.dispatchBatch({
     nowMs: 1000,
     activeTtlSec: 30,
     maxJobs: 10,

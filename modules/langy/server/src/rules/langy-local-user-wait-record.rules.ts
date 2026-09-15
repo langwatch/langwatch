@@ -80,7 +80,7 @@ export type UserWaitBuffer = Pick<
 export interface UserWaitQuestion {
   question: string;
   header?: string;
-  options: Array<{ label: string; description?: string }>;
+  options: { label: string; description?: string }[];
   multiple?: boolean;
   allowOther?: boolean;
 }
@@ -132,11 +132,11 @@ export function toPollResponse(wait: StoredUserWait): PollWaitResponse {
     state: wait.state,
     ...(wait.answers !== undefined
       ? {
-          answers: wait.answers as Array<{
+          answers: wait.answers as {
             question: string;
             selected: string[];
             other?: string;
-          }>,
+          }[],
         }
       : {}),
   };

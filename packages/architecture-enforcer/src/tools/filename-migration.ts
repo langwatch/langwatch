@@ -194,7 +194,7 @@ function replaceModuleSpecifiers(
   mappings: Map<string, string>,
 ): string {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  const replacements: { start: number; end: number; text: string }[] = [];
 
   for (const literal of moduleSpecifierNodes(sourceFile)) {
     const target = relativeModuleTarget(file, literal.text);
@@ -224,7 +224,7 @@ function replaceModuleSpecifiers(
 
 function applyReplacements(
   source: string,
-  replacements: Array<{ start: number; end: number; text: string }>,
+  replacements: { start: number; end: number; text: string }[],
 ): string {
   return replacements
     .sort((left, right) => right.start - left.start)
@@ -235,7 +235,7 @@ function applyReplacements(
 
 function replaceJsonPaths(file: string, source: string, mappings: FilenameRename[]): string {
   const sourceFile = ts.parseJsonText(file, source);
-  const replacements: Array<{ start: number; end: number; text: string }> = [];
+  const replacements: { start: number; end: number; text: string }[] = [];
   const pathMap = new Map<string, string>();
 
   for (const mapping of mappings) {

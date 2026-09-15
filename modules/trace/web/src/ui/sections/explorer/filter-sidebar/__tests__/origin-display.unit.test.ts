@@ -6,7 +6,7 @@ import { facetLabel, paletteFromColor } from "../utils.ts";
 import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells.tsx";
 import type { TraceListItem } from "../../types/trace.ts";
 
-const knownOrigins = Object.keys(ORIGIN_DISPLAY) as Array<keyof typeof ORIGIN_DISPLAY>;
+const knownOrigins = Object.keys(ORIGIN_DISPLAY) as (keyof typeof ORIGIN_DISPLAY)[];
 
 function renderOriginBadge(origin: string): ReactElement<{
   children: React.ReactNode;

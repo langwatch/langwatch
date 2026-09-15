@@ -27,9 +27,7 @@ interface Recorded {
 /** Collects every value written through it, in order. */
 function createRecordingMeterProvider() {
   const recorded: Recorded[] = [];
-  const observableCallbacks: Array<
-    (result: { observe: (v: number, a?: Attributes) => void }) => unknown
-  > = [];
+  const observableCallbacks: ((result: { observe: (v: number, a?: Attributes) => void }) => unknown)[] = [];
 
   const write = (instrument: string) => ({
     add: (value: number, attributes?: Attributes) => {

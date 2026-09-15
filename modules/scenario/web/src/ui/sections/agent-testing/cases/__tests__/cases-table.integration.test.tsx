@@ -261,7 +261,7 @@ function setRecentRuns(runs: ScenarioRunData[], scenarioSetIds: Record<string, s
 
 async function openRecentRuns(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("recent-runs-trigger"));
-  return await screen.findByTestId("recent-runs-list");
+  return screen.findByTestId("recent-runs-list");
 }
 
 /** The pieces of text one row of the recent runs list is made of. */

@@ -12,7 +12,7 @@ export const METRIC_KIND_DATA_KEY: Record<MetricKind, string> = {
   summary: "summary",
 };
 
-const KINDS_BY_DATA_KEY: Array<[string, MetricKind]> = Object.entries(METRIC_KIND_DATA_KEY).map(
+const KINDS_BY_DATA_KEY: [string, MetricKind][] = Object.entries(METRIC_KIND_DATA_KEY).map(
   ([kind, key]) => [key, kind as MetricKind],
 );
 
@@ -22,11 +22,17 @@ function metricKind(metric: UnknownRecord): MetricKind | null {
   return present.length === 1 ? present[0]![1] : null;
 }
 
+function hasDataPointsArray(
+  container: unknown,
+): container is UnknownRecord & { dataPoints: unknown[] } {
+  return isRecord(container) && Array.isArray(container.dataPoints);
+}
+
 /** Best-effort count of points an unusable metric would have contributed. */
 function candidatePointCount(metric: UnknownRecord): number {
   const count = KINDS_BY_DATA_KEY.reduce<number>((total, [key]) => {
     const container = metric[key];
-    if (!isRecord(container) || !Array.isArray(container.dataPoints)) {
+    if (!hasDataPointsArray(container)) {
       return total;
     }
     return total + container.dataPoints.length;

@@ -28,7 +28,7 @@ const buildRun = ({
   scoresByRow,
 }: {
   runIndex: number;
-  rowMetadata: Array<Record<string, string>>;
+  rowMetadata: Record<string, string>[];
   scoresByRow: number[];
 }): ComparisonRunData => {
   const runId = `run-${runIndex + 1}`;
@@ -259,7 +259,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
   });
 
   describe("given rows whose city is missing on some entries", () => {
-    const PARTIAL_ROWS: Array<Record<string, string>> = [
+    const PARTIAL_ROWS: Record<string, string>[] = [
       { city: "Berlin", difficulty: "easy" },
       { difficulty: "easy" }, // city missing
       { city: "Lisbon", difficulty: "hard" },

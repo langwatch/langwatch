@@ -20,11 +20,11 @@ import { openPlatformDrawer } from "../../behavior/model-provider-open-platform-
 type OrganizationGraphEntry = {
   id: string;
   name: string;
-  teams: Array<{
+  teams: {
     id: string;
     name: string;
-    projects: Array<{ id: string; name: string; slug: string }>;
-  }>;
+    projects: { id: string; name: string; slug: string }[];
+  }[];
 };
 
 export function ModelProviderHost({ children }: { children: ReactNode }) {

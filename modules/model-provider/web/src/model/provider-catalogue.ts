@@ -53,7 +53,7 @@ export function addableProviders(): AddableProvider[] {
 /** A configured provider row, as narrow as the ordering below needs it. */
 type OrderableProviderRow = {
   name: string;
-  scopes?: Array<{ scopeType: string }>;
+  scopes?: { scopeType: string }[];
   scopeType?: string;
 };
 

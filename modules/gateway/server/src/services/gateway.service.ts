@@ -235,7 +235,7 @@ export class GatewayService {
   }
 
   async resolveScopeTargets(
-    budgets: Array<{ scopeType: string; scopeId: string }>,
+    budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>> {
     const projectIds = budgets

@@ -95,11 +95,11 @@ export const WEBHOOK_FEATURE_LABEL = "Gateway webhooks for metering and rebillin
  * keeps describing the same capability, and nothing has to match prose to know
  * which capability a plan is missing.
  */
-const ENTERPRISE_PLAN_FEATURE_ENTRIES: ReadonlyArray<{
+const ENTERPRISE_PLAN_FEATURE_ENTRIES: readonly {
   label: string;
   /** The plan field that decides this bullet, when one does. */
   entitlement?: keyof Pick<PlanInfo, "webhookEndpointsEnabled">;
-}> = [
+}[] = [
   { label: "Alternative hosting options" },
   { label: "Custom data retention" },
   { label: "Custom SSO / RBAC" },

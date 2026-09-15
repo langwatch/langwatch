@@ -13,7 +13,7 @@ export type Semaphore = {
  */
 export const createSemaphore = (concurrency: number): Semaphore => {
   let available = concurrency;
-  const queue: Array<() => void> = [];
+  const queue: (() => void)[] = [];
 
   const acquire = (): Promise<void> => {
     return new Promise((resolve) => {

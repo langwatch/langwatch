@@ -35,10 +35,10 @@ export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState>
   }
 
   async storeBatch(
-    entries: Array<{
+    entries: {
       state: GatewaySpendState;
       context: ProjectionStoreContext;
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
     await this.repo.upsertFromFold(

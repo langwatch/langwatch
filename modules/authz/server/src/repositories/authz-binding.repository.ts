@@ -56,16 +56,16 @@ export abstract class AuthzBindingRepository {
 
   abstract findScopeRows(input: {
     organizationId: string;
-    scopes: ReadonlyArray<{
+    scopes: readonly {
       scopeType: RoleBindingScopeType;
       scopeId: string;
-    }>;
+    }[];
   }): Promise<AuthzBindingScopeRow[]>;
 
   abstract findGroupMembers(input: {
     organizationId: string;
     groupIds: readonly string[];
-  }): Promise<Array<{ groupId: string; userId: string }>>;
+  }): Promise<{ groupId: string; userId: string }[]>;
 
   abstract findUserGroups(input: {
     organizationId: string;

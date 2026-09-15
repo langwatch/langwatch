@@ -48,7 +48,7 @@ describe("given an admin on the Inventory page", () => {
       await userEvent.click(
         screen.getAllByRole("button", { name: /Add environment/ })[0]!,
       );
-      return await screen.findByRole("dialog");
+      return screen.findByRole("dialog");
     }
 
     /** @scenario "The add dialog asks for a name and a description" */

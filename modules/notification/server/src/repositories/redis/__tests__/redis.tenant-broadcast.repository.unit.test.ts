@@ -10,7 +10,7 @@ import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.reposi
  * Expectations are literals to verify compatibility with subscriber processes.
  */
 class RecordingPublisher extends TenantBroadcastPublisher {
-  readonly published: Array<{ channel: string; message: string }> = [];
+  readonly published: { channel: string; message: string }[] = [];
 
   async publish(channel: string, message: string): Promise<number> {
     this.published.push({ channel, message });
@@ -111,7 +111,7 @@ describe("RedisTenantBroadcastAdapter", () => {
   describe("given a tenant broadcast publisher whose connection refuses", () => {
     /** @scenario "A publish that fails does not fail the work that caused it" */
     it("reports the silence without repeating the tenant's payload", async () => {
-      const logged: Array<[Record<string, unknown>, string]> = [];
+      const logged: [Record<string, unknown>, string][] = [];
       const logger = {
         error: (fields: Record<string, unknown>, message: string) => {
           logged.push([fields, message]);

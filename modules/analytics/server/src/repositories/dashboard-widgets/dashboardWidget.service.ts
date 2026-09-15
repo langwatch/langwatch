@@ -176,7 +176,7 @@ export class DashboardWidgetService {
         select: { gridRow: true, rowSpan: true },
       });
 
-      return await tx.customGraph.create({
+      return tx.customGraph.create({
         data: {
           id: nanoid(),
           projectId,

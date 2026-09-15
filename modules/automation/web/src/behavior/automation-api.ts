@@ -31,7 +31,7 @@ export type AutomationRow = {
   createdAt: string;
   updatedAt: string;
   lastRunAt: string | null;
-  checks?: Array<Monitor | undefined>;
+  checks?: (Monitor | undefined)[];
   customGraph?: { id: string; name: string } | null;
 };
 
@@ -103,7 +103,7 @@ type BorrowedProcedures = {
       query: {
         input: { slug: string; organizationId: string };
         output: {
-          members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+          members: { user: { id: string; name: string | null; email: string | null } }[];
         } | null;
       };
     };
@@ -113,7 +113,7 @@ type BorrowedProcedures = {
     getQueues: {
       query: {
         input: ProjectScope;
-        output: Array<{ id: string; name: string }>;
+        output: { id: string; name: string }[];
       };
     };
   };
@@ -122,17 +122,17 @@ type BorrowedProcedures = {
     getAll: {
       query: {
         input: { isDemo?: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           slug: string;
-          teams: Array<{
+          teams: {
             id: string;
             name: string;
             slug: string;
-            projects: Array<{ id: string; name: string; slug: string }>;
-          }>;
-        }>;
+            projects: { id: string; name: string; slug: string }[];
+          }[];
+        }[];
       };
     };
 
@@ -140,7 +140,7 @@ type BorrowedProcedures = {
       query: {
         input: { organizationId: string };
         output: {
-          members: Array<{ user: { id: string; name: string | null } }>;
+          members: { user: { id: string; name: string | null } }[];
         } | null;
       };
     };

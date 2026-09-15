@@ -65,8 +65,8 @@ export function ProviderScopeSection({
   organizationName?: string;
   projectId?: string;
   projectName?: string;
-  availableTeams?: Array<{ id: string; name: string }>;
-  availableProjects?: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams?: { id: string; name: string }[];
+  availableProjects?: { id: string; name: string; teamId?: string }[];
 }) {
   const isExisting = Boolean(provider.id);
   const hasOrgOrTeam = Boolean(organizationId ?? teamId);

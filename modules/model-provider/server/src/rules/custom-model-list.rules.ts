@@ -4,7 +4,7 @@
 export function toCanonicalCustomModelList(
   value: unknown,
   type: "chat" | "embedding",
-): Array<{ id: string; label: string; type: "chat" | "embedding" }> | undefined {
+): { id: string; label: string; type: "chat" | "embedding" }[] | undefined {
   if (!Array.isArray(value)) return undefined;
 
   return value.flatMap((model) => {

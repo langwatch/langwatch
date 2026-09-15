@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:prompt-read-service");
 
 type VersionedPromptMapper = (
   config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
-  tags: Array<{ name: string; versionId: string }>,
+  tags: { name: string; versionId: string }[],
 ) => VersionedPrompt;
 
 export class PromptReadService {

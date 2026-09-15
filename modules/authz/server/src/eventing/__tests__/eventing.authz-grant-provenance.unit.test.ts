@@ -30,7 +30,7 @@ function service() {
   return { grants, db, sent };
 }
 
-type Sent = Array<{ verb: string; data: unknown }>;
+type Sent = { verb: string; data: unknown }[];
 
 /** The `source` on each `attachGrant` command the writer emitted. */
 function attachedSources(sent: Sent): unknown[] {

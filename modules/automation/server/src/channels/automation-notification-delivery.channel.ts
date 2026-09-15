@@ -12,13 +12,13 @@ export abstract class AutomationNotificationDelivery {
    * adapter; Automation decides when a legacy digest is sent. */
   abstract sendLegacyEmail(input: {
     recipients: string[];
-    triggerData: Array<{
+    triggerData: {
       traceId: string;
       input: string;
       output: string;
       projectId: string;
       fullTrace: TraceRecord;
-    }>;
+    }[];
     triggerName: string;
     triggerId: string;
     projectId: string;
@@ -47,13 +47,13 @@ export abstract class AutomationNotificationDelivery {
 
   abstract sendLegacySlackWebhook(input: {
     webhook: string;
-    triggerData: Array<{
+    triggerData: {
       traceId: string;
       input: string;
       output: string;
       projectId: string;
       fullTrace: TraceRecord;
-    }>;
+    }[];
     triggerName: string;
     projectSlug: string;
     triggerType: AlertType | null;

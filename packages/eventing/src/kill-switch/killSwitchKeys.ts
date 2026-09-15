@@ -52,7 +52,7 @@ export interface KillSwitchComponentSource {
   foldProjections: Map<string, { definition: KillSwitchComponent }>;
   mapProjections: Map<string, { definition: KillSwitchComponent }>;
   stateProjections?: Map<string, { options?: { killSwitch?: KillSwitchOptions } }>;
-  commands: ReadonlyArray<{ name: string; options?: { killSwitch?: KillSwitchOptions } }>;
+  commands: readonly { name: string; options?: { killSwitch?: KillSwitchOptions } }[];
   eventSubscribers: Map<string, KillSwitchComponent>;
 }
 

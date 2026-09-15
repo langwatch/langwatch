@@ -70,7 +70,7 @@ export class WorkerPiiAnalysisAdapter implements PiiAnalysis {
     piiRedactionLevel: PIIRedactionLevel;
     exceptPatterns?: readonly string[];
   }): Promise<string | null> {
-    return await clearGoogleDlp(this, input);
+    return clearGoogleDlp(this, input);
   }
 
   async clearPresidio(
@@ -78,7 +78,7 @@ export class WorkerPiiAnalysisAdapter implements PiiAnalysis {
     piiRedactionLevel: PIIRedactionLevel,
     entities?: readonly string[],
   ): Promise<(string | null)[]> {
-    return await clearPresidio(this.config, this.metrics, texts, piiRedactionLevel, entities);
+    return clearPresidio(this.config, this.metrics, texts, piiRedactionLevel, entities);
   }
 
   async close(): Promise<void> {

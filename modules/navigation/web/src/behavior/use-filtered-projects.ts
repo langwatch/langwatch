@@ -13,14 +13,14 @@ interface TeamMember {
 
 interface Organization {
   name: string;
-  teams: Array<{
+  teams: {
     name: string;
     members?: TeamMember[];
-    projects: Array<{
+    projects: {
       slug: string;
       name: string;
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 /**

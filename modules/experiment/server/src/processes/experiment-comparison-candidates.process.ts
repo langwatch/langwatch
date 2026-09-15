@@ -59,7 +59,7 @@ export const evaluatorScoresBlock = ({
   variantId: string;
   completedTargetEvaluatorScores?: Map<
     string,
-    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
+    { name: string; score?: number; label?: string; passed?: boolean }[]
   >;
 }): string => {
   const scores = completedTargetEvaluatorScores?.get(`${rowIndex}:${variantId}`);

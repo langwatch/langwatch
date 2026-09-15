@@ -51,7 +51,7 @@ function build(overrides: Partial<WorkerTraceProcessingPipelineOptions> = {}) {
 function frozenTraceRoutingKeys(): string[] {
   const registryPath = fileURLToPath(new URL("../../features/job-registry.json", import.meta.url));
   const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
-    pipelines: Array<{ name: string; jobs: string[] }>;
+    pipelines: { name: string; jobs: string[] }[];
   };
   const pipeline = registry.pipelines.find((entry) => entry.name === "trace_processing");
   if (!pipeline) throw new Error("trace_processing is absent from the job registry");
@@ -148,7 +148,7 @@ describe("given the worker composition root and no application module", () => {
       } as unknown as TraceProcessingEvent;
 
       const leaned = prepare!(event) as unknown as {
-        data: { span: { attributes: Array<{ key: string; value: { stringValue: string } }> } };
+        data: { span: { attributes: { key: string; value: { stringValue: string } }[] } };
       };
       const keys = leaned.data.span.attributes.map((attr) => attr.key);
 

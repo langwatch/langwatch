@@ -92,7 +92,7 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
     const client = query.tenantId
       ? await this.resolveClient(query.tenantId)
       : await this.resolveOrganizationClient(query.organizationId);
-    return await MetricDataPointClickHouseRepository.queryMetricUsageEstimates({ client, query });
+    return MetricDataPointClickHouseRepository.queryMetricUsageEstimates({ client, query });
   }
 
   async getSeriesTotalsByPointAttribute({

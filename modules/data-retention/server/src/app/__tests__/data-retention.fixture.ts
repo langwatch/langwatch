@@ -85,7 +85,7 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
     return scope.scopeId === projectId ? organizationId : null;
   }
 
-  async listScopeProjects(): Promise<ReadonlyArray<{ id: string; teamId: string }>> {
+  async listScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
   }
 }

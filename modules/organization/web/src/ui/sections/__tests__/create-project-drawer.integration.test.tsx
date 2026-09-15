@@ -24,7 +24,7 @@ const { mockCreate, mockCreateState, mockTeams, invalidations, mockEmit } = vi.h
         projects: [{ id: "proj-1" }],
       },
       { id: "team-2", name: "Data", slug: "data", isPersonal: false, projects: [] },
-    ] as Array<Record<string, unknown>>,
+    ] as Record<string, unknown>[],
   },
   invalidations: { current: [] as string[] },
   mockEmit: vi.fn(),

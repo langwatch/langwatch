@@ -101,7 +101,7 @@ const createDataset = async ({
 
 /** The list the page renders, over exactly the datasets a scenario created. */
 const listed = async (): Promise<
-  Array<{ id: string; _count: { datasetRecords: number }; contentLayout?: string | null }>
+  { id: string; _count: { datasetRecords: number }; contentLayout?: string | null }[]
 > => {
   const page = await datasets().listPaginated({ projectId: PROJECT_ID, skip: 0, take: 50 });
 

@@ -269,7 +269,7 @@ describe("MetricDataPointClickHouseRepository", () => {
 
   /** @scenario "A folded rollup read keeps its encoded request inside a budget" */
   it("chunks successor parameters below the URL budget", async () => {
-    const queryCalls: Array<{ query: string; query_params?: Record<string, unknown> }> = [];
+    const queryCalls: { query: string; query_params?: Record<string, unknown> }[] = [];
     const query: MetricClickHouseClient["query"] = async (request) => {
       queryCalls.push(request);
       return response([]);
@@ -292,7 +292,7 @@ describe("MetricDataPointClickHouseRepository", () => {
   it.each([1, 12, 64, 130, 260])(
     "keeps the successor statement and parameter count fixed for %i points",
     async (count) => {
-      const requests: Array<{ query: string; params: Record<string, unknown> }> = [];
+      const requests: { query: string; params: Record<string, unknown> }[] = [];
       const query: MetricClickHouseClient["query"] = async (request) => {
         if (request.query.includes("{seriesIds:Array(String)}")) {
           requests.push({ query: request.query, params: request.query_params ?? {} });
@@ -328,7 +328,7 @@ describe("MetricDataPointClickHouseRepository", () => {
 
   /** @scenario "A folded rollup read binds a fixed number of parameters" */
   it("splits successor reads by encoded parameter bytes without dropping series", async () => {
-    const requests: Array<Record<string, unknown>> = [];
+    const requests: Record<string, unknown>[] = [];
     const query: MetricClickHouseClient["query"] = async (request) => {
       if (request.query.includes("{seriesIds:Array(String)}")) {
         requests.push(request.query_params ?? {});

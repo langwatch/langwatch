@@ -25,7 +25,7 @@ function toHandle(name: string): string {
 export async function handleCreatePrompt(params: {
   name: string;
   handle?: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: { role: string; content: string }[];
   model: string;
   tags?: string[];
 }): Promise<string> {

@@ -252,7 +252,7 @@ export function langyPlan(
      * present it is PREFERRED over parsing the raw todowrite parts — the client then
      * enforces the same caps the manager did.
      */
-    overrideItems?: Array<{ content: string; status: string }> | null;
+    overrideItems?: { content: string; status: string }[] | null;
   },
 ): LangyPlan | null {
   const parts = message.parts ?? [];

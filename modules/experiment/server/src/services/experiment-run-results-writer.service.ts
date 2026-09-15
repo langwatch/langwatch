@@ -97,7 +97,7 @@ export class ExperimentRunResultsWriterService implements RunResultsWriter {
     projectId: string;
     experimentId?: string | undefined;
     scope: ExecutionScope;
-    data?: Array<Record<string, unknown>> | undefined;
+    data?: Record<string, unknown>[] | undefined;
     datasetId?: string | undefined;
     parameters?: Record<string, string | number | boolean> | undefined;
     errorReporting?: ExperimentRunErrorReporting;

@@ -262,7 +262,7 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
 
   /** Maps prompt I/O arrays to DSL Field format, preserving field.value from existing inputs. */
   const mapIOToFields = useCallback(
-    (items?: Array<{ identifier: string; type: string }>): Field[] | undefined => {
+    (items?: { identifier: string; type: string }[]): Field[] | undefined => {
       if (!items) return undefined;
       const currentInputs = signatureNode.data.inputs ?? [];
       return items.map((item) => {
@@ -283,8 +283,8 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
       name: string;
       version?: number;
       versionId?: string;
-      inputs?: Array<{ identifier: string; type: string }>;
-      outputs?: Array<{ identifier: string; type: string }>;
+      inputs?: { identifier: string; type: string }[];
+      outputs?: { identifier: string; type: string }[];
     }) => {
       const data: Partial<Signature> & Record<string, unknown> = {
         promptId: prompt.id,
@@ -309,8 +309,8 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
     (prompt: {
       version: number;
       versionId: string;
-      inputs?: Array<{ identifier: string; type: string }>;
-      outputs?: Array<{ identifier: string; type: string }>;
+      inputs?: { identifier: string; type: string }[];
+      outputs?: { identifier: string; type: string }[];
     }) => {
       const data: Partial<Signature> & Record<string, unknown> = {
         promptVersionId: prompt.versionId,

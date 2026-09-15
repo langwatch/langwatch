@@ -39,7 +39,7 @@ const parseEmail = ({ value, source }: { value: string; source: string }): strin
  */
 export const parseTeamFlags = (
   values: string[] = [],
-): Array<{ teamId: string; role: ManagementRole }> =>
+): { teamId: string; role: ManagementRole }[] =>
   values.map((value) => {
     const parts = value.split(":");
     if (parts.length !== 2 || parts.some((part) => !part.trim())) {

@@ -29,7 +29,7 @@ export function createMergedResource(
 
   const userResource = resourceFromAttributes({
     [semconv.ATTR_SERVICE_NAME]: serviceName ?? DEFAULT_SERVICE_NAME,
-    ...(attributes ?? {}),
+    ...attributes,
   });
 
   return (givenResource ?? defaultResource()).merge(langwatchResource).merge(userResource);

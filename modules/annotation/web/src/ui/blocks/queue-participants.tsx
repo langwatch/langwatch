@@ -32,8 +32,8 @@ export function QueueParticipants({
 }: {
   annotators: QueueParticipant[];
   setAnnotators: (annotators: QueueParticipant[]) => void;
-  queues: ReadonlyArray<{ id: string; name: string }>;
-  members: ReadonlyArray<{ user: { id: string; name: string | null; image: string | null } }>;
+  queues: readonly { id: string; name: string }[];
+  members: readonly { user: { id: string; name: string | null; image: string | null } }[];
   /** Opens the queue editor on a new queue. */
   onCreateQueue: () => void;
   onSend: () => void;

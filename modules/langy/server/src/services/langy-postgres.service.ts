@@ -43,11 +43,11 @@ import { LangyTurnService, type LangyTurnTechnicalMembers } from "./langy-turn.s
 
 export abstract class LangyTrustedMessage {
   abstract getRecordsByConversation(input: { conversationId: string; projectId: string }): Promise<
-    Array<{
+    {
       id: string;
       role: "user" | "assistant" | "tool" | "system";
       content: string;
-    }>
+    }[]
   >;
 }
 

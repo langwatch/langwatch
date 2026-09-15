@@ -57,7 +57,7 @@ function shownPhoto(): string | null {
  * one in the dialog, which shows what would be saved. A preview is a claim
  * about the second, so the assertion reads the set rather than the first.
  */
-function shownPhotos(): Array<string | null> {
+function shownPhotos(): (string | null)[] {
   return Array.from(document.querySelectorAll("img")).map((img) => img.getAttribute("src"));
 }
 

@@ -20,7 +20,7 @@ export type ProcessManagerPurgeOptions = Readonly<{
 
 export type ProcessManagerPurgeReport = Readonly<{
   mode: "dry-run" | "apply";
-  targets: ReadonlyArray<{ name: string; eligible: number; deleted: number; capped: boolean }>;
+  targets: readonly { name: string; eligible: number; deleted: number; capped: boolean }[];
 }>;
 
 /**
@@ -42,12 +42,12 @@ export async function purgeProcessManagerTables({
   requireWholeNumber({ name: "sleepMs", value: sleepMs, min: 0 });
   requireWholeNumber({ name: "maxBatches", value: maxBatches, min: 1 });
 
-  const targets: ReadonlyArray<{ name: string; target: ProcessManagerPurgeTarget }> = [
+  const targets: readonly { name: string; target: ProcessManagerPurgeTarget }[] = [
     { name: "ProcessManagerOutbox (dispatched)", target: "outbox-dispatched" },
     { name: "ProcessManagerInbox (consumed)", target: "inbox-consumed" },
   ];
 
-  const report: Array<{ name: string; eligible: number; deleted: number; capped: boolean }> = [];
+  const report: { name: string; eligible: number; deleted: number; capped: boolean }[] = [];
   for (const { name, target } of targets) {
     const eligible = await repository.countEligible({ target, retentionDays });
     if (!apply) {

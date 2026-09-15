@@ -287,7 +287,7 @@ describe("the projects REST family", () => {
 
       expect(response.status).toBe(200);
       const body = (await response.json()) as {
-        data: Array<Record<string, unknown>>;
+        data: Record<string, unknown>[];
         pagination: { page: number; limit: number; total: number };
       };
       expect(body.pagination).toEqual({ page: 1, limit: 50, total: 2 });

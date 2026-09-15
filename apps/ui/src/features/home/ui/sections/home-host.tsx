@@ -34,19 +34,19 @@ const LANGY_CREATE_PERMISSION = "langy:create";
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
 /** The organization graph, narrowed to what the home reads off it. */
-type OrganizationsRead = ReadonlyArray<{
+type OrganizationsRead = readonly {
   id: string;
   name: string;
-  teams: Array<{
-    projects: Array<{
+  teams: {
+    projects: {
       id: string;
       name: string;
       slug: string;
       firstMessage?: boolean | null;
       apiKey?: string | null;
-    }>;
-  }>;
-}>;
+    }[];
+  }[];
+}[];
 
 /** What kind of deployment: no config block means self-hosted, never a crash. */
 function readDeployment(): ProjectHomeDeployment {

@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { buildSesClientConfig, type SesAwsClientConfiguration } from "../ses.ts";
 
 function fakeAws(): SesAwsClientConfiguration & {
-  calls: Array<{ region?: string; targetHost: string; endpoint?: string }>;
+  calls: { region?: string; targetHost: string; endpoint?: string }[];
 } {
-  const calls: Array<{ region?: string; targetHost: string; endpoint?: string }> = [];
+  const calls: { region?: string; targetHost: string; endpoint?: string }[] = [];
   return {
     calls,
     build(input) {

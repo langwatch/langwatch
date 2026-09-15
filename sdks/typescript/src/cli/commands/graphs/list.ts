@@ -40,7 +40,7 @@ export const listGraphsCommand = async (options: {
       process.exit(1);
     }
 
-    const graphs = (await response.json()) as Array<{
+    const graphs = (await response.json()) as {
       id: string;
       name: string;
       dashboardId: string | null;
@@ -48,7 +48,7 @@ export const listGraphsCommand = async (options: {
       gridRow: number;
       colSpan: number;
       rowSpan: number;
-    }>;
+    }[];
 
     spinner.succeed(`Found ${graphs.length} graph${graphs.length !== 1 ? "s" : ""}`);
 

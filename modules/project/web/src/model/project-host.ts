@@ -28,7 +28,7 @@ export type ProjectHostOrganization = {
    * The teams under it, which the LLMOps hand-off needs to name a home for a
    * project it is about to create.
    */
-  teams: Array<{ id: string; name: string; slug: string; isPersonal: boolean }>;
+  teams: { id: string; name: string; slug: string; isPersonal: boolean }[];
 };
 
 /**

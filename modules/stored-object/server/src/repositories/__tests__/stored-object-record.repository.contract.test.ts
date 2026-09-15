@@ -17,7 +17,7 @@ import type {
   StoredObjectRecordRepository,
 } from "../stored-object-record.repository.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => StoredObjectRecordRepository }> = [
+const backends: readonly { name: string; create: () => StoredObjectRecordRepository }[] = [
   { name: "memory", create: () => MemoryStoredObjectRecordRepository.create() },
 ];
 

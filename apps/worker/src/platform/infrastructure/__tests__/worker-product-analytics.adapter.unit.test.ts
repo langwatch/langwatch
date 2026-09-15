@@ -34,7 +34,7 @@ function fakeClient(): ProductAnalyticsClient & {
 
 function adapterWith(config: { key?: string; host?: string }) {
   const client = fakeClient();
-  const built: Array<[string, { host: string | undefined }]> = [];
+  const built: [string, { host: string | undefined }][] = [];
   const adapter = WorkerPostHogProductAnalyticsAdapter.createWithClientFactory({
     config,
     logger: { warn: vi.fn() } as never,

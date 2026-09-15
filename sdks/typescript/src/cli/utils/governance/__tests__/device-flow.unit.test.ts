@@ -206,7 +206,7 @@ describe("pollUntilDone", () => {
     exchanges,
     approval = () => emptyResponse(404),
   }: {
-    exchanges: Array<() => Response>;
+    exchanges: (() => Response)[];
     approval?: () => Response;
   }) {
     const polls: string[] = [];

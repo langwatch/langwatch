@@ -155,7 +155,7 @@ describe("ScenarioProcessorService", () => {
 
   describe("worker drain", () => {
     let fixture: ReturnType<typeof processorFixture>;
-    let killSignals: Array<number | NodeJS.Signals | undefined>;
+    let killSignals: (number | NodeJS.Signals | undefined)[];
 
     beforeEach(() => {
       fixture = processorFixture();

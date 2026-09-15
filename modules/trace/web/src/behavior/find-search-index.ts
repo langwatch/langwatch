@@ -12,12 +12,12 @@ export type TraceSearchItem = {
   userId?: string;
   traceName?: string;
   models: string[];
-  evaluations: Array<{
+  evaluations: {
     evaluatorName: string | null;
     label: string | null;
-  }>;
+  }[];
   events: {
-    groups: Array<{ name: string }>;
+    groups: { name: string }[];
   };
 };
 

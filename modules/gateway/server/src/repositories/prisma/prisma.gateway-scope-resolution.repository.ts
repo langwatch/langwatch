@@ -97,7 +97,7 @@ export class PrismaGatewayScopeResolutionRepository extends GatewayScopeResoluti
     routingPolicyId: string;
     transaction?: GatewayPersistenceTransaction;
   }): Promise<GatewayRoutingPolicyOrder | null> {
-    return await this.client(transaction).routingPolicy.findUnique({
+    return this.client(transaction).routingPolicy.findUnique({
       where: { id: routingPolicyId },
       select: { modelProviderIds: true, organizationId: true },
     });

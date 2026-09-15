@@ -10,7 +10,7 @@ export interface ResourceOwnership {
 
 /** Owns process resources and closes them once in reverse registration order. */
 export class ResourceScope {
-  private readonly resources: Array<{ name: string; close: ResourceCloser }> = [];
+  private readonly resources: { name: string; close: ResourceCloser }[] = [];
   private closeResult: Promise<void> | undefined;
   private readonly services: RuntimeService[] = [];
   private servicesSealed = false;
@@ -52,7 +52,7 @@ export class ResourceScope {
   }
 
   private async closeOwnedResources(): Promise<void> {
-    const failures: Array<{ name: string; error: unknown }> = [];
+    const failures: { name: string; error: unknown }[] = [];
     for (const resource of [...this.resources].reverse()) {
       try {
         await resource.close();

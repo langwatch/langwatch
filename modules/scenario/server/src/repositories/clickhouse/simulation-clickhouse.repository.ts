@@ -985,7 +985,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
-    return await this.queryRows<{
+    return this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
       NormalizedSetId: string;

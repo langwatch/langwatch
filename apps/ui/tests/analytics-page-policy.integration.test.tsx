@@ -116,7 +116,7 @@ function capabilities(session: UiSession): UiCapabilities {
 }
 
 /** Every key this family serves, paired with the screen it must resolve to. */
-const KEYS: ReadonlyArray<readonly [string, string]> = [
+const KEYS: readonly (readonly [string, string])[] = [
   ["pages/[project]/analytics/index", "overview"],
   ["pages/[project]/analytics/users", "users"],
   ["pages/[project]/analytics/topics", "topics"],

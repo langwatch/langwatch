@@ -98,7 +98,7 @@ const rows = (count = 2) =>
     input: `Task ${i}`,
   }));
 
-const outputsFor = (entries: Array<[string, unknown]>) =>
+const outputsFor = (entries: [string, unknown][]) =>
   new Map<string, SeededOutput>(entries.map(([key, output]) => [key, { output }]));
 
 const planWith = ({
@@ -111,7 +111,7 @@ const planWith = ({
   prompts = loadedPrompts,
 }: {
   state: PlanState;
-  datasetRows?: Array<Record<string, unknown>>;
+  datasetRows?: Record<string, unknown>[];
   completedTargetOutputs: Map<string, SeededOutput>;
   completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
   scopedRowIndices?: number[];

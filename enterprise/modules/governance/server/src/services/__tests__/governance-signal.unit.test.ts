@@ -13,10 +13,10 @@ import { GovernanceSignalService } from "../governance-signal.service.ts";
 import { type Instant, Temporal } from "@langwatch/time";
 
 class RecordingDiagnostics implements GovernanceDiagnosticsSink {
-  readonly warnings: Array<{
+  readonly warnings: {
     message: string;
     context: Record<string, unknown>;
-  }> = [];
+  }[] = [];
 
   warn(message: string, context: Record<string, unknown>): void {
     this.warnings.push({ message, context });

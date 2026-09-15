@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryUserRepositories } from "../memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../user.repositories.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => UserRepositories }> = [
+const backends: readonly { name: string; create: () => UserRepositories }[] = [
   { name: "memory", create: () => MemoryUserRepositories.create() },
 ];
 

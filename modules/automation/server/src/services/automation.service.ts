@@ -322,7 +322,7 @@ export class AutomationService {
 
   async getAllEnriched(input: {
     projectId: string;
-  }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
+  }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
     const rows = await this.suppressions.findAll(input);
     const ids = [...new Set(rows.flatMap((row) => (row.triggerId ? [row.triggerId] : [])))];
     const names = await this.names.findTriggerNames({

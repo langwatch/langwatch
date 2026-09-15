@@ -118,7 +118,7 @@ class GithubHttpFixture {
     }
     if (apiPath.toLowerCase() === `/repos/acme-${namespace}/widgets/pulls`.toLowerCase()) {
       this.listingUrls.push(url.toString());
-      return await this.pullResponse();
+      return this.pullResponse();
     }
     if (
       apiPath.toLowerCase() ===
@@ -196,7 +196,7 @@ function branchRequest(headBranch: string, repositoryHost = "github.com") {
 }
 
 async function storedFor(github: GithubApi, headBranch: string, repositoryHost = "github.com") {
-  return await github.findAllByBranches({
+  return github.findAllByBranches({
     organizationId,
     repositoryHost,
     repositoryFullName,
@@ -205,7 +205,7 @@ async function storedFor(github: GithubApi, headBranch: string, repositoryHost =
 }
 
 async function branchCheck(headBranch: string, repositoryHost = "github.com") {
-  return await database().githubBranchPullRequestCheck.findUnique({
+  return database().githubBranchPullRequestCheck.findUnique({
     where: {
       organizationId_repositoryHost_repositoryFullName_headBranch: {
         organizationId,

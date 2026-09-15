@@ -26,10 +26,10 @@ type ProviderKey = keyof typeof modelProviderIcons;
  * Which provider a bare model name belongs to, by the prefix it starts with.
  * Order matters only in that the first matching entry wins.
  */
-const PROVIDER_BY_MODEL_PREFIX: ReadonlyArray<{
+const PROVIDER_BY_MODEL_PREFIX: readonly {
   prefixes: readonly string[];
   provider: ProviderKey;
-}> = [
+}[] = [
   {
     prefixes: ["gpt-", "o1", "o3", "o4", "text-embedding-", "dall-e", "whisper", "chatgpt-"],
     provider: "openai",

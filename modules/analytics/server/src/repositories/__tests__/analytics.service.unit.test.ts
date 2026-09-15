@@ -183,7 +183,7 @@ describe("AnalyticsService", () => {
   });
 
   it("validates and decodes ClickHouse JSONEachRow results", async () => {
-    const calls: Array<Record<string, unknown>> = [];
+    const calls: Record<string, unknown>[] = [];
     const service = AnalyticsAdapter.create({
       clickhouseEnabled: true,
       resolveClient: async () =>
@@ -253,7 +253,7 @@ describe("AnalyticsService", () => {
   /** @scenario "Feedback reads preserve their existing result shape" */
   /** @scenario "Top-document reads preserve their existing result shape" */
   it("preserves legacy feedback decoding and document ordering", async () => {
-    const calls: Array<Record<string, unknown>> = [];
+    const calls: Record<string, unknown>[] = [];
     const service = AnalyticsAdapter.create({
       clickhouseEnabled: true,
       resolveClient: async () =>

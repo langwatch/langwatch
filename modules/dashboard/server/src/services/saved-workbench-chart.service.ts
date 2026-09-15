@@ -193,7 +193,7 @@ export class SavedWorkbenchChartService {
   }): Promise<LangWatchQLQueryResult> {
     const chart = await this.getById({ projectId: input.projectId, chartId: input.chartId });
 
-    return await this.#analytics.executeLangWatchQL({
+    return this.#analytics.executeLangWatchQL({
       ...input.execution,
       sql: chart.definition.sql,
       parameters: chart.definition.parameters,

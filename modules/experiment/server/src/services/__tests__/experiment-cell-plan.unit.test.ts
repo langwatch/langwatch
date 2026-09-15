@@ -10,7 +10,7 @@ import { ExperimentCellPlanService } from "../experiment-cell-plan.service.ts";
 const cellPlan = ExperimentCellPlanService.create();
 const generateCells = (
   state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
-  datasetRows: Array<Record<string, unknown>>,
+  datasetRows: Record<string, unknown>[],
   scope: ExecutionScope,
 ) => cellPlan.generateCells({ state, datasetRows, scope });
 

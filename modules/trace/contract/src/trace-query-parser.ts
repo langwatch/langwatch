@@ -28,8 +28,8 @@ export function parseTraceQuerySyntax(query: string): LiqeQuery {
  * `]`/`)` before boolean ops, stray whitespace in parens). Normalise
  * post-serialisation while preserving quoted strings.
  */
-function splitOnQuotes(s: string): Array<{ text: string; quoted: boolean }> {
-  const segments: Array<{ text: string; quoted: boolean }> = [];
+function splitOnQuotes(s: string): { text: string; quoted: boolean }[] {
+  const segments: { text: string; quoted: boolean }[] = [];
   let buf = "";
   let quoteChar = "";
   for (let i = 0; i < s.length; i++) {

@@ -20,7 +20,7 @@ export type ModelProviderProjectContext = {
 export type ModelProviderAvailableScopes = {
   organization: ScopeReference;
   teams: ScopeReference[];
-  projects: Array<ScopeReference & { teamId: string }>;
+  projects: (ScopeReference & { teamId: string })[];
 };
 
 export type { ModelProviderProjectSystemContext };

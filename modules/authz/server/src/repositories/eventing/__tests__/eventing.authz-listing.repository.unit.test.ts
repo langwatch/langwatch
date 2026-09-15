@@ -39,11 +39,11 @@ const grantRow = (seed: GrantRowSeed) => ({
 
 const prismaWith = (data: {
   grants?: ReturnType<typeof grantRow>[];
-  users?: Array<Record<string, unknown>>;
-  groups?: Array<Record<string, unknown>>;
-  apiKeys?: Array<Record<string, unknown>>;
-  roles?: Array<Record<string, unknown>>;
-  groupMemberships?: Array<Record<string, unknown>>;
+  users?: Record<string, unknown>[];
+  groups?: Record<string, unknown>[];
+  apiKeys?: Record<string, unknown>[];
+  roles?: Record<string, unknown>[];
+  groupMemberships?: Record<string, unknown>[];
 }) => {
   const prisma = {
     grant: { findMany: vi.fn().mockResolvedValue(data.grants ?? []) },

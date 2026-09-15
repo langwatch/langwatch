@@ -108,7 +108,7 @@ describe("the launcher's command contract", () => {
       const hooksFile = path.join(tmpDir, "settings.json");
       installSessionContextHooks({ tool: "claude_code", filePath: hooksFile });
       const settings = JSON.parse(fs.readFileSync(hooksFile, "utf8")) as {
-        hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
+        hooks: Record<string, { hooks: { command: string }[] }[]>;
       };
       const rawCommands = settings.hooks.SessionStart!.flatMap((group) =>
         group.hooks.map((hook) => hook.command),

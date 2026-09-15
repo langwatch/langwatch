@@ -11,7 +11,7 @@
 import { createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const logCalls: Array<{ level: string; fields: unknown; message: string }> = [];
+const logCalls: { level: string; fields: unknown; message: string }[] = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@langwatch/observability")>();
@@ -43,7 +43,7 @@ const NOW = Date.now();
 /** Distinctive enough that finding it anywhere in a log is unambiguous. */
 const CUSTOMER_SECRET = "sk-live-CUSTOMER-PROMPT-DO-NOT-LOG";
 
-const reportedErrors: Array<{ message: string; context: unknown }> = [];
+const reportedErrors: { message: string; context: unknown }[] = [];
 
 const runtime = createRestRuntime({
   identity: {
@@ -127,7 +127,7 @@ describe("given a span that fails schema validation", () => {
     it("names the failing path and the rule that rejected it", async () => {
       await postCollector({ trace_id: "trace-1", spans: [badSpan] });
 
-      const issues = rejectionLog().fields.issues as Array<{ path: string; code: string }>;
+      const issues = rejectionLog().fields.issues as { path: string; code: string }[];
       expect(issues.map((issue) => issue.path).join(" ")).toContain("timestamps.started_at");
       expect(issues.map((issue) => issue.code)).toContain("invalid_type");
       expect(rejectionLog().fields.issueCount).toBeGreaterThan(0);

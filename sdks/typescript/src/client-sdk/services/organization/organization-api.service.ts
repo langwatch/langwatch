@@ -63,7 +63,7 @@ export interface OrganizationMemberDetail extends OrganizationMember {
 
 export interface UpdatedOrganizationMember extends OrganizationMember {
   /** Teams the change left with no administrator. Informative, never blocking. */
-  teamsLeftWithoutAdmin?: Array<{ id: string; name: string }>;
+  teamsLeftWithoutAdmin?: { id: string; name: string }[];
 }
 
 export interface ListMembersOptions {
@@ -95,13 +95,13 @@ export interface MemberAccessBreakdown {
     orgRole: string;
     orgRolePermissions: string[];
   };
-  groups: Array<{
+  groups: {
     id: string;
     name: string;
     slug: string;
     scimSource: string | null;
     bindings: MemberAccessBinding[];
-  }>;
+  }[];
   directBindings: MemberAccessBinding[];
 }
 
@@ -132,7 +132,7 @@ export interface CreatedOrganizationInvite extends OrganizationInvite {
 export interface InviteInput {
   email: string;
   role: OrganizationRole;
-  teams: Array<{ teamId: string; role: string; customRoleId?: string }>;
+  teams: { teamId: string; role: string; customRoleId?: string }[];
 }
 
 export interface CreateInvitesInput {

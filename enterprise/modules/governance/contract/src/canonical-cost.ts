@@ -13,10 +13,10 @@ export type OtlpLogRecord = {
   timeUnixNano?: OtlpFixed64;
 };
 export type OtlpLogsRequest = {
-  resourceLogs?: Array<{
+  resourceLogs?: {
     resource?: { attributes?: OtlpKeyValue[] };
-    scopeLogs?: Array<{ logRecords?: OtlpLogRecord[] }>;
-  }>;
+    scopeLogs?: { logRecords?: OtlpLogRecord[] }[];
+  }[];
 };
 
 export type CanonicalCostEvent = {

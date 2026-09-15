@@ -584,13 +584,13 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeCommandQueues<Payload extends Record<string, unknown>>(
-    commandRegistrations: Array<{
+    commandRegistrations: {
       name: string;
       handlerClass: CommandHandlerClass<any, any, EventType>;
       /** Pre-constructed instance — when provided, used instead of `new handlerClass()`. */
       handlerInstance?: CommandHandler<any, EventType>;
       options?: CommandHandlerOptions<Payload>;
-    }>,
+    }[],
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
     _pipelineName: string,
   ): void {

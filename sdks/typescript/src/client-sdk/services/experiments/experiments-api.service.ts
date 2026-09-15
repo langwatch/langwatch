@@ -20,7 +20,7 @@ export interface ExperimentRunStartResponse {
  * `dataset_id` are mutually exclusive on the server (400 if both are sent).
  */
 export interface ExperimentRunStartRequest {
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   dataset_id?: string;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];
@@ -35,7 +35,7 @@ export const toRunStartRequest = ({
   parameters,
   rowIndices,
 }: {
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   datasetId?: string;
   parameters?: Record<string, string | number | boolean>;
   rowIndices?: number[];

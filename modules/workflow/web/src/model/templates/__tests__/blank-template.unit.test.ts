@@ -10,7 +10,7 @@ const node = (id: string) => {
 const param = ({ nodeId, identifier }: { nodeId: string; identifier: string }) =>
   (
     node(nodeId).data as {
-      parameters: Array<{ identifier: string; value: unknown }>;
+      parameters: { identifier: string; value: unknown }[];
     }
   ).parameters.find((p) => p.identifier === identifier)?.value;
 

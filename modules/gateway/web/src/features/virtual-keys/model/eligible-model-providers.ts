@@ -33,7 +33,7 @@ export type OrgModelProvider = {
   disabledAt?: Instant | string | null;
   scopes: ModelProviderScopeEntry[];
   models?: string[] | null;
-  customModels?: Array<{ modelId: string }> | null;
+  customModels?: { modelId: string }[] | null;
 };
 
 export type EligibleModelProvider = {
@@ -64,7 +64,7 @@ export function resolveProviderDefaultModel(
   providerKey: string,
   providerLabel: string,
   providerModels: string[],
-  customModels?: Array<{ modelId: string }> | null,
+  customModels?: { modelId: string }[] | null,
 ): string {
   const registryDefault = MODEL_PROVIDER_DEFAULT_MODELS[providerKey];
   const fallbackModel = providerModels[0] ?? customModels?.[0]?.modelId;
@@ -80,7 +80,7 @@ export function resolveProviderDefaultModel(
  * PROJECT scope up to its owning TEAM.
  */
 export function buildScopeHierarchy(
-  availableProjects: Array<{ id: string; teamId?: string }>,
+  availableProjects: { id: string; teamId?: string }[],
   organizationId: string | undefined,
 ): ScopeHierarchy {
   const teamOfProject = new Map<string, string>();
@@ -190,7 +190,7 @@ export function resolveEligible({
 export function firstEligibleDefaultModel(args: {
   scopes: VirtualKeyScopeEntry[];
   providers: OrgModelProvider[];
-  availableProjects: Array<{ id: string; teamId?: string }>;
+  availableProjects: { id: string; teamId?: string }[];
   organizationId: string | undefined;
 }): string | undefined {
   const { scopes, providers, availableProjects, organizationId } = args;

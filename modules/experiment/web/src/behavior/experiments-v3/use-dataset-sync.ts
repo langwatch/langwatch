@@ -28,7 +28,7 @@ export const useDatasetSync = () => {
           d,
         ): d is DatasetReference & {
           type: "saved";
-          savedRecords: Array<{ id: string } & Record<string, string>>;
+          savedRecords: ({ id: string } & Record<string, string>)[];
         } => d.type === "saved" && d.datasetId === dbDatasetId,
       );
       return dataset?.savedRecords?.find((r) => r.id === recordId);

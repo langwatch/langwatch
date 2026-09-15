@@ -28,12 +28,12 @@ interface Example {
 
 type WarmAccent = "orange" | "red" | "yellow" | "pink";
 
-const EXAMPLE_GROUPS: ReadonlyArray<{
+const EXAMPLE_GROUPS: readonly {
   title: string;
   icon: React.ElementType;
   accent: WarmAccent;
-  examples: ReadonlyArray<Example>;
-}> = [
+  examples: readonly Example[];
+}[] = [
   {
     title: "Common",
     icon: Zap,
@@ -101,11 +101,11 @@ const EXAMPLE_GROUPS: ReadonlyArray<{
   },
 ];
 
-const OPERATOR_ROWS: ReadonlyArray<{
+const OPERATOR_ROWS: readonly {
   op: string;
   meaning: string;
   example: string;
-}> = [
+}[] = [
   {
     op: "AND",
     meaning: "Both must match",
@@ -124,11 +124,11 @@ const OPERATOR_ROWS: ReadonlyArray<{
   },
 ];
 
-const VALUE_ROWS: ReadonlyArray<{
+const VALUE_ROWS: readonly {
   form: string;
   example: string;
   notes: string;
-}> = [
+}[] = [
   { form: "Exact", example: "model:gpt-4o", notes: "Case-insensitive" },
   { form: "Wildcard", example: "model:gpt-*", notes: "* matches anything" },
   { form: "Comparison", example: "cost:>0.05", notes: ">, >=, <, <=" },
@@ -235,7 +235,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
   );
 };
 
-const SYNTAX_TIPS: ReadonlyArray<{ label: string; example: string }> = [
+const SYNTAX_TIPS: readonly { label: string; example: string }[] = [
   { label: "wildcard", example: "model:gpt-*" },
   { label: "exclusion", example: "-status:ok" },
   { label: "range", example: "cost:[0.01 TO 1]" },
@@ -422,8 +422,8 @@ const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
 );
 
 const SyntaxTable: React.FC<{
-  columns: ReadonlyArray<string>;
-  rows: ReadonlyArray<{ key: string; cells: ReadonlyArray<React.ReactNode> }>;
+  columns: readonly string[];
+  rows: readonly { key: string; cells: readonly React.ReactNode[] }[];
 }> = ({ columns, rows }) => (
   <Table.Root size="sm" variant="outline">
     <Table.Header>

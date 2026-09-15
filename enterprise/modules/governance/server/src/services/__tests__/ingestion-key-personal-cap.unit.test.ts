@@ -48,7 +48,7 @@ class KeyLedger {
   readonly rows: Row[] = [];
   /** Ids whose revoke throws, standing in for a key another device just killed. */
   readonly unrevokable = new Set<string>();
-  readonly revokedWith: Array<{ id: string; cause: string | undefined }> = [];
+  readonly revokedWith: { id: string; cause: string | undefined }[] = [];
 
   issue(input: { sourceType: string }): Row {
     this.nextId += 1;

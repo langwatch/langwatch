@@ -424,11 +424,11 @@ describe("every management family", () => {
     it("returns the API response untouched as data, and renders a table over the same data", async () => {
       // One representative command per family, each answering a response with
       // fields the human table never shows: `data` must still carry them.
-      const cases: Array<{
+      const cases: {
         name: string;
         response: unknown;
         run: () => Promise<{ data: unknown; table: () => void } | void>;
-      }> = [
+      }[] = [
         {
           name: "organization get",
           response: ORGANIZATION_SETTINGS_RESPONSE,

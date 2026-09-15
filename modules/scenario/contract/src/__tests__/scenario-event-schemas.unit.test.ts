@@ -50,10 +50,10 @@ describe("scenarioMessageSnapshotSchema — input_audio wire acceptance (#5149)"
     // store the bytes. If validation stripped it, the extractor would no-op.
     const audioPart = (result.success ? result.data.messages[0] : undefined) as
       | {
-          content: Array<{
+          content: {
             type: string;
             input_audio?: { data?: string; format?: string };
-          }>;
+          }[];
         }
       | undefined;
     const part = audioPart?.content.find((p) => p.type === "input_audio");
@@ -354,7 +354,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
       expect(result.success).toBe(true);
 
       const message = (result.success ? result.data.messages[0] : undefined) as
-        | { content: Array<{ type: string; image?: string }> }
+        | { content: { type: string; image?: string }[] }
         | undefined;
       const part = message?.content.find((p) => p.type === "image");
       expect(part?.image).toBe(WEBP_DATA_URI);
@@ -399,10 +399,10 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
 
       const message = (result.success ? result.data.messages[0] : undefined) as
         | {
-            content: Array<{
+            content: {
               type: string;
               file?: { file_data?: string; filename?: string };
-            }>;
+            }[];
           }
         | undefined;
       const part = message?.content.find((p) => p.type === "file");
@@ -435,7 +435,7 @@ describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () =
       expect(result.success).toBe(true);
 
       const message = (result.success ? result.data.messages[0] : undefined) as
-        | { content: Array<{ type: string; data?: string }> }
+        | { content: { type: string; data?: string }[] }
         | undefined;
       const part = message?.content.find((p) => p.type === "file");
       expect(part?.data).toBe(base64);

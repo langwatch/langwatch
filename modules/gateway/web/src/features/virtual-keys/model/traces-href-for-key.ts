@@ -65,9 +65,9 @@ export function resolveTracesHrefForKey({
   window,
   model,
 }: {
-  teams: ReadonlyArray<{
-    projects: ReadonlyArray<{ id: string; slug: string }>;
-  }>;
+  teams: readonly {
+    projects: readonly { id: string; slug: string }[];
+  }[];
   virtualKeyId: string;
   traceProjectId: string | null | undefined;
   traceProjectArchived: boolean | undefined;

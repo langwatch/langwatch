@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { End } from "@langwatch/workflow-contract";
 
 const mockSetNode = vi.fn();
-let mockEdges: Array<{ id: string; source: string; target: string; targetHandle?: string }> = [];
+let mockEdges: { id: string; source: string; target: string; targetHandle?: string }[] = [];
 let mockWorkflowType = "workflow";
 let currentNode: Node<End>;
 

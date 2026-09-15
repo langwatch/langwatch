@@ -49,10 +49,10 @@ type Data = {
   shareLinks?: ShareLinkFactRow[];
   externalMembers?: ExternalMemberFact[];
   credentials?: ProjectCredentialFact[];
-  groupMemberships?: Array<{ userId: string; groupId: string }>;
+  groupMemberships?: { userId: string; groupId: string }[];
   grantHeads?: GrantHeadRow[];
   /** `deleted` defaults to false: a head is live unless a test buries it. */
-  roleHeads?: Array<Omit<RoleHeadRow, "deleted"> & { deleted?: boolean }>;
+  roleHeads?: (Omit<RoleHeadRow, "deleted"> & { deleted?: boolean })[];
   resourceRows?: ResourceGrantRow[];
   /** Wraps the recording ledger, for tests that need to observe or fail a
    *  send rather than only read what was sent. */
@@ -429,7 +429,7 @@ describe("given an organization with legacy access rows", () => {
 
       expect(outcome.status).toBe("migrated");
       const report = outcome.report as {
-        diffs: Array<{ kind: string; id: string; field?: string }>;
+        diffs: { kind: string; id: string; field?: string }[];
       };
       expect(report.diffs).toContainEqual(
         expect.objectContaining({
@@ -677,7 +677,7 @@ describe("given an organization with legacy access rows", () => {
 
       expect(outcome.status).toBe("migrated");
       const report = outcome.report as {
-        diffs: Array<{ kind: string; id: string; field?: string }>;
+        diffs: { kind: string; id: string; field?: string }[];
       };
       expect(report.diffs).toContainEqual(
         expect.objectContaining({
@@ -804,7 +804,7 @@ describe("given an organization with legacy access rows", () => {
 
       expect(outcome.status).toBe("migrated");
       const report = outcome.report as {
-        diffs: Array<{ kind: string; id: string }>;
+        diffs: { kind: string; id: string }[];
       };
       expect(report.diffs).toContainEqual(
         expect.objectContaining({ kind: "grant_revoked", id: row.id }),
@@ -851,7 +851,7 @@ describe("given an organization with legacy access rows", () => {
         ),
       ).toBe(true);
       const report = outcome.report as {
-        diffs: Array<{ kind: string; field?: string }>;
+        diffs: { kind: string; field?: string }[];
       };
       expect(report.diffs).toContainEqual(
         expect.objectContaining({ kind: "role_changed", field: "permissions" }),
@@ -886,7 +886,7 @@ describe("given an organization with legacy access rows", () => {
 
       expect(outcome.status).toBe("migrated");
       const report = outcome.report as {
-        diffs: Array<{ kind: string; field?: string }>;
+        diffs: { kind: string; field?: string }[];
       };
       expect(report.diffs).toContainEqual(
         expect.objectContaining({ kind: "role_changed", field: "name" }),
@@ -983,7 +983,7 @@ describe("given an organization with legacy access rows", () => {
       expect(outcome.status).toBe("migrated");
       const report = outcome.report as {
         outstanding: number;
-        diffs: Array<{ kind: string; id: string }>;
+        diffs: { kind: string; id: string }[];
       };
       // Named, not repaired: `role.upsert` leaves `deletedAt` alone, so no
       // restatement could raise the row.

@@ -5,7 +5,7 @@ export class MemoryBillingWebhookHostChannel extends BillingWebhookHost {
   async sendSlackSubscriptionEvent(): Promise<void> {}
   async sendSlackBillingThresholdFailureAlert(): Promise<void> {}
   async listOrganizationRetentionRules(): Promise<
-    Array<{ scopeType: string; scopeId: string; category: string }>
+    { scopeType: string; scopeId: string; category: string }[]
   > {
     return [];
   }

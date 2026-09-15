@@ -29,7 +29,7 @@ export interface CanonicalPointValues {
   positiveBucketCounts: string[];
   negativeOffset: number | null;
   negativeBucketCounts: string[];
-  quantileValues: Array<{ quantile: number | null; value: number | null }>;
+  quantileValues: { quantile: number | null; value: number | null }[];
 }
 
 function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValues"] {

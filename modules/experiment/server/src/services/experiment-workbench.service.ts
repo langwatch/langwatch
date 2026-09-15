@@ -112,7 +112,7 @@ export class ExperimentWorkbenchService {
     const state = parseWorkbenchState(command.state);
     const target = await this.repository.resolveWorkbenchSaveTarget(command);
     if (target.kind === "create") {
-      return await this.createEvaluationsV3({
+      return this.createEvaluationsV3({
         ...command,
         ...(target.id ? { id: target.id } : {}),
       });
@@ -184,7 +184,7 @@ export class ExperimentWorkbenchService {
       throw new InvalidExperimentConfigurationError(current.slug);
     }
 
-    return await this.saveWorkbenchState({
+    return this.saveWorkbenchState({
       ...command,
       state: current.state,
       expectedVersion: current.version,
@@ -216,7 +216,7 @@ export class ExperimentWorkbenchService {
     });
     const restored = parseWorkbenchState(version.state);
 
-    return await this.saveWorkbenchState({
+    return this.saveWorkbenchState({
       projectId: command.projectId,
       id: current.experimentId,
       state: current.state?.results ? { ...restored, results: current.state.results } : restored,
@@ -240,7 +240,7 @@ export class ExperimentWorkbenchService {
       throw new InvalidExperimentConfigurationError(current.slug);
     }
 
-    return await this.saveWorkbenchState({
+    return this.saveWorkbenchState({
       projectId: command.projectId,
       id: current.experimentId,
       state: { ...current.state, results: command.results },

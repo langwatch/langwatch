@@ -236,7 +236,7 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
         LIMIT ${limit}
         -- @tenancy: scheduler cross-tenant ops read (system-owned, read-only)
       `,
-      this.prisma.$queryRaw<Array<{ total: number }>>`
+      this.prisma.$queryRaw<{ total: number }[]>`
         SELECT COUNT(*)::int AS "total"
         FROM "ScheduledJob"
         WHERE "active" = false

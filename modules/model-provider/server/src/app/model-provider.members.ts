@@ -56,12 +56,12 @@ export abstract class ModelProviderCredentialPolicy {
     storedCredentialsUnreadable: boolean;
   }): void;
   abstract mergeHeaders(input: {
-    incoming: Array<{ key: string; value: string }>;
-    stored: Array<{ key: string; value: string }>;
-  }): Array<{ key: string; value: string }>;
+    incoming: { key: string; value: string }[];
+    stored: { key: string; value: string }[];
+  }): { key: string; value: string }[];
   abstract maskHeaders(
-    value: Array<{ key: string; value: string }>,
-  ): Array<{ key: string; value: string }>;
+    value: { key: string; value: string }[],
+  ): { key: string; value: string }[];
 }
 
 /** OAuth exchange boundary owned by the application runtime. */

@@ -9,7 +9,7 @@ import { ModelProviderAuthorizationService } from "../model-provider-authorizati
 
 /** Records what was asked of authz, and answers however the test wants. */
 function recordingAuthz(permitted: boolean) {
-  const asked: Array<{ permission: string; tier: string; id: string }> = [];
+  const asked: { permission: string; tier: string; id: string }[] = [];
   const authz = {
     getDecision: async (input: {
       userId: string;

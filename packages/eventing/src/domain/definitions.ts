@@ -36,11 +36,11 @@ export function defineAggregate<
   const seen = new Set<string>();
   for (const event of definition.events) {
     if (event.type.trim().length === 0) {
-      throw new Error(`Aggregate \"${definition.type}\" has an empty event type`);
+      throw new Error(`Aggregate "${definition.type}" has an empty event type`);
     }
     if (seen.has(event.type)) {
       throw new Error(
-        `Aggregate \"${definition.type}\" declares event \"${event.type}\" more than once`,
+        `Aggregate "${definition.type}" declares event "${event.type}" more than once`,
       );
     }
     seen.add(event.type);
@@ -65,7 +65,7 @@ export class EventCatalogue {
         existingAggregateDefinition &&
         (existingAggregateDefinition.events.length > 0 || aggregate.events.length > 0)
       ) {
-        throw new Error(`Aggregate type \"${aggregate.type}\" is registered twice`);
+        throw new Error(`Aggregate type "${aggregate.type}" is registered twice`);
       }
       if (existingAggregateDefinition) continue;
       this.aggregatesByType.set(aggregate.type, aggregate);
@@ -74,7 +74,7 @@ export class EventCatalogue {
         const existingAggregate = this.aggregateByEventType.get(event.type);
         if (existingAggregate !== undefined) {
           throw new Error(
-            `Event type \"${event.type}\" belongs to both \"${existingAggregate}\" and \"${aggregate.type}\"`,
+            `Event type "${event.type}" belongs to both "${existingAggregate}" and "${aggregate.type}"`,
           );
         }
         this.aggregateByEventType.set(event.type, aggregate.type);
@@ -97,11 +97,11 @@ export class EventCatalogue {
   assertEvent(aggregateType: AggregateType, eventType: EventType): void {
     const registeredAggregate = this.aggregateByEventType.get(eventType);
     if (registeredAggregate === undefined) {
-      throw new Error(`Event type \"${eventType}\" is not registered`);
+      throw new Error(`Event type "${eventType}" is not registered`);
     }
     if (registeredAggregate !== aggregateType) {
       throw new Error(
-        `Event type \"${eventType}\" belongs to aggregate \"${registeredAggregate}\", not \"${aggregateType}\"`,
+        `Event type "${eventType}" belongs to aggregate "${registeredAggregate}", not "${aggregateType}"`,
       );
     }
   }

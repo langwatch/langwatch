@@ -93,7 +93,7 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
   }
 
   /** Fact stamps are a ClickHouse-side projection; this tier holds none. */
-  async listSessionsByStampedBranch(): Promise<Array<{ tenantId: string; sessionId: string }>> {
+  async listSessionsByStampedBranch(): Promise<{ tenantId: string; sessionId: string }[]> {
     return [];
   }
 }

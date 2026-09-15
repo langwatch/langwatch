@@ -64,7 +64,7 @@ function conversationEvent(action: string): NormalizedPullEvent {
 
 function attributesOf(request: unknown) {
   const span = (request as any).resourceSpans[0].scopeSpans[0].spans[0];
-  return (span.attributes as Array<{ key: string; value: any }>).reduce<
+  return (span.attributes as { key: string; value: any }[]).reduce<
     Record<string, string | undefined>
   >((acc, attr) => {
     acc[attr.key] = attr.value?.stringValue;

@@ -98,12 +98,12 @@ const scopeRank = (scopeType?: string): number =>
  * narrower-scope row that can't serve the mode. Exported for tests.
  */
 export const providersWithoutRegistryModels = (
-  rows: Array<{
+  rows: {
     provider: string;
     enabled: boolean;
     scopeType?: string | undefined;
     embeddingsUnsupported?: boolean | undefined;
-  }>,
+  }[],
   mode: "chat" | "embedding",
 ): Set<string> => {
   const unavailable = new Set<string>();

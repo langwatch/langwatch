@@ -29,7 +29,7 @@ export class StubDatasetHost extends DatasetHostApi {
   readonly successes: DatasetSuccessNotice[] = [];
   readonly failures: DatasetFailureNotice[] = [];
   readonly navigations: string[] = [];
-  readonly queries: Array<Readonly<Record<string, string | undefined>>> = [];
+  readonly queries: Readonly<Record<string, string | undefined>>[] = [];
 
   constructor(private readonly options: StubDatasetHostOptions = {}) {
     super();

@@ -28,7 +28,7 @@ vi.mock("shiki", () => {
 const TOKEN = "sk-lw-test-token-value";
 
 function renderDialog(
-  overrides: { projectId?: string; orgProjects?: Array<{ id: string; name: string }> } = {},
+  overrides: { projectId?: string; orgProjects?: { id: string; name: string }[] } = {},
 ) {
   const host = new FakeApiKeyHost();
   render(

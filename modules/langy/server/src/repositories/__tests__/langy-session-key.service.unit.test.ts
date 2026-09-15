@@ -19,8 +19,8 @@ import { Temporal, type Instant } from "@langwatch/time";
 class SessionKeyRepository extends LangySessionKeyRepository {
   key: LangySessionKeyRecord | null = null;
   reapedCount = 0;
-  readonly revocations: Array<{ apiKeyId: string; revokedAt: Instant }> = [];
-  readonly reaperCalls: Array<{ revokedAt: Instant; name: string }> = [];
+  readonly revocations: { apiKeyId: string; revokedAt: Instant }[] = [];
+  readonly reaperCalls: { revokedAt: Instant; name: string }[] = [];
 
   async tryFindProjectScope() {
     return { teamId: "team-1", organizationId: "organization-1" };

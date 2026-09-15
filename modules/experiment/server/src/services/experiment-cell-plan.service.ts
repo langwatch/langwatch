@@ -91,7 +91,7 @@ export class ExperimentCellPlanService {
     datasetId,
   }: {
     state: PlanState;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     scope: Extract<ExecutionScope, { type: "evaluator-all-rows" }>;
     datasetId: string;
   }): ExecutionCell[] {
@@ -136,7 +136,7 @@ export class ExperimentCellPlanService {
     datasetId,
   }: {
     state: PlanState;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     scope: Extract<ExecutionScope, { type: "evaluator" }>;
     datasetId: string;
   }): ExecutionCell[] {
@@ -210,7 +210,7 @@ export class ExperimentCellPlanService {
     seedTargetOutputs,
   }: {
     state: PlanState;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     scope: ExecutionScope;
     seedTargetOutputs?: Record<string, SeededTargetOutput>;
   }): ExecutionCell[] {
@@ -304,7 +304,7 @@ export class ExperimentCellPlanService {
     seedTargetOutputs,
   }: {
     state: PlanState;
-    datasetRows: Array<Record<string, unknown>>;
+    datasetRows: Record<string, unknown>[];
     scope: ExecutionScope;
     seedTargetOutputs?: Record<string, SeededTargetOutput>;
   }): number {

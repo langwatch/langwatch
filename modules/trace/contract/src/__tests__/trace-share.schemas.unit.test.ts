@@ -82,7 +82,7 @@ const keysOf = (schema: { shape: Record<string, unknown> }) => Object.keys(schem
 describe("sharedTrace output schema", () => {
   describe("given an internal read schema the share payload mirrors", () => {
     const shared = sharedTraceDtoSchema.shape;
-    const sections: Array<[string, string[], string[]]> = [
+    const sections: [string, string[], string[]][] = [
       ["header", keysOf(traceHeaderSchema), keysOf(shared.header)],
       ["spanTree", keysOf(spanTreeNodeSchema), keysOf(shared.spanTree.element)],
       ["spansFull", keysOf(spanDetailSchema), keysOf(shared.spansFull.element)],

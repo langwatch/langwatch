@@ -47,7 +47,7 @@ export interface SubsystemProbeCollaborators {
       projectId: string;
       triggerId: string;
       limit: number;
-    }): Promise<ReadonlyArray<{ firedAt: Instant }>>;
+    }): Promise<readonly { firedAt: Instant }[]>;
   }>;
   /** Whether the project has the workflow the workflow probe was pointed at. */
   workflowExists(input: { workflowId: string; projectId: string }): Promise<boolean>;
@@ -55,22 +55,22 @@ export interface SubsystemProbeCollaborators {
 
 /** The OTLP body a canary is sent as, written out rather than borrowed. */
 type CanaryOtelPayload = Readonly<{
-  resourceSpans: ReadonlyArray<{
-    resource: { attributes: ReadonlyArray<{ key: string; value: { stringValue: string } }> };
-    scopeSpans: ReadonlyArray<{
+  resourceSpans: readonly {
+    resource: { attributes: readonly { key: string; value: { stringValue: string } }[] };
+    scopeSpans: readonly {
       scope: { name: string };
-      spans: ReadonlyArray<{
+      spans: readonly {
         traceId: string;
         spanId: string;
         name: string;
         kind: string;
         startTimeUnixNano: string;
         endTimeUnixNano: string;
-        attributes: ReadonlyArray<{ key: string; value: { stringValue: string } }>;
+        attributes: readonly { key: string; value: { stringValue: string } }[];
         status: Record<string, never>;
-      }>;
-    }>;
-  }>;
+      }[];
+    }[];
+  }[];
 }>;
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

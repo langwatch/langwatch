@@ -61,7 +61,7 @@ export class ExperimentFindOrCreateService {
     }
 
     if (!experiment && slug) {
-      return await this.experiments.save({
+      return this.experiments.save({
         id: generate(EXPERIMENT_KSUID_RESOURCE).toString(),
         name: input.experimentName ?? input.experimentSlug ?? slug,
         requestedSlug: slug,
@@ -80,7 +80,7 @@ export class ExperimentFindOrCreateService {
     // A name or a workflow sent with an EXISTING experiment updates it; the
     // slug is preserved, because it is already in the customer's URLs.
     if (input.experimentName ?? input.workflowId) {
-      return await this.experiments.save({
+      return this.experiments.save({
         id: experiment.id,
         name: input.experimentName ?? experiment.name,
         requestedSlug: experiment.slug,

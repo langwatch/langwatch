@@ -78,7 +78,7 @@ export class LangyUiActionBackendService {
         return { source: "saved", version: read.version, ...read.projection };
       }
       case "transform":
-        return await this.applyTransform({
+        return this.applyTransform({
           projectId,
           kind,
           definition,
@@ -87,7 +87,7 @@ export class LangyUiActionBackendService {
           actor,
         });
       case "run":
-        return await this.startRun({
+        return this.startRun({
           projectId,
           kind,
           payload,
@@ -159,7 +159,7 @@ export class LangyUiActionBackendService {
 
     logger.info({ kind, target }, "stale save, retrying transform once");
 
-    return await this.applyTransform({
+    return this.applyTransform({
       projectId,
       kind,
       definition,

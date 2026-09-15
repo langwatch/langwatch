@@ -23,7 +23,7 @@ const successResponse = {
 };
 
 describe("scenario model factory", () => {
-  let requestBodies: Array<Record<string, unknown>>;
+  let requestBodies: Record<string, unknown>[];
 
   beforeEach(() => {
     requestBodies = [];

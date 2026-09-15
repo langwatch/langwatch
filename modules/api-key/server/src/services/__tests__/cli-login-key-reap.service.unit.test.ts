@@ -14,7 +14,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 const NOW = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 
 function repositoryDouble(
-  elapsed: Array<{ id: string; userId: string | null; organizationId: string }> = [],
+  elapsed: { id: string; userId: string | null; organizationId: string }[] = [],
 ) {
   const findElapsedLoginKeys = vi.fn(async (_input: { now: Instant }) => elapsed);
   const repository = { findElapsedLoginKeys } as unknown as ApiKeyRepository;

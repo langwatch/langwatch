@@ -54,7 +54,7 @@ const answerJudge = {
 };
 
 const serviceWith = (
-  evaluators: Array<typeof sqlEquivalence | typeof answerJudge>,
+  evaluators: (typeof sqlEquivalence | typeof answerJudge)[],
 ): EvaluatorsApiService =>
   ({
     get: vi.fn(async (reference: string) => {

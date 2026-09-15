@@ -118,7 +118,7 @@ export type GovernanceIngestMetricCollectionChannel = (input: {
  * deployment with no gateway spend store can honestly say.
  */
 export type GovernanceIngestSpend = Readonly<{
-  insertDebit: (rows: ReadonlyArray<Record<string, unknown>>) => Promise<unknown>;
+  insertDebit: (rows: readonly Record<string, unknown>[]) => Promise<unknown>;
   resolveApplicableBudgets: (scopes: {
     organizationId: string;
     teamId: string;
@@ -126,9 +126,9 @@ export type GovernanceIngestSpend = Readonly<{
     virtualKeyId: string;
     principalUserId: string | null;
   }) => Promise<
-    ReadonlyArray<{
+    readonly {
       budget: Readonly<{ id: string; scopeType: string; scopeId: string; window: string }>;
-    }>
+    }[]
   >;
   appendChange: (input: {
     organizationId: string;
@@ -427,7 +427,7 @@ export function createGovernanceIngestRestApp(options: {
     if (!header) return null;
     const match = /^Bearer\s+(lw_is_[A-Za-z0-9_-]+)$/.exec(header.trim());
     if (!match) return null;
-    return await ports.governance().findIngestionSourceByIngestSecret(match[1]!);
+    return ports.governance().findIngestionSourceByIngestSecret(match[1]!);
   };
 
   /**

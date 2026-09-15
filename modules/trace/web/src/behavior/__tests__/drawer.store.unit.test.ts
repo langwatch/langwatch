@@ -21,7 +21,7 @@ beforeEach(() => {
     preMaximizeWidthPx: null,
   });
   // Reset pane state by toggling any "on" flags back off.
-  (Object.keys(paneState) as Array<keyof typeof paneState>).forEach((id) => {
+  (Object.keys(paneState) as (keyof typeof paneState)[]).forEach((id) => {
     if (paneState[id].collapsed) togglePaneCollapsed(id);
     if (paneState[id].maximizedWithinGroup) togglePaneMaximized(id);
   });

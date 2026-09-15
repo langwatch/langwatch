@@ -33,7 +33,7 @@ describe("customEvaluatorTemplate", () => {
     it("references the input in its prompt and drops llm_output", () => {
       const params = (
         node("llm_call").data as {
-          parameters: Array<{ identifier: string; value: unknown }>;
+          parameters: { identifier: string; value: unknown }[];
         }
       ).parameters;
       const messages = JSON.stringify(params.find((p) => p.identifier === "messages")?.value);
@@ -46,7 +46,7 @@ describe("customEvaluatorTemplate", () => {
     /** @scenario Custom evaluator template lists details first on the end node */
     it("puts details first so the reasoning edge does not cross the verdict", () => {
       expect(
-        (node("end").data as { inputs: Array<{ identifier: string }> }).inputs.map(
+        (node("end").data as { inputs: { identifier: string }[] }).inputs.map(
           (i) => i.identifier,
         ),
       ).toEqual(["details", "passed", "score", "label"]);

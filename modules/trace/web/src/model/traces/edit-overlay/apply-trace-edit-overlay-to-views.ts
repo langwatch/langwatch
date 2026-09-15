@@ -148,7 +148,7 @@ function correctedSpanCount({
 }: {
   header: TraceHeader;
   patch: TraceEditOverlayPatch;
-  spans?: ReadonlyArray<{ spanId: string; parentSpanId?: string | null }>;
+  spans?: readonly { spanId: string; parentSpanId?: string | null }[];
 }): number | undefined {
   if (!spans || spans.length === 0) return undefined;
   const removed = countRemovedSpans({
@@ -214,7 +214,7 @@ export function applyOverlayToTraceHeader({
 }: {
   header: TraceHeader;
   patch: TraceEditOverlayPatch | null | undefined;
-  spans?: ReadonlyArray<{ spanId: string; parentSpanId?: string | null }>;
+  spans?: readonly { spanId: string; parentSpanId?: string | null }[];
 }): TraceHeader {
   if (!patch || !patchHasAnyEdit(patch)) return header;
 

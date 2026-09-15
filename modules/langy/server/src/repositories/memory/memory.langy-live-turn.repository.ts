@@ -97,7 +97,7 @@ export class LangyResourceLinksMemoryRepository implements LangyResourceLinksRep
 
   async remember(input: {
     conversationId: string;
-    links: Array<{ id: string; href: string }>;
+    links: { id: string; href: string }[];
   }): Promise<void> {
     const links = this.store.resourceLinks.get(input.conversationId) ?? new Map<string, string>();
     for (const link of input.links) links.set(link.id, link.href);

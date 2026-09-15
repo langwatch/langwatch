@@ -198,7 +198,7 @@ describe.skipIf(!DB_URL)(
     };
 
     describe("given a member who administers two teams and a shared project", () => {
-      let result: { teamsLeftWithoutAdmin: Array<{ id: string; name: string }> };
+      let result: { teamsLeftWithoutAdmin: { id: string; name: string }[] };
 
       beforeAll(async () => {
         result = await repository.updateMemberRole({

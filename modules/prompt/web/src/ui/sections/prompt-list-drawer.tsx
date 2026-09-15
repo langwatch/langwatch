@@ -34,8 +34,8 @@ export type PromptListDrawerProps = {
     name: string;
     version?: number;
     versionId?: string;
-    inputs?: Array<{ identifier: string; type: string }>;
-    outputs?: Array<{ identifier: string; type: string }>;
+    inputs?: { identifier: string; type: string }[];
+    outputs?: { identifier: string; type: string }[];
   }) => void;
   onCreateNew?: () => void;
 };
@@ -263,12 +263,12 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
 
 type PromptFolderProps = {
   folder: string;
-  prompts: Array<{
+  prompts: {
     id: string;
     handle: string | null;
     model: string | null;
     version: number;
-  }>;
+  }[];
   onSelect: (prompt: { id: string; handle: string | null }) => void;
 };
 

@@ -207,7 +207,7 @@ export class ExperimentTargetLoadingService {
     evaluators,
     services,
   }: LoadArgs & {
-    evaluators: Array<{ dbEvaluatorId?: string }>;
+    evaluators: { dbEvaluatorId?: string }[];
   }): Promise<Map<string, Evaluator> | LoadFailure> {
     const ids = new Set<string>();
     for (const evaluator of evaluators) {

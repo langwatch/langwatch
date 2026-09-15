@@ -35,7 +35,7 @@ function reaches(scopeType: string, scopeId: string, over: Record<string, unknow
 
 describe("GatewayBudgetScopeReachService", () => {
   describe("given each scope type", () => {
-    const matching: Array<[string, string]> = [
+    const matching: [string, string][] = [
       ["ORGANIZATION", "organization-1"],
       ["TEAM", "team-1"],
       ["PROJECT", "project-1"],

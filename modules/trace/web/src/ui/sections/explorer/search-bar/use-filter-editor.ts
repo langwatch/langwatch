@@ -72,8 +72,8 @@ function suggestionRowsEqual(
 }
 
 function suggestionRowArraysEqual(
-  a: ReadonlyArray<{ value: string; isPrefix?: boolean }>,
-  b: ReadonlyArray<{ value: string; isPrefix?: boolean }>,
+  a: readonly { value: string; isPrefix?: boolean }[],
+  b: readonly { value: string; isPrefix?: boolean }[],
 ): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;

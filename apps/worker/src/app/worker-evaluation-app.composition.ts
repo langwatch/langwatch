@@ -302,7 +302,7 @@ class WorkerEvaluationWorkflowLlmParameters implements WorkflowLlmParameters {
   }): Promise<readonly WorkflowLlmParameterResolution[]> {
     const providers = await getProjectModelProviders(this.#modelProviders, input.projectId);
 
-    return await Promise.all(
+    return Promise.all(
       input.models.map(async (model) => {
         const provider = model.split("/")[0]!;
         const modelProvider = providers[provider];

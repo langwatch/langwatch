@@ -863,7 +863,7 @@ export class Experiment {
             const callbackResult = callback(ctx);
 
             if (callbackResult && typeof (callbackResult as Promise<R>).then === "function") {
-              return await callbackResult;
+              return callbackResult;
             }
             return callbackResult as R;
           });

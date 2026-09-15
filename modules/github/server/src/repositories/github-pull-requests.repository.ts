@@ -120,11 +120,11 @@ export abstract class GithubPullRequestsRepository {
    */
   abstract findAllByBranchKeys(params: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
+    }[];
   }): Promise<GithubPullRequestRow[]>;
 
   /** One pull request by its number within a repository, or null. */

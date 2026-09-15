@@ -10,7 +10,7 @@ interface PromptInput {
 /** Every template variable the prompt text and the messages name. */
 function detectedVariableNames(
   prompt: string,
-  messages: Array<{ role: string; content: string }>,
+  messages: { role: string; content: string }[],
 ): Set<string> {
   const detected = new Set<string>();
 
@@ -34,7 +34,7 @@ export function mergeAutoDetectedInputs({
   inputs,
 }: {
   prompt: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: { role: string; content: string }[];
   inputs: PromptInput[];
 }): PromptInput[] {
   const detectedNames = detectedVariableNames(prompt, messages);

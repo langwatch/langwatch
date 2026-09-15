@@ -68,8 +68,8 @@ function recordingDatabase(row: typeof storedRow | null = storedRow) {
 }
 
 function recordingPorts() {
-  const changes: Array<{ kind: string; inTransaction: boolean }> = [];
-  const audits: Array<{ action: string; inTransaction: boolean }> = [];
+  const changes: { kind: string; inTransaction: boolean }[] = [];
+  const audits: { action: string; inTransaction: boolean }[] = [];
   return {
     changes,
     audits,

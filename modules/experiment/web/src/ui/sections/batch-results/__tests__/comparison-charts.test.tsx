@@ -44,13 +44,13 @@ const createMockRunData = (
     metadata: metadata ?? defaultMetadata(i),
   }));
 
-  const evaluatorResults: Array<{
+  const evaluatorResults: {
     evaluatorId: string;
     evaluatorName: string;
     status: "processed" | "skipped" | "error";
     score: number | null;
     passed: boolean | null;
-  }> = [];
+  }[] = [];
   if (hasScores) {
     evaluatorResults.push({
       evaluatorId: "accuracy",

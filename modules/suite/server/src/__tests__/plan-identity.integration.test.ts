@@ -168,7 +168,7 @@ function fakeScenarioService(): ScenarioApi {
   } as unknown as ScenarioApi;
 }
 
-function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecution {
+function capturingExecution(started: Record<string, unknown>[]): SuiteExecution {
   return {
     execute: vi.fn(async (input): Promise<SuiteRunResult> => {
       started.push(input);
@@ -184,7 +184,7 @@ function capturingExecution(started: Array<Record<string, unknown>>): SuiteExecu
 }
 
 let agents: Map<string, FakeAgent>;
-let startedRuns: Array<Record<string, unknown>>;
+let startedRuns: Record<string, unknown>[];
 let suiteService: SuiteService;
 
 function buildService() {

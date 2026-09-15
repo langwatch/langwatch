@@ -213,7 +213,7 @@ function buildEntries({
   matchups: number[];
   strength: number[];
   score: number[];
-  scoreCI: Array<[number, number] | null>;
+  scoreCI: ([number, number] | null)[];
   degenerateMask: boolean[];
 }): BTLeaderboardEntry[] {
   const entries: BTLeaderboardEntry[] = variantIds.map((id, i) => ({
@@ -482,7 +482,7 @@ function bootstrapIntervals({
   variantIds: string[];
   opts: Required<BTLeaderboardOptions>;
 }): {
-  scoreCI: Array<[number, number] | null>;
+  scoreCI: ([number, number] | null)[];
   differenceCI: ScoreDifferenceCI | null;
   nonConvergence: number | null;
 } {
@@ -526,7 +526,7 @@ function bootstrapScoreCI({
   maxIter: number;
   tol: number;
 }): {
-  scoreCI: Array<[number, number] | null>;
+  scoreCI: ([number, number] | null)[];
   differenceCI: ScoreDifferenceCI;
   nonConverged: number;
 } {

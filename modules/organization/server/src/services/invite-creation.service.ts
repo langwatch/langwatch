@@ -117,10 +117,10 @@ export class InviteCreationService {
     user,
   }: {
     organizationId: string;
-    newInvites: Array<{
+    newInvites: {
       role: OrganizationUserRole;
-      teams?: Array<{ customRoleId?: string }>;
-    }>;
+      teams?: { customRoleId?: string }[];
+    }[];
     user?: PlanProviderUser;
   }): Promise<void> {
     const subscriptionLimits = await this.planProvider.getActivePlan({
@@ -308,7 +308,7 @@ export class InviteCreationService {
     validation: "strict" | "lenient";
   }): Promise<{
     organization: Organization & { members: OrganizationUser[] };
-    invites: Array<{ invite: OrganizationInvite; emailNotSent: boolean }>;
+    invites: { invite: OrganizationInvite; emailNotSent: boolean }[];
   }> {
     const isStrict = validation === "strict";
 
@@ -421,12 +421,12 @@ export class InviteCreationService {
     invites: CreateAdminInviteInput[];
     organization: Organization;
     isStrict: boolean;
-  }): Promise<Array<{ invite: OrganizationInvite; organization: Organization }>> {
+  }): Promise<{ invite: OrganizationInvite; organization: Organization }[]> {
     const txInviteService = this.onRepository(transaction);
-    const records: Array<{
+    const records: {
       invite: OrganizationInvite;
       organization: Organization;
-    }> = [];
+    }[] = [];
 
     for (const invite of invites) {
       const existingInvite = await txInviteService.tryCheckDuplicateInvite({

@@ -17,7 +17,7 @@ import {
 const PROCESS_NAME = "langwatch-api";
 
 /** The command names a definition declares, in the order it declares them. */
-function commandNamesOf(definition: { commands: ReadonlyArray<{ name: string }> }): string[] {
+function commandNamesOf(definition: { commands: readonly { name: string }[] }): string[] {
   return definition.commands.map((command) => command.name);
 }
 

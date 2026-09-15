@@ -115,7 +115,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
 
   // Compat heads kept for rollback-to-legacy; outside transaction, conflicts best-effort.
   private async writeCompatHeads(
-    entries: Array<{ write: GrantProjectionWrite; result: unknown }>,
+    entries: { write: GrantProjectionWrite; result: unknown }[],
   ): Promise<void> {
     for (const { write, result } of entries) {
       try {

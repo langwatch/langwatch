@@ -299,12 +299,12 @@ type CanonicalProvider = {
   /** Last known reachability, rendered by the routing-policy credential picker. */
   healthStatus?: "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
   customKeys: Record<string, unknown> | null;
-  customModels: Array<{ id: string; label: string; type: string }>;
-  customEmbeddingsModels: Array<{ id: string; label: string; type: string }>;
+  customModels: { id: string; label: string; type: string }[];
+  customEmbeddingsModels: { id: string; label: string; type: string }[];
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   /** Where the provider is attached; `filterProvidersByScope` reads it directly. */
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   /** Operator override, or null to fall through to the registry default (ADR-129). */
   langySkipPermissionsModels?: string[] | null;
   /** Gateway knobs the Advanced (Gateway) accordion edits. */

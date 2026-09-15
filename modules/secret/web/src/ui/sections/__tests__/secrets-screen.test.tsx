@@ -15,7 +15,7 @@ import SecretsScreen from "../secrets-screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    secrets: [] as Array<Record<string, unknown>>,
+    secrets: [] as Record<string, unknown>[],
     isLoading: false,
     createRejectsWith: void 0 as unknown,
     deleteRejectsWith: void 0 as unknown,

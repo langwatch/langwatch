@@ -33,7 +33,7 @@ function makeRepositoryReturning(record: Record<string, unknown>) {
   });
 }
 
-function makeOrderingRepository(rows: Array<Record<string, unknown>>) {
+function makeOrderingRepository(rows: Record<string, unknown>[]) {
   const { client, seen } = orderingClient(rows);
   return {
     repository: TraceAnalyticsClickHouseRepository.create({

@@ -81,15 +81,15 @@ export function startLangySession(options: LangySessionOptions): LangySession {
   /** Every call this session took, so a replayed one is never taken twice. */
   const handled = new Set<string>();
   const pending = new Map<string, PendingPermission>();
-  const background: Array<{ pid: number; logPath: string }> = [];
+  const background: { pid: number; logPath: string }[] = [];
   /** Asks waiting for the selector, which draws one question at a time. */
-  const askQueue: Array<{
+  const askQueue: {
     call: LocalCall;
     summary: string;
     reason: string;
     patterns: string[];
     timeoutSeconds?: number;
-  }> = [];
+  }[] = [];
   let selectorOpen = false;
 
   let skipPermissions = false;

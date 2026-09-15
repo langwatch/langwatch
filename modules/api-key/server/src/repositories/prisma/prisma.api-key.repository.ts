@@ -1,4 +1,4 @@
-import { PrismaRepository, type PrismaRepositoryClient } from "@langwatch/prisma-client";
+import { PrismaRepository, type PrismaModelClient } from "@langwatch/prisma-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
@@ -12,7 +12,7 @@ import type {
   StoredApiKey,
 } from "../api-key.repository.ts";
 
-export type PrismaApiKeyDatabase = PrismaRepositoryClient<["ApiKey"]>;
+export type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey">;
 
 /** Prisma persistence is private to the API-key server package. */
 export class PrismaApiKeyRepository
@@ -175,7 +175,7 @@ export class PrismaApiKeyRepository
   findLiveChildren(input: {
     parentApiKeyId: string;
     organizationId: string;
-  }): Promise<Array<{ id: string }>> {
+  }): Promise<{ id: string }[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
@@ -200,7 +200,7 @@ export class PrismaApiKeyRepository
   }
   findElapsedLoginKeys(input: {
     now: Instant;
-  }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>> {
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
     return this.database.apiKey.findMany({
       where: {
         name: { startsWith: CLI_LOGIN_KEY_NAME_PREFIX },

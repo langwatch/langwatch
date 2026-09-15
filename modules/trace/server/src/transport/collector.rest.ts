@@ -342,7 +342,7 @@ async function collect({
   });
   if (isCollectorRejection(prepared)) return answer(prepared.body, prepared.status);
 
-  return await ingestCollectorBody({ project, app, params, prepared });
+  return ingestCollectorBody({ project, app, params, prepared });
 }
 
 export const collectorRest = defineRestRouter(CollectorApi)

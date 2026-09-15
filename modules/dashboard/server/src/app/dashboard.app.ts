@@ -287,7 +287,7 @@ export class DashboardApp implements DashboardApi {
   /** The whole grid after a drag. */
   batchUpdateGraphLayouts(input: {
     projectId: string;
-    layouts: Array<{ graphId: string; layout: GraphLayout }>;
+    layouts: { graphId: string; layout: GraphLayout }[];
   }): Promise<{ success: true }> {
     return this.#dashboards.batchUpdateGraphLayouts(input);
   }

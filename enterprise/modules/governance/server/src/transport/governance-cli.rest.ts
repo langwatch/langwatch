@@ -132,13 +132,13 @@ export type GovernanceCliBudgetReader = Readonly<{
   }) => Promise<
     Readonly<{
       decision: string;
-      blockedBy: ReadonlyArray<{
+      blockedBy: readonly {
         scope: string;
         scopeId: string;
         limitUsd: string;
         spentUsd: string;
         window: string;
-      }>;
+      }[];
     }>
   >;
 }>;
@@ -986,7 +986,7 @@ export function createGovernanceCliRestApp(options: {
       }
 
       if (parsed.data.project) {
-        return await mintProjectIngestionKey(c, {
+        return mintProjectIngestionKey(c, {
           caller,
           projectRef: parsed.data.project,
           sourceType: parsed.data.source_type,
@@ -994,7 +994,7 @@ export function createGovernanceCliRestApp(options: {
         });
       }
 
-      return await mintPersonalIngestionKey(c, {
+      return mintPersonalIngestionKey(c, {
         caller,
         sourceType: parsed.data.source_type,
       });
@@ -1288,7 +1288,7 @@ async function issuePersonalVirtualKey(input: {
     displayEmail,
   });
   const suffix = input.deviceLabel ?? randomBytes(3).toString("hex");
-  return await governance.personalVirtualKeyIssue({
+  return governance.personalVirtualKeyIssue({
     userId,
     organizationId,
     personalProjectId: workspace.project.id,

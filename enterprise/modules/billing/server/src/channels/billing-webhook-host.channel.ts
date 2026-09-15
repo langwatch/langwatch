@@ -15,7 +15,7 @@ export abstract class BillingWebhookHost {
 
   abstract listOrganizationRetentionRules(input: {
     organizationId: string;
-  }): Promise<Array<{ scopeType: string; scopeId: string; category: string }>>;
+  }): Promise<{ scopeType: string; scopeId: string; category: string }[]>;
 
   abstract setOrganizationRetention(input: {
     scope: { scopeType: "ORGANIZATION"; scopeId: string };

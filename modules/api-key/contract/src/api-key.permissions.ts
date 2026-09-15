@@ -14,7 +14,7 @@ export function refineRestrictedPermissions(
   data: {
     permissionMode?: string;
     permissions?: string[];
-    bindings?: Array<{ role: string }>;
+    bindings?: { role: string }[];
   },
   ctx: z.RefinementCtx,
 ): void {

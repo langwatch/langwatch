@@ -23,13 +23,13 @@ export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
   readonly bindings: AuthzManagedBindingRow[] = [];
-  readonly scopes: Array<AuthzBindingScopeRow & { organizationId: string }> = [];
-  readonly groupMemberships: Array<{ organizationId: string; userId: string } & AuthzUserGroupRow> =
+  readonly scopes: (AuthzBindingScopeRow & { organizationId: string })[] = [];
+  readonly groupMemberships: ({ organizationId: string; userId: string } & AuthzUserGroupRow)[] =
     [];
   readonly organizationRoles = new Map<string, OrganizationRole>();
-  readonly legacySharedTeamMemberships: Array<{ organizationId: string; userId: string }> = [];
-  readonly roles: Array<AuthzAssignableRoleRow & { organizationId: string }> = [];
-  readonly apiKeys: Array<{ organizationId: string; apiKeyId: string }> = [];
+  readonly legacySharedTeamMemberships: { organizationId: string; userId: string }[] = [];
+  readonly roles: (AuthzAssignableRoleRow & { organizationId: string })[] = [];
+  readonly apiKeys: { organizationId: string; apiKeyId: string }[] = [];
 
   static create(): AuthzMemoryStore {
     return new AuthzMemoryStore();

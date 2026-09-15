@@ -63,7 +63,7 @@ export const seatChangeParams = ({
 }) => {
   const params: {
     cancel_at_period_end?: false;
-    items: Array<{ id: string; quantity: number }>;
+    items: { id: string; quantity: number }[];
     proration_behavior: "always_invoice";
     proration_date: number;
   } = {

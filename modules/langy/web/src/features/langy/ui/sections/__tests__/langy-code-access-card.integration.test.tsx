@@ -14,10 +14,10 @@ const setPreference = vi.fn();
 const refetchWorkspace = vi.fn();
 let workspaceData: unknown = null;
 let workspaceError: unknown = null;
-let githubInstallations: Array<{
+let githubInstallations: {
   installationId: string;
   accountLogin: string;
-}> = [];
+}[] = [];
 
 vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),

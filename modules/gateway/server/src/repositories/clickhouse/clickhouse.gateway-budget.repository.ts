@@ -407,9 +407,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     });
     const existing = new Map(
       (
-        (await probe.json()) as Array<
-          { GatewayRequestId: string } & Record<string, string | number>
-        >
+        (await probe.json()) as ({ GatewayRequestId: string } & Record<string, string | number>)[]
       ).map((r) => [r.GatewayRequestId, r]),
     );
 
@@ -483,12 +481,12 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
       },
       format: "JSONEachRow",
     });
-    const [row] = (await result.json()) as Array<{
+    const [row] = (await result.json()) as {
       SpentNanoUSD: string;
       Items: string | number;
       TokensInput: string;
       TokensOutput: string;
-    }>;
+    }[];
     if (!row) return empty;
 
     const nano = BigInt(row.SpentNanoUSD || "0");
@@ -528,7 +526,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
       format: "JSONEachRow",
     });
     const existing = new Map(
-      ((await probe.json()) as Array<{ BudgetId: string; ScopeId: string }>).map((r) => [
+      ((await probe.json()) as { BudgetId: string; ScopeId: string }[]).map((r) => [
         r.BudgetId,
         r.ScopeId,
       ]),
@@ -673,7 +671,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
         },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<Record<string, string>>;
+      const rows = (await result.json()) as Record<string, string>[];
       const row = rows[0] ?? {};
       return floored.map((t, i) => ({
         budgetId: t.budgetId,

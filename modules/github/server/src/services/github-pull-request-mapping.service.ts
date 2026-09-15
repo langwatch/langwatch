@@ -51,11 +51,11 @@ export class GithubPullRequestMappingService {
 
   async findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
+    }[];
   }): Promise<readonly GithubPullRequest[]> {
     const rows = await this.repository.findAllByBranchKeys(input);
 

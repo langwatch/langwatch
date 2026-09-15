@@ -263,7 +263,7 @@ function endpointStreamRef(endpoint: string) {
 }
 
 async function endpointStream(endpoint: string) {
-  return store.findByRef<{ pending: Array<{ appendedAtMs: number }> }>({
+  return store.findByRef<{ pending: { appendedAtMs: number }[] }>({
     ref: endpointStreamRef(endpoint),
   });
 }
@@ -290,7 +290,7 @@ async function sendMessagesFor(endpoint: string) {
 function batchOf(call: DispatchInput) {
   return (
     JSON.parse(call.body) as {
-      batch: Array<{ id: string; type: string; data: Record<string, unknown> }>;
+      batch: { id: string; type: string; data: Record<string, unknown> }[];
     }
   ).batch;
 }

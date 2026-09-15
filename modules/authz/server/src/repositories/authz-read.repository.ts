@@ -156,7 +156,7 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   abstract findShareLinks(args: {
     projectId: string;
     tokens: readonly string[];
-    links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
+    links: readonly { kind: ShareableResourceKind; id: string }[];
     organizationId?: string;
   }): Promise<ShareLinkRow[]>;
 

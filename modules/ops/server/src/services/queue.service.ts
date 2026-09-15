@@ -148,7 +148,7 @@ export class QueueService {
   }
 
   async getAllDlqGroups(): Promise<
-    Array<{
+    {
       queueName: string;
       queueDisplayName: string;
       groupId: string;
@@ -157,10 +157,10 @@ export class QueueService {
       pipelineName: string | null;
       jobCount: number;
       movedAt: number | null;
-    }>
+    }[]
   > {
     const queueNames = await this.repository.discoverQueueNames();
-    const allGroups: Array<{
+    const allGroups: {
       queueName: string;
       queueDisplayName: string;
       groupId: string;
@@ -169,7 +169,7 @@ export class QueueService {
       pipelineName: string | null;
       jobCount: number;
       movedAt: number | null;
-    }> = [];
+    }[] = [];
 
     for (const queueName of queueNames) {
       const groups = await this.repository.listDlqGroups({ queueName });

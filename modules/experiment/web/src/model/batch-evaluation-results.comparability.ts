@@ -105,7 +105,7 @@ type Tarjan = {
   onStack: boolean[];
   stack: number[];
   components: number[][];
-  work: Array<[node: number, nextNeighbour: number]>;
+  work: [node: number, nextNeighbour: number][];
   counter: number;
 };
 

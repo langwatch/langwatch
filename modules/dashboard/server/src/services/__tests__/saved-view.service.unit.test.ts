@@ -13,7 +13,7 @@ type Call = { method: string } & Record<string, unknown>;
 
 function serviceWith(
   options: {
-    existing?: Array<{ id: string; name: string; order: number; userId?: string | null }>;
+    existing?: { id: string; name: string; order: number; userId?: string | null }[];
     count?: number;
     byId?: { id: string; userId: string | null } | null;
   } = {},
@@ -77,7 +77,7 @@ describe("SavedViewService.getAll", () => {
       await service.getAll({ projectId: "project-1" });
 
       const created = calls.find((call) => call.method === "createMany");
-      const names = (created?.views as Array<{ name: string }> | undefined)?.map((v) => v.name);
+      const names = (created?.views as { name: string }[] | undefined)?.map((v) => v.name);
       expect(names).toEqual(["Application", "Evaluations", "Simulations", "Playground", "Gateway"]);
     });
   });
@@ -92,7 +92,7 @@ describe("SavedViewService.getAll", () => {
       await service.getAll({ projectId: "project-1" });
 
       const created = calls.find((call) => call.method === "createMany");
-      const names = (created?.views as Array<{ name: string }> | undefined)?.map((v) => v.name);
+      const names = (created?.views as { name: string }[] | undefined)?.map((v) => v.name);
       expect(names).not.toContain("All");
       expect(names?.length ?? 0).toBeGreaterThan(0);
     });
@@ -102,7 +102,7 @@ describe("SavedViewService.getAll", () => {
       const first = serviceWith({ count: 0, existing: [] });
       await first.service.getAll({ projectId: "project-1" });
       const allSeeds = (
-        first.calls.find((call) => call.method === "createMany")?.views as Array<{ name: string }>
+        first.calls.find((call) => call.method === "createMany")?.views as { name: string }[]
       ).map((view) => view.name);
 
       const { service, calls } = serviceWith({ existing: seeded(allSeeds) });

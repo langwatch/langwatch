@@ -295,7 +295,7 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
   }: {
     conversationId: string;
     turnId: string;
-    items: Array<{ content: string; status: string }>;
+    items: { content: string; status: string }[];
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
     await this.append(conversationId, turnId, { type: "plan", items });
@@ -565,11 +565,9 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
         reader as {
           xread(
             ...args: (string | number)[]
-          ): Promise<Array<[string, Array<[string, string[]]>]>> | null;
+          ): Promise<[string, [string, string[]][]][]> | null;
         }
-      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as Array<
-        [string, Array<[string, string[]]>]
-      > | null;
+      ).xread("BLOCK", LANGY_STREAMING.FOLLOW_BLOCK_MS, "STREAMS", key, cursor)) as [string, [string, string[]][]][] | null;
       if (!res) continue; // block timed out; loop re-checks the abort signal
       for (const [, rows] of res) {
         for (const [id, fields] of rows) {

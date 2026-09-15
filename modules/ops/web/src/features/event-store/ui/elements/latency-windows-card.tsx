@@ -2,7 +2,7 @@ import { Card, HStack, Table, Text } from "@chakra-ui/react";
 import type { LatencyWindowPercentiles, LatencyWindows } from "@langwatch/ops-contract";
 import { formatCount, formatMs } from "../../../../model/ops-formatters.ts";
 
-const WINDOW_ROWS: Array<{ key: keyof LatencyWindows; label: string }> = [
+const WINDOW_ROWS: { key: keyof LatencyWindows; label: string }[] = [
   { key: "hour", label: "Last hour" },
   { key: "day", label: "Last 24 hours" },
   { key: "week", label: "Last 7 days" },

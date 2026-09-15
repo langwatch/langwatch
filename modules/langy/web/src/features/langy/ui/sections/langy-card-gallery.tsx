@@ -95,12 +95,12 @@ function traceFixture({
 
 /** The tool-call parts of an assistant message, as AI-SDK emits them. */
 function toolMessage(
-  parts: Array<{
+  parts: {
     name: string;
     state: string;
     input?: unknown;
     output?: unknown;
-  }>,
+  }[],
 ): UIMessage {
   return {
     id: "gallery",

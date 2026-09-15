@@ -58,7 +58,7 @@ export abstract class OrganizationInviteRepository {
   /** Each custom role in the organization with its stored `permissions` value. */
   abstract findCustomRolePermissions(input: {
     organizationId: string;
-  }): Promise<Array<{ id: string; permissions: unknown }>>;
+  }): Promise<{ id: string; permissions: unknown }[]>;
   abstract tryFindOrganization(input: { organizationId: string }): Promise<Organization | null>;
   /** The organization with its membership rows, as the batch path reports it back. */
   abstract tryFindOrganizationWithMembers(input: {
@@ -66,7 +66,7 @@ export abstract class OrganizationInviteRepository {
   }): Promise<(Organization & { members: OrganizationUser[] }) | null>;
   /** The personal team a set of role-binding scopes reaches, by its owner's name for it. */
   abstract tryFindPersonalTeamInScopes(input: {
-    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
   }): Promise<{ name: string } | null>;
 
   abstract createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite>;

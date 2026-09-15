@@ -186,7 +186,7 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
   const sorted = [...occurredAts].sort((a, b) => a - b);
   // Merge points whose ±window ranges would overlap; split when farther apart.
   const clusterGap = 2 * EVENT_PARTITION_WINDOW_MS;
-  const clusters: Array<{ from: number; to: number }> = [];
+  const clusters: { from: number; to: number }[] = [];
   for (const ts of sorted) {
     const last = clusters[clusters.length - 1];
     if (last && ts - last.to <= clusterGap) {
@@ -450,7 +450,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     occurredAt?: OccurredAtRange,
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
@@ -535,7 +535,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     /** Maximum distinct trace IDs to return (default 2 — enough to detect ambiguity) */
     limit?: number;
   }): Promise<string[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
       async () => {
@@ -562,7 +562,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          const rows = (await result.json()) as { TraceId: string }[];
           return rows.map((r) => r.TraceId);
         } catch (error) {
           this.logger.warn(
@@ -585,7 +585,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesByThreadId",
       {
         attributes: { "tenant.id": projectId, "thread.id": threadId },
@@ -614,7 +614,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          const rows = (await result.json()) as { TraceId: string }[];
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -661,7 +661,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpansByThreadIds",
       {
         attributes: {
@@ -700,7 +700,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          const rows = (await result.json()) as { TraceId: string }[];
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -743,7 +743,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},
   ): Promise<TracesForProjectResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
       async (_span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
@@ -1057,7 +1057,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @returns TopicCountsResult
    */
   async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
@@ -1095,11 +1095,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{
+          const rows = (await result.json()) as {
             TopicId: string | null;
             SubTopicId: string | null;
             count: string;
-          }>;
+          }[];
 
           // Aggregate counts by topic and subtopic
           const topicCountsMap = new Map<string, number>();
@@ -1146,7 +1146,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @returns CustomersAndLabelsResult
    */
   async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
@@ -1181,9 +1181,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const customerRows = (await customerResult.json()) as Array<{
+          const customerRows = (await customerResult.json()) as {
             customer_id: string;
-          }>;
+          }[];
 
           // Query for unique labels
           // Labels are stored as JSON array in langwatch.labels attribute
@@ -1203,9 +1203,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const labelsRows = (await labelsResult.json()) as Array<{
+          const labelsRows = (await labelsResult.json()) as {
             labels_json: string;
-          }>;
+          }[];
 
           // Parse labels from JSON arrays
           const labelsSet = new Set<string>();
@@ -1240,7 +1240,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     spanId: string;
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.tryGetSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
@@ -1279,7 +1279,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const allRows = (await queryResult.json()) as Array<{
+          const allRows = (await queryResult.json()) as {
             SpanId: string;
             TraceId: string;
             ParentSpanId: string | null;
@@ -1290,7 +1290,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             DurationMs: number;
             StatusCode: number | null;
             StatusMessage: string | null;
-          }>;
+          }[];
 
           const requestedRow = allRows.find((r) => r.SpanId === spanId);
           if (!requestedRow) {
@@ -1478,7 +1478,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     startDate: number,
     endDate: number,
   ): Promise<DistinctFieldNamesResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
@@ -1505,9 +1505,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const spanRows = (await spanResult.json()) as Array<{
+          const spanRows = (await spanResult.json()) as {
             SpanName: string;
-          }>;
+          }[];
 
           const spanNames = spanRows.map((row) => ({
             key: row.SpanName,
@@ -1533,9 +1533,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const metaRows = (await metaResult.json()) as Array<{
+          const metaRows = (await metaResult.json()) as {
             key: string;
-          }>;
+          }[];
 
           const metadataKeys = metaRows.map((row) => ({
             key: row.key,
@@ -1567,10 +1567,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const evalRows = (await evalResult.json()) as Array<{
+          const evalRows = (await evalResult.json()) as {
             id: string;
             name: string | null;
-          }>;
+          }[];
 
           const evaluationNames = evalRows.map((row) => ({
             key: row.id,
@@ -1637,7 +1637,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
      */
     scrollStart?: number;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.fetchTracesWithPagination",
       {
         attributes: { "tenant.id": projectId },
@@ -1832,8 +1832,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         ]);
 
         const [countRows, idRows] = await Promise.all([
-          countResult.json() as Promise<Array<{ total: string }>>,
-          idsResult.json() as Promise<Array<{ TraceId: string }>>,
+          countResult.json() as Promise<{ total: string }[]>,
+          idsResult.json() as Promise<{ TraceId: string }[]>,
         ]);
 
         const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
@@ -2359,7 +2359,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     resolveBlobs,
   }: {
     projectId: string;
-    entries: Array<{ summary: TraceSummaryData; spans: NormalizedSpan[] }>;
+    entries: { summary: TraceSummaryData; spans: NormalizedSpan[] }[];
     protections: Protections;
     /**
      * Per-call gate: resolves offloaded eventref pointers from event_log only when true, so
@@ -2586,10 +2586,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       query_params: { tenantId: projectId, traceIds },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
+    const rows = (await result.json()) as {
       fromMs: number | null;
       toMs: number | null;
-    }>;
+    }[];
     const row = rows[0];
     if (!row || !(Number(row.fromMs) > 0) || !(Number(row.toMs) > 0)) {
       return undefined;
@@ -2607,7 +2607,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traceIds: string[],
     occurredAt?: OccurredAtRange,
   ): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.fetchTracesWithSpansJoined",
       {
         attributes: { "tenant.id": projectId },

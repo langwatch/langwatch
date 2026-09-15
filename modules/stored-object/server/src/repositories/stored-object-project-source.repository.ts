@@ -2,5 +2,5 @@
 export abstract class StoredObjectProjectSource {
   abstract listForOrganization(input: {
     organizationId: string;
-  }): Promise<ReadonlyArray<{ id: string }>>;
+  }): Promise<readonly { id: string }[]>;
 }

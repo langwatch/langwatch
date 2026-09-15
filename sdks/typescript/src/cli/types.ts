@@ -40,10 +40,10 @@ export type MaterializedPrompt = {
   version: number;
   versionId: string;
   model: string;
-  messages: Array<{
+  messages: {
     role: "system" | "user" | "assistant";
     content: string;
-  }>;
+  }[];
   prompt: string;
   temperature?: number;
   maxTokens?: number;
@@ -54,11 +54,11 @@ export type MaterializedPrompt = {
 };
 
 export type SyncResult = {
-  fetched: Array<{ name: string; version: number; versionSpec: string }>;
-  pushed: Array<{ name: string; version: number }>;
+  fetched: { name: string; version: number; versionSpec: string }[];
+  pushed: { name: string; version: number }[];
   unchanged: string[];
   cleaned: string[];
-  errors: Array<{ name: string; error: string }>;
+  errors: { name: string; error: string }[];
 };
 
 export type PromptsLockEntry = {

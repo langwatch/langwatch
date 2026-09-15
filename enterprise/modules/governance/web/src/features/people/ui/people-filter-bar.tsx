@@ -37,7 +37,7 @@ export function PeopleFilterBar({
   sortBy: SpendSortField;
   onSortChange: (next: SpendSortField) => void;
 }) {
-  const sortOptions: Array<{ key: SpendSortField; label: string }> = [
+  const sortOptions: { key: SpendSortField; label: string }[] = [
     { key: "spend", label: "Spend" },
     { key: "requests", label: "Requests" },
     { key: "lastActivity", label: "Last active" },

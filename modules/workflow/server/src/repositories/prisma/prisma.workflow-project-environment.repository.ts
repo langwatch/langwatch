@@ -18,7 +18,7 @@ export type WorkflowProjectEnvironmentDatabase = {
     findMany(input: {
       where: { projectId: string };
       select: { name: true; encryptedValue: true };
-    }): Promise<Array<{ name: string; encryptedValue: string }>>;
+    }): Promise<{ name: string; encryptedValue: string }[]>;
   };
 };
 

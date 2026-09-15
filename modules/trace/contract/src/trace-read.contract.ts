@@ -50,8 +50,8 @@ export interface TracesForProjectResult {
  * Result structure for topic count aggregations.
  */
 export interface TopicCountsResult {
-  topicCounts: Array<{ key: string; count: number }>;
-  subtopicCounts: Array<{ key: string; count: number }>;
+  topicCounts: { key: string; count: number }[];
+  subtopicCounts: { key: string; count: number }[];
 }
 
 /**
@@ -68,9 +68,9 @@ export interface CustomersAndLabelsResult {
  * produced (not just the ones on the currently loaded trace).
  */
 export interface DistinctFieldNamesResult {
-  spanNames: Array<{ key: string; label: string }>;
-  metadataKeys: Array<{ key: string; label: string }>;
-  evaluationNames: Array<{ key: string; label: string }>;
+  spanNames: { key: string; label: string }[];
+  metadataKeys: { key: string; label: string }[];
+  evaluationNames: { key: string; label: string }[];
 }
 
 /**

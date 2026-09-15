@@ -30,7 +30,7 @@ class FakeProjectEnvironment implements WorkflowProjectEnvironment {
 }
 
 class FakeLlmParameters implements WorkflowLlmParameters {
-  readonly calls: Array<{ projectId: string; models: readonly string[] }> = [];
+  readonly calls: { projectId: string; models: readonly string[] }[] = [];
 
   constructor(private readonly resolution: Partial<WorkflowLlmParameterResolution> = {}) {}
 

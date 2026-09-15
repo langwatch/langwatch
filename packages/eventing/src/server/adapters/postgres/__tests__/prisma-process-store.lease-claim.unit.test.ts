@@ -15,7 +15,7 @@ function fakePrismaClient() {
   });
   const transaction = vi.fn(async (run: (tx: unknown) => Promise<unknown>) => {
     calls.push("$transaction");
-    return await run(client);
+    return run(client);
   });
   const client = {
     calls,

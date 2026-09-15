@@ -13,7 +13,7 @@ import { formSchemaForSave } from "@langwatch/prompt-contract";
 
 describe("formSchemaForSave — system prompt required refinement (Issue #3196)", () => {
   function valuesWithMessages(
-    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+    messages: { role: "system" | "user" | "assistant"; content: string }[],
   ) {
     return {
       ...DEFAULT_FORM_VALUES,

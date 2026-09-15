@@ -386,7 +386,7 @@ interface LangyState extends TurnPhaseState {
    * The manager's typed plan snapshot for the live turn (its whole todo list),
    * last-snapshot-wins.
    */
-  turnPlan: Array<{ content: string; status: string }> | null;
+  turnPlan: { content: string; status: string }[] | null;
   setTurnStatus: (status: string | null) => void;
   /** Set the manager's readiness placeholder status (see turnStatusIsReadiness). */
   setTurnReadinessStatus: (status: string | null) => void;
@@ -395,7 +395,7 @@ interface LangyState extends TurnPhaseState {
   /** Append a run of streamed reasoning tokens to the live thinking. */
   appendTurnReasoning: (text: string) => void;
   /** Replace the live plan snapshot (whole list; last wins). */
-  setTurnPlan: (items: Array<{ content: string; status: string }>) => void;
+  setTurnPlan: (items: { content: string; status: string }[]) => void;
   /** Clear the live signals — called when a new turn starts. */
   resetTurnSignals: () => void;
 
@@ -451,7 +451,7 @@ const emptyConversationState = () => ({
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
   turnReasoning: null as string | null,
-  turnPlan: null as Array<{ content: string; status: string }> | null,
+  turnPlan: null as { content: string; status: string }[] | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
   // A conversation change also drops the id a panel-open warm minted: the

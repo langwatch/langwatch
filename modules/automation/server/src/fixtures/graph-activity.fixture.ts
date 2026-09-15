@@ -24,7 +24,7 @@ export class FrozenClock implements AutomationClock {
 }
 
 export class SilentLogger extends AutomationLogger {
-  readonly errors: Array<[Record<string, unknown>, string]> = [];
+  readonly errors: [Record<string, unknown>, string][] = [];
 
   error(fields: Record<string, unknown>, message: string): void {
     this.errors.push([fields, message]);
@@ -45,9 +45,9 @@ export class TestDispatchErrors extends AutomationDispatchError {
 
 /** Records what would have left the process, and never a token or a body. */
 export class RecordingDelivery extends AutomationNotificationDelivery {
-  readonly emails: Array<{ recipients: string[]; subject: string; triggerId: string }> = [];
-  readonly slackWebhooks: Array<{ webhook: string; triggerName: string }> = [];
-  readonly slackBots: Array<{ channel: string; triggerName: string }> = [];
+  readonly emails: { recipients: string[]; subject: string; triggerId: string }[] = [];
+  readonly slackWebhooks: { webhook: string; triggerName: string }[] = [];
+  readonly slackBots: { channel: string; triggerName: string }[] = [];
   readonly webhooks: string[] = [];
 
   async sendLegacyEmail(): Promise<void> {
@@ -169,8 +169,8 @@ export class OneProject implements AutomationProjectDirectory {
 
 type PrismaDoubleSeed = {
   triggers: TriggerRow[];
-  customGraphs?: Array<Record<string, unknown>>;
-  suppressions?: Array<{ projectId: string; triggerId: string | null; email: string }>;
+  customGraphs?: Record<string, unknown>[];
+  suppressions?: { projectId: string; triggerId: string | null; email: string }[];
 };
 
 /**
@@ -185,14 +185,14 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
   const triggers = seed.triggers.map((row) => ({ ...row }));
   const customGraphs = (seed.customGraphs ?? [customGraphRow]).map((row) => ({ ...row }));
   const suppressions = (seed.suppressions ?? []).map((row) => ({ ...row }));
-  const triggerSent: Array<Record<string, unknown>> = [];
+  const triggerSent: Record<string, unknown>[] = [];
   const reads = { triggerFindMany: 0 };
   let nextId = 1;
 
   const matches = (row: Record<string, unknown>, where: Record<string, unknown>): boolean =>
     Object.entries(where).every(([key, value]) => {
       if (key === "OR") {
-        return (value as Array<Record<string, unknown>>).some((clause) => matches(row, clause));
+        return (value as Record<string, unknown>[]).some((clause) => matches(row, clause));
       }
       if (key === "id" && typeof value === "string") return row.id === value;
       return row[key] === value;
@@ -239,7 +239,7 @@ export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
         triggerSent.push(row);
         return row;
       },
-      createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => {
+      createMany: async ({ data }: { data: Record<string, unknown>[] }) => {
         let count = 0;
         for (const entry of data) {
           const duplicate = triggerSent.some(

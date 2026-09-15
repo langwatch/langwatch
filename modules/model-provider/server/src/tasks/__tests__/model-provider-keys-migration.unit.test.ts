@@ -29,8 +29,8 @@ function cipher(): ModelProviderCredentialCipher & { decrypted: string[] } {
   } as ModelProviderCredentialCipher & { decrypted: string[] };
 }
 
-function databaseOver(rows: Array<{ id: string; customKeys: unknown }>) {
-  const writes: Array<{ id: string; customKeys: unknown }> = [];
+function databaseOver(rows: { id: string; customKeys: unknown }[]) {
+  const writes: { id: string; customKeys: unknown }[] = [];
   const stored = rows.map((row) => ({ ...row }));
 
   const database: ModelProviderMigrationDatabase = {

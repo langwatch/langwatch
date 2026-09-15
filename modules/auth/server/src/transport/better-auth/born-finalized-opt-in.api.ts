@@ -82,5 +82,5 @@ async function organizationForDomain({
 }): Promise<string | null> {
   const domain = extractEmailDomain(email);
   if (domain === null) return null;
-  return await directory.tryFindOrganizationIdBySsoDomain(domain);
+  return directory.tryFindOrganizationIdBySsoDomain(domain);
 }

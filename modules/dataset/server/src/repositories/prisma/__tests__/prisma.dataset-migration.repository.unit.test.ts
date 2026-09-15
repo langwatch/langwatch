@@ -67,7 +67,7 @@ function fingerprintRow(input: Fingerprint) {
 function fixture(input: {
   current?: DatasetLayout | null;
   candidatePages?: string[][];
-  recordPages?: Array<Array<{ id: string; entry: unknown }>>;
+  recordPages?: { id: string; entry: unknown }[][];
   storage?: DatasetStorage;
 }) {
   const current =

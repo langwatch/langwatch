@@ -20,13 +20,13 @@ function makeNode({
 }: {
   id: string;
   type?: string;
-  inputs?: Array<{ identifier: string; type: string }>;
-  outputs?: Array<{ identifier: string; type: string }>;
-  parameters?: Array<{
+  inputs?: { identifier: string; type: string }[];
+  outputs?: { identifier: string; type: string }[];
+  parameters?: {
     identifier: string;
     type: string;
     value?: unknown;
-  }>;
+  }[];
 }): Node {
   return {
     id,
@@ -479,10 +479,10 @@ describe("workflowStoreCore", () => {
 
         const state = testStore.getState();
         const nodeB = state.nodes.find((n) => n.id === "nodeB");
-        const params = nodeB?.data.parameters as Array<{
+        const params = nodeB?.data.parameters as {
           identifier: string;
           value: unknown;
-        }>;
+        }[];
 
         expect(params.find((p) => p.identifier === "some_param")?.value).toEqual({
           ref: "new_name",
@@ -611,7 +611,7 @@ describe("workflowStoreCore", () => {
       const params =
         (
           node?.data as {
-            parameters?: Array<{ identifier: string; value?: unknown }>;
+            parameters?: { identifier: string; value?: unknown }[];
           }
         ).parameters ?? [];
       return params.find((p) => p.identifier === "code")?.value as string;

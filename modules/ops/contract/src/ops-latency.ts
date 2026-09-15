@@ -48,7 +48,7 @@ export function latencyAllTimeKey(queueName: string): string {
 
 /** Field-wise sum of histogram hashes, tolerant of non-numeric noise. */
 export function mergeHistogramCounts(
-  hashes: Array<Record<string, string | number>>,
+  hashes: Record<string, string | number>[],
 ): Map<string, number> {
   const merged = new Map<string, number>();
   for (const hash of hashes) {

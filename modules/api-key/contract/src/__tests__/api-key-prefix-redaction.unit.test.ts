@@ -7,7 +7,7 @@ import { API_KEY_PREFIX, INGEST_KEY_PREFIX, LEGACY_PAT_PREFIX } from "../api-key
 // Renaming a prefix here without following it there fails the build rather than silently leaking
 // keys.
 describe("the redaction rules, given the API key prefixes the app mints", () => {
-  const prefixes: Array<[string, string]> = [
+  const prefixes: [string, string][] = [
     ["API key", API_KEY_PREFIX],
     ["ingest key", INGEST_KEY_PREFIX],
     ["legacy personal access token", LEGACY_PAT_PREFIX],

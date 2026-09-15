@@ -168,7 +168,7 @@ function serviceWith({
   sessions: CodingAgentSessionBranchRecord[];
   modelTotals?: SessionModelTotalsRow[];
   /** What the stamped-branch discovery read answers. */
-  stampedSessions?: Array<{ tenantId: string; sessionId: string }>;
+  stampedSessions?: { tenantId: string; sessionId: string }[];
   /** What the by-id session read answers for the stamp-only discoveries. */
   sessionsById?: CodingAgentSessionBranchRecord[];
   isSourceNonBillable?: (params: {

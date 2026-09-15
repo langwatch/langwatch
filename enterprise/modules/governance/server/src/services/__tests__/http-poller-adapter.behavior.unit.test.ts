@@ -40,12 +40,12 @@ interface FetchCall {
 }
 
 let capturedCalls: FetchCall[] = [];
-let responseQueue: Array<{
+let responseQueue: {
   status: number;
   body: unknown;
   /** Extra response headers, for the answers whose meaning is in a header. */
   headers?: Record<string, string>;
-}> = [];
+}[] = [];
 
 class TestHttp implements GovernanceHttpClient {
   async fetch(

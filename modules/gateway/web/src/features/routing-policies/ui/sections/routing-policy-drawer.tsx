@@ -160,8 +160,8 @@ function DrawerBody({
   isEditing: boolean;
   organizationId: string;
   organizationName?: string;
-  availableTeams: Array<{ id: string; name: string }>;
-  availableProjects: Array<{ id: string; name: string; teamId?: string }>;
+  availableTeams: { id: string; name: string }[];
+  availableProjects: { id: string; name: string; teamId?: string }[];
   scopesWithNames: ScopeTriadEntry[];
   providerOptions: ProviderCredentialOption[];
   providersLoading: boolean;

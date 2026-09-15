@@ -583,7 +583,7 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  return await storeResults(deps, projectId, clusteringResult, false, runContext);
+  return storeResults(deps, projectId, clusteringResult, false, runContext);
 };
 
 export const incrementalClustering = async (
@@ -638,7 +638,7 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  return await storeResults(deps, projectId, clusteringResult, true, runContext);
+  return storeResults(deps, projectId, clusteringResult, true, runContext);
 };
 
 export const storeResults = async (
@@ -779,7 +779,7 @@ export const fetchTopicsBatchClustering = async (
     "uploading traces data for project",
   );
 
-  return await postToTopicClustering(deps, {
+  return postToTopicClustering(deps, {
     projectId,
     url: `${baseUrl}/topics/batch_clustering`,
     body: params,
@@ -806,7 +806,7 @@ export const fetchTopicsIncrementalClustering = async (
     "uploading traces data for project",
   );
 
-  return await postToTopicClustering(deps, {
+  return postToTopicClustering(deps, {
     projectId,
     url: `${baseUrl}/topics/incremental_clustering`,
     body: params,

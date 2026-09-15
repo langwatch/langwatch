@@ -15,8 +15,8 @@ import ApiKeysScreen, { API_KEY_SCOPE_QUERY_KEY } from "../api-keys-screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
-    keys: [] as Array<Record<string, unknown>>,
-    members: [] as Array<Record<string, unknown>>,
+    keys: [] as Record<string, unknown>[],
+    members: [] as Record<string, unknown>[],
     regenerate: { apiKey: "sk-rotated-9999" },
     createToken: "sk-lw-mintedtokenvalue0001",
     regenerateFails: false,

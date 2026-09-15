@@ -511,15 +511,15 @@ function groupSpendCommands(
   records: GatewayInternalSpendCommandRecord[],
   rating: GatewaySpendRating,
 ): {
-  perCommand: Record<GatewayInternalSpendCommandName, Array<Record<string, unknown>>>;
-  rejected: Array<{ index: number; code: string }>;
+  perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]>;
+  rejected: { index: number; code: string }[];
 } {
-  const perCommand: Record<GatewayInternalSpendCommandName, Array<Record<string, unknown>>> = {
+  const perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]> = {
     admitSpend: [],
     confirmSpend: [],
     failSpend: [],
   };
-  const rejected: Array<{ index: number; code: string }> = [];
+  const rejected: { index: number; code: string }[] = [];
 
   records.forEach((record, index) => {
     const mapped = toSpendCommandData(record, rating);
@@ -643,8 +643,8 @@ async function enrichAttributedCommands({
   outcomes,
 }: {
   store: GatewayInternalStore;
-  admits: Array<Record<string, unknown>>;
-  outcomes: Array<Record<string, unknown>>;
+  admits: Record<string, unknown>[];
+  outcomes: Record<string, unknown>[];
 }): Promise<void> {
   // An outcome from a build predating attribution-on-outcome names no key, so
   // there is nothing to join against — those requests keep the admit-time join
@@ -696,7 +696,7 @@ async function enrichAttributedCommands({
  */
 async function sendSpendCommands(
   commands: Record<string, GatewaySpendCommandSender | undefined>,
-  perCommand: Record<GatewayInternalSpendCommandName, Array<Record<string, unknown>>>,
+  perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]>,
 ): Promise<GatewayInternalSpendCommandName | null> {
   for (const name of GATEWAY_INTERNAL_SPEND_COMMANDS) {
     const batch = perCommand[name];

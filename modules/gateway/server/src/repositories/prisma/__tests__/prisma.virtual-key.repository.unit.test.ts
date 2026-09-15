@@ -67,7 +67,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
 
         await repository.tryFindByHashedSecret("hash-current");
 
-        const or = (calls[0]?.args.where as { OR: Array<Record<string, unknown>> }).OR;
+        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
         expect(or[0]).toEqual({ hashedSecret: "hash-current" });
       });
 
@@ -76,7 +76,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
 
         await repository.tryFindByHashedSecret("hash-previous");
 
-        const or = (calls[0]?.args.where as { OR: Array<Record<string, unknown>> }).OR;
+        const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
         const previous = or[1] as {
           previousHashedSecret: string;
           previousSecretValidUntil: { gt: Date };

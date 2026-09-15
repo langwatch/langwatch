@@ -163,11 +163,11 @@ class Triggers extends TriggerRepository {
   reportTargets: ReportScheduleTarget[] = [];
   rowsByProject = new Map<string, TriggerSummary[]>();
   findActiveCalls = 0;
-  claimSendCalls: Array<{
+  claimSendCalls: {
     triggerId: string;
     traceId: string;
     projectId: string;
-  }> = [];
+  }[] = [];
   findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     this.findActiveCalls++;
     return Promise.resolve(this.rowsByProject.get(projectId) ?? []);
@@ -188,7 +188,7 @@ class Triggers extends TriggerRepository {
   updateLastRunAt() {
     return Promise.resolve();
   }
-  findByIdInputs: Array<{ triggerId: string; projectId: string }> = [];
+  findByIdInputs: { triggerId: string; projectId: string }[] = [];
   rowsById = new Map<string, Trigger>();
   findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     this.findByIdInputs.push(input);

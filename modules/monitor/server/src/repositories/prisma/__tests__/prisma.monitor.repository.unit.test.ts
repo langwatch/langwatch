@@ -46,7 +46,7 @@ const INPUT: ExperimentUpsert = {
 };
 
 function repositoryWith(row: unknown = STORED) {
-  const calls: Array<Record<string, unknown>> = [];
+  const calls: Record<string, unknown>[] = [];
   const database = {
     monitor: {
       async upsert(args: Record<string, unknown>) {

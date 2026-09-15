@@ -268,7 +268,7 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
-    invites: Array<{ email: string; role: string }>;
+    invites: { email: string; role: string }[];
   }): Promise<{ url: string | null }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();

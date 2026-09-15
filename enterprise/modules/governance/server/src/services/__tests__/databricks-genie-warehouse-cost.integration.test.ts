@@ -244,7 +244,7 @@ afterEach(async () => {
 
 async function pull({ warehouseId, deadlineMs }: { warehouseId?: string; deadlineMs?: number }) {
   const puller = makePuller();
-  return await puller.runOnce(
+  return puller.runOnce(
     {
       cursor: null,
       credentials: { token: "dapi-fixture" },
@@ -859,10 +859,10 @@ describe("a source that names a warehouse", () => {
     // The half that holding the watermark exists for, and the half a cursor
     // assertion alone does not show: the next run, resuming from that cursor,
     // asks about the same period again — and prices it once billing answers.
-    const refusedFrom = statementBodies[0]!.parameters as Array<{
+    const refusedFrom = statementBodies[0]!.parameters as {
       name: string;
       value: string;
-    }>;
+    }[];
     const askedAboutFirst = refusedFrom.find((p) => p.name === "from_ts")!.value;
 
     statementBodies.length = 0;
@@ -893,7 +893,7 @@ describe("a source that names a warehouse", () => {
     );
 
     const askedAboutAgain = (
-      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+      statementBodies[0]!.parameters as { name: string; value: string }[]
     ).find((p) => p.name === "from_ts")!.value;
 
     // Same period, not a window that moved on past it.
@@ -1376,7 +1376,7 @@ describe("a billing answer that did not come back", () => {
     // gives: inside the settling look-back a period is re-read whatever the
     // watermark says. The instant that separates the two is the period's first.
     const askedAboutFirst = (
-      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+      statementBodies[0]!.parameters as { name: string; value: string }[]
     ).find((p) => p.name === "from_ts")!.value;
 
     statementBodies.length = 0;
@@ -1407,7 +1407,7 @@ describe("a billing answer that did not come back", () => {
     );
 
     const askedAboutAgain = (
-      statementBodies[0]!.parameters as Array<{ name: string; value: string }>
+      statementBodies[0]!.parameters as { name: string; value: string }[]
     ).find((p) => p.name === "from_ts")!.value;
 
     expect(askedAboutAgain).toBe(askedAboutFirst);
@@ -1499,7 +1499,7 @@ describe("a period with more statements than one answer can carry", () => {
     // And the narrower questions were actually asked: a day at most, where the
     // refused one covered a week.
     const spanOf = (body: Record<string, unknown>) => {
-      const p = body.parameters as Array<{ name: string; value: string }>;
+      const p = body.parameters as { name: string; value: string }[];
       const at = (name: string) => Date.parse(p.find((x) => x.name === name)!.value);
       return at("to_ts") - at("from_ts");
     };

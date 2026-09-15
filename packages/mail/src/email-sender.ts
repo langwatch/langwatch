@@ -9,5 +9,5 @@ export const sendEmail = async ({
   mailer: EmailDelivery;
   content: EmailContent;
 }) => {
-  return await mailer.send(content);
+  return mailer.send(content);
 };

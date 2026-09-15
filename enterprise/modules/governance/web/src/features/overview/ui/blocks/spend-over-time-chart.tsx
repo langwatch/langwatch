@@ -23,7 +23,7 @@ import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
  */
 export interface SpendOverTimeBucket {
   bucketIso: string;
-  points: Array<{ key: string; label: string; spendUsd: string }>;
+  points: { key: string; label: string; spendUsd: string }[];
 }
 
 export type GroupBy = "team" | "user" | "model";
@@ -48,7 +48,7 @@ export function SpendOverTimeChart({
     if (!buckets || buckets.length === 0) {
       return {
         rows: [],
-        seriesKeys: [] as Array<{ key: string; label: string }>,
+        seriesKeys: [] as { key: string; label: string }[],
       };
     }
     const labelByKey = new Map<string, string>();

@@ -35,7 +35,7 @@ export class RedisJobBlobStore implements JobBlobStore {
    * A missing key returns null.
    */
   async get({ id, ttlSeconds }: { id: string; ttlSeconds?: number }): Promise<Buffer | null> {
-    return await this.redis.getexBuffer(
+    return this.redis.getexBuffer(
       this.keyPrefix + id,
       "EX",
       ttlSeconds ?? BLOB_BACKSTOP_TTL_SECONDS,
@@ -49,7 +49,7 @@ export class RedisJobBlobStore implements JobBlobStore {
    * A missing key returns null.
    */
   async peek({ id }: { id: string }): Promise<Buffer | null> {
-    return await this.redis.getBuffer(this.keyPrefix + id);
+    return this.redis.getBuffer(this.keyPrefix + id);
   }
 
   async delete({ id }: { id: string }): Promise<void> {

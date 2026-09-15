@@ -83,7 +83,7 @@ const refreshHistory = () =>
 interface EngineMessage {
   id: string;
   role: "user" | "assistant";
-  parts: Array<{ type: string; text?: string }>;
+  parts: { type: string; text?: string }[];
 }
 
 const engine = {
@@ -134,7 +134,7 @@ vi.mock("@ai-sdk/react", async () => {
         error: engine.error,
         sendMessage: async (message: {
           role: string;
-          parts: Array<{ type: string; text?: string }>;
+          parts: { type: string; text?: string }[];
         }) => {
           // Optimistic, exactly like the SDK: the question is in the thread
           // before any request settles.

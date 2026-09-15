@@ -34,7 +34,7 @@ export type AnnotationTableTraceField = {
 
 export type AnnotationTableProps = {
   rows: AnnotationRow[];
-  activeScoreTypes: ReadonlyArray<ActiveScoreType>;
+  activeScoreTypes: readonly ActiveScoreType[];
   dateColumnLabel: string;
   selectedRowIds: ReadonlySet<string>;
   allRowsSelected: boolean;

@@ -42,19 +42,19 @@ export interface OtlpAttribute {
 }
 
 export interface OtlpBody {
-  resourceLogs: Array<{
+  resourceLogs: {
     resource: { attributes: OtlpAttribute[] };
-    scopeLogs: Array<{
+    scopeLogs: {
       scope: { name: string; version: string };
-      logRecords: Array<{
+      logRecords: {
         eventName: string;
         timeUnixNano: string;
         attributes: OtlpAttribute[];
         traceId?: string;
         spanId?: string;
-      }>;
-    }>;
-  }>;
+      }[];
+    }[];
+  }[];
 }
 
 export interface PostedRequest {

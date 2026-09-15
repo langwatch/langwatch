@@ -18,7 +18,7 @@ function rolling(windowMs: number): () => { from: number; to: number } {
   };
 }
 
-export const ROLLING_PRESETS: ReadonlyArray<TimeRangePreset> = [
+export const ROLLING_PRESETS: readonly TimeRangePreset[] = [
   {
     id: "15m",
     label: "Last 15 minutes",
@@ -63,7 +63,7 @@ export const ROLLING_PRESETS: ReadonlyArray<TimeRangePreset> = [
   },
 ];
 
-export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
+export const CALENDAR_PRESETS: readonly TimeRangePreset[] = [
   {
     id: "wtd",
     label: "This week",
@@ -101,15 +101,15 @@ export const CALENDAR_PRESETS: ReadonlyArray<TimeRangePreset> = [
   },
 ];
 
-export const ALL_PRESETS: ReadonlyArray<TimeRangePreset> = [
+export const ALL_PRESETS: readonly TimeRangePreset[] = [
   ...ROLLING_PRESETS,
   ...CALENDAR_PRESETS,
 ];
 
-export const PRESET_GROUPS: ReadonlyArray<{
+export const PRESET_GROUPS: readonly {
   label: string;
-  presets: ReadonlyArray<TimeRangePreset>;
-}> = [
+  presets: readonly TimeRangePreset[];
+}[] = [
   { label: "Rolling", presets: ROLLING_PRESETS },
   { label: "Period to date", presets: CALENDAR_PRESETS },
 ];

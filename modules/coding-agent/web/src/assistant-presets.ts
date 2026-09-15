@@ -65,12 +65,12 @@ export const ASSISTANT_PRESETS: Record<Exclude<AssistantKind, "custom">, Assista
   },
 };
 
-export const ASSISTANT_OPTIONS: Array<{
+export const ASSISTANT_OPTIONS: {
   value: AssistantKind;
   label: string;
-}> = [
+}[] = [
   ...(
-    Object.entries(ASSISTANT_PRESETS) as Array<[Exclude<AssistantKind, "custom">, AssistantPreset]>
+    Object.entries(ASSISTANT_PRESETS) as [Exclude<AssistantKind, "custom">, AssistantPreset][]
   ).map(([value, p]) => ({ value, label: p.label })),
   { value: "custom" as const, label: "Custom" },
 ];

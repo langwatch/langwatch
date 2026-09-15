@@ -142,7 +142,7 @@ function findClosestPrecedingSibling({
   // Collect every preceding sibling that resolves to a prompt reference,
   // ordered by startTime ascending. The last entry supplies the identity;
   // every entry contributes its variables (later overrides earlier).
-  const preceding: Array<{ ref: PromptReference; startTime: number }> = [];
+  const preceding: { ref: PromptReference; startTime: number }[] = [];
   for (const child of children) {
     if (excludeSpanIds.has(child.spanId)) continue;
     if (child.startTime > targetStartTime) continue;

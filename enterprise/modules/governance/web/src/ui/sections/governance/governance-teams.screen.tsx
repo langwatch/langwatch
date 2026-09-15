@@ -216,7 +216,7 @@ function SortChips({
   onChange: (v: SortField) => void;
   ariaLabelledBy?: string;
 }) {
-  const opts: Array<{ key: SortField; label: string }> = [
+  const opts: { key: SortField; label: string }[] = [
     { key: "spend", label: "Spend" },
     { key: "requests", label: "Requests" },
     { key: "lastActivity", label: "Last active" },

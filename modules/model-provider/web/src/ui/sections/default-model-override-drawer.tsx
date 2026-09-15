@@ -199,7 +199,7 @@ function customModelIdsFor({
   enabledEntries,
   mode,
 }: {
-  enabledEntries: Array<[string, ProviderRow]>;
+  enabledEntries: [string, ProviderRow][];
   mode: "chat" | "embedding";
 }): string[] {
   const customModels: string[] = [];
@@ -229,7 +229,7 @@ function modelOptionsForMode({
   isLoading,
   mode,
 }: {
-  enabledEntries: Array<[string, ProviderRow]>;
+  enabledEntries: [string, ProviderRow][];
   hasProviderLoadError: boolean;
   isLoading: boolean;
   mode: "chat" | "embedding";
@@ -258,7 +258,7 @@ function modelOptionsByRoleFor({
   isLoading: boolean;
   providers: ProviderRow[];
 }): Record<ModelRoleKey, string[]> {
-  const enabledEntries: Array<[string, ProviderRow]> = providers
+  const enabledEntries: [string, ProviderRow][] = providers
     .filter((p) => p.enabled === true)
     .map((p) => [p.provider, p]);
   const aliasChatOptions = aliasChatOptionsFor(new Set(enabledEntries.map(([key]) => key)));
@@ -306,7 +306,7 @@ async function persistConfig({
     mutateAsync(input: {
       id?: string;
       config: Record<string, string>;
-      scopes: Array<{ scopeType: ScopeType; scopeId: string }>;
+      scopes: { scopeType: ScopeType; scopeId: string }[];
     }): Promise<unknown>;
   };
   scopes: ScopeTriadEntry[];

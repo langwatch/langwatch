@@ -35,7 +35,7 @@ export interface SampleInsight {
  * Most pressing first, which is the order this list will be built in when it is
  * real.
  */
-export const SAMPLE_INSIGHTS: ReadonlyArray<SampleInsight> = [
+export const SAMPLE_INSIGHTS: readonly SampleInsight[] = [
   {
     severity: "warning",
     headline:
@@ -73,7 +73,7 @@ export interface SampleActivityRow {
  * alone is not enough to place "Engineering" or "Monthly review", and the kind
  * is what tells the reader which screen they are going back to.
  */
-export const SAMPLE_ACTIVITY: ReadonlyArray<SampleActivityRow> = [
+export const SAMPLE_ACTIVITY: readonly SampleActivityRow[] = [
   {
     name: "Spend by department",
     kind: "Costs",

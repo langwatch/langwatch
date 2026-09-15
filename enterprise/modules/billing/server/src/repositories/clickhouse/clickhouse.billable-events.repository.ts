@@ -150,7 +150,7 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
    */
   async findByProjectApprox(
     input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<Array<{ projectId: string; count: number }>> {
+  ): Promise<{ projectId: string; count: number }[]> {
     const client = await this.resolveOrganizationClient(input.organizationId);
     const result = await client.query({
       query: `
@@ -178,7 +178,7 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
   /** Exact per-project billable-event counts for the org in the window. */
   async findByProject(
     input: { organizationId: string } & BillableEventsWindow,
-  ): Promise<Array<{ projectId: string; count: number }>> {
+  ): Promise<{ projectId: string; count: number }[]> {
     const client = await this.resolveOrganizationClient(input.organizationId);
     const result = await client.query({
       query: `
@@ -210,9 +210,9 @@ function parseTotal(jsonResult: unknown): number {
   return parseInt(firstRow?.total ?? "0", 10);
 }
 
-function parseByProject(jsonResult: unknown): Array<{ projectId: string; count: number }> {
+function parseByProject(jsonResult: unknown): { projectId: string; count: number }[] {
   const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  return (rows as Array<{ projectId: string; total: string }>).map((row) => ({
+  return (rows as { projectId: string; total: string }[]).map((row) => ({
     projectId: row.projectId,
     count: parseInt(row.total, 10),
   }));

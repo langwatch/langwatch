@@ -46,7 +46,7 @@ const LANGY_COMMAND_NAMES = [
   "changeLocalPolicy",
   "startUserWait",
   "endUserWait",
-] as const satisfies ReadonlyArray<keyof LangyConversationCommands>;
+] as const satisfies readonly (keyof LangyConversationCommands)[];
 
 /** Reads the registration's senders, FAILING AT BOOT for a command it did not produce. */
 function resolveSenders(registered: { commands: unknown }): LangyConversationCommands {

@@ -46,7 +46,7 @@ export class InviteTeamAssignmentService {
     teamIds: string[];
     organizationId: string;
   }): Promise<string[]> {
-    return await this.invites.findTeamIdsInOrganization({ teamIds, organizationId });
+    return this.invites.findTeamIdsInOrganization({ teamIds, organizationId });
   }
 
   /**

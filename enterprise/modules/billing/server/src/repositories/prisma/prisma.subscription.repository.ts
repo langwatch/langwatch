@@ -137,7 +137,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
     id: string;
     stripeSubscriptionId: string;
   }): Promise<{ count: number }> {
-    return await this.prisma.subscription.updateMany({
+    return this.prisma.subscription.updateMany({
       where: { id: input.id },
       data: { stripeSubscriptionId: input.stripeSubscriptionId },
     });
@@ -199,7 +199,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
   async migrateToSeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<Array<{ stripeSubscriptionId: string | null }>> {
+  }): Promise<{ stripeSubscriptionId: string | null }[]> {
     const TIERED_PLAN_TYPES: PlanTypes[] = [
       PlanTypes.LAUNCH,
       PlanTypes.ACCELERATE,
@@ -209,7 +209,7 @@ export class PrismaSubscriptionRepository extends SubscriptionRepository {
       PlanTypes.GROWTH,
     ];
 
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       await tx.organization.update({
         where: { id: input.organizationId },
         data: { pricingModel: "SEAT_EVENT" },

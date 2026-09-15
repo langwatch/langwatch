@@ -63,7 +63,7 @@ async function stageMappingJob(payload: ReturnType<typeof payloadFor>, stagedJob
   const dedup = subscriber.options?.deduplication;
   if (!dedup) throw new Error("subscriber declares no deduplication");
   const groupId = groupIdFor(payload);
-  return await scripts.stage({
+  return scripts.stage({
     stagedJobId,
     groupId,
     dispatchAfterMs: payload.event.createdAt + (subscriber.options?.delay ?? 0),

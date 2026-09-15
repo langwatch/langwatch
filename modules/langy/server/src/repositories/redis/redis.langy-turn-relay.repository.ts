@@ -92,7 +92,7 @@ const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
  * Every `{id, href}` pair a payload's NESTED objects surface — a LIST returns many resources in one
  * call, each carrying its own `platformUrl`.
  */
-function collectItemPlatformLinks(payload: unknown): Array<{ id: string; href: string }> {
+function collectItemPlatformLinks(payload: unknown): { id: string; href: string }[] {
   const links = new Map<string, string>();
   const walk = (node: unknown, depth: number): void => {
     if (!node || typeof node !== "object" || depth > 4) return;
@@ -135,7 +135,7 @@ export interface LangyRelayBuffer {
   appendPlan(a: {
     conversationId: string;
     turnId: string;
-    items: Array<{ content: string; status: string }>;
+    items: { content: string; status: string }[];
   }): Promise<void>;
   appendTool(a: {
     conversationId: string;
@@ -211,7 +211,7 @@ export interface LangyRelayConversations {
     projectId: string;
     conversationId: string;
     turnId: string;
-    items: Array<{ content: string; status: string }>;
+    items: { content: string; status: string }[];
   }): Promise<void>;
 }
 
@@ -826,7 +826,7 @@ export class RedisLangyTurnRelayRepository {
    */
   private chainedNavigateInvocationsOf(
     frame: Extract<LangyRelayFrame, { type: "tool" }>,
-  ): Array<{ resourceId: string }> {
+  ): { resourceId: string }[] {
     const command = this.shellCommandOfFrame(frame);
     if (!command) return [];
     return parseAllLangwatchCommands(command)

@@ -340,7 +340,7 @@ function GuardrailDrawer({
   mode: "create" | "edit";
   existing: GuardrailRow | null;
   projectId: string;
-  guardrailEvaluators: Array<{ id: string; name: string; slug: string }>;
+  guardrailEvaluators: { id: string; name: string; slug: string }[];
   onClose: () => void;
 }) {
   const showErrorToast = useShowErrorToast();

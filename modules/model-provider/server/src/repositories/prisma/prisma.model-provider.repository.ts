@@ -343,7 +343,7 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     return parsed.success ? parsed.data : null;
   }
 
-  private static asHeaders(value: unknown): Array<{ key: string; value: string }> {
+  private static asHeaders(value: unknown): { key: string; value: string }[] {
     if (!Array.isArray(value)) {
       return [];
     }

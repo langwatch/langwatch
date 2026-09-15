@@ -173,7 +173,7 @@ describe("apiClientAddress()", () => {
  */
 async function freshResolver() {
   vi.resetModules();
-  return await import("../api-client-address.ts");
+  return import("../api-client-address.ts");
 }
 
 describe("given TRUSTED_PROXY_ADDRESSES is not set", () => {

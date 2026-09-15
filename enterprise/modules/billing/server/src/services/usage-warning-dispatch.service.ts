@@ -60,7 +60,7 @@ export class UsageWarningDispatchService {
     currentMonthMessagesCount: number;
     maxMonthlyUsageLimit: number;
     crossedThreshold: number;
-    projectUsageData: Array<{ id: string; name: string; messageCount: number }>;
+    projectUsageData: { id: string; name: string; messageCount: number }[];
   }): Promise<UsageLimitEmailData> {
     const actionUrl = `${this.deps.baseHost}/settings/usage`;
 
@@ -153,12 +153,12 @@ export class UsageWarningDispatchService {
   }: {
     organizationId: string;
     organizationName: string;
-    deliverableAdmins: Array<{ user: { id: string; email: string | null } }>;
+    deliverableAdmins: { user: { id: string; email: string | null } }[];
     emailContext: UsageLimitEmailData;
   }): Promise<{
     recipientsSuccessCount: number;
     recipientsFailureCount: number;
-    failedRecipients: Array<{ userId: string; error: string }>;
+    failedRecipients: { userId: string; error: string }[];
   }> {
     const emailResults = await Promise.allSettled(
       deliverableAdmins.map(async (member) => {
@@ -172,7 +172,7 @@ export class UsageWarningDispatchService {
 
     let recipientsSuccessCount = 0;
     let recipientsFailureCount = 0;
-    const failedRecipients: Array<{ userId: string; error: string }> = [];
+    const failedRecipients: { userId: string; error: string }[] = [];
 
     emailResults.forEach((result, index) => {
       const member = deliverableAdmins[index];
@@ -229,7 +229,7 @@ export class UsageWarningDispatchService {
     deliverableAdminsCount: number;
     recipientsSuccessCount: number;
     recipientsFailureCount: number;
-    failedRecipients: Array<{ userId: string; error: string }>;
+    failedRecipients: { userId: string; error: string }[];
   }): Promise<Notification> {
     return this.deps.records.create({
       organizationId,

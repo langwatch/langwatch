@@ -110,11 +110,11 @@ export type TimeseriesBucket = AnalyticsTimeseriesBucket;
  * Filter data result for dropdown options
  */
 export interface FilterDataResult {
-  options: Array<{
+  options: {
     field: string;
     label: string;
     count: number;
-  }>;
+  }[];
 }
 
 /**

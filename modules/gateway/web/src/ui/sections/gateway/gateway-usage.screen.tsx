@@ -53,7 +53,7 @@ function queryString(query: Readonly<Record<string, string | undefined>>): strin
   return params.toString();
 }
 
-const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
+const PRESETS: { label: string; days: number | "mtd" }[] = [
   { label: "Last 24h", days: 1 },
   { label: "Last 7 days", days: 7 },
   { label: "Last 30 days", days: 30 },
@@ -161,13 +161,13 @@ function GatewayUsagePage() {
   const data = virtualKeyId
     ? vkSummaryQuery.data && {
         ...vkSummaryQuery.data,
-        byVirtualKey: [] as Array<{
+        byVirtualKey: [] as {
           virtualKeyId: string;
           name: string;
           displayPrefix: string | null;
           totalUsd: string;
           requests: number;
-        }>,
+        }[],
       }
     : summaryQuery.data;
 
@@ -399,7 +399,7 @@ function GatewayUsagePage() {
 function SpendSparkline({
   byDay,
 }: {
-  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+  byDay: { day: string; totalUsd: string; requests: number }[];
 }) {
   const points = useMemo(
     () =>

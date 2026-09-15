@@ -200,10 +200,10 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
         query_params: { tenantId: TENANT_ID },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{
+      const rows = (await result.json()) as {
         Window: string;
         buckets: string;
-      }>;
+      }[];
 
       // Every window produced a rollup bucket, and getSpendForBudgets above
       // found all of them. A window present here but missing from the spend

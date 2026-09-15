@@ -235,7 +235,7 @@ export type GatewayBudgetListWithHealth = {
 export type GatewayBudgetDetail = {
   budget: GatewayBudgetWithSeats;
   scopeTarget: GatewayBudgetScopeTarget;
-  recentLedger: Array<{
+  recentLedger: {
     id: string;
     virtualKeyId: string;
     amountUsd: GatewayMoney;
@@ -243,7 +243,7 @@ export type GatewayBudgetDetail = {
     status: GatewayBudgetLedgerStatus;
     occurredAt: Instant;
     virtualKey: { name: string; displayPrefix: string } | null;
-  }>;
+  }[];
   spendAvailable: boolean;
   unreachableByAnyKey: boolean;
 };

@@ -46,7 +46,7 @@ export type LegacyModelProviderExecution = {
   customKeys: Record<string, unknown> | null;
   customModels: LegacyCustomModel[];
   customEmbeddingsModels: LegacyCustomModel[];
-  extraHeaders: Array<{ key: string; value: string }>;
+  extraHeaders: { key: string; value: string }[];
   rateLimitRpm: number | null;
   rateLimitTpm: number | null;
   rateLimitRpd: number | null;

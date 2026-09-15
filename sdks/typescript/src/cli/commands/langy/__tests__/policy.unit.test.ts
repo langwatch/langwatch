@@ -215,7 +215,7 @@ describe("given a folder shared with a Langy conversation", () => {
 
     /** @scenario "The reason says what the command changes" */
     it("reads as one sentence about what changes, with no command quoted", () => {
-      const table: Array<{ command: string; reason: string }> = [
+      const table: { command: string; reason: string }[] = [
         {
           command: "pnpm typecheck",
           reason: "This runs the project's own checks.",
@@ -366,7 +366,7 @@ describe("given a folder shared with a Langy conversation", () => {
 
     /** @scenario "The session grant names the program and its first argument" */
     it("keeps a first argument that is a flag out of a grant over the whole program", () => {
-      const patterns: Array<[string[], boolean[] | undefined, string]> = [
+      const patterns: [string[], boolean[] | undefined, string][] = [
         [[".venv/bin/python", "-c", "from app import x"], [false, false, true], ".venv/bin/python -c"],
         [[".venv/bin/python", "-m", "compileall", "-q"], undefined, ".venv/bin/python -m"],
         [["git", "commit", "-m", "done"], undefined, "git commit"],
@@ -792,7 +792,7 @@ describe("when a command wraps another one in env", () => {
    * The operand grammar of every form of `env` this policy understands. A
    * form that is not in this table asks, whatever it looks like.
    */
-  const forms: Array<[string, PolicyDecision["kind"]]> = [
+  const forms: [string, PolicyDecision["kind"]][] = [
     ["env", "ask"],
     ["env -0", "ask"],
     ["printenv", "ask"],
@@ -836,7 +836,7 @@ describe("when an allowed command carries an operand that writes", () => {
    * that writes takes the command out of the read-only class, whatever the
    * name in front of it is.
    */
-  const grammar: Array<[string, PolicyDecision["kind"]]> = [
+  const grammar: [string, PolicyDecision["kind"]][] = [
     ["git branch", "run"],
     ["git branch -a", "run"],
     ["git branch --list", "run"],
@@ -878,7 +878,7 @@ describe("when an allowed command carries an operand that writes", () => {
 describe("when a shell command reads a file that may hold secrets", () => {
   /** @scenario "A shell command that reads a file which may hold secrets asks" */
   it("asks for the same file a read of it asks for", () => {
-    const reads: Array<[string, PolicyDecision["kind"]]> = [
+    const reads: [string, PolicyDecision["kind"]][] = [
       ["cat .env", "ask"],
       ["head -n 3 .env.local", "ask"],
       ["grep KEY .env", "ask"],
@@ -911,7 +911,7 @@ describe("when Langy lists the branches or the tags of the repository", () => {
    * Langy to list the branches of a prefix before it makes one, so these run
    * with no card, and their operands are references rather than file names.
    */
-  const listings: Array<[string, PolicyDecision["kind"]]> = [
+  const listings: [string, PolicyDecision["kind"]][] = [
     ["git branch --list 'langy/*'", "run"],
     ["git branch -l 'langy/*'", "run"],
     ["git branch --show-current", "run"],
@@ -947,7 +947,7 @@ describe("when Langy lists the branches or the tags of the repository", () => {
 describe("when a write option is attached to its value or to another flag", () => {
   /** @scenario "An allowed command with an operand that writes asks" */
   it("reads the option whichever way it is written", () => {
-    const spellings: Array<[string, PolicyDecision["kind"]]> = [
+    const spellings: [string, PolicyDecision["kind"]][] = [
       ["sort -o out.txt package.json", "ask"],
       ["sort -oout.txt package.json", "ask"],
       ["sort -ro out.txt package.json", "ask"],

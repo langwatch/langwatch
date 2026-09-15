@@ -15,8 +15,8 @@ import type {
 import type { LangyEffectMembers } from "./app/langy.members.ts";
 
 export interface StubLangyEffectCalls {
-  dispatchedTurns: Array<LangyWorkerDispatchIntent & { projectId: string }>;
-  titleRequests: Array<LangyGenerateTitleIntent & { projectId: string }>;
+  dispatchedTurns: (LangyWorkerDispatchIntent & { projectId: string })[];
+  titleRequests: (LangyGenerateTitleIntent & { projectId: string })[];
 }
 
 export function createStubLangyEffectPorts(): {

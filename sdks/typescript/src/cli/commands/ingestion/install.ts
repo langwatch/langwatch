@@ -147,7 +147,7 @@ async function runInstall(
       saveConfig({
         ...cfg,
         default_personal_ingest_keys: {
-          ...(cfg.default_personal_ingest_keys ?? {}),
+          ...cfg.default_personal_ingest_keys,
           [tool]: { secret: token, prefix },
         },
       });

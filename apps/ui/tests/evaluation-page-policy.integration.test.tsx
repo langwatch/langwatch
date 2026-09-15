@@ -126,7 +126,7 @@ function capabilities(session: UiSession): UiCapabilities {
 }
 
 /** Every key this move serves, paired with the screen it must resolve to. */
-const KEYS: ReadonlyArray<readonly [string, string]> = [
+const KEYS: readonly (readonly [string, string])[] = [
   ["pages/[project]/evaluators", "the evaluators page"],
   ["pages/[project]/online-evaluations", "the online evaluations page"],
 ];

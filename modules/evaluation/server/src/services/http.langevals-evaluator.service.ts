@@ -52,7 +52,7 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
   }
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
-    return await this.evaluateWithRetry(params, this.config.maxRetries);
+    return this.evaluateWithRetry(params, this.config.maxRetries);
   }
 
   private async evaluateWithRetry(
@@ -115,7 +115,7 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
     if (!response.ok) {
       if (response.status >= 500 && retriesLeft > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        return await this.evaluateWithRetry(params, retriesLeft - 1);
+        return this.evaluateWithRetry(params, retriesLeft - 1);
       }
 
       const duration = performance.now() - startTime;

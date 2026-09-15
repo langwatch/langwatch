@@ -163,21 +163,21 @@ export interface BillingUsageLimitOrganization {
     id: string;
     name: string;
     sentPlanLimitAlert: Instant | null;
-    members: Array<{ user: { id: string; name: string | null; email: string | null } }>;
+    members: { user: { id: string; name: string | null; email: string | null } }[];
     /** Which self-serve ladder this organization buys from, for the next-step hook. */
     pricingModel: BillingPricingModel | null;
     /** What the next-step plan is quoted in for this organization. */
     currency: "USD" | "EUR";
   } | null>;
   updateSentPlanLimitAlert(organizationId: string, timestamp: Instant): Promise<void>;
-  findProjectsWithName(organizationId: string): Promise<Array<{ id: string; name: string }>>;
+  findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]>;
 }
 
 export interface BillingUsageCounter {
   getCountByProjects(input: {
     organizationId: string;
     projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }> | typeof USAGE_UNKNOWN>;
+  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
 }
 
 export interface BillingPlanResolver {

@@ -142,8 +142,8 @@ export type GraphEvaluationPlan = {
 export type GraphSeriesEvaluation = {
   currentValue: number;
   previousValue: number | null;
-  currentPoints: Array<{ timestamp: string; value: number }>;
-  previousPoints: Array<{ timestamp: string; value: number }>;
+  currentPoints: { timestamp: string; value: number }[];
+  previousPoints: { timestamp: string; value: number }[];
 };
 
 export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;

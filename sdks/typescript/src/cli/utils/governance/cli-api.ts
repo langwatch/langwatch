@@ -615,11 +615,11 @@ export async function listIngestionKeys(
   options: CliApiOptions = {},
 ): Promise<{ sourceType: string; lookupId: string }[]> {
   const body = await requestREST<{
-    keys: Array<{
+    keys: {
       source_type: string;
       lookup_id: string;
       ingestion_template_id: string | null;
-    }>;
+    }[];
   }>(cfg, "GET", "/api/auth/cli/governance/ingestion-keys", options);
   return body.keys.map((k) => ({
     sourceType: k.source_type,

@@ -67,8 +67,8 @@ export type PersonalContext = {
   summary: PersonalSummary;
   budget: PersonalBudgetState;
   budgetOverview: PersonalBudgetOverview;
-  spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
-  spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
+  spendByDay: { day: string; usd: number; billedUsd: number }[];
+  spendByTool: { tool: string; usd: number; billedUsd: number }[];
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;

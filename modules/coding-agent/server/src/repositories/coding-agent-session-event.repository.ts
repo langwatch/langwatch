@@ -39,7 +39,7 @@ export abstract class CodingAgentSessionEventRepository {
     repositoryName: string;
     branches: string[];
     fromMs: number;
-  }): Promise<Array<{ tenantId: string; sessionId: string }>>;
+  }): Promise<{ tenantId: string; sessionId: string }[]>;
 }
 
 /**

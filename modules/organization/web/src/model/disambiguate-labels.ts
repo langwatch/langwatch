@@ -2,7 +2,7 @@
 export function disambiguateLabels<T extends { label: string }>(
   items: readonly T[],
   suffix: (item: T) => string,
-): Array<T & { displayLabel: string }> {
+): (T & { displayLabel: string })[] {
   const counts: Record<string, number> = {};
   for (const item of items) {
     counts[item.label] = (counts[item.label] ?? 0) + 1;

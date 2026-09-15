@@ -69,7 +69,7 @@ const textOf = (data: unknown): string => {
 };
 
 const wrapWs = (socket: WsWebSocket): SocketLike => {
-  const closeListeners: Array<(code: number) => void> = [];
+  const closeListeners: ((code: number) => void)[] = [];
   let closed = false;
   const emitClose = (code: number) => {
     if (closed) return;
@@ -176,10 +176,10 @@ export class HttpLongPollSocket implements SocketLike {
   private readonly url: string;
   private readonly headers: Record<string, string>;
   private readonly fetchImpl: typeof fetch;
-  private readonly messageListeners: Array<(data: string) => void> = [];
-  private readonly closeListeners: Array<(code: number) => void> = [];
-  private readonly errorListeners: Array<(error: unknown) => void> = [];
-  private readonly pingListeners: Array<() => void> = [];
+  private readonly messageListeners: ((data: string) => void)[] = [];
+  private readonly closeListeners: ((code: number) => void)[] = [];
+  private readonly errorListeners: ((error: unknown) => void)[] = [];
+  private readonly pingListeners: (() => void)[] = [];
   private readonly inFlight = new Set<string>();
   private readonly polls = new AbortController();
   private readonly frames = new AbortController();

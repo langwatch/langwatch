@@ -12,7 +12,7 @@ import type { ExecutionCell } from "@langwatch/experiment-contract";
 const datasetColumns = [{ id: "input", name: "input", type: "string" }];
 
 const scripted: {
-  dispatched: Array<{ type: string; payload: Record<string, any> }>;
+  dispatched: { type: string; payload: Record<string, any> }[];
 } = { dispatched: [] };
 
 const resetBoundary = () => {

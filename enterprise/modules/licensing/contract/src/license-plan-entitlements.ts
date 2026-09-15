@@ -47,7 +47,7 @@ export function applyPlanTypeEntitlements(plan: PlanInfo): PlanInfo {
   if (!entitlements) return plan;
 
   let filled: PlanInfo | undefined;
-  for (const field of Object.keys(entitlements) as Array<keyof TierEntitlements>) {
+  for (const field of Object.keys(entitlements) as (keyof TierEntitlements)[]) {
     if (plan[field] !== undefined) continue;
     filled ??= { ...plan };
     filled[field] = entitlements[field];

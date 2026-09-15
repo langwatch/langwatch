@@ -383,7 +383,7 @@ export class ExperimentCellExecutionService {
   }: {
     cell: ExecutionCell;
     projectId: string;
-    datasetColumns: Array<{ id: string; name: string; type: string }>;
+    datasetColumns: { id: string; name: string; type: string }[];
     loadedData: LoadedCellData;
     resultMapperConfig?: ResultMapperConfig;
     isAborted?: () => Promise<boolean>;

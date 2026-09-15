@@ -39,7 +39,7 @@ async function encodeGq2(
   data: Record<string, unknown>,
   tieredBlobs: TieredBlobStore = blobStore(),
 ): Promise<string> {
-  return await encodeJobEnvelope({
+  return encodeJobEnvelope({
     jobData: data,
     tieredBlobs,
     projectId: PROJECT,
@@ -69,7 +69,7 @@ describe("job envelope retry attempt", () => {
   describe("given a re-staged job whose body is held outside the message", () => {
     /** A blob-offloaded envelope: the body is empty, everything is in the header. */
     async function offloaded(attempt: number): Promise<string> {
-      return await encodeGq2({
+      return encodeGq2({
         ...jobData(attempt),
         bulk: "x".repeat(200_000),
       });

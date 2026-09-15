@@ -102,7 +102,7 @@ describe("EventStoreProducerOnly", () => {
 
     /** @scenario "Every read is refused on the same terms" */
     it("refuses every read operation, each naming itself", async () => {
-      const reads: Array<[string, Promise<unknown>]> = [
+      const reads: [string, Promise<unknown>][] = [
         [
           "getEvent",
           store.getEvent({

@@ -49,7 +49,7 @@ export class MemorySavedViewRepository implements SavedViewRepository {
   async findByIds(input: {
     ids: string[];
     projectId: string;
-  }): Promise<Array<{ id: string; userId: string | null }>> {
+  }): Promise<{ id: string; userId: string | null }[]> {
     return this.#views
       .filter((view) => view.projectId === input.projectId && input.ids.includes(view.id))
       .map((view) => ({ id: view.id, userId: view.userId }));

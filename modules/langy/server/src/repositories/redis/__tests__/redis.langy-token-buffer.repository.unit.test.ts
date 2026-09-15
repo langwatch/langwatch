@@ -20,7 +20,7 @@ interface RecordedEntry {
  */
 function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
   const entries: RecordedEntry[] = [];
-  const streams = new Map<string, Array<[string, string[]]>>();
+  const streams = new Map<string, [string, string[]][]>();
   let seq = 0;
   const redis: LangyStreamRedis = {
     xadd: async (key, ...args) => {

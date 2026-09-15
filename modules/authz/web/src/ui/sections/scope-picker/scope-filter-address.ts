@@ -5,8 +5,8 @@ import type { AvailableScopes, ScopeFilterValue } from "./scope-filter.tsx";
 /** The org tree a filter is resolved against, as narrow as the resolution needs. */
 export type ScopeHierarchy = {
   organization?: { id: string } | null;
-  teams?: Array<{ id: string }>;
-  projects?: Array<{ id: string; teamId?: string | null }>;
+  teams?: { id: string }[];
+  projects?: { id: string; teamId?: string | null }[];
 };
 
 /** A filter with the two ambient kinds already resolved against the reader's scope. */

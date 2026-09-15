@@ -24,7 +24,7 @@ import { buildIdentityInfrastructure } from "../identity-composition.build.ts";
  */
 function recordingRuntime() {
   const registered: string[] = [];
-  const sent: Array<{ pipeline: string; command: string; data: unknown }> = [];
+  const sent: { pipeline: string; command: string; data: unknown }[] = [];
   const installed = new Map<string, Record<string, unknown>>();
   const senderFor = (pipeline: string, name: string) => ({
     send: (data: unknown) => {
@@ -34,7 +34,7 @@ function recordingRuntime() {
   });
   const runtime = {
     isEnabled: true,
-    register: (definition: { metadata: { name: string }; commands: Array<{ name: string }> }) => {
+    register: (definition: { metadata: { name: string }; commands: { name: string }[] }) => {
       const pipeline = definition.metadata.name;
       registered.push(pipeline);
       return {

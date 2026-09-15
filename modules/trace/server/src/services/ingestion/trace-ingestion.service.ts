@@ -145,7 +145,7 @@ export class TraceIngestionService {
     traceRequest: IExportTraceServiceRequest,
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<TraceRequestCollectionResult> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "TraceIngestionService.handleOtlpTraceRequest",
       {
         kind: ApiSpanKind.PRODUCER,
@@ -269,7 +269,7 @@ export class TraceIngestionService {
       return { status: "filtered" };
     }
 
-    return await this.ingestNormalizedSpan({
+    return this.ingestNormalizedSpan({
       tenantId: input.tenantId,
       span: this.withHexIds(spanParseResult.data),
       resource: input.resource,

@@ -37,7 +37,7 @@ export class EventingTraceTopicAdapter implements CommandHandler<
   private readonly logger = createLogger("langwatch:trace-processing:assign-topic");
 
   async handle(command: Command<AssignTopicCommandData>): Promise<TopicAssignedEvent[]> {
-    return await this.tracer.withActiveSpan(
+    return this.tracer.withActiveSpan(
       "AssignTopicCommand.handle",
       {
         kind: SpanKind.INTERNAL,

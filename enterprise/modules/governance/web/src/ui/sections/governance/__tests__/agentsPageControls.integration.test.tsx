@@ -18,7 +18,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
-  openedDrawers: [] as Array<{ drawer: string; props?: unknown }>,
+  openedDrawers: [] as { drawer: string; props?: unknown }[],
 }));
 
 import {

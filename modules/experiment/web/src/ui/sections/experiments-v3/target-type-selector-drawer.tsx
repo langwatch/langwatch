@@ -34,12 +34,12 @@ export type TargetTypeSelectorDrawerProps = {
   };
 };
 
-const targetTypes: Array<{
+const targetTypes: {
   type: TargetCardKey;
   icon: typeof FileText;
   title: string;
   description: string;
-}> = [
+}[] = [
   {
     type: "prompt",
     icon: FileText,

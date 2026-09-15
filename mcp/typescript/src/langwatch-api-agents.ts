@@ -217,7 +217,7 @@ export function buildRelayBody({
     }
     inputParams = parsed.data;
   }
-  if (inputParams || parameters) body.params = { ...(inputParams ?? {}), ...(parameters ?? {}) };
+  if (inputParams || parameters) body.params = { ...inputParams, ...parameters };
   return body;
 }
 

@@ -24,7 +24,7 @@ export function maskApiKey(key: string): string {
 
 /** Build a `.env` snippet from key/value entries. */
 export function formatEnvLines(
-  entries: Array<{ key: string; value: string; mask?: boolean }>,
+  entries: { key: string; value: string; mask?: boolean }[],
 ): string {
   return entries
     .map(({ key, value, mask }) => `${key}="${mask ? maskSecret(value) : value}"`)

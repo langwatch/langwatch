@@ -180,11 +180,11 @@ const OAUTH_HANDSHAKE_POLICY: AccessPolicy = publicEndpoint(
 
 const MCP_HEALTH_POLICY: AccessPolicy = publicEndpoint("MCP liveness probe; reads no project data");
 
-const ROUTE_VERBS: ReadonlyArray<{
+const ROUTE_VERBS: readonly {
   path: string;
   methods: readonly string[];
   policy: AccessPolicy;
-}> = [
+}[] = [
   { path: "/mcp", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
   { path: "/mcp/health", methods: ["GET"], policy: MCP_HEALTH_POLICY },
   { path: "/sse", methods: ["GET"], policy: BEARER_SESSION_POLICY },
@@ -230,14 +230,14 @@ const ROUTE_VERBS: ReadonlyArray<{
  * answers `OPTIONS` on every path it claims, and a preflight nobody declared is
  * exactly the kind of verb this registry exists to surface.
  */
-export function hostedMcpRoutePolicies(): ReadonlyArray<{
+export function hostedMcpRoutePolicies(): readonly {
   method: string;
   path: string;
   policy: AccessPolicy;
   family: string;
   credentialClass: CredentialClass;
   credential: Credential;
-}> {
+}[] {
   return ROUTE_VERBS.flatMap((route) =>
     [...route.methods, "OPTIONS"].map((method) => {
       const policy =

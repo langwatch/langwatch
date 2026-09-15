@@ -18,7 +18,7 @@ vi.mock("recharts", () => {
     // Surfaces the chart's computed data (one entry per bar, in render
     // order) as text so the test can assert on it without depending on
     // recharts' internal SVG tick rendering.
-    BarChart: ({ data }: { data: Array<{ name: string }> }) => (
+    BarChart: ({ data }: { data: { name: string }[] }) => (
       <div data-testid="bar-chart-data">{data.map((d) => d.name).join(", ")}</div>
     ),
     Bar: MockComponent,

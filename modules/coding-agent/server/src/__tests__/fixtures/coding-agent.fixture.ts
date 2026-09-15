@@ -60,7 +60,7 @@ export class TestClickHouseEndpoint {
     private readonly server: Server,
     private readonly client: ClickHouseClient,
     readonly requests: ClickHouseRequest[],
-    readonly queryRows: Array<Array<Record<string, unknown>>>,
+    readonly queryRows: Record<string, unknown>[][],
   ) {
     this.clickhouse = new ClickHouseQueryClient({
       driver: singleEndpointDriver(client),
@@ -70,7 +70,7 @@ export class TestClickHouseEndpoint {
 
   static async create(): Promise<TestClickHouseEndpoint> {
     const requests: ClickHouseRequest[] = [];
-    const queryRows: Array<Array<Record<string, unknown>>> = [];
+    const queryRows: Record<string, unknown>[][] = [];
     const server = createServer(async (request, response) => {
       let body = "";
       for await (const chunk of request) body += String(chunk);
@@ -262,44 +262,42 @@ export class TestSessions extends CodingAgentSessionRepository {
   recentRowsByTenant = new Map<string, CodingAgentSession[]>();
   branchRows: CodingAgentSessionBranchRecord[] = [];
   bySessionIdRows: CodingAgentSessionBranchRecord[] = [];
-  bySessionIdInputs: Array<{
+  bySessionIdInputs: {
     tenantIds: string[];
     sessionIds: string[];
     startedAtFromMs: number;
-  }> = [];
+  }[] = [];
   missWhenWindowed = false;
-  findInputs: Array<{
+  findInputs: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }> = [];
-  recentInputs: Array<{
+  }[] = [];
+  recentInputs: {
     tenantId: string;
     userId?: string;
     fromMs: number;
     toMs: number;
     limit: number;
-  }> = [];
-  branchInputs: Array<{
+  }[] = [];
+  branchInputs: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
     repositoryName: string;
     branches: string[];
     startedAtFromMs: number;
-  }> = [];
-  stored: Array<{
+  }[] = [];
+  stored: {
     row: CodingAgentSession;
     retentionDays: number;
     appliedEventIds: readonly string[];
-  }> = [];
-  storedBatches: Array<
-    Array<{
+  }[] = [];
+  storedBatches: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>
-  > = [];
+    }[][] = [];
   applied: { row: CodingAgentSession; appliedEventIds: string[] } | null = null;
 
   async upsert(
@@ -311,11 +309,11 @@ export class TestSessions extends CodingAgentSessionRepository {
   }
 
   async upsertBatch(
-    rows: Array<{
+    rows: {
       row: CodingAgentSession;
       retentionDays: number;
       appliedEventIds: readonly string[];
-    }>,
+    }[],
   ): Promise<void> {
     this.storedBatches.push(rows);
   }
@@ -376,7 +374,7 @@ export class TestSessions extends CodingAgentSessionRepository {
 
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   mapping: CodingAgentTraceSessionRecord | null = null;
-  inputs: Array<{ tenantId: string; traceId: string }> = [];
+  inputs: { tenantId: string; traceId: string }[] = [];
 
   async ensure(): Promise<void> {}
 
@@ -391,12 +389,12 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
 
 export class TestMetricSeries extends SessionMetricSeriesRepository {
   totals: SessionMetricTotal[] = [];
-  inputs: Array<{
+  inputs: {
     tenantId: string;
     sessionIds: string[];
     fromMs: number;
     toMs: number;
-  }> = [];
+  }[] = [];
 
   async ensure(): Promise<void> {}
 
@@ -416,16 +414,16 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     events: [],
     nextCursor: null,
   };
-  pages: Array<{ events: CodingAgentSessionEvent[]; nextCursor: null }> = [];
-  inputs: Array<{
+  pages: { events: CodingAgentSessionEvent[]; nextCursor: null }[] = [];
+  inputs: {
     tenantId: string;
     sessionId: string;
     kinds?: string[];
     occurredAt?: { fromMs: number; toMs: number };
     cursor?: { timeUnixMs: number; recordId: string };
     limit: number;
-  }> = [];
-  modelTotals: Array<{
+  }[] = [];
+  modelTotals: {
     tenantId: string;
     sessionId: string;
     model: string;
@@ -438,21 +436,21 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     cacheReadTokens: number;
     cacheCreationTokens: number;
     costUsd: number;
-  }> = [];
-  modelTotalInputs: Array<{
+  }[] = [];
+  modelTotalInputs: {
     tenantIds: string[];
     sessionIds: string[];
     fromMs: number;
-  }> = [];
-  stampedSessions: Array<{ tenantId: string; sessionId: string }> = [];
-  stampedInputs: Array<{
+  }[] = [];
+  stampedSessions: { tenantId: string; sessionId: string }[] = [];
+  stampedInputs: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
     repositoryName: string;
     branches: string[];
     fromMs: number;
-  }> = [];
+  }[] = [];
 
   async ensure(): Promise<void> {}
 
@@ -473,7 +471,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     sessionIds: string[];
     fromMs: number;
   }): Promise<
-    Array<{
+    {
       tenantId: string;
       sessionId: string;
       model: string;
@@ -486,7 +484,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
       cacheReadTokens: number;
       cacheCreationTokens: number;
       costUsd: number;
-    }>
+    }[]
   > {
     this.modelTotalInputs.push(input);
     return this.modelTotals;
@@ -499,7 +497,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     repositoryName: string;
     branches: string[];
     fromMs: number;
-  }): Promise<Array<{ tenantId: string; sessionId: string }>> {
+  }): Promise<{ tenantId: string; sessionId: string }[]> {
     this.stampedInputs.push(input);
     return this.stampedSessions;
   }
@@ -518,21 +516,21 @@ export class TestBillingPolicy implements CodingAgentBillingPolicy {
 export class TestGithubService implements GithubApi {
   readonly configured = true;
   pullRequests: GithubPullRequest[] = [];
-  mappingRequests: Array<{
+  mappingRequests: {
     tenantId: string;
     repositoryHost: string;
     repositoryOwner: string;
     repositoryName: string;
     headBranch: string;
-  }> = [];
-  branchLookupInputs: Array<{
+  }[] = [];
+  branchLookupInputs: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
-  }> = [];
+    }[];
+  }[] = [];
   coveredRepositories = true;
   mappingError: Error | null = null;
 
@@ -653,11 +651,11 @@ export class TestGithubService implements GithubApi {
 
   async findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{
+    keys: readonly {
       repositoryHost: string;
       repositoryFullName: string;
       headBranch: string;
-    }>;
+    }[];
   }): Promise<readonly GithubPullRequest[]> {
     this.branchLookupInputs.push(input);
     return this.pullRequests;
@@ -689,8 +687,8 @@ export class TestGithubService implements GithubApi {
 }
 
 export class TestProjectService extends TestProjectApi {
-  projects: Array<{ id: string }> = [];
-  sessionActivity: Array<{ projectId: string; at: Instant }> = [];
+  projects: { id: string }[] = [];
+  sessionActivity: { projectId: string; at: Instant }[] = [];
   sessionActivityError: Error | null = null;
   organizationId = "organization-1";
   teamProject: ProjectWithTeam | null = projectWithTeamSchema.parse({

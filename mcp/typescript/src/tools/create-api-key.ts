@@ -5,11 +5,11 @@ export async function handleCreateApiKey(params: {
   name: string;
   description?: string;
   expiresAt?: string;
-  bindings?: Array<{
+  bindings?: {
     role: "ADMIN" | "MEMBER" | "VIEWER";
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }>;
+  }[];
   projectIds?: string[];
 }): Promise<string> {
   const result = await apiCreateApiKey(params);

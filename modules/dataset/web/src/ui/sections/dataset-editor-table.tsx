@@ -90,7 +90,7 @@ const stringifyCellValue = (value: unknown): string => {
 };
 
 const toEditorRecords = (
-  datasetRecords: Array<{ id: string } & Record<string, unknown>>,
+  datasetRecords: ({ id: string } & Record<string, unknown>)[],
   columnTypes: DatasetColumns,
 ): EditorRecord[] =>
   datasetRecords.map((record) => ({
@@ -101,8 +101,8 @@ const toEditorRecords = (
   }));
 
 const toEntryRecords = (
-  rows: ReadonlyArray<{ id: string; entry: unknown }>,
-): Array<{ id: string } & Record<string, unknown>> =>
+  rows: readonly { id: string; entry: unknown }[],
+): ({ id: string } & Record<string, unknown>)[] =>
   rows.map((row) => ({ id: row.id, ...(row.entry as Record<string, unknown>) }));
 
 export function DatasetEditorTable({

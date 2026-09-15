@@ -43,7 +43,7 @@ function reasonOf(error: unknown): string {
  *  from. `detail` is a string, an object with `message`, or an array of
  *  `{ msg }` (FastAPI validation-error shape) depending on the endpoint. */
 interface ElevenLabsErrorBody {
-  detail?: string | { message?: string } | Array<{ msg?: string }>;
+  detail?: string | { message?: string } | { msg?: string }[];
 }
 
 /**

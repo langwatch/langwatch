@@ -28,12 +28,12 @@ function reassignIds(span: SpanConfig) {
 
 function injectRealPrompts(
   config: TraceConfig,
-  prompts: Array<{
+  prompts: {
     id: string;
     handle: string | null;
     versionId: string;
     version: number;
-  }>,
+  }[],
 ) {
   const promptSpans: SpanConfig[] = [];
   function collect(spans: SpanConfig[]) {

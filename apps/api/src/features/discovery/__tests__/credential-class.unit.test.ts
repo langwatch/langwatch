@@ -63,11 +63,11 @@ type ApiDocument = {
 const document = JSON.parse(readFileSync(SPEC_PATH, "utf8")) as ApiDocument;
 
 /** Every documented operation on a public surface, with what it must publish. */
-function publicOperations(): Array<{
+function publicOperations(): {
   operationKey: string;
   scheme: string;
   published: unknown;
-}> {
+}[] {
   return Object.entries(document.paths).flatMap(([path, item]) => {
     const surface = surfaceFor(path);
     if (!surface) return [];

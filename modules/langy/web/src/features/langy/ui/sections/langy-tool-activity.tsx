@@ -237,8 +237,8 @@ export const toCapabilityCalls = memoizeOnParts(readCapabilityCalls);
 
 function readCapabilityCalls(
   message: PartsView,
-): Array<{ id: string; call: CapabilityToolCall } & Sequenced> {
-  const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> = [];
+): ({ id: string; call: CapabilityToolCall } & Sequenced)[] {
+  const result: ({ id: string; call: CapabilityToolCall } & Sequenced)[] = [];
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     const name = partToolName(part);
@@ -566,7 +566,7 @@ export function LangyActivityParts({
   // into the same card, since nothing is hidden. A turn still running, or one that never replied,
   // keeps its failures where they are.
   const answerIndex = lastAnswerTextIndex(view);
-  const rows: Array<{ key: string; order: number; node: ReactNode }> = [
+  const rows: { key: string; order: number; node: ReactNode }[] = [
     ...failures.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
       order,
@@ -1544,7 +1544,7 @@ function RunningActivityHeader({
 }
 
 function completedActivityLabel(label: string): string {
-  const replacements: Array<[RegExp, string]> = [
+  const replacements: [RegExp, string][] = [
     [/^Running\b/i, "Ran"],
     [/^Reading\b/i, "Read"],
     [/^Writing\b/i, "Wrote"],

@@ -331,7 +331,7 @@ describe("given the All Annotations address", () => {
 
       renderWithAnnotationHost(<AnnotationsScreen view="all" />);
 
-      const rows = mocks.listProps?.rows as Array<Record<string, unknown>>;
+      const rows = mocks.listProps?.rows as Record<string, unknown>[];
       expect(rows).toHaveLength(2);
       expect(rows[0]!.queueItemId).toBeNull();
       expect(rows[0]!.date).toEqual(Temporal.Instant.from("2026-07-20T10:00:00Z"));

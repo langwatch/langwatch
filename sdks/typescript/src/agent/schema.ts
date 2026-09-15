@@ -36,12 +36,12 @@ export interface StandardJsonSchemaConverter {
 /** One problem a Standard Schema `validate` reports. */
 export interface StandardSchemaIssue {
   readonly message: string;
-  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined;
+  readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }
 
 export type StandardSchemaResult<O> =
   | { readonly value: O; readonly issues?: undefined }
-  | { readonly issues: ReadonlyArray<StandardSchemaIssue> };
+  | { readonly issues: readonly StandardSchemaIssue[] };
 
 /**
  * Any object that implements the Standard JSON Schema interface. When it also
@@ -253,7 +253,7 @@ export function resolveParameterValues({
   specs: ParameterSpec[];
   supplied: Record<string, AgentParameterValue> | undefined;
 }): Record<string, AgentParameterValue> {
-  const values: Record<string, AgentParameterValue> = { ...(supplied ?? {}) };
+  const values: Record<string, AgentParameterValue> = { ...supplied };
   for (const spec of specs) {
     const value = values[spec.name];
     if (value === undefined) {

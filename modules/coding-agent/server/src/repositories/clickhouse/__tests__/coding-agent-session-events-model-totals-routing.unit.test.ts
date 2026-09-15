@@ -13,7 +13,7 @@ const FROM_MS = Date.parse("2026-07-01T00:00:00.000Z");
  * NAMED — what the real client routes by — beside the tenant list the statement
  * scoped itself to.
  */
-function recordingClient(rows: Array<Record<string, unknown>>): {
+function recordingClient(rows: Record<string, unknown>[]): {
   client: ClickHouseQueryClient;
   named: () => string[];
   scopedTo: () => string[][];

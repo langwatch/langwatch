@@ -35,7 +35,7 @@ export type StoredStudioDatasetRecord = z.input<typeof storedStudioDatasetRecord
 export type StoredStudioDataset = z.input<typeof storedStudioDatasetSchema>;
 
 export function transpostRowsFirstToColumnsFirstWithoutId(
-  data: Array<Record<string, unknown>>,
+  data: Record<string, unknown>[],
 ): Record<string, unknown[]> {
   const columns: Record<string, unknown[]> = {};
 
@@ -120,7 +120,7 @@ export function inMemoryDatasetToNodeDataset(dataset: StudioInMemoryDataset): No
 }
 
 export const simpleRecordListToNodeDataset = (
-  records: Array<Record<string, unknown>>,
+  records: Record<string, unknown>[],
 ): NodeDataset => {
   const columnsFirst = transpostRowsFirstToColumnsFirstWithoutId(records);
   return {

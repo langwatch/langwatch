@@ -76,7 +76,7 @@ export const withParsedFlags = <T>(parse: () => T): T => {
 };
 
 /** Shared so every single-resource read across the families prints one shape. */
-export const printFacts = (facts: Array<[string, string]>): void => {
+export const printFacts = (facts: [string, string][]): void => {
   const width = Math.max(...facts.map(([label]) => label.length));
   console.log();
   for (const [label, value] of facts) {

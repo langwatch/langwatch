@@ -139,7 +139,7 @@ describe("StoredObjectStoragePortAdapter", () => {
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
     });
 
-    const addresses: ReadonlyArray<StoredObjectStorageAddress> = [
+    const addresses: readonly StoredObjectStorageAddress[] = [
       { provider: "gcs", destinationId: "bucket", relativeId: "project-1/object-1" },
       { provider: "s3", destinationId: "bucket/other", relativeId: "project-1/object-1" },
       {

@@ -234,7 +234,7 @@ describe("synchronous external process signals", () => {
             now: T0 + 1,
           });
         }
-        return await originalCommit(commit);
+        return originalCommit(commit);
       };
 
       const result = await service.handleSignal({
@@ -275,7 +275,7 @@ describe("synchronous external process signals", () => {
             now: T0 + 1,
           });
         }
-        return await originalCommit(commit);
+        return originalCommit(commit);
       };
 
       const result = await noRetryService.handleSignal({

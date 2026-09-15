@@ -1242,7 +1242,7 @@ export async function selectRows<T>(
     format: "JSONEachRow",
     ...(options?.query_id ? { query_id: options.query_id } : {}),
   });
-  return await result.json<T>();
+  return result.json<T>();
 }
 
 /** Runs a SELECT expected to return exactly one scalar column named `value`. */
@@ -1892,7 +1892,7 @@ async function readContainerLog(
   { quietMs = 400, maxMs = 8_000 } = {},
 ): Promise<string> {
   const stream = await streamPromise;
-  return await new Promise<string>((resolve) => {
+  return new Promise<string>((resolve) => {
     let buffer = "";
     let settled = false;
     let quiet: ReturnType<typeof setTimeout> | undefined;

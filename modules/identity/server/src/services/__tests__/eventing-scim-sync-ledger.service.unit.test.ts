@@ -21,7 +21,7 @@ const SYNC = "scimsync_1";
 const ACTOR = { type: "system" as const, id: null };
 
 class RecordingEventing implements IdentityEventing {
-  readonly asked: Array<{ pipeline: string; command: string }> = [];
+  readonly asked: { pipeline: string; command: string }[] = [];
   readonly staged: unknown[] = [];
 
   constructor(private readonly registered: boolean) {

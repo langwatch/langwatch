@@ -247,7 +247,7 @@ export const MetricStatsTooltip = ({
   };
   formatValue: (value: number | null) => string;
 }) => {
-  const rows: Array<{ label: string; value: number | null }> = [
+  const rows: { label: string; value: number | null }[] = [
     { label: "Min", value: stats.min },
     { label: "Avg", value: stats.avg },
     { label: "Median (p50)", value: stats.median },
@@ -288,12 +288,12 @@ export const ChartTooltip = ({
   separator = ": ",
 }: {
   active?: boolean;
-  payload?: ReadonlyArray<Payload<ValueType, NameType>>;
+  payload?: readonly Payload<ValueType, NameType>[];
   label?: string | number;
   formatter?: Formatter<ValueType, NameType>;
   labelFormatter?: (
     label: string | number | undefined,
-    payload: ReadonlyArray<Payload<ValueType, NameType>>,
+    payload: readonly Payload<ValueType, NameType>[],
   ) => ReactNode;
   separator?: string;
 }) => {

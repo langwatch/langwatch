@@ -32,10 +32,10 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
   }
 
   async storeBatch(
-    entries: Array<{
+    entries: {
       state: EvaluationRunData;
       context: ProjectionStoreContext;
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
 

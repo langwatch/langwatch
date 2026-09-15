@@ -57,7 +57,7 @@ export function rememberAgentForDirectory(agentId: string): void {
   try {
     const cfg = loadConfig();
     cfg.agent_dev_agents = {
-      ...(cfg.agent_dev_agents ?? {}),
+      ...cfg.agent_dev_agents,
       [process.cwd()]: agentId,
     };
     saveConfig(cfg);

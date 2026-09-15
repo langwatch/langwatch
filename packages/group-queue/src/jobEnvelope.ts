@@ -180,7 +180,7 @@ function mergeMachinery(
   const hasRouting =
     typeof header.p === "string" || typeof header.t === "string" || typeof header.n === "string";
   if (!header.m && !hasRouting) return body;
-  const merged: Record<string, unknown> = { ...body, ...(header.m ?? {}) };
+  const merged: Record<string, unknown> = { ...body, ...header.m };
   if (typeof header.p === "string") merged.__pipelineName = header.p;
   if (typeof header.t === "string") merged.__jobType = header.t;
   if (typeof header.n === "string") merged.__jobName = header.n;
@@ -513,7 +513,7 @@ export function withJobAttempt({ value, attempt }: { value: string; attempt: num
     const { header, body } = splitEnvelope(value);
     return finalize(
       ENVELOPE_PREFIX_V2,
-      { ...header, m: { ...(header.m ?? {}), __attempt: attempt } },
+      { ...header, m: { ...header.m, __attempt: attempt } },
       body,
     );
   } catch {

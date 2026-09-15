@@ -32,7 +32,7 @@ export type WorkflowDeleteResponse =
  */
 interface WorkflowEvaluateRequest {
   version_id?: string;
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   dataset_id?: string;
   parameters?: Record<string, string | number | boolean>;
   row_indices?: number[];

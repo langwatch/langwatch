@@ -10,7 +10,7 @@ import {
 import type { AttributeCanonicaliser, ExtractorContext } from "../canonical-attributes.service.ts";
 
 /** OTel span kinds that name a span type on their own, in the spelling they arrive with. */
-const SPAN_KIND_TYPES: ReadonlyArray<readonly [string, string]> = [
+const SPAN_KIND_TYPES: readonly (readonly [string, string])[] = [
   ["SERVER", "server"],
   ["CLIENT", "client"],
   ["PRODUCER", "producer"],

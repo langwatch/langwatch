@@ -72,10 +72,10 @@ const WINDOW_END = Date.UTC(2026, 1, 1);
  * Keeping them in one table means a sixth read added later without a bound
  * fails here rather than shipping unbounded.
  */
-const READS: Array<{
+const READS: {
   name: string;
   run: (repo: ActivityMonitorSpendClickHouseRepository) => Promise<unknown>;
-}> = [
+}[] = [
   {
     name: "findSummarySpend",
     run: (repo) =>

@@ -29,8 +29,8 @@ const SCHEDULE = { cron: "0 9 * * *", timezone: "UTC" };
  * The mail gateway a report actually leaves through, faked.
  */
 class FakeMailGateway extends AutomationNotificationDelivery {
-  readonly emails: Array<{ recipients: string[]; subject: string; html: string }> = [];
-  readonly slackMessages: Array<{ payload: SlackPayload }> = [];
+  readonly emails: { recipients: string[]; subject: string; html: string }[] = [];
+  readonly slackMessages: { payload: SlackPayload }[] = [];
 
   async sendEmail(input: { recipients: string[]; subject: string; html: string }): Promise<void> {
     this.emails.push({

@@ -208,7 +208,7 @@ describe("TalkToItPanel", () => {
           status: 200,
           headers: { "content-type": "application/json" },
         });
-      const finishCalls: Array<Record<string, unknown>> = [];
+      const finishCalls: Record<string, unknown>[] = [];
       const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
         const href = String(url);
         if (href.endsWith("/api/voice/session")) {

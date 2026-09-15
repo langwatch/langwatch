@@ -75,11 +75,11 @@ function event(id: string) {
 }
 
 class FakeHttp implements GovernanceHttpClient {
-  readonly calls: Array<{
+  readonly calls: {
     url: string;
     init: Parameters<GovernanceHttpClient["fetch"]>[1];
-  }> = [];
-  readonly responses: Array<GovernanceHttpResponse | Error> = [];
+  }[] = [];
+  readonly responses: (GovernanceHttpResponse | Error)[] = [];
 
   async fetch(
     url: string,

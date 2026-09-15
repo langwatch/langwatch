@@ -109,7 +109,7 @@ function commonZeroThreshold({
   bucketMaps,
   scale,
 }: {
-  thresholds: Array<number | null>;
+  thresholds: (number | null)[];
   bucketMaps: BucketMap[];
   scale: number;
 }): number {

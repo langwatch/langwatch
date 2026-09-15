@@ -30,7 +30,7 @@ vi.mock("recharts", () => {
   const MockComponent = ({ children }: { children?: ReactNode }) => children ?? null;
   return {
     ResponsiveContainer: MockComponent,
-    BarChart: ({ data }: { data: Array<{ name: string; wins: number }> }) => (
+    BarChart: ({ data }: { data: { name: string; wins: number }[] }) => (
       <div data-testid="bar-chart-data">
         {JSON.stringify(data.map(({ name, wins }) => ({ name, wins })))}
       </div>

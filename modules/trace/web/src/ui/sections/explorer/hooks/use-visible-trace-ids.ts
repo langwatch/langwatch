@@ -56,10 +56,10 @@ export function useVisibleTraceIds(): VisibleTraceIds {
     return { ids: new Set(), topTimestamp: undefined, page };
   }
 
-  const items = cached.items as Array<{
+  const items = cached.items as {
     traceId: string;
     startedAt?: number | string | null;
-  }>;
+  }[];
 
   const ids = new Set(items.map((item) => item.traceId));
 

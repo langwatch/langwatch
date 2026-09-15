@@ -49,5 +49,5 @@ export async function confirmedDeaths({
   queueName: string;
   groupId: string;
 }): Promise<string | null> {
-  return await redis.hget(claimKey(queueName, groupId), "deaths");
+  return redis.hget(claimKey(queueName, groupId), "deaths");
 }

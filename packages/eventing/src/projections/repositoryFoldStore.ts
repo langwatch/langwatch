@@ -39,7 +39,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
   }
 
   async storeBatch(
-    entries: Array<{ state: TData; context: ProjectionStoreContext }>,
+    entries: { state: TData; context: ProjectionStoreContext }[],
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -73,7 +73,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
     }
   }
 
-  private isUniformContext(entries: Array<{ context: ProjectionStoreContext }>): boolean {
+  private isUniformContext(entries: { context: ProjectionStoreContext }[]): boolean {
     const first = entries[0]!.context;
     return entries.every(
       (entry) =>

@@ -1,10 +1,7 @@
 /**
- * Heal a personal ingest key the collector rejected. Such a key can die under a running agent
- * (a revoke, a session ending mid-run, a logout of a session that shared it); the hook is the
- * one process that learns this on every session, so it re-mints under the device's current
- * session (via the same resolver `langwatch instrument` uses), persists the cache, rewrites
- * the tool's wiring, and hands back a retry target. Nothing here throws to the caller: the
- * hook must never be why a session broke, so every failure is a null and a debug line.
+ * Heals a personal ingest key the collector rejected: re-mints it under the device's current
+ * session and rewrites the tool's wiring. Never throws to the caller — every failure degrades
+ * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
 import {
@@ -27,12 +24,9 @@ export interface HealedTarget {
 }
 
 /**
- * How a heal ended, and whether it cost anything. `declined` is decided from config alone,
- * before any network call, so retrying it costs nothing. The other three reached the
- * platform: `failed` may already have spent a mint, so must not be retried in a loop;
- * `withheld` means a person revoked the key on purpose, so the device must not replace it —
- * they must set the device up again instead; `expired` means the device itself is signed out,
- * which no mint can repair.
+ * How a heal ended. `declined` costs nothing and is safe to retry; `failed` may have already
+ * spent a mint, so must not be retried in a loop; `withheld` means the device must be set up
+ * again rather than retried; `expired` means the device is signed out, which no retry can fix.
  */
 export type HealOutcome =
   | { status: "declined" }
@@ -44,10 +38,9 @@ export type HealOutcome =
 const DECLINED: HealOutcome = { status: "declined" };
 
 /**
- * Stands in for a key status the platform never gave, because it refused the
- * device's session instead of answering. Distinct from the `null` any other
- * describe failure produces, so the heal can end on the repair the person can
- * actually make rather than on a silent failure.
+ * Stands in for a key status the platform never gave, because it refused the device's
+ * session instead of answering. Distinct from a plain `null` so the heal can end on the
+ * expired-session repair rather than a silent failure.
  */
 const EXPIRED_SESSION = Symbol("expired-session");
 
@@ -78,19 +71,16 @@ const REAL_DEPS: HealDeps = {
 const DESCRIBE_TIMEOUT_MS = 3_000;
 
 /**
- * The one revocation a device must not mint past: a person's. Every other
- * cause is the platform's own doing (a session that ended, a rotation, an
- * older server's cap) and the device repairs itself under its current
- * session. A revoke recorded with no cause may have been a person's, so it
- * counts as one.
+ * The one revocation a device must not mint past: a person's. Every other cause is the
+ * platform's own doing, and the device repairs itself under its current session. A revoke
+ * recorded with no cause may have been a person's, so it counts as one.
  */
 const USER_REVOCATION_CAUSE = "user";
 
 /**
- * The person lost their membership of the organization, so the session that
- * held this key was retired with them. A mint would be refused for the same
- * reason, so the heal ends here on the signed-out outcome rather than
- * spending a round trip to be told so.
+ * The person lost their membership of the organization, so the session that held this key
+ * was retired with them. A mint would be refused for the same reason, so the heal ends here
+ * on the signed-out outcome rather than spending a round trip to be told so.
  */
 const OFFBOARDED_REVOCATION_CAUSE = "offboarded";
 
@@ -102,11 +92,9 @@ const TOOL_BY_AGENT: Record<string, string> = {
 };
 
 /**
- * Re-mint the personal ingest key for `agent` and rewrite its wiring. Declines without
- * reaching the platform when this device isn't positioned to repair the 401 (no login, a
- * tool pinned to a project, or a rejected token that isn't exactly the cached personal key).
- * {@link revocationBlocksHeal} decides whether the platform's answer withholds the repair
- * instead of granting it.
+ * Re-mints the personal ingest key for `agent` and rewrites its wiring, declining without a
+ * platform call when this device can't repair the 401. {@link revocationBlocksHeal} decides
+ * whether the platform withholds the repair instead of granting it.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -145,12 +133,9 @@ export async function healRevokedIngestKey({
 }
 
 /**
- * The status check that stands between the 401 and the mint: an outcome when it ends the
- * heal, `null` when the key may still be replaced. A status call that times out or errors
- * ends the heal rather than falling through to the mint — a platform that didn't answer never
- * said "safe to re-mint", and the one revocation this device must not mint past is a
- * person's. A refused session ends on `expired` instead, the one outcome that names a repair
- * the person can make; a key retired because its person was offboarded reads the same way.
+ * The status check between the 401 and the mint: an outcome ends the heal, `null` means the
+ * key may still be replaced. A call that errors or times out also ends the heal — a platform
+ * that didn't answer never said "safe to re-mint" — and a refused session ends on `expired`.
  */
 async function revocationBlocksHeal({
   cfg,
@@ -205,7 +190,7 @@ function adoptMintedKey({
 }): HealOutcome {
   const cachedKeys = cfg.default_personal_ingest_keys;
   cfg.default_personal_ingest_keys = {
-    ...(cachedKeys ?? {}),
+    ...cachedKeys,
     [agent]: { secret: resolved.token, prefix: resolved.prefix },
   };
   try {

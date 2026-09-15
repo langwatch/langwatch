@@ -78,7 +78,7 @@ function templateRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderWith(rows: Array<Record<string, unknown>>) {
+function renderWith(rows: Record<string, unknown>[]) {
   listQuery.mockReturnValue({
     data: { budgets: rows, spendAvailable: true },
     isLoading: false,

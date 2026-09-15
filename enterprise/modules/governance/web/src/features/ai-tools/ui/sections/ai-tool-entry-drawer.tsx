@@ -41,7 +41,7 @@ import {
 } from "../../../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 import { api } from "../../../../behavior/governance-api.ts";
-const TILE_TYPE_OPTIONS: Array<{ value: AiToolTileType; label: string }> = [
+const TILE_TYPE_OPTIONS: { value: AiToolTileType; label: string }[] = [
   { value: "coding_assistant", label: "Coding assistant" },
   { value: "model_provider", label: "Model provider" },
   { value: "external_tool", label: "Internal tool" },
@@ -841,10 +841,10 @@ function ModelProviderFields({
   form: ModelProviderForm;
   setForm: (f: FormState) => void;
   providerOptions:
-    | Array<{ providerKey: string; displayName: string; configured: boolean }>
+    | { providerKey: string; displayName: string; configured: boolean }[]
     | undefined;
   providerOptionsLoading: boolean;
-  routingPolicyOptions: Array<{ id: string; name: string }> | undefined;
+  routingPolicyOptions: { id: string; name: string }[] | undefined;
   routingPolicyOptionsLoading: boolean;
 }) {
   const selectedProvider = providerOptions?.find((p) => p.providerKey === form.providerKey);

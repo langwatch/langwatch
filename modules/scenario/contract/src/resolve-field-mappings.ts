@@ -19,7 +19,7 @@ export function isScenarioMappingValid({
 
 /** The portable part of a scenario runner turn used by input mapping. */
 export type ScenarioInput = {
-  messages: ReadonlyArray<{ role: string; content: unknown }>;
+  messages: readonly { role: string; content: unknown }[];
   threadId?: string;
 };
 
@@ -163,7 +163,7 @@ const SCENARIO_FIELD_ALIASES: Record<string, string[]> = {
 export function computeBestMatchMappings({
   inputs,
 }: {
-  inputs: Array<{ identifier: string }>;
+  inputs: { identifier: string }[];
 }): Record<string, FieldMapping> {
   const result: Record<string, FieldMapping> = {};
   const usedFields = new Set<string>();

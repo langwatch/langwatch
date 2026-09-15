@@ -277,7 +277,7 @@ function sourceFiles(root: string, files: readonly string[] | undefined): string
   return [...new Set(files.map((file) => resolve(root, file)))].filter(isSourceFile).sort();
 }
 
-function commentRanges(source: string, file: ts.SourceFile): Array<{ pos: number; end: number }> {
+function commentRanges(source: string, file: ts.SourceFile): { pos: number; end: number }[] {
   const ranges = new Map<string, { pos: number; end: number }>();
 
   const add = (comments: ts.CommentRange[] | undefined): void => {

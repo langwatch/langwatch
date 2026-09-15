@@ -19,7 +19,7 @@ class ScriptedComparer implements CostRollupDayComparer {
   private index = 0;
 
   constructor(
-    private readonly looks: ReadonlyArray<{ mismatchedCells: number; cellsBehind: number }>,
+    private readonly looks: readonly { mismatchedCells: number; cellsBehind: number }[],
   ) {}
 
   compareDay(): Promise<CostRollupDayLook> {

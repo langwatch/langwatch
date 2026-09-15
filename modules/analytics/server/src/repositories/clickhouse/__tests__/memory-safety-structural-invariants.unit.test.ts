@@ -56,11 +56,11 @@ describe("memory-safety", () => {
       return sql.slice(selectIdx);
     }
 
-    const metricsRequiringSpans: Array<{
+    const metricsRequiringSpans: {
       metric: string;
       aggregation: "avg" | "sum" | "cardinality";
       label: string;
-    }> = [
+    }[] = [
       {
         metric: "performance.tokens_per_second",
         aggregation: "avg",

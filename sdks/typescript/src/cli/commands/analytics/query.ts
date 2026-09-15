@@ -106,11 +106,11 @@ export const queryAnalyticsCommand = async (options: {
         ...result,
         metric,
         aggregation,
-        ...(toTimeseriesShape({
+        ...toTimeseriesShape({
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,
           metric,
-        }) ?? {}),
+        }),
       },
       table: () => {
         console.log();

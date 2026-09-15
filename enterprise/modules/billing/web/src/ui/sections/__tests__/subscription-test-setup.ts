@@ -123,12 +123,12 @@ export const mockUpgradeWithInvites = vi.fn(() => ({
 }));
 
 export const mockGetPendingInvites = vi.fn(() => ({
-  data: [] as Array<{
+  data: [] as {
     id?: string;
     email?: string;
     role: string;
     status: string;
-  }>,
+  }[],
   isLoading: false,
 }));
 

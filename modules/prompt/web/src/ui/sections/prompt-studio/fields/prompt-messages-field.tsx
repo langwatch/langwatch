@@ -232,7 +232,7 @@ export function PromptMessagesField({
 
   // Compute a signature from messages to detect changes
   const computeMessagesSignature = (
-    messages: Array<{ role?: string; content?: string }>,
+    messages: { role?: string; content?: string }[],
   ): string => {
     return messages.map((m) => `${m.role}:${m.content ?? ""}`).join("|");
   };

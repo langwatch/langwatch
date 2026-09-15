@@ -17,7 +17,7 @@ interface IsolatedErrorBoundaryProps {
   /**
    * Reset keys — when any change, the boundary remounts its children.
    */
-  resetKeys?: ReadonlyArray<unknown>;
+  resetKeys?: readonly unknown[];
   /**
    * Optional telemetry hook — fires once on each caught error before the
    * fallback renders. Wire to PostHog/Sentry/etc. at the call site so the

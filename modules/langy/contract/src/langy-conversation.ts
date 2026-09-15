@@ -52,10 +52,10 @@ export type LangyStartConversationTurnInput = {
   session: LangyCredentialSession;
   requestedConversationId: string | null;
   adoptConversationId?: boolean;
-  messages: Array<{
+  messages: {
     role: "user" | "assistant" | "system";
     parts: LangyMessagePart[];
-  }>;
+  }[];
   modelOverride?: string;
   isRetry: boolean;
   turnContext: object;

@@ -52,7 +52,7 @@ export abstract class AbstractEventStore<
     _attributes: Record<string, string | number>,
     fn: () => Promise<T>,
   ): Promise<T> {
-    return await fn();
+    return fn();
   }
 
   /**
@@ -121,7 +121,7 @@ export abstract class AbstractEventStore<
       );
     }
 
-    return await this.instrument(
+    return this.instrument(
       operation,
       {
         "aggregate.id": aggregateId,
@@ -153,7 +153,7 @@ export abstract class AbstractEventStore<
     // partitions instead of cold-scanning every partition on S3. Returns
     // undefined (unbounded scan) for long-lived aggregate types or when no
     // usable anchor time is available, so behaviour is unchanged there.
-    return await this.readEvents({
+    return this.readEvents({
       operation: "getEvents",
       aggregateId,
       context,
@@ -172,7 +172,7 @@ export abstract class AbstractEventStore<
     aggregateType: AggregateType,
     occurredAtFromMs: number,
   ): Promise<readonly EventType[]> {
-    return await this.readEvents({
+    return this.readEvents({
       operation: "getEventsOccurredSince",
       aggregateId,
       context,
@@ -206,7 +206,7 @@ export abstract class AbstractEventStore<
       return [];
     }
 
-    return await this.instrument(
+    return this.instrument(
       label,
       {
         "aggregate.id": String(aggregateId),
@@ -259,7 +259,7 @@ export abstract class AbstractEventStore<
       return [];
     }
 
-    return await this.instrument(
+    return this.instrument(
       `${this.constructor.name}.getEventsUpTo`,
       {
         "aggregate.id": String(aggregateId),
@@ -334,7 +334,7 @@ export abstract class AbstractEventStore<
       );
     }
 
-    return await this.readEventsUpToPagedFromRepository(pagedRead, request);
+    return this.readEventsUpToPagedFromRepository(pagedRead, request);
   }
 
   /**
@@ -354,7 +354,7 @@ export abstract class AbstractEventStore<
     },
   ): Promise<readonly EventType[]> {
     const { aggregateId, context, aggregateType, upToEvent, after, limit } = request;
-    return await this.instrument(
+    return this.instrument(
       `${this.constructor.name}.getEventsUpToPaged`,
       {
         "aggregate.id": String(aggregateId),
@@ -426,7 +426,7 @@ export abstract class AbstractEventStore<
       return 0;
     }
 
-    return await this.instrument(
+    return this.instrument(
       `${this.constructor.name}.countEventsBefore`,
       {
         "aggregate.id": String(aggregateId),
@@ -467,7 +467,7 @@ export abstract class AbstractEventStore<
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
   ): Promise<void> {
-    return await this.instrument(
+    return this.instrument(
       `${this.constructor.name}.storeEvents`,
       {
         "tenant.id": context.tenantId,

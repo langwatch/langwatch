@@ -44,7 +44,7 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
   }
 
   async storeBatch(
-    entries: Array<{ state: SimulationRunStateData; context: ProjectionStoreContext }>,
+    entries: { state: SimulationRunStateData; context: ProjectionStoreContext }[],
   ): Promise<void> {
     const writable = entries.filter(({ state, context }) => {
       if (SimulationRunStateFoldProjection.hasRunDefiningEvent(state)) return true;
@@ -63,7 +63,7 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<SimulationRunStateData | null> {
-    return await this.inner.tryGet(aggregateId, context);
+    return this.inner.tryGet(aggregateId, context);
   }
 
   private reportDeclined(context: ProjectionStoreContext): void {

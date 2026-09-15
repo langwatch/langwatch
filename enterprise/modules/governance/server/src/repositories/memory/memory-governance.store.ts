@@ -34,7 +34,7 @@ export type MemoryGovernanceProject = GovernanceDirectoryProject & {
 export type MemoryGovernanceAlert = AnomalyAlertDispatchRecord & {
   ruleId: string;
   open: boolean;
-  dispatches: Array<Record<string, unknown>>;
+  dispatches: Record<string, unknown>[];
 };
 
 /**

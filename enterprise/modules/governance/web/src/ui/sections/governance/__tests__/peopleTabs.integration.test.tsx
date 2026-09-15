@@ -37,9 +37,9 @@ const harness = vi.hoisted(() => ({
   /** What each procedure answers; anything unlisted answers `undefined`. */
   answers: {} as Record<string, QueryAnswer>,
   /** Every mutation call, so a header action can be proven to reach one. */
-  mutations: [] as Array<{ path: string; input: unknown }>,
+  mutations: [] as { path: string; input: unknown }[],
   /** Every drawer the page asked for, and with what. */
-  openedDrawers: [] as Array<{ drawer: string; props: unknown }>,
+  openedDrawers: [] as { drawer: string; props: unknown }[],
 }));
 
 /** The org-member floor, the governance product grant, and the spend read. */

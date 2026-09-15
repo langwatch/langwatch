@@ -61,7 +61,7 @@ function blobDriver(): DatasetBlobDriver {
 }
 
 class SequencedS3Resolver implements DatasetS3ClientResolver {
-  readonly releases: Array<ReturnType<typeof vi.fn>> = [];
+  readonly releases: ReturnType<typeof vi.fn>[] = [];
 
   readonly acquire = vi.fn(async () => {
     const next = this.configurations.shift();

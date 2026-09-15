@@ -676,7 +676,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       });
     }
 
-    return await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // Create the config within the transaction
       const newConfig = await tx.llmPromptConfig.create({
         data: {

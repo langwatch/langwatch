@@ -299,7 +299,7 @@ describe("createGovernanceRestApp", () => {
       });
 
       const admin = await asUser("/api/governance/ingestion-templates/admin");
-      const adminBody = (await admin.json()) as { data: Array<{ ottl_rules: string }> };
+      const adminBody = (await admin.json()) as { data: { ottl_rules: string }[] };
       expect(adminBody.data[0]?.ottl_rules).toContain('set(attributes["x"]');
       expect(templateListForUser).toHaveBeenCalledOnce();
       expect(templateListForOrgAdmin).toHaveBeenCalledOnce();
@@ -412,7 +412,7 @@ describe("createGovernanceRestApp", () => {
      * any caller forge an audit row's provenance.
      */
     it("honours cli and ignores a claim to be an in-process surface", async () => {
-      const surfaces: Array<CreateIngestionTemplateInput["surface"]> = [];
+      const surfaces: CreateIngestionTemplateInput["surface"][] = [];
       const templateCreateOrg = vi.fn(async (input: CreateIngestionTemplateInput) => {
         surfaces.push(input.surface);
         return template();

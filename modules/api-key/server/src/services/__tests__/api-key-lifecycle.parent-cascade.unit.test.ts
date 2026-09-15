@@ -39,7 +39,7 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
   } as unknown as StoredApiKey;
 }
 
-function makeService({ children }: { children: Array<{ id: string }> }) {
+function makeService({ children }: { children: { id: string }[] }) {
   const rows = new Map<string, StoredApiKey>();
   rows.set(LOGIN_ID, keyRow());
   for (const child of children) {

@@ -61,7 +61,7 @@ const mockGetSuiteById = vi.hoisted(() =>
 const mockGetAgents = vi.hoisted(() =>
   vi.fn(
     (): {
-      data: Array<{ id: string; name: string; type: string; environment?: string | null }>;
+      data: { id: string; name: string; type: string; environment?: string | null }[];
     } => ({ data: [] }),
   ),
 );

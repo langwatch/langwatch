@@ -63,7 +63,7 @@ export abstract class ExperimentRepository {
     slugPrefix: string;
     excludeId?: string;
   }): Promise<string[]>;
-  abstract findDraftNames(input: { projectId: string }): Promise<Array<{ name: string | null }>>;
+  abstract findDraftNames(input: { projectId: string }): Promise<{ name: string | null }[]>;
   abstract findAllSlugs(input: { projectId: string }): Promise<string[]>;
   abstract saveActive(
     input: SaveExperimentInput & {

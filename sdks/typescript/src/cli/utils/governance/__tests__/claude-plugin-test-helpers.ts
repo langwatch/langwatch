@@ -296,7 +296,7 @@ export function installClaudePluginHarness({
     writeConfig,
     loadModule: async () => {
       vi.resetModules();
-      return await import("../claude-plugin.js");
+      return import("../claude-plugin.js");
     },
   };
 }

@@ -77,10 +77,10 @@ const startsWithAny =
     prefixes.some((prefix) => model.startsWith(prefix));
 
 // Read in order: the first matcher that recognises the id names the provider.
-const PROVIDER_MATCHERS: ReadonlyArray<{
+const PROVIDER_MATCHERS: readonly {
   provider: ProviderKey;
   matches: (model: string) => boolean;
-}> = [
+}[] = [
   {
     provider: "openai",
     matches: startsWithAny(

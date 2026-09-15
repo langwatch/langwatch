@@ -57,11 +57,11 @@ function DeadLetterBanner({
   now,
 }: {
   total: number;
-  byProcess: Array<{
+  byProcess: {
     processName: string;
     count: number;
     oldestUpdatedAt: number;
-  }>;
+  }[];
   now: number;
 }) {
   const oldest = Math.min(...byProcess.map((row) => row.oldestUpdatedAt));

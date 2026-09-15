@@ -31,7 +31,7 @@ const readStdin = async (): Promise<string> => {
  * which one it hit.
  */
 const readPayloadFile = async (file: string): Promise<string> => {
-  if (file === "-") return await readStdin();
+  if (file === "-") return readStdin();
   try {
     return await readFile(file, "utf8");
   } catch (error) {

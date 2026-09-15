@@ -45,10 +45,10 @@ function matches(recorded: Attributes, expected: Attributes | undefined): boolea
 export function createRecordingMeterProvider(): RecordingMeterProvider {
   const recorded: RecordedMetric[] = [];
   const descriptions = new Map<string, string | undefined>();
-  const observables: Array<{
+  const observables: {
     instrument: string;
     callback: (result: { observe: (value: number, attributes?: Attributes) => void }) => unknown;
-  }> = [];
+  }[] = [];
 
   const writer = (instrument: string, options?: { description?: string }) => {
     descriptions.set(instrument, options?.description);

@@ -69,10 +69,10 @@ describe("replayEvents", () => {
 
     expect(processed).toBe(3);
     expect(storeBatchSpy).toHaveBeenCalledOnce();
-    const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+    const batch = storeBatchSpy.mock.calls[0]![0] as {
       state: { total: number; count: number };
       context: { aggregateId: string; tenantId: string; key: string };
-    }>;
+    }[];
     expect(batch).toHaveLength(1); // One aggregate -> one entry
     expect(batch[0]!.state).toEqual({ total: 60, count: 3 });
   });
@@ -100,10 +100,10 @@ describe("replayEvents", () => {
 
       // All events share the same tenantId, so storeBatch called once
       expect(storeBatchSpy).toHaveBeenCalledOnce();
-      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+      const batch = storeBatchSpy.mock.calls[0]![0] as {
         state: { total: number; count: number };
         context: { aggregateId: string; tenantId: string; key: string };
-      }>;
+      }[];
       expect(batch).toHaveLength(2);
 
       const stateA = batch.find((e) => e.context.aggregateId === "agg-A");
@@ -141,10 +141,10 @@ describe("replayEvents", () => {
 
       const allEntries = storeBatchSpy.mock.calls.flatMap(
         (call: unknown[]) =>
-          call[0] as Array<{
+          call[0] as {
             state: { total: number; count: number };
             context: { aggregateId: string; tenantId: string };
-          }>,
+          }[],
       );
       expect(allEntries).toHaveLength(2);
 
@@ -179,10 +179,10 @@ describe("replayEvents", () => {
       await replayEvents({ projection, events });
 
       expect(storeBatchSpy).toHaveBeenCalledOnce();
-      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+      const batch = storeBatchSpy.mock.calls[0]![0] as {
         state: { total: number; count: number };
         context: { key: string };
-      }>;
+      }[];
       expect(batch).toHaveLength(2); // Two custom keys: custom-X and custom-Y
 
       const groupX = batch.find((e) => e.context.key === "custom-X");
@@ -230,9 +230,9 @@ describe("replayEvents", () => {
 
       await replayEvents({ projection, events });
 
-      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+      const batch = storeBatchSpy.mock.calls[0]![0] as {
         state: { total: number; count: number };
-      }>;
+      }[];
       // State is init() + both events, NOT loaded from store.get()
       expect(batch[0]!.state).toEqual({ total: 12, count: 2 });
       // store.get was never called (replay rebuilds from scratch)
@@ -256,9 +256,9 @@ describe("FoldAccumulator", () => {
     await accumulator.flush();
 
     expect(storeBatchSpy).toHaveBeenCalledOnce();
-    const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+    const batch = storeBatchSpy.mock.calls[0]![0] as {
       state: { total: number; count: number };
-    }>;
+    }[];
     expect(batch[0]!.state).toEqual({ total: 60, count: 3 });
   });
 
@@ -281,10 +281,10 @@ describe("FoldAccumulator", () => {
 
     const allEntries = storeBatchSpy.mock.calls.flatMap(
       (call: unknown[]) =>
-        call[0] as Array<{
+        call[0] as {
           state: { total: number };
           context: { tenantId: string };
-        }>,
+        }[],
     );
     expect(allEntries).toHaveLength(2);
 
@@ -324,9 +324,9 @@ describe("FoldAccumulator", () => {
 
       await accumulator.flush();
 
-      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+      const batch = storeBatchSpy.mock.calls[0]![0] as {
         state: { total: number; count: number };
-      }>;
+      }[];
       expect(batch[0]!.state).toEqual({ total: 30, count: 2 });
     });
   });
@@ -364,9 +364,9 @@ describe("MapAccumulator", () => {
     await acc.flush();
 
     expect(bulkAppendSpy).toHaveBeenCalledOnce();
-    const records = bulkAppendSpy.mock.calls[0]![0] as Array<{
+    const records = bulkAppendSpy.mock.calls[0]![0] as {
       doubled: number;
-    }>;
+    }[];
     expect(records).toEqual([{ doubled: 10 }, { doubled: 20 }, { doubled: 30 }]);
   });
 
@@ -384,9 +384,9 @@ describe("MapAccumulator", () => {
 
       await acc.flush();
 
-      const records = bulkAppendSpy.mock.calls[0]![0] as Array<{
+      const records = bulkAppendSpy.mock.calls[0]![0] as {
         doubled: number;
-      }>;
+      }[];
       expect(records).toEqual([{ doubled: 10 }]);
     });
   });
@@ -414,7 +414,7 @@ describe("MapAccumulator", () => {
       await acc.flush();
 
       const bulkSpy = projection.store.bulkAppend as ReturnType<typeof vi.fn>;
-      const records = bulkSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      const records = bulkSpy.mock.calls[0]![0] as { doubled: number }[];
       expect(records).toEqual([{ doubled: 40 }]);
     });
   });
@@ -432,10 +432,8 @@ describe("MapAccumulator", () => {
 
       expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
 
-      const byTenant = new Map<string, Array<{ doubled: number }>>();
-      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
-        [Array<{ doubled: number }>, { tenantId: string }]
-      >) {
+      const byTenant = new Map<string, { doubled: number }[]>();
+      for (const [records, context] of bulkAppendSpy.mock.calls as [{ doubled: number }[], { tenantId: string }][]) {
         byTenant.set(String(context.tenantId), records);
       }
       expect(byTenant.get("t-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
@@ -461,7 +459,7 @@ describe("MapAccumulator", () => {
       expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
 
       const [records, context] = bulkAppendSpy.mock.calls[0]! as [
-        Array<{ doubled: number }>,
+        { doubled: number }[],
         { tenantId: string; aggregateId?: string },
       ];
       expect(records).toEqual([{ doubled: 2 }, { doubled: 4 }, { doubled: 6 }]);
@@ -550,7 +548,7 @@ describe("MapAccumulator", () => {
 
       expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
       const allRecords = bulkAppendSpy.mock.calls.flatMap(
-        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
+        (call: unknown[]) => call[0] as { doubled: number }[],
       );
       expect(allRecords).toEqual([
         { doubled: 2 },
@@ -578,7 +576,7 @@ describe("MapAccumulator", () => {
       // aggregates' records — not one call per aggregate.
       expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
       const [records, context] = bulkAppendSpy.mock.calls[0]! as [
-        Array<{ doubled: number }>,
+        { doubled: number }[],
         { tenantId: string },
       ];
       expect(records).toEqual([{ doubled: 2 }, { doubled: 4 }]);
@@ -709,9 +707,9 @@ describe("retention policy on replay write contexts", () => {
       await acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
       await acc.flush();
 
-      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+      const batch = storeBatchSpy.mock.calls[0]![0] as {
         context: { retentionPolicy?: RetentionPolicy };
-      }>;
+      }[];
       expect(batch[0]!.context.retentionPolicy).toBe(retention);
       expect(resolver.resolve).toHaveBeenCalledWith("t-A");
     });

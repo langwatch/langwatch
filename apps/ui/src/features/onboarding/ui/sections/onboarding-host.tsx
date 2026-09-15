@@ -31,7 +31,7 @@ function pathnameOf(address: string): string {
 /** Maps one team's projects to the onboarding host's project shape. */
 function toOnboardingProjects<P extends { id: string; name: string; slug: string }>(team: {
   projects: P[];
-}): Array<{ id: string; name: string; slug: string }> {
+}): { id: string; name: string; slug: string }[] {
   return team.projects.map((project) => ({
     id: project.id,
     name: project.name,
@@ -43,7 +43,7 @@ function toOnboardingProjects<P extends { id: string; name: string; slug: string
  *  host's own team/org shape (`OnboardingOrganization`) so the base key
  *  read below stays a reading of its own rather than living on the graph. */
 function findActiveOnboardingProject<
-  T extends { teams: Array<{ projects: Array<{ id: string }> }> },
+  T extends { teams: { projects: { id: string }[] }[] },
 >(graph: T[] | undefined, projectId: string | undefined) {
   if (!projectId) return void 0;
   for (const entry of graph ?? []) {

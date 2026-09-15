@@ -30,8 +30,8 @@ export type SuiteRunMessage = {
   id?: string;
   role?: string;
   content?: unknown;
-  tool_calls?: Array<{ function?: { name?: string } }>;
-  toolCalls?: Array<{ function?: { name?: string } }>;
+  tool_calls?: { function?: { name?: string } }[];
+  toolCalls?: { function?: { name?: string } }[];
 };
 
 type MessagePreviewProps = {
@@ -199,9 +199,9 @@ export function MessagePreview({ messages, streamingMessages }: MessagePreviewPr
           "tool_calls" in message && message.tool_calls
             ? message.tool_calls
             : "toolCalls" in message && (message as Record<string, unknown>).toolCalls
-              ? ((message as Record<string, unknown>).toolCalls as Array<{
+              ? ((message as Record<string, unknown>).toolCalls as {
                   function?: { name?: string };
-                }>)
+                }[])
               : null;
         if (toolCalls) {
           return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (

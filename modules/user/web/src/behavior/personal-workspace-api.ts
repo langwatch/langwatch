@@ -41,18 +41,18 @@ export type PersonalUsageRollup = {
     completionTokens: number;
     mostUsedModel: { name: string; usagePct: number } | null;
   };
-  dailyBuckets: Array<{
+  dailyBuckets: {
     day: string;
     spentUsd: number;
     billedUsd: number;
     requests: number;
-  }>;
-  breakdownByModel: Array<{
+  }[];
+  breakdownByModel: {
     label: string;
     spentUsd: number;
     billedUsd: number;
     requests: number;
-  }>;
+  }[];
 };
 
 /**
@@ -91,7 +91,7 @@ export type PersonalBudgetOverviewItem = {
   scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
   scopePhrase: string;
   resetsAt: string | null;
-  topModels?: Array<{ model: string; spentUsd: number }>;
+  topModels?: { model: string; spentUsd: number }[];
 };
 
 export type PersonalBudgetOverviewPayload = {
@@ -116,7 +116,7 @@ export type PersonalVirtualKeyView = {
   createdAtMs: number;
   updatedAtMs: number;
   lastUsedAtMs: number | null;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  scopes: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
 };
 
 /** A key together with its secret, which the mutation that mints one returns once. */
@@ -197,13 +197,13 @@ export type PersonalOrganizationGraph = {
   id: string;
   name: string;
   slug: string;
-  members: Array<{ userId: string; role: string }>;
+  members: { userId: string; role: string }[];
   ssoProvider?: string | null;
-  teams: Array<{
+  teams: {
     id: string;
     name: string;
-    projects: Array<{ id: string; name: string; slug: string }>;
-  }>;
+    projects: { id: string; name: string; slug: string }[];
+  }[];
 };
 
 type BorrowedProcedures = {

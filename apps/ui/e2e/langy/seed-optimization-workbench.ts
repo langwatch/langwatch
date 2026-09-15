@@ -400,18 +400,18 @@ export async function getWorkbenchState(slug: string): Promise<{
   name: string;
   version: number;
   state: {
-    datasets: Array<{
+    datasets: {
       id: string;
       inline?: { records: Record<string, string[]> };
-    }>;
-    targets: Array<{
+    }[];
+    targets: {
       id: string;
       type: string;
       promptId?: string;
       localPromptConfig?: unknown;
       comparison?: { variants: string[]; hasGoldenAnswer?: boolean };
       mappings: Record<string, Record<string, unknown>>;
-    }>;
+    }[];
     evaluators: SavedEvaluator[];
   };
 }> {
@@ -424,7 +424,7 @@ export async function getWorkbenchState(slug: string): Promise<{
 /** Layer-2 read: the runs recorded for an experiment, newest first. */
 export async function listExperimentRuns(
   slug: string,
-): Promise<Array<{ runId: string; status?: string }>> {
+): Promise<{ runId: string; status?: string }[]> {
   const result = await api({
     method: "GET",
     path: `/api/experiments/runs?experimentSlug=${encodeURIComponent(slug)}&pageSize=50`,

@@ -26,23 +26,23 @@ const graphAlertDetailedSource = readFileSync(
 );
 
 function makeNotifier() {
-  const sentEmails: Array<{
+  const sentEmails: {
     recipients: string[];
     subject: string;
     html: string;
-  }> = [];
-  const sentSlack: Array<{ webhook: string; payload: unknown }> = [];
-  const sentSlackBot: Array<{
+  }[] = [];
+  const sentSlack: { webhook: string; payload: unknown }[] = [];
+  const sentSlackBot: {
     token: string;
     channel: string;
     payload: unknown;
-  }> = [];
-  const sentWebhooks: Array<{
+  }[] = [];
+  const sentWebhooks: {
     url: string;
     method: string;
     headers: Record<string, string>;
     body: string;
-  }> = [];
+  }[] = [];
   // The endpoint's answer a webhook test fire surfaces to the author; tests
   // override to exercise a non-2xx failure.
   let webhookStatus = 200;

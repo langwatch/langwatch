@@ -53,7 +53,7 @@ export class SystemMigrationEnrollmentService {
     query,
   }: {
     query: string;
-  }): Promise<Array<{ id: string; name: string }>> {
+  }): Promise<{ id: string; name: string }[]> {
     const trimmed = query.trim();
     if (trimmed.length === 0) {
       return [];
@@ -126,7 +126,7 @@ export class SystemMigrationEnrollmentService {
     /** Draw organizations whose events live in their own ClickHouse instance. */
     includePrivateDataplane?: boolean;
   }): Promise<{
-    enrolled: Array<{ id: string; name: string }>;
+    enrolled: { id: string; name: string }[];
     eligibleCount: number;
   }> {
     if (!this.deps.isSaaS()) {

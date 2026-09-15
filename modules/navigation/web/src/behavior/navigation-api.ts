@@ -23,12 +23,12 @@ export type NavigationApiMap = {
     getAll: {
       query: {
         input: { isDemo: boolean };
-        output: Array<{
+        output: {
           id: string;
           name: string;
           slug: string;
-          members?: Array<{ role: string }>;
-          teams: Array<{
+          members?: { role: string }[];
+          teams: {
             id: string;
             name: string;
             isPersonal?: boolean | null;
@@ -38,8 +38,8 @@ export type NavigationApiMap = {
              * somebody else's, opened with administrative reach.
              */
             ownerUserId?: string | null;
-            members?: Array<{ userId: string }>;
-            projects: Array<{
+            members?: { userId: string }[];
+            projects: {
               id: string;
               name: string;
               slug: string;
@@ -50,9 +50,9 @@ export type NavigationApiMap = {
                */
               lastCodingAgentSessionAt?: string | null;
               lastCodingAgentPullRequestAt?: string | null;
-            }>;
-          }>;
-        }>;
+            }[];
+          }[];
+        }[];
       };
     };
   };
@@ -162,7 +162,7 @@ export type NavigationApiMap = {
     getAllPromptsForProject: {
       query: {
         input: { projectId: string };
-        output: Array<{ id: string; handle?: string | null; version?: number }>;
+        output: { id: string; handle?: string | null; version?: number }[];
       };
     };
   };
@@ -174,26 +174,26 @@ export type NavigationApiMap = {
     getAll: {
       query: {
         input: { projectId: string };
-        output: Array<{ id: string; name: string; type: AgentType }>;
+        output: { id: string; name: string; type: AgentType }[];
       };
     };
   };
 
   dataset: {
     getAll: {
-      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+      query: { input: { projectId: string }; output: { id: string; name: string }[] };
     };
   };
 
   workflow: {
     getAll: {
-      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+      query: { input: { projectId: string }; output: { id: string; name: string }[] };
     };
   };
 
   evaluators: {
     getAll: {
-      query: { input: { projectId: string }; output: Array<{ id: string; name: string }> };
+      query: { input: { projectId: string }; output: { id: string; name: string }[] };
     };
   };
 

@@ -102,7 +102,7 @@ class TestGuardrailRepository extends GatewayGuardrailRepository {
  */
 function testGuardrails(options?: {
   guardrails?: GatewayGuardrailCheckRow[];
-  monitors?: Array<{ id: string; evaluatorId: string; checkType: string; parameters: unknown }>;
+  monitors?: { id: string; evaluatorId: string; checkType: string; parameters: unknown }[];
   runEvaluator?: () => Promise<SingleEvaluationResult>;
 }): GatewayGuardrailEvaluationService {
   return GatewayGuardrailEvaluationService.create({
@@ -212,9 +212,7 @@ describe("the gateway internal control plane", () => {
       expect(commands.confirmSpend.sendBatch).toHaveBeenCalledTimes(1);
       // The wire carries quantities and never money, so the figure below can
       // only have come from the rating seam this family binds.
-      const batch = (commands.confirmSpend.sendBatch.mock.calls[0]?.[0] ?? []) as Array<
-        Record<string, unknown>
-      >;
+      const batch = (commands.confirmSpend.sendBatch.mock.calls[0]?.[0] ?? []) as Record<string, unknown>[];
       expect(batch).toHaveLength(1);
       expect(batch[0]).toMatchObject({
         gateway_request_id: "gwreq_1",

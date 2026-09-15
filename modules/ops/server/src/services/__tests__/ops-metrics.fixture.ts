@@ -9,7 +9,7 @@ import type {
 export class OpsMetricsTestAdapter {
   private queueNames: string[] = [];
   private queues: QueueInfo[] = [];
-  private pendingReconciliations: Array<OpsQueueReconcileResult | null> = [];
+  private pendingReconciliations: (OpsQueueReconcileResult | null)[] = [];
   private pendingDrift = 0;
   private scanCalls = 0;
 
@@ -27,7 +27,7 @@ export class OpsMetricsTestAdapter {
     this.queues = queues;
   }
 
-  enqueuePendingReconciliations(results: Array<OpsQueueReconcileResult | null>): void {
+  enqueuePendingReconciliations(results: (OpsQueueReconcileResult | null)[]): void {
     this.pendingReconciliations.push(...results);
   }
 

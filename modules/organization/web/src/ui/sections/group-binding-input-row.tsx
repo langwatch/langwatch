@@ -73,7 +73,7 @@ function roleItemsForSeat({
   customRoles,
   organizationRole,
 }: {
-  customRoles: Array<{ id: string; name: string }>;
+  customRoles: { id: string; name: string }[];
   organizationRole?: OrganizationUserRole;
 }) {
   const items = [
@@ -117,8 +117,8 @@ function scopeNameFor({
   scopeType: RoleBindingScopeType;
   scopeId: string;
   organizationName: string | undefined;
-  teamItems: Array<{ label: string; value: string }>;
-  projectItems: Array<{ label: string; value: string }>;
+  teamItems: { label: string; value: string }[];
+  projectItems: { label: string; value: string }[];
 }): string | undefined {
   if (scopeType === RoleBindingScopeType.ORGANIZATION) return organizationName ?? "Organization";
   if (scopeType === RoleBindingScopeType.TEAM)

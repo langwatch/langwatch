@@ -15,7 +15,7 @@ const scripted: {
   flow: StudioServerEvent[];
   component: StudioServerEvent[];
   componentThrows: Error | undefined;
-  dispatched: Array<{ type: string; payload: Record<string, any> }>;
+  dispatched: { type: string; payload: Record<string, any> }[];
 } = { flow: [], component: [], componentThrows: undefined, dispatched: [] };
 
 const ports = {

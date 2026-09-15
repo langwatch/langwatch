@@ -284,7 +284,7 @@ function evalColumnOptionsFrom({
 function sectionsMatching(
   allColumns: readonly LensColumnOption[],
   q: string,
-): Array<{ title: string; columns: LensColumnOption[] }> {
+): { title: string; columns: LensColumnOption[] }[] {
   const grouped = groupBySection(allColumns);
   if (!q) return grouped;
   return grouped
@@ -297,7 +297,7 @@ function sectionsMatching(
 
 function groupBySection(
   columns: readonly LensColumnOption[],
-): Array<{ title: string; columns: LensColumnOption[] }> {
+): { title: string; columns: LensColumnOption[] }[] {
   const byTitle = new Map<string, LensColumnOption[]>();
   for (const c of columns) {
     const title = c.section ?? "Other";

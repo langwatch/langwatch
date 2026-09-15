@@ -60,8 +60,8 @@ export function modelProviderTrpcTestPorts(
 
 /** Every probe this test decided, and the verdict each one answers with. */
 export class RecordingCredentialProbe extends ModelProviderCredentialProbe {
-  readonly probed: Array<{ provider: string; customKeys: Record<string, string> }> = [];
-  readonly probedStored: Array<{ projectId: string; provider: string }> = [];
+  readonly probed: { provider: string; customKeys: Record<string, string> }[] = [];
+  readonly probedStored: { projectId: string; provider: string }[] = [];
 
   static create(verdict: ModelProviderCredentialVerdict): RecordingCredentialProbe {
     return new RecordingCredentialProbe(verdict);

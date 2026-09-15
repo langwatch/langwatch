@@ -40,7 +40,7 @@ class EmptyFullIo implements TraceFullIo {
 
 const resolver =
   (
-    calls: Array<{ tenantId: string; sql: string }>,
+    calls: { tenantId: string; sql: string }[],
     cost: string | number = 0.2,
   ): TraceClickHouseResolver =>
   async (tenantId): Promise<TraceClickHouseClient> => ({
@@ -71,7 +71,7 @@ const resolver =
 
 describe("TraceTreeComposition", () => {
   it("constructs concrete repositories behind the public adapter", async () => {
-    const calls: Array<{ tenantId: string; sql: string }> = [];
+    const calls: { tenantId: string; sql: string }[] = [];
     const service = TraceTreeComposition.create({
       resolveClient: resolver(calls),
       modelProviders: new TestModelProviderService(),
@@ -103,7 +103,7 @@ describe("TraceTreeComposition", () => {
 
   /** @scenario "A span tree is read page by page with the live response shape" */
   it("preserves the full node wire shape while pricing a missing stored cost", async () => {
-    const calls: Array<{ tenantId: string; sql: string }> = [];
+    const calls: { tenantId: string; sql: string }[] = [];
     const modelProviders = new TestModelProviderService(0.47);
     const service = TraceTreeComposition.create({
       resolveClient: resolver(calls, ""),
@@ -258,7 +258,7 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
   });
 
   it("uses the live cursor without constraining latest-version election", async () => {
-    const calls: Array<{ sql: string; params?: Record<string, unknown> }> = [];
+    const calls: { sql: string; params?: Record<string, unknown> }[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {
@@ -399,10 +399,10 @@ describe("ClickHouseTraceSpanRepository page parity", () => {
 
   /** @scenario "A live waterfall receives row-version updates" */
   it("uses the live row-version delta query without an occurrence window", async () => {
-    const calls: Array<{
+    const calls: {
       sql: string;
       params?: Record<string, unknown>;
-    }> = [];
+    }[] = [];
     const repository = ClickHouseTraceSpanRepository.create({
       resolve: async (): Promise<TraceClickHouseClient> => ({
         query: async <_Row>(input: Parameters<TraceClickHouseClient["query"]>[0]) => {

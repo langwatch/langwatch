@@ -105,7 +105,7 @@ export class PrismaVirtualKeyAuthorizationRepository extends VirtualKeyAuthoriza
     organizationId: string;
   }): Promise<{
     traceProjectId: string | null;
-    scopes: Array<{ scopeType: string; scopeId: string }>;
+    scopes: { scopeType: string; scopeId: string }[];
   } | null> {
     return this.database.virtualKey.findFirst({
       where: { id: virtualKeyId, organizationId },

@@ -64,7 +64,7 @@ async function createProjectBudget(options: {
   projectId: string;
   allowUnreachable?: boolean;
 }) {
-  return await service.create({
+  return service.create({
     organizationId: options.organizationId,
     scope: { kind: "PROJECT", projectId: options.projectId },
     name: `budget-${nanoid(6)}`,

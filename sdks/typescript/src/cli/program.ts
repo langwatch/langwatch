@@ -145,8 +145,8 @@ const trackTestSuiteFlags = (
  */
 const trackEvaluatorFlags = (
   command: Command,
-): (() => Array<{ reference: string; required?: boolean }> | undefined) => {
-  let refs: Array<{ reference: string; required?: boolean }> | undefined;
+): (() => { reference: string; required?: boolean }[] | undefined) => {
+  let refs: { reference: string; required?: boolean }[] | undefined;
   const gate = (required: boolean): void => {
     const last = refs?.[refs.length - 1];
     if (!last) {

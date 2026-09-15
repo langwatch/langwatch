@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryTopicRepositories } from "../memory/memory.topic.repositories.ts";
 import type { TopicRepositories } from "../topic.repositories.ts";
 
-const backends: ReadonlyArray<{ name: string; create: () => TopicRepositories }> = [
+const backends: readonly { name: string; create: () => TopicRepositories }[] = [
   { name: "memory", create: () => MemoryTopicRepositories.create() },
 ];
 

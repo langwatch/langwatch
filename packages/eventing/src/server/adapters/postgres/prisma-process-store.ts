@@ -674,7 +674,7 @@ export class PrismaProcessStore implements ProcessStore {
 
   async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
-    return await this.#prisma.$executeRaw`
+    return this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
@@ -692,7 +692,7 @@ export class PrismaProcessStore implements ProcessStore {
     // so it IS the moment the row became a failure record. No new index: `dead` is a rare
     // status, so the existing (status, nextAttemptAt, leasedUntil) index already makes this
     // selective. `discarded` is reaped on the same window and by the same sweep.
-    return await this.#prisma.$executeRaw`
+    return this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
@@ -709,7 +709,7 @@ export class PrismaProcessStore implements ProcessStore {
 
   async deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
-    return await this.#prisma.$executeRaw`
+    return this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerInbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerInbox"

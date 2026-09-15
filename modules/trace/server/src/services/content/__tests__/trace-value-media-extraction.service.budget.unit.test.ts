@@ -72,7 +72,7 @@ describe("extraction budget", () => {
       expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(result.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(budget.droppedByCap).toBe(4);
-      const parts = (result.value as Array<{ content: Array<{ image_url: { url: string } }> }>)[0]!
+      const parts = (result.value as { content: { image_url: { url: string } }[] }[])[0]!
         .content;
       const externalized = parts.filter((p) => p.image_url.url.startsWith("/api/files/"));
       const inline = parts.filter((p) => p.image_url.url.startsWith("data:"));

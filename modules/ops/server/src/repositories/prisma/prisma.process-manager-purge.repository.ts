@@ -47,13 +47,13 @@ export class PrismaProcessManagerPurgeRepository extends ProcessManagerPurgeRepo
   }): Promise<number> {
     const rows =
       target === "outbox-dispatched"
-        ? await this.database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+        ? await this.database.$queryRaw<{ n: bigint }[]>(Prisma.sql`
             -- @tenancy: cross-tenant process-manager retention; ops-gated
             SELECT count(*)::bigint AS n FROM "ProcessManagerOutbox"
             WHERE "status" = 'dispatched'
               AND "dispatchedAt" < now() - (${retentionDays}::int * interval '1 day')
           `)
-        : await this.database.$queryRaw<Array<{ n: bigint }>>(Prisma.sql`
+        : await this.database.$queryRaw<{ n: bigint }[]>(Prisma.sql`
             -- @tenancy: cross-tenant process-manager retention; ops-gated
             SELECT count(*)::bigint AS n FROM "ProcessManagerInbox"
             WHERE "consumedAt" < now() - (${retentionDays}::int * interval '1 day')

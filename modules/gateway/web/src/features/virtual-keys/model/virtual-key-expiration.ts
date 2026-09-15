@@ -11,10 +11,10 @@ import { readableDate } from "../../../model/readable-date.ts";
 /** The option a select is currently on. "" is Never, "custom" is a date. */
 export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";
 
-export const VIRTUAL_KEY_EXPIRATION_OPTIONS: ReadonlyArray<{
+export const VIRTUAL_KEY_EXPIRATION_OPTIONS: readonly {
   label: string;
   value: VirtualKeyExpirationPreset;
-}> = [
+}[] = [
   { label: "Never", value: "" },
   { label: "1 day", value: "1" },
   { label: "7 days", value: "7" },

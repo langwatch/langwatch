@@ -28,7 +28,7 @@ type CostReply = {
   status?: number;
   state?: string;
   columns?: string[];
-  rows?: Array<Array<string | null>>;
+  rows?: (string | null)[][];
   nextChunkIndex?: number;
   totalRowCount?: number;
 };
@@ -48,8 +48,8 @@ function hour(ms: number): string {
 }
 
 class GenieWorkspace implements GovernanceHttpClient {
-  readonly calls: Array<{ url: URL; init: Parameters<GovernanceHttpClient["fetch"]>[1] }> = [];
-  readonly costRequests: Array<Record<string, unknown>> = [];
+  readonly calls: { url: URL; init: Parameters<GovernanceHttpClient["fetch"]>[1] }[] = [];
+  readonly costRequests: Record<string, unknown>[] = [];
   readonly costReplies: CostReply[] = [];
   messageCreatedAt = Date.now() - 60_000;
   hasQuery = true;
@@ -148,7 +148,7 @@ function run(
   return adapter.runOnce({ cursor, credentials }, adapter.validateConfig(config(overrides)));
 }
 
-function hint(result: { events: Array<{ extra?: Record<string, unknown> }> }) {
+function hint(result: { events: { extra?: Record<string, unknown> }[] }) {
   return z
     .object({
       costBasis: z.string(),

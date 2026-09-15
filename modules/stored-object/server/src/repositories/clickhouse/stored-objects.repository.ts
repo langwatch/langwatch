@@ -164,7 +164,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
     projectId,
   }: {
     projectId: string;
-  }): Promise<Array<{ id: string; storage_uri: string }>> {
+  }): Promise<{ id: string; storage_uri: string }[]> {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.findAllByProject",
       {

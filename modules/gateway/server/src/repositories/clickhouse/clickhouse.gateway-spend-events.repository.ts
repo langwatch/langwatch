@@ -81,11 +81,11 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
    * re-setting the same state replaces rather than duplicates.
    */
   async upsertFromFold(
-    entries: Array<{
+    entries: {
       tenantId: string;
       gatewayRequestId: string;
       state: GatewaySpendState;
-    }>,
+    }[],
   ): Promise<void> {
     if (entries.length === 0) return;
     const tenantId = entries[0]!.tenantId;
@@ -167,7 +167,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       query_params: { tenantId, gatewayRequestId },
       format: "JSONEachRow",
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     const r = raw[0];
     if (!r) return null;
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
@@ -256,7 +256,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       query_params: params,
       format: "JSONEachRow",
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = rows[rows.length - 1];
     return {
@@ -299,7 +299,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       query_params: { tenantId, fromMs, toMs, limit },
       format: "JSONEachRow",
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     return raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
   }
 
@@ -352,7 +352,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       query_params: params,
       format: "JSONEachRow",
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = raw[raw.length - 1];
     return {
@@ -469,7 +469,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
         max_execution_time: SUMMARIES_MAX_EXECUTION_SECONDS,
       },
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     const last = raw[raw.length - 1];
     const nextCursor =
       raw.length === limit && last
@@ -553,7 +553,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       },
       format: "JSONEachRow",
     });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const raw = (await result.json()) as Record<string, unknown>[];
     const row = raw[0];
     if (!row) return empty;
     const nano = parseSummedNanoUsd(row.SpendNanoUSD);

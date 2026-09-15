@@ -19,7 +19,7 @@ const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set<ScenarioRunStatu
 export function getAdaptivePollingInterval({
   runs,
 }: {
-  runs: ReadonlyArray<Pick<SimulationRunData, "status">>;
+  runs: readonly Pick<SimulationRunData, "status">[];
 }): number {
   const hasActiveRuns = runs.some((run) => ACTIVE_STATUSES.has(run.status));
 

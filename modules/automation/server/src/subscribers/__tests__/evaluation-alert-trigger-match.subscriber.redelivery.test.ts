@@ -185,7 +185,7 @@ class TestAutomationService
 }
 
 class TestTriggerMatchRecorder implements AutomationTriggerMatchRecorder {
-  readonly sent: Array<Record<string, unknown>> = [];
+  readonly sent: Record<string, unknown>[] = [];
   readonly committed = new Set<string>();
 
   async send(input: {

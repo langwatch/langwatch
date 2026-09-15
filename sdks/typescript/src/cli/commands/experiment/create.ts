@@ -20,9 +20,7 @@ export const experimentCreateCommand = async (
   try {
     // No setup is sent: the platform builds the blank workbench, so the CLI
     // does not carry a second definition of what "empty" means.
-    const created = await service.create({
-      ...(options.name ? { name: options.name } : {}),
-    });
+    const created = await service.create((options.name ? { name: options.name } : {}));
 
     spinner.succeed(`Experiment created: ${chalk.green(created.slug)}`);
 

@@ -163,7 +163,7 @@ function CustomTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
+  payload?: { name: string; value: number; color: string }[];
   label?: number;
 }) {
   if (!active || !payload?.length || label == null) return null;

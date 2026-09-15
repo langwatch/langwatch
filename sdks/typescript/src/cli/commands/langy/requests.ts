@@ -91,7 +91,7 @@ const quiet = (command: string, args: string[], cwd: string): string | null => {
 
 /** The lockfile that says which package manager the folder uses. */
 export function packageManagerOf(root: string): string | undefined {
-  const lockfiles: Array<[string, string]> = [
+  const lockfiles: [string, string][] = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],

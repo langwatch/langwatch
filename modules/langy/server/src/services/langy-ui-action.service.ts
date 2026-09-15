@@ -216,7 +216,7 @@ export class LangyUiActionService {
       payload: parsed.data,
     });
 
-    return await this.awaitResult({
+    return this.awaitResult({
       actionId,
       projectId,
       userId,

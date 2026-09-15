@@ -476,7 +476,7 @@ describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real
           query_params: { tenantId: PROJECT_A_ID },
           format: "JSONEachRow",
         });
-        const [row] = (await result.json()) as Array<{ matched: string }>;
+        const [row] = (await result.json()) as { matched: string }[];
         expect(Number(row?.matched ?? 0)).toBe(1);
       } finally {
         await ch().command({ query: `DROP TABLE IF EXISTS ${table}` });

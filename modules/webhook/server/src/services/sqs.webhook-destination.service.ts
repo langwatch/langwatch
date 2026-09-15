@@ -509,7 +509,7 @@ export class SqsWebhookDestinationAdapter implements WebhookDestination {
     });
     if (refusal) return refusal;
 
-    return await putOnQueue({
+    return putOnQueue({
       client: this.createClient
         ? this.createClient(this.config)
         : sqsClientFor(this.config, awsClientConfig),

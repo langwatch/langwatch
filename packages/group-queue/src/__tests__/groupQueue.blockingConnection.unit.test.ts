@@ -40,7 +40,7 @@ function makeDefinition(): GroupQueueRuntimeDefinition<TestPayload> {
 }
 
 describe("GroupQueueProcessor blockingConnection selection", () => {
-  const connections: Array<IORedis | Cluster> = [];
+  const connections: (IORedis | Cluster)[] = [];
 
   function track<T extends IORedis | Cluster>(conn: T): T {
     connections.push(conn);

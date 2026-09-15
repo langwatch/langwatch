@@ -609,7 +609,7 @@ function AddModelProviderMenu({
   onPick,
 }: {
   children: ReactNode;
-  addableProviders: Array<{ provider: string; name: string; icon: ReactNode }>;
+  addableProviders: { provider: string; name: string; icon: ReactNode }[];
   disabledReason: string | undefined;
   onPick: (providerKey: string) => void;
 }) {

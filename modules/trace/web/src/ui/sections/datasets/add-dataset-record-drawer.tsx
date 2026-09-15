@@ -36,7 +36,7 @@ export type DatasetEditorComponent = ComponentType<{
     /** Optional to match the editor's own `InMemoryDataset` shape. */
     name?: string;
     columnTypes: DatasetColumns;
-    datasetRecords?: Array<{ id?: string } & Record<string, unknown>>;
+    datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
   };
   open?: boolean;
   onClose?: () => void;

@@ -16,7 +16,7 @@ import {
  */
 
 function clickHouse(rows: unknown[] = []) {
-  const calls: Array<{ query: string; query_params?: Record<string, unknown> }> = [];
+  const calls: { query: string; query_params?: Record<string, unknown> }[] = [];
 
   return {
     calls,
@@ -148,7 +148,7 @@ describe("given the trace reads automation settlement makes in this process", ()
   describe("when the settled fold is asked for", () => {
     /** @scenario "A settled match reaches its recipients from this process" */
     it("reads the fold this process itself writes, at the key it wrote", async () => {
-      const reads: Array<{ key: string; tenantId: string }> = [];
+      const reads: { key: string; tenantId: string }[] = [];
       const reader = WorkerAutomationSettlementTraceReader.create({
         traceSummaryStore: {
           tryGet: async (key: string, scope: { tenantId: string }) => {
@@ -238,7 +238,7 @@ describe("given the trace reads automation settlement makes in this process", ()
      */
     /** @scenario "The worker reads a settled trace's full record for itself" */
     it("hides captured content and keeps reading when the policy cannot resolve", async () => {
-      const errors: Array<Record<string, unknown>> = [];
+      const errors: Record<string, unknown>[] = [];
       const ch = clickHouse([]);
       const reader = WorkerTraceRecordReader.create({
         connection: { client: {} } as never,
@@ -304,7 +304,7 @@ describe("given the trace reads automation settlement makes in this process", ()
      */
     /** @scenario "Content older than the plan's window is teased in this process too" */
     it("fails closed to the free window when the plan cannot be resolved", async () => {
-      const errors: Array<Record<string, unknown>> = [];
+      const errors: Record<string, unknown>[] = [];
       const ch = clickHouseWithAgedTrace();
       const reader = WorkerTraceRecordReader.create({
         connection: { client: {} } as never,

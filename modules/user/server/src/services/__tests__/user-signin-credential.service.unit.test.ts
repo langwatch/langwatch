@@ -35,7 +35,7 @@ class TestPasswordHasher implements UserPasswordHasher {
 class FakeCredentialRepository implements UserCredentialRepository {
   constructor(private account: UserCredentialAccount | null) {}
 
-  readonly writes: Array<{ accountId: string; passwordHash: string }> = [];
+  readonly writes: { accountId: string; passwordHash: string }[] = [];
 
   findCredentialAccount = vi.fn(async (): Promise<UserCredentialAccount | null> => this.account);
 

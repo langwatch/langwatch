@@ -58,11 +58,11 @@ type Rule = RouterOutputs["anomalyRules"]["list"][number];
 type Severity = "critical" | "warning" | "info";
 type Scope = "organization" | "team" | "project" | "source_type" | "source";
 
-const SEVERITY_OPTIONS: Array<{
+const SEVERITY_OPTIONS: {
   value: Severity;
   label: string;
   tone: string;
-}> = [
+}[] = [
   { value: "critical", label: "Critical", tone: "red" },
   { value: "warning", label: "Warning", tone: "orange" },
   { value: "info", label: "Info", tone: "blue" },
@@ -72,7 +72,7 @@ const SEVERITY_OPTIONS: Array<{
 // project are persisted but skipped at evaluation time, so they're held
 // back from the composer until the subscriber adds them. See
 // docs/ai-gateway/governance/anomaly-rules.mdx scope coverage table.
-const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
+const SCOPE_OPTIONS: { value: Scope; label: string }[] = [
   { value: "organization", label: "Organization" },
   { value: "source_type", label: "Ingestion source type" },
   { value: "source", label: "Specific ingestion source" },

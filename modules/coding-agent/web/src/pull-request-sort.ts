@@ -34,7 +34,7 @@ export interface SortablePullRequestRow {
   headBranch: string;
   snapshotStatus: PullRequestStatus | null;
   lastActivityAtMs: number;
-  modelBreakdown: ReadonlyArray<{ model: string }>;
+  modelBreakdown: readonly { model: string }[];
   totalTokens: number;
   costUsd: number | null;
 }

@@ -9,7 +9,7 @@ import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts"
 
 function pluginIdsFor(overrides: Partial<BetterAuthDeploymentConfiguration>): string[] {
   const auth = betterAuthTransportFor(overrides);
-  return ((auth.options?.plugins ?? []) as Array<{ id?: string }>).map((p) => p.id ?? "");
+  return ((auth.options?.plugins ?? []) as { id?: string }[]).map((p) => p.id ?? "");
 }
 
 describe("the deployment's Better Auth factor plugins", () => {

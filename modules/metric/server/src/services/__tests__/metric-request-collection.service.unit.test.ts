@@ -46,8 +46,8 @@ function makeService(
 function gaugeRequest(args: {
   value?: number;
   values?: number[];
-  resourceAttributes?: Array<Record<string, unknown>>;
-  pointAttributes?: Array<Record<string, unknown>>;
+  resourceAttributes?: Record<string, unknown>[];
+  pointAttributes?: Record<string, unknown>[];
 }) {
   return {
     resourceMetrics: [

@@ -1,13 +1,13 @@
 import type { GithubPullRequest } from "@langwatch/github-contract";
 
 /** A pull request as the branch-assignment pass reads it: numbers and epoch milliseconds. */
-export function assignablePullRequests(pullRequests: readonly GithubPullRequest[]): Array<{
+export function assignablePullRequests(pullRequests: readonly GithubPullRequest[]): {
   prNumber: number;
   headBranch: string;
   prCreatedAtMs: number;
   prClosedAtMs: number | null;
   prMergedAtMs: number | null;
-}> {
+}[] {
   return pullRequests.map((pullRequest) => ({
     prNumber: pullRequest.prNumber,
     headBranch: pullRequest.headBranch,

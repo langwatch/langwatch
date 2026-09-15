@@ -20,11 +20,11 @@ import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fa
 type OrganizationGraphEntry = {
   id: string;
   name: string;
-  teams: Array<{
+  teams: {
     id: string;
     name: string;
-    projects: Array<{ id: string; name: string }>;
-  }>;
+    projects: { id: string; name: string }[];
+  }[];
 };
 
 export function DataRetentionHost({ children }: { children: ReactNode }) {

@@ -63,7 +63,7 @@ function foldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData 
   } as unknown as TraceSummaryData;
 }
 
-function spanEvent(attributes: Array<{ key: string; value: unknown }> = []): TraceProcessingEvent {
+function spanEvent(attributes: { key: string; value: unknown }[] = []): TraceProcessingEvent {
   return {
     id: "event-1",
     aggregateId: "trace-1",

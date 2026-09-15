@@ -57,14 +57,14 @@ type SdkPlaceCallArgs = Omit<
 > & { record?: boolean };
 
 interface FakeAdapter extends TwilioAdapterLike {
-  readonly placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]>;
+  readonly placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][];
   readonly disconnectCount: () => number;
 }
 
 function fakeAdapter(
   behaviour: { connectRejects?: Error; placeCallRejects?: Error } = {},
 ): FakeAdapter {
-  const placeCallArgs: Array<Parameters<TwilioAdapterLike["placeCall"]>[0]> =
+  const placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][] =
     [];
   let disconnects = 0;
   return {
@@ -90,7 +90,7 @@ function buildTransport({
   adapter?: FakeAdapter;
   processEnv?: NodeJS.ProcessEnv;
 } = {}) {
-  const factoryOptions: Array<Parameters<TwilioAgentFactory>[0]> = [];
+  const factoryOptions: Parameters<TwilioAgentFactory>[0][] = [];
   const twilioAgentFactory: TwilioAgentFactory = (options) => {
     factoryOptions.push(options);
     return adapter;

@@ -17,7 +17,7 @@ import AuthenticationScreen from "../authentication.screen.tsx";
 const { state } = vi.hoisted(() => ({
   state: {
     authProvider: "auth0" as string | undefined,
-    linkedAccounts: [] as Array<{ id: string; provider: string; providerAccountId: string }>,
+    linkedAccounts: [] as { id: string; provider: string; providerAccountId: string }[],
     accountsLoading: false,
     hasPassword: true,
     ssoGate: void 0 as unknown,

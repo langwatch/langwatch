@@ -3,7 +3,7 @@ import { clonePayload } from "../payload-clone.rules.ts";
 
 describe("clonePayload", () => {
   describe("given a payload the structured clone algorithm also handles", () => {
-    const payloads: ReadonlyArray<readonly [string, unknown]> = [
+    const payloads: readonly (readonly [string, unknown])[] = [
       ["unicode and astral characters", { text: 'héllo \u{1F600} \\ " ünïcø∂e' }],
       ["control characters in a string", { text: "line\nbreak\ttab\u0000nul" }],
       ["nested null", { a: { b: null, c: [null, { d: null }] } }],

@@ -63,7 +63,7 @@ export function buildQueryFilter(column: string, params: ClickHouseFilterQueryPa
  * Standard result extractor for field/label/count rows.
  */
 export function extractStandardResults(rows: unknown[]): FilterOption[] {
-  return (rows as Array<{ field: string; label: string; count: string }>).map((row) => ({
+  return (rows as { field: string; label: string; count: string }[]).map((row) => ({
     field: row.field,
     label: row.label,
     count: parseInt(row.count, 10),

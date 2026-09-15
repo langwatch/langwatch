@@ -60,9 +60,9 @@ const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contex
  * Parses JSON string values in specified columns.
  */
 const parseJsonColumns = (
-  rows: Array<Record<string, unknown>>,
+  rows: Record<string, unknown>[],
   jsonColumnKeys: Set<string>,
-): Array<Record<string, unknown>> => {
+): Record<string, unknown>[] => {
   if (jsonColumnKeys.size === 0) {
     return rows;
   }
@@ -88,9 +88,9 @@ const parseJsonColumns = (
  * Normalizes inline dataset records from column IDs to column names.
  */
 const normalizeColumnIdsToNames = (
-  rows: Array<Record<string, unknown>>,
-  columns: Array<{ id: string; name: string }>,
-): Array<Record<string, unknown>> => {
+  rows: Record<string, unknown>[],
+  columns: { id: string; name: string }[],
+): Record<string, unknown>[] => {
   const idToName = Object.fromEntries(columns.map((c) => [c.id, c.name]));
 
   return rows.map((row) => {
@@ -108,8 +108,8 @@ const normalizeColumnIdsToNames = (
  * Result of loading a dataset.
  */
 export type LoadedDataset = {
-  rows: Array<Record<string, unknown>>;
-  columns: Array<{ id: string; name: string; type: string }>;
+  rows: Record<string, unknown>[];
+  columns: { id: string; name: string; type: string }[];
 };
 
 /**
@@ -119,11 +119,11 @@ export type LoadedDataset = {
 type DatasetInput = {
   type: "inline" | "saved";
   inline?: {
-    columns: Array<{ id: string; name: string; type: string }>;
+    columns: { id: string; name: string; type: string }[];
     records: Record<string, unknown[]>;
   };
   datasetId?: string;
-  columns: Array<{ id: string; name: string; type: string }>;
+  columns: { id: string; name: string; type: string }[];
 };
 
 /**
@@ -131,7 +131,7 @@ type DatasetInput = {
  * loaded dataset shape. Columns are derived from the union of keys across
  * rows.
  */
-const rowsFromInlineData = (data: Array<Record<string, unknown>>): LoadedDataset => {
+const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDataset => {
   const columnNames: string[] = [];
   const seen = new Set<string>();
   for (const row of data) {
@@ -167,8 +167,8 @@ export type LoadedEvaluators = Map<string, { id: string; name: string; config: u
  * Result of loading all execution data.
  */
 export type LoadedExecutionData = {
-  datasetRows: Array<Record<string, unknown>>;
-  datasetColumns: Array<{ id: string; name: string; type: string }>;
+  datasetRows: Record<string, unknown>[];
+  datasetColumns: { id: string; name: string; type: string }[];
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, Agent>;
   loadedEvaluators: Map<string, Evaluator>;
@@ -202,7 +202,7 @@ type EvaluatorForLoading = {
  * Sent by the run API, the workflow evaluate endpoint, and the SDKs.
  */
 export type ExecutionDataInputs = {
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   datasetId?: string;
   parameters?: Record<string, string | number | boolean>;
 };
@@ -238,8 +238,8 @@ export class ExperimentExecutionDataService {
     projectId: string,
     datasets: DatasetApi,
   ): Promise<LoadedDataset | { error: string; status: number }> {
-    let rows: Array<Record<string, unknown>>;
-    let columns: Array<{ id: string; name: string; type: string }>;
+    let rows: Record<string, unknown>[];
+    let columns: { id: string; name: string; type: string }[];
 
     if (dataset.type === "inline" && dataset.inline) {
       columns = dataset.inline.columns;
@@ -292,12 +292,12 @@ export class ExperimentExecutionDataService {
     columns,
     parameters,
   }: {
-    rows: Array<Record<string, unknown>>;
-    columns: Array<{ id: string; name: string; type: string }>;
+    rows: Record<string, unknown>[];
+    columns: { id: string; name: string; type: string }[];
     parameters?: Record<string, string | number | boolean>;
   }): {
-    rows: Array<Record<string, unknown>>;
-    columns: Array<{ id: string; name: string; type: string }>;
+    rows: Record<string, unknown>[];
+    columns: { id: string; name: string; type: string }[];
   } {
     if (!parameters || Object.keys(parameters).length === 0) {
       return { rows, columns };
@@ -459,10 +459,10 @@ export class ExperimentExecutionDataService {
       limitMb: null,
     });
     const columns = (
-      (loadedDataset.dataset.columnTypes as unknown as Array<{
+      (loadedDataset.dataset.columnTypes as unknown as {
         name: string;
         type: string;
-      }>) ?? []
+      }[]) ?? []
     ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
     const jsonColumnKeys = new Set(
       columns

@@ -189,7 +189,7 @@ describe("TraceIOAccumulationService: media refs", () => {
     } as never);
 
   /** Fold a list of spans through the accumulator the way the projection does. */
-  function foldSpans(spans: Array<{ span: NormalizedSpan; input?: Rich }>) {
+  function foldSpans(spans: { span: NormalizedSpan; input?: Rich }[]) {
     let state = emptyState();
     let last!: ReturnType<TraceIOAccumulationService["accumulateIO"]>;
     for (const { span, input } of spans) {

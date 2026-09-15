@@ -207,12 +207,12 @@ export type SuiteRunResult = {
     scenarios: string[];
     targets: string[];
   };
-  items: Array<{
+  items: {
     scenarioRunId: string;
     scenarioId: string;
     target: SuiteTarget;
     name: string | undefined;
-  }>;
+  }[];
 };
 
 export type SuiteRunAllResult = SuiteRunResult & { suiteId: string };
