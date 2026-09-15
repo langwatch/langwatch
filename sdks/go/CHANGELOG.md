@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/langwatch/langwatch/compare/sdks/go/v1.0.0...sdks/go/v1.0.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
+
 ## [1.0.0](https://github.com/langwatch/langwatch/compare/sdks/go/v0.3.0...sdks/go/v1.0.0) (2026-09-09)
 
 
