@@ -140,7 +140,7 @@ Feature: Idempotency-Key on the control-plane creates
   @integration @rest
   Scenario: An unusable idempotency key is refused before anything is created
     When I send `POST /api/gateway/v1/budgets` with Idempotency-Key "short"
-    Then the response status is 400 and the code is `validation_error`
+    Then the response status is 422 and the code is `validation_error`
     And `meta.target` is "header"
     And no budget was created
     # Refused rather than ignored: a caller who sent a key believes its retry

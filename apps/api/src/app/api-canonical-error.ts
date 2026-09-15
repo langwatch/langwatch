@@ -33,11 +33,22 @@ const FALLBACK_ERROR_CODE = "internal_error";
 const INTERNAL_ERROR_MESSAGE = "An unknown error occurred";
 
 /**
- * Request validation answers 400, not 422. The shared validator raises `validation_error`
- * at 422 for the route families that predate the canonical envelope.
+ * One status for one code, across every family the process mounts.
+ *
+ * A validation failure is a request that arrived intact and was rejected on its values, so
+ * it answers 422. The pin is needed because `validation_error` is raised at two different
+ * statuses around the tree — the shared REST validator and `ValidationError` name 422,
+ * several module contracts name 400 — and without it a rejected field would be 422 on one
+ * family and 400 on the next. The envelope is the one place every family's refusals pass
+ * through, which is why the reconciliation belongs here rather than at each raise site.
+ *
+ * The other class needs no pin. A body that could not be read as a request at all is
+ * `malformed_request`, and both sites that raise it already name 400 — the status
+ * `error.httpStatus` answers below, unchanged. `api-canonical-error.unit.test.ts` holds
+ * both classes to their code so neither drifts back.
  */
 const VALIDATION_ERROR_CODE = "validation_error";
-const VALIDATION_ERROR_STATUS = 400;
+const VALIDATION_ERROR_STATUS = 422;
 
 /**
  * One link in `meta.reasons`, in the wire's own casing. `HandledError.serialize()` is

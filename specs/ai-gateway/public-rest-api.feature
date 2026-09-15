@@ -131,14 +131,15 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.code is "missing_credentials"
 
   @integration @rest
-  Scenario: A request-validation failure answers the canonical error envelope at 400
+  Scenario: A request-validation failure answers the canonical error envelope at 422
     When a request fails its schema
-    Then the response status is 400
+    Then the response status is 422
     And the body is the canonical error envelope with code "validation_error"
     And error.meta names the target and the offending fields
     And error.meta.reasons carries one entry per violation
-    # One status for one code: the surface used to answer 422 here while the
-    # platform routes answered 400 for the same refusal.
+    # One status for one code, and the code is 422: the request arrived intact
+    # and was rejected on its values. A body that could not be read as a
+    # request at all is the other class, and answers 400 malformed_request.
 
   @integration @rest
   Scenario: An unexpected server failure answers the canonical error envelope naming nothing internal
@@ -173,7 +174,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # A product-managed key is hidden from reads and refuses mutations —
     # nothing a customer can ever want to mint against themselves.
     When I create a key with purpose "langy"
-    Then the response status is 400 with error.code "validation_error"
+    Then the response status is 422 with error.code "validation_error"
 
   @integration @rest @budgets
   Scenario: A key and its cap are created atomically over REST
@@ -186,7 +187,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # The budget wire parses through the SAME zod schema the tRPC create
     # uses, so a cap tRPC would refuse cannot arrive via REST.
     When I create a key with `budget: { "limit_usd": "10abs", "window": "month" }`
-    Then the response status is 400
+    Then the response status is 422
     And the message names `limit_usd`
 
   # ============================================================================
@@ -260,7 +261,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # same spelling. One casing, both directions.
     When I send the stored casing on `?scope_type`, on a budget `kind`, or on a
     virtual key `scope_type`
-    Then each answers 400 with code "validation_error"
+    Then each answers 422 with code "validation_error"
 
   @integration @rest @budgets
   Scenario: Every enum a budget read returns is lowercase
@@ -620,7 +621,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest
   Scenario: Metadata beyond the documented caps is refused, naming the key
     When I send a `metadata` value longer than 500 characters
-    Then the response status is 400 with error.code = "validation_error"
+    Then the response status is 422 with error.code = "validation_error"
     And error.meta.fields names the offending key
     And a map of more than 40 keys is refused the same way
 

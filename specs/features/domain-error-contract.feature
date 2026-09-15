@@ -168,6 +168,34 @@ Feature: Handled errors — the handled-error boundary
     Then its response is used unchanged
     So the shared behaviour is a default, never an override
 
+  # --------------------------------------------------------------------------
+  # One status for one code, across the whole management surface
+  #
+  # The two statuses above are only worth stating if a caller gets the same one
+  # wherever it asks. `validation_error` is raised at two different statuses
+  # around the tree — the shared REST validator names 422, several module
+  # contracts name 400 — so the canonical envelope reconciles them in the one
+  # place every family's refusals pass through. A surface that answered 422 on
+  # one family and 400 on the next would teach callers to branch on the family
+  # rather than on the code.
+  # --------------------------------------------------------------------------
+
+  @unit @bdd @domain-errors
+  Scenario: A validation failure answers 422 whatever status its class named
+    Given a refusal of code "validation_error" raised at 400 by its own class
+    When it reaches the canonical error envelope
+    Then the response status is 422
+    And the envelope's type is "unprocessable_entity"
+    So one code cannot mean two statuses on one surface
+
+  @integration @bdd @domain-errors
+  Scenario: Both classes answer the same way on every family the process mounts
+    Given two REST families behind different doors, one project-keyed and one public
+    When a request to either is rejected on its values
+    Then both answer 422 with code "validation_error"
+    And the offending fields are named on each
+    So the status a caller reads does not depend on which family it asked
+
   # @unimplemented: the "type" half is a Go/REST producer concern, pinned
   # nowhere on the TypeScript side — `readHandledError` resolves code then
   # kind and never looks at `type`. Needs a Go-side test binding.
