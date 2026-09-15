@@ -9,8 +9,6 @@ import {
   excludedPolicyIds,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
-  lintCommentBlocks,
-  lintCommentBlockRoots,
   lintComposedExportsBaseline,
   lintFeatureLayouts,
   lintManifests,
@@ -31,8 +29,6 @@ const USAGE = `architecture-enforcer [options]
   --root <path>                    workspace root (default: the current directory)
   --all                            print every finding, not the first 25 per policy
   --list-policies                  print the policy registry (id, spec, baseline) and exit
-  --review-comment-blocks          print the comment-block review list; never fails
-  --all-comment-blocks             review every file, not only the changed ones
   --review-test-quality            run the test-quality policy alone
   --shrinking-baseline-only        compare the debt inventories with the merge base
   --baseline-reference-dir <path>  directory holding the merge-base baseline copies
@@ -48,7 +44,6 @@ Exit codes: 0 clean, 1 findings or stale baseline rows, 2 bad arguments or a cra
 const VALUE_FLAGS = new Set([
   "--root",
   "--baseline-reference-dir",
-  "--comment-block-roots-reference",
   "--boundary-edge-baseline-reference",
   "--oxlint-baseline-reference",
   "--composed-exports-baseline-reference",
@@ -57,8 +52,6 @@ const VALUE_FLAGS = new Set([
 const BOOLEAN_FLAGS = new Set([
   "--all",
   "--list-policies",
-  "--review-comment-blocks",
-  "--all-comment-blocks",
   "--review-test-quality",
   "--shrinking-baseline-only",
   "--no-declarations",
@@ -74,9 +67,7 @@ type CliOptions = {
   mode: "check" | "shrink" | "review";
   baselineDir?: string;
   all: boolean;
-  reviewCommentBlocks: boolean;
   reviewTestQuality: boolean;
-  allCommentBlocks: boolean;
   declarations: boolean;
   legacyApplicationMigration: boolean;
   legacyFeatureFragments: boolean;
@@ -120,9 +111,7 @@ function collectArguments(argv: readonly string[]): Arguments | string {
 }
 
 function modeOf(flags: Set<string>): CliOptions["mode"] {
-  const reviewing = flags.has("--review-comment-blocks") || flags.has("--review-test-quality");
-
-  if (reviewing) return "review";
+  if (flags.has("--review-test-quality")) return "review";
 
   return flags.has("--shrinking-baseline-only") ? "shrink" : "check";
 }
@@ -146,9 +135,7 @@ export function parseArgv(argv: readonly string[]): ParseResult {
       mode: modeOf(flags),
       baselineDir: values.get("--baseline-reference-dir"),
       all: flags.has("--all"),
-      reviewCommentBlocks: flags.has("--review-comment-blocks"),
       reviewTestQuality: flags.has("--review-test-quality"),
-      allCommentBlocks: flags.has("--all-comment-blocks"),
       declarations: !flags.has("--no-declarations"),
       legacyApplicationMigration: !flags.has("--no-legacy-application-migration"),
       legacyFeatureFragments: !flags.has("--no-legacy-feature-fragments"),
@@ -167,15 +154,6 @@ function reference(options: CliOptions, flag: string, file: string): string | un
 
 function boundaryEdgeReference(options: CliOptions): string | undefined {
   return reference(options, "--boundary-edge-baseline-reference", "boundary-edge-baseline.json");
-}
-
-function commentBlockRootsFindings(options: CliOptions): ArchitectureViolation[] {
-  const check = lintCommentBlockRoots(
-    options.root,
-    reference(options, "--comment-block-roots-reference", "comment-block-roots.json"),
-  );
-
-  return check.violations;
 }
 
 type ShrinkResult = { findings: ArchitectureViolation[]; bootstrapped: string[] };
@@ -213,7 +191,6 @@ function shrinkFindings(options: CliOptions, snapshot: WorkspaceSnapshot): Shrin
     ...boundaryEdges.violations,
     ...oxlint.violations,
     ...composedExports.violations,
-    ...commentBlockRootsFindings(options),
     ...lintServiceCeilings(snapshot),
     ...lintStrictPortModules(snapshot),
   ];
@@ -254,26 +231,6 @@ function checkFindings(
   return [...filterBaselinedBoundaryEdges(workspace, boundaryEdges.entries), ...boundaryEdges.violations];
 }
 
-/** The review tier: blocks worth a second look. Printed only when asked for, never a refusal. */
-function printCommentBlockReview(options: CliOptions, changedFiles: readonly string[]): void {
-  const { reviews } = lintCommentBlocks(
-    options.root,
-    options.allCommentBlocks ? {} : { changedFiles },
-  );
-
-  if (reviews.length > 0) {
-    const entries = reviews
-      .map((review) => `[${review.category}] ${review.file}:${review.line}\n  ${review.message}`)
-      .join("\n\n");
-
-    process.stdout.write(
-      `architecture-enforcer: comment-block review queue (${reviews.length} blocks, exit code unchanged)\n${entries}\n`,
-    );
-  }
-
-  process.stdout.write("architecture-enforcer: comment-block review complete\n");
-}
-
 function testQualityFindings(
   options: CliOptions,
   snapshot: WorkspaceSnapshot,
@@ -300,13 +257,6 @@ function printClean(options: CliOptions, bootstrapped: readonly string[]): void 
 
 function run(options: CliOptions): 0 | 1 {
   const changedFiles = changedSourceFiles(options.root);
-
-  if (options.reviewCommentBlocks) {
-    printCommentBlockReview(options, changedFiles);
-
-    return 0;
-  }
-
   const snapshot = buildWorkspaceSnapshot({ root: options.root, changedFiles });
   const shrink = options.mode === "shrink" ? shrinkFindings(options, snapshot) : void 0;
 

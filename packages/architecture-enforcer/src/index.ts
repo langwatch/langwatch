@@ -1,5 +1,5 @@
 import { relative, resolve } from "node:path";
-import { changedSourceFiles } from "./policies/quality/comment-blocks.ts";
+import { changedSourceFiles } from "./workspace/changed-files.ts";
 import { POLICIES } from "./policies/index.ts";
 import type { PolicyDefinition } from "./policies/index.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
@@ -45,18 +45,7 @@ export {
 } from "./baseline.ts";
 export type { Baseline, BaselineEntry, BaselinePolicy } from "./baseline.ts";
 export { lintApiTransportBoundaries, lintApiTransportFramework } from "./policies/api-transport.ts";
-export {
-  COMMENT_BLOCK_ROOTS_BASELINE,
-  changedSourceFiles,
-  lintCommentBlocks,
-  lintCommentBlockRoots,
-} from "./policies/quality/comment-blocks.ts";
-export type {
-  CommentBlockLintOptions,
-  CommentBlockLintResult,
-  CommentBlockReview,
-  CommentBlockRootsBaselineCheck,
-} from "./policies/quality/comment-blocks.ts";
+export { changedSourceFiles } from "./workspace/changed-files.ts";
 export type {
   LegacyApplicationBoundaryEdge,
   LegacyApplicationBoundaryKind,

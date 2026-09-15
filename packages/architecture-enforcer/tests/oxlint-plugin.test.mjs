@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -1691,61 +1690,4 @@ looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
       errors: [{ messageId: "commentColumns" }],
     },
   ],
-});
-
-describe("the comment-block burn-down allowlist", () => {
-  function allowlistRoot({ expires }) {
-    const root = fixtureRoot("comment-block-allowlist-");
-    const git = (...arguments_) =>
-      execFileSync("git", ["-C", root, ...arguments_], { stdio: "ignore" });
-    git("init", "--quiet", "--initial-branch=main");
-    git("config", "user.email", "test@example.com");
-    git("config", "user.name", "Architecture Lint Test");
-    git("config", "commit.gpgsign", "false");
-    writeFixture(root, "packages/legacy/src/nine.ts", blockComment(9));
-    writeFixture(root, "packages/other/src/nine.ts", blockComment(9));
-    writeFixture(
-      root,
-      "packages/architecture-enforcer/src/comment-block-roots.json",
-      JSON.stringify({
-        version: 0,
-        roots: [{ root: "packages/legacy", blocks: 1, expires }],
-      }),
-    );
-    git("add", ".");
-    git("commit", "--quiet", "-m", "baseline");
-    return root;
-  }
-
-  const liveRoot = allowlistRoot({ expires: "2099-01-01" });
-  fixtureTester(liveRoot).run("comment-block-size", plugin.rules["comment-block-size"], {
-    valid: [{ filename: "packages/legacy/src/nine.ts", code: blockComment(9) }],
-    invalid: [
-      {
-        filename: "packages/other/src/nine.ts",
-        code: blockComment(9),
-        errors: [
-          {
-            message: commentBlockSizeMessage(9),
-          },
-        ],
-      },
-    ],
-  });
-
-  const expiredRoot = allowlistRoot({ expires: "2020-01-01" });
-  fixtureTester(expiredRoot).run("comment-block-size", plugin.rules["comment-block-size"], {
-    valid: [],
-    invalid: [
-      {
-        filename: "packages/legacy/src/nine.ts",
-        code: blockComment(9),
-        errors: [
-          {
-            message: commentBlockSizeMessage(9),
-          },
-        ],
-      },
-    ],
-  });
 });

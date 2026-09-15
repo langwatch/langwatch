@@ -27,7 +27,6 @@ import {
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
 import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
-import { lintCommentBlockRoots } from "./quality/comment-blocks.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
@@ -277,20 +276,5 @@ export const POLICIES: readonly PolicyDefinition[] = [
     spec: LINT_BASELINES,
     baseline: "oxlint-baseline.json",
     run: (snapshot) => lintOxlintBaseline(snapshot.root).violations,
-  }),
-  definePolicy({
-    id: "comment-block-root",
-    spec: LINT_BASELINES,
-    baseline: "comment-block-roots.json",
-    run: (snapshot) => lintCommentBlockRoots(snapshot.root).violations,
-  }),
-  definePolicy({
-    id: "comment-block-review",
-    spec: LINT_BASELINES,
-    // The 4-5 line "review attention" tier never fails a run (A1); it is
-    // registered so `--list-policies` names it, but a checked run reports no
-    // violations for it — the CLI's `--review-comment-blocks` mode prints the
-    // review queue itself, from `lintCommentBlocks`, which is not a finding list.
-    run: () => [],
   }),
 ];

@@ -109,7 +109,6 @@ with nothing left to except, and the policy becomes a plain refusal.
 | `src/oxlint-baseline.json` | `oxlint` | `<rule>\|<file>` |
 | `src/boundary-edge-baseline.json` | `boundary-edge` | `<kind>\|<from>\|<to>` |
 | `src/composed-exports-baseline.json` | `composed-exports` | `<package directory>\|<exported name>` |
-| `src/comment-block-roots.json` | `comment-block-root` | the repository-relative root directory, with `count` its over-limit blocks |
 
 `src/declaration-budget.json` is not one of these: it carries per-package file
 counts rather than keyed rows, and nothing about it ratchets by key.

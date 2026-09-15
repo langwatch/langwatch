@@ -24,7 +24,7 @@ a folder of policy files a reader can hold.
 
 | id | where | what is wrong | why it matters | fix |
 | --- | --- | --- | --- | --- |
-| A1 | `src/cli-run.ts:139-147`, `src/comment-blocks.ts:363-391` | The 4-5 line comment "review attention" tier prints on every run, first, to stderr: 6,173 entries, 18,522 lines, exit code unchanged. | An agent reads 60% noise before the first violation; the signal is buried at line 18,523. | Print the review tier only under `--review-comment-blocks`; violations first, a per-policy count line before them. |
+| A1 | `src/cli-run.ts:139-147`, `src/comment-blocks.ts:363-391` | The 4-5 line comment "review attention" tier printed on every run, first, to stderr: 6,173 entries, 18,522 lines, exit code unchanged. | An agent read 60% noise before the first violation; the signal was buried at line 18,523. | **Done 2026-09-16 (D4):** the review tier, `--review-comment-blocks`, and `lintCommentBlocks` are deleted outright rather than gated — nothing prints it any more. |
 | A2 | `src/` (55 files, 24,032 lines); `frontend-ui-boundaries.ts` 2,199 lines / 51 functions / 35 policy ids; `check-feature-parity.ts` 1,936; `feature-app-contract.ts` 1,431; `api-transport-boundaries.ts` 1,159 | The package that enforces "12 files per folder, one concept per file" is one flat folder of 55 files with six God files, baselined against itself (`source-folder-shape-baseline.json` rows for `packages/architecture-enforcer/src`). | Nobody can find a policy; the lint cannot be trusted to say what it will not do itself. | Target layout below: `policies/` with one file per policy family, ≤12 per folder. |
 | A3 | `src/*-baseline.json` (14 files) with top-level keys `entries` (two spellings), `edges`, `roots`, `files` (×2), `sites`, `ports`, `services`, `budgets`; 22 `read*/format*/compare*Baseline` functions in 12 files | Eight baseline shapes, each with its own loader, sorter and formatter; sort rules differ (`composed-exports.ts:59` code-unit `<`, `index.ts:203` `localeCompare`); stale rows are reported by 11 policies and not by the rest. | Every ratchet is a separate mechanism to learn, and a stale row in one of the silent baselines silently allows what it once permitted. | One `baseline.ts`: `{ version, policy, entries: [{ key, measured, expires? }] }`, code-unit sorted, validated on load, stale rows always reported, one formatter. |
 | A4 | `api-transport-credential-context-baseline.json`, `api-transport-framework-allowlist.json`, `overengineering-baseline.json`, `port-module-baseline.json`, `service-ceilings-baseline.json`, `typed-prisma-seam-baseline.json` (all empty); `cli-run.ts:32-58` six `--*-baseline-reference` flags and `--shrinking-baseline-only` | Six ratchets have reached zero and still carry their loaders, formatters, comparison mode and CLI flags. | Dead mechanism that every reader has to rule out; `cli-run.ts` is 208 lines of flag plumbing for them. | Delete the six files and their read/format/compare code; the policies become plain refusals. |
@@ -43,7 +43,7 @@ a folder of policy files a reader can hold.
 | A17 | `boundary-edge-baseline.ts:155-163`, `comment-blocks.ts:200-204` enforce `expires`; every other baseline has `measured` only | Two ratchets expire, the rest only shrink; no stated rule for which a baseline gets. | Nobody knows whether a row is a debt with a date or a permanent allowance. | Decision (below): one rule for all baselines. |
 | A18 | `src/cli-run.ts:26-58` | Twelve argv flags parsed by `indexOf`, six of them per-baseline reference paths for the merge-base comparison mode. | Flag plumbing is half the file; the mode is a mystery to anyone who did not write it. | `--mode=check\|shrink\|review`, `--baseline-dir`, nothing else. |
 | A19 | `check-feature-parity.ts:64 SPECS_ROOTS`, `feature-shape.ts:72 BOOT_SCAN_ROOTS`, `feature-configuration.ts:15 APPLICATION_CONFIG_DIRECTORIES`, `frontend-ui-boundaries.ts:25 UI_SOURCE_DIRECTORIES`, `comment-blocks.ts:21`, `files.ts:4`, `source-folder-shape.ts SCANNED_ROOTS` | The repository tree is spelled out in seven constants across seven files. | The `features → modules` rename will touch all seven; today the ignore lists already disagree. | One `workspace/layout.ts` naming the roots and the ignore set. |
-| A20 | `src/comment-blocks.ts` + `comment-block-roots.json` (`apps/api` 1,281 blocks, expires 2026-09-17) versus the oxlint `comment-block-size` rules in `@langwatch/oxlint-rules` | Two systems govern comment length: an oxlint rule per block and an architecture ratchet per root. | Same rule, two reports, two baselines. | Keep the oxlint rule; let the roots ratchet expire and delete it. |
+| A20 | `src/comment-blocks.ts` + `comment-block-roots.json` (`apps/api` 1,281 blocks, expires 2026-09-17) versus the oxlint `comment-block-size` rules in `@langwatch/oxlint-rules` | Two systems governed comment length: an oxlint rule per block and an architecture ratchet per root. | Same rule, two reports, two baselines. | **Done 2026-09-16 (D4):** `comment-blocks.ts`, `comment-block-roots.json` and the `comment-block-root`/`comment-block-review` policies are deleted; the oxlint rule is the only governor left. |
 | A21 | `src/oxlint-baseline-check.ts`, `src/generate-native-baseline-overrides.mjs`, `src/lint-rules-doc.mjs` | Validation of another tool's baseline and its docs generator live here. | They are oxlint plumbing, not boundary policy. | Move to `@langwatch/oxlint-rules`. |
 | A22 | `src/*.cli.ts` (rename-workspace-package, rename-feature-sources, colocate-tests, declaration-budget) and their non-policy modules | One-shot migration tools share the folder with policies. | They inflate the folder and the door; none is a lint. | `tools/` or delete once their migration is done. |
 
@@ -115,11 +115,15 @@ them onto it.
   `measured` and the ratchet only shrinks. Today two policies do the first and twelve the second.
 - **D3** The 26 web-package dependency cycles: fix the packages (evaluator-web ↔ analytics-web and the
   eight-package ring through model-provider-web) or baseline the edges with owners.
-- **D4** Comment length: keep only the oxlint rule and let `comment-block-roots.json` expire on
-  2026-09-17, or keep the per-root ratchet too.
-- **D5** The 17 untested policies: write the tests, or delete the policies (candidates:
-  `overengineering-baseline`, `service-ceilings-baseline-growth`, `typed-prisma-seam-baseline`, all
-  three sitting on empty baselines).
+- **D4** Resolved 2026-09-16: the per-root ratchet is deleted; the oxlint `comment-block-size` rule is
+  the single governor of comment length. The ratchet permitted 20,110 over-limit blocks measured
+  2026-09-08 against a tree that had fallen to 6,168 — it constrained nothing and only injected an
+  expiry schedule of findings into a drive whose goal is zero.
+- **D5** Resolved 2026-09-16: already delivered. Measured today, 38 of 39 registered policies have a
+  test file named for them; the two named baseline candidates (`overengineering-baseline`,
+  `typed-prisma-seam-baseline`) no longer exist, and `service-ceilings` kept its policy (tested) and
+  lost its baseline. The one real gap, `architecture-records`, now has
+  `tests/architecture-records.unit.test.ts`.
 - **D6** Where the oxlint baseline check and the native-override generator live: here or in
   `@langwatch/oxlint-rules`.
 - **D7** Whether the `screens/*` and `surfaces/*` spellings keep working during the conversion drive

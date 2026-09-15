@@ -183,29 +183,6 @@ describe("given a workspace the lint can check", () => {
     }, 120_000);
   });
 
-  describe("when source files carry comment blocks worth a second look", () => {
-    /** @scenario "The comment-block review attention list is asked for, never volunteered" */
-    it("hides the review attention list until it is asked for, and never fails on it", () => {
-      const root = gitFixture("lint-report-review");
-      writeFixture(root, "src/review.ts", Array.from({ length: 4 }, () => "// comment").join("\n"));
-      writeFixture(root, "src/hard.ts", Array.from({ length: 9 }, () => "// comment").join("\n"));
-
-      const plain = runCli(["--root", root, "--no-declarations"]);
-      expect(plain.status).toBe(0);
-      expect(plain.stdout).not.toContain("review attention");
-      expect(plain.stderr).not.toContain("review attention");
-      expect(plain.stderr).not.toContain("comment-block review");
-
-      const asked = runCli(["--root", root, "--review-comment-blocks"]);
-      expect(asked.status).toBe(0);
-      expect(asked.stdout).toContain("architecture-enforcer: comment-block review queue");
-      expect(asked.stdout).toContain("src/review.ts:1");
-      expect(asked.stdout).toContain("review attention");
-      // An oversized block is langwatch/comment-block-size's refusal, not this list's.
-      expect(asked.stdout).not.toContain("src/hard.ts");
-      expect(asked.stderr).not.toContain("comment-block-size");
-    }, 120_000);
-  });
 });
 
 describe("given the lint runs on a machine that also runs typechecks", () => {
