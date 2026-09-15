@@ -43,8 +43,8 @@ const derived = LWQL_DERIVED_CATALOG;
 const derivedSourceTables = new Set(derived.map((view) => view.sourceTable));
 
 const HAND_WRITTEN_TABLE_COUNT = 10;
-const DERIVED_TABLE_COUNT = 26;
-const SKIPPED_TABLE_COUNT = 7;
+const DERIVED_TABLE_COUNT = 29;
+const SKIPPED_TABLE_COUNT = 4;
 
 describe("given every table in the committed ClickHouse columns manifest", () => {
   it("is hand-written, derived, or skipped-with-a-reason — exactly once", () => {

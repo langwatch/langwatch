@@ -22,6 +22,7 @@ import {
   defineDatasetFromTable,
 } from "../defineDatasetFromTable";
 import {
+  LWQL_ALL_OVERRIDES,
   LWQL_DERIVED_CATALOG,
   LWQL_HAND_WRITTEN_SOURCE_TABLES,
 } from "../derivedViews";
@@ -61,7 +62,10 @@ describe("given a manifest table", () => {
       dedup: { versionColumn: "InternalRev" },
       columnGates: { Body: ["output"] },
       aliases: { Body: "Payload" },
-      skipColumns: ["InternalRev", "LegacyName"],
+      skipColumns: {
+        InternalRev: "engine version column, bookkeeping",
+        LegacyName: "superseded name, not exposed",
+      },
       descriptions: { Body: "The body, renamed." },
       tenantColumn: "project_id",
       manifest: FAKE_MANIFEST,
@@ -150,7 +154,7 @@ describe("given a manifest table", () => {
         defineDatasetFromTable({
           ...base,
           table: "widgets",
-          skipColumns: ["Ghost"],
+          skipColumns: { Ghost: "does not exist" },
         }),
       ).toThrow(/not a column of the table/);
     });
@@ -216,6 +220,43 @@ describe("given the opt-out catalog over the committed manifest", () => {
     for (const source of bySource.keys()) {
       expect(handWritten).not.toContain(source);
       expect(skipReason(source, LWQL_CATALOG_SKIPPED_TABLES)).toBeUndefined();
+    }
+  });
+
+  it("exposes every manifest column of each derived table, or skips it with a reason", () => {
+    const manifestByTable = new Map(
+      LWQL_COLUMNS_MANIFEST.tables.map((table) => [table.name, table]),
+    );
+    for (const view of derived) {
+      const manifestTable = manifestByTable.get(view.sourceTable);
+      expect(manifestTable, `${view.sourceTable} not in manifest`).toBeDefined();
+      const override = LWQL_ALL_OVERRIDES[view.sourceTable] ?? {};
+      const skip = override.skipColumns ?? {};
+      // A column is covered when it is exposed under its own name or read by an
+      // exposed column (an alias reads its source), and every skip carries a
+      // reason string — so a manifest column can never quietly fall off a view.
+      const exposedNames = new Set(view.columns.map((column) => column.name));
+      const readSources = new Set(
+        view.columns.flatMap((column) => [
+          ...column.sourceColumns,
+          ...(column.joinedSourceColumns ?? []),
+        ]),
+      );
+      for (const column of manifestTable!.columns) {
+        const covered =
+          exposedNames.has(column.name) || readSources.has(column.name);
+        const reason = skip[column.name];
+        expect(
+          covered || (typeof reason === "string" && reason.length > 0),
+          `${view.sourceTable}.${column.name} is neither exposed nor skipped-with-a-reason`,
+        ).toBe(true);
+      }
+      for (const [skipped, reason] of Object.entries(skip)) {
+        expect(
+          typeof reason === "string" && reason.length > 0,
+          `${view.sourceTable} skips ${skipped} with no reason`,
+        ).toBe(true);
+      }
     }
   });
 

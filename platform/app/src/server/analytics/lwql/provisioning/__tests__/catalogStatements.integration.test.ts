@@ -622,6 +622,32 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).toBe(0);
       }
     });
+
+    /**
+     * The whole catalog, provisioned and read: every column of every view is
+     * projected as the restricted reader — not just the grain the fanout check
+     * names. `CREATE OR REPLACE VIEW` is lazy, so a column whose expression is
+     * invalid (a wrong `-Merge` combinator on an `AggregateFunction` state, a
+     * `mapFilter` over a non-map) survives provisioning and fails only when a
+     * row is projected. Selecting every column at `LIMIT 1` is what exercises
+     * each expression, and doing it as the reader role proves the grant covers
+     * every source column the projection reads.
+     */
+    /** @scenario "A LangWatchQL view returns one row per logical record, the latest version" */
+    it("projects every column of every view as the reader role", async () => {
+      for (const view of LWQL_VIEW_CATALOG) {
+        const columns = view.columns
+          .map((column) => `\`${column.name}\``)
+          .join(", ");
+        await expect(
+          selectRows(
+            tenantA,
+            `SELECT ${columns} FROM ${database}.${view.name} LIMIT 1`,
+          ),
+          `${view.name} could not be read column-complete as the reader role`,
+        ).resolves.toBeDefined();
+      }
+    });
   });
 
   /**

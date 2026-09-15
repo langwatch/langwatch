@@ -117,9 +117,25 @@ describe("Dataset overrides", () => {
     // gateway_budget_scope_totals are AggregatingMergeTree sources whose
     // AggregateFunction-state columns the derived builder cannot merge
     // correctly — they are skipped (see ../skippedTables.ts), not overridden.
-    it("carries no aggregating override for a skipped AggregatingMergeTree table", () => {
-      expect(METRICS_OVERRIDES.metric_time_rollups).toBeUndefined();
-      expect(GATEWAY_OVERRIDES.gateway_budget_scope_totals).toBeUndefined();
+    it("marks each AggregatingMergeTree rollup dataset aggregating", () => {
+      // These were skipped as a follow-up; they are now catalogued, and the
+      // builder finalises their AggregateFunction states with merge combinators
+      // under a GROUP BY — which only fires when the override declares it.
+      expect(GATEWAY_OVERRIDES.gateway_budget_scope_totals?.dedup).toEqual({
+        aggregating: true,
+      });
+      expect(METRICS_OVERRIDES.simulation_run_metrics_rollup?.dedup).toEqual({
+        aggregating: true,
+      });
+    });
+
+    it("dedups the ReplacingMergeTree time rollup on its version, not by merging", () => {
+      // metric_time_rollups is a ReplacingMergeTree despite its name — the
+      // latest version wins, so it takes a version column, not an aggregating
+      // GROUP BY.
+      expect(METRICS_OVERRIDES.metric_time_rollups?.dedup).toEqual({
+        versionColumn: "UpdatedAt",
+      });
     });
   });
 

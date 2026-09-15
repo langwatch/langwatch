@@ -38,6 +38,7 @@ import {
   lwqlContentGatedColumns,
   lwqlGatedColumns,
   lwqlGrainColumns,
+  lwqlPhysicalColumn,
   lwqlViewSourceColumns,
   lwqlVisibleViews,
 } from "../types";
@@ -185,7 +186,9 @@ describe("given the LangWatchQL view catalog", () => {
         // nothing exposes them — or that subquery cannot be evaluated.
         const sourceColumns = lwqlViewSourceColumns(view);
         for (const column of [
-          ...view.dedup.keyColumns,
+          // Key columns are exposed names; the grant (and the dedup subquery)
+          // names the physical source column an alias renames.
+          ...view.dedup.keyColumns.map((key) => lwqlPhysicalColumn(view, key)),
           ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
         ]) {
           expect(
