@@ -25,6 +25,7 @@ export const LEGACY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "Pre-canonical OpenTelemetry log record storage, superseded by " +
       "log_records; retained for rolling-deployment reads and draining " +
       "under its own TTL.",
+    timeColumn: "TimeUnixMs",
     dedup: { versionColumn: "UpdatedAt" },
     columnUnits: {
       TimeUnixMs: "ms",
@@ -36,6 +37,7 @@ export const LEGACY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "Pre-canonical OpenTelemetry metric record storage, superseded by " +
       "the metric_data_points family; retained for rolling-deployment reads " +
       "and draining under its own TTL.",
+    timeColumn: "TimeUnixMs",
     dedup: { versionColumn: "UpdatedAt" },
     columnUnits: {
       TimeUnixMs: "ms",

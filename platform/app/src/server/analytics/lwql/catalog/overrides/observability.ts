@@ -38,7 +38,7 @@ export const OBSERVABILITY_OVERRIDES: Record<
       "Canonical OpenTelemetry log records: requests, responses and " +
       "provider events, correlated to their trace and span.",
     grain: "one row per (TenantId, TraceId, TimeUnixMs, RecordId)",
-    timeColumn: "OccurredAt",
+    timeColumn: "TimeUnixMs",
     joinKeys: ["TraceId", "SpanId"],
     dedup: { versionColumn: "DedupVersion" },
     aliases: {
@@ -65,6 +65,7 @@ export const OBSERVABILITY_OVERRIDES: Record<
   log_usage_estimates: {
     name: "log_ingestion_usage",
     description: "Per-tenant log ingestion usage estimates.",
+    timeColumn: "AcceptedAt",
     dedup: { versionColumn: "DedupVersion" },
   },
 };

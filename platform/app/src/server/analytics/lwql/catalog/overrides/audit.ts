@@ -28,7 +28,7 @@ export const AUDIT_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description:
       "Legacy append-only event log, superseded by the canonical fact tables",
     grain: "one row per (AggregateType, AggregateId, IdempotencyKey)",
-    timeColumn: "EventTimestamp",
+    timeColumn: "EventOccurredAt",
     dedup: { versionColumn: "EventTimestamp" },
   },
 };

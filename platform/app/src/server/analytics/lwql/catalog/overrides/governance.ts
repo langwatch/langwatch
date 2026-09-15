@@ -39,7 +39,7 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "set includes it.",
     grain:
       "one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)",
-    timeColumn: "LastObservedAt",
+    timeColumn: "Day",
     dedup: { versionColumn: "EventTimestamp" },
     columnGates: {
       AmountNanoMinor: ["costs"],

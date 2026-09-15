@@ -48,6 +48,7 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   metric_usage_estimates: {
     name: "metric_ingestion_usage",
     description: "Per-tenant metric ingestion usage estimates",
+    timeColumn: "AcceptedAt",
     dedup: { versionColumn: "DedupVersion" },
   },
   session_metric_series: {

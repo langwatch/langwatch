@@ -15,6 +15,7 @@ export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description:
       "Experiment run results: completion counts, cost, and aggregate scores",
     grain: "one row per (RunId, ExperimentId)",
+    timeColumn: "StartedAt",
     dedup: { versionColumn: "UpdatedAt" },
     columnUnits: {
       TotalDurationMs: "ms",
@@ -28,6 +29,7 @@ export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description:
       "Individual item results within an experiment run with evaluations",
     grain: "one row per (RunId, ProjectionId)",
+    timeColumn: "OccurredAt",
     dedup: { versionColumn: "OccurredAt" },
     columnUnits: {
       TargetDurationMs: "ms",
@@ -48,6 +50,7 @@ export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description:
       "DSPy optimizer steps with prompts, examples, and LLM call details",
     grain: "one row per (ExperimentId, RunId, StepIndex)",
+    timeColumn: "CreatedAt",
     dedup: { versionColumn: "UpdatedAt" },
     columnGates: {
       Predictors: ["output"],
