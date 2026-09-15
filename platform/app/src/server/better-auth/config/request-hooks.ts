@@ -117,7 +117,16 @@ function submittedAddress(body: unknown): string | null {
  *
  * Asked ONLY for a request that names an address and only once the policy has
  * already allowed the route, so no deployment that refused these paths before
- * now pays a lookup for them.
+ * now pays a lookup for them. Email mode never arrives at all — the hook has
+ * already returned at `deploymentIsFederationCapable` — and a deployment that
+ * offers no password of its own was refused a line earlier.
+ *
+ * `/reset-password` carries a token rather than an address, so it is allowed
+ * through: a token can only be obtained from `/request-password-reset`, which
+ * this refuses, leaving one narrow residue — a token issued in the hour before
+ * an organization's connection went live is still redeemable. Resolving the
+ * token to its user here would close it, and is not worth putting a second
+ * lookup on the path for a window that opens only as a connection is created.
  */
 async function refuseConnectionGovernedCredential({
   pathname,
