@@ -50,7 +50,7 @@ import {
   __resetSsoGateForTests,
   __setSsoLicenseRepositoryForTests,
 } from "@ee/sso/sso-gate";
-import { routeSignIn } from "@langwatch/identity";
+import { routeSignIn, routingIdentifierOf } from "@langwatch/identity";
 import {
   isExpired,
   parseLicenseKey,
@@ -430,7 +430,6 @@ describe("the instance sign-in method policy", () => {
         "password",
         "passkey",
       ]);
-      // The one anybody reaches for is still first.
       expect(policy.defaultMethods[0]).toEqual({
         id: "auth0",
         kind: "federated",
@@ -467,17 +466,26 @@ describe("the instance sign-in method policy", () => {
     it("ranks a password the account holds, which is what lets it be offered back", async () => {
       const policy = await resolveSignInMethodPolicy();
 
-      // `rankAccountMethods` intersects with exactly this set — a password
-      // absent from it is a password nobody with one can be routed to.
       const decision = routeSignIn({
-        identifier: null,
+        identifier: routingIdentifierOf("sam@home.net"),
         breakGlass: false,
         policy,
         domainConnection: null,
         activeConnections: [],
+        // An account holding a password and nothing else. `rankAccountMethods`
+        // intersects what it holds with the offered set, so this is the
+        // assertion the switch is really for: a password missing from the
+        // policy is a password nobody holding one can be routed to, and
+        // passing no account at all would only re-check the default picker.
+        account: {
+          hasPassword: true,
+          hasPasskey: false,
+          providerIds: [],
+          connectionIds: [],
+        },
       });
 
-      expect(methodIds(decision.methodSet)).toContain("password");
+      expect(methodIds(decision.methodSet)).toEqual(["password"]);
     });
   });
 
