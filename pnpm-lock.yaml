@@ -4307,9 +4307,6 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
-      '@langwatch/identity-server':
-        specifier: workspace:*
-        version: link:../../identity/server
       '@langwatch/infrastructure':
         specifier: workspace:*
         version: link:../../../packages/infrastructure

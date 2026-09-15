@@ -50,6 +50,10 @@
       "types": "./dist/components/confirm-dialog.d.ts",
       "default": "./src/components/confirm-dialog.tsx"
     },
+    "./copy-icon": {
+      "types": "./dist/components/icons/copy.d.ts",
+      "default": "./src/components/icons/copy.tsx"
+    },
     "./delayed": {
       "types": "./dist/components/delayed.d.ts",
       "default": "./src/components/delayed.tsx"

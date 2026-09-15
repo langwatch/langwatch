@@ -29,7 +29,8 @@
     "./src/use-drawer.ts",
     "./src/upgrade-modal-store.ts",
     "./src/use-organization-team-project.ts",
-    "./src/format-time-ago.ts"
+    "./src/format-time-ago.ts",
+    "./src/feature-flag.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -46,7 +47,13 @@
   ],
   "references": [
     {
+      "path": "../api-client-web/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"

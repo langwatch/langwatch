@@ -26,6 +26,10 @@
     "./read-handled-error": {
       "types": "./dist/read-handled-error.d.ts",
       "default": "./src/read-handled-error.ts"
+    },
+    "./views": {
+      "types": "./dist/views.d.ts",
+      "default": "./src/views.tsx"
     }
   },
   "scripts": {
@@ -38,6 +42,10 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

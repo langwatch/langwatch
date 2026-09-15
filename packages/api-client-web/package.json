@@ -1,0 +1,39 @@
+{
+  "name": "@langwatch/api-client-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The browser's typed API clients: one tRPC client per family of procedures, derived from the contracts, so a feature that calls a family does not depend on the feature that happens to host it.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./workflow-api": {
+      "types": "./dist/workflow-api.d.ts",
+      "default": "./src/workflow-api.ts"
+    },
+    "./agent-client": {
+      "types": "./dist/agent-client.d.ts",
+      "default": "./src/agent-client.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

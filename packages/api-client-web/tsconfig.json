@@ -15,29 +15,32 @@
 
     "rewriteRelativeImportExtensions": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
 
   "references": [
     {
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../api-client-web/tsconfig.build.json"
+      "path": "../../modules/agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+      "path": "../api/tsconfig.build.json"
     },
     {
-      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
+      "path": "../../modules/dataset/contract/tsconfig.build.json"
     },
     {
-      "path": "../handled-error/tsconfig.build.json"
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../ui-drawer/tsconfig.build.json"
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }

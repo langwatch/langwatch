@@ -73,6 +73,10 @@
     "./format-time-ago": {
       "types": "./dist/format-time-ago.d.ts",
       "default": "./src/format-time-ago.ts"
+    },
+    "./feature-flag": {
+      "types": "./dist/feature-flag.d.ts",
+      "default": "./src/feature-flag.ts"
     }
   },
   "scripts": {
@@ -82,7 +86,9 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/api-client-web": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
