@@ -2081,7 +2081,7 @@ money tables, only the identity tables and read paths.
     measure", and stopped there. They read the same table and report the same
     unit over different populations. `spendByDepartment` resolves every live
     project of the organization and passes `tenantIds`
-    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:714`);
+    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:741`);
     `spendByUser` resolved the one hidden governance project, and the read
     additionally filtered
     `Attributes['langwatch.origin.kind'] = 'ingestion_source'`, which
@@ -2107,7 +2107,7 @@ money tables, only the identity tables and read paths.
     (`...activityMonitor.clickhouse.schemas.ts:62`), defaulting to
     `"governance"` at the procedure
     (`platform/app/ee/governance/routers/activityMonitor.ts:84`) and at the
-    service (`...activityMonitor.service.ts:638`). `"governance"` is the
+    service (`...activityMonitor.service.ts:652`). `"governance"` is the
     behaviour every caller had: the hidden governance project, and only traffic
     that arrived through a governance source. `"organization"` is every live
     project of the org with no source filter — `findSpendByDepartment`'s
@@ -2121,7 +2121,7 @@ money tables, only the identity tables and read paths.
   - **Two things that stay where they are.** The `ORDER BY` remains a lookup
     into `SORT_FIELD_TO_AGG_EXPR`; the scope is a code branch choosing between
     two literal fragments, never caller-supplied text
-    (`...spend.clickhouse.repository.ts:247-258`). And the project ids come
+    (`...spend.clickhouse.repository.ts:247-257`). And the project ids come
     from Prisma scoped to the organization, so a ClickHouse read in the
     organization scope can only ever reach this org's own projects — the same
     construction `spendByDepartment` relies on.
