@@ -10,7 +10,6 @@ export {
 export {
   type SuiteExecution,
   type SuiteRunCommands,
-  type SuiteRunId,
   type QueueSimulationRunCommandData,
 } from "./app/suite.app.ts";
 export { SuiteExecutionService } from "./services/suite-execution.service.ts";
@@ -59,7 +58,6 @@ export {
   type SuiteOrTestSuite,
 } from "./app/suite.app.ts";
 export {
-  SuiteExecutionUnavailableError,
   buildSuiteInfrastructure,
   type SuiteAppInfrastructure,
 } from "./app/suite-composition.build.ts";

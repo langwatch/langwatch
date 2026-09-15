@@ -5,13 +5,10 @@
  */
 import { defineRestMiddleware } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
-import type { SimulationSuite } from "@langwatch/prisma-client/generated";
 import {
   evaluatorAttachmentSchema,
   MAX_EVALUATOR_ATTACHMENTS,
   MAX_SUITE_FIELDS,
-  parseEvaluatorAttachments,
-  parseSuiteFieldDefinitions,
   runNoteSchema,
   runParameterValuesSchema,
   scenarioMappingSchema,
@@ -20,7 +17,6 @@ import {
 import {
   MAX_PLAN_NAME_LENGTH,
   MAX_REPEAT_COUNT,
-  parseSuiteScope,
   suiteScopeSchema,
   suiteTargetSchema,
   type SuiteTarget,
@@ -144,7 +140,7 @@ const runValuesShape = {
     .string()
     .optional()
     .describe(
-      "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Defaults to a new key per call.",
+      "Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call.",
     ),
   parameters: runParameterValuesSchema
     .optional()
@@ -392,72 +388,3 @@ export function toRunItemsWire(
   }));
 }
 
-// Read targets column defensively from JSON, skipping unparseable entries.
-function readTargets(raw: unknown): SuiteTargetWire[] {
-  const value = typeof raw === "string" ? parseJson(raw) : raw;
-  if (!Array.isArray(value)) return [];
-  const targets: SuiteTargetWire[] = [];
-  for (const entry of value) {
-    const parsed = suiteTargetSchema.safeParse(entry);
-    if (parsed.success) targets.push(parsed.data);
-  }
-  return targets;
-}
-
-function parseJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-/** One run plan row, as the API publishes it. */
-export function toRunPlanWire({
-  suite,
-  platformUrl,
-}: {
-  suite: SimulationSuite;
-  platformUrl: string;
-}): RunPlanWire {
-  return {
-    id: suite.id,
-    name: suite.name,
-    slug: suite.slug,
-    scope: parseSuiteScope(suite.scope),
-    scenarioIds: suite.scenarioIds,
-    targets: readTargets(suite.targets),
-    repeatCount: suite.repeatCount,
-    simulatorModel: suite.simulatorModel,
-    judgeModel: suite.judgeModel,
-    labels: suite.labels,
-    evaluators: parseEvaluatorAttachments(suite.evaluators),
-    archivedAt: suite.archivedAt?.toISOString() ?? null,
-    createdAt: suite.createdAt.toISOString(),
-    updatedAt: suite.updatedAt.toISOString(),
-    platformUrl,
-  };
-}
-
-/** One test suite row, as the API publishes it. */
-export function toTestSuiteWire({
-  suite,
-  platformUrl,
-}: {
-  suite: SimulationSuite;
-  platformUrl: string;
-}): TestSuiteWire {
-  return {
-    id: suite.id,
-    name: suite.name,
-    slug: suite.slug,
-    scenarioIds: suite.scenarioIds,
-    scenarioCount: suite.scenarioIds.length,
-    fields: parseSuiteFieldDefinitions(suite.fields),
-    evaluators: parseEvaluatorAttachments(suite.evaluators),
-    archivedAt: suite.archivedAt?.toISOString() ?? null,
-    createdAt: suite.createdAt.toISOString(),
-    updatedAt: suite.updatedAt.toISOString(),
-    platformUrl,
-  };
-}

@@ -461,8 +461,3 @@ export interface SuiteRunCommands {
 
   queueSimulationRun(data: QueueSimulationRunCommandData): Promise<void>;
 }
-
-
-export interface SuiteRunId {
-  next(): string;
-}

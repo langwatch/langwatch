@@ -35,7 +35,6 @@ async function queuedCommandFor(params: {
         queued.push(data);
       },
     },
-    ids: { next: () => `scenariorun_${Math.random().toString(36).slice(2)}` },
     scenarios: noopScenarios,
     resolveRunModels: params.resolveRunModels,
   });

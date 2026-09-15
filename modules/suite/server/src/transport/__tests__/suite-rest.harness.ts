@@ -25,21 +25,12 @@ import {
   type ScenarioTestSuite,
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
-import {
-  suiteSchema,
-  type StartSuiteRunCommandData,
-  type Suite,
-  type SuiteApi,
-} from "@langwatch/suite-contract";
+import { suiteSchema, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 
+import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
 import { SuiteApp } from "../../app/suite.app.ts";
-import {
-  type SuiteRunCommands,
-  type SuiteRunId,
-  type QueueSimulationRunCommandData,
-} from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
@@ -388,30 +379,6 @@ function memoryAgentApi(world: SuiteWorld): AgentApi {
   });
 }
 
-/** The two Eventing commands a run dispatches, recorded rather than queued. */
-class RecordingCommands implements SuiteRunCommands {
-  readonly started: StartSuiteRunCommandData[] = [];
-  readonly queued: QueueSimulationRunCommandData[] = [];
-
-  async startSuiteRun(data: StartSuiteRunCommandData): Promise<void> {
-    this.started.push(data);
-  }
-
-  async queueSimulationRun(data: QueueSimulationRunCommandData): Promise<void> {
-    this.queued.push(data);
-  }
-}
-
-class SequentialRunIds implements SuiteRunId {
-  private count = 0;
-
-  next(): string {
-    this.count += 1;
-
-    return `scenariorun_${this.count}`;
-  }
-}
-
 export type SuiteFamilies = ReturnType<typeof mountSuiteFamilies>;
 
 /** A handled refusal at its own status, carrying its own code. */
@@ -440,7 +407,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
   const caller = options.caller ?? {};
   const database = MemorySuiteDatabase.create();
   const world = new SuiteWorld(database);
-  const commands = new RecordingCommands();
+  const commands = new CollapsingRunCommands();
   const scenarios = memoryScenarioApi(world);
 
   const app = SuiteApp.createForTesting({
@@ -457,11 +424,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
       }),
     },
     infrastructure: {
-      execution: SuiteExecutionService.create({
-        commands,
-        ids: new SequentialRunIds(),
-        scenarios,
-      }),
+      execution: SuiteExecutionService.create({ commands, scenarios }),
       publicBaseUrl: "https://app.langwatch.test",
     },
     generateId: () => world.nextId("suite"),

@@ -22,7 +22,6 @@ import {
   SuiteApp,
   SuiteExecutionService,
   SuiteRunCommands,
-  SuiteRunId,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-server";
 import { cleanupTestRows } from "@langwatch/test-harness";
@@ -66,12 +65,6 @@ class TestSecretCipher implements ScenarioSecretCipher {
 
   decrypt(ciphertext: string): string {
     return ciphertext;
-  }
-}
-
-class RunIds implements SuiteRunId {
-  next(): string {
-    return `scenario_run_${randomUUID()}`;
   }
 }
 
@@ -251,7 +244,6 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       infrastructure: {
         execution: SuiteExecutionService.create({
           commands,
-          ids: new RunIds(),
           scenarios: scenarioApi,
         }),
       },

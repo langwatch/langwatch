@@ -2,7 +2,6 @@ import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch
 import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
 import { createLogger } from "@langwatch/observability";
 import {
-  generateBatchRunId,
   type ResolvedRunModels,
   type RunActor,
   type RunSecretCiphertext,
@@ -12,11 +11,8 @@ import {
   withNote,
   withResolvedModels,
 } from "@langwatch/scenario-contract";
-import {
-  type SuiteExecution,
-  type SuiteRunCommands,
-  type SuiteRunId,
-} from "../app/suite.app.ts";
+import { type SuiteExecution, type SuiteRunCommands } from "../app/suite.app.ts";
+import { deriveBatchRunId, deriveScenarioRunId } from "../rules/suite-run-identity.rules.ts";
 import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 
 const logger = createLogger("langwatch:suite-run:service");
@@ -58,7 +54,6 @@ type SuiteExecutionItem = {
 export class SuiteExecutionService implements SuiteExecution {
   static create(input: {
     commands: SuiteRunCommands;
-    ids: SuiteRunId;
     scenarios: ScenarioApi;
     /**
      * Reads, once per batch, the models each queued run really runs on. Absent in a context
@@ -67,17 +62,11 @@ export class SuiteExecutionService implements SuiteExecution {
      */
     resolveRunModels?: SuiteRunModelsResolver;
   }): SuiteExecutionService {
-    return new SuiteExecutionService(
-      input.commands,
-      input.ids,
-      input.scenarios,
-      input.resolveRunModels,
-    );
+    return new SuiteExecutionService(input.commands, input.scenarios, input.resolveRunModels);
   }
 
   private constructor(
     private readonly commands: SuiteRunCommands,
-    private readonly ids: SuiteRunId,
     private readonly scenarios: ScenarioApi,
     private readonly resolveRunModels?: SuiteRunModelsResolver,
   ) {
@@ -85,7 +74,10 @@ export class SuiteExecutionService implements SuiteExecution {
 
   async execute(input: SuiteExecutionRequest): Promise<SuiteRunResult> {
     const { parameters, secrets } = await this.resolveParameters(input);
-    const batchRunId = input.batchRunId ?? generateBatchRunId();
+    // A caller that pinned the run's identity keeps it; everyone else gets the
+    // identity their idempotency key and their configuration name, so a retry
+    // of the same request is the same run rather than a second one.
+    const batchRunId = input.batchRunId ?? deriveBatchRunId(input);
     const setId = getSuiteSetId(input.suiteId);
     const total = input.activeScenarioIds.length * input.activeTargets.length * input.repeatCount;
 
@@ -106,9 +98,7 @@ export class SuiteExecutionService implements SuiteExecution {
       occurredAt: Date.now(),
     });
 
-    // Ids are minted only once the run is on record, so a failed start does not
-    // burn a block of scenario run ids.
-    const items = this.planItems(input);
+    const items = SuiteExecutionService.planItems({ input, batchRunId });
     await this.queueAll({ input, items, batchRunId, setId, parameters, secrets });
 
     logger.debug(
@@ -166,15 +156,25 @@ export class SuiteExecutionService implements SuiteExecution {
     return { parameters, secrets: secrets ?? new Map() };
   }
 
-  /** One run per scenario, per target, per repeat. */
-  private planItems(input: SuiteExecutionRequest): SuiteExecutionItem[] {
+  /**
+   * One run per scenario, per target, per repeat — each one's id derived from
+   * the batch it belongs to and the slot it occupies, so the same request
+   * planned twice plans the same runs.
+   */
+  private static planItems({
+    input,
+    batchRunId,
+  }: {
+    input: SuiteExecutionRequest;
+    batchRunId: string;
+  }): SuiteExecutionItem[] {
     return input.activeScenarioIds.flatMap((scenarioId) =>
-      input.activeTargets.flatMap((target) =>
+      input.activeTargets.flatMap((target, targetSlot) =>
         Array.from({ length: input.repeatCount }, (_, repeat) => ({
           scenarioId,
           target,
           repeat,
-          scenarioRunId: this.ids.next(),
+          scenarioRunId: deriveScenarioRunId({ batchRunId, scenarioId, targetSlot, repeat }),
         })),
       ),
     );

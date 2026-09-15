@@ -32,7 +32,6 @@ async function queueOne(input: {
         queued.push(data);
       },
     },
-    ids: { next: () => `scenariorun_${Math.random().toString(36).slice(2)}` },
     scenarios: noopScenarios,
   });
 
@@ -118,7 +117,6 @@ describe("given a batch run against one agent twice, once with an override", () 
           queued.push(data);
         },
       },
-      ids: { next: () => `scenariorun_${Math.random().toString(36).slice(2)}` },
       scenarios: {
         resolveRunParametersForScenarios: async ({
           scenarios,

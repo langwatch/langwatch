@@ -8,6 +8,9 @@ import { errorCodeOf, mountSuiteFamilies } from "./suite-rest.harness.ts";
 
 const BASE = "/api/v1/run-plans";
 
+/** What a run answers with, as far as these suites read it. */
+type RunResponse = { batchRunId: string; items: { scenarioRunId: string }[] };
+
 describe("given the project holds one active plan and one archived plan", () => {
   describe("when the run plans are listed", () => {
     /** @scenario "Listing run plans leaves out archived plans" */
@@ -148,6 +151,60 @@ describe("given a configuration over one scenario and one agent", () => {
       const secondBody = (await second.json()) as { runPlanId: string; created: boolean };
       expect(secondBody.created).toBe(false);
       expect(secondBody.runPlanId).toBe(firstBody.runPlanId);
+    });
+  });
+
+  describe("when the same request is sent twice under one idempotency key", () => {
+    /** @scenario "Retrying a run with the same idempotency key joins the run already started" */
+    it("answers the run it already started, and starts nothing more", async () => {
+      const { api, world, commands } = mountSuiteFamilies();
+      const scenario = world.addScenario({ name: "Refund Flow" });
+      const agent = world.addAgent();
+      const body = {
+        name: "Nightly",
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: agent.id }],
+        },
+        idempotencyKey: "run-plan-retry-key",
+      };
+
+      const first = (await (await api.post(`${BASE}/run`, body)).json()) as RunResponse;
+      const retry = (await (await api.post(`${BASE}/run`, body)).json()) as RunResponse;
+
+      expect(retry.batchRunId).toBe(first.batchRunId);
+      expect(retry.items.map((item) => item.scenarioRunId)).toEqual(
+        first.items.map((item) => item.scenarioRunId),
+      );
+      // One run on record and one simulation queued, because the second
+      // request's commands carry identities the queue has already seen.
+      expect(commands.started).toHaveLength(1);
+      expect(commands.queued).toHaveLength(1);
+    });
+  });
+
+  describe("when the same request is sent twice under no idempotency key", () => {
+    /** @scenario "Running the same configuration without an idempotency key starts its own run" */
+    it("answers a second run", async () => {
+      const { api, world, commands } = mountSuiteFamilies();
+      const scenario = world.addScenario({ name: "Refund Flow" });
+      const agent = world.addAgent();
+      const body = {
+        name: "Nightly",
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: agent.id }],
+        },
+      };
+
+      const first = (await (await api.post(`${BASE}/run`, body)).json()) as RunResponse;
+      const second = (await (await api.post(`${BASE}/run`, body)).json()) as RunResponse;
+
+      expect(second.batchRunId).not.toBe(first.batchRunId);
+      expect(commands.started).toHaveLength(2);
+      expect(commands.queued).toHaveLength(2);
     });
   });
 

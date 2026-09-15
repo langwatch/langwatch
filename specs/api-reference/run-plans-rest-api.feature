@@ -89,6 +89,24 @@ Feature: The run plans REST API
     # and the run expands it at execution time. See
     # specs/scenarios/simulation-run-model-resolution.feature.
 
+  # The idempotency key is the only handle a caller holds across attempts: the
+  # batch run id is the platform's answer, not the caller's input. A run's
+  # identity is therefore derived from the key and the configuration it names.
+  # See specs/suites/suite-run-retry-safety.feature.
+
+  Scenario: Retrying a run with the same idempotency key joins the run already started
+    Given the project holds one scenario and one agent
+    And a run has been started under the name "Nightly" with an idempotency key
+    When I run the same configuration again under that same key
+    Then the response carries the batch run id the first call answered
+    And the response carries the scenario run ids the first call answered
+
+  Scenario: Running the same configuration without an idempotency key starts its own run
+    Given the project holds one scenario and one agent
+    And a run has been started under the name "Nightly" with no idempotency key
+    When I run the same configuration again with no idempotency key
+    Then the response carries a different batch run id
+
   Scenario: Running a stored run plan again runs the configuration it holds
     Given the project holds a run plan over one scenario and one agent
     When I run that run plan by its id

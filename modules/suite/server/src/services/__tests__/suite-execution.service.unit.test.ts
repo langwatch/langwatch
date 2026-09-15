@@ -1,20 +1,12 @@
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import type { SuiteRunCommands, SuiteRunId } from "../../app/suite.app.ts";
+import type { SuiteRunCommands } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
 class Commands implements SuiteRunCommands {
   readonly startSuiteRun = vi.fn().mockResolvedValue(undefined);
   readonly queueSimulationRun = vi.fn().mockResolvedValue(undefined);
-}
-
-class Ids implements SuiteRunId {
-  private index = 0;
-  next(): string {
-    this.index += 1;
-    return `run_${this.index}`;
-  }
 }
 
 function scenarios(
@@ -59,7 +51,6 @@ describe("SuiteExecutionService", () => {
     const commands = new Commands();
     const service = SuiteExecutionService.create({
       commands,
-      ids: new Ids(),
       scenarios: scenarios(),
     });
     await service.execute(input());
@@ -72,7 +63,7 @@ describe("SuiteExecutionService", () => {
     );
     expect(commands.queueSimulationRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        scenarioRunId: "run_1",
+        scenarioId: "scenario_1",
         scenarioSetId: "__internal__suite_1__suite",
         metadata: expect.objectContaining({ parameters: { tier: "gold" } }),
       }),
@@ -83,7 +74,6 @@ describe("SuiteExecutionService", () => {
     const commands = new Commands();
     const service = SuiteExecutionService.create({
       commands,
-      ids: new Ids(),
       scenarios: scenarios(vi.fn().mockRejectedValue({ code: "scenario_parameter_unknown" })),
     });
     await expect(service.execute(input())).rejects.toMatchObject({
@@ -97,7 +87,6 @@ describe("SuiteExecutionService", () => {
     const commands = new Commands();
     const service = SuiteExecutionService.create({
       commands,
-      ids: new Ids(),
       scenarios: scenarios(
         vi.fn().mockResolvedValue([
           {
@@ -124,7 +113,6 @@ describe("SuiteExecutionService", () => {
     const commands = new Commands();
     const service = SuiteExecutionService.create({
       commands,
-      ids: new Ids(),
       scenarios: scenarios(
         vi.fn().mockResolvedValue([
           { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
@@ -162,7 +150,6 @@ describe("SuiteExecutionService", () => {
     commands.queueSimulationRun.mockRejectedValueOnce(new Error("queue unavailable"));
     const service = SuiteExecutionService.create({
       commands,
-      ids: new Ids(),
       scenarios: scenarios(),
     });
 
@@ -179,7 +166,6 @@ describe("SuiteExecutionService", () => {
       const commands = new Commands();
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(),
       });
 
@@ -206,7 +192,6 @@ describe("SuiteExecutionService", () => {
       const commands = new Commands();
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(),
       });
 
@@ -226,7 +211,6 @@ describe("SuiteExecutionService", () => {
       const commands = new Commands();
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(),
       });
 
@@ -246,7 +230,6 @@ describe("SuiteExecutionService", () => {
       const commands = new Commands();
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(),
       });
 
@@ -266,7 +249,6 @@ describe("SuiteExecutionService", () => {
       const commands = new Commands();
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(
           vi.fn().mockResolvedValue([
             { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
@@ -309,7 +291,6 @@ describe("SuiteExecutionService", () => {
         ]);
       const service = SuiteExecutionService.create({
         commands,
-        ids: new Ids(),
         scenarios: scenarios(resolve),
       });
 

@@ -135,7 +135,6 @@ async function runBatch(params: {
         queued.push(data);
       },
     },
-    ids: { next: () => `scenariorun_${nanoid()}` },
     scenarios,
   });
 

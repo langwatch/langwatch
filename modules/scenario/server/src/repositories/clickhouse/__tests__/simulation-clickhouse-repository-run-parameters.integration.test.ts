@@ -72,7 +72,6 @@ async function queueRunAgainstTarget(): Promise<QueueSimulationRunCommandData> {
         queued.push(data);
       },
     },
-    ids: { next: () => `scenariorun_${nanoid()}` },
     scenarios: {
       resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
         scenarios.map((scenario) => ({
