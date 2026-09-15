@@ -9,7 +9,6 @@
  *
  * @see specs/features/onboarding/guided-tour.feature
  */
-import { GOVERNANCE_SOURCES_ROUTE } from "../landing";
 import type { GuidedPath } from "../paths";
 import type { TourActions } from "./tourRegistry";
 
@@ -126,20 +125,83 @@ export const TOUR_STEPS: Record<GuidedPath, readonly TourStep[]> = {
       onArrive: ({ actions }) => actions.revealVirtualKeySecret?.(),
     },
   ],
+  /* every page step turns the sample panels on before it navigates, so the
+     page mounts with its sample data in place; the end action below turns
+     them off, whichever way the tour ends */
   governance: [
     {
-      target: "sidebar",
-      text: "Everything here starts from your sources: billing exports, your identity provider, and the AI tools your teams already use.",
-      placement: "right",
+      target: "gov-cost-over-time",
+      text: "Costs: what your organization spends on AI over time, from vendor billing and the gateway.",
+      placement: "auto",
+      before: ({ navigate, actions }) => {
+        actions.showSampleData?.();
+        navigate(GOVERNANCE_TOUR_ROUTES.costs);
+      },
     },
     {
-      target: "main-content",
-      text: "This is where you connect them. Start with your identity provider, then the vendor billing exports: I'll map every tool, seat and dollar from there.",
-      placement: "left",
-      before: ({ navigate }) => navigate(GOVERNANCE_SOURCES_ROUTE),
+      target: "gov-cost-by-department",
+      text: "And where it goes: by department, by model and by agent.",
+      placement: "auto",
+      before: ({ actions }) => actions.showSampleData?.(),
+    },
+    {
+      target: "gov-agents",
+      text: "Agents: every agent your teams run, who owns it and what it costs.",
+      placement: "auto",
+      before: ({ navigate, actions }) => {
+        actions.showSampleData?.();
+        navigate(GOVERNANCE_TOUR_ROUTES.agents);
+      },
+    },
+    {
+      target: "gov-people",
+      text: "People: who uses which tools, by department, from your identity provider.",
+      placement: "auto",
+      before: ({ navigate, actions }) => {
+        actions.showSampleData?.();
+        navigate(GOVERNANCE_TOUR_ROUTES.people);
+      },
+    },
+    {
+      target: "gov-inventory",
+      text: "Inventory: the tools, the environments they run in and the sources behind them.",
+      placement: "auto",
+      before: ({ navigate, actions }) => {
+        actions.showSampleData?.();
+        navigate(GOVERNANCE_TOUR_ROUTES.inventory);
+      },
+    },
+    {
+      /* the menu stays open when the tour ends: it is the last thing the
+         demo shows */
+      target: "gov-add-source",
+      text: "It all starts here: connect an identity provider, a billing export or a tool's admin API.",
+      placement: "right",
+      click: true,
+      onArrive: ({ actions }) => actions.openAddSourceMenu?.(),
     },
   ],
   coding: [],
+};
+
+/** The governance pages the tour walks, in the order it walks them. */
+export const GOVERNANCE_TOUR_ROUTES = {
+  costs: "/governance/costs",
+  agents: "/governance/agents",
+  people: "/governance/people",
+  inventory: "/governance/inventory",
+} as const;
+
+/**
+ * What a path puts back when its tour ends, completed or skipped. The
+ * governance tour turns the sample panels off, so nothing invented outlives
+ * it; the other tours change nothing they need to undo here (the sidebar
+ * groups are restored by the layer itself).
+ */
+export const TOUR_END_ACTIONS: Partial<
+  Record<GuidedPath, (ctx: TourStepContext) => void>
+> = {
+  governance: ({ actions }) => actions.hideSampleData?.(),
 };
 
 export function pathHasTour(path: GuidedPath): boolean {

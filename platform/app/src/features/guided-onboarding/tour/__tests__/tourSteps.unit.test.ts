@@ -1,9 +1,10 @@
 import { describe, expect, it, type Mock, vi } from "vitest";
-import { GOVERNANCE_SOURCES_ROUTE } from "../../landing";
 import {
   BUILD_GROUP_ID,
+  GOVERNANCE_TOUR_ROUTES,
   pathHasTour,
   readMs,
+  TOUR_END_ACTIONS,
   TOUR_STEPS,
   TOUR_VIRTUAL_KEY_NAME,
   type TourStepContext,
@@ -23,6 +24,9 @@ function ctx(): TourStepContext & {
       typeVirtualKeyName: vi.fn(),
       submitVirtualKeyCreate: vi.fn(),
       revealVirtualKeySecret: vi.fn(),
+      showSampleData: vi.fn(),
+      hideSampleData: vi.fn(),
+      openAddSourceMenu: vi.fn(),
     },
   };
 }
@@ -113,18 +117,59 @@ describe("tour step tables", () => {
   });
 
   describe("given the governance tour", () => {
-    /** @scenario the governance tour has two steps, the second on the sources page */
-    it("shows the sidebar then navigates to the sources page", () => {
+    /** @scenario the governance tour walks Costs, Agents, People and Inventory and ends on the Add source menu */
+    it("walks two cost graphs, the agents, the people and the inventory, then the Add source button", () => {
       const steps = TOUR_STEPS.governance;
-      expect(steps.map((s) => s.target)).toEqual(["sidebar", "main-content"]);
-      expect(steps.map((s) => s.text)).toEqual([
-        "Everything here starts from your sources: billing exports, your identity provider, and the AI tools your teams already use.",
-        "This is where you connect them. Start with your identity provider, then the vendor billing exports: I'll map every tool, seat and dollar from there.",
+      expect(steps.map((s) => s.target)).toEqual([
+        "gov-cost-over-time",
+        "gov-cost-by-department",
+        "gov-agents",
+        "gov-people",
+        "gov-inventory",
+        "gov-add-source",
       ]);
+      expect(steps.map((s) => s.text)).toEqual([
+        "Costs: what your organization spends on AI over time, from vendor billing and the gateway.",
+        "And where it goes: by department, by model and by agent.",
+        "Agents: every agent your teams run, who owns it and what it costs.",
+        "People: who uses which tools, by department, from your identity provider.",
+        "Inventory: the tools, the environments they run in and the sources behind them.",
+        "It all starts here: connect an identity provider, a billing export or a tool's admin API.",
+      ]);
+    });
+
+    /** @scenario the governance tour walks Costs, Agents, People and Inventory and ends on the Add source menu */
+    it("navigates to each page before its first step, in order", () => {
       const c = ctx();
-      steps[1]!.before?.(c);
-      expect(c.navigate).toHaveBeenCalledWith(GOVERNANCE_SOURCES_ROUTE);
-      expect(steps[1]!.placement).toBe("left");
+      for (const step of TOUR_STEPS.governance) step.before?.(c);
+      expect(c.navigate.mock.calls.map(([to]) => to)).toEqual([
+        GOVERNANCE_TOUR_ROUTES.costs,
+        GOVERNANCE_TOUR_ROUTES.agents,
+        GOVERNANCE_TOUR_ROUTES.people,
+        GOVERNANCE_TOUR_ROUTES.inventory,
+      ]);
+    });
+
+    /** @scenario the governance tour ends with the Add source menu open */
+    it("opens the Add source menu when the cursor lands on the last step, with a click", () => {
+      const c = ctx();
+      const last = TOUR_STEPS.governance.at(-1)!;
+      expect(last.click).toBe(true);
+      last.onArrive?.(c);
+      expect(c.actions.openAddSourceMenu).toHaveBeenCalledTimes(1);
+      expect(c.navigate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario the governance tour shows sample data on every page it visits and turns it off when it ends */
+    it("turns the sample panels on before every page step and off in its end action", () => {
+      const c = ctx();
+      for (const step of TOUR_STEPS.governance) step.before?.(c);
+      expect(c.actions.showSampleData).toHaveBeenCalledTimes(5);
+      expect(c.actions.hideSampleData).not.toHaveBeenCalled();
+      TOUR_END_ACTIONS.governance?.(c);
+      expect(c.actions.hideSampleData).toHaveBeenCalledTimes(1);
+      expect(TOUR_END_ACTIONS.llmops).toBeUndefined();
+      expect(TOUR_END_ACTIONS.gateway).toBeUndefined();
     });
   });
 

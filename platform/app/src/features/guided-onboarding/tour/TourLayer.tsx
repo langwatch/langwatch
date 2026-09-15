@@ -50,15 +50,33 @@ import {
 import { getTourActions } from "./tourRegistry";
 import {
   readMs,
+  TOUR_END_ACTIONS,
   TOUR_STEPS,
   type TourStep,
   type TourStepContext,
 } from "./tourSteps";
 
+function targetElement(target: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`[data-tour="${target}"]`);
+}
+
 function targetRect(target: string): DOMRect | null {
-  const el = document.querySelector(`[data-tour="${target}"]`);
-  const rect = el?.getBoundingClientRect();
+  const rect = targetElement(target)?.getBoundingClientRect();
   return rect && rect.width > 0 ? rect : null;
+}
+
+/**
+ * Brings a target that sits outside the viewport into it before it is
+ * measured: the governance pages are taller than the window, and a spotlight
+ * on a panel below the fold lights nothing the reader can see.
+ */
+function scrollTargetIntoView(target: string): void {
+  const el = targetElement(target);
+  if (!el || typeof el.scrollIntoView !== "function") return;
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0) return;
+  if (rect.top >= 0 && rect.bottom <= window.innerHeight) return;
+  el.scrollIntoView({ block: "center" });
 }
 
 function sameRect(a: DOMRect, b: DOMRect): boolean {
@@ -137,6 +155,12 @@ function handoffZ(): number {
   if (!panel) return TOUR_HANDOFF_FALLBACK_Z;
   const z = Number.parseInt(window.getComputedStyle(panel).zIndex, 10);
   return Number.isFinite(z) ? z - 1 : TOUR_HANDOFF_FALLBACK_Z;
+}
+
+/** Where a step's `before` and `onArrive` send the page. */
+function useTourNavigate(): (to: string) => void {
+  const router = useRouter();
+  return useCallback((to: string) => void router.push(to), [router]);
 }
 
 /**
@@ -428,6 +452,7 @@ function keepWaiting(run: StepRun, retry: () => void): void {
 
 /** Looks for the step's target, and lands on it or waits for it. */
 function measureStep(run: StepRun): void {
+  scrollTargetIntoView(run.step.target);
   const rect = targetRect(run.step.target);
   if (!rect) {
     keepWaiting(run, () => measureStep(run));
@@ -458,7 +483,6 @@ function useStepEngine({
   endTour,
   goToStep,
   emit,
-  navigate,
 }: {
   active: boolean;
   step: TourStep | undefined;
@@ -472,8 +496,8 @@ function useStepEngine({
   endTour: (status: TourEndStatus) => void;
   goToStep: (index: number) => void;
   emit: ReturnType<typeof useAnalytics>["emit"];
-  navigate: (to: string) => void;
 }): { cursorMoves: MutableRefObject<number>; resetRun: () => void } {
+  const navigate = useTourNavigate();
   /* the last page action that answers later; the next step waits for it */
   const pendingAction = useRef<PendingAction | null>(null);
   /* the first cursor placement is instant, so it never flies in from a corner */
@@ -522,7 +546,9 @@ function useStepEngine({
 
 /**
  * A run's lifecycle: it starts on a clean screen, it ends by handing the
- * spotlight to the panel, and both ends are reported.
+ * spotlight to the panel, and both ends are reported. Whichever way it
+ * ends, the path's end action runs (`TOUR_END_ACTIONS`), so what a tour
+ * turned on for its pages is turned off again.
  *
  * `resetRun` is the engine's, and is called from here rather than from the
  * engine itself so a run is reset in exactly one place: the effect that sees
@@ -562,6 +588,7 @@ function useTourRun({
   back: () => void;
 } {
   const startedAt = useRef(0);
+  const navigate = useTourNavigate();
 
   const endTour = useCallback(
     (status: TourEndStatus) => {
@@ -569,6 +596,9 @@ function useTourRun({
       paint.clearPointer();
       /* the menu goes back to how it looked outside the tour */
       getTourActions().restoreGroups?.();
+      if (path) {
+        TOUR_END_ACTIONS[path]?.({ navigate, actions: getTourActions() });
+      }
       if (path && status === "completed") {
         emit("completed", "tour", {
           path,
@@ -580,7 +610,7 @@ function useTourRun({
       handoffAnimation.run();
       endRun(status);
     },
-    [clear, emit, endRun, handoffAnimation, paint, path, stepIndex],
+    [clear, emit, endRun, handoffAnimation, navigate, paint, path, stepIndex],
   );
 
   /* a new run (start or replay) starts from a clean screen */
@@ -637,7 +667,6 @@ function useTour() {
   const goToStep = useGuidedTourStore((s) => s.goToStep);
   const endRun = useGuidedTourStore((s) => s.end);
   const setHandoff = useGuidedTourStore((s) => s.setHandoff);
-  const router = useRouter();
   const { emit } = useAnalytics();
 
   const paint = useSpotlight();
@@ -669,7 +698,6 @@ function useTour() {
     endTour: (status) => endTourRef.current(status),
     goToStep,
     emit,
-    navigate: (to: string) => void router.push(to),
   });
   const { endTour, next, back } = useTourRun({
     running,

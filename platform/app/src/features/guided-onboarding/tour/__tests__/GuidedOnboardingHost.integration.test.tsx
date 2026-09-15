@@ -80,8 +80,13 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
   },
 }));
 
+import {
+  readSampleChoice,
+  writeSampleChoice,
+} from "~/components/governance/sample";
 import { GuidedOnboardingHost } from "../GuidedOnboardingHost";
 import { useGuidedTourStore } from "../guidedTourStore";
+import { getTourActions } from "../tourRegistry";
 
 function renderHost() {
   return render(
@@ -154,6 +159,38 @@ describe("GuidedOnboardingHost", () => {
         </ChakraProvider>,
       );
       expect(queueGuidedKickoff).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the governance path", () => {
+    beforeEach(() => {
+      writeSampleChoice(null);
+      guidedState = {
+        paths: ["governance"],
+        currentPath: "governance",
+        donePaths: [],
+      };
+    });
+
+    /** @scenario the governance tour shows sample data on every page it visits and turns it off when it ends */
+    it("lends the tour the sample actions, which write the governance sample choice", () => {
+      renderHost();
+      expect(useGuidedTourStore.getState().running).toBe(true);
+      /* the layer's first step has already turned them on */
+      expect(readSampleChoice()).toBe(true);
+      getTourActions().hideSampleData?.();
+      expect(readSampleChoice()).toBe(false);
+      getTourActions().showSampleData?.();
+      expect(readSampleChoice()).toBe(true);
+    });
+
+    /** @scenario the governance tour shows sample data on every page it visits and turns it off when it ends */
+    it("turns the sample panels off when it unmounts mid-tour", () => {
+      const { unmount } = renderHost();
+      getTourActions().showSampleData?.();
+      expect(readSampleChoice()).toBe(true);
+      unmount();
+      expect(readSampleChoice()).toBe(false);
     });
   });
 

@@ -27,6 +27,12 @@ export interface TourActions {
   /** Hands back the create request, so the tour knows when it answered. */
   submitVirtualKeyCreate: () => Promise<void>;
   revealVirtualKeySecret: () => void;
+  /** Turns the governance sample panels on, for whichever page is in view. */
+  showSampleData: () => void;
+  /** Turns them off again, so nothing invented outlives the tour. */
+  hideSampleData: () => void;
+  /** Opens the inventory's Add source menu, the governance tour's last stop. */
+  openAddSourceMenu: () => void;
 }
 
 interface TourRegistryState {

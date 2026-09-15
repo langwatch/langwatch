@@ -46,6 +46,3 @@ export function guidedLandingRoute({
       return "/governance";
   }
 }
-
-/** The governance sources page the governance tour ends on. */
-export const GOVERNANCE_SOURCES_ROUTE = "/governance/inventory?tab=sources";

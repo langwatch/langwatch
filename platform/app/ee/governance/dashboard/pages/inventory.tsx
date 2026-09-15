@@ -104,6 +104,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -1059,6 +1060,7 @@ function InventoryTabs({
 }) {
   return (
     <Tabs.Root
+      data-tour="gov-inventory"
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
@@ -1217,6 +1219,14 @@ function InventoryHeaderActions({
   page: ReturnType<typeof useIngestionSourcesPage>;
   inventoryTab: InventoryTab;
 }) {
+  /* the guided tour ends on the Add source menu, opened through the action
+     this header lends it; the menu is otherwise the reader's to open */
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
+  const tourActions = useMemo(
+    () => ({ openAddSourceMenu: () => setAddSourceOpen(true) }),
+    [],
+  );
+  useRegisterTourActions(tourActions);
   return (
     <HStack gap={2} flexShrink={0}>
       {inventoryTab === "catalog" && (
@@ -1237,6 +1247,9 @@ function InventoryHeaderActions({
           isEnterprise={page.isEnterprise}
           sourceCount={page.sourcesQuery.data?.length ?? 0}
           onAdd={page.startComposer}
+          tourId="gov-add-source"
+          open={addSourceOpen}
+          onOpenChange={setAddSourceOpen}
         />
       )}
       {inventoryTab === "environments" && (
@@ -1618,10 +1631,18 @@ function AddSourceControl({
   isEnterprise,
   sourceCount,
   onAdd,
+  tourId,
+  open,
+  onOpenChange,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
+  /** The `data-tour` target the guided tour spotlights, on the header's own. */
+  tourId?: string;
+  /** Controlled open state, so the tour can open the header's menu. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const atCap =
     !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
@@ -1639,8 +1660,10 @@ function AddSourceControl({
           : "A source is where this organization's AI usage is read from."
       }
       onPick={onAdd}
+      open={open}
+      onOpenChange={onOpenChange}
     >
-      <PageLayout.HeaderButton disabled={atCap}>
+      <PageLayout.HeaderButton disabled={atCap} data-tour={tourId}>
         <Plus size={14} /> Add source
       </PageLayout.HeaderButton>
     </AddIngestionSourceMenu>

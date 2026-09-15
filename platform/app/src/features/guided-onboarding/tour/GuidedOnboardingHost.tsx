@@ -7,13 +7,17 @@
  * (coding) and a reload after the tour with no conversation attached queue
  * the kickoff straight away.
  *
- * The tour's group actions (fold and open Build, restore it at the end) are
- * registered here: they act on the sidebar override store, which every
- * sidebar section reads, so no page has to lend them.
+ * The tour's group actions (fold and open Build, restore it at the end) and
+ * the governance sample actions (show and hide the sample panels) are
+ * registered here: they act on stores every page reads, the sidebar
+ * overrides and the governance sample choice, so no page has to lend them.
+ * A host that unmounts while a tour runs puts the path's end action through
+ * itself, so a tour cut short leaves the sample panels off.
  *
  * @see specs/features/onboarding/guided-tour.feature
  */
 import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
+import { writeSampleChoice } from "~/components/governance/sample";
 import { useSidebarSectionOverrides } from "~/components/sidebar/sidebarSectionOverrides";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -28,7 +32,7 @@ import { useGuidedOnboarding } from "../useGuidedOnboarding";
 import { useGuidedTourStore } from "./guidedTourStore";
 import { TourLayer } from "./TourLayer";
 import { useRegisterTourActions } from "./tourRegistry";
-import { pathHasTour } from "./tourSteps";
+import { pathHasTour, TOUR_END_ACTIONS } from "./tourSteps";
 
 /** The first name the greeting uses, or nothing when the account has none. */
 export function firstNameOf(
@@ -161,6 +165,38 @@ function useReleaseOnUnmount(): MutableRefObject<() => void> {
   return release;
 }
 
+/**
+ * The actions the host lends the tour: the sidebar group actions, on top of
+ * the persisted preference, and the governance sample choice. A tour cut
+ * short by the host unmounting still gets its path's end action.
+ */
+function useHostTourActions(): void {
+  const hostActions = useMemo(
+    () => ({
+      expandGroup: (id: string) =>
+        useSidebarSectionOverrides.getState().setOverride(id, true),
+      collapseGroup: (id: string) =>
+        useSidebarSectionOverrides.getState().setOverride(id, false),
+      restoreGroups: () => useSidebarSectionOverrides.getState().clearAll(),
+      showSampleData: () => writeSampleChoice(true),
+      hideSampleData: () => writeSampleChoice(false),
+    }),
+    [],
+  );
+  useRegisterTourActions(hostActions);
+  useEffect(
+    () => () => {
+      const tour = useGuidedTourStore.getState();
+      if (!tour.running || !tour.path) return;
+      TOUR_END_ACTIONS[tour.path]?.({
+        navigate: () => undefined,
+        actions: hostActions,
+      });
+    },
+    [hostActions],
+  );
+}
+
 export function GuidedOnboardingHost() {
   const pathname = usePathname();
   const onOnboarding = pathname?.startsWith("/onboarding") ?? false;
@@ -179,18 +215,7 @@ export function GuidedOnboardingHost() {
     },
   });
 
-  /* the group actions the tour drives, on top of the persisted preference */
-  const groupActions = useMemo(
-    () => ({
-      expandGroup: (id: string) =>
-        useSidebarSectionOverrides.getState().setOverride(id, true),
-      collapseGroup: (id: string) =>
-        useSidebarSectionOverrides.getState().setOverride(id, false),
-      restoreGroups: () => useSidebarSectionOverrides.getState().clearAll(),
-    }),
-    [],
-  );
-  useRegisterTourActions(groupActions);
+  useHostTourActions();
 
   /* one landing per path per page load: React re-renders, query refetches
      and StrictMode's double effects must not start a second tour or queue a

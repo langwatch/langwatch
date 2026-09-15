@@ -108,6 +108,74 @@ describe("TourLayer", () => {
     vi.useRealTimers();
   });
 
+  describe("given the governance tour with every target on the page", () => {
+    const showSampleData = vi.fn();
+    const hideSampleData = vi.fn();
+    const openAddSourceMenu = vi.fn();
+
+    beforeEach(() => {
+      showSampleData.mockReset();
+      hideSampleData.mockReset();
+      openAddSourceMenu.mockReset();
+      useTourRegistry
+        .getState()
+        .register({ showSampleData, hideSampleData, openAddSourceMenu });
+      for (const step of TOUR_STEPS.governance) {
+        mountTarget(step.target, rect(300, 120, 400, 200));
+      }
+      mountTarget("langy-panel", rect(880, 60, 392, 640));
+    });
+
+    /** @scenario the governance tour shows sample data on every page it visits and turns it off when it ends */
+    it("turns the sample panels on as it starts and off when the last step ends", () => {
+      const onEnd = vi.fn();
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("governance", { onEnd }));
+      expect(showSampleData).toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith("/governance/costs");
+      expect(hideSampleData).not.toHaveBeenCalled();
+      act(() =>
+        useGuidedTourStore
+          .getState()
+          .goToStep(TOUR_STEPS.governance.length - 1),
+      );
+      landStep(true);
+      fireEvent.click(screen.getByText("Next"));
+      expect(onEnd).toHaveBeenCalledWith("completed");
+      expect(hideSampleData).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario skipping the governance tour turns sample data off */
+    it("turns the sample panels off on Skip", () => {
+      const onEnd = vi.fn();
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("governance", { onEnd }));
+      act(() => useGuidedTourStore.getState().goToStep(2));
+      landStep(false);
+      fireEvent.click(screen.getByText("Skip"));
+      expect(onEnd).toHaveBeenCalledWith("skipped");
+      expect(hideSampleData).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario the governance tour ends with the Add source menu open */
+    it("opens the Add source menu when the cursor lands on the last step and leaves it open", () => {
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("governance"));
+      act(() =>
+        useGuidedTourStore
+          .getState()
+          .goToStep(TOUR_STEPS.governance.length - 1),
+      );
+      landStep(true);
+      expect(openAddSourceMenu).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("6 of 6")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("Next"));
+      expect(useGuidedTourStore.getState().running).toBe(false);
+      /* nothing closes the menu: it is the last thing the demo shows */
+      expect(openAddSourceMenu).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given the llmops tour with every target on the page", () => {
     beforeEach(() => {
       mountTarget("sidebar", rect(60, 60, 220, 600));

@@ -50,13 +50,48 @@ Feature: Guided onboarding tour
       | That's it! I will leave you to save it somewhere safe.                                    |
     And the name typed for the user is "production-app"
 
+  # Governance needs no Langy-driven setup: the tour is the demo. It walks the
+  # section's pages with their sample data on and ends on the menu of what can
+  # be connected, which is the last thing it shows.
   @unit
-  Scenario: the governance tour has two steps, the second on the sources page
-    Then the governance tour targets, in order, "sidebar" and "main-content"
+  Scenario: the governance tour walks Costs, Agents, People and Inventory and ends on the Add source menu
+    Then the governance tour targets, in order, "gov-cost-over-time", "gov-cost-by-department", "gov-agents", "gov-people", "gov-inventory" and "gov-add-source"
     And their texts are:
-      | Everything here starts from your sources: billing exports, your identity provider, and the AI tools your teams already use.                          |
-      | This is where you connect them. Start with your identity provider, then the vendor billing exports: I'll map every tool, seat and dollar from there. |
-    And the second step navigates to the governance sources page before the cursor moves
+      | Costs: what your organization spends on AI over time, from vendor billing and the gateway. |
+      | And where it goes: by department, by model and by agent.                                   |
+      | Agents: every agent your teams run, who owns it and what it costs.                         |
+      | People: who uses which tools, by department, from your identity provider.                  |
+      | Inventory: the tools, the environments they run in and the sources behind them.            |
+      | It all starts here: connect an identity provider, a billing export or a tool's admin API.  |
+    And the first step navigates to the costs page, the third to the agents page, the fourth to the people page and the fifth to the inventory page, each before its cursor moves
+
+  # The section's own switch: the "Viewing sample data" banner and the Hide
+  # sample data button, one choice for the whole section kept in the tab's
+  # session storage. The tour drives that switch and nothing else, so the
+  # pages look exactly as they do when a reader presses See sample data.
+  @unit
+  Scenario: the governance tour shows sample data on every page it visits and turns it off when it ends
+    Given the governance tour starts
+    Then the sample panels are turned on before each page step navigates, through the action the host lends the tour
+    And the action writes the governance section's own sample choice
+    When the tour ends on its last step
+    Then the sample panels are turned off
+    And a host that unmounts while the tour runs turns them off too
+    And closing the tab drops the choice with the tab's session storage
+
+  @unit
+  Scenario: skipping the governance tour turns sample data off
+    Given the governance tour is on a page with its sample data on
+    When the user clicks Skip
+    Then the sample panels are turned off
+
+  @unit @integration
+  Scenario: the governance tour ends with the Add source menu open
+    Given the governance tour is on its last step, the inventory's Add source button
+    When the cursor lands on it, with a click
+    Then the header's Add source menu opens through the action the inventory page registers
+    And the menu lists the source types that can be connected
+    And nothing closes it when the tour ends: it is the last thing the demo shows
 
   @unit
   Scenario: the coding path has no tour
