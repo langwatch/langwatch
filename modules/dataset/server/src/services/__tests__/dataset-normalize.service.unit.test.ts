@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
-import { DatasetNormalizeAdapter } from "../dataset-normalize.service.ts";
+import { DatasetNormalizeAdapter, StagingKeyMismatchError } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 
@@ -44,7 +44,9 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
 };
 
 const makeRepo = (dataset: Record<string, unknown> | null) => ({
-  findOne: vi.fn().mockResolvedValue(dataset),
+  // Rows default to the payload's stagingKey (what the enqueue side copies
+  // from the authoritative row); tests override it to model a stale/forged job.
+  findOne: vi.fn().mockResolvedValue({ stagingKey: basePayload.stagingKey, ...dataset }),
   update: vi.fn().mockResolvedValue({}),
 });
 
@@ -333,6 +335,62 @@ describe("DatasetNormalizeAdapter", () => {
         // Staging preserved for a manual retry; not deleted on failure.
         expect(deleteStaged).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("when the payload stagingKey matches the authoritative row", () => {
+    it("reads storage with the payload key and normalizes as today", async () => {
+      const { storage, headStagedObjectSize, writeChunks } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+      await handler(basePayload);
+
+      expect(headStagedObjectSize).toHaveBeenCalledWith({
+        projectId: "p1",
+        key: "staging/p1/u1",
+      });
+      expect(storage.streamStaged).toHaveBeenCalledWith({
+        projectId: "p1",
+        key: "staging/p1/u1",
+      });
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("ready");
+      expect(writeChunks).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the payload stagingKey disagrees with the authoritative row", () => {
+    it("rejects before any storage read and leaves the row untouched", async () => {
+      // A stale or forged job (e.g. enqueued before a re-upload replaced the
+      // staged object): the row is authoritative — reading the payload's key
+      // would fold a different upload's object into this dataset. The throw
+      // precedes the storage boundary and the failure marking alike.
+      const { storage, headStagedObjectSize, writeChunks, deleteChunksFrom } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from(['{"a":"1"}\n'])),
+      });
+      const repo = makeRepo({
+        id: "d1",
+        status: "processing",
+        stagingKey: "staging/p1/newer-upload",
+      });
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await expect(handler(basePayload)).rejects.toThrow(StagingKeyMismatchError);
+      expect(headStagedObjectSize).not.toHaveBeenCalled();
+      expect(storage.streamStaged).not.toHaveBeenCalled();
+      expect(writeChunks).not.toHaveBeenCalled();
+      expect(deleteChunksFrom).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
   });
 

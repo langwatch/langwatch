@@ -62,6 +62,21 @@ export class LargeJsonUnsupportedError extends Error {
   }
 }
 
+/**
+ * The payload's stagingKey disagrees with the authoritative dataset row
+ * (server-minted at presign time). The payload is stale or forged; the row
+ * and its staged object are left untouched for the current upload's own job.
+ */
+export class StagingKeyMismatchError extends Error {
+  constructor(datasetId: string, payloadStagingKey: string, rowStagingKey: string | null) {
+    super(
+      `Dataset ${datasetId} staging key mismatch: payload names "${payloadStagingKey}" ` +
+        `but the authoritative row carries "${rowStagingKey ?? "none"}"; refusing to read storage`,
+    );
+    this.name = "StagingKeyMismatchError";
+  }
+}
+
 const NULL_BYTE = "\u0000";
 
 /**
@@ -366,8 +381,7 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
     return new DatasetNormalizeAdapter(deps);
   }
 
-  private constructor(private readonly deps: DatasetNormalizeDeps) {
-  }
+  private constructor(private readonly deps: DatasetNormalizeDeps) {}
 
   async normalize(payload: DatasetNormalizePayload): Promise<void> {
     const { projectId, datasetId, stagingKey, filename } = payload;
@@ -377,6 +391,13 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.
     if (dataset?.status !== "processing") return;
+    // The row is authoritative for the staged object (server-minted at
+    // presign): a payload whose stagingKey disagrees is stale or forged.
+    // Refuse before any storage call — and outside the failure catch, so a
+    // stale job never flips a healthy in-flight upload to failed.
+    if (dataset.stagingKey !== stagingKey) {
+      throw new StagingKeyMismatchError(datasetId, stagingKey, dataset.stagingKey);
+    }
 
     const storage = await this.deps.getStorage(projectId);
 

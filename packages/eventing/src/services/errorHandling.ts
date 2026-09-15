@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
 import type { createLogger } from "@langwatch/observability";
 
 const TRANSIENT_NETWORK_CODES: ReadonlySet<string> = new Set([
@@ -120,6 +121,34 @@ export class SecurityError extends CriticalError {
     });
     this.operation = operation;
     this.tenantId = tenantId;
+  }
+}
+
+/**
+ * A queued job's payload tenant disagreed with its group-key tenant segment.
+ * Non-retryable so the job dead-letters: the mismatch cannot heal on
+ * re-delivery. Not forgery resistance (that needs per-tenant ACLs or signing).
+ */
+export class QueueTenantMismatchError extends NonRetryableGroupQueueError {
+  override readonly name = "QueueTenantMismatchError";
+  readonly payloadTenant: string;
+  readonly groupTenant: string;
+  readonly jobPath: string;
+
+  constructor(params: {
+    queueName: string;
+    payloadTenant: string;
+    groupTenant: string;
+    jobPath: string;
+  }) {
+    super(
+      `Job payload tenant "${params.payloadTenant}" does not match group-key tenant ` +
+        `"${params.groupTenant}" on ${params.jobPath} (queue ${params.queueName}); ` +
+        "refusing to process and dead-lettering the job",
+    );
+    this.payloadTenant = params.payloadTenant;
+    this.groupTenant = params.groupTenant;
+    this.jobPath = params.jobPath;
   }
 }
 

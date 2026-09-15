@@ -34,6 +34,12 @@ function createWithEntry() {
   const entry = {
     process: vi.fn().mockResolvedValue(undefined),
     processBatch: vi.fn().mockResolvedValue(undefined),
+    // The tenant gate reads both: group key's first segment must equal the
+    // recorded accessor's value for the payload. These payloads carry no
+    // tenantId, so "undefined" === "undefined" and the gate passes.
+    getTenantId: (payload: Record<string, unknown>) => String(payload.tenantId),
+    groupKeyFn: (payload: Record<string, unknown>) =>
+      `${String(payload.tenantId)}/subscriber/testJob/x`,
   };
   (
     eventSourcing as unknown as {

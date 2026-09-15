@@ -4,7 +4,6 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EventSourcing } from "../../eventSourcing.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const TEST_PIPELINE_NAME = "gateway_spend_processing";
@@ -26,6 +25,18 @@ vi.mock("@langwatch/observability", () => {
   };
   return { createLogger };
 });
+
+/**
+ * Test isolation is off: the module cache is shared across files, so an
+ * earlier importer pins the real observability module and vi.mock cannot
+ * replace it. The inline re-import below fetches a fresh copy.
+ */
+async function createEventSourcingWithMockedLogger() {
+  vi.resetModules();
+  // oxlint-disable-next-line langwatch/no-inline-dynamic-import
+  const { EventSourcing } = await import("../../eventSourcing.ts");
+  return new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+}
 
 /** A confirm exactly as the ingest route hands it to the queue: priced, with
  *  the routing metadata that names the pipeline holding its handler. */
@@ -64,7 +75,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
   it("rejects the spend command for retry and names the request at error level", async () => {
     // No pipeline is registered, which is what an older build looks like to a
     // command minted by a newer one.
-    const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+    const eventSourcing = await createEventSourcingWithMockedLogger();
 
     await expect(eventSourcing.globalQueue!.send(confirmSpendJob)).rejects.toThrow(
       /not registered in this worker/,
@@ -85,7 +96,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
   });
 
   it("keeps rejecting a job whose routing metadata is missing entirely", async () => {
-    const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
+    const eventSourcing = await createEventSourcingWithMockedLogger();
 
     await expect(
       eventSourcing.globalQueue!.send({

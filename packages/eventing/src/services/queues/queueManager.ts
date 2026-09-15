@@ -45,6 +45,12 @@ export interface JobRegistryEntry {
   process: (payload: any, delivery?: JobDelivery) => Promise<void>;
   groupKeyFn: (payload: any) => string;
   /**
+   * The tenant this lane's payload carries — the SAME accessor `buildGroupKey`
+   * prefixes the group key with. Recorded so the consumer can assert agreement
+   * without re-deriving lane shapes (reactor lanes read `payload.event.tenantId`).
+   */
+  getTenantId: (payload: any) => string;
+  /**
    * Exact group for aggregate-scoped migration pre-registration. Absent when
    * the job routes by a custom group key: that key is only knowable from a
    * payload, and preflight has to name every group before one exists.
@@ -438,15 +444,17 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
+      const getTenantId = (event: any) => String(event.tenantId);
       const groupKeyFn = this.buildGroupKey({
         jobPath: `${jobPath}/${handlerName}`,
-        getTenantId: (event: any) => String(event.tenantId),
+        getTenantId,
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
           : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn,
+        getTenantId,
         preflightGroupKey: customGroupKeyFn
           ? undefined
           : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
@@ -520,9 +528,10 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = projectionDef.groupKeyFn;
+      const getTenantId = (event: any) => String(event.tenantId);
       const groupKeyFn = this.buildGroupKey({
         jobPath: `${lane.jobPath}/${projectionName}`,
-        getTenantId: (event: any) => String(event.tenantId),
+        getTenantId,
         domainKeyFn: customGroupKeyFn
           ? (event: any) => customGroupKeyFn(event)
           : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
@@ -530,6 +539,7 @@ export class QueueManager<EventType extends Event = Event> {
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
       const entry: JobRegistryEntry = {
         groupKeyFn,
+        getTenantId,
         preflightGroupKey: customGroupKeyFn
           ? undefined
           : this.buildPreflightGroupKey(`${lane.jobPath}/${projectionName}`),
@@ -689,9 +699,10 @@ export class QueueManager<EventType extends Event = Event> {
       },
     );
 
+    const getTenantId = (payload: any) => String(payload.tenantId);
     const commandGroupKeyFn = this.buildGroupKey({
       jobPath: cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
-      getTenantId: (payload: any) => String(payload.tenantId),
+      getTenantId,
       domainKeyFn: (payload: any) => {
         const key = resolveCommandDomainKey(cmdEntry, payload);
         return `${this.aggregateType}:${String(key)}`;
@@ -734,6 +745,7 @@ export class QueueManager<EventType extends Event = Event> {
 
     return {
       groupKeyFn: commandGroupKeyFn,
+      getTenantId,
       preflightGroupKey:
         cmdEntry.options.serializeByAggregate || !cmdEntry.getGroupKey
           ? this.buildPreflightGroupKey(
@@ -799,15 +811,17 @@ export class QueueManager<EventType extends Event = Event> {
 
     for (const [subscriberName, subscriberDef] of Object.entries(subscribers)) {
       const customGroupKeyFn = subscriberDef.groupKeyFn;
+      const getTenantId = (payload: any) => String(payload.event.tenantId);
       const subscriberGroupKeyFn = this.buildGroupKey({
         jobPath: `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
-        getTenantId: (payload: any) => String(payload.event.tenantId),
+        getTenantId,
         domainKeyFn: customGroupKeyFn
           ? (payload: any) => customGroupKeyFn(payload)
           : (payload: any) => `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
         groupKeyFn: subscriberGroupKeyFn,
+        getTenantId,
         preflightGroupKey: customGroupKeyFn
           ? undefined
           : this.buildPreflightGroupKey(
@@ -957,14 +971,16 @@ export class QueueManager<EventType extends Event = Event> {
       return null;
     }
 
+    const getTenantId = (payload: any) => String(payload.tenantId);
     const entry: JobRegistryEntry = {
       groupKeyFn: groupKeyFn
         ? this.buildGroupKey({
             jobPath: `job/${name}`,
-            getTenantId: (payload: any) => String(payload.tenantId),
+            getTenantId,
             domainKeyFn: groupKeyFn as any,
           })
         : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
+      getTenantId,
       preflightGroupKey: groupKeyFn ? undefined : ({ tenantId }) => `${tenantId}/job/${name}`,
       scoreFn: scoreFn ? (scoreFn as any) : (payload: any) => occurredAtScore(payload),
       process: process as any,

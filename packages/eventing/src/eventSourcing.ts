@@ -22,7 +22,11 @@ import type {
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "./runtime.types.ts";
 import { EventSourcingPipeline } from "./runtimePipeline.ts";
-import { ConfigurationError, QueueError } from "./services/errorHandling.ts";
+import {
+  ConfigurationError,
+  QueueError,
+  QueueTenantMismatchError,
+} from "./services/errorHandling.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
@@ -251,7 +255,9 @@ export class EventSourcing {
   }
 
   /** One registration's capabilities, as a line a boot failure can carry. */
-  private describeDefinition(definition: StaticPipelineDefinition<any, any, any> | undefined): string {
+  private describeDefinition(
+    definition: StaticPipelineDefinition<any, any, any> | undefined,
+  ): string {
     if (!definition) return "an earlier registration this runtime kept no definition for";
     const subscribers =
       definition.foldSubscribers.size +
@@ -504,7 +510,16 @@ export class EventSourcing {
    * present and nothing else, because the rest of the payload is business
    * data and can hold an end user's identity.
    */
-  private static jobIdentity(payload: Record<string, unknown>): Record<string, unknown> {
+  private static jobIdentity(payload: Record<string, unknown>): {
+    pipelineName: string | null;
+    jobType: string | null;
+    jobName: string | null;
+    tenantId: string | null;
+    aggregateType: string | null;
+    aggregateId: string | null;
+    eventType: string | null;
+    gatewayRequestId: string | null;
+  } {
     const str = (value: unknown): string | undefined =>
       typeof value === "string" && value.length > 0 ? value : undefined;
     return {
@@ -534,6 +549,39 @@ export class EventSourcing {
       "job routing key is not registered in this worker",
       identity,
     );
+  }
+
+  /**
+   * Gate every dispatch on tenant consistency: the payload's tenant (via the
+   * lane's recorded accessor) must equal the group-key tenant segment, else
+   * the job was misrouted. Refuse non-retryably so the queue dead-letters it.
+   */
+  private assertTenantRoutingConsistency(
+    entry: JobRegistryEntry,
+    clean: Record<string, unknown>,
+    payload: Record<string, unknown>,
+    queueName: string,
+  ): void {
+    const payloadTenant = String(entry.getTenantId(clean));
+    const groupTenant = entry.groupKeyFn(clean).split("/")[0] ?? "";
+    if (payloadTenant === groupTenant) return;
+    const identity = EventSourcing.jobIdentity(payload);
+    logger.error(
+      {
+        ...identity,
+        queueName,
+        payloadTenant,
+        groupTenant,
+        jobPath: `${identity.pipelineName}:${identity.jobType}:${identity.jobName}`,
+      },
+      "Job payload tenant does not match its group-key tenant; refusing to process so the queue dead-letters it",
+    );
+    throw new QueueTenantMismatchError({
+      queueName,
+      payloadTenant,
+      groupTenant,
+      jobPath: `${identity.pipelineName}:${identity.jobType}:${identity.jobName}`,
+    });
   }
 
   private initializeStores(): void {
@@ -607,6 +655,7 @@ export class EventSourcing {
     if (!result) {
       this.rejectUnroutableJob(payload, queueName);
     }
+    this.assertTenantRoutingConsistency(result.entry, result.clean, payload, queueName);
     // Forward the delivery. Dropping it here silently pinned
     // `deliveryAttempt` at 1 for every registry entry, which disabled the
     // fold store's merge-on-retry applied-id handling in the running
@@ -637,9 +686,13 @@ export class EventSourcing {
   ): Promise<void> {
     if (payloads.length === 0) return;
     // Reject unroutable payloads upfront so lookupEntry returns only non-null.
+    // The tenant gate runs here for every payload, before any batch or
+    // per-item dispatch: a misrouted job must never reach its handler, alone
+    // or folded into a coalesced batch.
     const routed = payloads.map((payload) => {
       const result = this.lookupEntry(payload);
       if (!result) this.rejectUnroutableJob(payload, queueName);
+      this.assertTenantRoutingConsistency(result.entry, result.clean, payload, queueName);
       return result;
     });
 
