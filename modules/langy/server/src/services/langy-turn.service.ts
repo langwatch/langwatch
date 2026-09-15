@@ -13,7 +13,6 @@ export type {
   LangyTurnTechnicalMembers,
   StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
-export { LANGY_USER_MESSAGE_LABEL, LangyTurnSharedService } from "./langy-turn-shared.service.ts";
 
 /** The one public Langy turn facade; all workflow collaborators remain private. */
 export class LangyTurnService {

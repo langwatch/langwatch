@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { LANGY_HANDOFF_TTL_SECONDS } from "../repositories/langy-live-turn.repository.ts";
 import {
-  LANGY_HANDOFF_TTL_SECONDS,
   LangyTurnHandoffRedisRepository,
   type LangyHandoffRedis,
 } from "@langwatch/langy-server";

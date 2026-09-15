@@ -4,10 +4,10 @@ import type {
   LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-server";
+import { LangyApp } from "../app/langy.app.ts";
+import { LangyService } from "../services/langy.service.ts";
 import {
-  LangyApp,
   LangyBlockOtelMetricsAdapter,
-  LangyService,
   PostgresLangyAdapter,
 } from "@langwatch/langy-server";
 import {

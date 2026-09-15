@@ -2,7 +2,8 @@
  * The frameNonce dedup is the relay's intra-turn replay guard.
  */
 import { describe, expect, it, vi } from "vitest";
-import { LangyFrameDedupRedisRepository, type LangyFrameDedupRedis } from "@langwatch/langy-server";
+import { LangyFrameDedupRedisRepository } from "../repositories/redis/redis.langy-frame-dedup.repository.ts";
+import { type LangyFrameDedupRedis } from "@langwatch/langy-server";
 
 function fakeRedis(): LangyFrameDedupRedis & {
   sets: Map<string, Set<string>>;

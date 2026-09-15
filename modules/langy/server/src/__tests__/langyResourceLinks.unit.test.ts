@@ -4,7 +4,8 @@
  * an address from.
  */
 import { describe, expect, it, vi } from "vitest";
-import { LangyResourceLinksRedisRepository, type LangyLinkRedis } from "@langwatch/langy-server";
+import { LangyResourceLinksRedisRepository } from "../repositories/redis/redis.langy-resource-links.repository.ts";
+import { type LangyLinkRedis } from "@langwatch/langy-server";
 
 function fakeRedis() {
   const hashes = new Map<string, Map<string, string>>();

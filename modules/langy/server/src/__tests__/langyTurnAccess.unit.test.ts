@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { LangyTurnAccessRedisRepository } from "@langwatch/langy-server";
+import { LangyTurnAccessRedisRepository } from "../repositories/redis/redis.langy-turn-access.repository.ts";
 
 /** An in-memory stand-in for the Redis surface the store needs. */
 function fakeRedis() {

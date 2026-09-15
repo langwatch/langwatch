@@ -4,11 +4,11 @@ import {
   type AuthzEffectivePermissionsOutput,
   AuthzService,
 } from "@langwatch/authz-contract";
+import { type LangySessionKeyMetrics } from "@langwatch/langy-server";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
-  LangySessionKeyMetrics,
   LangySessionKeyService,
-} from "@langwatch/langy-server";
+} from "../../services/langy-session-key.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import {
   LangySessionKeyRepository,
