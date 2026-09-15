@@ -1583,6 +1583,14 @@
             ]
           },
           {
+            "group": "Gateway: Routing Policies",
+            "pages": [
+              "api-reference/gateway-routing-policies/overview",
+              "api-reference/gateway-routing-policies/list-routing-policies",
+              "api-reference/gateway-routing-policies/get-routing-policy"
+            ]
+          },
+          {
             "group": "Gateway: Budgets",
             "pages": [
               "api-reference/gateway-budgets/overview",
