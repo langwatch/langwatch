@@ -42,6 +42,16 @@
     // only the 10 that hoist mechanically — hoistability decides whether a
     // fixer is worth its risk, not whether the finding is worth reading.
     "langwatch/shared-setup-is-a-hook": "error",
+    // Measured 2026-09-15: 14 reports across 10 files, baselined. Reports
+    // `._def` on any object; only the tRPC host is exempt, by path, because
+    // the router type declares no accessor for which procedure lives at a
+    // path. An earlier name-based gate admitted only `*schema` locals and so
+    // missed the two shipped bugs in model-provider-credential.ts that
+    // dev/docs/best_practices/zod.md was written about.
+    "langwatch/zod-internals": "error",
+    // Measured 2026-09-15: zero. Ships clean as a guard against a defect class
+    // CLAUDE.md and react.md both name and that recurs in generated code.
+    "langwatch/jsx-from-hook": "error",
     "langwatch/no-try-prefix": "error",
     "langwatch/return-await-outside-try": "error",
     // NOT enabled: `positional-parameter-list` is registered in the plugin
