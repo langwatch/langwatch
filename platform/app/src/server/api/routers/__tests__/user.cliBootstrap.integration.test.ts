@@ -28,6 +28,7 @@
  */
 
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
+import { PLATFORM_TOOL_POLICY_DEFAULTS } from "@ee/governance/services/platformToolPolicy.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -205,6 +206,70 @@ describe("user.cliBootstrap integration", () => {
       // the anthropic tile is published but no credential is configured, so
       // the gateway has nothing to route through.
       expect(result.gatewayProviders).toEqual([]);
+    });
+  });
+
+  describe("when the org has published a pi tile with a stricter policy", () => {
+    /**
+     * The whole path, not the constants: a `pi` tile written to Postgres,
+     * read back through `resolveVisibleTilesForUser` →
+     * `ASSISTANT_KIND_TO_TOOL_SLUG` → `resolveToolPolicyOverrides`, merged
+     * over `PLATFORM_TOOL_POLICY_DEFAULTS`, and served in the same
+     * `toolPolicies` map the CLI caches at login and gates
+     * `langwatch pi` on.
+     *
+     * A kind missing from `ASSISTANT_KIND_TO_TOOL_SLUG` is skipped
+     * silently — no error, no entry — and the slug keeps the shipped
+     * default. That is the failure this asserts against, so the stricter
+     * policy is deliberately the inverse of the default on the one path
+     * the tile can move: a half-registered pi returns the default and this
+     * goes red.
+     */
+    /** @scenario "A pi policy set in the tile is the one the launcher applies" */
+    it("serves that policy in toolPolicies rather than the shipped default", async () => {
+      // pi ships with the gateway path already off and direct ingestion on,
+      // and `resolveToolPolicyOverrides` forces allowVk false whatever the
+      // tile says (pi ignores the base-URL env, ADR-132 §7). So allowVk
+      // cannot distinguish tile from default here — allowOtelDirect is the
+      // one axis that can, and the tile sets it to the inverse below.
+      // Asserted rather than assumed: if the default ever changes to match,
+      // the test below would pass for the wrong reason.
+      expect(PLATFORM_TOOL_POLICY_DEFAULTS.pi).toEqual({
+        allowVk: false,
+        allowOtelDirect: true,
+      });
+
+      await AiToolEntryService.create(prisma).create({
+        organizationId: ORG_ID,
+        departmentIds: [],
+        type: "coding_assistant",
+        displayName: "pi",
+        config: {
+          assistantKind: "pi",
+          setupCommand: "langwatch pi",
+          allowVk: false,
+          allowOtelDirect: false,
+        },
+        actorUserId: USER_ID,
+      });
+
+      const result = await caller.user.cliBootstrap({
+        organizationId: ORG_ID,
+      });
+
+      expect(result.toolPolicies.pi).toEqual({
+        allowVk: false,
+        allowOtelDirect: false,
+      });
+      expect(result.toolPolicies.pi).not.toEqual(
+        PLATFORM_TOOL_POLICY_DEFAULTS.pi,
+      );
+      // A slug the org published no tile for still carries its default, so
+      // the map above is the tile's policy merged over the defaults rather
+      // than the whole map having been replaced.
+      expect(result.toolPolicies.gemini).toEqual(
+        PLATFORM_TOOL_POLICY_DEFAULTS.gemini,
+      );
     });
   });
 });

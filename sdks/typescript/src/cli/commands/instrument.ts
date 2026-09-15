@@ -26,7 +26,11 @@ import {
 	sendsIngestKeyInClear,
 } from "../utils/governance/ingest-endpoint-scheme";
 import { installTelemetryWiring } from "../utils/governance/instrument-wiring";
-import { SOURCE_TYPE_BY_TOOL } from "../utils/governance/otel-env-block";
+import {
+	SOURCE_TYPE_BY_TOOL,
+	exportsTelemetry,
+	instrumentableTools,
+} from "../utils/governance/otel-env-block";
 import { resolvePlatformToolPolicy } from "../utils/governance/platform-tool-policy";
 import {
 	clearToolProjectPin,
@@ -56,7 +60,21 @@ export async function instrumentCommand(
 	const sourceType = SOURCE_TYPE_BY_TOOL[tool];
 	if (!sourceType) {
 		fail(
-			`'${tool}' is not an instrumentable tool. Supported: ${Object.keys(SOURCE_TYPE_BY_TOOL).join(", ")}.`,
+			`'${tool}' is not an instrumentable tool. Supported: ${instrumentableTools().join(", ")}.`,
+		);
+	}
+	// Being in SOURCE_TYPE_BY_TOOL means the tool has a mint slug, NOT that it
+	// exports telemetry worth wiring up. pi has a slug (the wrapper mints an
+	// ingest key to POST its transcript) but ships no exporter, so persisted
+	// wiring for it would write real config, mint a real key, and capture
+	// nothing forever. Derived from the env block rather than a second hand-kept
+	// list, so the two can never drift — a tool that gets no vars gets no
+	// instrument support, by construction.
+	if (!exportsTelemetry(tool)) {
+		fail(
+			`'${tool}' ships no telemetry exporter, so there is nothing to instrument. ` +
+				`Run it with \`langwatch ${tool}\` instead — capture happens there. ` +
+				`Instrumentable: ${instrumentableTools().join(", ")}.`,
 		);
 	}
 

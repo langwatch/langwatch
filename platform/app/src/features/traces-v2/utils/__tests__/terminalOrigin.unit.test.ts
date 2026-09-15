@@ -12,6 +12,27 @@ describe("isTerminalOrigin", () => {
     });
   });
 
+  describe("given pi's service name", () => {
+    it("is true for the exact name", () => {
+      expect(isTerminalOrigin({ serviceName: "pi" })).toBe(true);
+    });
+
+    it("is true regardless of case", () => {
+      expect(isTerminalOrigin({ serviceName: "PI" })).toBe(true);
+    });
+
+    // Two letters are not a marker: matched as a substring, "pi" would claim
+    // every service with those letters anywhere in its name.
+    it.each([
+      "pipeline-worker",
+      "spider",
+      "my-api",
+      "shipping-worker",
+    ])("is false for %s, which only contains the letters", (serviceName) => {
+      expect(isTerminalOrigin({ serviceName })).toBe(false);
+    });
+  });
+
   describe("given a coding-agent origin", () => {
     it("is true", () => {
       expect(isTerminalOrigin({ origin: "coding_agent" })).toBe(true);

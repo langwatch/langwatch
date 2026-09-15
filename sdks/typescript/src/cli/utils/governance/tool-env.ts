@@ -156,6 +156,28 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
 					ANTHROPIC_API_KEY: auth,
 				},
 			};
+		// pi is deliberately absent, and must stay absent. It reads NEITHER
+		// OPENAI_BASE_URL nor ANTHROPIC_BASE_URL: every catalog model in
+		// `@earendil-works/pi-ai`'s models.generated.js carries a literal
+		// `baseUrl`, and both client factories pass it to the vendor SDK
+		// constructor explicitly (`dist/api/openai-responses.js`,
+		// `dist/api/anthropic-messages.js`), so the SDK's readEnv() fallback
+		// never runs. A case here did exist, claiming pi honoured the pair; it
+		// did not, and the harm was not merely a missed capture — the
+		// OPENAI_API_KEY it set carried the user's LangWatch virtual key, so
+		// every gateway-mode run handed our own credential to api.openai.com,
+		// which echoed it back in the 401 body. pi's platform policy is
+		// allowVk:false for that reason (platform-tool-policy.ts), which makes
+		// this switch unreachable for pi — the case is removed as well as
+		// unreachable so a future flag flip cannot revive the leak.
+		//
+		// The earlier case cited `services/langyagent/adapters/pi/spawn.go` as
+		// proof pi honours the env. That was a misread: spawn.go launches the
+		// langy worker, and the worker points pi at the gateway by writing a
+		// generated models.json (`services/langyworker/src/models.ts:105-121`)
+		// — a config file, not an environment variable. Doing the same from
+		// the launcher would mean writing into the user's own pi install,
+		// which ADR-132's no-writes-to-the-user's-machine invariant forbids.
 		default:
 			return { vars: {} };
 	}

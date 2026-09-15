@@ -22,6 +22,14 @@ export const SOURCE_TYPE_BY_TOOL: Record<string, string> = {
 	// editor surface is separable from the CLI (`copilot_cli`) and app
 	// (`copilot_app`) in the API-keys page and analytics. ADR-039 §Extension #2.
 	code: "copilot_vscode",
+	// pi exports NO telemetry of its own, and unlike every other entry here it
+	// must receive no OTel env block at all — see the `case "pi"` in
+	// buildOtelEnvBlock below. Its presence in this table is solely the mint
+	// key for the ingest key the wrapper uses to POST pi's session transcript
+	// after the child exits (ADR-132 §7). This table names source types; it is
+	// NOT a list of tools that export. Those two meanings were conflated once
+	// already and leaked a bearer token into pi's child environment.
+	pi: "pi",
 };
 
 /**
@@ -46,6 +54,23 @@ export function telemetryEnvVarNames(tool: string): string[] {
 	return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
+/**
+ * Does `tool` ship an OTel exporter we can wire up?
+ *
+ * Derived from the env block, not a second hand-kept list: a tool we hand no
+ * vars to is a tool with nothing to instrument. Keeps `langwatch instrument`
+ * from writing persistent wiring — and minting a real ingest key — for a tool
+ * that will never emit. See the `case "pi"` in buildOtelEnvBlock.
+ */
+export function exportsTelemetry(tool: string): boolean {
+	return telemetryEnvVarNames(tool).length > 0;
+}
+
+/** The tools `langwatch instrument` accepts, in table order. */
+export function instrumentableTools(): string[] {
+	return Object.keys(SOURCE_TYPE_BY_TOOL).filter(exportsTelemetry);
+}
+
 export function buildOtelEnvBlock(
 	tool: string,
 	endpoint: string,
@@ -57,6 +82,50 @@ export function buildOtelEnvBlock(
 	};
 
 	switch (tool) {
+		case "pi":
+			// The ONLY tool that gets an empty block, and deliberately so.
+			//
+			// pi ships no OTel exporter (verified against the shipped `dist/`
+			// of @earendil-works/pi-coding-agent: zero references to OTEL_,
+			// otlp or opentelemetry). It would ignore these vars — but the
+			// child does not run alone. wrapper.ts:707 merges this block into
+			// the child env, and on an interactive shell buildShellReapply
+			// (wrapper.ts:296-312) re-`export`s it into the session, so every
+			// process the developer starts inside `langwatch pi` inherits an
+			// endpoint AND a live bearer token. An OTel-instrumented dev
+			// server, a pytest run, or the user's own app would then POST its
+			// spans to us authenticated as pi.
+			//
+			// This is the hazard ingestKeyProvenance.utils.ts:150-158 already
+			// documents for the VS Code extension, which answers it with a
+			// server-side scope gate (COPILOT_VSCODE_ALLOWED_SCOPES, enforced
+			// by dropForeignScopesForVscodeKey). That gate early-returns for
+			// any other source type, so it would never cover pi. Receiver-side
+			// filtering is also the wrong answer here: the exposed token is
+			// itself the problem, independent of which spans get accepted.
+			//
+			// Returning {} means the wrapper injects nothing of OURS: vars is
+			// empty and ingestionClears("pi") (wrapper-mode.ts) is empty too,
+			// so wrapper.ts:715-719 hands pi's child the inherited env
+			// untouched and buildShellReapply emits no export line.
+			//
+			// What it deliberately does NOT do is scrub an
+			// OTEL_EXPORTER_OTLP_* pair the developer exported in their own
+			// shell — from `langwatch instrument claude`, say. That is not
+			// this wrapper's exposure to widen: nothing in the CLI writes
+			// those into its own process env, so if they are present every
+			// process that shell starts already carries them, `langwatch pi`
+			// or not. Unsetting them would instead silently break the
+			// developer's own instrumented processes inside the session.
+			// ingestionClears exists for vars that change what the TOOL does
+			// (copilot's BYOK pair, the file exporter); pi reads none.
+			//
+			// Capture is unaffected — the endpoint and token stay in the mode
+			// result (wrapper-mode.ts:600-601) for the post-exit transcript
+			// POST, and telemetryEnvVarNames is only ever called with "claude"
+			// and "copilot", so no logout or refresh sweep depends on this key
+			// set.
+			return {};
 		case "claude":
 			// Three further OTel unlock knobs found in the claude-code 2.x
 			// bundled binary string sweep (alongside OTEL_LOG_USER_PROMPTS

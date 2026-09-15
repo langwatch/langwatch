@@ -975,6 +975,16 @@ const AGENT_BANNERS: Record<
     name: "GitHub Copilot",
     mark: flatMark(["▗▛▀▀▀▜▖", "▐ ▐▌▐▌▌", "▝▙▄▄▄▟▘"], TERMINAL_TOKENS.blue),
   },
+  // The one entry here that is NOT reproduced startup art: pi prints no
+  // banner. Its shipped bundle was searched for block glyphs, for a literal
+  // π, and for any logo/banner symbol — none of the three are in it, and
+  // `pi --help` is plain text. Rather than invent a logo for someone else's
+  // product, the mark is the letter its name is. Replace this only with art
+  // pi actually prints.
+  pi: {
+    name: "pi",
+    mark: flatMark(["█████", " █ █ ", " █ █ "], TERMINAL_TOKENS.green),
+  },
   unknown: {
     name: "Coding agent",
     mark: flatMark(["▛███▜", "█████", "▘▘ ▝▝"], TERMINAL_TOKENS.faint),

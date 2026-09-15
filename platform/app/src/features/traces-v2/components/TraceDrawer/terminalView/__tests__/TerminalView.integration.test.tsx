@@ -218,6 +218,19 @@ describe("TerminalView", () => {
       expect(screen.queryByText(/Claude Code/)).toBeNull();
     });
 
+    it("names pi rather than falling back to the generic identity", () => {
+      renderView({
+        banner: {
+          agent: "pi",
+          version: "0.85.1",
+          model: "gemini-3-pro",
+          repo: null,
+        },
+      });
+      expect(screen.getByText("pi v0.85.1")).toBeInTheDocument();
+      expect(screen.queryByText(/Coding agent/)).toBeNull();
+    });
+
     it("falls back to a generic identity when the agent is unknown", () => {
       renderView({
         banner: { agent: "unknown", version: "1.0.0", model: null, repo: null },

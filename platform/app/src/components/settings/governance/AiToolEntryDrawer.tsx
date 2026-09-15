@@ -841,6 +841,12 @@ function CliPathsSection({
   setForm: (f: FormState) => void;
 }) {
   const cursorOnly = form.assistantKind === "cursor";
+  // pi always calls its model provider directly and ignores the endpoint
+  // setting the gateway route depends on, so the server forces this off
+  // whatever the tile stores (resolveToolPolicyOverrides). Show that rather
+  // than a switch an admin can turn on to no effect. Same shape as the
+  // cursor case on the direct-ingestion row below.
+  const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
       label="CLI paths"
@@ -851,11 +857,14 @@ function CliPathsSection({
           <VStack align="start" gap={0}>
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
-              Route through the LangWatch gateway with a personal virtual key.
+              {isIngestionOnly
+                ? "pi always calls its model provider directly, so the gateway route never applies."
+                : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
           <Switch
-            checked={form.allowVk}
+            checked={isIngestionOnly ? false : form.allowVk}
+            disabled={isIngestionOnly}
             onCheckedChange={({ checked }) =>
               setForm({ ...form, allowVk: checked })
             }
