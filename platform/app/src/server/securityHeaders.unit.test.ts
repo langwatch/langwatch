@@ -80,6 +80,19 @@ describe("buildSecurityHeaders", () => {
     });
   });
 
+  describe("given the sandboxed custom-chart frame (#7870)", () => {
+    describe("when building production headers", () => {
+      /** @scenario The app's own headers let the srcdoc chart frame load its UMD bundles */
+      it("admits unpkg.com into script-src so the srcdoc frame's UMD bundles load", () => {
+        const csp = buildSecurityHeaders({ dev: false, environment: {} })[
+          "Content-Security-Policy"
+        ];
+
+        expect(csp).toMatch(/script-src [^;]*https:\/\/unpkg\.com/);
+      });
+    });
+  });
+
   describe("given a content-hashed asset CDN (ADR-086)", () => {
     const CDN = "https://cdn.langwatch.ai";
     const FETCH_DIRECTIVES = [

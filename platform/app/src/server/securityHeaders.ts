@@ -35,7 +35,8 @@ export function buildSecurityHeaders({
     // it the voice panel fails in production with "Failed to load the
     // rawAudioProcessor worklet module" while working in dev, where no CSP is
     // enforced (#7947).
-    `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
+    // unpkg.com in script-src: the sandboxed custom-chart srcdoc frame (#7870) loads its React/Recharts/Babel UMD builds from there and inherits this CSP.
+    `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev https://unpkg.com${cdn}`,
     `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com${cdn}`,
     `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
     `font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com${cdn}`,
