@@ -36,6 +36,10 @@ export interface RequestHooksDeps {
   twoStepCeremonies: () => TwoStepCeremoniesPort;
   /** Opening the session a completed reset earned (D13). */
   signInAfterPasswordReset: (ctx: ResetEndpointContext) => Promise<void>;
+  /** Whether an organization's own connection governs this address (D04).
+   *  Asked at the credential boundary so a deployment that issues its own
+   *  passwords still cannot hand one to somebody their company signs in. */
+  addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }
 
 /**
@@ -72,11 +76,79 @@ function refusesCredentialRoute({
   // the route this refuses and the button the door draws are decided by one
   // answer: refusing a form the screen just offered is the failure this whole
   // gate's docblock is about, and it would be self-inflicted here.
+  //
+  // This answers for the DEPLOYMENT only. An address governed by an
+  // organization's own connection is refused separately, by
+  // `refuseConnectionGovernedCredential` — a policy that offers a password
+  // says nothing about whether THIS address may use one.
   if (policy.defaultMethods.some((method) => method.kind === "password")) {
     return false;
   }
 
   return policy.defaultMethods.some((method) => method.kind === "federated");
+}
+
+/** The address a credential request names, or null where it names none. */
+function submittedAddress(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const email = (body as { email?: unknown }).email;
+  return typeof email === "string" && email.length > 0 ? email : null;
+}
+
+/**
+ * Refuses a credential route for an address an ORGANIZATION routes through
+ * its own identity provider.
+ *
+ * The deployment-wide policy cannot answer this. It knows a password is
+ * offered *somewhere* on this deployment; it does not know that this
+ * particular address belongs to a company whose connection is the only way
+ * its people are supposed to get in. Before a deployment could issue its own
+ * passwords the distinction never arose — `refusesCredentialRoute` turned
+ * every credential route away on any federating deployment, so no address
+ * reached one — and opening that door for the deployment would have opened it
+ * for those addresses too.
+ *
+ * That is an authorization bypass rather than an untidiness: an organization
+ * mandating SSO gets session lifetime, conditional access and revocation from
+ * its own provider, and a local password beside that connection silently
+ * answers none of them. Sign-up already refuses on the same ground — it asks
+ * the router, which ranks a live domain connection above everything — so this
+ * is the same rule stated at the boundary the router does not sit on.
+ *
+ * Asked ONLY for a request that names an address and only once the policy has
+ * already allowed the route, so no deployment that refused these paths before
+ * now pays a lookup for them.
+ */
+async function refuseConnectionGovernedCredential({
+  pathname,
+  isResetPath,
+  policy,
+  body,
+  addressRoutesToConnection,
+}: {
+  pathname: string;
+  isResetPath: boolean;
+  policy: SignInMethodPolicy;
+  body: unknown;
+  addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
+}): Promise<void> {
+  if (!isResetPath && !isEmailAuthPath(pathname)) return;
+  // Only the deployments this PR opened these routes for can reach a
+  // connection-governed address here; everywhere else the refusal above
+  // already answered.
+  if (!policy.defaultMethods.some((method) => method.kind === "password")) {
+    return;
+  }
+
+  const email = submittedAddress(body);
+  if (email === null) return;
+  if (!(await addressRoutesToConnection({ email }))) return;
+
+  throw APIError.from("BAD_REQUEST", {
+    code: "EMAIL_PASSWORD_DISABLED",
+    message:
+      "Credential management is disabled — your account is managed by your identity provider.",
+  });
 }
 
 /**
@@ -161,13 +233,17 @@ function refuseDirectEmailSignUp(pathname: string): void {
 async function enforceFederationRoutes({
   url,
   pathname,
+  body,
   deploymentIsFederationCapable,
   resolveSignInMethodPolicy,
+  addressRoutesToConnection,
 }: {
   url: string;
   pathname: string;
+  body: unknown;
   deploymentIsFederationCapable: () => boolean;
   resolveSignInMethodPolicy: () => Promise<SignInMethodPolicy>;
+  addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }): Promise<void> {
   // Deployments that name no federated method never register an IdP, so
   // there is no policy to enforce. The answer stays synchronous in email mode.
@@ -176,7 +252,17 @@ async function enforceFederationRoutes({
   refuseCredentialMutation(pathname);
   if (!isGateDependentPath(url)) return;
 
-  enforceGate({ url, pathname, policy: await resolveSignInMethodPolicy() });
+  const policy = await resolveSignInMethodPolicy();
+  enforceGate({ url, pathname, policy });
+  // After the deployment-wide answer, never instead of it: the organization's
+  // connection is a second refusal over an address the policy has allowed.
+  await refuseConnectionGovernedCredential({
+    pathname,
+    isResetPath: isPasswordResetPath(pathname),
+    policy,
+    body,
+    addressRoutesToConnection,
+  });
 }
 
 /**
@@ -217,6 +303,7 @@ export function requestHooks({
   resolveSignInMethodPolicy,
   twoStepCeremonies,
   signInAfterPasswordReset,
+  addressRoutesToConnection,
 }: RequestHooksDeps): BetterAuthOptions["hooks"] {
   return {
     before: createAuthMiddleware(async (ctx) => {
@@ -258,8 +345,10 @@ export function requestHooks({
       await enforceFederationRoutes({
         url,
         pathname,
+        body: ctx.body,
         deploymentIsFederationCapable,
         resolveSignInMethodPolicy,
+        addressRoutesToConnection,
       });
     }),
     /**

@@ -354,6 +354,21 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then a password is among the ways it may enroll
     And an address whose domain routes to a connection is still handed to that provider
 
+  # The deployment saying "a password is offered here" and a company saying
+  # "my people sign in through us" are different claims, and the second wins.
+  # An organization mandating a connection gets session lifetime, conditional
+  # access and revocation from its own provider, and a local password beside
+  # that connection answers none of them — so the widening is refused for
+  # exactly those addresses, at the boundary as well as on the screen.
+  @unit
+  Scenario: An organization's own connection still refuses a local password
+    Given a deployment that federates and issues its own passwords
+    And an address its organization routes through its own identity provider
+    When a credential sign-in or a password reset is attempted for that address
+    Then the request is refused as provider-managed
+    And an ordinary address on the same deployment is let through
+    And setting a first password for that address is refused as well
+
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 
   @unit

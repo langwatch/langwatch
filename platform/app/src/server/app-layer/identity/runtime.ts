@@ -467,6 +467,35 @@ export function signInRouter(): SignInRouterService {
   return signInRouterService;
 }
 
+/**
+ * Whether an ORGANIZATION's own connection governs this address (D04).
+ *
+ * The router already answers it — a live domain connection outranks
+ * everything it knows — so this asks the router rather than re-deriving the
+ * rule beside it, and reads only the part of the answer that names a
+ * connection. `connectionId !== null` is what makes it an organization's
+ * claim on the address: an instance-level redirect (the deployment's own sole
+ * federated method, the Auth0 connection bridge) carries no connection and is
+ * not somebody's company saying how its people sign in.
+ *
+ * Every caller is a REFUSAL — the credential boundary and the first-password
+ * write — so a router that throws must not be read as "no connection". It is
+ * left to throw: on a deployment that mandates SSO for this address, failing
+ * open would hand out exactly the local password the connection exists to
+ * prevent.
+ */
+export async function addressRoutesToConnection({
+  email,
+}: {
+  email: string;
+}): Promise<boolean> {
+  const decision = await signInRouter().route({ identifier: email });
+  return (
+    decision.outcome === "redirect_to_connection" &&
+    decision.methodSet.some((method) => method.connectionId !== null)
+  );
+}
+
 export type LocalSignUpDecision =
   | {
       outcome: "enroll";

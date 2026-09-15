@@ -75,6 +75,10 @@ vi.mock(
     identitySecretHealMigration: () => ({}),
     isLatched: async () => false,
     isAnyoneLatched: async () => false,
+    // No organization routes this suite's addresses, which is what lets the
+    // credential boundary answer at all — a true here would refuse every
+    // address as provider-managed.
+    addressRoutesToConnection: async () => false,
     // A value, not a factory: the runtime exports the birth-aware gate itself
     // so the adapter and the databaseHooks bridge fork on one closure.
     routesToIdentityBranch: async () => false,

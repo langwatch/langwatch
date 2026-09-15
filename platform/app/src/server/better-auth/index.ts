@@ -5,6 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
 import { env } from "~/env.mjs";
 import {
+  addressRoutesToConnection,
   BACKUP_CODE_COUNT,
   betterAuthInstance,
   secondaryStorage as composeSecondaryStorage,
@@ -232,6 +233,7 @@ export const auth = betterAuth({
     twoStepCeremonies: mfaCeremonies,
     signInAfterPasswordReset: (ctx) =>
       passwordResetSessionBridge().signInAfterPasswordReset(ctx),
+    addressRoutesToConnection,
   }),
 });
 

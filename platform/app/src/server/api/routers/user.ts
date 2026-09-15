@@ -18,6 +18,7 @@ import { getApp } from "~/server/app-layer/app";
 import type { FederatedPasswordResult } from "~/server/app-layer/identity/credential-account.service";
 import { changeTargetsBrokeredPassword } from "~/server/app-layer/identity/password-change-target";
 import {
+  addressRoutesToConnection,
   credentialAccounts,
   localSignUpDecision,
   signUpVerification,
@@ -608,6 +609,18 @@ export const userRouter = createTRPCRouter({
         (await resolveAuthProvider()) !== "email" &&
         !deploymentIssuesOwnPasswords(env)
       ) {
+        throw new DirectRegistrationUnavailableError();
+      }
+
+      // An address an organization routes through its OWN provider may not
+      // take a password here, on the same ground sign-up refuses one for it:
+      // the account is made at the provider, and a password beside that
+      // connection answers none of the session lifetime, conditional access
+      // or revocation the organization mandates SSO to get. Sign-up asks the
+      // router and so does this — the deployment-wide switch above widens who
+      // may hold a password, never whose company has already said otherwise.
+      const address = ctx.session.user.email;
+      if (address && (await addressRoutesToConnection({ email: address }))) {
         throw new DirectRegistrationUnavailableError();
       }
 
