@@ -407,6 +407,41 @@ No worker process is booted on either side, so anything whose observable
 result depends on a queue, projection or scheduler is compared in a state
 neither instance reaches in production.
 
+### The union blind spot — a route absent from *both* documents
+
+The probe set is the union of the two OpenAPI documents. A route that appears
+in neither is not compared, not skipped, and not counted: it is invisible, and
+the run is silent about it. Silence here is indistinguishable from agreement.
+
+This is not hypothetical. On 2026-09-15 the entire trace **ingestion** surface
+— `POST /api/collector`, `POST /api/otel/v1/traces`, the OTLP path-alias
+dispatcher, tracked events and trace export — was found defined, exported and
+mounted nowhere on the candidate branch, while both shipped SDKs and our own
+`services/langyagent` post to those paths. Seven runs of this tool had reported
+on that branch and none could have found it, because the ingestion routes are
+not in the OpenAPI document on either side. The nine-operation REST teams
+family went the same way and was found only because it happened to be *in*
+main's document, which is the difference between a diff finding and a silent
+hole.
+
+So: **a clean apidiff run means the documented surfaces agree. It does not mean
+the branch serves what its customers call.** Two other instruments are needed
+and neither is this one.
+
+1. A static check that an exported transport factory is actually named in some
+   `withTransports(...)` list. It catches the defect at the commit that drops
+   the registration rather than months later, and it needs to allow one
+   aggregator hop (a router bundled by a mounted transport file) and to match
+   an initialiser loosely — the alias dispatcher is built with
+   `CANDIDATE_PATHS.reduce(...)`, so a declaration-shape regex misses the most
+   important case in the set.
+2. A contract test asking whether every route the SDKs, the docs and the
+   Terraform provider reference actually exists on a booted stack. That is
+   neither a diff nor a lint, and nothing in the repository does it today.
+
+Do not extend this tool to cover either. Its comparison is between two running
+stacks, and both of those questions are answerable without a second stack.
+
 Finding kinds: `status_diff` (status-class changes only, by default),
 `body_shape_diff`, `body_value_diff` (success bodies only), `error_shape_diff`
 (`-exact-status` mode only), `operation_missing`, `permission_leak`,
