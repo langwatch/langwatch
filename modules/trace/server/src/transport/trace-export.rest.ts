@@ -44,10 +44,9 @@ export interface TraceExport<TRequest> {
 }
 
 /**
- * What the export download needs from the process.
- *
- * Method syntax throughout, so a host may name its own concrete session,
- * protections and request types rather than restating the widened ones here.
+ * What the export download needs from the process. Method syntax
+ * throughout, so a host may name its own concrete session, protections and
+ * request types rather than restating the widened ones here.
  */
 export interface TraceExportRestMembers<
   TRequest extends TraceExportRequestFields,
@@ -55,10 +54,9 @@ export interface TraceExportRestMembers<
   TSession,
 > {
   /**
-   * The export request as a caller sends it.
-   *
-   * Both the parsed shape and the shape a caller SENDS are carried, because
-   * they can differ, and the validator types the 422 body off the sent shape.
+   * The export request as a caller sends it. Both the parsed shape and the
+   * shape a caller SENDS are carried since they can differ, and the
+   * validator types the 422 body off the sent shape.
    */
   requestSchema(): z.ZodType<TRequest, TRequestRaw>;
   /** The live session behind this request, or null when there is none. */

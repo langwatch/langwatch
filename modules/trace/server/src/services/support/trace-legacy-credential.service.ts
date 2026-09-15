@@ -94,10 +94,9 @@ export class TraceLegacyCredentialService {
   }
 
   /**
-   * Resolves the request's project credential and enforces one permission as
-   * the API key's ceiling. Answers a refusal rather than throwing one: this
-   * family writes its own bodies, and a thrown `HandledError` would reach the
-   * caller in the framework's envelope instead.
+   * Resolves the request's project credential and enforces one permission
+   * as the API key's ceiling. Answers a refusal rather than throwing: this
+   * family writes its own bodies, unlike the framework's error envelope.
    */
   async resolve(input: {
     request: Request;

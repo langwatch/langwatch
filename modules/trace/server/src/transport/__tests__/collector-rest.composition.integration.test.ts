@@ -1,24 +1,7 @@
 /**
  * @vitest-environment node
- * `POST /api/collector` against the application the COMPOSITION builds, mounted
- * from the transports the MODULE declares.
- *
- * This is the test the family did not have, and its absence is why the door was
- * gone. `collector-rest.validation-diagnostics.integration.test.ts` constructs
- * `collectorRest` directly and passed on every commit while nothing served the
- * route at all: a router answers the same whether or not a process mounts it.
- *
- * So two things are deliberate here and must stay:
- *
- *  1. The mounted set is read off `traceServer.transports` rather than naming
- *     `collectorRest`. Drop the family from `trace.server.ts` and these tests
- *     fail with 404 - which is what a customer's SDK got.
- *  2. The application is `TraceApp` over `composeTraceAppDependencies`, reached
- *     through the operations-only feature-API proxy, so a member the door names
- *     and the composition does not supply fails here the way it fails in
- *     production rather than being handed over by a stub.
- *
- * Spec: specs/traces/trace-ingestion-door.feature
+ * `POST /api/collector` against the COMPOSITION-built app and MODULE-declared
+ * transports — proves neither is stubbed. Spec: specs/traces/trace-ingestion-door.feature
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
@@ -66,10 +49,9 @@ const TOKEN = "sk-lw-a-project-key";
 const API_KEY_ID = "api-key-1";
 
 /**
- * The peers the collector path never reaches, as the feature-API references
- * they really are: declared and deliberately never bound, so a call refuses by
- * name instead of quietly answering. No cast, and no hand-written twin of
- * another module's contract.
+ * The peers the collector path never reaches, as real feature-API
+ * references: declared but deliberately never bound, so a call refuses by
+ * name instead of quietly answering. No cast, no hand-written twin.
  */
 function unreachablePeers() {
   const apis = new LocalFeatureApis();
@@ -232,12 +214,9 @@ function deployment(access: CollectorAccess = {}) {
     },
   });
 
-  // Whether the MODULE declares the collector among its transports. This is the
-  // point of the file: the door is mounted here only if `trace.server.ts` still
-  // mounts it, so dropping it there turns every request below into the 404 a
-  // customer's SDK was getting.
-  // Widened to the descriptor the runtime mounts, so this stays a question
-  // about the declared LIST rather than one the compiler answers for us.
+  // Whether the MODULE declares the collector among its transports — the
+  // point of the file: dropping it from `trace.server.ts` turns every
+  // request below into the 404 a customer's SDK was getting.
   const declaredRest: readonly FeatureTransportDescriptor[] = traceServer.transports;
   const servesCollector = declaredRest.includes(collectorRest);
 

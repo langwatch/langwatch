@@ -22,10 +22,9 @@ export const TRACKED_EVENT_SYNC_DELAY_MS = 5_000;
 export const TRACKED_EVENT_SYNC_DEDUP_TTL_MS = 30_000;
 
 /**
- * Span event name the SDKs emit when a developer records live feedback (a
- * thumbs up/down, a rating) against an in-flight span. Mirrors
- * `langwatch.evaluation.custom` but feeds the tracked-event path instead of
- * the evaluation path.
+ * Span event name the SDKs emit for live feedback (thumbs up/down, a
+ * rating) against an in-flight span. Mirrors `langwatch.evaluation.custom`
+ * but feeds the tracked-event path instead.
  */
 const FEEDBACK_EVENT_NAME = "langwatch.event";
 
@@ -35,19 +34,17 @@ const DETAILS_PREFIX = "event.details.";
 
 /**
  * One reconstructed tracked-event payload, shaped like the REST
- * `POST /api/events/track` body so it can flow through the same ingestion path,
- * plus the occurrence ordinal that separates two feedback events of the same
- * type on one span.
+ * `POST /api/events/track` body for the same ingestion path, plus the
+ * occurrence ordinal separating two same-type feedback events on one span.
  */
 export interface ReconstructedTrackedEvent {
   event_type: string;
   metrics: Record<string, number>;
   event_details: Record<string, string>;
   /**
-   * Index of the source event within the span's own `events` list. That list is
-   * fixed for a given span, so the ordinal is stable across replays — unlike a
-   * running counter over the reconstructed subset, which would shift whenever a
-   * preceding event started or stopped passing reconstruction.
+   * Index of the source event within the span's own `events` list — fixed
+   * per span, so stable across replays, unlike a counter over the
+   * reconstructed subset which shifts as preceding events pass or fail.
    */
   occurrenceIndex: number;
 }
@@ -71,12 +68,9 @@ type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
 // idempotent; validation prevents recording invalid events.
 export class TrackedEventSync {
   /**
-   * An event type is recordable only when it is present, non-empty, and not the
-   * envelope's own wire name. `recordTrackedEventSpan` emits a span event named
-   * after the recorded `event_type` and always stamps an `event.type` attribute,
-   * so a tracked event typed `langwatch.event` would produce a span that matches
-   * this subscriber's own predicate — a self-feeding amplification loop that dedup
-   * cannot break, because every hop mints a fresh span id.
+   * Recordable only when present, non-empty, and not the envelope's own
+   * wire name — a tracked event typed `langwatch.event` would otherwise
+   * match this subscriber's own predicate, an amplification loop dedup can't break.
    */
   private static isRecordableEventType(value: unknown): value is string {
     return typeof value === "string" && value.length > 0 && value !== FEEDBACK_EVENT_NAME;
@@ -260,11 +254,9 @@ export class TrackedEventSync {
   }
 
   /**
-   * Validates one reconstructed event and records it. Returns the failure instead
-   * of throwing it so the caller can finish the remaining events first: every
-   * failure is logged here, and the caller rethrows the first so the framework
-   * retries the whole span. An event that fails validation is logged and dropped,
-   * which is not a failure — it returns undefined.
+   * Validates one reconstructed event and records it. Returns the failure
+   * (rather than throwing) so the caller finishes remaining events first,
+   * then rethrows the first so the framework retries the whole span.
    */
   private static async recordReconstructedEvent({
     deps,
@@ -325,10 +317,9 @@ export class TrackedEventSync {
   }
 
   /**
-   * Reconstructs every tracked event on the span and records each one, collecting
-   * the failures. The first failure is rethrown once the whole span has been
-   * attempted, so the framework retries; deterministic event ids make that retry
-   * idempotent for the events that already landed.
+   * Reconstructs every tracked event on the span, collecting failures. The
+   * first is rethrown once the whole span is attempted, so the framework
+   * retries; deterministic event ids make that retry idempotent.
    */
   private static async syncTrackedEventsFromSpan({
     event,

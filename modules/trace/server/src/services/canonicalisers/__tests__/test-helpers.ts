@@ -9,10 +9,9 @@ import type { ExtractorContext, LogExtractorContext } from "../canonical-attribu
 export { parseJsonStringAttrs };
 
 /**
- * Creates a real ExtractorContext for extractor unit tests: real stores so
- * extractors exercise production code paths, with recordRule/setAttr/setAttrIfAbsent
- * wrapped in vi.fn() for assertion. JSON strings auto-parse; pass skipJsonParsing
- * to feed raw strings and exercise an extractor's defensive safeJsonParse path.
+ * Creates a real ExtractorContext for extractor unit tests: real stores,
+ * with recordRule/setAttr/setAttrIfAbsent wrapped in vi.fn(). JSON strings
+ * auto-parse; pass skipJsonParsing to exercise the safeJsonParse fallback.
  */
 export function createExtractorContext(
   attrs: Record<string, unknown>,

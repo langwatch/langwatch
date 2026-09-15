@@ -58,12 +58,9 @@ export interface TraceEvaluationDispatch {
 }
 
 /**
- * Why an online-evaluator dispatch was refused by the loop guards.
- *
- * The two values are the guard's own vocabulary: `depth_direct` is a trace whose
- * evaluation would evaluate an evaluation, and `parent_in_subtree` is a trace
- * whose parent is already inside the subtree being evaluated. An operator reads
- * the two apart to tell a customer's recursive pipeline from our own fan-out.
+ * Why an online-evaluator dispatch was refused: `depth_direct` is a trace
+ * whose evaluation would evaluate an evaluation; `parent_in_subtree` is a
+ * trace whose parent is already inside the subtree being evaluated.
  */
 export type TraceEvaluationLoopBlockReason = "depth_direct" | "parent_in_subtree";
 

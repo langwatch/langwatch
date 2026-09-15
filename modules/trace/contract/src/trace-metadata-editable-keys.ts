@@ -13,10 +13,9 @@ const LABELS_ATTRIBUTE = "langwatch.labels";
 const LABELS_METADATA_KEY = "labels";
 
 /**
- * Metadata that decides where a trace belongs rather than what it contains.
- * A conversation, a user, a customer and a scenario run are assembled by
- * grouping traces on these, so correcting one would re-parent the trace, and a
- * correction read on top of the captured trace cannot re-parent anything.
+ * Metadata that decides where a trace belongs, not what it contains.
+ * Conversations, users, customers and scenario runs group traces on these,
+ * so a correction read cannot re-parent anything.
  */
 const GROUPING_METADATA_KEYS = new Set(["thread_id", "user_id", "customer_id"]);
 

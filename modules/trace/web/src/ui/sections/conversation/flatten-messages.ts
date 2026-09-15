@@ -21,11 +21,9 @@ export interface StreamingPart {
 const NO_CONTENT_SENTINEL = "None";
 
 /**
- * Reads the reasoning a message carried, under either vendor's field name.
- *
- * OpenAI's o-series puts chain-of-thought on `reasoning_content`; Anthropic
- * uses `thinking`. They mean the same thing to a reader, so they render the
- * same way.
+ * Reads the reasoning a message carried, under either vendor's field name:
+ * OpenAI's o-series uses `reasoning_content`, Anthropic `thinking`. Same
+ * meaning to a reader, so they render the same way.
  */
 function readReasoning(msg: FlattenableMessage): string | undefined {
   const raw = msg as Record<string, unknown>;
@@ -34,11 +32,9 @@ function readReasoning(msg: FlattenableMessage): string | undefined {
 }
 
 /**
- * Reads a message's tool calls, accepting both wire casings.
- *
- * `tool_calls` is OpenAI's and langwatch's own `chatMessageSchema`; `toolCalls`
- * is AG-UI's. Both reach this renderer, so both are read rather than one being
- * normalised at some earlier boundary that not every caller passes through.
+ * Reads a message's tool calls, accepting both wire casings: `tool_calls`
+ * is OpenAI's/langwatch's `chatMessageSchema`, `toolCalls` is AG-UI's. Both
+ * reach this renderer, so both are read rather than normalised earlier.
  */
 function readToolCalls(
   msg: FlattenableMessage,
@@ -180,11 +176,9 @@ function partsForMessage({
 }
 
 /**
- * Attaches each tool result to the call it answers, so the two render as one
- * card rather than as an orphaned request followed by an orphaned reply.
- *
- * A result whose call is not in the transcript keeps its own part — dropping
- * it would hide output the model actually received.
+ * Attaches each tool result to the call it answers, so the two render as
+ * one card rather than an orphaned request and an orphaned reply. A result
+ * with no matching call keeps its own part — dropping it would hide output.
  */
 function pairToolResults(parts: DisplayPart[]): DisplayPart[] {
   const callsById = new Map<string, DisplayPart & { kind: "tool" }>();

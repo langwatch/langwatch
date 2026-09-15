@@ -13,10 +13,9 @@ const PCM16_SAMPLE_RATE = 24000;
 const G711_SAMPLE_RATE = 8000;
 
 /**
- * Classify a raw / header-less realtime audio format from an `input_audio`
- * `format` hint and/or a mimeType. Returns null for container formats
- * (wav/mp3/flac/…) and anything unrecognised — those are already playable and
- * must pass through untouched.
+ * Classify a raw / header-less realtime audio format from a `format` hint
+ * and/or mimeType. Returns null for container formats and anything
+ * unrecognised — those are already playable and pass through untouched.
  */
 export function resolveRawPcmFormat(format?: string, mimeType?: string): RawPcmFormat | null {
   const f = format?.toLowerCase();
@@ -96,10 +95,9 @@ function g711ToPcm16(samples: Uint8Array, format: "g711_ulaw" | "g711_alaw"): Ui
 }
 
 /**
- * Wrap raw realtime audio bytes in a WAV container for the given format.
- * Returns null for an empty payload. pcm16 keeps its samples untouched under
- * a linear-PCM header; G.711 is expanded to linear PCM16 first (browser WAV
- * decoders are PCM-only — fmt codes 6/7 would produce a dead player).
+ * Wrap raw realtime audio bytes in a WAV container. pcm16 keeps its samples
+ * untouched; G.711 is expanded to linear PCM16 first (browser WAV decoders
+ * are PCM-only — fmt codes 6/7 would produce a dead player).
  */
 export function wrapRawPcmToWav(samples: Uint8Array, format: RawPcmFormat): Uint8Array | null {
   if (samples.length === 0) return null;

@@ -60,11 +60,9 @@ export interface TraceSummaryFieldsBase {
   SubTopicId: string | null;
   AnnotationIds: string[];
   /**
-   * Stored payload size of the trace in bytes — the MATERIALIZED
-   * `_size_bytes` column (CH-native `byteSize(...)`; see migration 00032).
-   * SELECT-only: never written in INSERTs. Optional because only the list
-   * read path projects it (`_size_bytes AS SizeBytes`); the single-trace
-   * summary read leaves it absent.
+   * Stored payload size in bytes — the MATERIALIZED `_size_bytes` column
+   * (migration 00032). SELECT-only, never written in INSERTs; optional
+   * because only the list read path projects it.
    */
   SizeBytes?: number;
 }
@@ -120,11 +118,9 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   HasAnnotation: number | null;
   LastEventOccurredAt: number;
   /**
-   * The span timing baseline, epoch ms (migration 00072): the earliest start
-   * across the trace's non-synthetic spans, 0 while none has been folded.
-   * `OccurredAt` used to carry this as well as the storage anchor; ADR-087 split
-   * them. Absent on rows written before 00072, which the version gate in
-   * {@link TraceSummaryClickHouseRepository.fromClickHouseRecord} handles.
+   * The span timing baseline, epoch ms (migration 00072): earliest
+   * non-synthetic-span start, 0 until folded. `OccurredAt` used to carry
+   * this too; ADR-087 split them. Absent pre-00072 (version gate handles it).
    */
   EarliestSpanStartMs?: number | string;
   _retention_days: number;
@@ -231,12 +227,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   }
 
   /**
-   * Fold read-back path (ADR-066): an explicit window is applied verbatim with NO internal
-   * fallback — the caller (the fold executor) owns the miss retry, so a second recovery ladder
-   * here would re-run the resolve seek on results the executor is about to re-read unwindowed
-   * anyway. Mapped onto queryWindowed with `fallback: "none"` so the read still lands on
-   * `clickhouse_windowed_read_total` exactly once. The centre/half-width round-trip is exact:
-   * fromMs/toMs are integers, so their mean and half-difference are exactly representable.
+   * Fold read-back path (ADR-066): an explicit window applies verbatim with
+   * NO internal fallback — the fold executor owns the miss retry, so a
+   * second recovery ladder here would re-run a seek the executor redoes anyway.
    */
   async #findInExplicitWindow({
     tenantId,
@@ -276,12 +269,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   }
 
   /**
-   * The fallback stage: the hint window missed, or there was no hint. Resolves the trace's
-   * OccurredAt from a cheap sort-key seek and bounds the heavy read, instead of scanning every
-   * weekly partition (incl. cold S3). OccurredAt is stable across versions (it is the
-   * `PARTITION BY toYearWeek(OccurredAt)` key), so the ±2-day window always contains the row. A
-   * trace genuinely absent returns null without ever issuing the heavy read; historical sentinel
-   * rows still use the legacy unbounded fallback to preserve correctness.
+   * The fallback stage: the hint window missed, or there was none. Resolves
+   * OccurredAt from a cheap sort-key seek and bounds the heavy read instead
+   * of scanning every weekly partition. A genuinely absent trace returns null.
    */
   async #findByResolvedOccurredAt({
     tenantId,
@@ -325,14 +315,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.tryFindByTraceId");
 
-    // Fold read-back path (ADR-066): an explicit window is applied verbatim
-    // with NO internal fallback — the caller (the fold executor) owns the miss
-    // retry, so a second recovery ladder here would re-run the resolve seek on
-    // results the executor is about to re-read unwindowed anyway. Mapped onto
-    // queryWindowed with `fallback: "none"` so the read still lands on
-    // `clickhouse_windowed_read_total` exactly once. The centre/half-width
-    // round-trip is exact: fromMs/toMs are integers, so their mean and
-    // half-difference are exactly representable and reconstruct the bounds.
+    // Fold read-back path (ADR-066): an explicit window applies verbatim
+    // with NO internal fallback — the fold executor owns the miss retry, so
+    // a second recovery ladder here would re-run a seek it redoes anyway.
     if (options?.window) {
       return this.#findInExplicitWindow({ tenantId, traceId, window: options.window });
     }
@@ -616,11 +601,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 }
 
 /**
- * The trace_summaries projection port over the same ClickHouse repository the
- * read side uses. The two spell one table, one key triple and one partition
- * column, so they share the repository on purpose; only the argument shape the
- * fold writes with differs, and it is reshaped here rather than at a
- * composition root.
+ * The trace_summaries projection port over the same ClickHouse repository
+ * the read side uses — same table, key triple and partition column. Only
+ * the fold's write argument shape differs, reshaped here, not at composition.
  */
 export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProjectionRepository {
   private constructor(private readonly repository: TraceSummaryClickHouseRepository) {

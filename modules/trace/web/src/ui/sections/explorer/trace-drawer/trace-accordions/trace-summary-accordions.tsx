@@ -791,10 +791,9 @@ function traceAttributeFlags({
 }
 
 /**
- * A signal counts as "empty" — and so becomes a compact card — only once its
- * query has settled with nothing. While it is still loading it is neither a full
- * section nor a card, simply absent, so it never flashes a full-width empty
- * state before settling.
+ * A signal counts as "empty" (a compact card) only once its query has
+ * settled with nothing. While loading it is neither a full section nor a
+ * card, simply absent, so no full-width empty state flashes before settling.
  */
 function traceSignalFlags({
   errorSpans,

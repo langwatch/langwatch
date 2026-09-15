@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
- * Parity pins three media-part views: classifier matches rewriter, extractable
- * shapes trigger markers, render surfaces all shapes. Fakes TraceMediaStore like
- * trace-content-extraction.service.unit.test.ts does.
+ * Parity pins three media-part views: classifier, marker and render.
  */
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import { TraceContentExtractionService } from "../trace-content-extraction.service.ts";

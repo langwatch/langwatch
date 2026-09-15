@@ -433,10 +433,9 @@ function suggestionStateFor({
 }
 
 /**
- * For value-mode autocomplete on facet-backed fields (model, service, …) the
- * dynamic resolver's output replaces the static items in the same render,
- * rather than through a follow-up effect: one render per keystroke, and no
- * flash of static items.
+ * For value-mode autocomplete on facet-backed fields, the dynamic
+ * resolver's output replaces static items in the same render, not a
+ * follow-up effect: one render per keystroke, no flash of static items.
  */
 function nextSuggestionUI({
   prev,
@@ -542,10 +541,9 @@ interface EditorKeyContext {
 }
 
 /**
- * `@` is a virtual trigger: it never enters the document. The autocomplete is
- * anchored to the cursor position and subsequent typing grows the active token.
- * When the cursor isn't at a clean token start a space is inserted first, so the
- * new clause doesn't glue onto the previous one.
+ * `@` is a virtual trigger: it never enters the document. The autocomplete
+ * anchors to the cursor and typing grows the token. A space is inserted
+ * first when the cursor isn't at a clean start, so clauses don't glue.
  */
 function openTriggerAtCursor({
   ctx,
@@ -837,10 +835,9 @@ function cycleOperatorAt(ctx: EditorMouseContext, opEl: HTMLElement): void {
 }
 
 /**
- * X widget click → drop the token. AST-path widgets ride on liqe's trimmed-text
- * locations; fallback-path widgets only exist while the parser is failing, so
- * there the matched range is sliced out of the raw text and any AND/OR glue is
- * tidied up.
+ * X widget click → drop the token. AST-path widgets ride on liqe's
+ * trimmed-text locations; fallback-path widgets (parser failing) slice the
+ * matched range out of the raw text and tidy up any AND/OR glue.
  */
 function deleteTokenAt(ctx: EditorMouseContext, btn: HTMLElement): void {
   const location = locationOf(btn, "locStart", "locEnd");
@@ -946,10 +943,9 @@ function refreshSuggestionUI({
 }
 
 /**
- * The two screen anchors the dropdown and the inline submit hint hang off. The
- * cursor anchor is only measured while the dropdown is open, since `coordsAtPos`
- * forces layout; the end anchor is independent of the caret so a ⌘+A or a
- * click back into the middle doesn't drag the hint onto the reader's text.
+ * The two screen anchors the dropdown and inline submit hint hang off. The
+ * cursor anchor is measured only while open (`coordsAtPos` forces layout);
+ * the end anchor is caret-independent so a ⌘+A doesn't drag the hint.
  */
 function updateSuggestionAnchors({
   editor,

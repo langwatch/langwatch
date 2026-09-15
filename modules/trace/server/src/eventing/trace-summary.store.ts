@@ -62,14 +62,9 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {
-    // `context.readWindow` — computed by the executor from the fold's declared
-    // `options.readWindow` — bounds this read so trace_summaries (partitioned
-    // by toYearWeek(OccurredAt)) prunes partitions instead of cold-scanning
-    // them all (incl. S3 tier). Passed through verbatim, and the repository
-    // applies it verbatim (no internal fallback on this path): the EXECUTOR
-    // retries a windowed miss without the window, which lands on the
-    // repository's resolve-OccurredAt path — so correctness never depends on
-    // the width, and no layer runs a second recovery ladder.
+    // `context.readWindow` bounds this read so trace_summaries (partitioned
+    // by toYearWeek) prunes instead of cold-scanning. The EXECUTOR retries a
+    // windowed miss without the window — correctness never depends on width.
     return this.storage.findByTraceId({
       tenantId: String(context.tenantId),
       traceId: aggregateId,
@@ -79,10 +74,9 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
 }
 
 /**
- * A fold state is worth persisting when it has at least one span, or log records that
- * contributed something a reader can see. The content check keeps ambient process telemetry
- * out: an agent that dies before its first prompt still emits lifecycle/error records, and
- * those must not mint a span-less row with no input, output or cost.
+ * A fold state is worth persisting only with a span, or a log record a
+ * reader can see. This keeps ambient telemetry out: an agent dying before
+ * its first prompt still emits lifecycle records, but must not mint a row.
  */
 function hasPersistableSignal(state: TraceSummaryData): boolean {
   if (state.spanCount > 0) return true;

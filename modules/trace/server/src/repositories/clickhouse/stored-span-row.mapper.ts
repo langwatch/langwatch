@@ -37,11 +37,9 @@ function validateStatusCode(value: number | null): NormalizedStatusCode | null {
 }
 
 /**
- * Ensures a ClickHouse Map(String, String) value is actually Record<string, string>.
- * Non-string values are dropped with a warning.
- *
+ * Ensures a ClickHouse Map(String, String) value is actually
+ * Record<string, string>; non-string values are dropped with a warning.
  * Exported so every stored_spans read path shares the same row decoding.
- * Pair with {@link deserializeAttributes}.
  */
 export function ensureStringRecord(raw: Record<string, unknown>): Record<string, string> {
   const result: Record<string, string> = {};
@@ -72,10 +70,9 @@ function parseJsonAttribute(trimmed: string): unknown {
 }
 
 /**
- * Intentionally lossy for string values that look like decimal numbers (e.g. zip codes "90210"
- * → 90210). The ClickHouse round-trip for originally-numeric attributes is correct; pure string
- * numerics may lose their string type. Integers beyond Number.MAX_SAFE_INTEGER stay strings, to
- * avoid precision loss.
+ * Intentionally lossy for strings that look like decimal numbers (e.g. zip
+ * "90210" → 90210); originally-numeric attributes round-trip correctly.
+ * Integers beyond Number.MAX_SAFE_INTEGER stay strings to avoid precision loss.
  */
 function parseNumericAttribute(trimmed: string): number | undefined {
   const isDecimalNumber =
@@ -111,10 +108,8 @@ function deserializeAttributeValue(value: string): unknown {
 }
 
 /**
- * Deserializes attribute values read from ClickHouse Map(String, String) columns.
- * Reverses serializeAttributes: parses JSON strings back to objects/arrays,
- * converts "true"/"false" to booleans, and numeric strings to numbers.
- *
+ * Deserializes attribute values from ClickHouse Map(String, String) columns:
+ * JSON strings to objects/arrays, "true"/"false" to booleans, numeric strings to numbers.
  * @internal Exported for unit testing
  */
 export function deserializeAttributes(attrs: Record<string, string>): Record<string, unknown> {
@@ -129,7 +124,6 @@ export function deserializeAttributes(attrs: Record<string, string>): Record<str
 /**
  * Serializes attribute values for ClickHouse Map(String, String) columns.
  * Non-scalar values are JSON-stringified at the write boundary.
- *
  * @internal Exported for unit testing
  */
 export function serializeAttributes(attrs: Record<string, unknown>): Record<string, string> {
@@ -160,10 +154,8 @@ export function serializeAttributes(attrs: Record<string, unknown>): Record<stri
 
 /**
  * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
- * Exported so the claim-check equivalence test can drive the REAL mapping
- * rather than a hand-built stand-in — the whole claim-check design rests on a
- * resolved span producing the same command as the inline one, and a
- * column-mapping regression is exactly what that contract must catch.
+ * Exported so the claim-check equivalence test drives the REAL mapping, not
+ * a hand-built stand-in — exactly the column-mapping regression it must catch.
  */
 export interface FullSpanRow {
   SpanId: string;

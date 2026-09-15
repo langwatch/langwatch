@@ -1,9 +1,7 @@
 /**
- * The protections-parameterized transcript read shared by the tRPC procedure
- * and the REST route (`GET /api/traces/:traceId/transcript`). The span/log
- * stores are mocked boundaries; the log visibility gate and the transcript
- * derivation run for real, so what these tests pin is the actual document an
- * API-key caller receives.
+ * The protections-parameterized transcript read shared by the tRPC
+ * procedure and the REST route. Span/log stores are mocked; the visibility
+ * gate and transcript derivation run for real, pinning the actual document.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";

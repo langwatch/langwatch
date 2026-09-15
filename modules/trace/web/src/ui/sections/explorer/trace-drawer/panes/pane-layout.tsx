@@ -407,10 +407,9 @@ function observeCtxPaneSizing({
 }
 
 /**
- * The details pane's collapsed size equals the SpanTabBar's height in vertical
- * layout, so collapsing leaves the tab row flush at the drawer bottom. In a
- * horizontal split it collapses away entirely and takes a pixel floor instead,
- * converted to the percentage `minSize` the library wants.
+ * The details pane's collapsed size equals SpanTabBar's height in vertical
+ * layout, flush at the drawer bottom. In a horizontal split it collapses
+ * away entirely, using a pixel floor converted to the library's `minSize`.
  */
 function observeDetailPaneSizing({
   layout,
@@ -549,10 +548,9 @@ function syncCtxPaneCollapse({
 }
 
 /**
- * Drives the details panel from the store, defensively: the library's own
- * `isCollapsed()` is unreliable after a drag, so the size is the check that is
- * trusted. Re-opening lands back on the reader's last manual size rather than
- * the library default, which could blow the panel up to 60-70% on wide screens.
+ * Drives the details panel from the store, defensively: `isCollapsed()` is
+ * unreliable after a drag, so size is the trusted check. Re-opening lands
+ * on the reader's last size, not a library default that could blow up wide.
  */
 function syncDetailPaneCollapse({
   collapsed,
@@ -580,10 +578,9 @@ function syncDetailPaneCollapse({
 }
 
 /**
- * The visualisation panel and, when a span is selected, the details panel beside
- * or below it with a resize handle between. With no selection the same
- * VizPlaceholder fills the group, so its scrolling, height and tab strip behave
- * identically either way.
+ * The visualisation panel and, when a span is selected, the details panel
+ * beside or below with a resize handle between. With no selection the
+ * same VizPlaceholder fills the group, so behavior stays identical.
  */
 function VizDetailGroup({
   detailCollapsedSize,

@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Clicking a facet row that carries a drilldown opens that drilldown as well
- * as applying the filter — see specs/traces-v2/evaluator-filter-label.feature,
- * rule "Picking a row opens its drilldown". The trailing chevron stays, but it
- * is no longer the only way in.
+ * Clicking a facet row with a drilldown opens it as well as applying the
+ * filter. The trailing chevron stays, but it's no longer the only way in.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -34,10 +31,9 @@ const ITEMS: FacetItem[] = [
 ];
 
 /**
- * Stands in for the evaluator drilldown: the real one is fed from
- * `item.aggregates` and is exercised by EvaluatorDrilldown.integration.test.tsx.
- * All this suite needs is a `below` present exactly when the section considers
- * the row expanded, and a `trailing` chevron that expands without filtering.
+ * Stands in for the evaluator drilldown (the real one is exercised by
+ * EvaluatorDrilldown.integration.test.tsx). Needs only a `below` present
+ * when expanded, and a `trailing` chevron that expands without filtering.
  */
 const renderInactiveRowExtras = (
   item: FacetItem,

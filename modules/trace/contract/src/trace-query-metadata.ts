@@ -18,11 +18,9 @@ export interface SearchFieldMeta {
   facetField?: string;
   valueType: "categorical" | "range" | "text" | "existence";
   /**
-   * Section the field belongs to in the autocomplete dropdown. Drives the
-   * "Trace / Span / Event / Eval / Metrics" headers — same semantic
-   * grouping the FilterSidebar uses, so the user's mental map matches in
-   * both surfaces. Optional for now so we can land the metadata gradually
-   * without forcing every new field through the registry.
+   * Section the field belongs to in the autocomplete dropdown — same semantic
+   * grouping the FilterSidebar uses. Optional while the metadata registry
+   * lands gradually.
    */
   group?: SearchFieldGroup;
 }

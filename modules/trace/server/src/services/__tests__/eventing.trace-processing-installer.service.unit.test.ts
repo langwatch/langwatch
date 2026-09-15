@@ -22,10 +22,8 @@ class TestDatasetNormalization extends DatasetNormalizationWorker {
 
 /**
  * Two of Trace's nine commands — all the installer's routing/durable-job
- * registration needs. Return type is the port's own, not widened, so the
- * narrowing cast lives here rather than loosening `TraceProcessingPipeline`
- * and costing the real builder its typing. Building the real nine would mean
- * four store-backed projections the installer never looks at.
+ * registration needs. The narrowing cast lives here rather than loosening
+ * `TraceProcessingPipeline` and costing the real builder its typing.
  */
 class TestTracePipeline implements TraceProcessingPipeline {
   deferredOrigins: TraceDeferredOriginScheduler | undefined;

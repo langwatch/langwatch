@@ -139,14 +139,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Latest-version dedup, shared by the page's inner stage and the count.
-    // Decided on the base predicates alone, so the filter chooses among current
-    // traces rather than deciding which version is current.
-    //
-    // It is a whole-window aggregate: it groups every row this tenant has in
-    // the time range, so each place it appears is another pass over that set.
-    // State it once per read — see the outer stage below, which reuses the
-    // inner stage's result instead of deriving the same thing again.
+    // Latest-version dedup, shared by the page's inner stage and the count,
+    // decided on base predicates alone. A whole-window aggregate, so state
+    // it once per read — the outer stage below reuses this result.
     const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM ${TABLE_NAME}

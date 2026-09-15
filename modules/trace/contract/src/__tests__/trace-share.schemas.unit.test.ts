@@ -58,11 +58,9 @@ const validPayload = () => ({
 });
 
 /**
- * The deliberate exclusions. Stripping is the safe default, but a silent strip
- * is also how a field the share page genuinely needs quietly goes blank — so
- * this asserts the pick lists are exhaustive apart from what is listed here.
- * Adding a field to an internal read schema therefore fails this test until
- * someone decides, explicitly, whether a share viewer should see it.
+ * The deliberate exclusions. Asserts the pick lists are exhaustive apart from
+ * what is listed here, so adding a field to an internal read schema fails
+ * this test until someone decides whether a share viewer should see it.
  */
 const INTENTIONALLY_NOT_SHARED: Record<string, string[]> = {
   header: [],
@@ -171,10 +169,9 @@ describe("sharedTrace output schema", () => {
 
   describe("given a redaction upstream has regressed", () => {
     /**
-     * These two are pinned rather than stripped: omitting them would be
-     * indistinguishable from a field that is simply absent, so the schema
-     * fails loudly instead. A parse failure is a 500 the share suite catches,
-     * which is the correct trade at a security boundary.
+     * Pinned rather than stripped: omitting them would be indistinguishable
+     * from an absent field, so the schema fails loudly — a parse failure is
+     * a 500 the share suite catches, the correct trade at a security boundary.
      */
     it("rejects a header whose userId was not nulled", () => {
       const payload = validPayload();

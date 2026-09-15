@@ -35,12 +35,9 @@ export interface ProjectMetadataSubscriberDeps {
 }
 
 /**
- * What a project's first trace tells us about the project.
- *
- * Ingest is the only moment some of this is knowable — the SDK language, that
- * the project is integrated at all — so it is read once, on the first real
- * trace. `isRealFirstIngest` is the whole guard: a re-delivered first trace
- * must not re-announce a project as newly integrated.
+ * What a project's first trace tells us. Ingest is the only moment some of
+ * this is knowable (SDK language, integrated at all), read once on the
+ * first real trace. `isRealFirstIngest` guards a re-delivered first trace.
  */
 export class ProjectMetadataSync {
   /**

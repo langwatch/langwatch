@@ -90,10 +90,8 @@ export function addSameFieldOrValue({
 
 /**
  * Locate the field's value when it appears exactly once, un-negated, as a
- * literal Tag — the shape we can safely fold into a same-field OR group.
- * Returns null when the field is absent, negated, multi-valued, or already
- * sitting inside an OR group (a value whose parent is an OR
- * `LogicalExpression` is handled by the splice path, not by wrapping).
+ * literal Tag — safe to fold into a same-field OR group. Null when absent,
+ * negated, multi-valued, or already inside an OR group.
  */
 function findLoneBareInclude(
   ast: LiqeQuery,
@@ -266,10 +264,9 @@ export function setFacetValueAtLocation({
 }
 
 /**
- * Flip the boolean operator at the given liqe location between AND and
- * OR. Drives the click-to-cycle affordance on operator keywords in the
- * search bar. Locations are in liqe's @-stripped trimmed-text coordinate
- * space — the same convention `removeNodeAtLocation` uses.
+ * Flip the boolean operator at the given liqe location between AND and OR.
+ * Locations are in liqe's @-stripped trimmed-text coordinate space — the
+ * same convention `removeNodeAtLocation` uses.
  */
 export function swapOperatorAtLocation({
   currentQuery,
@@ -283,13 +280,9 @@ export function swapOperatorAtLocation({
   if (!currentQuery.trim()) {
     return currentQuery;
   }
-  // The operator keyword's text content lives at [start, end) in the
-  // trimmed-string projection. We don't need to re-parse: a literal
-  // string swap of "AND" ↔ "OR" at those coordinates is unambiguous
-  // because the AST walk only emits operator slots for real boolean
-  // operators in the parsed query — they can't sit inside a quoted
-  // value. Working at the string level avoids re-serialisation
-  // reformatting the surrounding query.
+  // Literal string swap of "AND" ↔ "OR" at those coordinates: the AST walk
+  // only emits operator slots for real booleans (never inside a quoted
+  // value), so no re-parse is needed.
   const trimmed = currentQuery.trimStart();
   const leadingWs = currentQuery.length - trimmed.length;
   const absStart = leadingWs + start;
@@ -425,9 +418,8 @@ export function removeImplicitTermFromQuery({
 
 /**
  * Drop the Tag node at the given liqe location (start/end relative to the
- * @-stripped query string). Used by the inline X-button on each token —
- * `filterAST` collapses any orphaned logical/parenthesized parents so we
- * don't end up with stray operators or empty parens.
+ * @-stripped query string). `filterAST` collapses any orphaned
+ * logical/parenthesized parents so no stray operators or empty parens remain.
  */
 export function removeNodeAtLocation({
   currentQuery,

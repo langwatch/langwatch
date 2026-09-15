@@ -1,8 +1,7 @@
 /**
- * The server half of `traceEditOverlay.*`. Reading needs `traces:view`;
- * writing needs `annotations:update`, the same family the suggest-an-output
- * flow sits in. Transport only - the two redaction rules are the same
- * functions the legacy trace read applies.
+ * The server half of `traceEditOverlay.*`. Reading needs `traces:view`,
+ * writing `annotations:update`. Transport only — the two redaction rules
+ * are the same functions the legacy trace read applies.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { TraceApi, traceEditOverlayTrpc } from "@langwatch/trace-contract";

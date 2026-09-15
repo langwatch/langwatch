@@ -3,11 +3,9 @@
  */
 
 /**
- * Metadata keys that are already represented as dedicated columns
- * and should be excluded from the generic "metadata" field.
- *
- * Used by both CSV and JSON serializers to ensure consistent output
- * regardless of export format.
+ * Metadata keys already represented as dedicated columns, excluded from
+ * the generic "metadata" field. Used by both CSV and JSON serializers for
+ * consistent output.
  */
 export const RESERVED_METADATA_KEYS: Readonly<Record<string, true>> = {
   thread_id: true,

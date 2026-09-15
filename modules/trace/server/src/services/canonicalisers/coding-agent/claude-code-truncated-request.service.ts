@@ -12,10 +12,9 @@ interface SalvagedValue {
 }
 
 /**
- * What one character meant to a JSON scan. The walkers below each care about a
- * different subset, but all of them need string and escape state tracked
- * exactly right, which is the part that is easy to get subtly wrong, so it
- * lives in {@link JsonScan} once rather than three times.
+ * What one character meant to a JSON scan. Each walker below cares about a
+ * different subset, but all need string/escape state tracked exactly
+ * right — easy to get subtly wrong, so it lives in {@link JsonScan} once.
  */
 type JsonScanEvent =
   | "string-content"
@@ -26,10 +25,9 @@ type JsonScanEvent =
   | "literal";
 
 /**
- * A character cursor over (possibly cut) JSON that never allocates a parse
- * tree, so a 60KB body costs one linear pass. `depth` counts brackets and is
- * updated before the event is returned; a quote leaves it untouched, so a
- * caller reading `depth` on a string event sees the depth the string sits at.
+ * A character cursor over (possibly cut) JSON with no parse tree, so a
+ * 60KB body costs one linear pass. `depth` counts brackets, updated before
+ * the event returns; a quote leaves it untouched.
  */
 class JsonScan {
   depth = 0;
@@ -182,10 +180,9 @@ export class ClaudeCodeTruncatedRequestService {
   }
 
   /**
-   * The span of one JSON value starting at `start`, or its cut prefix. The value
-   * is expected to be a string, object or array, which is what the three keys
-   * salvage asks for always are; a bare scalar owns no delimiter to close on and
-   * so reads as running to the end of the input.
+   * The span of one JSON value starting at `start`, or its cut prefix.
+   * Expected to be a string, object or array; a bare scalar has no
+   * delimiter to close on, so it reads as running to the end of input.
    */
   private scanValueSpan(raw: string, start: number): SalvagedValue {
     const scan = new JsonScan();
@@ -228,9 +225,8 @@ export class ClaudeCodeTruncatedRequestService {
 
   /**
    * The readable text out of a CUT string or content-block-array fragment:
-   * for a string value the raw chars up to the cut (minus any dangling escape),
-   * for an array of blocks the complete blocks' text plus the cut block's
-   * partial `"text"` string.
+   * raw chars up to the cut for a string, or complete blocks' text plus the
+   * cut block's partial `"text"` string for an array.
    */
   private salvagePartialText(slice: string): string | null {
     const fragment = slice.trimStart();

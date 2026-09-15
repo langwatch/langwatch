@@ -13,10 +13,8 @@ import type { TracePayloadReaderRepository } from "./read/trace-payload-reader.r
 
 /**
  * The rows the trace module owns, chosen once at boot. One tier spans two
- * stores that coexist rather than compete: Postgres holds the reviewer
- * correction, ClickHouse holds the three projections the fold commits
- * through. ClickHouse is a second required input to the same tier, not an
- * alternative to it.
+ * coexisting stores: Postgres holds the reviewer correction, ClickHouse the
+ * three fold projections — a second required input, not an alternative.
  */
 export interface TraceRepositories {
   readonly editOverlay: TraceEditOverlayRepository;

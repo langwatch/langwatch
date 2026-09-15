@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for the audio members of `chatRichContentSchema` (#5304).
- * Feature: specs/trace-processing/audio-player-in-traces.feature
+ * Audio members of chatRichContentSchema (#5304); see the audio-player-in-traces feature.
  */
 import { chatRichContentSchema } from "../index.ts";
 import { describe, expect, it } from "vitest";

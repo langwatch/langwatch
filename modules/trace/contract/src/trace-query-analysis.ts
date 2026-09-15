@@ -9,11 +9,9 @@ import { walkAST } from "./trace-query-ast.ts";
 import type { FacetState } from "./trace-query-metadata.ts";
 
 /**
- * Walk the AST after a successful syntactic parse and reject queries the
- * server can't execute. Catches `field:` (no value) — liqe parses it as a
- * `Tag` whose expression is `EmptyExpression`, but the backend rejects with a
- * 422. Returning the error here lets the SearchBar surface red-border feedback
- * and prevents the doomed query from being committed and re-fired by polling.
+ * Rejects queries liqe parses but the server can't execute — e.g. `field:`
+ * (no value) becomes an `EmptyExpression` Tag the backend 422s on. Catching
+ * it here lets the SearchBar show red-border feedback before commit.
  */
 function missingValueMessage(ast: Extract<LiqeQuery, { type: "Tag" }>): string | null {
   if (ast.expression.type !== "EmptyExpression") return null;
@@ -85,10 +83,9 @@ export function getFacetValueState(ast: LiqeQuery, fieldName: string, value: str
 }
 
 /**
- * Single AST walk that captures every facet value's state. Returns a flat
- * lookup keyed by `${field}|${value}`. The sidebar renders dozens of rows,
- * each of which used to call `getFacetValueState` — meaning N×M walks per
- * render. With this lookup the walk happens once per AST identity change.
+ * Single AST walk that captures every facet value's state, keyed by
+ * `${field}|${value}`. Replaces dozens of per-row `getFacetValueState` calls
+ * (N×M walks) with one walk per AST identity change.
  */
 export function buildFacetStateLookup(ast: LiqeQuery): ReadonlyMap<string, FacetState> {
   const map = new Map<string, FacetState>();
@@ -209,12 +206,9 @@ export interface OrGroupAnalysis {
    */
   memberToGroupId: Map<string, string>;
   /**
-   * Field → list of group ids whose members include this field. A field
-   * can appear in multiple disjoint OR groups, so this is a list rather
-   * than a single id (e.g. `(status:error OR model:gpt-4) AND
-   * (status:warning OR service:api)` — `status` is in both groups).
-   * Sidebar consumers that want a single representative group should
-   * pick `[0]`; consumers that want all peers should iterate.
+   * Field → list of group ids whose members include this field (a field can
+   * appear in multiple disjoint OR groups). Consumers wanting one
+   * representative group pick `[0]`; consumers wanting all peers iterate.
    */
   fieldToGroupIds: Map<string, string[]>;
 }

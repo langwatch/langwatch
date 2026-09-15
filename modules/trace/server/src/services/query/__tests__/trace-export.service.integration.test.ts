@@ -1,10 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
- *
- * Integration tests for TraceExportService.
- * Mocks TraceService (external boundary) and verifies the async generator
- * yields correct chunks with progress.
+ * Integration tests for TraceExportService: mocks TraceService (external
+ * boundary) and verifies the async generator yields correct chunks with progress.
  */
 
 import { describe, expect, it, vi } from "vitest";

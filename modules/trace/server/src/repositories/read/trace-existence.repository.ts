@@ -1,10 +1,7 @@
 /**
  * Which of a set of candidate ids the project actually holds a trace for.
- *
- * The one question other verticals ask of trace storage without wanting a
- * trace: queueing for annotation and the automation that hands traces over
- * both need to know an id addresses something before they write a row against
- * it, and neither of them may reach into trace storage to find out.
+ * The one question other verticals ask without wanting a trace: annotation
+ * queueing and handoff automation need to know an id resolves before writing.
  */
 export abstract class TraceExistenceRepository {
   abstract findExistingTraceIds(input: {

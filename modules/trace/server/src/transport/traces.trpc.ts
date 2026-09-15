@@ -1,9 +1,7 @@
 /**
  * The server half of `traces.*`. Every procedure takes `traces:view`.
- * Transport only: policy and delegation to `TraceApp`. Which reads resolve
- * offloaded values in full and which stay on the stored preview is the
- * application's decision, not this door's. Anonymous shared reads are NOT
- * here - see `sharedTrace.get` (ADR-057).
+ * Transport only, delegating to `TraceApp`. Anonymous shared reads are NOT
+ * here — see `sharedTrace.get` (ADR-057).
  */
 import { on } from "node:events";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
@@ -172,14 +170,9 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     const { projectId, traceIds } = input;
     const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
 
-    // The digest is one more reading of the same spans the other columns are
-    // mapped from, so the correction is read the same way. Read without it,
-    // the one column that quotes the whole trace would spell out the very
-    // spans the reviewer deleted.
-    //
-    // It stays on previews all the same: this runs over a whole page of
-    // traces at once, and resolving every offloaded value on all of them is
-    // what #4991 kept off the grid. Applying a correction needs none of it.
+    // The digest reads the same spans the other columns map from; without
+    // it, the trace-quoting column would spell out spans the reviewer
+    // deleted. Stays on previews: #4991 avoided resolving every offload on a whole page.
     const traces = await app.readTracesWithSpansPreview({
       projectId,
       traceIds,
@@ -251,13 +244,9 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       userId: actor.id,
     });
 
-    // A download consumes trace content, so it must never serve the 64 KB
-    // preview (#4991 AC1) - and that holds whether or not spans are
-    // included, because the returned traces carry trace-level
-    // `input`/`output` either way. Gating resolveBlobs on includeSpans (as
-    // this did) silently truncated any offloaded trace in a spans-less
-    // download, the same data-loss bug fixed in ExportService for
-    // summary-mode exports.
+    // A download must never serve the 64 KB preview (#4991 AC1), spans or
+    // not — traces carry trace-level input/output either way. Gating
+    // resolveBlobs on includeSpans silently truncated spans-less downloads.
     return app.listTraces({
       query: { ...input, pageSize: input.pageSize ?? 10_000 },
       protections,

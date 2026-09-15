@@ -1,9 +1,7 @@
 /**
- * The server half of `spans.*`. Both procedures take `traces:view` - a span
- * is trace content, and nothing here is readable to a caller who may not read
- * the trace it belongs to. Transport only: the waterfall order is the
- * application's, not this door's, and the viewer's redactions are resolved
- * per request and handed to the read unchanged.
+ * The server half of `spans.*`. Both procedures take `traces:view` — a
+ * span is trace content. Transport only: waterfall order is the
+ * application's; viewer redactions resolve per request, handed through unchanged.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { SpanNotFoundError, TraceApi, promptStudioSpanSchema, spansTrpc } from "@langwatch/trace-contract";

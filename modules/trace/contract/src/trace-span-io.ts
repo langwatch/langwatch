@@ -25,11 +25,9 @@ function joinInstructionEntries(entries: unknown[]): string | null {
 }
 
 /**
- * One `gen_ai.system_instructions` value as a prompt. The semconv writes it as
- * a plain string, as an array of content blocks (`{ type, content }`), or, when
- * the transport cannot carry structured values, as that array JSON-encoded, and
- * the canonicaliser folds the blocks into text the same way. Anything else, and
- * an array with no text in it, reads as no prompt.
+ * One `gen_ai.system_instructions` value as a prompt: a plain string, an
+ * array of content blocks, or that array JSON-encoded when the transport
+ * can't carry structured values — all folded into text the same way.
  */
 function systemInstructionsText(value: unknown): string | null {
   if (Array.isArray(value)) return joinInstructionEntries(value);

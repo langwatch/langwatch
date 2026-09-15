@@ -17,10 +17,9 @@ import {
 import { TraceStreamBufferService } from "./trace-stream-buffer.service.ts";
 
 /**
- * Cap on a spool object read. The spool holds one over-threshold command, and
- * `capOversizedAttributes` already bounds a span well below this — the cap
- * exists so a tampered or corrupt object cannot OOM the worker, not to enforce
- * a product limit.
+ * Cap on a spool object read. `capOversizedAttributes` already bounds a
+ * span well below this — the cap exists so a tampered/corrupt object can't
+ * OOM the worker, not to enforce a product limit.
  */
 export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
 
@@ -38,9 +37,8 @@ export class SpoolDestinationUnsupportedError extends Error {
 
 /**
  * Refuses a destination that cannot bound an orphaned spool object.
- *
- * WRITE PATH ONLY. This is a rule about creating new objects, not about the
- * ones already out there — see the `purpose` note on `mintSpoolUri`.
+ * WRITE PATH ONLY — a rule about creating new objects, not the ones
+ * already out there. See the `purpose` note on `mintSpoolUri`.
  */
 function assertDestinationCanHostSpool({
   destination,
@@ -101,11 +99,9 @@ export type TraceSpoolIdentity = {
 };
 
 /**
- * Transient spool operations for the ADR-022 write path. A per-span transient object carries
- * over-threshold command payloads from the edge to the command worker, eagerly deleted after
- * the event_log INSERT succeeds; a 3-day lifecycle policy is the safety net for orphans. Spool
- * writes go through the shared stored-objects layer, so the spool lands wherever the project's
- * storage destination points.
+ * Transient spool operations for the ADR-022 write path: a per-span object
+ * carries over-threshold payloads from edge to worker, eagerly deleted
+ * after the event_log INSERT; a 3-day lifecycle policy nets orphans.
  */
 export class TraceSpoolService {
   static create(options: TraceSpoolServiceOptions): TraceSpoolService {
@@ -115,10 +111,9 @@ export class TraceSpoolService {
   private constructor(private readonly options: TraceSpoolServiceOptions) {}
 
   /**
-   * The object's location is re-derived from `projectId`/`traceId`/`spanId` — read from the
-   * queue-authenticated command, never from `spoolRef` — so a tampered reference cannot redirect
-   * this read at another tenant's bytes. NOT fail-open: the edge already cleared
-   * `span.attributes`, so returning nothing would write a permanently empty span to `event_log`.
+   * Location is re-derived from the queue-authenticated command, never
+   * from `spoolRef` — a tampered reference can't redirect this read. NOT
+   * fail-open: returning nothing would write a permanently empty span.
    */
   async getSpool(identity: TraceSpoolIdentity): Promise<Buffer> {
     if (isLegacySpoolRef(identity.spoolRef)) {
@@ -191,10 +186,9 @@ export class TraceSpoolService {
   }
 
   /**
-   * Re-derives the spool object's URI from server-trusted inputs, never from the command.
-   * `purpose` gates the destination guards to write time only: applying them to a read or
-   * delete would make in-flight spooled spans permanently unreadable and block the eager
-   * delete that is the spool's first line of cleanup.
+   * Re-derives the spool URI from server-trusted inputs, never the command.
+   * `purpose` gates destination guards to write time only — applying them
+   * to a read/delete would block the spool's eager-delete cleanup.
    */
   private async mintSpoolUri(input: {
     projectId: string;
@@ -222,12 +216,9 @@ export class TraceSpoolService {
   }
 
   /**
-   * v1 read path: the reference IS the object key. Retained for one release so
-   * commands queued across the deploy still resolve. See {@link isLegacySpoolRef}.
-   *
-   * Read through the same bounded helper the v2 path uses. A v1 reference points
-   * at an object written before this deploy, which is exactly the input the cap
-   * exists to distrust.
+   * v1 read path: the reference IS the object key, retained for one
+   * release so commands queued across the deploy still resolve. See
+   * {@link isLegacySpoolRef}. Read through the same bounded helper as v2.
    */
   private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
     const body = await this.legacyObjects().read({ projectId, key: spoolRef });

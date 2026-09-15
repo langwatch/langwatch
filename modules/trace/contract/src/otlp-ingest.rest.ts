@@ -1,9 +1,7 @@
 /**
- * The OTLP receiver's own errors and small pure helpers. The receiver's ports
- * are declared in the server transport file rather than here: they carry the
- * platform's own `Request`, which - like `TraceExportRestMembers` beside it -
- * keeps this contract free of a DOM-lib dependency neither the browser SDK
- * shape nor another module needs.
+ * The OTLP receiver's own errors and small pure helpers. Ports live in the
+ * server transport file instead, keeping this contract free of the DOM-lib
+ * `Request` dependency neither the browser SDK nor another module needs.
  */
 import { HandledError } from "@langwatch/handled-error";
 
@@ -29,10 +27,9 @@ export class OtlpIngestSourceBillingUnavailableError extends HandledError {
 }
 
 /**
- * Classifies a token by prefix without exposing the value, so on-call can
- * filter a 401 stream by SDK shape. Ingestion keys are ordinary `sk-lw-`
- * API keys and classify as `legacy` here - the ingest discriminator lives on
- * the resolved row, not the token prefix.
+ * Classifies a token by prefix without exposing the value. `sk-lw-` keys
+ * classify as `legacy` — the ingest discriminator lives on the resolved row,
+ * not the token prefix.
  */
 export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";

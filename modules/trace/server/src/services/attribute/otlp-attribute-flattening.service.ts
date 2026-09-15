@@ -153,12 +153,7 @@ function sanitizeInvalidJsonEscapes(json: string): string {
   return json.replace(/\\([<>])/g, "$1");
 }
 
-/**
- * Parses string values that look like JSON into their parsed form.
- * Scalars and already-parsed values pass through unchanged.
- *
- * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
- */
+/** Parses string values that look like JSON; scalars pass through unchanged. */
 /** @internal Exported for unit testing */
 const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAttributes => {
   const result: NormalizedAttributes = {};

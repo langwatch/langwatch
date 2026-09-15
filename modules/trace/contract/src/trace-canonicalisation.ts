@@ -113,11 +113,9 @@ export type ClassifyClaudeCallInput = z.infer<typeof classifyClaudeCallInputSche
 export type ClassifyClaudeCallResult = z.infer<typeof classifyClaudeCallResultSchema>;
 
 /**
- * Trace's portable deterministic canonicalisation boundary.
- *
- * Log and metric preparation have separate ownership. Trace projections only
- * receive the stable operations needed to interpret a trace span and its
- * correlated records.
+ * Trace's portable deterministic canonicalisation boundary. Log and metric
+ * preparation have separate ownership; this receives only the stable
+ * operations needed to interpret a span and its correlated records.
  */
 export abstract class TraceCanonicalisationService {
   abstract canonicalizeSpanAttributes(

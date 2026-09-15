@@ -17,10 +17,9 @@ export type ProjectionFrom = (typeof PROJECTION_FROM_ROOTS)[number];
 export const projectionFromSchema = z.enum(PROJECTION_FROM_ROOTS);
 
 /**
- * Request-body extension merged into `traceSearchBodySchema` (app.v1.ts).
- * `select` is a FLAT dotted-path list (RFC Technical Plan §1). The server
- * groups paths by root server-side (`metadata.*` → `metadata{}`, `events.*`
- * → `events[]`, …) — the caller never declares the grouping.
+ * Request-body extension merged into `traceSearchBodySchema`. `select` is a
+ * FLAT dotted-path list; the server groups paths by root (`metadata.*` →
+ * `metadata{}`, etc.) — the caller never declares the grouping.
  */
 export const projectionRequestSchema = z.object({
   from: projectionFromSchema
@@ -103,9 +102,8 @@ export interface ProjectionPlan {
 
 /**
  * An annotation row attached to a trace by the ENGINE before projection.
- * Sourced from Postgres (Prisma `Annotation`) — never present on the legacy
- * read path, so it is carried as an augmentation of `Trace` rather than on the
- * core type.
+ * Sourced from Postgres, never present on the legacy read path, so it's
+ * carried as an augmentation of `Trace` rather than on the core type.
  */
 export interface ProjectedAnnotation {
   id: string;
@@ -129,11 +127,9 @@ export type ProjectableTrace = Trace & {
 export type ProjectedRow = Record<string, unknown>;
 
 /**
- * The compiler's output. Single object that carries:
- *  - `schema`  → goes into the response envelope when `select` is present.
- *  - `plan`    → forwarded into `getAllTracesForProject` options.projection.
- *  - `project` → applied per-trace in the response serialize loop, replacing
- *                `formatTrace` when a projection is active.
+ * The compiler's output: `schema` for the response envelope, `plan` for
+ * `getAllTracesForProject`, and `project` applied per-trace in place of
+ * `formatTrace` when active.
  */
 export interface CompiledProjection {
   schema: ResolvedSchema;

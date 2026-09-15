@@ -1,12 +1,7 @@
 /**
- * The project credential both ingestion doors resolve for themselves: the SDK
- * collector and the OTLP receiver. One resolution, two refusal vocabularies -
- * the collector tells an unknown credential apart from a key that is known and
- * not allowed, because the two carry different copy; the receiver publishes the
- * status and body directly.
- *
- * Both ask for `traces:create` as the key's ceiling, which is what these doors
- * have always asked for.
+ * The project credential both ingestion doors (SDK collector, OTLP
+ * receiver) resolve for themselves. One resolution, two refusal
+ * vocabularies; both ask for `traces:create` as the key's ceiling.
  */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";

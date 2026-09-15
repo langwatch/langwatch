@@ -1,10 +1,7 @@
 /**
- * The deep copy the span pipeline takes before rewriting a payload, so
- * redaction/cap/cost enrichment never reference back into the command.
- * `structuredClone` cost 7.2ms per 200-span batch against 0.4ms here, since
- * decoded OTLP is plain objects/arrays/scalars; a plain recursive copy
- * handles those and defers anything else to `structuredClone` unchanged.
- * Preserves keys holding `undefined`, unlike a JSON stringify/parse round trip.
+ * The deep copy before rewriting a payload, so redaction/cap/cost
+ * enrichment never reference back into the command. `structuredClone` cost
+ * 7.2ms per 200-span batch vs 0.4ms here for plain OTLP objects/arrays/scalars.
  */
 export function clonePayload<T>(value: T): T {
   return cloneUnknown(value) as T;

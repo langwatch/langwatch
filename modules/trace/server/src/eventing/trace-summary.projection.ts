@@ -50,10 +50,9 @@ const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 // ─── Main composition ───────────────────────────────────────────────
 
 /**
- * Max spans we fully process (normalize + derive) into a trace summary. A
- * handful of traces accumulate tens of thousands of spans (reused trace_id,
- * runaway loops); deriving every one pays unbounded cost for no added value.
- * Past the cap we only keep counting so the true magnitude stays visible.
+ * Max spans fully processed (normalize + derive) into a trace summary. A
+ * handful of traces accumulate tens of thousands (reused trace_id, runaway
+ * loops); past the cap we only keep counting, to stay visible.
  */
 export const MAX_PROCESSED_SPANS = 512;
 
@@ -70,10 +69,8 @@ export const RESERVED_CACHE_CREATION_TOKENS = "langwatch.reserved.cache_creation
 export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
 /**
  * Anthropic's cache-creation split by TTL, summed across the trace's model
- * calls. The split rides ONLY the api_response_body log events (no span
- * attribute carries it), so unlike the read/creation totals above these sums
- * accumulate on the LOG contribution path, which also means summing them
- * there can never double-count a span-side number.
+ * calls. Rides ONLY api_response_body log events (no span attribute carries
+ * it), so summing on the LOG path can never double-count a span-side number.
  */
 export const RESERVED_CACHE_CREATION_5M_TOKENS = "langwatch.reserved.cache_creation_5m_tokens";
 export const RESERVED_CACHE_CREATION_1H_TOKENS = "langwatch.reserved.cache_creation_1h_tokens";
@@ -88,10 +85,8 @@ export const RESERVED_CONTEXT_SIZE_AT_MS = "langwatch.reserved.context_size_at_m
 
 /**
  * A single log record's normalized contribution to the trace summary fold.
- * Both log-path events fold identically once normalized to this shape:
- * `log_record_received` builds it from the raw record (IO extraction +
- * canonical lift + resource-level non-billable flag), `log_contributed`
- * carries the already-lifted fields on the event itself.
+ * Both log-path events fold identically once normalized: `log_record_received`
+ * builds it from the raw record; `log_contributed` carries lifted fields.
  */
 interface LogContribution {
   traceId: string;
@@ -271,12 +266,9 @@ export class TraceSummaryFoldProjection
     event: LogRecordReceivedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    // Standalone OTLP logs (e.g. Claude Code's OTEL_LOGS_EXPORTER without a
-    // traces exporter) carry no trace context. The wire-level fix accepts
-    // them, but folding them here would aggregate every context-less log per tenant
-    // under the same empty aggregateId — surfacing a single nameless
-    // "trace" in the messages list that grows unboundedly. Skip the fold;
-    // Canonical storage is handled by the dedicated log pipeline.
+    // Standalone OTLP logs (e.g. Claude Code without a traces exporter)
+    // carry no trace context. Folding them would aggregate every such log
+    // per tenant under one empty aggregateId. Skip; the log pipeline stores them.
     if (!event.data.traceId || !event.data.spanId) {
       return state;
     }
@@ -490,10 +482,9 @@ export class TraceSummaryFoldProjection
   }
 
   /**
-   * The per-TTL cache-creation lift is a PER-CALL value that must accumulate, not overwrite: it
-   * is summed into the reserved running totals and its per-call keys are kept out of the generic
-   * last-write-wins merge that follows. The lifts are merged after, so the reserved and
-   * log_count keys already set remain intact.
+   * The per-TTL cache-creation lift is PER-CALL and must accumulate, not
+   * overwrite: summed into reserved running totals, kept out of the
+   * generic last-write-wins merge, and merged after so those keys survive.
    */
   private static mergeLiftedAttributes({
     contribution,

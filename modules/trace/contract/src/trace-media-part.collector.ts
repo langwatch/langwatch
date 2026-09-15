@@ -34,8 +34,7 @@ export type MediaPartData =
 
 /**
  * Shared recursion ceiling for media walks — identical on the render-side
- * collector (below) and the ingestion-side extractor
- * (`value-media-extractor.ts`), so a part nested at the boundary is either
+ * collector and `value-media-extractor.ts`, so a boundary-nested part is
  * reached by both or by neither.
  */
 export const MAX_MEDIA_WALK_DEPTH = 8;
@@ -78,10 +77,9 @@ function isStoredObjectUrl(url: string): boolean {
 }
 
 /**
- * Whether an `input_audio` part names a raw, header-less realtime format. The
- * classification is the application's `resolveRawPcmFormat`, reduced to the
- * question this walk actually asks: such a part carries no playable inline
- * source here (see the `inputAudio` branch below).
+ * Whether an `input_audio` part names a raw, header-less realtime format —
+ * such a part carries no playable inline source here (see `inputAudio`
+ * below).
  */
 function isRawPcmFormat(format?: string, mimeType?: string): boolean {
   const f = format?.toLowerCase();
@@ -105,10 +103,9 @@ function documentToMediaData(source: ContentSource): MediaPartData {
 }
 
 /**
- * MediaPartData's members split on source.type, so narrow before building each concrete
- * variant — keeps this cast-free. Wire payloads often omit the media type, so an inline
- * payload defaults it per category: a data: URI built from `undefined` (`data:undefined;…`)
- * is a silently-broken element with no error badge.
+ * MediaPartData's members split on source.type; narrow before building each
+ * variant to stay cast-free. Wire payloads often omit the media type, so an
+ * inline payload defaults it per category.
  */
 function providerMediaToMediaData(
   p: Readonly<{ type: "image" | "audio" | "video" | "document"; source: ContentSource }>,
@@ -185,12 +182,9 @@ export function isRenderableCollectedMedia(media: MediaPartData): boolean {
 }
 
 /**
- * Rendering-side gate for parsing a nested JSON string. The ingest markers
- * (`containsMediaMarkers`) detect INLINE media; after extraction an
- * `image_url` part referencing `/api/files/...` carries none of them, so the
- * collector also hints on the reference shape. Bare substrings, same
- * escape-proofing rationale as the ingest markers; a false positive costs
- * one JSON.parse of a string that already looked like JSON.
+ * Rendering-side gate for parsing a nested JSON string. `containsMediaMarkers`
+ * detects INLINE media only; an extracted `/api/files/...` reference carries
+ * none, so this also hints on the reference shape.
  */
 function containsRenderableMediaHints(value: string): boolean {
   return containsMediaMarkers(value) || value.includes("/api/files/");
@@ -199,8 +193,6 @@ function containsRenderableMediaHints(value: string): boolean {
 /**
  * A string whose ENTIRE value is one media reference — a base64 `data:` URI
  * or an externalized `/api/files/` URL — synthesized into a renderable part.
- * This is how a bare data-URI span attribute (no JSON around it) surfaces,
- * and how the bare reference string the extractor rewrites it to renders.
  */
 function bareStringToMediaData(value: string): MediaPartData | null {
   const trimmed = value.trim();
@@ -245,9 +237,8 @@ export function collectMediaParts(value: unknown, depth = 0): MediaPartData[] {
 
 /**
  * The same walk as `collectMediaParts`, keeping the chat role each part was
- * found under. One walker serves both: consumers that only render parts stay
- * on the plain list, and consumers that must tell the caller's media from the
- * agent's reply (the trace summary strips) read the role.
+ * found under, for consumers that must tell the caller's media from the
+ * agent's reply.
  */
 export function collectAnnotatedMediaParts(value: unknown, depth = 0): CollectedMediaPart[] {
   const out: CollectedMediaPart[] = [];

@@ -1,9 +1,7 @@
 /**
  * The OTLP receiver: `POST /api/otel/v1/{traces,logs,metrics}`. Declared
- * public because the door resolves its own project-scoped credential through
- * `app.otlpCredential` rather than the framework's project-key door: a refusal
- * here answers with the credential chain's own status and body, which a
- * declared `projectKey` door does not let a route choose.
+ * public since it resolves its own credential via `app.otlpCredential`,
+ * so a refusal answers with the credential chain's own status and body.
  */
 import {
   collectAuthDiagnostics,
@@ -49,9 +47,8 @@ export type OtlpIngestProject = Readonly<{
 export type OtlpIngestIdentity = Readonly<{
   /**
    * The scoped key's id, or null for a legacy project key. Rewritten onto
-   * every authenticated request and must never become conditional: the
-   * redaction deny-list exempts this attribute name, sound only while the
-   * value cannot come from the payload.
+   * every authenticated request, never conditional: the redaction deny-list
+   * exempts this name, sound only while it can't come from the payload.
    */
   apiKeyId: string | null;
   organizationId: string;
@@ -110,11 +107,9 @@ export type OtlpLogCollectionOutcome =
     }>
   | Readonly<{ outcome: "unavailable"; errorMessage: string }>
   /**
-   * This deployment receives no logs at all - it composed no log collection,
-   * so no batch posted here can ever land. Told apart from `unavailable`
-   * because that one is a retryable blip and this one is permanent: answering
-   * a retryable status to an exporter that can never succeed turns every
-   * fleet posting here into an unbounded retry loop.
+   * This deployment composed no log collection, so no batch can ever land.
+   * Distinct from `unavailable` (a retryable blip): a retryable status here
+   * would turn every fleet posting here into an unbounded retry loop.
    */
   | Readonly<{ outcome: "not-served"; errorMessage: string }>;
 
@@ -147,19 +142,9 @@ export type OtlpIngestErrorReport = (
 ) => void;
 
 /**
- * The whole of what the three OTLP routes ask the process for.
- *
- * Every member carries the `otlp` prefix, because the one class that answers
- * this door also answers `/api/trace/*` and `POST /api/collector`, and each of
- * those resolves a credential and weighs an allowance of its own. A shared name
- * would be one door silently reading another's answer.
- *
- * NONE of them is optional, and that is load-bearing rather than tidy: the
- * mounted family reads this application through the operations-only feature-API
- * proxy, which throws a `TypeError` on ANY name the application does not serve.
- * An "optional" member is therefore not an absence the route can test for - it
- * is a 500 on a customer's first export. Stating all six here makes a member the
- * composition does not supply a build failure instead.
+ * The whole of what the three OTLP routes ask the process for. NONE is
+ * optional: the operations-only proxy throws a `TypeError` on any
+ * unserved name, so stating all six here is a build failure, not a 500.
  */
 export type OtlpIngestRestMembers = Readonly<{
   otlpCredential: OtlpIngestCredentialResolver;
@@ -196,9 +181,8 @@ function bodyForensics(body: ArrayBuffer | Uint8Array) {
 
 /**
  * A misconfigured exporter fleet posts continuously with an identical
- * project/path signal on every batch, so a pair is reported at most once a
- * window - repetition costs money on an ingestion hot path for no new
- * information.
+ * project/path signal, so a pair is reported at most once a window —
+ * repetition costs money on an ingestion hot path for no new information.
  */
 const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
 const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
@@ -217,9 +201,8 @@ function correctedPathIsDueToLog({ pair, now }: { pair: string; now: number }): 
 
 /**
  * Records that this request reached us on a path a misconfigured exporter
- * produced. Logged here (not at the alias) since the project id is what
- * makes it actionable - the difference between knowing something is
- * misconfigured and knowing whose.
+ * produced. Logged here, not at the alias, since the project id is what
+ * makes it actionable.
  */
 function logCorrectedPath({
   request,
@@ -324,9 +307,8 @@ function applyReceiverProvenance({
 
 /**
  * Best-effort extraction of customer trace_ids from an OTLP traces body.
- * Never throws - an empty, malformed or unparsable body yields an empty
- * array. Tags rejection logs so "I sent trace_id X and it never appeared" can
- * be matched to the rejection.
+ * Never throws — an empty, malformed or unparsable body yields an empty
+ * array. Tags rejection logs so a customer's trace_id can be matched to it.
  */
 export function peekCustomerTraceIds(
   body: ArrayBuffer,
@@ -367,10 +349,9 @@ function collectDecodedTraceIds(request: IExportTraceServiceRequest, max: number
 }
 
 /**
- * Reconstructs a `Request` the shared `readOtlpBody` decompressor can read:
- * `.withRawBody("bytes")` has already drained the framework's own copy, so
- * this hands the SAME headers (content-encoding included) over a fresh body
- * stream built from the bytes already in hand, rather than reading twice.
+ * Reconstructs a `Request` the shared `readOtlpBody` decompressor can
+ * read: `.withRawBody("bytes")` already drained the framework's copy, so
+ * this hands the SAME headers over a fresh body stream from bytes in hand.
  */
 function requestForDecompression(request: Request, bytes: Uint8Array): Request {
   return new Request(request.url, {

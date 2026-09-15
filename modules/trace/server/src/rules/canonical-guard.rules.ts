@@ -42,10 +42,9 @@ export const asNumber = (v: unknown): number | null => {
 };
 
 /**
- * Coerces a value to a boolean. Accepts native booleans and the stringy
- * spellings that arrive over OTLP ("true"/"false", "1"/"0"). Returns null when
- * the value is absent or not a recognisable boolean, so callers can leave the
- * attribute unset rather than guessing.
+ * Coerces a value to a boolean, accepting native booleans and OTLP's stringy
+ * spellings ("true"/"false", "1"/"0"). Returns null when unrecognisable, so
+ * callers can leave the attribute unset rather than guessing.
  */
 export const asBoolean = (v: unknown): boolean | null => {
   if (typeof v === "boolean") {

@@ -1,9 +1,7 @@
 /**
- * Decoding one message's `content` into display parts.
- *
- * Split from the message-level walk so each file answers one question: this
- * one is "what is inside a message", `flattenMessages` is "what is in the
- * conversation".
+ * Decoding one message's `content` into display parts. Split from the
+ * message-level walk so each file answers one question: this is "what is
+ * inside a message", `flattenMessages` is "what is in the conversation".
  */
 import type { ContentPartVisitor } from "../../../model/shared/content-parts/visit-content-part.ts";
 import { visitContentPart } from "../../../model/shared/content-parts/visit-content-part.ts";
@@ -23,11 +21,9 @@ const asString = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
 
 /**
- * Reads a `tool_use` / `tool_call` / `tool_result` content block.
- *
- * Read here rather than through `visitContentPart` because these carry the ids
- * the result-pairing pass needs, and the visitor's `toolCall` / `toolResult`
- * branches do not surface them.
+ * Reads a `tool_use`/`tool_call`/`tool_result` content block. Read here,
+ * not through `visitContentPart`, because these carry the ids the
+ * result-pairing pass needs, which the visitor's branches don't surface.
  */
 export function readToolBlock({
   item,
@@ -67,11 +63,8 @@ export function readToolBlock({
 
 /**
  * OpenAI Realtime audio, in either state: inline base64 before server-side
- * extraction, or a `/api/files/<id>` reference after it.
- *
- * Each branch builds its whole part because `MediaPartData` splits its union
- * on `source.type` — a shared object literal over a union of sources matches
- * neither arm.
+ * extraction, or a `/api/files/<id>` reference after. Each branch builds
+ * its whole part since `MediaPartData` splits on `source.type`.
  */
 function audioPart({
   audio,
@@ -190,11 +183,9 @@ export function decodeContentPart({
 }
 
 /**
- * Folds a lone audio part and its sibling text into one part.
- *
- * The OpenAI Realtime API puts spoken audio and its transcript in the same
- * content array as siblings. Rendering them as two units reads as the model
- * having said everything twice.
+ * Folds a lone audio part and its sibling text into one part. The OpenAI
+ * Realtime API puts spoken audio and its transcript as array siblings;
+ * rendering two units reads as the model saying everything twice.
  */
 export function collapseAudioTranscript(parts: DisplayPart[]): DisplayPart[] {
   const media = parts.filter((part) => part.kind === "media");

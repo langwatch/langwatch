@@ -25,10 +25,9 @@ function buildChildrenIndex(
 }
 
 /**
- * Every span the correction removes, including spans that became descendants
- * of a deletion root after the correction was saved. Generic over any
- * id/parent pair so the canonical `Span` tree, the v2 tree nodes and a test
- * fixture all walk through the same code.
+ * Every span the correction removes, including descendants of a deletion
+ * root added after the correction was saved. Generic over any id/parent pair
+ * so the canonical tree, the v2 tree, and test fixtures share one walk.
  */
 export function expandDeletedSpanIds({
   links,
@@ -84,10 +83,9 @@ export function indexSpanPatches(patch: TraceEditOverlayPatch): Map<string, Trac
 }
 
 /**
- * The canonical `Span` is a union whose members pin `type` to a literal, so the
- * replacements are written through a structural alias instead of fighting the
- * discriminant. Every editable field is named identically on both sides, which
- * is what lets one loop carry all six.
+ * `Span` is a union pinning `type` to a literal, so replacements go through a
+ * structural alias instead of fighting the discriminant — every editable
+ * field is named identically, letting one loop carry all six.
  */
 function applySpanPatch({ span, spanPatch }: { span: Span; spanPatch: TraceEditSpanPatch }): Span {
   const next = { ...span } as Span;

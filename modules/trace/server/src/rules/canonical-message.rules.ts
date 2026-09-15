@@ -212,10 +212,9 @@ export const stripSystemMessages = (messages: unknown[]): unknown[] =>
   messages.filter((m) => !(isRecord(m) && isSystemRole(m.role)));
 
 /**
- * Best-effort "messages" decoding from unknown payloads:
- * - array => assume messages
- * - { messages: [...] } => messages
- * - string => raw prompt/completion
+ * Best-effort "messages" decoding from unknown payloads: an array is
+ * assumed to be messages, `{ messages: [...] }` unwraps, a string is raw
+ * prompt/completion.
  */
 export const decodeMessagesPayload = (payload: unknown): unknown => {
   if (isUnknownArray(payload)) {
@@ -264,10 +263,8 @@ export const normalizeToMessages = (
 
 /**
  * Checks if a value is a non-array object whose keys are all non-negative
- * integer strings (e.g. {"0": ..., "1": ...}).  This pattern arises when
- * `safeUnflatten` reconstructs flattened OTEL attribute paths like
- * `gen_ai.prompt.0.content.0.text` — the inner numeric segments become
- * object keys instead of array indices.
+ * integer strings — arises when `safeUnflatten` reconstructs flattened OTEL
+ * paths like `gen_ai.prompt.0.content.0.text` into keys, not array indices.
  */
 const isObjectWithNumericKeys = (v: unknown): v is Record<string, unknown> => {
   if (!v || typeof v !== "object" || Array.isArray(v)) {

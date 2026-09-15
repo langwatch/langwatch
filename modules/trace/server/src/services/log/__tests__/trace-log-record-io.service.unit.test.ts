@@ -1,10 +1,7 @@
 /**
- * Which vendor's log shape wins, and when one record falls through to the next
- * vendor's reading of it.
- *
- * The fall-through is the part worth pinning: Spring AI answers a record in its
- * own scope even when that record is empty, but a record whose first line it
- * does not recognise is passed on rather than swallowed.
+ * Which vendor's log shape wins, and when a record falls through to the
+ * next. Spring AI answers within its own scope even when empty, but an
+ * unrecognised first line is passed on rather than swallowed.
  */
 
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";

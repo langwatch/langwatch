@@ -7,12 +7,9 @@ import {
 } from "../trace-clickhouse-client.repository.ts";
 
 /**
- * The aggregate every offloaded trace field is stored under.
- *
- * A literal in both graphs: `event_log` is keyed by
- * `(TenantId, AggregateType, AggregateId, EventId)`, so a reader that asks for
- * the wrong aggregate type matches no row and returns the 64 KB preview instead
- * of the offloaded value — a silent degradation, not an error.
+ * The aggregate every offloaded trace field is stored under. `event_log` is
+ * keyed by `(TenantId, AggregateType, AggregateId, EventId)`, so the wrong
+ * type matches no row, returning the 64 KB preview — a silent degradation.
  */
 export const TRACE_PAYLOAD_AGGREGATE_TYPE = "trace";
 
@@ -28,12 +25,9 @@ class ResolvedTraceClickHouse extends TraceClickHouse {
 }
 
 /**
- * Half-width (ms) of the `EventOccurredAt` window applied to event_log blob
- * reads. The KSUID creation time and `EventOccurredAt` are stamped from the
- * same ingestion clock, so they land within queue lag of each other; ±2 days
- * comfortably covers that skew while still pruning to the one or two weekly
- * partitions the row can live in. Matches the ±2-day span partition hint used
- * on the trace-fetch path.
+ * Half-width (ms) of the `EventOccurredAt` window for event_log blob reads.
+ * KSUID creation time and `EventOccurredAt` share an ingestion clock, so ±2
+ * days covers the skew while pruning to one or two weekly partitions.
  */
 const EVENT_LOG_OCCURRED_AT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -104,11 +98,9 @@ const eventPayloadSchema = z.object({
 });
 
 /**
- * The durable ADR-022 read path: a claim-check fetch of one offloaded field out
- * of the `event_log` row that recorded it.
- *
- * TenantId is the FIRST predicate in the WHERE clause, structurally blocking
- * cross-tenant reads.
+ * The durable ADR-022 read path: a claim-check fetch of one offloaded field
+ * out of the `event_log` row that recorded it. TenantId is the FIRST WHERE
+ * predicate, structurally blocking cross-tenant reads.
  */
 export class ClickHouseTraceEventPayloadRepository {
   static create(clickhouse: TraceClickHouse): ClickHouseTraceEventPayloadRepository {
@@ -126,14 +118,11 @@ export class ClickHouseTraceEventPayloadRepository {
 
   private constructor(private readonly clickhouse: TraceClickHouse) {}
 
-  /**
-   * The event_log claim-check read behind the narrow port Trace declares.
-   *
-   * Absence is the contract: `tryRead` answers null for a missing row, a
-   * missing field, a corrupt payload and an unreachable cluster alike, because
-   * every one of them means the same thing to the caller — this field cannot
-   * be recalled, serve the preview.
-   */
+/**
+ * The event_log claim-check read behind the narrow port Trace declares.
+ * Absence is the contract: `tryRead` answers null for a missing row, field,
+ * corrupt payload or unreachable cluster alike — serve the preview instead.
+ */
   async tryRead(input: {
     tenantId: string;
     traceId: string;

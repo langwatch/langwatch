@@ -48,11 +48,9 @@ export const traceRecordSpanSchema = z.looseObject({
 });
 
 /**
- * Portable form of the existing full-trace read.
- *
- * The named fields are the stable domain surface. Loose nested records retain
- * captured model/provider fields without making the Trace contract depend on
- * a transport-specific union for every provider payload.
+ * Portable form of the existing full-trace read. Named fields are the stable
+ * domain surface; loose nested records retain provider fields without a
+ * transport-specific union.
  */
 export const traceRecordSchema = z.looseObject({
   trace_id: z.string(),

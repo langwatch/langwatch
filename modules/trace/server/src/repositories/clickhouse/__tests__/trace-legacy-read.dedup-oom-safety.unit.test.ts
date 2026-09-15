@@ -52,10 +52,9 @@ describe("trace dedup OOM safety", () => {
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
   /**
-   * The clustering domain has moved twice — into app-layer, then out into the
-   * topic feature package — and this read followed neither. Resolved from the
-   * workspace root so the next move fails loudly on the path instead of
-   * silently taking the whole suite out of CI.
+   * The clustering domain has moved twice and this read followed neither.
+   * Resolved from the workspace root so the next move fails loudly on the
+   * path instead of silently taking the whole suite out of CI.
    */
   const topicClusteringPath = path.join(
     repoRoot(),

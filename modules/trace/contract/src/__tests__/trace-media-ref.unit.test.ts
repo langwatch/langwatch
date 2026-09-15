@@ -14,12 +14,9 @@ import {
 } from "../index.ts";
 
 /**
- * The compact media references the trace summary carries, harvested from
- * `platform/app/src/shared/traces/media-refs.ts` in step (g1).
- *
- * Every pin here is a LITERAL rather than a read of the application's source:
- * the column has one writer and three readers, and a format they disagree
- * about is a thumbnail that silently resolves to nothing.
+ * The compact media references the trace summary carries. Every pin here is a
+ * LITERAL: the column has one writer and three readers, and a disagreement is
+ * a thumbnail that silently resolves to nothing.
  */
 
 const storedImage = {

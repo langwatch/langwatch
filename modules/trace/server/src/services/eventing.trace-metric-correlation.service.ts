@@ -74,11 +74,9 @@ export class EventingTraceMetricCorrelationAdapter implements CommandHandler<
   }
 
   /**
-   * Tenant-scoped like every other trace command's. A PointId already hashes
-   * its tenant transitively (via SeriesId), so a collision is not reachable
-   * today — but nothing states that invariant at this layer, and a dedup key
-   * that silently depends on it would suppress another tenant's work the day
-   * it changes.
+   * Tenant-scoped like every other trace command. A PointId already hashes
+   * its tenant transitively (via SeriesId), so a collision isn't reachable
+   * today — but this dedup key states the scoping rather than assume it.
    */
   static makeJobId(payload: RecordMetricCorrelationCommandData): string {
     return `${payload.tenantId}:${payload.traceId}:metric_correlation:${payload.pointId}:${payload.spanId}`;

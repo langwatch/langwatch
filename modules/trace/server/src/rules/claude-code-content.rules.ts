@@ -16,11 +16,9 @@ function contentBlockToText(block: unknown): string {
 }
 
 /**
- * Flatten one Anthropic message `content` (string OR array of content blocks)
- * to display text. Text + tool_result blocks contribute their text; tool_use
- * blocks render as a compact `[tool_use: name]` marker so the turn reads as a
- * conversation rather than raw JSON; thinking blocks are redacted by Anthropic
- * and images carry no text, so both are dropped.
+ * Flatten one Anthropic message `content` to display text. Text/tool_result
+ * blocks contribute their text; tool_use renders as `[tool_use: name]` so
+ * the turn reads as conversation; thinking/images carry no text and drop.
  */
 export function contentToText(content: unknown): string {
   if (typeof content === "string") {
@@ -41,10 +39,8 @@ export function contentToText(content: unknown): string {
 
 /**
  * The request's tool definitions as a compact system-side message: name and
- * first description line per tool. This is where MCP servers and skills show
- * up in what the session actually pays for, a request with 40 tools is 40
- * schemas of context on every call, and until now the whole array was
- * silently dropped.
+ * first description line per tool — where MCP servers and skills show up in
+ * what the session pays for. Previously the whole array was silently dropped.
  */
 export function toolDefinitionsMessage(tools: unknown): { role: string; content: string } | null {
   if (!Array.isArray(tools)) {

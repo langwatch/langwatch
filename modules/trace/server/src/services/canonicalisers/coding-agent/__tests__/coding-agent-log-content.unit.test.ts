@@ -112,11 +112,9 @@ describe("logContentKeys", () => {
 });
 
 /**
- * The transcript derivation reads log attributes by name through
- * `readString(attrs, "…")`. Every one of those names that carries content has
- * to be in the table, or the endpoint surfaces something the gate never sees.
- * Metadata names (ids, counts, model names, decisions) are listed as known-safe
- * so a genuinely new content key cannot hide among them.
+ * The transcript derivation reads log attributes by name. Every content-
+ * carrying name must be in this table, or the endpoint surfaces something
+ * the gate never sees. Metadata names are listed as known-safe instead.
  */
 const KNOWN_METADATA_ATTRS: ReadonlySet<string> = new Set([
   "event.name",

@@ -91,11 +91,9 @@ export type TraceReaderCompositionOptions = {
    */
   ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
   /**
-   * The one question the INGEST path asks the Coding Agent module: whether a
-   * span is one a coding agent emits about itself, which the receiver drops.
-   * Narrow, and separate from the whole `codingAgents` peer below, for the
-   * reason `ingestAuthz` is separate from the viewer protections' own authz -
-   * one question does not need the whole peer to ask it.
+   * The one question the INGEST path asks Coding Agent: whether a span is
+   * one a coding agent emits about itself, which the receiver drops. Narrow
+   * and separate from the whole `codingAgents` peer below.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */

@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * State-free notification: all event types, byte-identical message. 2s
- * throttle is cost control.
+ * State-free notification: all event types, byte-identical message; 2s throttle is cost control.
  */
 import { describe, expect, it, vi } from "vitest";
 import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";

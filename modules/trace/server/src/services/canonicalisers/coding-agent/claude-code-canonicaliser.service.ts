@@ -49,13 +49,9 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     liftNumber("output_tokens", ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
     liftNumber("cache_read_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS);
     liftNumber("cache_creation_tokens", ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS);
-    // The span states how many tokens were written to the cache but not how
-    // long they live; the lifetime follows the call's request context (see
-    // claudeCacheWritesLongLived). A main-thread call's writes are stamped
-    // hour-long so computeSpanCost prices them at 2x input rather than the
-    // five-minute 1.25x, which undercounted every cache-heavy turn by about a
-    // third. setAttrIfAbsent keeps a provider-stated split, should the span
-    // ever start carrying one, ahead of this rule.
+    // The span doesn't say how long cache-written tokens live; a main-thread
+    // call is stamped hour-long so computeSpanCost prices at 2x rather than
+    // the 1.25x that undercounted cache-heavy turns by about a third.
     const cacheWriteTokens = asNumber(attrs.get("cache_creation_tokens"));
     const writesLongLivedCache =
       cacheWriteTokens !== null &&
@@ -130,10 +126,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
 
   /**
    * The per-TTL cache-creation split lives ONLY in the response body's
-   * `usage.cache_creation` object, no span or log attribute carries it.
-   * Lifted per call here; the trace summary fold sums the per-call values
-   * into reserved running totals (these are the only cache numbers that
-   * ride logs exclusively, so summing them can never double-count a span).
+   * `usage.cache_creation` object. Lifted per call here; the trace summary
+   * fold sums per-call values, which can never double-count a span.
    */
   private liftApiResponseBodyUsage(ctx: LogExtractorContext): void {
     const usage = claudeCodeResponseService.tryExtractCacheCreationTtlSplit(

@@ -861,10 +861,9 @@ function repeatsTopOfStack(stack: TraceHistoryEntry[], entry: TraceHistoryEntry)
 }
 
 /**
- * Browser history must not throw away work. Going back to a URL from before the
- * reviewer started editing would otherwise drop an unsaved correction with no
- * way to get it back, so a dirty session stays open and the sync effect
- * re-asserts the URL.
+ * Browser history must not throw away work: going back to a URL from
+ * before editing started would otherwise drop an unsaved correction, so a
+ * dirty session stays open and the sync effect re-asserts the URL.
  */
 function editingFromUrl(s: DrawerState, next: Partial<DrawerUrlState>): boolean | undefined {
   if (next.isEditing === undefined || next.isEditing === s.isEditing) return undefined;

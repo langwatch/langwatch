@@ -218,12 +218,9 @@ class MemberTraceClickHouseClient implements TraceClickHouseWriteClient {
 }
 
 /**
- * The member, as the tenant-keyed resolver every Trace repository takes.
- *
- * The cast is the one seam where Trace's own narrow client meets a parameter
- * still declared as the vendor's `ClickHouseClient`; the deleted composition
- * cast at the same seam, for the same reason - the repositories call `query`
- * and `insert` and nothing else on it.
+ * The member, as the tenant-keyed resolver every Trace repository takes. The
+ * cast is the one seam where Trace's own narrow client meets the vendor's
+ * `ClickHouseClient` param — repositories only call `query` and `insert`.
  */
 function memberClickHouseResolver(
   clickhouse: ClickHouseQueryClient,

@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * Broadcast notification: byte-identical messages trigger viewer refetch.
- * Queue 15s TTL is debounce, not safety mechanism.
+ * Byte-identical messages trigger viewer refetch; the 15s queue TTL is debounce, not safety.
  */
 import { describe, expect, it, vi } from "vitest";
 import { createSpanStorageBroadcastHandler } from "../span-storage-broadcast.subscriber.ts";

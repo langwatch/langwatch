@@ -42,9 +42,8 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
 
 /**
  * The read ports, real everywhere the package owns the implementation.
- * `tryGetVisibilityCutoffMs` answers "no window": the plan's visibility cutoff
- * is a SEPARATE gate resolved by the process, and leaving it on would mask the
- * data-privacy decisions these suites measure.
+ * `tryGetVisibilityCutoffMs` answers "no window": that cutoff is a SEPARATE
+ * gate resolved by the process, and leaving it on would mask what these suites measure.
  */
 export function createTranscriptReadPorts(): TracesV2ReadMembers {
   return {

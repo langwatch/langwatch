@@ -145,10 +145,9 @@ function parseJsonObjectString(value: unknown): unknown {
 }
 
 /**
- * A `langwatch.input` / `langwatch.output` value read under its annotated type: the wrapper
- * unwrapped, chat messages and text kept as such, everything else json. ClickHouse's
- * `deserializeAttributes()` may parse JSON-like strings back to objects, so a text value is
- * re-stringified rather than reaching `String([object Object])`.
+ * A `langwatch.input`/`output` value read under its annotated type: chat
+ * messages and text kept as such, everything else json. Text is
+ * re-stringified so a JSON-like string doesn't reach `String([object Object])`.
  */
 function readAnnotatedValue(
   value: unknown,

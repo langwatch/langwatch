@@ -34,10 +34,9 @@ export interface TraceEventRollupParams {
 }
 
 /**
- * Ordered list of LangWatch signal buckets projected per-span — a flat array
- * of bucket names so the wire payload stays tiny, one entry per active bucket,
- * fixed order. Empty means the span carries no LangWatch-instrumented
- * attributes surfaced in the UI.
+ * Ordered list of LangWatch signal buckets projected per-span — a flat
+ * array of names, one per active bucket, fixed order. Empty means no
+ * LangWatch-instrumented attributes are surfaced in the UI.
  */
 export const LANGWATCH_SIGNAL_BUCKETS = [
   "prompt",
@@ -58,10 +57,9 @@ export interface SpanLangwatchSignalsRow {
 }
 
 /**
- * Optional partition-pruning hint. stored_spans is partitioned by
- * toYearWeek(StartTime); an approximate trace timestamp lets the repo
- * restrict the scan to a small window instead of walking every weekly
- * partition (cold S3 included).
+ * Optional partition-pruning hint. stored_spans partitions by
+ * toYearWeek(StartTime); an approximate timestamp restricts the scan to a
+ * small window instead of walking every weekly partition (incl. cold S3).
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;
@@ -92,10 +90,9 @@ export abstract class SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span[]>;
   /**
-   * Normalized spans for a trace, used by read-time derivations (trace
-   * events + scenario role cost/latency) needing canonicalized attributes and
-   * parent links. Bounded by MAX_DERIVATION_SPANS so a pathological trace
-   * can't make the read unbounded.
+   * Normalized spans for a trace, for read-time derivations (trace events +
+   * scenario role cost/latency) needing canonicalized attributes and parent
+   * links. Bounded by MAX_DERIVATION_SPANS against a pathological trace.
    */
   abstract getNormalizedSpansByTraceId(
     params: {
@@ -113,30 +110,25 @@ export abstract class SpanStorageRepository {
   ): Promise<Span | null>;
   /**
    * @see ADR-069
-   * Claim-check resolution read: one canonical span by identity, windowed by
-   * the reference's partition hint with no unbounded fallback — a miss stays
-   * cheap since the caller retries via the queue. Derivation-shaped: the
-   * returned span carries empty events/links; a caller needing a whole span
-   * wants tryGetSpanByIds.
+   * Claim-check resolution read: one canonical span by identity, windowed
+   * with no unbounded fallback — a miss stays cheap via queue retry.
+   * Derivation-shaped: empty events/links; use tryGetSpanByIds for a whole span.
    */
   abstract tryFindNormalizedSpanById(
     params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
-   * trace-detail read, derived from spans' OTel events. Events-only (ARRAY
-   * JOIN over Events.*, no heavy attribute scan), far cheaper than fetching
-   * whole spans. Includes exception events for parity with the fold's old
-   * list.
+   * trace-detail read, derived from spans' OTel events (ARRAY JOIN over
+   * Events.*, no heavy attribute scan) — far cheaper than fetching whole spans.
    */
   abstract getTraceEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
   /**
-   * Event rollups for a page of traces, for the trace list's Events column.
-   * Same Events.* ARRAY JOIN as {@link getTraceEventsByTraceId}, grouped by
-   * name and batched across the page (one query, not one per row). Attributes
-   * aren't read — a badge needs only a name and count.
+   * Event rollups for a page of traces (the list's Events column). Same
+   * Events.* ARRAY JOIN as {@link getTraceEventsByTraceId}, batched across
+   * the page in one query — a badge needs only a name and count.
    */
   abstract getTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,
@@ -204,9 +196,8 @@ export abstract class SpanStorageRepository {
   }): Promise<ModelSpanSampleRow[]>;
   /**
    * Clamps a requested span-read limit to [1, max] (default
-   * MAX_DERIVATION_SPANS). Ceiling is hard — a caller can only lower it,
-   * never raise it. Missing/non-finite limit (undefined, NaN, Infinity)
-   * defaults to the ceiling so it never propagates into a CH UInt32 param.
+   * MAX_DERIVATION_SPANS). Ceiling is hard — callers can only lower it.
+   * Missing/non-finite limit defaults to the ceiling, never a CH UInt32 param.
    */
   static clampSpanReadLimit(
     limit?: number,

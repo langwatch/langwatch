@@ -2,11 +2,9 @@ import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { mapChRowToNormalized, serializeAttributes } from "../stored-span-row.mapper.ts";
 
 /**
- * A normalized span put through the real ClickHouse row round trip.
- *
- * The claim-check read path rebuilds a span from its stored row rather than
- * from the value it wrote, so a test that spreads the original masks exactly
- * the mapping regressions this exists to catch.
+ * A normalized span put through the real ClickHouse row round trip. The
+ * claim-check read path rebuilds a span from its stored row, not the value
+ * it wrote, so spreading the original would mask the regressions this catches.
  */
 export function storedSpanReadBack(span: NormalizedSpan): NormalizedSpan {
   return mapChRowToNormalized({

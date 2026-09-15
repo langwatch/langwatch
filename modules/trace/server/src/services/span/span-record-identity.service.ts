@@ -5,10 +5,8 @@ import type { SpanReceivedEvent } from "@langwatch/trace-contract";
 import { OtlpTraceRequestService } from "../ingestion/otlp-trace-request.service.ts";
 
 /**
- * KSUID resource prefixes for the two identifiers this module mints — the
- * app-side `SPAN` and `TRACE_SUMMARY` resources.
- *
- * The literals are the identity of every span record and trace-summary row
+ * KSUID resource prefixes for the two identifiers this module mints. The
+ * literals are the identity of every span record and trace-summary row
  * ever written, so they are pinned here rather than derived.
  */
 const SPAN_KSUID_RESOURCE = "span";
@@ -16,11 +14,8 @@ const TRACE_SUMMARY_KSUID_RESOURCE = "tracesummary";
 
 /**
  * Deterministic identities for a span record and its trace summary.
- *
- * Derived, never random: the same span arriving twice must produce the same
- * id, because that is what makes a redelivery replace the earlier row instead
- * of landing beside it. The identity is a KSUID whose timestamp is the span's
- * own, so ids sort chronologically without a separate ordering column.
+ * Derived, never random, so a redelivered span replaces the earlier row
+ * instead of landing beside it. The KSUID's timestamp is the span's own.
  */
 export class SpanRecordIdentityService {
   private constructor() {}

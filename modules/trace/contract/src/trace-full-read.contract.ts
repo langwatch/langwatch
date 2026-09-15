@@ -2,10 +2,9 @@ import { z } from "zod";
 import { traceRecordValueSchema } from "./trace-record.ts";
 
 /**
- * Captured input and output values in a full Trace read.
- *
- * Values intentionally remain JSON-shaped: provider-specific message and tool
- * payloads are part of the captured trace, not a transport-owned union.
+ * Captured input/output values in a full Trace read. Intentionally
+ * JSON-shaped: provider message/tool payloads are part of the captured
+ * trace, not a transport-owned union.
  */
 export const traceFullContentSchema = z.looseObject({
   type: z.string().optional(),
@@ -50,10 +49,8 @@ export const traceFullRecordEventSchema = z.looseObject({
 export type TraceFullRecordEvent = z.infer<typeof traceFullRecordEventSchema>;
 
 /**
- * Trace-owned full capture for internal readers.
- *
- * This is an internal read with process-owned visibility; it is not a browser
- * DTO and must not be supplied with caller-selected protections.
+ * Trace-owned full capture for internal readers: process-owned visibility,
+ * not a browser DTO — never supply it with caller-selected protections.
  */
 export const traceFullRecordSchema = z.looseObject({
   trace_id: z.string(),

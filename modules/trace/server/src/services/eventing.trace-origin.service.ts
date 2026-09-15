@@ -15,11 +15,9 @@ import type { OriginResolvedEvent } from "@langwatch/trace-contract";
 const logger = createLogger("langwatch:trace-processing:resolve-origin");
 
 /**
- * Command handler for resolving the origin of a trace.
- *
- * Emits an OriginResolvedEvent when origin is inferred (not explicitly set
- * by the SDK). This persists the inferred origin through the event-sourcing
- * pipeline so it reaches ClickHouse via the fold projection.
+ * Command handler for resolving the origin of a trace. Emits
+ * OriginResolvedEvent when origin is inferred (not explicit from the SDK),
+ * persisting it through event-sourcing to reach ClickHouse via the fold.
  */
 export class EventingTraceOriginAdapter implements CommandHandler<
   Command<ResolveOriginCommandData>,

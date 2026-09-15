@@ -120,10 +120,9 @@ export class TraceListService {
   }
 
   /**
-   * Teases input/output/error previews and user-authored labels of items beyond the caller's
-   * visibility window — existence and counts stay untouched. Labels are user-authored metadata
-   * strings, so they are gated alongside the content fields to avoid leaking through on old
-   * traces.
+   * Teases input/output/error previews and user-authored labels beyond the
+   * caller's visibility window — existence and counts stay untouched.
+   * Labels are gated alongside content to avoid leaking through on old traces.
    */
   static #gateItems(
     items: TraceListItem[],

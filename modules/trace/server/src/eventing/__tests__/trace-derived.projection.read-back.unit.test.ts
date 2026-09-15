@@ -11,11 +11,8 @@ import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
  * Read-back of a PRE-SPLIT row (migration 00061): before `storageAnchorMs`
- * existed as its own column, `OccurredAt` carried both jobs at once — the
- * partition/TTL anchor AND the span timing baseline `SpanTimingService`
- * measures duration from. Decoding a row stamped at that version has to take
- * BOTH from that one column, or a population recorded before the split would
- * either move its own partition (re-anchoring) or restart its duration.
+ * existed, `OccurredAt` carried both the partition/TTL anchor and the span
+ * timing baseline — decoding must take BOTH from that one column.
  */
 
 const TENANT = "tenant-rb";
@@ -51,10 +48,9 @@ function committedState(): TraceAnalyticsData {
 }
 
 /**
- * The one older stamp that is decoded rather than refused. On a pre-split row
- * `OccurredAt` is `min(span start)` — at once a valid anchor (it is what the
- * row is already partitioned and TTL'd on) and the correct span timing
- * baseline (it is what the new column was split out to carry).
+ * The one older stamp decoded rather than refused. On a pre-split row
+ * `OccurredAt` is `min(span start)` — both a valid partition/TTL anchor and
+ * the correct span timing baseline.
  */
 function preSplitRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
   return {

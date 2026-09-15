@@ -1,9 +1,6 @@
 /**
- * Gemini Content Format Conversion
- *
- * Helpers for translating the Gemini API content shapes carried in
- * Vertex AI Agent Engine (Google ADK) payloads — { role, parts:
- * [{ text | function_call | function_response }] } — into canonical
+ * Helpers translating Gemini API content shapes carried in Vertex AI Agent
+ * Engine (Google ADK) payloads — { role, parts: [...] } — into canonical
  * chat messages. Used by the VertexAdk extractor.
  */
 
@@ -29,10 +26,8 @@ const geminiRoleToChatRole = ({
 
 /**
  * Converts a single Gemini content object ({ role, parts }) into chat
- * messages. Text and function_call parts fold into one message (an
- * assistant turn can carry both text and tool calls); function_response
- * parts become separate tool-role messages, matching chat semantics —
- * ADK wraps tool results in a user-role content.
+ * messages. Text and function_call fold into one message; function_response
+ * becomes separate tool-role messages (ADK wraps tool results as user-role).
  */
 const toolCallFromFunctionCall = (fc: Record<string, unknown>): unknown => ({
   ...(isNonEmptyString(fc.id) ? { id: fc.id } : {}),
@@ -92,10 +87,8 @@ const foldGeminiPart = (
 
 /**
  * Converts a single Gemini content object ({ role, parts }) into chat
- * messages. Text and function_call parts fold into one message (an
- * assistant turn can carry both text and tool calls); function_response
- * parts become separate tool-role messages, matching chat semantics —
- * ADK wraps tool results in a user-role content.
+ * messages. Text and function_call fold into one message; function_response
+ * becomes separate tool-role messages (ADK wraps tool results as user-role).
  */
 export const convertGeminiContent = ({
   content,

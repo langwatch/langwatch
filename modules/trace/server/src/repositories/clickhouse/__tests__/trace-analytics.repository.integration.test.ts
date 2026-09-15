@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- * Round-trips the slim trace_analytics table (migrations 00039 + 00056)
- * through real INSERT/SELECT SQL, proving the DDL/repository column
- * contract and the ADR-066 read-back path that unit tests (no I/O) cannot.
+ * Round-trips trace_analytics (migrations 00039+00056) via real SQL: the DDL/column contract.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

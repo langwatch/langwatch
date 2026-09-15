@@ -2,12 +2,9 @@ import type { TraceSpanSpool, TraceSpanSpoolIdentity } from "../app/trace.member
 import { TraceSpoolService } from "./ingestion/trace-spool.service.ts";
 
 /**
- * Renames the spool service onto the narrow members `EventingRecordSpanAdapter` names.
- *
- * The service is not a subclass of the members member and must not become
- * one: `putSpool` belongs to the ingestion edge, which is a different process
- * from the command worker that reads and deletes. The members member
- * carries only the two the worker calls.
+ * Renames the spool service onto the narrow members `EventingRecordSpanAdapter`
+ * names. Not a subclass: `putSpool` belongs to the ingestion edge, a
+ * different process from the command worker that reads and deletes.
  */
 export class TraceSpanSpoolAdapter implements TraceSpanSpool {
   static create(spool: TraceSpoolService): TraceSpanSpoolAdapter {

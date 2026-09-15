@@ -17,11 +17,8 @@ export interface CustomEvaluationSyncSubscriberDeps {
   reportEvaluation: (data: ReportEvaluationCommandData) => Promise<void>;
   /**
    * The evaluator id an SDK evaluation gets when it names no `evaluator_id`.
-   *
-   * Evaluation owns the slug rule (the same one the collector and the legacy
-   * evaluations route apply), so the rule is injected rather than restated
-   * here: a Trace-local copy would drift and silently re-key every custom
-   * evaluator it derives.
+   * Evaluation owns the slug rule, injected rather than restated here — a
+   * Trace-local copy would drift and silently re-key every derived evaluator.
    */
   deriveEvaluatorId: (evaluationName: string) => string;
 }
@@ -48,11 +45,9 @@ const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
 type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
 
 /**
- * Customer-reported evaluations, read back out of the spans that carried them.
- *
- * The counterpart to {@link TrackedEventSync} and the same shape: derived ids
- * so a redelivery replaces rather than duplicates, and a payload that must
- * parse before anything is reported.
+ * Customer-reported evaluations, read back out of spans. Counterpart to
+ * {@link TrackedEventSync}: derived ids so redelivery replaces rather than
+ * duplicates, and a payload that must parse before anything is reported.
  */
 export class CustomEvaluationSync {
   /**
@@ -98,10 +93,9 @@ export class CustomEvaluationSync {
   }
 
   /**
-   * Cheap presence check — no JSON.parse. The predicate runs on the projection
-   * hot path with attacker-supplied span payloads, so it only looks for an
-   * evaluation event carrying a string payload; full parsing and validation
-   * stay in the handler off the hot path.
+   * Cheap presence check — no JSON.parse. Runs on the projection hot path
+   * with attacker-supplied payloads, so it only looks for an evaluation
+   * event carrying a string payload; parsing stays in the handler.
    */
   private static spanHasEvaluationEvents(span: OtlpSpan): boolean {
     return (span.events ?? []).some(
@@ -149,9 +143,8 @@ export class CustomEvaluationSync {
 
   /**
    * A verdict is only real when the evaluator ran to completion — an
-   * errored/skipped run's stray passed/score/label must not reach
-   * analytics or triggers as a real result (#6833). Same gate as the shared
-   * verdictGate helpers now applied at the executeEvaluation command boundary.
+   * errored/skipped run's stray passed/score/label must not reach analytics
+   * or triggers as a real result (#6833). Same gate as verdictGate.
    */
   private static verdictFields(evaluation: SdkEvaluation, hasVerdict: boolean) {
     return {
@@ -245,10 +238,9 @@ export class CustomEvaluationSync {
   }
 
   /**
-   * Extracts SDK evaluations directly from OTLP span events.
-   *
-   * Reads `langwatch.evaluation.custom` events from the raw OTLP span,
-   * parses the `json_encoded_event` attribute from each.
+   * Extracts SDK evaluations directly from OTLP span events: reads
+   * `langwatch.evaluation.custom` events from the raw span and parses each
+   * `json_encoded_event` attribute.
    */
   static extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
     const evaluations: SdkEvaluation[] = [];
@@ -262,11 +254,9 @@ export class CustomEvaluationSync {
   }
 
   /**
-   * Total, non-throwing relevance guard. As the subscriber's `when` it is
-   * evaluated both pre-enqueue (a filtered event never pays serialization) and
-   * again in the handler on the fail-open path: only span events that are
-   * recent (not a resync) and actually carry `langwatch.evaluation.custom`
-   * events need this subscriber.
+   * Total, non-throwing relevance guard, evaluated both pre-enqueue and
+   * again in the handler's fail-open path: only recent span events (not a
+   * resync) carrying `langwatch.evaluation.custom` need this subscriber.
    */
   static hasSyncableEvaluations(event: TraceProcessingEvent): boolean {
     if (!isSpanReceivedEvent(event)) return false;

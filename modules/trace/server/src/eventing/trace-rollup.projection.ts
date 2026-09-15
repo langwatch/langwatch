@@ -7,12 +7,9 @@ import { SpanCostService } from "../services/span/span-cost.service.ts";
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
 
 /**
- * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent.
- *
- * Field names match the ClickHouse columns exactly (PascalCase) so the
- * repository hands the record to `JSONEachRow` without a second mapping
- * layer. `BucketStart` is a JS `Date` floored to the minute — the CH client
- * serializes it as a `DateTime64(3)` literal.
+ * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent. Field
+ * names match ClickHouse columns exactly (PascalCase) for `JSONEachRow`
+ * with no second mapping layer. `BucketStart` floors to the minute.
  */
 export interface TraceAnalyticsRollupRow {
   /** Project id; multitenancy boundary. Always required. */
@@ -116,12 +113,9 @@ export class TraceAnalyticsRollupMapProjection
     const model = this.spanCostService.extractModelsFromSpan(span)[0] ?? "";
     const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
 
-    // A span flagged as a redundant usage copy (e.g. codex's lower-level
-    // response span echoing the turn rollup's counts) contributes nothing to
-    // the TRACE totals — `accumulateTokens` zeroes it, so `trace_summaries`
-    // counts that usage exactly once. The rollup is a trace-level aggregate
-    // too, so it must apply the same gate. (`stored_spans.Cost` deliberately
-    // does NOT: that column is per-span detail, not a trace total.)
+    // A redundant usage-copy span (e.g. codex's lower-level echo of the turn
+    // rollup) contributes nothing to TRACE totals — the rollup is a
+    // trace-level aggregate too, so it applies the same zeroing gate.
     const skipTokenAccumulation = this.spanCostService.isTokenAccumulationSkipped(span);
     const tokens = skipTokenAccumulation
       ? { promptTokens: 0, completionTokens: 0, cost: 0 }

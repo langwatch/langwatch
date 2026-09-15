@@ -23,10 +23,9 @@ import {
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
- * The version gate on the committed row. The row is trusted only when its
- * projection stamp is one the decoder can read in full; an older stamp is a
- * store miss so the fold rebuilds rather than resuming from a shape whose
- * missing columns are indistinguishable from real values.
+ * The version gate on the committed row: trusted only when its projection
+ * stamp is one the decoder reads in full. An older stamp is a store miss,
+ * so the fold rebuilds rather than resuming from an indistinguishable shape.
  */
 
 const TENANT = "tenant-gate";
@@ -134,10 +133,9 @@ describe("TraceAnalyticsStore read-back version gate", () => {
 });
 
 /**
- * A trace whose only signal is a classification carries nothing the analytics
- * row can hold, so the store writes no row for it. ADR-066 makes that safe
- * rather than lossy: no row is a MISS, and the fold's `refoldOnStoreMiss`
- * rebuilds the classification from the event log when a real event lands.
+ * A trace whose only signal is a classification carries nothing the row can
+ * hold, so the store writes none (ADR-066): a MISS, not lossy — the fold's
+ * `refoldOnStoreMiss` rebuilds it from event_log when a real event lands.
  */
 describe("TraceAnalyticsStore dimension-only signal", () => {
   const topicEvent = {

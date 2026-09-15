@@ -44,20 +44,18 @@ interface ConversationThreadProps {
   /** Scrolls the newest part into view as content arrives. */
   shouldAutoScroll?: boolean;
   /**
-   * Renders an assistant reply that parses as a JSON object as a value tree
-   * rather than as markdown. On for surfaces whose prompts declare structured
-   * outputs; off elsewhere, where a JSON-shaped reply is still prose the user
-   * wrote and should read as they wrote it.
+   * Renders an assistant reply that parses as JSON as a value tree, not
+   * markdown. On for surfaces with structured-output prompts; off
+   * elsewhere, where a JSON-shaped reply is still prose the user wrote.
    */
   shouldRenderStructuredOutput?: boolean;
   // Standalone chat panel framing: scrollbar at panel edge, messages centred;
   // drawer supplies its own frame and keeps section behavior.
   panel?: { contentMaxWidth: string };
   /**
-   * A reply has been asked for and has not begun arriving. Draws the waiting
-   * state at the end of the thread, where the reply itself will appear — the
-   * gap between sending and the first token is otherwise silent, and a silent
-   * gap reads as nothing having happened.
+   * A reply has been asked for and hasn't begun arriving. Draws the
+   * waiting state where the reply will appear — otherwise the gap between
+   * sending and the first token reads as nothing having happened.
    */
   hasPendingReply?: boolean;
   // Live mode numbers turns from start and shows affordances as trace lands,
@@ -134,12 +132,9 @@ function ConversationPart({
 }
 
 /**
- * The thread column's own layout. The drawer's section already pads; the grid
- * cell does not. A panel pads itself, so neither the first message nor the
- * avatars beside the messages sit flush against its edges — the horizontal
- * room matches what a bubble sets inside itself. A panel's height comes from
- * its content inside the scroll box; a section fills the box it was handed
- * and scrolls inside it.
+ * The thread column's own layout. The drawer's section already pads; the
+ * grid cell does not. A panel pads itself so nothing sits flush against
+ * its edges; height comes from content, unlike a section that fills its box.
  */
 function threadBodyLayout({
   compact,

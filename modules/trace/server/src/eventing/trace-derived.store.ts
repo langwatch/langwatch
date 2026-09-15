@@ -17,11 +17,9 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034 Phase 2, read-back
- * per ADR-066). Its Hoisted Dims columns are derived by the same service classes the
- * trace-summary fold uses, so they match trace_summaries to the cent for the same trace.
- * `get`/`getWithApplied` decode the last committed row instead of refolding from `event_log`;
- * decoding is gated on the row's projection version — see `getWithApplied`.
+ * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
+ * Phase 2, read-back per ADR-066). `get`/`getWithApplied` decode the last
+ * committed row instead of refolding from `event_log`.
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   private constructor(
@@ -85,10 +83,9 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
   }
 
   /**
-   * Reads the trace's last committed slim state with its applied-event-id watermark (ADR-066).
-   * An older projection version reports a MISS rather than decoding stale defaults, and
-   * `refoldOnStoreMiss` rebuilds it once — except the pre-split stamp (ADR-071), admitted and
-   * decoded directly; see {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
+   * Reads the trace's last committed slim state with its applied-event-id
+   * watermark (ADR-066). An older version reports a MISS rather than
+   * decoding stale defaults, except the pre-split stamp (ADR-071).
    */
   async getWithApplied(
     aggregateId: string,
@@ -104,13 +101,9 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
-    // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer as for "no row"
-    // — the watermark is dropped too, because a watermark without the state it
-    // belongs to would suppress the very events the re-fold needs — but report
-    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
-    // executor must not answer with an unwindowed re-read that can only find
-    // the same row again.
+    // Stale schema snapshot: read-back columns didn't exist when this row was
+    // written, so decoding would fabricate state. Reported `undecodable`, not
+    // `absent`, so the executor won't retry an unwindowed re-read.
     if (!DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }

@@ -209,10 +209,9 @@ describe("sharedTrace share-safe gates", () => {
     });
 
     /**
-     * Fail-closed on a policy outage: `getUserProtectionsForProject`
-     * returns a catch-all `*` rule when the privacy policy cannot be resolved;
-     * `gateResources` must then redact EVERY attribute. An empty list would
-     * redact nothing, so this pins the "catch-all means hide all" invariant.
+     * Fail-closed on a policy outage: an unresolved privacy policy returns
+     * a catch-all `*` rule, so `gateResources` must redact EVERY attribute —
+     * pins the "catch-all means hide all" invariant.
      */
     it("redacts every resource attribute under the fail-closed catch-all rule", () => {
       const resources = {

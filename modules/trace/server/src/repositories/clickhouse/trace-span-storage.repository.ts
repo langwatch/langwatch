@@ -57,9 +57,8 @@ const SINGLE_SPAN_FETCH_SETTINGS = {
 
 /**
  * Replaces specified number-typed fields with Date for the DateTime64 write
- * path. Declared here rather than imported because the application's copy sits
- * behind its own path alias; scenario and experiment each keep the same local
- * copy for the same reason.
+ * path. Declared here, not imported, because the application's copy sits
+ * behind its own path alias; scenario and experiment keep the same local copy.
  */
 type WithDateWrites<T, K extends keyof T> = {
   [P in keyof T]: P extends K
@@ -167,11 +166,9 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
   }
 
   /**
-   * One insert for the whole batch. This is the ingestion path: a per-span
-   * insert would multiply the round trips, the async-insert buffers and the
-   * parts ClickHouse then has to merge by the batch size, which is the cost the
-   * batching exists to avoid. Never rewrite this as a loop over
-   * {@link insertSpan}.
+   * One insert for the whole batch — the ingestion path. A per-span insert
+   * would multiply round trips, async-insert buffers and merge parts by the
+   * batch size. Never rewrite this as a loop over {@link insertSpan}.
    */
   async insertSpans(spans: SpanInsertData[]): Promise<void> {
     if (spans.length === 0) return;
@@ -338,11 +335,9 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
 }
 
 /**
- * The stored-span read half over the same repository the write half uses.
- * `stored_spans` has one row shape, one key triple and one partition column,
- * and a reader that spelled any of the three differently from the writer would
- * resolve nothing while looking correct. The two exist because the CAPABILITIES
- * differ - one is the ingestion hot path, the other a redelivery lookup.
+ * The stored-span read half over the same repository the write half uses —
+ * one row shape, key triple and partition column, so a mismatched spelling
+ * resolves nothing while looking correct. Split for CAPABILITIES, not shape.
  */
 export class TraceStoredSpanReaderClickHouseRepository extends TraceStoredSpanReaderRepository {
   private constructor(private readonly repository: TraceSpanStorageClickHouseRepository) {

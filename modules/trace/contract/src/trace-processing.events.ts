@@ -41,11 +41,9 @@ export type { SpanReceivedEvent, SpanReceivedEventData, SpanReceivedEventMetadat
 
 const aggregateTypeSchema = z.string().trim().min(1);
 /**
- * The contract's own definition of a valid tenant id, exported because anyone
- * constructing one of these events needs to mint the branded value and the
- * alternative is reaching into `@langwatch/eventing` for `createTenantId` —
- * which would make this contract depend on the event-sourcing framework for a
- * string brand it already declares.
+ * The contract's own definition of a valid tenant id, so minting a branded
+ * value here doesn't require depending on `@langwatch/eventing`'s
+ * `createTenantId` for a string brand this contract already declares.
  */
 export const tenantIdSchema = z
   .string()
@@ -449,12 +447,9 @@ export const traceNameChangedEventMetadataSchema = z
   .passthrough();
 
 /**
- * Zod schema for TraceNameChangedEvent data.
- *
- * The trim+length bounds are domain rules — the same shape the
- * ChangeTraceName command's input schema enforces. Encoding them on the
- * event itself means a replay against bad historical data still rejects
- * via Zod instead of silently overriding with a 4 KB blob.
+ * The trim+length bounds mirror ChangeTraceName's input schema, so a replay
+ * against bad historical data still rejects via Zod instead of silently
+ * overriding with a 4 KB blob.
  */
 export const traceNameChangedEventDataSchema = z.object({
   traceId: z.string(),

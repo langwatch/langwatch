@@ -10,10 +10,9 @@ import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-
 import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
- * The applied-event-id watermark (ADR-066). The executor dedups a redelivered
- * batch against the ids persisted NEXT TO the row, so a store that drops them
- * re-applies the batch on the next cold-cache retry: a silent double-count with
- * no error anywhere.
+ * The applied-event-id watermark (ADR-066): the executor dedups a
+ * redelivered batch against ids persisted NEXT TO the row. Drop them and a
+ * cold-cache retry silently double-counts.
  */
 
 const TENANT = "tenant-watermark";

@@ -62,12 +62,9 @@ function isDispatchableEvaluationEvent(event: TraceProcessingEvent): boolean {
 }
 
 /**
- * Dispatches evaluation commands for traces that have a resolved origin.
- *
- * Fires on every trace event (via traceSummary fold). If origin is absent,
- * returns early — the originGate subscriber handles deferred resolution.
- * Once origin is present, iterates all enabled ON_MESSAGE monitors and
- * sends an executeEvaluation command per monitor.
+ * Dispatches evaluation commands for traces with a resolved origin. Fires on
+ * every trace event; if origin is absent, returns early (originGate handles
+ * deferred resolution). Otherwise iterates enabled ON_MESSAGE monitors.
  */
 export function createEvaluationTriggerSubscriber(
   deps: EvaluationTriggerSubscriberDeps,

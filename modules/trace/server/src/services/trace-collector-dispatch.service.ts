@@ -79,10 +79,9 @@ function partitionFreshSpans(
 }
 
 /**
- * `ingestNormalizedSpan` catches its own errors and RESOLVES with `{ status: "failed", error }`
- * (it never rejects), so inspect the resolved status — checking the allSettled "rejected"
- * wrapper would count every failure as a success. An unexpected rejection is still treated as a
- * failure defensively. "deduped" is a success, not an error.
+ * `ingestNormalizedSpan` catches its own errors and RESOLVES with
+ * `{ status: "failed", error }` (never rejects), so inspect the resolved
+ * status — the allSettled "rejected" wrapper would miss it. "deduped" is a success.
  */
 function ingestionFailureDetails(
   results: PromiseSettledResult<Readonly<{ status: string; error?: string | undefined }>>[],

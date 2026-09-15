@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The correction contract: what a stored patch may say, what a malformed one
- * degrades to, and how the text a reviewer typed becomes a canonical captured
- * value again.
+ * The correction contract: what a stored patch may say and what a malformed one degrades to.
  */
 import { describe, expect, it } from "vitest";
 import {

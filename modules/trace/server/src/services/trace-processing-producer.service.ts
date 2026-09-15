@@ -1,8 +1,7 @@
 /**
- * One trace_processing definition, two registrations: the worker (consumer) supplies the real
- * dependencies; a producer registers the same definition only for addAnnotation/removeAnnotation,
- * folding nothing. This module supplies stand-ins that construct successfully but refuse by name
- * if ever called — refusing beats a silently-succeeding fold reporting nothing as written.
+ * One trace_processing definition, two registrations: the worker supplies
+ * real dependencies; a producer registers the same definition only for
+ * add/removeAnnotation, with stand-ins that refuse by name if ever called.
  */
 import type { AppendStore, FoldProjectionStore, TenantId } from "@langwatch/eventing";
 import {

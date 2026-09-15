@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- * Verifies rejection payloads are specific enough to distinguish schema bugs
- * from sender errors.
- *
- * This test builds the router directly, so it proves what the ROUTER answers
- * and nothing about whether the module mounts it. The family was unmounted for
- * the whole life of this file and it stayed green throughout. What the door is
- * served at all is `collector-rest.composition.integration.test.ts`.
+ * Verifies rejection payloads distinguish schema bugs from sender errors.
+ * Builds the router directly: proves what it answers, not whether mounted.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -452,9 +452,8 @@ const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
 
 /**
  * Chip hover is delegated on the search bar so both the cold-load
- * PlaceholderEditor and the live editor's decoration-injected chips broadcast
- * into `facetHoverStore`; the sidebar listens there and cross-highlights the
- * matching row.
+ * PlaceholderEditor and the live editor's chips broadcast into
+ * `facetHoverStore`; the sidebar listens there and cross-highlights the row.
  */
 function broadcastChipHover(root: HTMLDivElement | null): (() => void) | undefined {
   // When the chip layer disappears (an AI/Langy ask-mode swap, an unmount) no

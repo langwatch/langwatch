@@ -744,10 +744,9 @@ describe("createEvaluationTriggerSubscriber — causality depth (handler-level)"
 });
 
 /**
- * The guards below used to live inside `handle`, so every span of a 10k-span
- * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
- * threw the job away. They are pure and read only the payload `handle` receives,
- * so `shouldDispatch` rejects them pre-enqueue instead (ADR-026).
+ * These guards used to live inside `handle`, serializing/blobbing every span
+ * before the queue's dedup threw the job away. Pure and payload-only, so
+ * `shouldDispatch` rejects them pre-enqueue instead (ADR-026).
  */
 describe("evaluationTrigger relevance check", () => {
   const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>

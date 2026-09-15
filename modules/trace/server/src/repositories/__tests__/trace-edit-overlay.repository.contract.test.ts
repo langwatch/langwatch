@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * The reviewer-correction contract, stated once and run against every backend
- * the package can reach. The memory twin runs always; a Postgres backend
- * joins the table when this package declares a datastore in its vitest
- * config.
+ * The reviewer-correction contract, run against every backend the package
+ * can reach: the memory twin always runs; Postgres joins per vitest config.
  */
 import { describe, expect, it } from "vitest";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";

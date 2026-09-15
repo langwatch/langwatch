@@ -19,9 +19,8 @@ export interface SessionGroupSort {
 
 /**
  * Keyset cursor for the session list. Sort value is the exact number the
- * repository computed (floats rounded in SQL so comparison is bit-stable across
- * requests); conversation id is the unique tie-breaker turning every sort into
- * a total order.
+ * repository computed (rounded in SQL for bit-stable comparison);
+ * conversation id is the unique tie-breaker into a total order.
  */
 export interface SessionGroupCursor {
   sortValue: number;

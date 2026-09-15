@@ -140,12 +140,9 @@ describe("TraceCanonicalisationService — langwatch.metrics handling", () => {
   });
 });
 
-// The Go SDK is dropping the langwatch.metrics token duplication and emitting
-// usage only under gen_ai.usage.*. Python/TS SDKs still emit langwatch.metrics,
-// so the backend reads BOTH — but the OTel GenAI semconv source is the default
-// and WINS when both are present. Older SDKs that only emit langwatch.metrics
-// keep working as the fallback.
-//
+// The Go SDK emits usage only under gen_ai.usage.*; Python/TS SDKs still
+// emit langwatch.metrics too. The backend reads BOTH, but gen_ai wins when
+// both are present, so older SDKs keep working as the fallback.
 // Spec: specs/ai-gateway/cache-token-telemetry.feature
 describe("TraceCanonicalisationService — gen_ai is the default token source", () => {
   describe("given a span carries both gen_ai.usage.* and a langwatch.metrics token blob", () => {
@@ -216,11 +213,9 @@ describe("TraceCanonicalisationService — gen_ai is the default token source", 
   });
 });
 
-// The Go SDK emits cache-read tokens as the flat gen_ai.usage.cached_input_tokens.
-// Cost + the trace cache rollup only read the dotted form, so the flat alias is
-// canonicalised onto gen_ai.usage.cache_read.input_tokens for any span — and the
-// canonicalised count must reach the cost cascade.
-//
+// The Go SDK emits cache-read tokens as the flat
+// gen_ai.usage.cached_input_tokens; canonicalised onto the dotted form
+// since cost and the cache rollup only read that.
 // Spec: specs/ai-gateway/cache-token-telemetry.feature
 describe("TraceCanonicalisationService — cache-read token canonicalisation", () => {
   describe("given a span emits the flat cached_input_tokens alias", () => {

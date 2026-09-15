@@ -103,13 +103,9 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
     });
   });
 
-  // A SUMMARY export reads NO span content — but it is still a content-consuming
-  // read: buildSummaryRow emits trace-level `trace.input.value` / `trace.output
-  // .value` (serializers/csv-serializer.ts:91-92), and the summary JSON
-  // serializer does the same. Gating resolution on includeSpans therefore
-  // silently shipped the truncated 64 KB preview for any offloaded (>64 KB)
-  // trace, with no error and no indication data was cut — the exact data-loss
-  // bug this PR exists to fix, just on the other export mode.
+  // A SUMMARY export reads no span content but still emits trace-level
+  // input/output, so gating resolution on includeSpans silently shipped the
+  // truncated 64 KB preview for any offloaded trace — the bug this PR fixes.
   describe("given a SUMMARY export (reads trace-level input/output)", () => {
     describe("when exportTraces streams a batch", () => {
       it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {

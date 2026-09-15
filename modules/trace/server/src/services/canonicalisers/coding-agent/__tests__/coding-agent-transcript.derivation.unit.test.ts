@@ -1,10 +1,7 @@
 /**
- * The coding-agent transcript, derived on the SERVER.
- *
- * These pin the two properties that made it worth moving off the client: the
- * transcript is ordered by what actually happened (not by which exporter arrived
- * first), and it includes the moments that have NO span — a tool the human
- * refused never runs, so the logs are the only place it exists.
+ * The coding-agent transcript, derived on the SERVER. Pins the two
+ * properties worth moving off the client: ordered by what actually
+ * happened, and includes moments with NO span (a tool the human refused).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -944,11 +941,9 @@ describe("buildCodingAgentTranscript injected session context", () => {
 });
 
 /**
- * Codex exports no conversation content, so a codex trace's prompts, tool calls
- * and replies arrive on a separate span the harvest writes from the session
- * transcript. Before this was understood here, the Terminal view rendered
- * "this agent reported tokens and timing only" over a trace that plainly had a
- * conversation on it.
+ * Codex exports no conversation content; prompts/tool calls/replies arrive
+ * on a separate span the harvest writes from the session transcript.
+ * Previously the Terminal view rendered "tokens and timing only" regardless.
  */
 function recoveredCodexTurn({
   atMs,
@@ -1452,12 +1447,9 @@ describe("given a prompt pasting tens of thousands of unclosed tags", () => {
   describe("when the session transcript is derived", () => {
     /** @scenario "A prompt full of unclosed tags is read without stalling the server" */
     it("derives the transcript in well under a tenth of a second", () => {
-      // 63,999 characters, every tag unclosed, right at the size the
-      // injected-context test still considers: the shape that costs a
-      // backtracking tag match one scan to end-of-string per tag. The bound is
-      // loose by two orders of magnitude on purpose. What it pins is the
-      // scanner's algorithmic class, not a microbenchmark, so it holds on a
-      // loaded CI box.
+      // 63,999 unclosed tags — the shape that costs a backtracking tag
+      // match one scan to end-of-string per tag. This pins the scanner's
+      // algorithmic class, not a microbenchmark, so it holds on a loaded CI box.
       const pasted = "<a>".repeat(21_333);
       const span = recoveredCodexTurn({
         atMs: 1_000,
@@ -1481,10 +1473,9 @@ describe("given a prompt pasting tens of thousands of unclosed tags", () => {
 });
 
 /**
- * Whether a message is nothing but tags, spelled the way the transcript's tag
- * strip was first written: a backreference with a lazy body. It stands here as
- * the oracle the derivation's scanner is held to, and it runs only over the
- * few-hundred-character shapes below.
+ * Whether a message is nothing but tags, spelled as the transcript's tag
+ * strip was first written (a backreference with a lazy body) — the oracle
+ * the derivation's scanner is held to, over the shapes below.
  */
 function isTagsOnlyByBacktrackingStrip(content: string): boolean {
   const trimmed = content.trim();

@@ -82,11 +82,9 @@ export class SpanCostService {
   }
 
   /**
-   * Per-span cache + reasoning token counts, read from the same canonical
-   * keys the drawer popover looks at. These are summed across the trace's
-   * spans by the fold (the raw keys never reach the trace attribute map),
-   * so "Cache write" and "Cache read" reflect the whole turn rather than
-   * the last span — where, for Anthropic, the cache write is always zero.
+   * Per-span cache + reasoning token counts, read from the same keys the
+   * drawer popover uses. Summed across spans by the fold, so "Cache
+   * write/read" reflect the whole turn, not the last span (zero for Anthropic).
    */
   extractCacheTokens(span: NormalizedSpan): {
     cacheReadTokens: number;
@@ -145,12 +143,9 @@ export class SpanCostService {
   }
 
   /**
-   * Whether this span's token usage is a redundant copy of another span's
-   * and must be excluded from the trace-level token/cost/cache totals. An
-   * extractor sets the marker when an emitter reports the same usage on two
-   * spans (e.g. codex's lower-level response span repeats the turn rollup's
-   * counts). The per-span detail is untouched — only the fold's
-   * accumulation skips it, so the trace total counts the usage once.
+   * Whether this span's token usage is a redundant copy of another's,
+   * excluded from trace-level totals. An extractor sets the marker when an
+   * emitter double-reports usage (e.g. codex's lower-level echo span).
    */
   isTokenAccumulationSkipped(span: NormalizedSpan): boolean {
     return SpanCostService.markerIsTrue(
@@ -305,24 +300,18 @@ export class SpanCostService {
   }
 
   /**
-   * Marker stamped by the receiver (resource-level) on traces whose LLM usage
-   * is covered by a flat subscription rather than billed per token, or set
-   * directly on a span by an extractor or instrumentation that knows a single
-   * call is bundled (the codex account provider's spans, for example). A
-   * span-level value overrides the resource-level default, so a trace can mix
-   * billed and bundled spans.
+   * Marker for traces whose LLM usage is a flat subscription, not billed
+   * per token (e.g. the codex account provider). A span-level value
+   * overrides the resource-level default, mixing billed and bundled spans.
    */
   private static markerIsTrue(value: unknown): boolean {
     return value === true || value === "true";
   }
 
   /**
-   * LangWatch SDKs export span timing via the `langwatch.timestamps`
-   * attribute — { started_at, first_token_at, finished_at } in unix epoch
-   * milliseconds — rather than stream events or semconv attributes. The
-   * receiver parses JSON-string attribute values into objects, but a raw
-   * string can still reach us (e.g. oversized blobs skip parsing), so
-   * accept both shapes.
+   * LangWatch SDKs export span timing via `langwatch.timestamps` (unix
+   * epoch ms), not stream events or semconv. The receiver usually parses
+   * it to an object, but a raw string can still arrive, so accept both.
    */
   private static firstTokenAtFromLangWatchTimestamps(value: unknown): number | null {
     let parsed: unknown = value;

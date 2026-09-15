@@ -31,11 +31,9 @@ export function ErrorMessage({ error }: ErrorMessageProps) {
 const UNKNOWN_FAILURE = "Something went wrong. We've been notified. Try again in a moment.";
 
 /**
- * The sentence for each failure class `parseLLMError` recognises.
- *
- * Sits next to `renderAction`, which chooses the follow-on link off the same
- * discriminant — one switch for what happened, one for what to do about it.
- * `unknown` is absent on purpose: it means the parser recognised nothing.
+ * The sentence for each failure class `parseLLMError` recognises. Sits
+ * next to `renderAction` (same discriminant, one switch each for what
+ * happened and what to do). `unknown` is absent — the parser recognised nothing.
  */
 function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
   switch (type) {

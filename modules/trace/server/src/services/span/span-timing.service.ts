@@ -4,10 +4,9 @@ import { isValidTimestamp } from "../../rules/span-timing.rules.ts";
 const SYNTHETIC_SPAN_NAMES: ReadonlySet<string> = new Set(["langwatch.track_event"]);
 
 /**
- * Accumulates trace-level timing from individual spans.
- *
- * Computes the earliest `occurredAt` and the total wall-clock duration
- * that covers all spans seen so far.
+ * Accumulates trace-level timing from individual spans: the earliest
+ * `occurredAt` and the total wall-clock duration covering all spans seen
+ * so far.
  */
 export class SpanTimingService {
   private constructor() {}

@@ -133,12 +133,9 @@ export interface TestSpanReceivedEventOptions {
 }
 
 /**
- * A real `span_received` event carrying a wire-shaped OTLP span, so a test can
- * drive a trace fold through its own dispatch (`projection.apply`) instead of
- * reaching past the normalization pipeline into the fold's span handler.
- *
- * Defaults describe one two-second `llm-call` root span on a single trace; every
- * field a test needs to vary is an option.
+ * A real `span_received` event carrying a wire-shaped OTLP span, driving a
+ * fold through its own dispatch instead of reaching past normalization.
+ * Defaults: one two-second `llm-call` root span; every field is an option.
  */
 export function createSpanReceivedEvent(
   options: TestSpanReceivedEventOptions = {},

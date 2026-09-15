@@ -15,12 +15,9 @@ import {
 import type { TraceApp } from "#app/trace.app";
 
 /**
- * The ports this read needs that Trace does not own — the plan's visibility window, the
- * mapping/redaction implementations, and the two ingest-derived content attribute prefixes.
- *
- * Free of the metadata schema's type parameters on purpose: the transcript read never
- * touches `changeMetadata`, and threading generics through it only to discard them would
- * make the REST caller name types it does not have.
+ * The ports this read needs that Trace does not own. Free of the metadata
+ * schema's type parameters on purpose: threading generics through just to
+ * discard them would force the REST caller to name types it doesn't have.
  */
 export type TracesV2ReadMembers = Readonly<{
   /** The plan's visibility window for one project, or null when unbounded. */
@@ -32,12 +29,9 @@ export type TracesV2ReadMembers = Readonly<{
 }>;
 
 /**
- * Load one trace's spans, enriched and REDACTED.
- *
- * Extracted so `spansFull` and `codingAgentTranscript` cannot drift apart. The
- * transcript endpoint returning content that had skipped this pass would be a way
- * around the data-privacy policy the span reads enforce, so there is exactly one
- * way in.
+ * Load one trace's spans, enriched and REDACTED. Extracted so `spansFull`
+ * and `codingAgentTranscript` cannot drift apart — content that skipped
+ * this pass would bypass the data-privacy policy, so there's exactly one way in.
  */
 async function loadSpansFullWithProtections({
   app,
@@ -120,11 +114,9 @@ async function loadTraceLogsWithProtections({
 /** The transcript read both the `codingAgentTranscript` procedure and the REST route stand on. */
 export class TraceTranscriptReadService {
   /**
-   * Transcript read shared by the `codingAgentTranscript` procedure and the REST route
-   * (`GET /api/traces/:traceId/transcript`). The REST caller authenticates with a project
-   * API key, so it resolves `Protections` for the project rather than for a user session
-   * and hands them in; both doors then run identical span and log loads, so transcript
-   * content goes through the same redaction passes as every sibling read.
+   * Transcript read shared by the `codingAgentTranscript` procedure and
+   * the REST route. The REST caller authenticates with a project API key,
+   * so both doors run identical span/log loads through the same redaction.
    */
   static async readCodingAgentTranscript({
     app,

@@ -22,11 +22,9 @@ import type { TracesTrpcEmitters } from "./trace.app.ts";
 export const traceDependencies = {
   annotations: AnnotationApi,
   /**
-   * The API-key directory the deprecated `/api/trace/*` family resolves its own
-   * project credential through. That family opts out of the framework door
-   * because its refusal bodies predate the framework envelope and a released
-   * SDK parses them, so the door it uses instead is the module's own and needs
-   * the same directory every other door reads.
+   * The API-key directory the deprecated `/api/trace/*` family resolves its
+   * own credential through — it opts out of the framework door because a
+   * released SDK parses its pre-framework refusal bodies.
    */
   apiKeys: ApiKeyApi,
   authz: AuthzApi,

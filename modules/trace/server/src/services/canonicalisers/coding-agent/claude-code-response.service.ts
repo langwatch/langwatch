@@ -30,20 +30,16 @@ const sessionTitleSchema = z.looseObject({ title: z.string() });
 type ResponseBody = z.infer<typeof responseBodySchema>;
 
 /**
- * How much of a generated title is kept. Titles are a phrase, so anything past
- * this is either a model that ignored the instruction or a body that is not a
- * title at all; the cap bounds what lands in a durable session column either
- * way.
+ * How much of a generated title is kept. Titles are a phrase, so anything
+ * past this is a model ignoring the instruction or not a title at all; the
+ * cap bounds what lands in a durable session column either way.
  */
 const MAX_SESSION_TITLE_CHARS = 512;
 
 /**
- * What a Claude Code response body says, for the canonical span.
- *
- * The bodies arrive as JSON text that may be malformed or truncated, so every
- * reader here is total: it answers what it can find and nothing when it finds
- * nothing. A throw would lose the span, and a span is still worth storing when
- * only its text could not be read.
+ * What a Claude Code response body says, for the canonical span. Bodies
+ * arrive as JSON that may be malformed or truncated, so every reader is
+ * total — a throw would lose the span, still worth storing without its text.
  */
 export class ClaudeCodeResponseService {
   private constructor() {}
@@ -74,11 +70,9 @@ export class ClaudeCodeResponseService {
   }
 
   /**
-   * Parse a string-or-already-parsed JSON body into an object. The upstream
-   * attribute bag (`parseJsonStringValues`) eagerly JSON.parses string
-   * attributes that look like JSON, so a body attribute can arrive as either a
-   * raw string OR a pre-parsed object — accept both. Returns null when absent or
-   * unparseable (claude truncates large bodies inline, making them invalid JSON).
+   * Parse a string-or-already-parsed JSON body into an object — the
+   * upstream bag eagerly JSON.parses JSON-looking strings, so accept both
+   * forms. Returns null when absent or unparseable (truncated bodies).
    */
   private parseJsonBody(raw: unknown): ResponseBody | null {
     if (raw === null || raw === void 0) {
@@ -204,11 +198,8 @@ export class ClaudeCodeResponseService {
   }
 
   /**
-   * Anthropic's per-TTL cache-write split out of a response body's usage:
-   * `usage.cache_creation.{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}`.
-   * Returns null when the body is unparseable or carries no split (older API
-   * responses report only the flat cache_creation_input_tokens total).
-   *
+   * Anthropic's per-TTL cache-write split out of a response body's usage.
+   * Null when unparseable or split-less (older APIs report only the flat total).
    * @internal exported for unit testing
    */
   tryExtractCacheCreationTtlSplit(raw: unknown): {

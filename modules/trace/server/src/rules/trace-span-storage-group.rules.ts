@@ -9,17 +9,15 @@ export const SPAN_STORAGE_MAP_SHARD_COUNT = 128;
 
 /**
  * How many same-lane span events one queue dispatch may coalesce into a
- * single bulkAppend. Matches the log/metric map ceilings; the queue's
- * byte budget (ADR-066 pillar 2) bounds fat-span batches independently, so
- * the count ceiling never produces an oversized insert.
+ * single bulkAppend. Matches the log/metric ceilings; the queue's byte
+ * budget (ADR-066 pillar 2) independently bounds fat-span batches.
  */
 export const TRACE_SPAN_MAP_COALESCE_MAX_BATCH = 256;
 
 /**
- * GroupQueue key for a span-received event: `span-map:<lane>`, lane pinned by
- * the span id (from event metadata; the event id is the deterministic
- * fallback for malformed metadata). The framework prepends
- * `<tenantId>/map/spanStorage/` so lanes are always tenant-scoped.
+ * GroupQueue key for a span-received event: `span-map:<lane>`, lane pinned
+ * by the span id (event id as fallback for malformed metadata). The
+ * framework prepends `<tenantId>/map/spanStorage/` for tenant scoping.
  */
 export function spanStorageMapGroupKey(event: Event): string {
   const spanId =

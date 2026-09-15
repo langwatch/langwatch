@@ -1,6 +1,5 @@
 /**
  * @vitest-environment node
- *
  * Which process registers trace_processing: producer-only vs. draining with
  * subscribers/folds. See trace-processing-registration-ownership.feature.
  */
@@ -22,10 +21,9 @@ const silentLogger = {
 } as unknown as Logger;
 
 /**
- * An `EventSourcing` that records what a composition asked of it, standing in
- * for the runtime the process owns. `getPipeline` answers only what has been
- * registered, exactly as the real one does - a lookup before the install phase
- * throws rather than answering emptily.
+ * An `EventSourcing` that records what a composition asked of it.
+ * `getPipeline` answers only what has been registered, exactly as the real
+ * one does — a lookup before install throws rather than answering emptily.
  */
 function recordingRuntime() {
   const registered: string[] = [];

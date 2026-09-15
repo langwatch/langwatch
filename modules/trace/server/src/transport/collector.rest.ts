@@ -73,21 +73,16 @@ export type CollectorCredentialResolver = (input: {
 export type CollectorUsageLimit = (input: { project: CollectorProject }) => Promise<void>;
 
 /**
- * The whole of what `POST /api/collector` asks the process for.
- *
- * Every member carries the `collector` prefix where the trace application
- * already answers a question of the same name for another door: the legacy
- * `/api/trace/*` family resolves a `credential` too, and the OTLP receiver an
- * allowance and an error report, and one class serves all three. A shared name
- * would be one of the three doors silently reading another's answer.
+ * The whole of what `POST /api/collector` asks the process for. Every
+ * member carries the `collector` prefix since one class also answers the
+ * legacy `/api/trace/*` and OTLP doors, each with its own credential.
  */
 export type CollectorApp = Readonly<{
   collectorCredential: CollectorCredentialResolver;
   /**
-   * The plan allowance. Resolves without refusing where the process composed no
-   * usage meter, and then no monthly allowance is enforced - it is a member
-   * rather than an optional one because the application is reached through the
-   * operations-only proxy, which throws on a name it does not serve.
+   * The plan allowance. Resolves without refusing where no usage meter was
+   * composed (no monthly allowance enforced) — a required member because
+   * the operations-only proxy throws on a name it doesn't serve.
    */
   collectorUsageLimit: CollectorUsageLimit;
   /** Where a normalized span goes. Required: it is the whole of this door. */
@@ -98,10 +93,9 @@ export type CollectorApp = Readonly<{
    */
   reportEvaluation: CollectorEvaluationReport;
   /**
-   * The evaluator-id slug rule, for an evaluation that names no evaluator. Supplied by the
-   * process because the rule is EVALUATION's — the same one its own `custom-evaluation-sync`
-   * subscriber applies — and a feature server package may not reach into another feature's
-   * server package.
+   * The evaluator-id slug rule, for an evaluation naming none. Supplied by
+   * the process because the rule is EVALUATION's — a feature server package
+   * may not reach into another feature's server package.
    */
   deriveEvaluatorId: (name: string) => string;
   collectorReportError: CollectorErrorReport;
@@ -226,10 +220,9 @@ function prepareCollectorBody(
 }
 
 /**
- * Total ingestion failure: every dispatched span failed (e.g. Redis / group-queue outage). There
- * is no fallback stack, so a 200 here would tell the SDK the trace landed and it would never
- * retry — permanent trace loss. Return 500 so clients retry; the dedup gate releases failed spans
- * via releaseOnFailure, so a retry is safe. Partial success stays 2xx for SDK back-compat.
+ * Total ingestion failure (e.g. Redis/group-queue outage): no fallback
+ * stack, so a 200 would mean permanent trace loss. Return 500 so clients
+ * retry; releaseOnFailure makes that safe. Partial success stays 2xx.
  */
 async function ingestCollectorBody(input: {
   project: CollectorProject;

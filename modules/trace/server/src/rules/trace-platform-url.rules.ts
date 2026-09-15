@@ -1,9 +1,7 @@
 /**
- * One trace resource's platform address: the app's `publicBaseUrl`, the
- * project's slug, and the path the caller already resolved. Mirrors
- * `agent-platform-url.rules.ts` and `suite-platform-url.rules.ts` — the
- * `traces` REST declaration is a static object with no request-scoped
- * builder, so the app composes the link itself.
+ * One trace resource's platform address: `publicBaseUrl`, project slug,
+ * and the caller's resolved path. Mirrors `agent-platform-url.rules.ts` —
+ * the `traces` REST declaration has no request-scoped builder.
  */
 export function tracePlatformUrl({
   publicBaseUrl,

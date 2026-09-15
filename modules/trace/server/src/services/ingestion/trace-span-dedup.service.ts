@@ -1,12 +1,7 @@
 /**
- * Best-effort span deduplication for the ingestion doors, on the same Redis
- * keys every other graph has used. THE KEY FORMAT IS FROZEN: a running
- * deployment holds live claims under it, and changing it would re-ingest every
- * span an SDK retries during the rollout.
- *
- * The connection is taken as the two operations this needs rather than as the
- * Redis client type, so this module states what it uses and takes on no client
- * dependency to say it.
+ * Best-effort span dedup on the same Redis keys every other graph uses. THE
+ * KEY FORMAT IS FROZEN: a live deployment holds claims under it, and
+ * changing it would re-ingest every span an SDK retries mid-rollout.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
 

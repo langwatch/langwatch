@@ -118,10 +118,8 @@ describe("evaluator verdict presentation", () => {
 
     /**
      * The regression this guards: ordering the facet through FACET_DEFAULTS
-     * also SEEDS it. That map feeds `synthesizeDefaultDescriptors` and renders
-     * its entries as zero-count rows, so a verdict the project has never
-     * emitted would take up a permanent row in an already-dense section.
-     * Order ranks what is present; it must not conjure anything.
+     * also SEEDS it, rendering a zero-count row for a verdict never
+     * emitted. Order ranks what is present; it must not conjure anything.
      */
     it("does not seed the facet with verdict rows", () => {
       expect(FACET_DEFAULTS.evaluatorVerdict).toBeUndefined();

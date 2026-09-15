@@ -16,10 +16,9 @@ import {
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 
 /**
- * Offset pagination was dropped when trace search moved to ClickHouse: deep
- * OFFSET degrades badly, and keyset (`scrollId`) replaced it. The field stays
- * on the schema so sending it produces an explanatory error rather than being
- * silently discarded.
+ * Offset pagination was dropped for ClickHouse (deep OFFSET degrades badly;
+ * keyset `scrollId` replaced it). Kept on the schema so sending it produces
+ * an explanatory error, not silent discard.
  */
 const pageOffsetInput = z
   .number()
@@ -79,12 +78,9 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(evaluationSchema.array().optional())
 
   /**
-   * Protected (not public-share): the read is keyed by evaluationId, which is
-   * only tenant-scoped, so authorization must be the whole project too. A
-   * public-share token is scoped to a single trace and could otherwise be
-   * used to read any evaluation's inputs in the project by supplying another
-   * evaluationId. Public-shared trace drawers already get inputs eagerly from
-   * the public `getEvaluations`; this lazy fallback stays project-gated.
+   * Protected (not public-share): keyed by evaluationId, which is only
+   * tenant-scoped, so a share token could otherwise read any evaluation's
+   * inputs in the project by supplying another id. Stays project-gated.
    */
   .query("getEvaluationInputs")
   .withInput(z.object({ projectId: z.string(), evaluationId: z.string() }))

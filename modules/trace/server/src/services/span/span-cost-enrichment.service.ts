@@ -39,11 +39,9 @@ const CODING_AGENT_MODEL_SPAN_NAMES: ReadonlySet<string> = new Set([
  */
 export class OtlpSpanCostEnrichmentService {
   /**
-   * The application constructs this with `new` over a `getCustomModelCosts`
-   * function it builds in its adapter; here the same read is the narrow port
-   * Trace declares. `service-classes` requires a strict feature package to
-   * expose construction through a static factory, and `service-quality`
-   * requires the constructor to be private once it has one.
+   * The application constructs this with `new` over an adapter-built
+   * function; here it's the narrow port Trace declares. `service-classes`
+   * requires a static factory; `service-quality` requires a private constructor.
    */
   static create(deps: { modelCosts: TraceModelCostCatalog }): OtlpSpanCostEnrichmentService {
     return new OtlpSpanCostEnrichmentService(deps.modelCosts, SpanModelNameService.create());
@@ -55,12 +53,9 @@ export class OtlpSpanCostEnrichmentService {
   ) {}
 
   /**
-   * Enriches the span with custom cost rates when a matching custom model cost
-   * exists. Mutates the span in place (pushes new attributes).
-   *
-   * The catalog read is skipped entirely for a span with no model name, which
-   * is most spans: this runs on every ingested span, and the read is a scope
-   * cascade over three tiers.
+   * Enriches the span with custom cost rates when a match exists, mutating
+   * it in place. The catalog read is skipped for a span with no model name
+   * (most spans) — a scope cascade over three tiers, run on every span.
    */
   async enrichSpan({ span, tenantId }: { span: OtlpSpan; tenantId: string }): Promise<void> {
     const modelName = this.modelNames.tryExtractModelName(

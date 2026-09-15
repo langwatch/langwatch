@@ -125,12 +125,9 @@ async function insertTraceSummaries(rows: Record<string, unknown>[]) {
 }
 
 /**
- * One transcript log record for a session, as a raw `log_records` row.
- *
- * `SessionGroupsClickHouseRepository` reads `TenantId`, `TimeUnixMs`,
- * `ProviderSessionId`, `BodyText` and `AttributesFlatJson` directly — the
- * rest of the schema is filled with production-shaped defaults so the row is
- * a valid canonical record, not because the repository under test reads them.
+ * One transcript log record, as a raw `log_records` row. The repository
+ * reads `TenantId`, `TimeUnixMs`, `ProviderSessionId`, `BodyText` and
+ * `AttributesFlatJson`; the rest is production-shaped defaults.
  */
 async function insertSessionLog({
   sessionId,

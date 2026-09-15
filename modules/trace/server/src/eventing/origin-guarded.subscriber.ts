@@ -10,20 +10,16 @@ const logger = createLogger("langwatch:trace-processing:origin-guarded-subscribe
 const OLD_TRACE_THRESHOLD_MS = 60 * 60 * 1000;
 
 /**
- * Never re-run an on-message subscriber for a trace whose first span is older
- * than this, even on a genuine new span. Re-evaluating / re-alerting days-old
- * traces is never wanted, and bounds the blast radius of any path that
- * re-touches historical traces. Distinct from `OLD_TRACE_THRESHOLD_MS` (which
- * skips stale *events*); this bounds the *trace* age.
+ * Never re-run an on-message subscriber for a trace whose first span is
+ * older than this, even on a genuine new span — bounds the blast radius of
+ * any path re-touching historical traces. Distinct from `OLD_TRACE_THRESHOLD_MS`.
  */
 const MAX_TRACE_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Trace-processing events that represent genuine new message content and so
- * should (re-)run on-message subscribers. Everything else (topic assignment,
- * annotations, name changes, log/metric records) updates the fold projection
- * but must NOT fan out to side-effecting subscribers. `origin_resolved` is
- * here so deferred-origin traces still dispatch once their origin lands.
+ * Trace-processing events that represent genuine new message content and
+ * so should (re-)run on-message subscribers. `origin_resolved` is here too,
+ * so deferred-origin traces still dispatch once their origin lands.
  */
 const MESSAGE_EVENT_TYPES = new Set<string>([SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE]);
 

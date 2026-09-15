@@ -85,16 +85,10 @@ export const EmptyResultsPane: React.FC = React.memo(() => {
             or the mask geometry; see
             `onboarding/effects/OnboardingAurora.tsx`. */}
         <OnboardingAurora />
-        {/* Outer wrapper is pointer-events:none so clicks fall
-            through to the table behind it (notably the highlighted
-            row during `postArrival`, which is otherwise eclipsed by
-            this scroll-container's hit area). The hero composition
-            inside `EmptyStateOverlay` sets pointer-events:auto on
-            its inner Box, so headings, CTAs, and density cards stay
-            clickable. We also drop `overflow:auto` here for the same
-            reason — overflow:auto creates a hit-testable scroll
-            container. The hero composition Flex inside has its own
-            overflow:auto for the rare tall-hero case. */}
+        {/* pointer-events:none lets clicks reach the table (the highlighted
+            postArrival row); EmptyStateOverlay's Box re-enables it, and
+            overflow:auto is dropped here since it creates a hit-testable
+            scroll container. */}
         <Box position="absolute" inset={0} zIndex={1} pointerEvents="none">
           <EmptyStateOverlay />
         </Box>

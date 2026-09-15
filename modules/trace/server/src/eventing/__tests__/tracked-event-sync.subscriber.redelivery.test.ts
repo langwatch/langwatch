@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * Event ID hashed from trace, span, event type, ordinal. All deterministic,
- * so redelivery records identical row.
+ * Event ID hashed from trace, span, event type, ordinal — deterministic, so redelivery repeats.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
@@ -199,10 +198,9 @@ describe("given two feedback events of the same type on one span", () => {
 
 describe("given a span whose feedback sits behind an unrelated span event", () => {
   /**
-   * The ordinal reads `span.events`, so an event the reconstructor skips still
-   * occupies its position. What redelivery needs is that the position does not
-   * move BETWEEN deliveries of one span, which is what this pins: the same span
-   * yields the same id however its events are laid out.
+   * The ordinal reads `span.events`, so a skipped event still occupies its
+   * position. This pins that the position never moves BETWEEN deliveries —
+   * the same span yields the same id however its events are laid out.
    */
   it("mints a stable identity across deliveries", async () => {
     const sink = makeTrackedEventSink();

@@ -11,12 +11,9 @@ import type { TraceSpanCollectionService } from "../ingestion/trace-ingestion.se
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The ksuid prefix every tracked-event id ever written carries.
- *
- * A literal rather than an import: the platform's `KSUID_RESOURCES` map is not
- * published by any contract package, and this prefix is part of ids already in
- * customers' databases — so it is pinned here and pinned again in the test,
- * exactly as `evaluation-trigger.subscriber.ts` pins the evaluation prefix.
+ * The ksuid prefix every tracked-event id ever written carries. A literal
+ * rather than an import: not published by any contract package, and part
+ * of ids already in customers' databases, so pinned here and in the test.
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 
@@ -35,11 +32,9 @@ export class TrackedEventSpanService {
   }
 
   /**
-   * The span id both paths must agree on.
-   *
-   * Sixteen hex characters because that is an OTLP span id; a digest rather
-   * than a random value because idempotency here is the difference between one
-   * recorded rating and two.
+   * The span id both paths must agree on. Sixteen hex characters because
+   * that is an OTLP span id; a digest rather than random because
+   * idempotency here is the difference between one rating and two.
    */
   static spanIdFor(input: { traceId: string; eventId: string }): string {
     return createHash("sha256")

@@ -3,10 +3,9 @@ import { z } from "zod";
 import { evaluationSchema } from "./trace-format.schemas.ts";
 
 /**
- * How many spans' full detail one share payload may carry. The share page
- * renders the whole waterfall regardless; beyond this many spans it stops
- * shipping per-span detail and says so. Lifting the cap properly means a
- * token-validated `sharedTrace.spanDetail` — see ADR-057's follow-ups.
+ * How many spans' full detail one share payload may carry; beyond this the
+ * page still renders the waterfall but stops shipping per-span detail.
+ * Lifting it properly needs a token-validated `sharedTrace.spanDetail` (ADR-057).
  */
 export const SHARE_MAX_FULL_SPANS = 500;
 
@@ -25,10 +24,9 @@ import { spanTreeNodeSchema } from "./trace.ts";
  */
 
 /**
- * `langwatch.user_id` identifies the end user behind the trace. It is pinned to
- * `null` rather than omitted: the share page's header type still carries the
- * field, and pinning means a future path that forgets to null it fails the
- * output parse instead of shipping PII to an anonymous viewer.
+ * `langwatch.user_id` is pinned to `null` rather than omitted: a future path
+ * that forgets to null it fails the output parse instead of shipping PII to
+ * an anonymous viewer.
  */
 const sharedTraceHeaderSchema = traceHeaderSchema
   .pick({
@@ -150,11 +148,9 @@ const sharedTraceEventSchema = z.object({
 });
 
 /**
- * Evaluator verdicts. `inputs` is absent from the pick — it is captured trace
- * content and is never shared, at any visibility. `details` and the error
- * message follow content visibility (applied by `gateEvaluations`), and the
- * stacktrace is pinned empty so an evaluator's internal frames can never reach
- * an anonymous viewer.
+ * Evaluator verdicts. `inputs` is never shared, at any visibility. `details`
+ * and the error message follow content visibility (`gateEvaluations`); the
+ * stacktrace is pinned empty so internal frames never reach a viewer.
  */
 const sharedEvaluationSchema = evaluationSchema
   .pick({
@@ -200,12 +196,9 @@ export const sharedTraceDtoSchema = z.object({
   events: z.array(sharedTraceEventSchema),
   evaluations: z.array(sharedEvaluationSchema),
   /**
-   * True when `spansFull` carries detail for only the first
-   * `SHARE_MAX_FULL_SPANS` spans. The waterfall (`spanTree`) is always
-   * complete — it is small per span — but full detail is not, because this
-   * endpoint is unauthenticated and a wide trace would otherwise assemble an
-   * unbounded response in memory. The viewer says so rather than silently
-   * showing an empty detail pane. See ADR-057.
+   * True when `spansFull` only carries the first `SHARE_MAX_FULL_SPANS`
+   * spans — this endpoint is unauthenticated, so a wide trace would
+   * otherwise assemble an unbounded response in memory. See ADR-057.
    */
   isSpanDetailTruncated: z.boolean(),
 });

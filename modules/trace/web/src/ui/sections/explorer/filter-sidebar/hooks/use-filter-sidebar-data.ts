@@ -561,10 +561,9 @@ function buildDiscreteFacetItems(range: RangeSectionData, synthetic: boolean): F
 }
 
 /**
- * Exported for direct unit coverage. This is where a facet's curated colour
- * and order rules actually reach the rows — `FACET_COLORS` being correct
- * proves nothing if `dotColorFor` stops consulting it, and that wiring is
- * otherwise only observable through the whole sidebar.
+ * Exported for direct unit coverage: where a facet's curated colour and
+ * order rules actually reach the rows. `FACET_COLORS` being correct proves
+ * nothing if `dotColorFor` stops consulting it.
  */
 export function buildFacetItems({
   cat,

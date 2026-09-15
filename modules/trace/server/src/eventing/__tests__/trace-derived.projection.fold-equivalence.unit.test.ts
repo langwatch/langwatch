@@ -18,10 +18,9 @@ import {
 } from "./trace-summary-test.fixtures.ts";
 
 /**
- * The read-back boundary is a DESERIALIZE, not a rebuild: a fold resumed from
- * its last committed slim row must reach exactly the row the fold that never
- * lost its state reaches. Any working field the trim drops and the decoder does
- * not recover shows up here as a column that diverges after the split.
+ * The read-back boundary is a DESERIALIZE, not a rebuild: a resumed fold
+ * must reach exactly the row an uninterrupted fold reaches. A field the trim
+ * drops and the decoder doesn't recover shows up as a diverging column.
  */
 
 const TENANT = "tenant-fold-eq";

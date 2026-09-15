@@ -18,10 +18,9 @@ import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules.ts";
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 
 /**
- * RFC 4180 line ending, explicit not relying on PapaParse default. Every
- * chunk must both use and end with this — a streamed export concatenates
- * chunks straight into file, so a missing trailing newline glues rows together.
- * Exported so export.service.ts strips header on same sequence it was written.
+ * RFC 4180 line ending, explicit rather than PapaParse's default. Every
+ * chunk must end with this — a streamed export concatenates chunks
+ * straight into file, so a missing newline glues rows together.
  */
 export const CSV_NEWLINE = "\r\n";
 

@@ -7,12 +7,9 @@ import { SpanCostService } from "../../span/span-cost.service.ts";
 import { TraceEventDerivationService } from "../../ingestion/trace-event-derivation.service.ts";
 
 /**
- * Read amplification across a coalesced fold batch. A coalesced batch dispatches
- * its subscribers once per event against ONE shared final fold state, so a
- * derivation that reads per invocation turns one multi-megabyte trace read into
- * hundreds — the amplification that saturated ClickHouse during a backlog
- * drain. The memo is keyed on the fold version, so it holds only while the fold
- * has not moved.
+ * Read amplification across a coalesced fold batch: subscribers dispatch
+ * once per event against ONE shared state, so per-invocation reads turn one
+ * trace read into hundreds. The memo is keyed on the fold version.
  */
 
 /** Counts how many times each underlying span read is issued. */

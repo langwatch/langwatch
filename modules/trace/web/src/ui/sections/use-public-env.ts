@@ -1,10 +1,7 @@
 /**
- * What the deployment is, as this package reads it.
- *
- * Wholly the static half the shell injected into the HTML: there used to be a
- * per-viewer half fetched over a `publicEnv` query, gated behind an
- * `includeCapabilities` flag nothing in this package ever set to true. The
- * query is gone; this hook was already dead weight for it.
+ * What the deployment is, as this package reads it: wholly the static half
+ * the shell injected into the HTML. The per-viewer `publicEnv` half is
+ * gone; this hook was already dead weight for it.
  */
 
 const PUBLIC_APP_CONFIG_META_NAME = "langwatch-public-config";

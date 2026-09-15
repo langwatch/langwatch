@@ -19,10 +19,9 @@ import {
 } from "./trace-summary-test.fixtures.ts";
 
 /**
- * A backed-up group is folded as ONE batch: the executor loads the state once,
- * applies every event in order, and stores once. The accumulated count that
- * reaches the store has to match the per-event fold exactly — a batch that
- * double-counts or loses a span is invisible until someone reads the row.
+ * A backed-up group is folded as ONE batch: load state once, apply every
+ * event in order, store once. The accumulated count must match the
+ * per-event fold exactly — a batch that miscounts is invisible until read.
  */
 
 const TENANT = "tenant-coalesce";

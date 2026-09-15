@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The trace module's own registry, selected the way a memory-only process
- * selects it with `.withPersistence("memory", {})`. A write followed by a
- * read through the SAME instances is what proves the memory tier is not a
- * stub: the module boots without Postgres or ClickHouse behind it.
+ * The trace module's own registry, selected memory-only. A write then read
+ * through the SAME instances proves it boots without Postgres or ClickHouse.
  */
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";

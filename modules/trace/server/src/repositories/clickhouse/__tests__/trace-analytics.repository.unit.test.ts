@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- * DateTime64 decode is timezone-safe (CI runs UTC, so this suite forces
- * Kolkata, +05:30). Sets TZ through node:process, not the global: under a
- * vm pool with isolate:false a worker reuses one context, and vitest's
- * `process` global wraps it, missing Node's native setter that flushes
- * V8's cached timezone (verified: TZ=UTC, one worker, Date-suite loaded first).
+ * DateTime64 decode is timezone-safe (forces Kolkata). Sets TZ via
+ * node:process, not the global — isolate:false needs Node's native setter.
  */
 import { env as nodeProcessEnv } from "node:process";
 
@@ -103,12 +100,9 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
 });
 
 /**
- * Two physical versions of one trace can tie on UpdatedAt: the fold stamps
- * `max(Date.now(), prev + 1)`, monotonic only within one state chain, so two
- * writers resuming from the same committed version land on the same ms. Both
- * then satisfy the IN-tuple dedup, and a bare LIMIT 1 picks arbitrarily —
- * resuming the fold from stale state that it rewrites, dropping the other
- * version's contributions and its applied-id watermark.
+ * Two physical versions of one trace can tie on UpdatedAt (the fold's
+ * `max(Date.now(), prev+1)` stamp is monotonic only per chain). A bare
+ * LIMIT 1 then picks arbitrarily, resuming from stale, dropped state.
  */
 describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
   describe("given two committed versions of a trace that tie on UpdatedAt", () => {
@@ -324,10 +318,9 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
 });
 
 /**
- * The write half of the migration window (ADR-066). Without the explicit
- * `input_format_skip_unknown_fields: 0`, a worker writing before migration
- * 00056 applies gets HTTP 200 with the new columns silently dropped, and
- * the row decodes as all-defaults with no rebuild path.
+ * The write half of the migration window (ADR-066): without explicit
+ * `input_format_skip_unknown_fields: 0`, a pre-migration-00056 writer gets
+ * HTTP 200 with new columns silently dropped, decoding as all-defaults.
  */
 describe("TraceAnalyticsClickHouseRepository insert settings", () => {
   const ROW: TraceAnalyticsRow = {

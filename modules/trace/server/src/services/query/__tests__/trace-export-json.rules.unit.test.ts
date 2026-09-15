@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for JSON (JSONL) serializers (summary and full mode).
- * Pure function tests — no mocking needed.
+ * Unit tests for JSON (JSONL) serializers (summary and full mode) — pure
+ * function tests, no mocking needed.
  */
 
 import { describe, expect, it } from "vitest";

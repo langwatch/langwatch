@@ -1,9 +1,7 @@
 /**
- * Fetch policy for the trace behind a conversation turn.
- *
- * A trace lands a beat after the messages that produced it, so the affordance
- * that opens it has to retry rather than conclude the trace does not exist.
- * Traces are immutable once written, so caching forever is correct.
+ * Fetch policy for the trace behind a conversation turn: it lands a beat
+ * after the messages that produced it, so the affordance retries rather
+ * than concluding it doesn't exist. Immutable once written, so cache forever.
  */
 export const TRACE_QUERY_CONFIG = {
   retry: 10,

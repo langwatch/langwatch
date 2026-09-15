@@ -8,11 +8,9 @@ import { NullSpanStorageRepository, type OccurredAtHint } from "../../span-stora
 import type { MemoryTraceSpanStore } from "./memory-trace-span.store.ts";
 
 /**
- * The span storage twin over {@link MemoryTraceSpanStore}. Every read this
- * store can answer from what was written is answered here; the projections a
- * ClickHouse query computes (rollups, usage statistics, signal buckets) keep
- * the null answers this extends, so a memory process reads empty rather than
- * inventing an aggregate.
+ * The span storage twin over {@link MemoryTraceSpanStore}. Every read the
+ * store can answer is answered; ClickHouse-only projections (rollups, usage
+ * stats, signal buckets) keep the null answers this extends — empty, not invented.
  */
 export class MemorySpanStorageRepository extends NullSpanStorageRepository {
   readonly #store: MemoryTraceSpanStore;

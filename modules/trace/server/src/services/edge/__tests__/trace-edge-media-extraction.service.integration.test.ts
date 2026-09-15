@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
- * Fake TraceMediaStore content-addresses bytes identically to StoredObjectsService,
- * deduping via isDuplicate on second write. Production code with faked storage and
- * feature-flag boundaries.
+ * Fake TraceMediaStore content-addresses bytes; dedups via isDuplicate on second write.
  */
 import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service.ts";
 import { createHash } from "node:crypto";

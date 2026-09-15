@@ -1,8 +1,7 @@
 /**
- * The presence toggle as the account dropdown draws it.
- *
- * Spec: specs/traces-v2/presence-toggle-placement.feature
  * @vitest-environment jsdom
+ * The presence toggle as the account dropdown draws it.
+ * Spec: specs/traces-v2/presence-toggle-placement.feature
  */
 import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -36,9 +36,8 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [TOPIC_ASSIGNED_EVENT_VERSION_LATES
 
 /**
  * Trace-fold contribution event for a received log record. No live minter
- * since the `recordLog` command was retired (canonical `log_records` is now the
- * only log write path) — kept so historical `event_log` replays of the trace
- * folds still reproduce pre-cutover log contributions.
+ * since `recordLog` was retired — kept so historical `event_log` replays
+ * still reproduce pre-cutover log contributions.
  */
 export const LOG_RECORD_RECEIVED_EVENT_TYPE = "lw.obs.trace.log_record_received" as const;
 export const LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-03-08" as const;
@@ -56,10 +55,8 @@ export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST = "2026-07-15" as
 
 /**
  * How many metric exemplars correlate to a trace — NOT how many metric data
- * points its metrics produced. Trace folds only ever see the trace-scoped
- * correlation events; canonical data points are a separate pipeline. The
- * legacy `metric_record_count` key it replaces counted folded metric records,
- * which no longer exist.
+ * points its metrics produced; trace folds only see the trace-scoped
+ * correlation events. Replaces the legacy `metric_record_count` key.
  */
 export const METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE =
   "langwatch.reserved.metric_exemplar_correlation_count" as const;
@@ -162,11 +159,9 @@ export function isStorageAnchoredVersion(version: string | undefined): boolean {
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * Span name the `/api/track_event` endpoint and the tracked-event sync
- * subscriber give synthetic event spans.
- *
- * These spans represent user-tracked events (a thumbs-up, a rating), not
- * actual execution, and must be excluded from trace timing calculations.
+ * Span name `/api/track_event` and the tracked-event sync subscriber give
+ * synthetic event spans (a thumbs-up, a rating) — not actual execution, so
+ * excluded from trace timing calculations.
  */
 export const TRACK_EVENT_SPAN_NAME = "langwatch.track_event" as const;
 
@@ -185,9 +180,8 @@ export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
 export const RECORD_SPAN_COALESCE_MAX_BATCH = 64;
 
 /**
- * Correlation commands share a trace queue group, so coalescing prevents chatty
- * traces from producing one tiny event-log part per item. Each handler derives
- * one independently idempotent event from its command, making retries safe.
- * The drain's 4 MiB byte budget bounds large previews before this count does.
+ * Correlation commands share a trace queue group, so coalescing prevents
+ * chatty traces from producing one tiny event-log part per item. The drain's
+ * 4 MiB byte budget bounds large previews before this count does.
  */
 export const TRACE_CORRELATION_COALESCE_MAX_BATCH = 256;

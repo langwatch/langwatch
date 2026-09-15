@@ -40,12 +40,9 @@ describe("SpanStatusService.extractStatus", () => {
 
   describe("when the span carries an exception event and a statusMessage", () => {
     it("prefers the exception event's exception.message over statusMessage (Thread-tab #78 regression)", () => {
-      // Regression: the Thread-tab trace-level error renderer reads from
-      // TraceSummary.errorMessage, which this service populates. Before
-      // the fix, statusMessage ("Bad Request") won over the event — so
-      // the rich "provider X not bound" text never reached the UI even
-      // though the gateway wrote it to span.events. Parallels the
-      // span.mapper fix in 531f31721.
+      // Regression: TraceSummary.errorMessage must prefer the exception
+      // event over statusMessage, or richer error text (e.g. "provider X
+      // not bound") never reaches the UI. Parallels the span.mapper fix in 531f31721.
       const span = makeSpan({
         statusCode: NormalizedStatusCode.ERROR,
         statusMessage: "Bad Request",

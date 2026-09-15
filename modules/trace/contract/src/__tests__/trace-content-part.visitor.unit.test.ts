@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- * Provider media shapes reaching the decoder as provider vocabulary (Anthropic
- * `source`, Gemini `inline_data`) are normalized to AG-UI form. See
- * specs/trace-processing/trace-media-blob-extraction.feature.
+ * Provider media shapes (Anthropic `source`, Gemini `inline_data`) normalize to AG-UI form.
  */
 
 import { describe, expect, it } from "vitest";

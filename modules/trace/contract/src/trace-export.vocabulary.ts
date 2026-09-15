@@ -34,12 +34,9 @@ export const traceExportRequestShape = {
 } as const;
 
 /**
- * A download request, as the export service consumes it.
- *
- * `filters` is typed from the legacy read's own structural restatement rather
- * than from the analytics schema, for the reason above; what a caller may SEND
- * is still checked against the real thing, because the process validates with
- * the joined schema at the transport.
+ * A download request, as the export service consumes it. `filters` is typed
+ * from the legacy read's restatement, not the analytics schema — a caller's
+ * input is still checked against the joined schema at the transport.
  */
 export type ExportRequest = {
   projectId: string;

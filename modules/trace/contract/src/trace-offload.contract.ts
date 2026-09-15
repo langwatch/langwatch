@@ -19,12 +19,9 @@ export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
 export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
 
 /**
- * What an eventref attribute's value decodes to.
- *
- * `field` is the payload field on the stored event that holds the full value;
- * `eventId` is the event log row to read it from. The read path needs BOTH —
- * it JOINs event_log by EventId rather than guessing which event of the trace
- * carried the attribute.
+ * What an eventref attribute's value decodes to. `field` is the payload
+ * field holding the full value; `eventId` is the event_log row to read it
+ * from — the read path JOINs by EventId rather than guessing.
  */
 export interface TraceEventReference {
   field: string;
@@ -38,9 +35,8 @@ export function traceEventReferenceKey(attrKey: string): string {
 
 /**
  * The attribute value a reader decodes. Key order is `field` then `eventId`,
- * matching every pointer already written to ClickHouse — readers parse JSON so
- * order is not load-bearing for them, but a stored-attribute equality test is
- * how a drift in this codec would first be seen.
+ * matching every pointer already in ClickHouse; a stored-attribute equality
+ * test is how codec drift would first be seen.
  */
 export function serializeTraceEventReference(reference: TraceEventReference): string {
   return JSON.stringify({ field: reference.field, eventId: reference.eventId });

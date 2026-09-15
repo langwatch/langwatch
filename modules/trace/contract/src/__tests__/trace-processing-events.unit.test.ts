@@ -16,11 +16,8 @@ describe("events schemas", () => {
   describe("spanReferencedPayloadSchema", () => {
     describe("when a job staged under the previous wire shape arrives", () => {
       /**
-       * The schema is a plain DTO now (no longer an EventSchema extension),
-       * but the bytes on the queue are a contract with jobs staged by earlier
-       * builds. This fixture is deliberately ALL literals — no shared
-       * constants — so any drift in the wire strings or the envelope fields
-       * fails here rather than on a live queue mid-rollout.
+       * Deliberately ALL literals (no shared constants) so wire-string or
+       * envelope drift fails here, not on a live queue mid-rollout.
        */
       const pinnedWireJob = () => ({
         id: "evt-wire-ref",

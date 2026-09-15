@@ -1,8 +1,7 @@
 /**
- * OTel GenAI Semantic Conventions v1.38.0 conformance tests: spans following
- * https://github.com/open-telemetry/semantic-conventions/tree/v1.38.0/docs/gen-ai
- * parse correctly through the full TraceCanonicalisationService (to catch
- * interaction bugs between extractors).
+ * OTel GenAI Semantic Conventions v1.38.0 conformance: spans parse
+ * correctly through the full TraceCanonicalisationService, to catch
+ * interaction bugs between extractors.
  */
 import { describe, expect, it } from "vitest";
 import { canonicalisation, makeStubSpan } from "./test-helpers.ts";

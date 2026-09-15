@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * Metadata assertion (idempotent) + first-trace milestone (guarded) +
- * unguarded bootstrap reconciliation.
+ * Metadata assertion (idempotent) + milestone (guarded) + reconciliation (unguarded).
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {
@@ -94,10 +93,9 @@ describe("given a project receiving its first real trace", () => {
 
   describe("when the first delivery's write is lost before the second", () => {
     /**
-     * The level-triggered half: the subscriber does not remember that it ran,
-     * it re-reads the project. A lost write is re-asserted to the same values
-     * rather than to different ones, which is what makes a redelivery safe
-     * without a dedup key.
+     * The level-triggered half: the subscriber re-reads the project rather
+     * than remembering it ran, so a lost write re-asserts the same values —
+     * what makes a redelivery safe without a dedup key.
      */
     it("re-asserts the same metadata", async () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
@@ -133,11 +131,9 @@ describe("given a project that was already integrated", () => {
 
   describe("when a clustering bootstrap is wired", () => {
     /**
-     * Deliberately unguarded, and the comment on `assertClusteringSchedule`
-     * says why: it is the reconciliation path, so a project that lost its
-     * schedule gets it back on its next trace rather than waiting for an
-     * operator. The injected implementation is rate-limited, so the repeat
-     * costs at most one commit per project per claim window.
+     * Deliberately unguarded: the reconciliation path, so a project that
+     * lost its schedule gets it back on its next trace. Rate-limited, so
+     * the repeat costs at most one commit per project per claim window.
      */
     it("re-asserts the clustering schedule on every delivery", async () => {
       const store = makeProjectStore({ firstMessage: true, integrated: true });

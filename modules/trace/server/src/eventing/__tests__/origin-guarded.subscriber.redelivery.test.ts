@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * Origin guard ensures decisions are deterministic from event+fold state.
- * Clock only restricts (never relaxes), so redelivery is idempotent.
+ * Deterministic from event+fold state; clock only restricts, so redelivery is idempotent.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "@langwatch/eventing";
@@ -102,9 +101,8 @@ describe("given an origin-guarded subscriber", () => {
 
   describe("when a derived event is redelivered", () => {
     /**
-     * Only span arrivals and origin resolution re-run side effects. A daily
-     * topic-clustering pass re-emits `topic_assigned` for thousands of
-     * historical traces; without this, one redelivery of that pass would fan
+     * Only span arrivals and origin resolution re-run side effects — without
+     * this, one redelivery of the daily topic-clustering pass would fan
      * every monitor out over the whole backlog.
      */
     it("declines it however many times it arrives", async () => {
@@ -120,10 +118,9 @@ describe("given an origin-guarded subscriber", () => {
 
   describe("when the caller's own relevance guard throws", () => {
     /**
-     * Fails OPEN, deliberately (ADR-026): a throwing guard costs one redundant
-     * run, never a dropped side effect. That is only safe BECAUSE the
-     * subscribers it wraps are idempotent — which is the contract this file
-     * and its siblings hold.
+     * Fails OPEN, deliberately (ADR-026): a throwing guard costs one
+     * redundant run, never a dropped side effect — safe only because the
+     * wrapped subscribers are idempotent.
      */
     it("runs the body anyway, on every delivery", async () => {
       const { ran, subscriber } = makeGuardedSubscriber({

@@ -7,12 +7,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * The repository this reads, resolved once.
- *
- * Named in one place because the assertions are about the SQL the shipped
- * source issues: if the file moves and each call site keeps its own path, the
- * suite dies with ENOENT, which reads exactly like a guard that stopped
- * guarding. One resolver means one thing to fix.
+ * The repository this reads, resolved once: the assertions are about the
+ * SQL the shipped source issues, so a moved file with per-call-site paths
+ * would die with ENOENT — a guard that looks like it's still guarding.
  */
 function traceReadSourcePath(): string {
   return path.resolve(
@@ -137,12 +134,9 @@ describe("memory-safety", () => {
       it("resolves every client through the injected per-tenant resolver", () => {
         const source = fs.readFileSync(traceReadSourcePath(), "utf-8");
 
-        // Every read must go through the resolver this repository was composed
-        // with, whose clients are built by the one construction path that
-        // applies the package query-default policy — so the memory-safety
-        // settings are injected on every query rather than remembered at each
-        // call site. A bare driver client would carry none of them. The
-        // wrapper's merge behaviour is tested in the managed-client suite.
+        // Every read must go through the resolver this repository was
+        // composed with, so memory-safety settings are injected on every
+        // query rather than remembered per call site. A bare client carries none.
         expect(source).toContain("this.resolveClient(");
         expect(source).not.toMatch(/\bcreateClient\s*\(/);
       });

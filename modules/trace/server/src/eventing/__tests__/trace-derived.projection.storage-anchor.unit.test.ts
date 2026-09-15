@@ -267,14 +267,9 @@ describe("traceAnalytics storage anchor", () => {
 
     /** @scenario "A trace's duration is measured from its spans, never from a log record" */
     it("measures the duration from the span, not from the gap to the log", () => {
-      // REGRESSION GUARD, and the reason the anchor is a separate field rather
-      // than a seeded `occurredAt`. `SpanTimingService` reads `occurredAt > 0`
-      // as "a span has seeded the baseline" and computes
-      // `currentEnd = occurredAt + totalDurationMs`. Seed it from a log — whose
-      // time is platform ACCEPT time — and the first span measures from the log
-      // instead of from itself, inflating TotalDurationMs by the whole ingest
-      // lag and taking TokensPerSecond (completion tokens over that duration)
-      // with it.
+      // REGRESSION GUARD: the anchor is a separate field, not a seeded
+      // `occurredAt`, because seeding from a log (platform ACCEPT time)
+      // would inflate TotalDurationMs and TokensPerSecond by the ingest lag.
       const state = foldAll([log, span]);
 
       expect(state.occurredAt).toBe(spanStartMs);
@@ -350,13 +345,9 @@ describe("traceAnalytics storage anchor", () => {
   });
 
   describe("given a business time a producer sent from far in the future", () => {
-    // The anchor is producer-controlled and the collector bounds only the PAST
-    // edge, so without a future bound one span claiming to start in 2286 fixes
-    // that row's partition AND its `OccurredAt + retention` TTL deadline in
-    // 2286 — a row that outlives its tenant's retention indefinitely and that
-    // `ttlReconciler` cannot reach, because it anchors on the same column.
-    // Before the freeze this self-corrected: `min(span start)` pulled the live
-    // row back as soon as a sane span arrived. Freezing is what makes it stick.
+    // The anchor is producer-controlled; without a future bound, one span
+    // claiming to start in 2286 fixes the row's partition and TTL deadline
+    // there too, outliving retention indefinitely. Freezing is what makes it stick.
     const now = BASE_MS;
     const farFuture = BASE_MS + 400 * 24 * 60 * 60 * 1000;
 

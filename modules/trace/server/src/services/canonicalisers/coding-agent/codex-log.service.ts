@@ -42,9 +42,8 @@ export class CodexLogCanonicaliserService {
 
   /**
    * Every codex log record names its session as `conversation.id`. A turn
-   * whose span never lands has only its log records to key the session fold
-   * off, so this lifts it onto both the trace's conversation key and
-   * `langwatch.thread.id`. Read, not taken: the pipeline keys off the same attribute.
+   * with no span has only logs to key the session fold off, so this lifts
+   * it onto the trace's conversation key and `langwatch.thread.id`.
    */
   private liftConversationId(ctx: LogExtractorContext): void {
     const conversationId = asString(ctx.bag.attrs.get("conversation.id"));

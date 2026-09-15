@@ -1,10 +1,7 @@
 /**
  * Shapes for the v1 trace REST family (`/api/traces`) and the deprecated
- * `/api/trace` family beside it: the search body's
- * additive half, the path/query params the two `:traceId` reads share, and the
- * metadata PATCH body and answer. The deployment's own analytics filter
- * vocabulary is the other half of the search body and stays a process concern
- * (it is built from that process's own list-input schema).
+ * `/api/trace` family: search body's additive half, shared `:traceId`
+ * params, metadata PATCH. Analytics filter vocabulary stays a process concern.
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
@@ -45,10 +42,9 @@ export const traceSearchBodyExtensions = {
 } as const;
 
 /**
- * Offset pagination was dropped when trace search moved to ClickHouse: deep
- * OFFSET degrades badly, and keyset (`scrollId`) replaced it. The field
- * remains on the schema so that sending it produces an explanatory error
- * rather than being silently discarded.
+ * Offset pagination was dropped for ClickHouse (deep OFFSET degrades badly;
+ * keyset `scrollId` replaced it). Kept on the schema so sending it produces
+ * an explanatory error, not silent discard.
  */
 const pageOffsetInput = z
   .number()
@@ -108,9 +104,8 @@ export type TraceSearchBody = ProjectionRequest &
 
 /**
  * The `:id` segment of the deprecated `/api/trace/:id` and `/api/thread/:id`
- * reads. A separate schema from {@link traceIdParamsSchema} because the
- * superseded family spells the parameter `id`, and a declaration's parameters
- * must match the path it answers at exactly.
+ * reads — separate from {@link traceIdParamsSchema} because the superseded
+ * family spells the parameter `id`, and it must match the path exactly.
  */
 export const traceLegacyIdParamsSchema = z.object({
   id: z.string().min(1).describe("The trace ID, or the thread ID on the thread read."),

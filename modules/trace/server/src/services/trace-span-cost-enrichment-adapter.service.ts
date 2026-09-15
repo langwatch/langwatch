@@ -4,12 +4,9 @@ import { type TraceSpanCostEnrichment } from "../app/trace.members.ts";
 import { OtlpSpanCostEnrichmentService } from "./span/span-cost-enrichment.service.ts";
 
 /**
- * Renames record-time cost enrichment onto the narrow port `EventingRecordSpanAdapter`
- * names.
- *
- * The service is not a subclass of the port and must not become one: it takes a
- * named-argument object and the port takes positional arguments, and the port
- * is one of four sibling preparation steps that must stay interchangeable.
+ * Renames record-time cost enrichment onto the narrow `EventingRecordSpanAdapter`
+ * port. Not a subclass: named arguments vs. positional, one of four
+ * interchangeable sibling preparation steps.
  */
 export class TraceSpanCostEnrichmentAdapter implements TraceSpanCostEnrichment {
   static create(options: {

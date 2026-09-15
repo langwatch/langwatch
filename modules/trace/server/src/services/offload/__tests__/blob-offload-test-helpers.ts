@@ -1,8 +1,7 @@
 /**
  * Shared fixture helpers for the large-trace blob-offload integration tests
- * (#4888 / #4215 / ADR-022). These constants and functions are identical across
- * the blob-offload read-path tests, so they live here once instead of being
- * copy-pasted per file (avoids schema/shape drift across the family).
+ * (#4888/#4215/ADR-022): identical across the read-path tests, so they
+ * live here once instead of being copy-pasted (avoids drift).
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -26,11 +25,9 @@ export function assertOverThreshold(value: string): void {
 }
 
 /**
- * Inserts ONE full event_log row, exactly as the production write path stores it
- * (`EventPayload` IS `event.data`). Mirrors the canonical event_log test idiom
- * (JSONEachRow with a stringified payload) and stamps `_retention_days: 0`
- * (never-expire sentinel, test-only) so a merge-cycle TTL can't evict the fixture
- * mid-run.
+ * Inserts ONE full event_log row, exactly as the production write path
+ * stores it. Stamps `_retention_days: 0` (never-expire sentinel, test-only)
+ * so a merge-cycle TTL can't evict the fixture mid-run.
  */
 export async function insertEventLogRow({
   client,

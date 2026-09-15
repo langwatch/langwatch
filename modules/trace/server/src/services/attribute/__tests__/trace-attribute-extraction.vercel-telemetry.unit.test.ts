@@ -1,9 +1,7 @@
 /**
- * The Vercel AI SDK flattens `experimental_telemetry.metadata` onto every span
- * it emits as `ai.telemetry.metadata.<key>`. The trace summary read
- * `langwatch.*`, `gen_ai.*` and `tag.tags` only, so a Vercel AI call tagged
- * through the SDK's own metadata channel reached the product with no labels,
- * no user, no conversation and no custom keys.
+ * The Vercel AI SDK flattens `experimental_telemetry.metadata` as
+ * `ai.telemetry.metadata.<key>`. The trace summary read only
+ * `langwatch.*`/`gen_ai.*`/`tag.tags`, missing Vercel's own channel entirely.
  */
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";

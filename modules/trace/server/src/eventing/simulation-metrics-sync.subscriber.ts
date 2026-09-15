@@ -15,12 +15,9 @@ export interface SimulationMetricsSyncSubscriberDeps {
 }
 
 /**
- * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
- * fold state) and the handler (fail-open path): only simulation traces
- * (scenario.run_id present) with something to aggregate need this
- * subscriber. Role cost/latency are no longer accumulated on the fold;
- * computeRunMetrics derives them per-trace from stored_spans, so we dispatch
- * in pull mode rather than carrying metrics.
+ * Pure relevance guard, shared by `when` and the fail-open handler: only
+ * simulation traces with something to aggregate need this. Role
+ * cost/latency are derived from stored_spans in pull mode, not carried.
  */
 export function hasSimulationMetrics(foldState: TraceSummaryData): boolean {
   if (!foldState.attributes["scenario.run_id"]) return false;

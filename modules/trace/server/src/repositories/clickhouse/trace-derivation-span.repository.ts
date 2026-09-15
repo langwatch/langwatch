@@ -41,11 +41,9 @@ const DERIVATION_SPAN_LIMIT = 10_000;
 const DERIVATION_EVENT_LIMIT = 10_000;
 
 /**
- * Per-query ceiling for the whole-trace fetch.
- *
- * `max_memory_usage` keeps one runaway trace failing on its own read rather
- * than on the pod, and the dedup is done in SQL so a re-exported span cannot
- * be counted twice into a role total.
+ * Per-query ceiling for the whole-trace fetch. `max_memory_usage` keeps one
+ * runaway trace failing on its own read rather than the pod; dedup is done
+ * in SQL so a re-exported span cannot be counted twice into a role total.
  */
 const DERIVATION_FETCH_SETTINGS = {
   max_memory_usage: "2000000000",

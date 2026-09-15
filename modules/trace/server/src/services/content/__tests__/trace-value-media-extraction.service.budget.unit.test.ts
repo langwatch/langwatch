@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
- * Tests BUDGET and MARKER GATE in value media walker; production code with faked
- * media store for deterministic testing.
+ * Tests BUDGET and MARKER GATE; production code with a faked media store.
  */
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import { containsMediaMarkers } from "@langwatch/trace-contract";

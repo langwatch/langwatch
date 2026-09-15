@@ -13,10 +13,9 @@ import { type FlattenableMessage, flattenMessages } from "../flatten-messages.ts
 const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
 
 /**
- * The playground's own configuration, so these tests answer for the surface
- * the spec is about: `PromptPlaygroundChat` renders `ConversationThread` with
- * `shouldRenderStructuredOutput` on, the default `regular` variant (turn separators on)
- * and the default shouldAutoScroll, and adds nothing else.
+ * The playground's own configuration: `PromptPlaygroundChat` renders
+ * `ConversationThread` with `shouldRenderStructuredOutput` on, the default
+ * `regular` variant, and default shouldAutoScroll — nothing else.
  */
 function renderConversation({
   messages,

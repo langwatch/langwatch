@@ -14,11 +14,9 @@ import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
 
 /**
- * Canonical Trace server feature installer and application factory.
- * The registry selects the Postgres-backed reviewer correction (`editOverlay`);
- * TraceApp does not yet take it from `setup.repositories` - see
- * app/trace-read.composition.ts, which still constructs its own Prisma
- * repository directly, for the remaining wiring.
+ * Canonical Trace server feature installer and application factory. The
+ * registry selects the Postgres-backed `editOverlay`; TraceApp does not
+ * yet take it from `setup.repositories` — see app/trace-read.composition.ts.
  */
 export const traceServer = defineServerModule("trace")
   .withRepositories(traceRepositories)
@@ -30,24 +28,13 @@ export const traceServer = defineServerModule("trace")
     traceLegacyRest,
     tracesRest,
     // `POST /api/collector`, the one address a released SDK posts a trace to.
-    // It binds NO transport fact, unlike the reads above: the door is declared
-    // public and resolves the project credential inside the handler, because
-    // its refusal bodies predate the framework envelope and a deployed SDK
-    // parses them. The binding it does have is `TraceApp.collectorCredential`,
-    // which every mounted process supplies through the API-key directory.
-    //
-    // Mounted after the reads, and anything matching `/api/collector/*`
-    // must be mounted after it: a wildcard in front would swallow this literal.
+    // Public and resolves the project credential inside the handler, since
+    // its refusal bodies predate the framework envelope. Mounted after the
+    // reads — a wildcard in front would swallow this literal.
     collectorRest,
-    // `POST /api/otel/v1/{traces,logs,metrics}`, the canonical OTLP receiver -
-    // where every OTLP exporter posts, our own langyagent included. Public and
-    // handler-resolved for the same reason the collector is, and its six
-    // members are all required, so a composition that cannot answer one fails
-    // the build rather than a customer's first export.
-    //
-    // Mounted LAST of the REST families, and the path alias - which claims
-    // `/api/otel/*` with a wildcard - must be mounted after this one when it
-    // returns, or it swallows these literals.
+    // `POST /api/otel/v1/{traces,logs,metrics}`, the canonical OTLP receiver,
+    // handler-resolved for the same reason the collector is. Mounted LAST
+    // of the REST families — the path alias's wildcard must come after it.
     otlpIngestRest,
   )
   .withTransportFacts(() => [

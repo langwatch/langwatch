@@ -7,12 +7,9 @@ import { TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
  */
 
 /**
- * `tracesV2.header`, as the browser sends it.
- *
- * `full` is optional here and required after parsing: the procedure defaults it
- * to `true`, so the CLIENT-facing input is `z.input` of the schema, not
- * `z.output`. Declaring it required in a browser-side type is the easiest way
- * to make a correct call site fail to compile.
+ * `tracesV2.header`, as the browser sends it. `full` is optional here and
+ * defaulted to `true` by the procedure, so the client input is `z.input`,
+ * not `z.output` — declaring it required would break a correct call site.
  */
 export const traceHeaderReadInputSchema = z.object({
   projectId: z.string(),
@@ -58,10 +55,9 @@ export type ChangeTraceNameRejectionMeta = {
 };
 
 /**
- * Reads a rename rejection out of an unknown transport error.
- *
- * Lives in the contract rather than in the browser because the shape is the
- * server's; the words the customer reads are the browser's, and stay there.
+ * Reads a rename rejection out of an unknown transport error. Lives in the
+ * contract because the shape is the server's; the customer-facing words are
+ * the browser's, and stay there.
  */
 export function readChangeTraceNameRejection(
   meta: unknown,

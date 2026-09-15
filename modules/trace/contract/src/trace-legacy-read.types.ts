@@ -34,11 +34,8 @@ export interface GetAllTracesForProjectOptions {
   includeSpans?: boolean;
   /**
    * Resolve offloaded >64 KB IO from event_log to the FULL value (#4991).
-   * Only the download/export path (a content-consuming read) opts in; the
-   * list/search grid leaves this false so it keeps the ≤64 KB preview and
-   * issues zero event_log SELECTs (#4888 AC2 / ADR-022). Requires
-   * `includeSpans: true` to have any effect (resolution runs during span
-   * enrichment). No-op unless the TraceService carries blob-resolution deps.
+   * Only the download/export path opts in (ADR-022); requires
+   * `includeSpans: true` and TraceService blob-resolution deps.
    */
   resolveBlobs?: boolean;
   scrollId?: string | null;

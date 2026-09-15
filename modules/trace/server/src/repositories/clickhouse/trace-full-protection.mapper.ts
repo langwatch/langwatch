@@ -23,12 +23,9 @@ export const internalTraceFullReadProtections: TraceFullReadProtections = {
 };
 
 /**
- * The redactions applied to a full trace record on its way out.
- *
- * One entry point and ten steps that only serve it, walking spans, events,
- * content and metrics. Keeping them together is the point: a value that
- * reaches the reader unredacted does so because one branch of this walk missed
- * it, and the branches are only comparable when they sit side by side.
+ * The redactions applied to a full trace record on its way out. One entry
+ * point and ten steps walking spans, events, content and metrics, kept
+ * together so every branch stays comparable side by side.
  */
 export class TraceFullProtectionMapper {
   private static protectSpan(

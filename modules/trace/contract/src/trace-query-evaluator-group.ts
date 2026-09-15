@@ -263,9 +263,8 @@ function stripGroup(ast: LiqeQuery, evaluatorId: string): LiqeQuery {
 
 /**
  * Core mutation: read the evaluator's group, apply `transform`, then rebuild
- * the query with the group removed and re-appended in canonical form. On parse
- * failure the original query is returned unchanged (matching the rest of the
- * mutation helpers).
+ * the query with the group removed and re-appended in canonical form. On
+ * parse failure the original query returns unchanged.
  */
 function mutateEvaluatorGroup(
   currentQuery: string,

@@ -40,10 +40,9 @@ export type TraceLegacyCredential =
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /**
- * How this process turns a request plus one permission ceiling into a project
- * credential. The permission travels with the request because the family is
- * split by grain: reads ask for `traces:view`, the share pair asks for
- * `traces:share`, which mints a PUBLIC link.
+ * How this process turns a request plus one permission ceiling into a
+ * project credential. The permission travels with the request since reads
+ * ask for `traces:view`, the share pair for `traces:share` (a PUBLIC link).
  */
 export type TraceLegacyCredentialResolver = (input: {
   request: Request;
@@ -88,10 +87,9 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   /** The share ledger, resolved the same way. */
   shares(): TraceLegacyShare;
   /**
-   * The API KEY caller's read-time redactions for one project. Same resolution
-   * the v1 family uses — a key is not a person, so content categories resolve as
-   * they do for a caller with no session, and costs are visible because a project
-   * key carries full project access.
+   * The API KEY caller's read-time redactions for one project. Same
+   * resolution as v1: a key resolves content categories like a caller with
+   * no session, but costs are visible (a project key has full access).
    */
   getProtections(
     input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,

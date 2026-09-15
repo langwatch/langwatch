@@ -163,11 +163,9 @@ export function ImagePart({
 }
 
 /**
- * One media part, drawn by the host.
- *
- * The player itself is a render port rather than an import: the component that
- * knows how to probe a stored object and coordinate playback belongs to the
- * surface that owns those, and this package may not reach it.
+ * One media part, drawn by the host. The player itself is a render port,
+ * not an import: the component that probes a stored object and
+ * coordinates playback belongs to the owning surface, unreachable here.
  */
 export type RenderMediaPart = (input: {
   part: Extract<DisplayPart, { kind: "media" }>["part"];

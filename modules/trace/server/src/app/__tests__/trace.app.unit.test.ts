@@ -3,7 +3,6 @@ import type { ShareApi } from "@langwatch/share-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
- *
  * Trace application rules: full resolution on content-consuming reads,
  * partition-pruning hints, visibility-window verdicts. See specs/traces #4991.
  */
@@ -62,10 +61,9 @@ function summaryRow(redacted: boolean): TraceSummaryData {
 type ReadCall = { name: string; args: unknown[] };
 
 /**
- * The trace reads this suite drives, and nothing else. Every other collaborator
- * of the application is left off: a reach for one throws on the missing
- * property, which is the loud failure we want from a suite about what the
- * application decides rather than about what a store answers.
+ * The trace reads this suite drives, and nothing else. Every other
+ * collaborator is left off: a reach for one throws on the missing property,
+ * the loud failure this suite wants.
  */
 function harness(
   reads: Partial<{

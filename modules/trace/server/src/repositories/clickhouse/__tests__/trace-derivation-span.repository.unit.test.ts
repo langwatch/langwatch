@@ -6,11 +6,8 @@ import { SpanCostService } from "../../../services/span/span-cost.service.ts";
 
 /**
  * Spec: specs/scenarios/worker-simulation-pipeline-conversion.feature
- *
- * The read a simulation's per-role metrics are derived from. Every assertion
- * here is a property ClickHouse hides: a partition it did not prune, a
- * duplicate row it happily returned twice, a limit it never applied. None of
- * them fails loudly — each one produces a number that is merely wrong.
+ * Per-role metrics read: properties ClickHouse hides (an unpruned
+ * partition, a duplicate row) never fail loudly, each just wrongs a number.
  */
 
 type ChQuery = { query: string; query_params?: Record<string, unknown> };
@@ -69,10 +66,9 @@ describe("given a trace whose spans back a derivation", () => {
     });
 
     /**
-     * `stored_spans` is a `ReplacingMergeTree`: a re-exported span sits as two
-     * physical rows until a merge. Returning both would add that span's cost
-     * and latency into its role's total twice, and nothing downstream could
-     * tell.
+     * `stored_spans` is a `ReplacingMergeTree`: a re-exported span sits as
+     * two physical rows until a merge. Returning both would double-count
+     * that span's cost and latency in its role's total, silently.
      */
     it("dedups by span id in SQL rather than by returning every physical row", async () => {
       const ch = client([]);
@@ -124,10 +120,9 @@ describe("given a trace whose spans back a derivation", () => {
 describe("given the per-role derivation over one trace", () => {
   describe("when several subscribers of one coalesced batch ask at the same fold version", () => {
     /**
-     * The all-spans read is multi-MB for a large trace and a coalesced batch
-     * fires its subscribers once per event at one shared final state. Without
-     * the memo the same read runs once per span in the backlog, which is the
-     * read amplification that re-saturated ClickHouse during a drain.
+     * The all-spans read is multi-MB, and a coalesced batch fires its
+     * subscribers once per event. Without the memo, the same read runs per
+     * span — the amplification that saturated ClickHouse during a drain.
      */
     it("reads storage once", async () => {
       const ch = client([SPAN_ROW]);

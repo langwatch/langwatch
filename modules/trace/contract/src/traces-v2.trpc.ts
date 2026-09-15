@@ -48,10 +48,9 @@ const sortSchema = z.object({
 });
 
 /**
- * Reusable Zod fields for span-read endpoints that accept the partition-
- * pruning hint. The drawer carries the trace's approximate timestamp in the
- * URL, so callers thread it through every span query that targets
- * `stored_spans`. Spread into a procedure's input shape with `...`.
+ * Reusable Zod fields for span-read endpoints that accept the
+ * partition-pruning hint the drawer carries in the URL. Spread into a
+ * procedure's input shape with `...`.
  */
 const spanReadHintShape = {
   occurredAtMs: z.number().int().optional(),
@@ -188,10 +187,9 @@ export const tracesV2Trpc = defineTrpcContract("tracesV2")
   .withOutput(aiQueryResultSchema)
 
   /**
-   * Higher-level AI action — the model picks between filtering and creating a
-   * saved lens. The composer in the search bar uses this so users can say
-   * "save as Failing GPT-4" and get a new tab, or "show errors" and just get
-   * a query applied.
+   * Higher-level AI action — the model picks between filtering and creating
+   * a saved lens, so a user can say "save as Failing GPT-4" or "show errors"
+   * and get the right one applied.
    */
   .mutation("aiAction")
   .withInput(
@@ -268,29 +266,26 @@ export const tracesV2Trpc = defineTrpcContract("tracesV2")
 
   /**
    * One page of the span tree in `(startTimeMs, spanId)` order. Traces can
-   * carry 20k-100k+ spans, so the client assembles the tree page by page
-   * instead of ever pulling it in one response. `nextCursor` is null on the
-   * final page.
+   * carry 20k-100k+ spans, so the client assembles the tree page by page.
+   * `nextCursor` is null on the final page.
    */
   .query("spanTreePaginated")
   .withInput(spanTreeTransportInputSchema)
   .withOutput(spanTreePageSchema)
 
   /**
-   * Spans of a live trace whose row version is newer than
-   * `sinceUpdatedAtMs`. Keyed on the row version rather than the span start
-   * so an in-place update (end time, duration, status, cost) is picked up
-   * too.
+   * Spans of a live trace newer than `sinceUpdatedAtMs`, keyed on row
+   * version rather than span start so an in-place update (end time,
+   * duration, status, cost) is picked up too.
    */
   .query("spanTreeDelta")
   .withInput(spanTreeDeltaTransportInputSchema)
   .withOutput(tracesV2SpanTreeNodesSchema)
 
   /**
-   * Whole-tree read in one response. The frontend no longer fetches through
-   * this for the tree itself — `spanTreePaginated` pages under the same
-   * cache key — and this procedure remains as that cache entry's type/key
-   * anchor (preview seeding, SSE invalidation, cancel).
+   * Whole-tree read in one response. The frontend no longer fetches the
+   * tree through this — `spanTreePaginated` pages instead — but this stays
+   * as that cache entry's type/key anchor.
    */
   .query("spanTree")
   .withInput(
@@ -304,9 +299,8 @@ export const tracesV2Trpc = defineTrpcContract("tracesV2")
 
   /**
    * Per-span LangWatch instrumentation signals (prompt, scenario, user,
-   * thread, evaluation, rag, metadata, genai). Fired secondarily by the
-   * waterfall and span-list views so the primary `spanTree` query stays
-   * cheap.
+   * thread, evaluation, rag, metadata, genai) — fired secondarily so the
+   * primary `spanTree` query stays cheap.
    */
   .query("spanLangwatchSignals")
   .withInput(

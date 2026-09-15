@@ -1,9 +1,7 @@
-// Bounds UTF-8 byte-size of oversized payload strings at content-lift sites;
-// prevents multi-MB bodies from bloating Redis fold state
+// Bounds UTF-8 byte-size of oversized payload strings at content-lift sites.
 /**
- * Generous threshold (256KB). Real-world text input/output is far smaller; this
- * only trips on embedded binary blobs (base64 images/audio) and pathologically
- * large payloads.
+ * Generous threshold (256KB); real-world text is far smaller. Trips only on
+ * embedded binary blobs (base64 images/audio) or pathological payloads.
  */
 export const DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES = 256 * 1024;
 
@@ -32,10 +30,9 @@ function capStringWithFlag(
 }
 
 /**
- * Public single-string cap. Use at any content lift site (e.g. the assistant
- * output text pulled from `api_response_body`) so a pathological payload is
- * bounded before it reaches the fold / ComputedOutput. `label` is embedded in
- * the truncation marker so a cut is visible in the stored value.
+ * Public single-string cap. Use at any content lift site to bound a
+ * pathological payload before it reaches the fold/ComputedOutput. `label`
+ * is embedded in the truncation marker so a cut is visible in the stored value.
  */
 export function capPayloadString(
   value: string,

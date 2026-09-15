@@ -10,10 +10,9 @@ function spanKey(tenantId: string, traceId: string, spanId: string): string {
 }
 
 /**
- * The stored_spans twin for a process with no ClickHouse: the last write per
- * tenant, trace and span, answered back to every read that shares it. The
- * span storage, existence and derivation rows are handed the SAME instance,
- * the way one ClickHouse connection serves all three.
+ * The stored_spans twin for a process with no ClickHouse: the last write
+ * per tenant, trace and span, shared by every reader. Span storage,
+ * existence and derivation are handed the SAME instance, like one connection.
  */
 export class MemoryTraceSpanStore {
   readonly #spans = new Map<string, SpanInsertData>();

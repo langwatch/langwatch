@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- * Redelivery idempotency: evaluation_id hashed from trace+payload. Store keys
- * on evaluationId; queue dedup insufficient (30s TTL).
+ * evaluation_id is hashed from trace+payload; queue dedup alone is insufficient (30s TTL).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
@@ -80,9 +79,8 @@ describe("given one span carrying an SDK evaluation", () => {
 
     /**
      * The retry that matters: a worker crash puts minutes between the two
-     * deliveries, well past the queue's 30-second dedup TTL. A `Date.now()`
-     * anywhere in the identity would make this a second verdict on one SDK
-     * call, and the trace would show the evaluation twice.
+     * deliveries, past the queue's 30s dedup TTL. A `Date.now()` in the
+     * identity would double-count one SDK call as two verdicts.
      */
     it("keeps the identity when the redelivery is half an hour later", async () => {
       const sink = makeEvaluationSink();

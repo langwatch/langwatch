@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * The trace list surfaces cache/reasoning/context-size token attributes so
- * the list and drawer header can show context size next to tokens.
- * See specs/coding-agent/trace-fidelity.feature.
+ * Surfaces cache/reasoning/context-size token attributes for the list and drawer header.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

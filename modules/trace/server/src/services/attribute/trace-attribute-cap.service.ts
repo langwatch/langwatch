@@ -12,12 +12,9 @@ type AttributeList = OtlpSpan["attributes"];
 // the mutating pair's traversal shape to stay enforceable when one changes.
 
 /**
- * The size ceiling an attribute is held to before it is stored.
- *
- * Attributes are customer data of unbounded size, and an oversized one is
- * carried through the whole pipeline before anything refuses it. Capping
- * replaces the value with a placeholder that SAYS it was truncated, because a
- * silently shortened value is indistinguishable from what the customer sent.
+ * The size ceiling an attribute is held to before storage. Capping replaces
+ * an oversized value with a placeholder that SAYS it was truncated — a
+ * silent shortening would be indistinguishable from what the customer sent.
  */
 export class TraceAttributeCapService {
   private constructor() {}
@@ -59,11 +56,10 @@ export class TraceAttributeCapService {
   }
 
   /**
-   * Caps a single OTLP AnyValue in place. Returns true when something was
-   * replaced (used only for bookkeeping / tests). Recurses into arrays and
-   * kvlists so blobs nested inside structured params are caught too.
+   * Caps a single OTLP AnyValue in place. Recurses into arrays/kvlists so
+   * nested blobs are caught too; returns true when something was replaced.
    */
-  /** The string half of the cap: an over-large `stringValue` becomes the placeholder. */
+  /** The string half: an over-large `stringValue` becomes the placeholder. */
   private capStringValue(value: OtlpAnyValue, maxBytes: number): boolean {
     if (typeof value.stringValue !== "string") {
       return false;
@@ -204,12 +200,9 @@ export class TraceAttributeCapService {
   }
 
   /**
-   * Read-only recursive size probe. Returns true iff any `stringValue` or
-   * `bytesValue` in `value` (or nested inside `arrayValue`/`kvlistValue`)
-   * exceeds `maxBytes`. Allocates nothing, never throws, short-circuits on the
-   * first over-limit value.
-   *
-   * Mirrors the traversal shape of `capAnyValue` exactly.
+   * Read-only recursive size probe: true iff any `stringValue`/`bytesValue`
+   * (incl. nested `arrayValue`/`kvlistValue`) exceeds `maxBytes`. Allocates
+   * nothing, never throws, short-circuits on the first over-limit value.
    */
   valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
     if (value == null || typeof value !== "object") {

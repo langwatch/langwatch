@@ -1,25 +1,7 @@
 /**
  * @vitest-environment node
- * `POST /api/otel/v1/{traces,logs,metrics}` against the application the
- * COMPOSITION builds, mounted from the transports the MODULE declares.
- *
- * The sibling of `collector-rest.composition.integration.test.ts`, and for the
- * same reason: this family was declared, exported and mounted by nobody, while
- * our own `services/langyagent` posted trace batches to it. A router-level test
- * would have passed throughout - a router answers the same whether or not a
- * process mounts it.
- *
- * So two things are deliberate here and must stay:
- *
- *  1. The mounted set is read off `traceServer.transports` rather than naming
- *     `otlpIngestRest`. Drop the family from `trace.server.ts` and every test
- *     below fails with 404 - which is what every OTLP exporter was getting.
- *  2. The application is `TraceApp` over `composeTraceAppDependencies`, reached
- *     through the operations-only feature-API proxy, so a member the door names
- *     and the composition does not supply fails here the way it fails in
- *     production rather than being handed over by a stub.
- *
- * Spec: specs/traces/trace-ingestion-door.feature
+ * `POST /api/otel/v1/{...}` against the COMPOSITION-built app and
+ * MODULE-declared transports — sibling of the collector composition test.
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
@@ -67,10 +49,9 @@ const TOKEN = "sk-lw-a-project-key";
 const API_KEY_ID = "api-key-1";
 
 /**
- * The peers the receiver path never reaches, as the feature-API references they
- * really are: declared and deliberately never bound, so a call refuses by name
- * instead of quietly answering. No cast, and no hand-written twin of another
- * module's contract.
+ * The peers the receiver path never reaches, as real feature-API
+ * references: declared but deliberately never bound, so a call refuses by
+ * name instead of quietly answering. No cast, no hand-written twin.
  */
 function unreachablePeers() {
   const apis = new LocalFeatureApis();

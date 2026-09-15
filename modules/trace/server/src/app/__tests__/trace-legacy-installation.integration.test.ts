@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Legacy `/api/trace/*` routes mounted over real application. Tests that all
- * required members are read and refusals answer correctly.
+ * Legacy `/api/trace/*` routes mounted over real application. Tests that
+ * all required members are read and refusals answer correctly.
  */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";

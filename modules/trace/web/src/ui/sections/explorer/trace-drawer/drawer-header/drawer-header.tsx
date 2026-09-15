@@ -695,10 +695,9 @@ export const DrawerHeader = memo(function DrawerHeader({
 });
 
 /**
- * Cache and reasoning totals are summed across the trace's spans by the fold and
- * parked on reserved keys (the raw per-span `gen_ai.usage.cache_*` values never
- * reach the trace attribute map), so the reserved sums are read first and the raw
- * keys are the fallback for traces folded before the sum landed.
+ * Cache and reasoning totals are summed by the fold onto reserved keys
+ * (raw per-span `gen_ai.usage.cache_*` never reaches the attribute map),
+ * so reserved sums are read first, raw keys as fallback for older folds.
  */
 function readTokenUsage(attributes: TraceHeader["attributes"]): {
   cacheCreation1hTokens: number | null;
@@ -965,10 +964,9 @@ function userPins(ctx: PinBuildContext): CategorizedPin[] {
 }
 
 /**
- * Auto and user pins resolved into one array with category buckets, so the strip
- * can group them with subtle dividers between identity / run / tag / custom. An
- * auto-pin is skipped when the reader already pinned the same key explicitly, so
- * the same row never shows twice.
+ * Auto and user pins resolved into one array with category buckets, so the
+ * strip can group them with dividers between identity/run/tag/custom. An
+ * auto-pin is skipped when the reader already pinned that key.
  */
 function categorizePins(ctx: PinBuildContext): CategorizedPin[] {
   const userKeys = new Set(ctx.pins.map((p) => `${p.source}:${p.key}`));
@@ -1051,10 +1049,9 @@ function BackNavigationMenu({
 }
 
 /**
- * The drawer's own chrome: share, refresh, maximize, the overflow menu, and
- * close. Every one of these needs a session, so the cluster is unmounted rather
- * than hidden for a share viewer — `display:none` would still run the overflow
- * menu's queries.
+ * The drawer's own chrome: share, refresh, maximize, overflow menu, close.
+ * Each needs a session, so the cluster is unmounted for a share viewer —
+ * `display:none` would still run the overflow menu's queries.
  */
 function HeaderActions({
   canShare,

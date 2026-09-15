@@ -94,11 +94,9 @@ export const traceSummaryDataSchema = z.object({
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
   /**
-   * Stored payload size of the trace in bytes, read from the MATERIALIZED
-   * `_size_bytes` column (CH-native `byteSize(...)`; see migration 00032).
-   * Read-only projection: it is computed server-side and never written in
-   * INSERTs (MATERIALIZED columns reject inserted values), so the write/
-   * upsert path leaves it undefined — only the list read populates it.
+   * Stored payload size in bytes, from the MATERIALIZED `_size_bytes` column
+   * (migration 00032). Read-only: MATERIALIZED columns reject inserted
+   * values, so the write/upsert path leaves it undefined.
    */
   sizeBytes: z.number().optional(),
   attributes: z.record(z.string(), z.string()),
@@ -106,11 +104,9 @@ export const traceSummaryDataSchema = z.object({
   /** Root span start time for deterministic tie-breaking across multiple spans. */
   rootSpanStartTimeMs: z.number().optional(),
   /**
-   * When true the user has explicitly renamed the trace via
-   * `ChangeTraceNameCommand`, and the fold projection must NOT clobber
-   * `traceName` from a later root-span arrival. Without this latch, a
-   * delayed root span landing post-rename would wipe out the user's edit
-   * the next time the projection re-folds.
+   * True after an explicit `ChangeTraceNameCommand` rename, so the fold
+   * projection must NOT clobber `traceName` from a later root-span arrival
+   * — without this latch a delayed root span would wipe out the user's edit.
    */
   traceNameUserOverridden: z.boolean().optional(),
   /**

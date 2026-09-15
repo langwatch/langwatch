@@ -23,10 +23,9 @@ export interface OtlpPathAliasApp {
 export const OtlpPathAliasApi = moduleApi<OtlpPathAliasApp>("trace");
 
 /**
- * Every namespace a recognised misconfiguration can land in. `/v1/*` is only
- * reachable because the process routes root-level OTLP paths into the API -
- * left to the SPA fallback, an exporter would read the HTML shell's 200 as
- * success before dropping the batch.
+ * Every namespace a recognised misconfiguration can land in. `/v1/*` is
+ * only reachable because root-level OTLP paths route into the API — left
+ * to the SPA fallback, an exporter would misread the HTML shell as success.
  */
 const CANDIDATE_PATHS = ["/api/otel/*", "/api/collector/*", "/api/v1/*", "/v1/*"] as const;
 

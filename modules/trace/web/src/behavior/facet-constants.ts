@@ -98,10 +98,8 @@ const EVALUATOR_VERDICT_COLORS: Record<string, Tokens["colors"]> = {
 
 /**
  * Status keeps a fixed traffic-light mapping. Origin derives its dot
- * colours from the shared `ORIGIN_DISPLAY` table — the same one the
- * Origin column badge consumes — so "evaluation" is always green,
- * "application" always blue, in both the sidebar and the table.
- * Span Type still hashes — the value set is open-ended.
+ * colours from the shared `ORIGIN_DISPLAY` table, matching the Origin
+ * column badge. Span Type still hashes — its value set is open-ended.
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
@@ -154,10 +152,9 @@ export const FACET_VALUE_ORDER: Record<string, readonly string[]> = {
 };
 
 /**
- * Range keys that should appear in the sidebar immediately — even before
- * discover responds — as synthetic placeholder sections. Rendered with
- * a disabled state (min === max === 0, flagged synthetic) so users can
- * see the affordance without being able to interact with a zero-span range.
+ * Range keys that appear in the sidebar immediately, before discover
+ * responds, as synthetic placeholder sections — disabled (min===max===0)
+ * so users see the affordance without interacting with a zero-span range.
  */
 export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
 

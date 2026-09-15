@@ -60,11 +60,9 @@ export type DisplayPart =
     };
 
 /**
- * Consecutive parts that share a trace, presented as one exchange.
- *
- * Parts with no trace (a reply still streaming, a message that predates
- * tracing) form their own unnumbered turn so they render without a separator
- * rather than being folded into the previous one.
+ * Consecutive parts that share a trace, presented as one exchange. Parts
+ * with no trace (a streaming reply, a pre-tracing message) form their own
+ * unnumbered turn, rendered without a separator rather than folded in.
  */
 export interface ConversationTurn {
   key: string;

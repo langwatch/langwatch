@@ -1,9 +1,7 @@
 /**
- * REST for the user events a trace carries. `POST /api/events/track` is the canonical
- * route; `POST /api/track_event` is the same family's older name, declared beside it as
- * an alias that forwards into the canonical app rather than redirecting (a 307 drops the
- * body for some clients). The recorder, predefined-payload check, error sink and
- * validation prose arrive as ports - neither belongs in a transport.
+ * REST for the user events a trace carries. `POST /api/events/track` is
+ * canonical; `POST /api/track_event` is the older name, forwarding rather
+ * than redirecting (a 307 drops the body for some clients).
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -31,18 +29,16 @@ const trackEventResponseSchema = z.object({
 });
 
 /**
- * A payload this family refused, carrying the prose the caller reads.
- *
- * The body has always been the bare `{ error }` the family writes itself, so
- * the refusal maps to `BadRequestError`, which renders the same flat shape.
+ * A payload this family refused, carrying the prose the caller reads. The
+ * body has always been the bare `{ error }` this family writes, so the
+ * refusal maps to `BadRequestError`, which renders the same flat shape.
  */
 class TrackedEventRejectedError extends Error {}
 
 /**
- * What recording a tracked event needs from the process.
- *
- * Method syntax throughout, so a host implementation may name its own concrete
- * session, project and error types rather than restating the widened ones here.
+ * What recording a tracked event needs from the process. Method syntax
+ * throughout, so a host may name its own concrete session, project and
+ * error types rather than restating the widened ones here.
  */
 export interface TrackedEventMembers {
   /**

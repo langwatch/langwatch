@@ -95,3 +95,49 @@ block sat directly above a bare `// @vitest-environment node` line, and
 of comment style, so the two counted as a single 8-line block. A blank line
 splits them into two compliant blocks, which is cheaper than over-cutting the
 JSDoc. It is the only non-comment character in a 1,328-line diff.
+
+---
+
+## modules/trace — lane `comments-trace`
+
+381 findings cleared across 200 files. Recover any original with
+`git show <the trace commit>~1:<path>`.
+
+### ADR candidates (four)
+
+1. **Why the collector and OTLP composition tests exist at all** —
+   `server/src/transport/__tests__/collector-rest.composition.integration.test.ts`
+   and its sibling `otlp-ingest-rest.composition.integration.test.ts`. The
+   dropped narrative: the collector and OTLP doors were once **fully unmounted
+   from production while router-level tests still passed green**. That incident
+   is the entire reason these composition-level tests exist, and without it a
+   later reader has no way to know that deleting them re-opens the hole.
+
+2. **Why none of the six OTLP members may be optional** —
+   `server/src/transport/otlp-ingest.rest.ts:149`. Dropped: "a shared name
+   would be one door silently reading another's answer", and that the failure
+   surfaces as "a 500 on a customer's first export".
+
+3. **The DateTime64/timezone verification trail** —
+   `server/src/repositories/clickhouse/__tests__/trace-analytics.repository.unit.test.ts`.
+   Dropped the exact conditions under which the fix was verified:
+   `TZ=UTC`, one worker, Date-suite loaded first. Without them the test's
+   passing says less than it appears to.
+
+### A method bug this lane found, worth carrying to every later lane
+
+oxlint reports a block's line count **post-discount** — structural JSDoc tags
+(`@param`, `@see`, …) and `@lint-keep` lines are subtracted before the number
+is reported (`comment-block-size.rule.mjs:146`). A lane that treats the
+reported count as a raw line range and replaces that many lines **eats the
+following code line**. It happened twice here
+(`span-storage.repository.ts`, `span-token-estimation.service.ts`), and twice
+more from a second cause: splitting one file's findings across two batches
+without re-deriving line numbers that the first batch had already shifted
+(`trace-spool.service.ts`, `flatten-messages.ts`).
+
+All four were caught and repaired by the lane before it finished, and the
+coordinator confirmed the repair independently — the comment-stripped
+comparison reported 0 of 200 files with changed non-comment text. But the trap
+is generic: **never replace by reported line count; re-read the range, and
+re-derive line numbers after every edit to the same file.**

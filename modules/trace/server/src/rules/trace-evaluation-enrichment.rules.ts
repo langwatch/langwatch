@@ -1,10 +1,9 @@
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 
 /**
- * Merge evaluations from traceChecks into trace objects.
- *
- * TraceService returns evaluations separately in `traceChecks`; this function
- * attaches them to each trace's `evaluations` array for serialization.
+ * Merges evaluations from traceChecks into trace objects: TraceService
+ * returns them separately, so this attaches each to its trace's
+ * `evaluations` array for serialization.
  */
 export function enrichTracesWithEvaluations({
   traces,

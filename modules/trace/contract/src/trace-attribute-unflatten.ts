@@ -1,9 +1,6 @@
 /**
- * Shared safe unflatten utility.
- *
- * Converts flat dot-notation keys into nested objects with prototype pollution
- * protection via DANGEROUS_KEYS blocklist and Object.create(null) intermediate
- * nodes.
+ * Converts flat dot-notation keys into nested objects, guarding against
+ * prototype pollution via the DANGEROUS_KEYS blocklist.
  */
 
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);

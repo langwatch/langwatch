@@ -972,10 +972,8 @@ describe("traceRequest.utils", () => {
 
     /**
      * Spec: specs/traces/zero-valued-attributes-survive-ingest.feature
-     *
-     * A tracked event's metrics arrive here as numeric attributes, so an
-     * attribute dropped for being zero is a vote, a count or a score that was
-     * accepted and then stored as absent.
+     * A tracked event's metrics arrive as numeric attributes, so dropping
+     * one for being zero stores an accepted vote/count/score as absent.
      */
     describe("when a numeric attribute is zero", () => {
       /** @scenario "A neutral vote is kept as the value it was sent as" */
@@ -1037,10 +1035,9 @@ describe("traceRequest.utils", () => {
     });
 
     /**
-     * The control for the change above, deliberately unbound: no scenario in
-     * the spec claims it, because a reading that was never at risk is not a
-     * behaviour anyone asked for. It is here so that widening the check to
-     * presence is shown not to have moved anything else.
+     * The control for the change above, deliberately unbound: a reading
+     * never at risk isn't a claimed behaviour. Shows widening the check to
+     * presence didn't move anything else.
      */
     describe("when a numeric attribute is not zero", () => {
       it("keeps the reading untouched", () => {

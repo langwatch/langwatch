@@ -12,10 +12,9 @@ export interface TraceClickHouseWriteClient extends TraceClickHouseClient {
   insert(input: {
     table: string;
     /**
-     * Read-only on purpose: nothing behind this port mutates the batch it is
-     * handed, and saying so is what lets a caller holding a `readonly` row
-     * array — the Eventing ClickHouse client a background process composes
-     * from — satisfy the port without copying every insert.
+     * Read-only on purpose: nothing behind this port mutates the batch it
+     * is handed, so a caller holding a `readonly` row array (the Eventing
+     * client a background process composes) satisfies it without copying.
      */
     values: readonly unknown[];
     format: "JSONEachRow";

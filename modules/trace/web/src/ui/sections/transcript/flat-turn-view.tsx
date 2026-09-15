@@ -33,14 +33,9 @@ export function FlatTurnView({
     const label = ROLE_LABELS[sourceRole] ?? sourceRole.toUpperCase();
     return (
       <FlatBody Icon={RoleIcon} palette={palette} label={label} onCollapse={onCollapse}>
-        {/* System prompts in thread layout render as plain text instead
-            of the asMarkdownBody → fenced-code-block path used elsewhere.
-            The latter detects pseudo-XML markers like `<role>`/`<goal>`
-            and wraps the WHOLE message in a Shiki ```xml block, which
-            then renders at 0.78em — visibly tiny vs neighbouring user
-            and assistant turns. Plain `<pre>`-style rendering keeps the
-            same baseline font size (textStyle="xs") as every other
-            turn body. */}
+        {/* Renders as plain text instead of asMarkdownBody's fenced-code path:
+            that path wraps the WHOLE message in a Shiki block at 0.78em (tiny
+            vs neighbouring turns) on any pseudo-XML marker like `<role>`. */}
         <SystemPlainText blocks={turn.blocks} />
       </FlatBody>
     );

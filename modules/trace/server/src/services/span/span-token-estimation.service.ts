@@ -37,10 +37,9 @@ export interface OtlpSpanTokenEstimationServiceDependencies {
  * globally or per-project. */
 export class OtlpSpanTokenEstimationService {
   /**
-   * The application constructs this with `new`; `service-classes` requires a
-   * strict feature package to expose construction through a static factory and
-   * `service-quality` requires the constructor to be private once it has one.
-   * Both graphs still build the same object from the same two dependencies.
+   * The application constructs this with `new`; `service-classes` requires
+   * a static factory and `service-quality` a private constructor once it
+   * has one. Both graphs build the same object from the same two deps.
    */
   static create(deps: OtlpSpanTokenEstimationServiceDependencies): OtlpSpanTokenEstimationService {
     return new OtlpSpanTokenEstimationService(deps, SpanModelNameService.create());
@@ -56,12 +55,11 @@ export class OtlpSpanTokenEstimationService {
   }
 
   /**
-   * Estimates token counts for the span if it's an LLM span with input/output
-   * but missing token counts. Mutates the span in place (pushes new attributes).
-   *
-   * @param tenantId - Project ID used for per-project kill switch evaluation
+   * Estimates token counts for the span if it's an LLM span with
+   * input/output but missing token counts, mutating the span in place.
+   * @param tenantId - Project ID for per-project kill switch evaluation
    */
-  /** One direction's estimated token-count attribute, or none when there is no text to count. */
+  /** One direction's estimated token-count attribute, or none with no text to count. */
   async #estimateDirection({
     span,
     model,

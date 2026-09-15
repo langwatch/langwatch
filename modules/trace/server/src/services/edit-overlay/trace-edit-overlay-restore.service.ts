@@ -11,10 +11,9 @@ import {
 } from "@langwatch/trace-contract";
 
 /**
- * The span fields the stored correction holds that this viewer never received faithfully, having
- * been dropped or handed over redacted. Identity comparison is the test: every read gate passes
- * a readable value through by reference, so anything different is something the viewer could
- * not edit.
+ * Span fields the stored correction holds that this viewer never received
+ * faithfully (dropped or redacted). Identity comparison is the test: a
+ * readable value passes by reference, so anything different wasn't editable.
  */
 function withheldSpanFields({
   storedSpan,

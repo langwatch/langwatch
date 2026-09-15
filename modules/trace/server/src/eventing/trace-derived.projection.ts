@@ -148,10 +148,8 @@ export interface TraceAnalyticsRow {
 
   // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
-  // store.tryGet() can decode the row without replaying event_log. The hoisted
-  // dimension columns above (UserId / ConversationId / CustomerId / Origin /
-  // Models / Labels / TraceName) double as read-back sources for the fold's
-  // attribute map; these carry the state the slim row otherwise dropped.
+  // store.tryGet() can decode without replaying event_log; the hoisted
+  // dimension columns above double as read-back sources for the attribute map.
   /** Spans seen — the MAX_PROCESSED_SPANS cap AND the persistable-signal gate. */
   spanCount: number;
   /** The id set behind HasAnnotation; the row kept only the boolean. */
@@ -208,9 +206,8 @@ export interface TraceAnalyticsData {
 
   // Metric scalars
   /**
-   * The span timing baseline, epoch ms: the earliest start across the trace's
-   * non-synthetic spans, 0 while none has been folded. SPAN-SEEDED ONLY — see
-   * `storageAnchorMs` above for why a log record must not set it.
+   * Span timing baseline, epoch ms: earliest non-synthetic-span start, 0
+   * until folded. SPAN-SEEDED ONLY — see `storageAnchorMs` for why not log.
    */
   occurredAt: number;
   totalDurationMs: number;
@@ -942,12 +939,9 @@ export class TraceAnalyticsFoldProjection
     });
     const status = runtime.spanStatus.accumulateStatus({ state: view, span });
 
-    // Slim does not run TraceIOAccumulationService — but
-    // `TraceAttributeAccumulationService.accumulateAttributes` requires the IO
-    // bookkeeping fields as arguments. Feed it the neutral "no IO extracted"
-    // values: the same shape the IO service returns when nothing was
-    // discovered, so the reserved output_source / *_is_fallback keys land on
-    // the attribute map identically to a trace with no IO-bearing span.
+    // Slim skips TraceIOAccumulationService but still needs IO bookkeeping
+    // fields for `accumulateAttributes`. Feed the neutral "no IO extracted"
+    // values so reserved output_source / *_is_fallback keys land identically.
     const attributes = runtime.traceAttributes.accumulateAttributes({
       state: view,
       span,

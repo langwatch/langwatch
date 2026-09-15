@@ -267,11 +267,9 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({ anchor, onCl
 };
 
 /**
- * Focus deferred to the next frame so it wins the race against the chip click
- * that opened the picker — a plain `autoFocus` fires mid-mount and the opening
- * click steals it straight back. The whole prefilled value is selected so the
- * first keystroke replaces it, while a deliberate click still drops the caret
- * mid-text.
+ * Focus deferred to the next frame to win the race against the click that
+ * opened the picker — `autoFocus` fires mid-mount and gets stolen back. The
+ * whole value is selected so the first keystroke replaces it.
  */
 function focusAndSelectValue(inputRef: { current: HTMLInputElement | null }): () => void {
   const raf = requestAnimationFrame(() => {
@@ -342,10 +340,8 @@ function customRowState({
 
 /**
  * "Pristine" means the input still holds the chip's unedited value, or is
- * empty. While pristine the picker reads as a dropdown of alternatives: the full
- * preloaded top-N, and no server round-trip. Once the text is edited it becomes
- * a server-side prefix search, so a value beyond the preloaded top-N can be
- * found and picked.
+ * empty — the picker reads the preloaded top-N with no round-trip. Once
+ * edited it becomes a server-side prefix search, reaching beyond top-N.
  */
 function isPristineText(text: string, currentValue: string | undefined): boolean {
   if (currentValue === undefined) return true;

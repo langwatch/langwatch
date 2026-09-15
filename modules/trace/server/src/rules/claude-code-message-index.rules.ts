@@ -76,10 +76,9 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
 /**
- * Ingest parsed the raw body once and stamped the reply text on the record, so prefer that over
- * re-parsing a 60 KB blob on every read. The parse stays as the fallback for records ingested
- * before the derivation existed — and it keeps the `tool_use` markers, which the derived text
- * does not, so the shortcut is only taken when the call asked for no tools.
+ * Ingest stamped the reply text on the record once, so prefer that over
+ * re-parsing a 60 KB blob. The parse remains as fallback for pre-derivation
+ * records, and because it keeps `tool_use` markers the derived text drops.
  */
 function outputBodyText(
   log: ClaudeContentLog,

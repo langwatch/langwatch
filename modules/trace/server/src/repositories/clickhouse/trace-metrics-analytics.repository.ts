@@ -23,10 +23,9 @@ const READ_BACK_FOLD_INSERT_SETTINGS = {
 } as const;
 
 /**
- * ClickHouse write shape for the slim `trace_analytics` table (ADR-034
- * Phase 2, migration 00039). 64-bit-integer columns (`TotalDurationMs`) are
- * serialised as strings in the JSONEachRow body, since JSON numbers can't
- * safely round-trip past 2^53; Float64/UInt16/UInt32/Bool stay unstringified.
+ * ClickHouse write shape for `trace_analytics` (ADR-034 Phase 2, migration
+ * 00039). 64-bit-integer columns are serialised as strings in JSONEachRow
+ * (JSON numbers can't round-trip past 2^53); other types stay unstringified.
  */
 interface ClickHouseTraceAnalyticsWriteRecord {
   TenantId: string;
@@ -196,9 +195,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   /**
    * The trace's last committed slim row plus its applied-event-id watermark
-   * (ADR-066, migration 00056), the CH-fallthrough behind a Redis cache
-   * miss. `fallback: "none"`: the fold executor owns the miss retry (see
-   * {@link queryLatestVersion}), so a second ladder here would be wasted.
+   * (ADR-066), the CH-fallthrough behind a Redis miss. `fallback: "none"`:
+   * the fold executor owns the miss retry, so a second ladder is wasted.
    */
   async findByTraceId({
     tenantId,
@@ -245,11 +243,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   /**
    * How two versions sharing `max(UpdatedAt)` are ranked, as SQL — reachable
-   * because `AbstractFoldProjection`'s monotonic stamp is only monotonic
-   * within one state chain. Full tiebreak rationale (progress watermark,
-   * span count, applied-id length/contents, frozen OccurredAt) in
-   * dev/docs/best_practices/clickhouse-queries.md, "Breaking Ties Among
-   * Versions Sharing max(UpdatedAt)".
+   * because the fold's monotonic stamp is only monotonic per state chain.
+   * Full tiebreak rationale in dev/docs/best_practices/clickhouse-queries.md.
    */
   private static readonly LATEST_VERSION_ORDER = `
         ORDER BY
@@ -260,12 +255,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
           toString(AppliedEventIds) DESC`;
 
   /**
-   * One ClickHouse attempt for {@link findByTraceId}. Dedups
-   * with the IN-tuple pattern, never FINAL. `window` bounds OccurredAt on
-   * the outer read only — the inner dedup is deliberately unwindowed, per
-   * the "range filter on a movable column inside a dedup subquery" rule in
-   * dev/docs/best_practices/clickhouse-queries.md, since OccurredAt can
-   * drift after a post-miss rebuild re-stamps the frozen anchor (ADR-071).
+   * One ClickHouse attempt for {@link findByTraceId}. Dedups with the
+   * IN-tuple pattern, never FINAL. `window` bounds the outer read only —
+   * the inner dedup stays unwindowed per clickhouse-queries.md (ADR-071).
    */
   private async queryLatestVersion({
     tenantId,
@@ -412,11 +404,9 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   }
 
   /**
-   * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}, the
-   * inverse of {@link toClickHouseRecord}. DateTime64 columns MUST go
-   * through `parseClickHouseDateTimeMs`, never `new Date(str)`: ClickHouse
-   * emits them zone-less, so V8 reads them as local time — skewing the
-   * frozen storage anchor by the host's offset permanently on a cache miss.
+   * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. DateTime64
+   * columns MUST go through `parseClickHouseDateTimeMs`, never `new Date(str)`:
+   * ClickHouse emits them zone-less, skewing the anchor by the host's offset.
    */
   private static fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
     return {

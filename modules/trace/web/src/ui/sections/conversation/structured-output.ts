@@ -1,9 +1,7 @@
 /**
- * Detects an assistant reply that is really a structured value.
- *
- * A prompt with more than one declared output field streams its result as a
- * JSON object. Rendered as markdown that reads as a wall of braces, so the
- * surfaces that expect structured output render it as a tree instead.
+ * Detects an assistant reply that is really a structured value: a prompt
+ * with more than one declared output field streams JSON, which reads as a
+ * wall of braces as markdown — surfaces expecting it render a tree instead.
  */
 export function findStructuredOutput(content: string | undefined): object | undefined {
   if (!content || typeof content !== "string") {

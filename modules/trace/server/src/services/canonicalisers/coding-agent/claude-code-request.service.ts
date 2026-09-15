@@ -25,11 +25,9 @@ const toolResultSchema = z.looseObject({
 type RequestBody = z.infer<typeof requestBodySchema>;
 
 /**
- * What a Claude Code request body says, for the canonical span.
- *
- * The counterpart to {@link ClaudeCodeResponseService}, and total for the same
- * reason. A request body arrives truncated often enough that salvaging one is
- * its own module.
+ * What a Claude Code request body says, for the canonical span. Counterpart
+ * to {@link ClaudeCodeResponseService}, total for the same reason: a
+ * truncated body arrives often enough that salvaging one is its own module.
  */
 export class ClaudeCodeRequestService {
   private constructor() {}

@@ -148,10 +148,7 @@ integration("TraceSummaryClickHouseRepository.tryFindByTraceId (integration)", (
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
   });
 
-  // The OccurredAt=0 sentinel fallback (resolve reports found-without-a-usable
-  // timestamp -> unbounded heavy read) is covered deterministically in
-  // trace-summary.clickhouse.repository.unit.test.ts. It is intentionally not an
-  // integration test: round-tripping an epoch timestamp through a shared,
-  // heavily-loaded CI ClickHouse container proved flaky in a way that does not
-  // reflect the product behavior.
+  // The OccurredAt=0 sentinel fallback is covered deterministically in
+  // trace-summary.clickhouse.repository.unit.test.ts, not here: round-tripping
+  // an epoch timestamp through a shared CI ClickHouse container proved flaky.
 });

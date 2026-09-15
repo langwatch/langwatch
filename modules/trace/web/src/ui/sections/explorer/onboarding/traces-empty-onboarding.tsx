@@ -356,10 +356,9 @@ function scheduleStageAdvance({
 }
 
 /**
- * A density confirmed in a past journey skips the spotlight stage the moment the
- * reader lands on it. The stage stays in the journey config — its copy still
- * exists for first-timers — it is only advanced past on entry, so the reader
- * goes straight to the aurora beat.
+ * A density confirmed in a past journey skips the spotlight stage on
+ * entry. The stage stays in the journey config for first-timers, only
+ * advanced past, so the reader goes straight to the aurora beat.
  */
 function skipConfirmedDensityStage({
   setStage,
@@ -375,9 +374,8 @@ function skipConfirmedDensityStage({
 
 /**
  * Opens the highlighted rich-arrival trace when nothing is clicked within
- * `POST_ARRIVAL_AUTO_OPEN_MS`. Never behind the IntegrateDrawer: the reader is
- * on SDK setup there, and a second drawer popping underneath would be jarring
- * and cost them the moment.
+ * `POST_ARRIVAL_AUTO_OPEN_MS`. Never behind the IntegrateDrawer: a second
+ * drawer popping underneath the SDK-setup reader would be jarring.
  */
 function scheduleRichTraceAutoOpen({
   drawerOpen,
@@ -822,10 +820,9 @@ function headingHeroElement({
 }
 
 /**
- * Returning readers land on the welcome beat, re-entered through the toolbar's
- * "SDK connection pending" button after dismissing the empty state. They skip
- * the linear typewriter narrative they have already sat through and get a small
- * jump-to-this-bit hub instead.
+ * Returning readers land on the welcome beat, re-entered via the toolbar's
+ * "SDK connection pending" button. They skip the typewriter narrative
+ * they've already sat through and get a small jump-to-this-bit hub instead.
  */
 function heroForStage({
   headingHero,
@@ -890,12 +887,9 @@ function ChapterProgress({ stage }: { stage: Stage }) {
 }
 
 /**
- * The drawer is the climax of the journey, not an optional detour, so opening it
- * during `postArrival` — by clicking the highlighted row or by the auto-open
- * timer — advances straight to `drawerOverview`, and closing it mid-chapter
- * drops back so the highlighted row pulses again. At the outro the drawer is
- * closed outright, since that chapter renders its panel on a centred hero the
- * drawer would clip.
+ * The drawer is the climax of the journey: opening it during `postArrival`
+ * advances straight to `drawerOverview`; closing mid-chapter drops back so
+ * the row pulses again. At the outro it's closed outright (clips the hero).
  */
 function syncStageWithDrawer({
   closeDrawer,
