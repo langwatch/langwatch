@@ -22,7 +22,8 @@ import type { ScenarioRepository } from "../../repositories/scenario.repository.
 import type { ScenarioId, ScenarioTestSuiteId } from "../scenario.app.ts";
 import type { ScenarioClock } from "../scenario.app.ts";
 import type { ScenarioSecretCipher } from "../scenario.app.ts";
-import { ScenarioApp, ScenarioSimulationsUnavailableError } from "../scenario.app.ts";
+import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
+import { ScenarioApp } from "../scenario.app.ts";
 
 function harness() {
   const commands: SimulationQueueRun[] = [];
