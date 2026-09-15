@@ -26,9 +26,10 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: Read what a tool call printed
 
-    # Part B, blocked on whether claude_code.tool output is recoverable at all
-    # (langwatch-saas#811) — no `log_records` dataset exists to bind this to yet.
-    @e2e @unimplemented
+    # coding_tool_results joins the tool call to the next turn's request body,
+    # so this reads as one query. Bound by the integration test in
+    # catalog/__tests__/codingToolResults.integration.test.ts.
+    @e2e
     Scenario: Read what a tool call printed
       Given a user with an API key with access to a project with coding-agent sessions
       When they ask for the output of a tool call
