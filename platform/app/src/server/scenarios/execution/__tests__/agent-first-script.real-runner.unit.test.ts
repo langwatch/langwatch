@@ -19,11 +19,13 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
-import { buildIsAgentSpeaksFirstScript } from "../agent-first-script";
+import { buildAgentGreetsFirstScript } from "../agent-first-script";
 import type { TargetAdapterData } from "../types";
 
-/** A phone voice target, greeting on connect or not. */
-function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
+/** A phone voice target, inbound (greets on connect) or outbound. */
+function phoneVoiceData(
+  callDirection: "inbound" | "outbound",
+): TargetAdapterData {
   return {
     type: "voice",
     agentId: "agent_row_1",
@@ -31,7 +33,7 @@ function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
       transport: "phone",
       agentId: "+14155550123",
       credential: null,
-      isAgentSpeaksFirst,
+      callDirection,
     },
     callerEnv: {},
     maxCallSeconds: 300,
@@ -121,9 +123,9 @@ async function runCast(script: ScenarioRunner.ScriptStep[] | undefined) {
 }
 
 describe("agent-first cast against the real runtime", () => {
-  describe("given Agent speaks first is on", () => {
+  describe("given an inbound phone target whose agent greets first", () => {
     it("runs agent, then user, then agent, before the first verdict", async () => {
-      const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(true));
+      const script = buildAgentGreetsFirstScript(phoneVoiceData("inbound"));
       const { calls, result } = await runCast(script);
 
       expect(calls).toEqual(["agent", "user", "agent", "judge"]);
@@ -131,9 +133,9 @@ describe("agent-first cast against the real runtime", () => {
     });
   });
 
-  describe("given Agent speaks first is off", () => {
+  describe("given an outbound phone target", () => {
     it("keeps the default order: user, then agent, then judge", async () => {
-      const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(false));
+      const script = buildAgentGreetsFirstScript(phoneVoiceData("outbound"));
       expect(script).toBeUndefined();
 
       const { calls, result } = await runCast(script);

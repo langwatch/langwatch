@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { Switch } from "~/components/ui/switch";
+import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import {
@@ -42,6 +42,16 @@ import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /** The transport a new voice agent is reached through, until phone lands. */
 const DEFAULT_TRANSPORT: VoiceTransport = "elevenlabs_convai";
+
+/**
+ * Which way a phone call goes. "inbound" = the agent answers and greets first;
+ * "outbound" = the agent places the call and waits for the caller to speak.
+ */
+type CallDirection = "inbound" | "outbound";
+
+/** A new phone target places calls and waits for the caller, matching the
+ *  schema default so an unchanged form keeps today's behavior. */
+const DEFAULT_CALL_DIRECTION: CallDirection = "outbound";
 
 /** The settings route that adds a model provider key. Top-level, no slug. */
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
@@ -137,7 +147,7 @@ type VoiceForm = {
   transport: VoiceTransport;
   agentId: string;
   phoneNumber: string;
-  isAgentSpeaksFirst: boolean;
+  callDirection: CallDirection;
 };
 
 /** The form values seeded from a saved agent's stored config. */
@@ -149,14 +159,14 @@ function formFromAgent(agentData: {
     transport?: VoiceTransport;
     agentId?: string;
     phoneNumber?: string;
-    isAgentSpeaksFirst?: boolean;
+    callDirection?: CallDirection;
   };
   return {
     name: agentData.name ?? "",
     transport: config.transport ?? DEFAULT_TRANSPORT,
     agentId: config.agentId ?? "",
     phoneNumber: config.phoneNumber ?? "",
-    isAgentSpeaksFirst: config.isAgentSpeaksFirst ?? false,
+    callDirection: config.callDirection ?? DEFAULT_CALL_DIRECTION,
   };
 }
 
@@ -168,9 +178,9 @@ function formFromDraft(projectId: string): VoiceForm {
     transport: draft?.transport ?? DEFAULT_TRANSPORT,
     agentId: draft?.agentId ?? "",
     phoneNumber: draft?.phoneNumber ?? "",
-    // The draft (create flow) never persists the phone-only toggle; a new phone
-    // target starts with the agent NOT speaking first.
-    isAgentSpeaksFirst: false,
+    // The draft (create flow) never persists the phone-only call direction; a
+    // new phone target starts as outbound.
+    callDirection: DEFAULT_CALL_DIRECTION,
   };
 }
 
@@ -339,7 +349,9 @@ function useVoiceFormState({
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [isAgentSpeaksFirst, setIsAgentSpeaksFirst] = useState(false);
+  const [callDirection, setCallDirection] = useState<CallDirection>(
+    DEFAULT_CALL_DIRECTION,
+  );
   const formInitializedRef = useRef(false);
   const lastAgentIdRef = useRef<string | undefined>(undefined);
 
@@ -361,7 +373,7 @@ function useVoiceFormState({
     setTransport(initial.transport);
     setVoiceAgentId(initial.agentId);
     setPhoneNumber(initial.phoneNumber);
-    setIsAgentSpeaksFirst(initial.isAgentSpeaksFirst);
+    setCallDirection(initial.callDirection);
     formInitializedRef.current = true;
   }, [agentData, agentId, isCreating, isOpen, projectId]);
 
@@ -392,8 +404,8 @@ function useVoiceFormState({
     setVoiceAgentId,
     phoneNumber,
     setPhoneNumber,
-    isAgentSpeaksFirst,
-    setIsAgentSpeaksFirst,
+    callDirection,
+    setCallDirection,
   };
 }
 
@@ -482,7 +494,7 @@ function submitVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
-    isAgentSpeaksFirst: boolean;
+    callDirection: CallDirection;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -493,7 +505,7 @@ function submitVoiceAgent({
       ? {
           transport: form.transport,
           phoneNumber: form.phoneNumber.trim(),
-          isAgentSpeaksFirst: form.isAgentSpeaksFirst,
+          callDirection: form.callDirection,
         }
       : { transport: form.transport, agentId: form.voiceAgentId.trim() };
   const savedAgentId = agentId ?? createdAgentRowId;
@@ -534,7 +546,7 @@ function useSaveVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
-    isAgentSpeaksFirst: boolean;
+    callDirection: CallDirection;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -821,8 +833,8 @@ function VoiceAgentDrawerBody({
           setVoiceAgentId={form.setVoiceAgentId}
           phoneNumber={form.phoneNumber}
           setPhoneNumber={form.setPhoneNumber}
-          isAgentSpeaksFirst={form.isAgentSpeaksFirst}
-          setIsAgentSpeaksFirst={form.setIsAgentSpeaksFirst}
+          callDirection={form.callDirection}
+          setCallDirection={form.setCallDirection}
           hasTwilioKey={editor.hasTwilioKey}
           hasElevenLabsKey={editor.hasElevenLabsKey}
           hasAttemptedSubmit={editor.hasAttemptedSubmit}
@@ -954,8 +966,8 @@ function VoiceAgentForm({
   setVoiceAgentId,
   phoneNumber,
   setPhoneNumber,
-  isAgentSpeaksFirst,
-  setIsAgentSpeaksFirst,
+  callDirection,
+  setCallDirection,
   hasTwilioKey,
   hasElevenLabsKey,
   hasAttemptedSubmit,
@@ -968,8 +980,8 @@ function VoiceAgentForm({
   setVoiceAgentId: (value: string) => void;
   phoneNumber: string;
   setPhoneNumber: (value: string) => void;
-  isAgentSpeaksFirst: boolean;
-  setIsAgentSpeaksFirst: (value: boolean) => void;
+  callDirection: CallDirection;
+  setCallDirection: (value: CallDirection) => void;
   hasTwilioKey: boolean;
   hasElevenLabsKey: boolean;
   hasAttemptedSubmit: boolean;
@@ -1043,18 +1055,10 @@ function VoiceAgentForm({
             setPhoneNumber={setPhoneNumber}
             invalid={phoneNumberInvalid}
           />
-          <Field.Root>
-            <Switch
-              checked={isAgentSpeaksFirst}
-              onCheckedChange={(e) => setIsAgentSpeaksFirst(e.checked)}
-              inputProps={{ "data-testid": "voice-agent-speaks-first" }}
-            >
-              Agent speaks first
-            </Switch>
-            <Field.HelperText>
-              Turn on if the agent greets as soon as the call connects.
-            </Field.HelperText>
-          </Field.Root>
+          <CallDirectionField
+            callDirection={callDirection}
+            setCallDirection={setCallDirection}
+          />
         </>
       ) : (
         <ElevenLabsAgentIdField
@@ -1065,6 +1069,61 @@ function VoiceAgentForm({
         />
       )}
     </VStack>
+  );
+}
+
+/**
+ * Which way the phone call goes. Inbound targets greet on connect (the run
+ * opens with the agent's turn); outbound targets wait for the caller. Rendered
+ * only for the phone transport, and — like the phone number — never persisted
+ * to the create draft.
+ */
+function CallDirectionField({
+  callDirection,
+  setCallDirection,
+}: {
+  callDirection: CallDirection;
+  setCallDirection: (value: CallDirection) => void;
+}) {
+  return (
+    <Field.Root>
+      <Field.Label>Call direction</Field.Label>
+      <RadioGroup
+        value={callDirection}
+        onValueChange={(d: { value: string | null }) => {
+          if (d.value === "inbound" || d.value === "outbound") {
+            setCallDirection(d.value);
+          }
+        }}
+        data-testid="voice-agent-call-direction"
+        size="sm"
+      >
+        <VStack align="start" gap={2}>
+          <Radio
+            value="inbound"
+            data-testid="voice-agent-call-direction-inbound"
+          >
+            <VStack align="start" gap={0}>
+              <Text fontSize="sm">Inbound</Text>
+              <Text fontSize="xs" color="fg.muted">
+                The agent answers calls and greets first.
+              </Text>
+            </VStack>
+          </Radio>
+          <Radio
+            value="outbound"
+            data-testid="voice-agent-call-direction-outbound"
+          >
+            <VStack align="start" gap={0}>
+              <Text fontSize="sm">Outbound</Text>
+              <Text fontSize="xs" color="fg.muted">
+                The agent places calls and waits for the caller to speak first.
+              </Text>
+            </VStack>
+          </Radio>
+        </VStack>
+      </RadioGroup>
+    </Field.Root>
   );
 }
 

@@ -1,11 +1,11 @@
 /**
  * @vitest-environment node
  *
- * "Agent speaks first" for a phone voice target: when the callee greets on
- * connect, the run must open with the agent's own turn so the greeting is
- * captured as the first turn, then hand over to the normal simulator/judge
- * loop (`proceed()`), which runs the scenario to its conclusion. Every other
- * target keeps the default cast, which opens with the user simulator.
+ * An inbound phone voice target: when the callee greets on connect, the run
+ * must open with the agent's own turn so the greeting is captured as the first
+ * turn, then hand over to the normal simulator/judge loop (`proceed()`), which
+ * runs the scenario to its conclusion. Every other target keeps the default
+ * cast, which opens with the user simulator.
  *
  * This drives the real script builder and EXECUTES the produced steps against
  * a recording executor — the same way the SDK's own runner invokes them — so
@@ -17,11 +17,13 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import { buildIsAgentSpeaksFirstScript } from "../../execution/agent-first-script";
+import { buildAgentGreetsFirstScript } from "../../execution/agent-first-script";
 import type { TargetAdapterData } from "../../execution/types";
 
-/** A phone voice target's prefetched data, greeting on connect or not. */
-function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
+/** A phone voice target's prefetched data, inbound (greets on connect) or outbound. */
+function phoneVoiceData(
+  callDirection: "inbound" | "outbound",
+): TargetAdapterData {
   return {
     type: "voice",
     agentId: "agent_row_1",
@@ -29,7 +31,7 @@ function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
       transport: "phone",
       agentId: "+14155550123",
       credential: null,
-      isAgentSpeaksFirst,
+      callDirection,
     },
     callerEnv: {},
     maxCallSeconds: 300,
@@ -75,11 +77,11 @@ function fakeExecutor() {
   return { calls, executor };
 }
 
-describe("buildIsAgentSpeaksFirstScript", () => {
-  describe('given a phone target whose agent greets on connect and "Agent speaks first" is on', () => {
-    /** @scenario "A callee that greets on connect opens the call when Agent speaks first is on" */
+describe("buildAgentGreetsFirstScript", () => {
+  describe("given an inbound phone target whose agent greets on connect", () => {
+    /** @scenario "An inbound agent that greets on connect opens the call" */
     it("opens with the greeting, then the caller's reply and the agent's response, before proceeding", async () => {
-      const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(true));
+      const script = buildAgentGreetsFirstScript(phoneVoiceData("inbound"));
 
       // The run opens with the agent's greeting, the caller's reply and the
       // agent's response — all scheduled explicitly — before handing over.
@@ -98,10 +100,10 @@ describe("buildIsAgentSpeaksFirstScript", () => {
     });
   });
 
-  describe('given a phone target with "Agent speaks first" off', () => {
+  describe("given an outbound phone target", () => {
     it("keeps the default cast: no agent-first script", () => {
       expect(
-        buildIsAgentSpeaksFirstScript(phoneVoiceData(false)),
+        buildAgentGreetsFirstScript(phoneVoiceData("outbound")),
       ).toBeUndefined();
     });
   });
@@ -109,7 +111,7 @@ describe("buildIsAgentSpeaksFirstScript", () => {
   describe("given an ElevenLabs voice target", () => {
     it("never adds an agent-first script (the behavior is phone-only)", () => {
       expect(
-        buildIsAgentSpeaksFirstScript(elevenLabsVoiceData()),
+        buildAgentGreetsFirstScript(elevenLabsVoiceData()),
       ).toBeUndefined();
     });
   });
@@ -124,7 +126,7 @@ describe("buildIsAgentSpeaksFirstScript", () => {
         headers: [],
         secrets: {},
       };
-      expect(buildIsAgentSpeaksFirstScript(httpData)).toBeUndefined();
+      expect(buildAgentGreetsFirstScript(httpData)).toBeUndefined();
     });
   });
 
