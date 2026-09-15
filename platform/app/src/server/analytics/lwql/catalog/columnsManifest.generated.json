@@ -835,6 +835,11 @@
           "name": "AgentReportedCostUsd",
           "type": "Float64",
           "comment": ""
+        },
+        {
+          "name": "Auxiliary",
+          "type": "Bool",
+          "comment": ""
         }
       ]
     },

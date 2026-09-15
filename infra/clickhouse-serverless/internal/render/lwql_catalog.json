@@ -235,6 +235,7 @@
       "ApiErrors",
       "AtMentions",
       "Attempts",
+      "Auxiliary",
       "BlockedOnUserMs",
       "CacheCreationTokens",
       "CacheReadTokens",

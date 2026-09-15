@@ -1861,6 +1861,14 @@ const CODING_AGENT_SESSIONS: LangWatchQLViewDefinition = {
       sourceColumns: ["IsFork"],
     },
     {
+      name: "Auxiliary",
+      type: "Bool",
+      description:
+        "Whether the session was a helper thread the agent ran for itself, such as generating a conversation title or a recap. The sessions list omits these.",
+      gates: [],
+      sourceColumns: ["Auxiliary"],
+    },
+    {
       name: "ModelCalls",
       type: "UInt32",
       description: "Model API calls made in the session.",
