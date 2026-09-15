@@ -53,7 +53,7 @@ Every ClickHouse table is a view by default: the catalog is derived from a gener
 
 Two column families are gated rather than freely selectable: free-text carriers (captured input, captured output, tool output, log bodies) sit behind the `output` gate (`input` for a few views that separate the two), and billed/derived cost columns sit behind the `costs` gate. A gate's state comes from the project's privacy settings, never from the query. Selecting a gated column your key's project has not opened is refused outright with `GATED_COLUMN`, never silently dropped from the result.
 
-<!-- lwql-views-start -->
+{/* lwql-views-start */}
 
 #### Observability: traces, spans, logs
 
@@ -160,7 +160,7 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 | `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
 | `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
 
-<!-- lwql-views-end -->
+{/* lwql-views-end */}
 
 ### Tables intentionally left out
 

@@ -62,6 +62,8 @@ var notMetrics = map[string]string{
 	"gateway_budget_ledger_events":   "ClickHouse table",
 	"gateway_budget_scope_totals":    "ClickHouse rollup table",
 	"gateway_budget_scope_totals_mv": "ClickHouse materialized view",
+	"gateway_budget_totals":          "LWQL view merging the budget rollup",
+	"gateway_request_spend":          "LWQL view over per-request spend records",
 	"gateway_spend":                  "ClickHouse table (the billing spend ledger)",
 
 	// Structured log event names. gateway_draining is deliberately absent

@@ -1,7 +1,7 @@
 /**
  * The LWQL docs page (docs/api-reference/query/overview.mdx) carries a
  * human-readable table of every queryable view, bounded by the
- * `<!-- lwql-views-start -->` / `<!-- lwql-views-end -->` markers. It exists
+ * MDX comment markers named by {@link VIEWS_SECTION_START} / {@link VIEWS_SECTION_END}. It exists
  * because `GET /api/v1/query/schema` is machine-readable but nobody reads an
  * API response to learn what's queryable — an agent or engineer reads the
  * docs page first.
@@ -21,8 +21,8 @@ const DOCS_PATH = join(
   "../../docs/api-reference/query/overview.mdx",
 );
 
-const VIEWS_SECTION_START = "<!-- lwql-views-start -->";
-const VIEWS_SECTION_END = "<!-- lwql-views-end -->";
+const VIEWS_SECTION_START = "{/* lwql-views-start */}";
+const VIEWS_SECTION_END = "{/* lwql-views-end */}";
 
 /** Every view name named in the docs' bounded table section, first column only. */
 function docsViewNames(): string[] {
