@@ -21,6 +21,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { lwqlViewByName } from "../catalog/lwqlViews";
 import {
   auditedSettingValue,
   definerViewAuditQuery,
@@ -30,6 +31,10 @@ import {
   lwqlPolicyCoverageQuery,
   lwqlRowPolicyStatement,
 } from "../provisioning/accessModel";
+import {
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "../provisioning/catalogStatements";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -1160,6 +1165,241 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         definerViewAuditQuery({ names: harness.names }),
       );
       expect(cleanAfter).toEqual([]);
+    });
+  });
+});
+
+/**
+ * Tenant isolation for the coding-agent datasets (#8085 / #8116 Part A),
+ * proved over the *shipped* migrations rather than the toy fixture above —
+ * `coding_agent_sessions` and `coding_agent_session_events` do not exist in
+ * the fixture schema, only in a real migrated database, so this runs its own
+ * harness instance under `facts: "migrated"` (the same mode
+ * `catalogStatements.integration.test.ts` uses) and provisions only the two
+ * views under proof, not the whole catalog.
+ *
+ * @see specs/lwql/coding-agent-datasets.feature
+ */
+describe("given the coding-agent datasets provisioned over the shipped migrations (#8085)", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let tenantA: ClickHouseClient;
+  let tenantB: ClickHouseClient;
+  let database: string;
+  let facts: string;
+
+  function codingSessionRow({
+    tenantId,
+    sessionId,
+  }: {
+    tenantId: string;
+    sessionId: string;
+  }) {
+    return {
+      TenantId: tenantId,
+      SessionId: sessionId,
+      SessionKeySource: "agent",
+      Version: "1",
+      StartedAt: "2026-02-20 12:00:00.000",
+      Agent: "claude_code",
+      AgentVersion: "1.0.0",
+      GitBranch: "main",
+      ModelCalls: 4,
+      CostUsd: 1.5,
+    };
+  }
+
+  function codingSessionEventRow({
+    tenantId,
+    sessionId,
+    recordId,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    recordId: string;
+  }) {
+    return {
+      TenantId: tenantId,
+      SessionId: sessionId,
+      TimeUnixMs: "2026-02-20 12:00:01.000",
+      // FixedString(64): padded so a short fixture id still fits the column.
+      RecordId: recordId.padEnd(64, "0"),
+      EventKind: "model_call",
+      Agent: "claude_code",
+      SessionKeySource: "agent",
+      CostUsd: 0.02,
+    };
+  }
+
+  beforeAll(async () => {
+    harness = await startLangWatchQLClickHouse({
+      suite: "codingagent",
+      facts: "migrated",
+    });
+    database = harness.names.database;
+    facts = harness.factDatabase;
+
+    const sessions = lwqlViewByName("coding_sessions");
+    const sessionEvents = lwqlViewByName("coding_session_events");
+    if (!sessions || !sessionEvents) {
+      throw new Error(
+        "coding_sessions / coding_session_events are not registered in LWQL_VIEW_CATALOG — nothing to provision",
+      );
+    }
+
+    await harness.applyAsAdmin(
+      lwqlViewSetupStatements({
+        names: harness.names,
+        sourceDatabase: facts,
+        views: [sessions, sessionEvents],
+        dedup: SHIPPED_LWQL_DEDUP,
+      }),
+    );
+
+    await harness.admin.insert({
+      table: `${facts}.coding_agent_sessions`,
+      format: "JSONEachRow",
+      values: [
+        codingSessionRow({
+          tenantId: harness.tenantA.tenantId,
+          sessionId: "session-a-1",
+        }),
+        codingSessionRow({
+          tenantId: harness.tenantB.tenantId,
+          sessionId: "session-b-1",
+        }),
+      ],
+    });
+    await harness.admin.insert({
+      table: `${facts}.coding_agent_session_events`,
+      format: "JSONEachRow",
+      values: [
+        codingSessionEventRow({
+          tenantId: harness.tenantA.tenantId,
+          sessionId: "session-a-1",
+          recordId: "record-a-1",
+        }),
+        codingSessionEventRow({
+          tenantId: harness.tenantB.tenantId,
+          sessionId: "session-b-1",
+          recordId: "record-b-1",
+        }),
+      ],
+    });
+
+    tenantA = await harness.restrictedClient({
+      keyHash: harness.tenantA.keyHash,
+    });
+    tenantB = await harness.restrictedClient({
+      keyHash: harness.tenantB.keyHash,
+    });
+  }, 600_000);
+
+  afterAll(async () => {
+    await harness?.stop();
+  });
+
+  describe("when a tenant reads coding_sessions", () => {
+    /** @scenario "List sessions" */
+    it("reads only its own tenant's rows, and none of the other tenant's", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: "coding_agent_sessions",
+        tenantColumn: "TenantId",
+        database: facts,
+      });
+
+      const rows = await selectRows<{ TenantId: string }>(
+        tenantA,
+        `SELECT TenantId FROM ${database}.coding_sessions`,
+      );
+
+      expectOnlyTenantA({
+        rows,
+        tenantColumn: "TenantId",
+        harness,
+        context: "coding_sessions",
+      });
+      expect(rows).toHaveLength(control.tenantA);
+    });
+  });
+
+  describe("when a tenant reads coding_session_events", () => {
+    /** @scenario "Read every event of a session" */
+    it("reads only its own tenant's rows, and none of the other tenant's", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: "coding_agent_session_events",
+        tenantColumn: "TenantId",
+        database: facts,
+      });
+
+      const rows = await selectRows<{ TenantId: string }>(
+        tenantB,
+        `SELECT TenantId FROM ${database}.coding_session_events`,
+      );
+
+      expect(new Set(rows.map((row) => row.TenantId))).toEqual(
+        new Set([harness.tenantB.tenantId]),
+      );
+      expect(rows).toHaveLength(control.tenantB);
+    });
+  });
+
+  describe("when a query joins both coding-agent datasets", () => {
+    it("keeps both sides of the join inside the caller's own tenant", async () => {
+      await recordSeedControl({
+        harness,
+        table: "coding_agent_sessions",
+        tenantColumn: "TenantId",
+        database: facts,
+      });
+      await recordSeedControl({
+        harness,
+        table: "coding_agent_session_events",
+        tenantColumn: "TenantId",
+        database: facts,
+      });
+
+      const rows = await selectRows<{
+        sessionTenant: string;
+        eventTenant: string;
+      }>(
+        tenantA,
+        `SELECT s.TenantId AS sessionTenant, e.TenantId AS eventTenant ` +
+          `FROM ${database}.coding_sessions AS s ` +
+          `INNER JOIN ${database}.coding_session_events AS e ON e.SessionId = s.SessionId`,
+      );
+
+      expect(
+        rows.length,
+        "the join returned nothing to check tenant scoping on",
+      ).toBeGreaterThan(0);
+      expect(new Set(rows.map((row) => row.sessionTenant))).toEqual(
+        new Set([harness.tenantA.tenantId]),
+      );
+      expect(new Set(rows.map((row) => row.eventTenant))).toEqual(
+        new Set([harness.tenantA.tenantId]),
+      );
+    });
+  });
+
+  describe("when the key-hash context matches no project", () => {
+    it("returns zero rows from both coding-agent datasets, never an error", async () => {
+      const noProject = await harness.restrictedClient({
+        keyHash: "not-a-real-key-hash",
+      });
+
+      const sessions = await selectRows(
+        noProject,
+        `SELECT SessionId FROM ${database}.coding_sessions`,
+      );
+      const events = await selectRows(
+        noProject,
+        `SELECT SessionId FROM ${database}.coding_session_events`,
+      );
+
+      expect(sessions).toHaveLength(0);
+      expect(events).toHaveLength(0);
     });
   });
 });

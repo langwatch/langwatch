@@ -10,7 +10,7 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: List sessions
 
-    @e2e @unimplemented
+    @e2e
     Scenario: List sessions
       Given a user with an API key with access to a project with coding-agent sessions
       When they ask for the sessions of a day
@@ -18,7 +18,7 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: Read every event of a session
 
-    @e2e @unimplemented
+    @e2e
     Scenario: Read every event of a session
       Given a user with an API key with access to a project with coding-agent sessions
       When they ask for the events of one session
@@ -26,6 +26,8 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: Read what a tool call printed
 
+    # Part B, blocked on whether claude_code.tool output is recoverable at all
+    # (langwatch-saas#811) — no `log_records` dataset exists to bind this to yet.
     @e2e @unimplemented
     Scenario: Read what a tool call printed
       Given a user with an API key with access to a project with coding-agent sessions
@@ -34,6 +36,8 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: Ask about organization-level facts
 
+    # Needs an organization-level capability, not a project-scoped dataset —
+    # every LangWatchQL key is tenant-scoped to one project's row policy today.
     @e2e @unimplemented
     Scenario: Ask about organization-level facts
       Given a user with an API key with access to an organization

@@ -68,7 +68,10 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "~/server/analytics/lwql/__tests__/lwqlClickHouseHarness";
-import { LWQL_VIEW_CATALOG } from "~/server/analytics/lwql/catalog/lwqlViews";
+import {
+  LWQL_VIEW_CATALOG,
+  lwqlViewByName,
+} from "~/server/analytics/lwql/catalog/lwqlViews";
 import {
   isPostgresResident,
   type LangWatchQLViewDefinition,
@@ -94,6 +97,8 @@ import { app } from "../[[...route]]/app";
 const SEEDED_TRACES = 6;
 const SEEDED_EVALUATIONS = 4;
 const SEEDED_SIMULATIONS = 2;
+const SEEDED_CODING_SESSIONS = 2;
+const SEEDED_CODING_EVENTS_PER_SESSION = 3;
 
 /** Everything is seeded at one instant, inside the window the queries ask for. */
 const SEED_AT = "2026-02-20 12:00:00.000";
@@ -383,6 +388,62 @@ async function seedTenant({
     ],
   });
 
+  // The coding-agent datasets (#8085 / #8116 Part A): one row per session,
+  // and a handful of ordered events per session.
+  const sessionIds = [...Array(SEEDED_CODING_SESSIONS).keys()].map(
+    (index) => `${tenantId}-coding-session-${index}`,
+  );
+  await admin.insert({
+    table: `${database}.coding_agent_sessions`,
+    format: "JSONEachRow",
+    values: sessionIds.map((sessionId, index) => ({
+      TenantId: tenantId,
+      SessionId: sessionId,
+      SessionKeySource: "agent",
+      Version: "1",
+      StartedAt: SEED_AT,
+      Agent: "claude_code",
+      AgentVersion: "1.0.0",
+      GitBranch: `feature/${index}`,
+      RepositoryHost: "github.com",
+      RepositoryOwner: "langwatch",
+      RepositoryName: "langwatch",
+      ModelCalls: 5 + index,
+      ToolCalls: 10 + index,
+      SubAgents: index,
+      ToolCounts: { Bash: 3 },
+      ToolDurationMs: { Bash: 1200 + index },
+      CostUsd: 1.5 + index,
+      UpdatedAt: SEED_AT,
+    })),
+  });
+
+  await admin.insert({
+    table: `${database}.coding_agent_session_events`,
+    format: "JSONEachRow",
+    values: sessionIds.flatMap((sessionId) =>
+      [...Array(SEEDED_CODING_EVENTS_PER_SESSION).keys()].map((eventIndex) => ({
+        TenantId: tenantId,
+        SessionId: sessionId,
+        // Ordered strictly after SEED_AT, one second apart, so "every event in
+        // order" has an order to prove rather than one indistinguishable instant.
+        TimeUnixMs: new Date(
+          new Date(`${SEED_AT.replace(" ", "T")}Z`).getTime() +
+            (eventIndex + 1) * 1000,
+        )
+          .toISOString()
+          .replace("T", " ")
+          .replace("Z", ""),
+        RecordId: `${sessionId}-event-${eventIndex}`.padEnd(64, "0"),
+        EventKind: eventIndex === 0 ? "user_prompt" : "model_call",
+        Agent: "claude_code",
+        SessionKeySource: "agent",
+        CostUsd: 0.01 * (eventIndex + 1),
+        UpdatedAt: SEED_AT,
+      })),
+    ),
+  });
+
   await admin.insert({
     table: `${database}.evaluation_analytics_rollup`,
     format: "JSONEachRow",
@@ -420,6 +481,15 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
   let gatedProject: Project;
   let database: string;
   let facts: string;
+
+  /** Looks a view up by name, failing loudly rather than passing `undefined` on. */
+  const viewByName = (name: string): LangWatchQLViewDefinition => {
+    const view = lwqlViewByName(name);
+    if (!view) {
+      throw new Error(`${name} is not registered in LWQL_VIEW_CATALOG`);
+    }
+    return view;
+  };
 
   /** The two paths this family serves. */
   const runPath = "/api/v1/query";
@@ -1821,6 +1891,126 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       const appended = logged[0]!.query.replace(sql, "").trim();
       expect(appended).toMatch(/^LIMIT\s+\d+/i);
       expect(appended).toContain("FORMAT JSON");
+    });
+  });
+
+  /**
+   * The two bound scenarios of `specs/lwql/coding-agent-datasets.feature`
+   * (#8085 / #8116 Part A), run against the issue's own example query shapes.
+   */
+  describe("when a caller asks for coding-agent sessions and their events", () => {
+    /** @scenario "List sessions" */
+    it("returns one row per session with when it ran, its branch, repository and cost", async () => {
+      const body = await run(
+        openProject,
+        `SELECT SessionId, GitBranch, StartedAt, CostUsd, ModelCalls, ToolCalls, SubAgents, ` +
+          `ToolDurationMs['Bash'] AS BashMs ` +
+          `FROM ${database}.coding_sessions ` +
+          `WHERE StartedAt >= toDateTime64('${SEED_WINDOW.from}', 3) ` +
+          `ORDER BY SessionId`,
+      );
+
+      expect(body.rows).toHaveLength(SEEDED_CODING_SESSIONS);
+      const rowIds = body.rows.map((row: any) => row.SessionId);
+      expect(new Set(rowIds).size, "returned duplicate sessions").toBe(
+        rowIds.length,
+      );
+      for (const row of body.rows) {
+        expect(row.SessionId).toContain(openProject.id);
+        expect(typeof row.GitBranch).toBe("string");
+        expect(row.StartedAt).toBeTruthy();
+        expect(Number(row.CostUsd)).toBeGreaterThan(0);
+        expect(Number(row.ModelCalls)).toBeGreaterThan(0);
+        expect(Number(row.ToolCalls)).toBeGreaterThan(0);
+        expect(Number(row.BashMs)).toBeGreaterThan(0);
+      }
+    });
+
+    /** @scenario "List sessions" */
+    it("sees only its own tenant's sessions, never the other tenant's", async () => {
+      expect(
+        await adminSourceRowCount(
+          viewByName("coding_sessions"),
+          gatedProject.id,
+        ),
+        "the other tenant has no coding-agent sessions — the read below proves nothing",
+      ).toBeGreaterThan(0);
+
+      const body = await run(
+        openProject,
+        `SELECT DISTINCT TenantId FROM ${database}.coding_sessions`,
+      );
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
+        openProject.id,
+      ]);
+    });
+
+    /** @scenario "Read every event of a session" */
+    it("returns every model call, tool call and sub-agent call of one session, in order", async () => {
+      const sessionId = `${openProject.id}-coding-session-0`;
+      const body = await run(
+        openProject,
+        `SELECT EventKind, TimeUnixMs, CostUsd FROM ${database}.coding_session_events ` +
+          `WHERE SessionId = '${sessionId}' ORDER BY TimeUnixMs`,
+      );
+
+      expect(body.rows).toHaveLength(SEEDED_CODING_EVENTS_PER_SESSION);
+      const timestamps = body.rows.map((row: any) =>
+        new Date(row.TimeUnixMs).getTime(),
+      );
+      const sorted = [...timestamps].sort((a, b) => a - b);
+      expect(
+        timestamps,
+        "the endpoint did not preserve the ORDER BY TimeUnixMs the caller asked for",
+      ).toEqual(sorted);
+      expect(body.rows[0].EventKind).toBe("user_prompt");
+    });
+
+    /** @scenario "Read every event of a session" */
+    it("sees only its own tenant's events, never the other tenant's", async () => {
+      expect(
+        await adminSourceRowCount(
+          viewByName("coding_session_events"),
+          gatedProject.id,
+        ),
+        "the other tenant has no coding-agent events — the read below proves nothing",
+      ).toBeGreaterThan(0);
+
+      const body = await run(
+        openProject,
+        `SELECT DISTINCT TenantId FROM ${database}.coding_session_events`,
+      );
+      expect(body.rows.map((row: any) => row.TenantId)).toEqual([
+        openProject.id,
+      ]);
+    });
+
+    /**
+     * The one conversation-derived column on `coding_sessions`, gated on
+     * `input` per migration 00075 — proved the same way the `traces` content
+     * gate is above. `CostUsd` is NOT proved refused here: every API-key
+     * caller resolves `canSeeCosts: true` unconditionally
+     * (`getProtectionsForProject` in `~/server/api/utils.ts`), so this REST
+     * door has no caller shape that can exercise a costs refusal — there is
+     * no project a caller can hold a valid key for and lack the costs gate.
+     */
+    it("refuses Title for the caller without captured-input permission, and answers it for the caller with it", async () => {
+      const sessionId = `${gatedProject.id}-coding-session-0`;
+      const refused = await refuse(
+        gatedProject,
+        `SELECT Title FROM ${database}.coding_sessions WHERE SessionId = '${sessionId}'`,
+      );
+      expect(refused.code).toBe("lwql_not_permitted");
+      expect(
+        refused.meta.violations.map((violation: any) => violation.code),
+      ).toContain("GATED_COLUMN");
+
+      const permittedSessionId = `${openProject.id}-coding-session-0`;
+      const answered = await run(
+        openProject,
+        `SELECT Title FROM ${database}.coding_sessions WHERE SessionId = '${permittedSessionId}'`,
+      );
+      expect(answered.rows).toHaveLength(1);
     });
   });
 
