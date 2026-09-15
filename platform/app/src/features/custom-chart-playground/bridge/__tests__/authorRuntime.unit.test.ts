@@ -117,7 +117,13 @@ describe("authorRuntime", () => {
 
         // Verify the CallExpression visitor rewrites string-literal dynamic imports
         expect(capturedVisitor).toBeDefined();
+        if (!capturedVisitor) {
+          throw new Error("capturedVisitor is undefined");
+        }
         expect(capturedVisitor.CallExpression).toBeDefined();
+        if (!capturedVisitor.CallExpression) {
+          throw new Error("capturedVisitor.CallExpression is undefined");
+        }
 
         // Test 1: Dynamic import with string literal should be rewritten
         const stringLiteralImportNode = {
@@ -128,11 +134,17 @@ describe("authorRuntime", () => {
         };
         capturedVisitor.CallExpression(stringLiteralImportNode);
 
+        const stringLiteralArg = stringLiteralImportNode.node.arguments[0];
+        if (!stringLiteralArg) {
+          throw new Error(
+            "stringLiteralImportNode.node.arguments[0] is undefined",
+          );
+        }
         const expected = resolveImportSpecifier(
           "dayjs",
           CHART_FRAME_BUILTIN_MODULES,
         );
-        expect(stringLiteralImportNode.node.arguments[0].value).toBe(expected);
+        expect(stringLiteralArg.value).toBe(expected);
 
         // Test 2: Dynamic import with non-literal argument should be untouched
         const nonLiteralImportNode = {
@@ -141,9 +153,21 @@ describe("authorRuntime", () => {
             arguments: [{ type: "Identifier", name: "pkgName" }],
           },
         };
-        const originalValue = nonLiteralImportNode.node.arguments[0].name;
+        const nonLiteralArg = nonLiteralImportNode.node.arguments[0];
+        if (!nonLiteralArg) {
+          throw new Error(
+            "nonLiteralImportNode.node.arguments[0] is undefined",
+          );
+        }
+        const originalValue = nonLiteralArg.name;
         capturedVisitor.CallExpression(nonLiteralImportNode);
-        expect(nonLiteralImportNode.node.arguments[0].name).toBe(originalValue);
+        const nonLiteralArgAfter = nonLiteralImportNode.node.arguments[0];
+        if (!nonLiteralArgAfter) {
+          throw new Error(
+            "nonLiteralImportNode.node.arguments[0] is undefined after CallExpression",
+          );
+        }
+        expect(nonLiteralArgAfter.name).toBe(originalValue);
 
         // Test 3: Built-in package should be untouched
         const builtinImportNode = {
@@ -153,7 +177,11 @@ describe("authorRuntime", () => {
           },
         };
         capturedVisitor.CallExpression(builtinImportNode);
-        expect(builtinImportNode.node.arguments[0].value).toBe("react");
+        const builtinArg = builtinImportNode.node.arguments[0];
+        if (!builtinArg) {
+          throw new Error("builtinImportNode.node.arguments[0] is undefined");
+        }
+        expect(builtinArg.value).toBe("react");
       });
     });
 
