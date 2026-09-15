@@ -1,4 +1,11 @@
-export { entitlementServer } from "./entitlement.server.ts";
+export {
+  entitlementServer,
+  createUsageMembershipRepository,
+  classifyRoleChangeType,
+  isViewOnlyCustomRole,
+  createEntitlementService,
+  createPlanNextStepService,
+} from "./entitlement.server.ts";
 export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
 export { planTrpcTransport } from "./transport/plan.trpc.ts";
 export { usageLimitsTrpcTransport } from "./transport/usage-limits.trpc.ts";
@@ -21,33 +28,19 @@ export {
 } from "./app/entitlement.members.ts";
 export type { UsageMembershipRepository } from "./repositories/usage-membership.repository.ts";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository.ts";
-export {
-  MESSAGE_LIMIT_WARNING_THRESHOLD,
-  UNCAPPED_MONTHLY_USAGE_LIMIT,
-  UsageStatsService,
-  type UsageStatsCaller,
-} from "./services/usage-stats.service.ts";
+export type { UsageStatsCaller } from "./services/usage-stats.service.ts";
 export {
   MemberClassificationService,
   type MemberType,
   type RoleChangeType,
 } from "./services/member-classification.service.ts";
-export {
-  USAGE_UNIT_DISPLAY_LABELS,
-  UsageMeterPolicyService,
-  type MeterDecision,
-} from "./services/usage-meter-policy.service.ts";
-export {
-  OrganizationNotFoundForTeamError,
-  UsageService,
-  type PlanResolver,
-  type UsageLimitResult,
-  type UsageServiceDependencies,
+export type { MeterDecision } from "./services/usage-meter-policy.service.ts";
+export type {
+  PlanResolver,
+  UsageLimitResult,
+  UsageServiceDependencies,
 } from "./services/usage-enforcement.service.ts";
-export {
-  UsageLimitMessageService,
-  type UsageDeployment,
-} from "./services/usage-limit-message.service.ts";
+export type { UsageDeployment } from "./services/usage-limit-message.service.ts";
 export { InProcessUsageCache, NoUsageCache } from "./services/usage-cache.service.ts";
 export { type UsageCache } from "./app/entitlement.members.ts";
 export {

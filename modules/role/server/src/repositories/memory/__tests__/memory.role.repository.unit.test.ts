@@ -7,7 +7,7 @@
  */
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
-import { roleRepositories } from "@langwatch/role-server";
+import { roleRepositories } from "../../role-repositories.registry.ts";
 import { describe, expect, it } from "vitest";
 
 const ORGANIZATION_ID = "org-1";

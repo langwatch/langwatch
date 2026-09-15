@@ -703,21 +703,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./app/api-key.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./repositories/agent-sandbox-key-share.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./repositories/memory/memory.agent-sandbox-key-share.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/api-key/server/src/index.ts|./repositories/memory/memory.api-key-token.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -728,32 +713,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./repositories/redis/redis.agent-sandbox-key-share.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./services/agent-sandbox-key-mint.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/api-key/server/src/index.ts|./services/agent-sandbox-key-reap.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
       "key": "private-runtime-export|modules/api-key/server/src/index.ts|./services/agent-sandbox-maintenance.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./services/api-key-binding-id.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/api-key/server/src/index.ts|./services/api-key-diagnostics.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -893,32 +858,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/data-privacy/server/src/index.ts|./services/content-drop-policy.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/data-privacy/server/src/index.ts|./services/data-privacy-resolution.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/data-privacy/server/src/index.ts|./services/otlp-span-content-drop.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
       "key": "private-runtime-export|modules/data-privacy/server/src/index.ts|./services/otlp-span-pii-redaction.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/data-privacy/server/src/index.ts|./services/pii-redaction-policy.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/data-retention/server/src/index.ts|./repositories/prisma/prisma.data-retention-directory.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -974,26 +919,6 @@
     },
     {
       "key": "private-runtime-export|modules/entitlement/server/src/index.ts|./services/plan-next-step.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/entitlement/server/src/index.ts|./services/usage-enforcement.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/entitlement/server/src/index.ts|./services/usage-limit-message.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/entitlement/server/src/index.ts|./services/usage-meter-policy.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/entitlement/server/src/index.ts|./services/usage-stats.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1058,11 +983,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/feature-flag/server/src/index.ts|./app/feature-flag.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/gateway/server/src/index.ts|./adapters/clickhouse.gateway-open-admissions.adapter.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -1114,11 +1034,6 @@
     },
     {
       "key": "private-runtime-export|modules/github/server/src/index.ts|./services/github-maintenance.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/hosted-mcp/server/src/index.ts|./services/mcp-authorization.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1313,31 +1228,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./app/platform-health.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./rules/platform-health-report.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./services/platform-health-key.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./services/platform-health.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/platform-health/server/src/index.ts|./services/subsystem-probe.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/presence/server/src/index.ts|./repositories/redis/redis.broadcast.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -1399,11 +1289,6 @@
     },
     {
       "key": "private-runtime-export|modules/prompt/server/src/index.ts|./services/prompt-postgres-composition.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/role/server/src/index.ts|./repositories/role-repositories.registry.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

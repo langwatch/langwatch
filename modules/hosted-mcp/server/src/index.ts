@@ -16,14 +16,12 @@ export {
   type HostedMcpRedis,
   type McpToolServer,
 } from "./app/hosted-mcp-members.ts";
-export {
-  McpAuthorizationService,
-  MCP_AUTHORIZE_PERMISSION,
-  type McpApprovalOutcome,
-  type McpApprovalRequest,
-  type McpApprover,
-  type McpAuthorizationCollaborators,
-  type McpAuthorizeProject,
+export type {
+  McpApprovalOutcome,
+  McpApprovalRequest,
+  McpApprover,
+  McpAuthorizationCollaborators,
+  McpAuthorizeProject,
 } from "./services/mcp-authorization.service.ts";
 export {
   type McpAuthorizeApi,

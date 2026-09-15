@@ -1,12 +1,9 @@
-export { PlatformHealthApp, type PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
+export type { PlatformHealthInfrastructure } from "./app/platform-health.app.ts";
 export { platformHealthServer } from "./platform-health.server.ts";
-export { PlatformHealthService } from "./services/platform-health.service.ts";
-export { PlatformHealthKeyService } from "./services/platform-health-key.service.ts";
-export {
-  SubsystemProbeService,
-  type SubsystemProbeCollaborators,
-  type SubsystemProbeOutcome,
-  type SubsystemProbeReason,
+export type {
+  SubsystemProbeCollaborators,
+  SubsystemProbeOutcome,
+  SubsystemProbeReason,
 } from "./services/subsystem-probe.service.ts";
 export {
   SubsystemProbeAdapter,
@@ -17,7 +14,6 @@ export {
   type SubsystemProbe,
   type SubsystemProbeResult,
 } from "./app/platform-health.members.ts";
-export { httpStatusForReport, rollUpStatus } from "./rules/platform-health-report.rules.ts";
 export {
   platformHealthAuthorization,
   platformHealthRest,

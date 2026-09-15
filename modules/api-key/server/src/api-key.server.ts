@@ -1,10 +1,50 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
+import type { Instant } from "@langwatch/time";
 import { ApiKeyApp } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";
+import { ApiKeyTokenAdapter } from "./repositories/memory/memory.api-key-token.repository.ts";
+import {
+  PrismaApiKeyRepository,
+  type PrismaApiKeyDatabase,
+} from "./repositories/prisma/prisma.api-key.repository.ts";
 import { apiKeyRepositories } from "./repositories/api-key-repositories.registry.ts";
+import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
+import {
+  EventingAgentSandboxMaintenanceAdapter,
+  type AgentSandboxMaintenancePipelineDeps,
+} from "./services/agent-sandbox-maintenance.service.ts";
 import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
+
+/**
+ * Runtime seams: thin factories over this feature's private classes, so a
+ * composition root never names one directly (private-runtime-export drive,
+ * dev/docs/plans/private-runtime-export-drive.md §3d).
+ */
+
+/** Wraps the static secret hasher so a caller never names the token adapter class. */
+export function hashApiKeySecret(secret: string, pepper: string): string {
+  return ApiKeyTokenAdapter.hashApiKeySecret(secret, pepper);
+}
+
+/** The sandbox-key sweep over the process's own Prisma-backed repository. */
+export function createAgentSandboxKeyReapService(options: {
+  database: PrismaApiKeyDatabase;
+  now?: () => Instant;
+}): AgentSandboxKeyReapService {
+  return AgentSandboxKeyReapService.create({
+    repository: PrismaApiKeyRepository.create({ prisma: options.database }),
+    now: options.now,
+  });
+}
+
+/** The built maintenance pipeline, ready to register on the eventing runtime. */
+export function buildAgentSandboxMaintenancePipeline(
+  deps: AgentSandboxMaintenancePipelineDeps,
+): ReturnType<EventingAgentSandboxMaintenanceAdapter["build"]> {
+  return EventingAgentSandboxMaintenanceAdapter.create(deps).build();
+}
 
 /**
  * The whole module, declared. Every call answers something already

@@ -11,6 +11,9 @@ import {
 import { MemberClassificationService } from "../../services/member-classification.service.ts";
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 
+/** Only what this repository needs, named so a caller never names Prisma's own types. */
+export type PrismaUsageMembershipDatabase = PrismaClient | Prisma.TransactionClient;
+
 /** The first instant of the current calendar month, in the process's zone. */
 function getCurrentMonthStart(): Date {
   const now = new Date();
@@ -45,11 +48,11 @@ interface MemberClassificationContext {
  * Pure data access layer - only Prisma queries, no business logic.
  */
 export class PrismaUsageMembershipRepository implements UsageMembershipRepository {
-  static create(prisma: PrismaClient | Prisma.TransactionClient): PrismaUsageMembershipRepository {
+  static create(prisma: PrismaUsageMembershipDatabase): PrismaUsageMembershipRepository {
     return new PrismaUsageMembershipRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient | Prisma.TransactionClient) {}
+  private constructor(private readonly prisma: PrismaUsageMembershipDatabase) {}
 
   /**
    * Counts full members: ADMIN/MEMBER role, EXTERNAL role with a non-view custom role, or a
