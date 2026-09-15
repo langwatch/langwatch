@@ -416,20 +416,17 @@ describe("better-auth config", () => {
           AZURE_AD_TENANT_ID: "tenant",
         },
       ],
-    ])(
-      "social provider %s never overwrites profile info on sign-in",
-      async (_label, provider, creds) => {
-        const { buildSocialProviders } = await import("@ee/sso/providers");
-        const providers = buildSocialProviders({
-          ...noSocialEnv,
-          NEXTAUTH_PROVIDER: provider,
-          ...creds,
-        } as Parameters<typeof buildSocialProviders>[0]);
-        const built = Object.values(providers);
-        expect(built).toHaveLength(1);
-        expect(overrideFlags(built[0])).toEqual([]);
-      },
-    );
+    ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
+      const { buildSocialProviders } = await import("@ee/sso/providers");
+      const providers = buildSocialProviders({
+        ...noSocialEnv,
+        NEXTAUTH_PROVIDER: provider,
+        ...creds,
+      } as Parameters<typeof buildSocialProviders>[0]);
+      const built = Object.values(providers);
+      expect(built).toHaveLength(1);
+      expect(overrideFlags(built[0])).toEqual([]);
+    });
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
       const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
