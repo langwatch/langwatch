@@ -1,5 +1,4 @@
 import type {
-  TraceLegacyFilterInput,
   TraceLegacyListInput,
   TracesForProjectResult,
 } from "./trace-read.contract.ts";

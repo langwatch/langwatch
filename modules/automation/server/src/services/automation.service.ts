@@ -40,7 +40,7 @@ import { AutomationGraphService } from "./trigger-graph.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
-import { type Instant, fromDate } from "@langwatch/time";
+import { type Instant } from "@langwatch/time";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 

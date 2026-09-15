@@ -26,7 +26,7 @@ import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { createAutomationTestRuntime } from "../../testing.ts";
-import { type Instant, Temporal, fromDate, toDate } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
   findProjectsWithGraphTriggers = async () => [];

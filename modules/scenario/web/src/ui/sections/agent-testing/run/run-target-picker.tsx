@@ -9,7 +9,6 @@ import { agentHasDevTunnel } from "@langwatch/agent-web/agent-client";
 import { notRunnableCopy } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
-import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 

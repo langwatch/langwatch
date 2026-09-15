@@ -1,6 +1,6 @@
 import { manifestDependencies } from "./manifests.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 
 export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const packages = snapshot.packages;

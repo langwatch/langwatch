@@ -21,7 +21,7 @@ import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automat
 import type { WorkerMailComposition } from "./worker-mail.composition.ts";
 import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 // Capabilities the graph vertical needs: project identity (narrowed from
 // ProjectApi) and analytics for metric queries

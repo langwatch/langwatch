@@ -5,7 +5,6 @@
  */
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";

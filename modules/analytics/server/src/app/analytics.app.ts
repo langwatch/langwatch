@@ -23,7 +23,6 @@ import type {
   LangWatchQLRunCaller,
   LangWatchQLSchema,
   LangWatchQLService,
-  AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";

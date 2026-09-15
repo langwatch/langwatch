@@ -10,7 +10,7 @@ import {
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AuthzGrantsEvent } from "./authz-grant.events.ts";
-import { type Instant, Temporal } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import {
   type AuthzAuditRow,
   AuthzAuditTrailStore,

@@ -1,44 +1,18 @@
 import { type TenantId } from "@langwatch/eventing";
-import type { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { LangyConversationCommands } from "../app/langy.members.ts";
-import type {
-  LangyAgentRespondedEventData,
-  LangyAgentResponseFailedEventData,
-  LangyAgentTurnAcceptedEventData,
-  LangyConversationArchivedEventData,
-  LangyConversationForkedEventData,
-  LangyConversationHandoffConsumedEventData,
-  LangyConversationHandoffPendingEventData,
-  LangyConversationMetadataUpdatedEventData,
-  LangyConversationStartedEventData,
-  LangyConversationTitleGeneratedEventData,
-  LangyLocalControlRequestedEventData,
-  LangyLocalPolicyChangedEventData,
-  LangyLocalWorkspaceConnectedEventData,
-  LangyLocalWorkspaceDisconnectedEventData,
-  LangyMessageImportedEventData,
-  LangyMessageRecordedEventData,
-  LangyPlanUpdatedEventData,
-  LangyToolCallFailedEventData,
-  LangyToolCallInitiatedEventData,
-  LangyToolCallSucceededEventData,
-  LangyUserWaitEndedEventData,
-  LangyUserWaitStartedEventData,
-} from "@langwatch/langy-contract";
 import {} from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
 import {} from "@langwatch/langy-contract";
-import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,
   NullLangyMessageRepository,
 } from "../repositories/langy-message.repository.ts";
-import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
+import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository.ts";
 

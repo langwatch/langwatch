@@ -23,7 +23,6 @@ import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
 import {
   documentedResponses,
-  restRouteDocumentation,
   securityForCredentialClass,
 } from "../openapi.ts";
 import { declined } from "../response.ts";

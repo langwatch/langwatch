@@ -9,7 +9,7 @@ import type {
   StoredGraphConfig,
   TimeseriesInputType,
 } from "./trigger-evaluator.service.ts";
-import { fromDate, type Instant } from "@langwatch/time";
+import { type Instant } from "@langwatch/time";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}

@@ -52,7 +52,7 @@ import {
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
-import { AuditLogApi, type AuditLogApi as AuditLogApiContract } from "@langwatch/audit-log-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import { buildAutomationInfrastructure } from "./automation-composition.build.ts";

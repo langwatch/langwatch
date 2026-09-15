@@ -1,5 +1,5 @@
 /** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
-import { vi, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   OrganizationNotFoundError,
   OrganizationHasNoTeamError,

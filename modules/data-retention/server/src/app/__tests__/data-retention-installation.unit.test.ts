@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest";
 import { dataRetentionServer } from "../../data-retention.server.ts";
 import {
   createDataRetentionTestAuthz,
-  createDataRetentionTestInfrastructure,
   createDataRetentionTestOrganizations,
   createDataRetentionTestProjects,
   createDataRetentionTestUsers,

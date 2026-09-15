@@ -10,7 +10,6 @@ import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
   dataPrivacyTestGraph,
-  dataPrivacyTestInfrastructure,
 } from "./data-privacy.fixture.ts";
 
 const PROJECT_ID = dataPrivacyTestGraph.projectId;

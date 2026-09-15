@@ -6,7 +6,6 @@ import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import type {
   MigrationDataset,
-  MigrationPageRequest,
   MigrationProject,
   ObjectStorageMigrationInventory,
 } from "#repositories/object-storage-migration-inventory.repository";

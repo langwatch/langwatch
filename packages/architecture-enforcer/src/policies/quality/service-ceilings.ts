@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
 import { sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
-import { walkFiles } from "../../workspace/layout.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 
 const MAX_MODULE_LINES = 500;
 const MAX_METHOD_LINES = 80;

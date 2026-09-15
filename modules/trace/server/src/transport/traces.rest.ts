@@ -17,7 +17,6 @@ import {
   projectRestFacts,
   RequestValidationError,
   resolver,
-  type RestRawResult,
 } from "@langwatch/api/rest";
 import {
   TraceApi,

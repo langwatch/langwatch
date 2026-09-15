@@ -1,9 +1,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
-  type DomainJoinSetting,
   isPublicEmailDomain,
-  JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
   type JoinLookupDecision,
   JoinNotAvailableError,
@@ -11,12 +9,10 @@ import {
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
   joinDomainOf,
-  normalizeDomain,
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
 import type {} from "../repositories/join-request.repository.ts";
-import type { JoinRequestService } from "./join-request.service.ts";
 import {
   approveJoinCommandId,
   newJoinRequestCommandId,

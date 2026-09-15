@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import {
   type BaselineEntry,

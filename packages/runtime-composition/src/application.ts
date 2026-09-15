@@ -39,7 +39,6 @@ import {
   buildClaimedMembers,
   membersFor,
   noMembers,
-  type MemberClaim,
   type MemberSource,
 } from "./module-members.ts";
 import {

@@ -1,4 +1,4 @@
-import { ApiKeyAlreadyRevokedError, CLI_LOGIN_KEY_NAME_PREFIX } from "@langwatch/api-key-contract";
+import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";

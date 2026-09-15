@@ -1,4 +1,4 @@
-import type { AlertType, AutomationLimitNextStep, DatasetActionParams, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, GraphTriggerSweepCandidate, SlackActionParams, SlackPayload, Trigger, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput, GraphAlertTemplateContext } from "@langwatch/automation-contract";
+import type { AutomationLimitNextStep, GraphTriggerEvaluationReason, GraphTriggerEvaluationResult, SlackActionParams, SlackPayload, Trigger, TriggerMatchRecordedEventData, TriggerSummary, WebhookActionParams, WebhookDeliveryInput, GraphAlertTemplateContext } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 import type { TraceQueryClassification, TraceSummaryData } from "@langwatch/trace-contract";
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";

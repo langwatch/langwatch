@@ -1,5 +1,4 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,

@@ -6,10 +6,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import {
   CALL_ENVELOPE_SLACK_MS,

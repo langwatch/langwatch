@@ -8,7 +8,6 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type {
-  BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,
 } from "../repositories/organization/billing-report-organization.repository.ts";
 import type { BillingCheckpointRepository } from "../repositories/billing-checkpoint.repository.ts";

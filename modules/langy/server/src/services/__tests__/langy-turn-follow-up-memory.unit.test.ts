@@ -11,7 +11,7 @@ import {
   type LangyTurnServiceDeps,
   type StartConversationTurnInput,
 } from "../langy-turn.service.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const dispatch = vi.fn(async () => "accepted" as const);

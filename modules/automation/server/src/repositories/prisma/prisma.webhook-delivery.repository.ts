@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { WebhookDeliveryRepository } from "../webhook-delivery.repository.ts";
-import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 

@@ -26,7 +26,6 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { ErrorHandler } from "hono";
-import { z } from "zod";
 import {
   type AppRestBroadcast,
   baseResponses,

@@ -15,7 +15,6 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import {
   scenarioTestSuiteSchema,
   ScenarioTestSuiteNotFoundError,

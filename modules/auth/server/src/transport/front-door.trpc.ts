@@ -8,7 +8,6 @@ import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/
 import { AuthApi, frontDoorTrpc } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 /**

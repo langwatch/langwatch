@@ -1,7 +1,5 @@
-import type { CommandEnvelope } from "@langwatch/eventing";
 import { type TenantId } from "@langwatch/eventing";
 import type { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import type {
   LangyConversationStartedEventData,
   LangyMessagePart,
@@ -11,7 +9,6 @@ import type {
 import { langyJsonValueSchema } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
 import {} from "@langwatch/langy-contract";
 import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";

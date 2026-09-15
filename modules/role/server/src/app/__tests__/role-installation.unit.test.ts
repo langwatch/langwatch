@@ -6,11 +6,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { roleServer } from "../../role.server.ts";
-import {
-  AllowingTestRolePlan,
-  AllowingTestRoleScope,
-  CountingTestRoleBindingIds,
-} from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 

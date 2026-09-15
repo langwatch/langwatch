@@ -2,7 +2,6 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import { DatasetService } from "@/client-sdk/services/datasets";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**

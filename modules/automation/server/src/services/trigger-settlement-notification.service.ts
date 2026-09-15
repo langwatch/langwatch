@@ -29,7 +29,6 @@ import {
   TriggerSettlementEmailService,
   type SettlementNotificationCandidate,
 } from "./trigger-settlement-email.service.ts";
-import { fromDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automation:settlement-notification");
 

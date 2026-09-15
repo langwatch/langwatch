@@ -26,8 +26,8 @@
  * policy id and its own `lint*` entry in policies/index.ts.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { existsSync } from "node:fs";
+import { join, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "../workspace/layout.ts";
 import { sourceFile, sourceText } from "../workspace/module-graph.ts";

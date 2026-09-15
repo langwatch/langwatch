@@ -8,7 +8,6 @@ import { Popover } from "@langwatch/design-system/popover";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { useSession } from "../../../behavior/auth-session.ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ownerOnlyCopy } from "@langwatch/agent-contract";
 import {
   isAgentTarget,
   notRunnableCopy,

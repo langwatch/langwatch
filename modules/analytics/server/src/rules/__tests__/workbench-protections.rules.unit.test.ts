@@ -4,7 +4,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { PLATFORM_DEFAULT_DATA_PRIVACY, type DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import {

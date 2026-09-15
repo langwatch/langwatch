@@ -11,7 +11,6 @@ import type {
   VirtualKeyWithScopes,
 } from "@langwatch/gateway-contract";
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   serializeRowForAudit,

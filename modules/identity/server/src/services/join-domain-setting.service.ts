@@ -4,7 +4,6 @@
  * already admits people, then the domain nobody has proved.
  */
 import {
-  DOMAIN_AUTO_JOIN_POLICY_ID,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
   normalizeDomain,

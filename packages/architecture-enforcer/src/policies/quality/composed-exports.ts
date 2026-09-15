@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import {

@@ -1,25 +1,19 @@
-import type { CommandEnvelope } from "@langwatch/eventing";
 import { type TenantId } from "@langwatch/eventing";
-import type { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type {} from "@langwatch/langy-contract";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
 import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
 } from "@langwatch/langy-contract";
-import { type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
   type LangyMessageRepository,
   type LangyMessageRow,
 } from "../repositories/langy-message.repository.ts";
-import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 import {

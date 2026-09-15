@@ -8,7 +8,7 @@ import { AutomationRunawayNotice } from "../channels/automation-runaway-notice.c
 import { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
 import { TriggerRepository } from "../repositories/trigger.repository.ts";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 
 export { RUNAWAY_PAUSE_REASON };
 

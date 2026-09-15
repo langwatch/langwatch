@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import ts from "typescript";
 import { sourceFile } from "../workspace/module-graph.ts";

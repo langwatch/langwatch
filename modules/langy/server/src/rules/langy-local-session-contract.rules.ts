@@ -10,20 +10,14 @@ import type {
   LangyMessagePart,
   LangyMessageRole,
 } from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
-import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {} from "./langy-local-session-text.rules.ts";
-import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import { LangyWaitExpiredError } from "@langwatch/langy-contract";
 import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 import type {
   ConnectedWorkspace,
-  LangyLocalPresence,
 } from "../repositories/langy-local-presence.repository.ts";
 import {
   type LocalControlRefusedCode,

@@ -15,7 +15,6 @@ import type {
   AutomationLogger,
 } from "./automation-graph-runtime.service.ts";
 import type { Instant } from "@langwatch/time";
-import { fromDate } from "@langwatch/time";
 
 export type AnalyticsMetricSource = RepositoryMetricSource;
 export type ClickHouseClient = {

@@ -1,7 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  type UsageStatsClickHouseQuery,
-} from "../index.ts";
 import type { UsageStatsProjectDatabase, UsageStatsProjectCounts } from "../app/ops.app.ts";
 import {
   UsageStatsClickHouseRepository,

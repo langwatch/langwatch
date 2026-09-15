@@ -3,7 +3,6 @@ import type {
   AutomationPersistCapConfig,
   AutomationPersistCapDecision,
   AutomationPlan,
-  AutomationPlanProvider,
 } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";

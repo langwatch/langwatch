@@ -1,7 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";

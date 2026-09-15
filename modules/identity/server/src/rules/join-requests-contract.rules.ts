@@ -3,7 +3,6 @@
  * often somebody may ask and look, how long a rejection holds them off, and the narrow
  * collaborator shapes the service is given rather than reaching for.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { type DomainJoinSetting } from "@langwatch/identity-contract";
 import type {
   JoinCandidateRepository,

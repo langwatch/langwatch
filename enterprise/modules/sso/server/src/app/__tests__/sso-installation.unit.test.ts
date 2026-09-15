@@ -17,7 +17,6 @@ import {
   createSsoTestOperators,
   createSsoTestUsers,
   RecordingSsoConnectionLedger,
-  RecordingSsoGateLogger,
   SSO_TEST_STAFF_EMAIL,
 } from "./sso.fixture.ts";
 

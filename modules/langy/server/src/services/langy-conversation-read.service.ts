@@ -1,6 +1,4 @@
-import type { CommandEnvelope } from "@langwatch/eventing";
-import { createTenantId, REHYDRATION_WINDOW_MS, type TenantId } from "@langwatch/eventing";
-import type { HandledError } from "@langwatch/handled-error";
+import { createTenantId, REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type {} from "@langwatch/langy-contract";
 import {
@@ -12,17 +10,13 @@ import {
   langyConversationTurnEventSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangyTurnErrors } from "@langwatch/langy-contract";
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
-import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
 import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
-import { type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRepository,
 } from "../repositories/langy-conversation-projection.repository.ts";
 import {} from "../repositories/langy-message.repository.ts";
-import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 import {
   foldWaitTurns,

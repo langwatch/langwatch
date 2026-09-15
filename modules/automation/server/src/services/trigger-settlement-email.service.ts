@@ -11,7 +11,6 @@ import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
-import { fromDate } from "@langwatch/time";
 
 export type SettlementNotificationCandidate = {
   traceId: string;

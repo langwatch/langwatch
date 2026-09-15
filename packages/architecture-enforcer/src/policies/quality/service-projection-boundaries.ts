@@ -1,10 +1,8 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
 const PROJECTION_WRITE_METHODS = new Set(["storeProjection", "storeProjectionBatch"]);

@@ -7,7 +7,6 @@ import {
   type BatchSummary,
   type ScenarioRunData,
   scenarioLegacyErrorBodySchema,
-  scenarioRunRestResponseSchema,
   scenarioRunRestResponseWithPlatformUrlSchema,
   simulationBatchSummaryRestSchema,
   simulationRunListQuerySchema,
@@ -18,7 +17,6 @@ import {
   simulationBatchListResponseSchema,
 } from "@langwatch/scenario-contract";
 import type { ErrorHandler } from "hono";
-import { z } from "zod";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,

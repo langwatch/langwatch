@@ -15,7 +15,6 @@ import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
   dataPrivacyTestGraph,
-  dataPrivacyTestInfrastructure,
   MemoryDataPrivacyDirectory,
 } from "./data-privacy.fixture.ts";
 

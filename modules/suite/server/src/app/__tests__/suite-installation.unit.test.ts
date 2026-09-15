@@ -15,7 +15,6 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { suiteServer } from "../../suite.server.ts";
-import { RecordingSuiteExecution } from "./suite.fixture.ts";
 
 /**
  * The one member `SuiteApp` declares it reads (`suite.app.ts`,

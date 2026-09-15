@@ -4,7 +4,6 @@
  * authz grants ledger, and a change that would leave a team with no administrator is refused
  * before anything is written.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DuplicateBindingError,
   type AuthzAccessBinding,

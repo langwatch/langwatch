@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
-import { walkFiles } from "../../workspace/layout.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 
 function isStrictPort(path: string): boolean {
   return /\/server\/src\/ports\/.+\.port\.ts$/.test(path);

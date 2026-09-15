@@ -7,14 +7,11 @@ import type {
   ProcessIntent,
   ProcessStore,
 } from "@langwatch/eventing";
-import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
 import { eventMatches, type WebhookEndpointView } from "@langwatch/webhook-contract";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 import { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
-import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   confirmedDeliverPayload,
   deliveryEventType,

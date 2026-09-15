@@ -1,7 +1,6 @@
 /** @vitest-environment jsdom */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { UiFeedback, useUiCapabilities } from "@langwatch/ui-host/capabilities";

@@ -23,10 +23,8 @@ import type { TraceLegacyRead } from "../trace.members.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
-  type TraceProjectReader,
   type TraceShareReader,
   type TraceSummaryReader,
-  type TracesTopicReader,
   type TracesV2ListReader,
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,

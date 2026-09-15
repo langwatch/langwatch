@@ -9,7 +9,6 @@ import type {
 import type { Instant } from "@langwatch/time";
 import type {
   BackfillAccountRow,
-  BackfillUserRow,
 } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
 import type { IdentityVerificationRecord } from "../identity-verification.repository.ts";
