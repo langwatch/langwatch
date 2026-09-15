@@ -3,7 +3,7 @@ import {
   type EventingClickHouseClientResolver,
   type EventingProcessPersistenceDatabase,
 } from "@langwatch/eventing/server";
-import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract";
+import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { ResourceScope } from "@langwatch/runtime-composition";
