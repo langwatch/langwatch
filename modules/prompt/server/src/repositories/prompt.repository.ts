@@ -78,26 +78,26 @@ export abstract class LlmConfigRepository {
 
   abstract listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]>;
 
-  abstract tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null>;
+  abstract getCopySource(input: { promptId: string }): Promise<PromptCopySource>;
 
   abstract getAllWithLatestVersion(params: {
     projectId: string;
     organizationId: string;
   }): Promise<LlmConfigWithLatestVersion[]>;
 
-  abstract tryGetPromptByIdOrHandle(params: {
+  abstract getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-  }): Promise<PromptConfigRow | null>;
+  }): Promise<PromptConfigRow>;
 
-  abstract tryGetConfigByIdOrHandleWithLatestVersion(params: {
+  abstract getConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
     version?: number;
     versionId?: string;
-  }): Promise<LlmConfigWithLatestVersion | null>;
+  }): Promise<LlmConfigWithLatestVersion>;
 
   abstract updateConfig(
     idOrHandle: string,
@@ -130,12 +130,12 @@ export abstract class LlmConfigRepository {
     };
   }): Promise<LlmConfigWithLatestVersion>;
 
-  abstract tryGetConfigVersionByNumber(params: {
+  abstract getConfigVersionByNumber(params: {
     idOrHandle: string;
     versionNumber: number;
     projectId: string;
     organizationId: string;
-  }): Promise<PromptVersionRow | null>;
+  }): Promise<PromptVersionRow>;
 
   abstract checkModifyPermission(params: {
     idOrHandle: string;

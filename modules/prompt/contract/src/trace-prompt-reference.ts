@@ -159,7 +159,12 @@ function findClosestPrecedingSibling({
 
   const identity = preceding[preceding.length - 1]!.ref;
   const mergedVariables = mergeVariables(preceding.map((p) => p.ref));
-  return { ...identity, promptVariables: mergedVariables };
+  return {
+    ...identity,
+    // The reference carries `null` for "this span declared no variables", so
+    // an empty merge is written back as that rather than as an empty panel.
+    promptVariables: Object.keys(mergedVariables).length > 0 ? mergedVariables : null,
+  };
 }
 
 /** SDK dispatch envelope keys; filtered out to keep Variables panel noise-free on resume. */
@@ -171,7 +176,7 @@ const INTERNAL_PROMPT_VARIABLE_KEYS = new Set<string>([
 ]);
 
 /** Union prompt variables across refs (later wins); skip dispatch-internal keys. */
-function mergeVariables(refs: PromptReference[]): Record<string, string> | null {
+function mergeVariables(refs: PromptReference[]): Record<string, string> {
   const merged: Record<string, string> = {};
   for (const r of refs) {
     if (!r.promptVariables) continue;
@@ -180,5 +185,5 @@ function mergeVariables(refs: PromptReference[]): Record<string, string> | null 
       merged[k] = v;
     }
   }
-  return Object.keys(merged).length > 0 ? merged : null;
+  return merged;
 }

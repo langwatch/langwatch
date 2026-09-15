@@ -311,7 +311,7 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
         }),
       },
       suiteConfigFetcher: { getBySetId: async () => null },
-      promptFetcher: { tryGetPromptByIdOrHandle: async () => null },
+      promptFetcher: { findByIdOrHandle: async () => null },
       agentFetcher: { findById: async () => ({ ...agent, projectId }) },
       workflowVersionFetcher: {
         getLatestDsl: async () => ({

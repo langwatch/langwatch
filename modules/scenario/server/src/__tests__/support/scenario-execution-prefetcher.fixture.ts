@@ -58,7 +58,7 @@ export interface SuiteConfigFetcher {
 }
 
 export interface PromptFetcher {
-  tryGetPromptByIdOrHandle(input: {
+  findByIdOrHandle(input: {
     projectId: string;
     idOrHandle: string;
   }): Promise<Record<string, unknown> | null>;
@@ -215,8 +215,8 @@ function suiteService(deps: ScenarioPrefetchFixture): SuiteApi {
 
 function promptService(deps: ScenarioPrefetchFixture): PromptService {
   return fakeService<PromptService>({
-    tryGetPromptByIdOrHandle: async (input) => {
-      const value = await deps.promptFetcher.tryGetPromptByIdOrHandle(input);
+    findByIdOrHandle: async (input) => {
+      const value = await deps.promptFetcher.findByIdOrHandle(input);
       if (!value) return null;
       const now = new Date(0);
       return versionedPromptSchema.parse({

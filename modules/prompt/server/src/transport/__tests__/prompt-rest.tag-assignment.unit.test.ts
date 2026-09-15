@@ -25,7 +25,7 @@ function buildApi() {
   const app = {
     // The organization-scoped prompt a SIBLING project owns, which is what the
     // by-handle lookup is written to reach.
-    tryGetPromptByIdOrHandle: vi.fn(async () => ({ id: "prompt_1", projectId: OWNING_PROJECT })),
+    getByIdOrHandle: vi.fn(async () => ({ id: "prompt_1", projectId: OWNING_PROJECT })),
     assignTag,
   } as unknown as PromptApi;
 

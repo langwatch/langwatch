@@ -16,7 +16,9 @@ import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
  * The engine reports the output field's whole current value on every state
  * change, so the delta is what has been appended. A value shorter than what we
  * already sent is a different field winning a race rather than the model
- * retracting what it said, so it is ignored.
+ * retracting what it said, so it is ignored — an event that appended nothing
+ * answers with empty text and the total unmoved, which is what the caller
+ * sends on and remembers.
  */
 export function deltaFrom({
   outputs,
@@ -26,10 +28,10 @@ export function deltaFrom({
   outputs: Record<string, unknown> | undefined;
   outputConfigs: OutputConfig[] | undefined;
   alreadySent: string;
-}): { text: string; total: string } | undefined {
+}): { text: string; total: string } {
   const current = extractStreamableOutput(outputs, outputConfigs);
   if (current === undefined || current.length < alreadySent.length) {
-    return undefined;
+    return { text: "", total: alreadySent };
   }
 
   return { text: current.slice(alreadySent.length), total: current };
@@ -73,12 +75,12 @@ export function handleEngineEvent({
     outputConfigs,
     alreadySent: sentSoFar,
   });
-  if (delta?.text) send({ type: "delta", content: delta.text });
+  if (delta.text) send({ type: "delta", content: delta.text });
 
   if (state.error) throw new Error(state.error);
 
   return {
-    sent: delta?.total ?? sentSoFar,
+    sent: delta.total,
     done: state.status === "success",
   };
 }

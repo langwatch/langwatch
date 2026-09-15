@@ -17,6 +17,21 @@ export class PromptNotFoundError extends HandledError {
     this.name = "PromptNotFoundError";
   }
 }
+/**
+ * The prompt was never copied from anywhere, so there is nothing to sync from.
+ * Raised by persistence, where the copy link actually lives.
+ */
+export class PromptNotACopyError extends HandledError {
+  declare readonly code: "prompt_not_a_copy";
+
+  constructor() {
+    super("prompt_not_a_copy", "This prompt is not a copy and has no source to sync from", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "PromptNotACopyError";
+  }
+}
 export class PromptTagNotFoundError extends Error {
   readonly code = "prompt_tag_not_found";
   constructor(public readonly tagName: string) {

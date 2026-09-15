@@ -63,7 +63,6 @@ const agentApi = createApiFixture<AgentApi>({
 
 const promptApi = createApiFixture<PromptApi>({
   getAllPrompts: mockMethod(),
-  tryGetPromptByIdOrHandle: mockMethod(),
   getAllVersions: mockMethod(),
   createPrompt: mockMethod(),
   updatePrompt: mockMethod(),
@@ -73,7 +72,7 @@ const promptApi = createApiFixture<PromptApi>({
   listTags: mockMethod(),
   createTag: mockMethod(),
   renameTag: mockMethod(),
-  tryDeleteTagByName: mockMethod(),
+  deleteTagByName: mockMethod(),
   listForProject: mockMethod(),
   findByIdOrHandle: mockMethod(),
   getByIdOrHandle: mockMethod(),

@@ -2,6 +2,7 @@
 import {
   diffRuntimeParameters,
   type getLatestConfigVersionSchema,
+  NotFoundError,
   type LatestConfigVersionSchema,
   type PromptScope,
   runtimeParametersEqual,
@@ -11,6 +12,7 @@ import { describeLocalFileUpdate } from "../rules/prompt-describe-local-file-upd
 import { mergeAutoDetectedInputs } from "../rules/prompt-merge-auto-detected-inputs.rules.ts";
 import { transformSnakeToCamel } from "../rules/prompt-transform-db.rules.ts";
 import type { LlmConfigRepository } from "../repositories/prompt.repository.ts";
+import type { PromptVersionRow } from "../repositories/prompt-version.repository.ts";
 import { remoteConfigDataOf } from "../rules/prompt-sync.rules.ts";
 import type { PromptReadService } from "./prompt-read.service.ts";
 import type { PromptWriteService } from "./prompt-write.service.ts";
@@ -173,12 +175,22 @@ export class PromptSyncService {
       remoteParameters: Record<string, unknown>;
     };
   }> {
-    const localBaseVersion = await this.repository.tryGetConfigVersionByNumber({
-      idOrHandle,
-      versionNumber: localVersion,
-      projectId,
-      organizationId,
-    });
+    // A sync sends the version the local file was last written from, and the
+    // server may have never stored it (a file edited offline against a version
+    // that was since squashed). That is a comparison we cannot make, not a
+    // failure, so the refusal is read here as "no base to compare against".
+    let localBaseVersion: PromptVersionRow | undefined;
+    try {
+      localBaseVersion = await this.repository.getConfigVersionByNumber({
+        idOrHandle,
+        versionNumber: localVersion,
+        projectId,
+        organizationId,
+      });
+    } catch (error) {
+      if (!(error instanceof NotFoundError)) throw error;
+    }
+
     if (localBaseVersion) {
       const baseComparison = this.repository.compareConfigContent(
         resolvedConfigData,
@@ -273,14 +285,19 @@ export class PromptSyncService {
     // Must run before comparison/creation so both code paths use the merged inputs.
     const resolvedConfigData = mergeInputsIntoConfigData(localConfigData);
 
-    // Check if prompt exists on server
-    const existingPrompt = await this.read.tryGetPromptByIdOrHandle({
-      idOrHandle,
-      projectId,
-      organizationId,
-    });
+    // Check if prompt exists on server. A handle the server has never seen is
+    // the ordinary first sync, so the lookup's refusal is read as "create it"
+    // rather than propagated.
+    let existingPrompt: VersionedPrompt;
+    try {
+      existingPrompt = await this.read.getPromptByIdOrHandle({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
+    } catch (error) {
+      if (!(error instanceof NotFoundError)) throw error;
 
-    if (!existingPrompt) {
       return {
         action: "created",
         prompt: await this.createSyncedPrompt({ ...params, resolvedConfigData }),

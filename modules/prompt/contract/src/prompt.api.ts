@@ -60,9 +60,6 @@ export interface PromptApi {
     organizationId?: string;
     version?: "latest" | "all";
   }): Promise<VersionedPrompt[]>;
-  tryGetPromptByIdOrHandle(
-    input: PromptReference & { organizationId?: string },
-  ): Promise<VersionedPrompt | null>;
   getAllVersions(input: {
     idOrHandle: string;
     projectId: string;
@@ -97,7 +94,7 @@ export interface PromptApi {
     oldName: string;
     newName: string;
   }): Promise<PromptTag>;
-  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null>;
+  deleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag>;
   listForProject(input: {
     projectId: string;
     organizationId?: string;

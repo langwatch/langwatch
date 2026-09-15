@@ -66,7 +66,7 @@ export class PrismaPromptTagRepository extends PromptTagRepository {
   /**
    * Fetches a single custom tag by ID and org (for auth scoping).
    */
-  async tryFindById({
+  async findById({
     id,
     organizationId,
   }: {
@@ -95,7 +95,7 @@ export class PrismaPromptTagRepository extends PromptTagRepository {
   /**
    * Fetches a single custom tag by name and org (for name-based lookups).
    */
-  async tryFindByName({
+  async findByName({
     organizationId,
     name,
   }: {
@@ -205,7 +205,7 @@ export class PrismaPromptTagRepository extends PromptTagRepository {
   /**
    * Finds a tag definition by org and name. Returns null if not found.
    */
-  async tryFindByOrgAndName({
+  async findByOrgAndName({
     organizationId,
     name,
   }: {

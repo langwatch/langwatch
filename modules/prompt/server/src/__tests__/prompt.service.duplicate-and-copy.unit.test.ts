@@ -41,7 +41,12 @@ function buildService({
   const service = createPromptServiceForTest();
   const taken = new Set(takenHandles);
 
-  vi.spyOn(service.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(source);
+  const reads = vi.spyOn(service.reads, "getPromptByIdOrHandle");
+  if (source) {
+    reads.mockResolvedValue(source);
+  } else {
+    reads.mockRejectedValue(new NotFoundError("Prompt config not found."));
+  }
   vi.spyOn(service.writes, "checkHandleUniqueness").mockImplementation(
     async ({ handle }) => !taken.has(handle),
   );

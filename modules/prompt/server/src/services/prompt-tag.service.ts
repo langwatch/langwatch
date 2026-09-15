@@ -98,18 +98,14 @@ export class PromptTagService {
 
   /**
    * Deletes a custom tag definition and cascades to PromptTagAssignment rows.
+   * Refuses when the org has no tag by that id: a delete names the row it
+   * removes, so "there was nothing there" is an answer the caller asked for.
    */
-  async tryDelete({
-    id,
-    organizationId,
-  }: {
-    id: string;
-    organizationId: string;
-  }): Promise<PromptTag | null> {
-    const tag = await this.repo.tryFindById({ id, organizationId });
+  async delete({ id, organizationId }: { id: string; organizationId: string }): Promise<PromptTag> {
+    const tag = await this.repo.findById({ id, organizationId });
 
     if (!tag) {
-      return null;
+      throw new PromptTagNotFoundError(id);
     }
 
     if (PROTECTED_TAGS.includes(tag.name as ProtectedTag)) {
@@ -123,22 +119,23 @@ export class PromptTagService {
 
   /**
    * Deletes a custom tag definition by name and cascades to PromptTagAssignment rows.
+   * Refuses when the org carries no tag by that name.
    */
-  async tryDeleteByName({
+  async deleteByName({
     organizationId,
     name,
   }: {
     organizationId: string;
     name: string;
-  }): Promise<PromptTag | null> {
+  }): Promise<PromptTag> {
     if (PROTECTED_TAGS.includes(name as ProtectedTag)) {
       throw new PromptTagProtectedError(name);
     }
 
-    const tag = await this.repo.tryFindByName({ organizationId, name });
+    const tag = await this.repo.findByName({ organizationId, name });
 
     if (!tag) {
-      return null;
+      throw new PromptTagNotFoundError(name);
     }
 
     await this.repo.deleteByName({ organizationId, name });

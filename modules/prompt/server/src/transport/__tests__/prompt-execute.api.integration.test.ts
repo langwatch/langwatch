@@ -47,7 +47,7 @@ const SESSION: PromptExecuteRestSession = { user: { id: "user_1" } };
 
 function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestSession>> = {}) {
   const isAllowedOrigin = vi.fn(() => true);
-  const resolveSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
+  const findSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
   const probeProjectPermission = vi.fn(async () => true);
   const prepareStudioEvent = vi.fn(async (input: { event: StudioClientEvent }) => input.event);
   const postEvent = vi.fn(async ({ onEvent }: { onEvent: (event: { type: "done" }) => void }) => {
@@ -56,7 +56,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
 
   const members = {
     isAllowedOrigin,
-    resolveSession,
+    findSession,
     probeProjectPermission,
     isDemoProject: () => false,
     prepareStudioEvent,
@@ -95,7 +95,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     hono,
     execute,
     isAllowedOrigin,
-    resolveSession,
+    findSession,
     probeProjectPermission,
     postEvent,
   };
@@ -147,7 +147,7 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
     it("refuses before the permission check runs", async () => {
       const probeProjectPermission = vi.fn(async () => true);
       const { execute } = buildApi({
-        resolveSession: async () => null,
+        findSession: async () => null,
         probeProjectPermission,
       });
 
@@ -160,16 +160,16 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the request comes from another origin", () => {
     it("refuses before the session is read", async () => {
-      const resolveSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
+      const findSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
       const { execute } = buildApi({
         isAllowedOrigin: () => false,
-        resolveSession,
+        findSession,
       });
 
       const response = await execute();
 
       expect(response.status).toBe(403);
-      expect(resolveSession).not.toHaveBeenCalled();
+      expect(findSession).not.toHaveBeenCalled();
     });
   });
 
@@ -201,9 +201,12 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
     it("answers 404 instead of falling through", async () => {
       const { hono } = buildApi();
 
-      const response = await hono.request("http://api.test/api/prompt-playground/2000-01-01/prompt.execute", {
-        method: "POST",
-      });
+      const response = await hono.request(
+        "http://api.test/api/prompt-playground/2000-01-01/prompt.execute",
+        {
+          method: "POST",
+        },
+      );
 
       expect(response.status).toBe(404);
     });

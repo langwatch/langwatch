@@ -29,8 +29,8 @@ function makeTag(overrides: Partial<StoredPromptTag> = {}): StoredPromptTag {
 function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagRepository {
   return {
     findAll: vi.fn().mockResolvedValue([]),
-    tryFindById: vi.fn().mockResolvedValue(null),
-    tryFindByName: vi.fn().mockResolvedValue(null),
+    findById: vi.fn().mockResolvedValue(null),
+    findByName: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue(makeTag()),
     delete: vi.fn().mockResolvedValue(undefined),
     deleteByName: vi.fn().mockResolvedValue(undefined),
@@ -226,16 +226,17 @@ describe("PromptTagService", () => {
 
   describe("delete()", () => {
     describe("when tag does not exist", () => {
-      it("returns null without calling repo.delete", async () => {
-        const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(null) });
+      it("refuses without calling repo.delete", async () => {
+        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(null) });
         const service = PromptTagService.create(repo);
 
-        const result = await service.tryDelete({
-          id: "ptag_unknown",
-          organizationId,
-        });
+        await expect(
+          service.delete({
+            id: "ptag_unknown",
+            organizationId,
+          }),
+        ).rejects.toThrow(PromptTagNotFoundError);
 
-        expect(result).toBeNull();
         expect(repo.delete).not.toHaveBeenCalled();
       });
     });
@@ -243,29 +244,29 @@ describe("PromptTagService", () => {
     describe("when tag is a protected system tag", () => {
       it("throws PromptTagProtectedError for 'latest'", async () => {
         const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(tag) });
+        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
         const service = PromptTagService.create(repo);
 
-        await expect(service.tryDelete({ id: tag.id, organizationId })).rejects.toThrow(
+        await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow(
           PromptTagProtectedError,
         );
       });
 
       it("does not call repo.delete when tag is protected", async () => {
         const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(tag) });
+        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
         const service = PromptTagService.create(repo);
 
-        await expect(service.tryDelete({ id: tag.id, organizationId })).rejects.toThrow();
+        await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow();
         expect(repo.delete).not.toHaveBeenCalled();
       });
 
       it("includes the tag name in the error message", async () => {
         const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(tag) });
+        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
         const service = PromptTagService.create(repo);
 
-        await expect(service.tryDelete({ id: tag.id, organizationId })).rejects.toThrow(/latest/);
+        await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow(/latest/);
       });
     });
 
@@ -273,12 +274,12 @@ describe("PromptTagService", () => {
       it("deletes the tag and returns it", async () => {
         const tag = makeTag({ name: "canary" });
         const repo = makeRepo({
-          tryFindById: vi.fn().mockResolvedValue(tag),
+          findById: vi.fn().mockResolvedValue(tag),
           delete: vi.fn().mockResolvedValue(undefined),
         });
         const service = PromptTagService.create(repo);
 
-        const result = await service.tryDelete({ id: tag.id, organizationId });
+        const result = await service.delete({ id: tag.id, organizationId });
 
         expect(repo.delete).toHaveBeenCalledWith({
           id: tag.id,
@@ -290,10 +291,10 @@ describe("PromptTagService", () => {
       it("deletes seeded tags (production, staging) without error", async () => {
         for (const name of ["production", "staging"]) {
           const tag = makeTag({ name });
-          const repo = makeRepo({ tryFindById: vi.fn().mockResolvedValue(tag) });
+          const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
           const service = PromptTagService.create(repo);
 
-          const result = await service.tryDelete({ id: tag.id, organizationId });
+          const result = await service.delete({ id: tag.id, organizationId });
           expect(result).toEqual(tag);
         }
       });
@@ -302,16 +303,17 @@ describe("PromptTagService", () => {
 
   describe("deleteByName()", () => {
     describe("when tag does not exist", () => {
-      it("returns null without calling repo.deleteByName", async () => {
-        const repo = makeRepo({ tryFindByName: vi.fn().mockResolvedValue(null) });
+      it("refuses without calling repo.deleteByName", async () => {
+        const repo = makeRepo({ findByName: vi.fn().mockResolvedValue(null) });
         const service = PromptTagService.create(repo);
 
-        const result = await service.tryDeleteByName({
-          organizationId,
-          name: "nonexistent",
-        });
+        await expect(
+          service.deleteByName({
+            organizationId,
+            name: "nonexistent",
+          }),
+        ).rejects.toThrow(PromptTagNotFoundError);
 
-        expect(result).toBeNull();
         expect(repo.deleteByName).not.toHaveBeenCalled();
       });
     });
@@ -321,7 +323,7 @@ describe("PromptTagService", () => {
         const repo = makeRepo();
         const service = PromptTagService.create(repo);
 
-        await expect(service.tryDeleteByName({ organizationId, name: "latest" })).rejects.toThrow(
+        await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow(
           PromptTagProtectedError,
         );
       });
@@ -330,7 +332,7 @@ describe("PromptTagService", () => {
         const repo = makeRepo();
         const service = PromptTagService.create(repo);
 
-        await expect(service.tryDeleteByName({ organizationId, name: "latest" })).rejects.toThrow();
+        await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow();
         expect(repo.deleteByName).not.toHaveBeenCalled();
       });
     });
@@ -339,12 +341,12 @@ describe("PromptTagService", () => {
       it("deletes the tag and returns it", async () => {
         const tag = makeTag({ name: "canary" });
         const repo = makeRepo({
-          tryFindByName: vi.fn().mockResolvedValue(tag),
+          findByName: vi.fn().mockResolvedValue(tag),
           deleteByName: vi.fn().mockResolvedValue(undefined),
         });
         const service = PromptTagService.create(repo);
 
-        const result = await service.tryDeleteByName({
+        const result = await service.deleteByName({
           organizationId,
           name: "canary",
         });

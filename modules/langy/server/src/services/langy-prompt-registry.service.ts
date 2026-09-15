@@ -10,7 +10,7 @@ const logger = createLogger("langwatch:langy:prompt-registry");
 
 /** Narrow technical port over the external Prompt feature. */
 export abstract class LangyPrompt {
-  abstract tryGetPromptByIdOrHandle(input: {
+  abstract findByIdOrHandle(input: {
     idOrHandle: string;
     projectId: string;
     tag: string;
@@ -56,7 +56,7 @@ export class LangyPromptRegistryService {
     const tag = params.tag ?? LANGY_PROMPT_DEFAULT_TAG;
 
     try {
-      const versioned = await this.prompts.tryGetPromptByIdOrHandle({
+      const versioned = await this.prompts.findByIdOrHandle({
         idOrHandle: handle,
         projectId,
         tag,

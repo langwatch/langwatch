@@ -70,7 +70,7 @@ export interface PromptInfrastructure {
    * `LoggedApiPromptNurturing`, before b383462d96).
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
-/** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
+  /** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
   prompts: PromptService;
 }
 
@@ -130,19 +130,6 @@ export class PromptTagMissingError extends NotFoundError {
   constructor(name: string) {
     super("prompt_tag_not_found", "Tag", name, { meta: { name } });
     this.name = "PromptTagMissingError";
-  }
-}
-
-/** The prompt was never copied from anywhere, so there is nothing to sync from. */
-export class PromptNotACopyError extends HandledError {
-  declare readonly code: "prompt_not_a_copy";
-
-  constructor() {
-    super("prompt_not_a_copy", "This prompt is not a copy and has no source to sync from", {
-      httpStatus: 400,
-      fault: "customer",
-    });
-    this.name = "PromptNotACopyError";
   }
 }
 
@@ -304,10 +291,6 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.getAllPrompts(input);
   }
 
-  tryGetPromptByIdOrHandle(input: PromptReference & { organizationId?: string }) {
-    return this.#dependencies.prompts.tryGetPromptByIdOrHandle(input);
-  }
-
   getAllVersions(input: { idOrHandle: string; projectId: string; organizationId?: string }) {
     return this.#dependencies.prompts.getAllVersions(input);
   }
@@ -341,17 +324,29 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.renameTag(input);
   }
 
-  tryDeleteTagByName(input: { organizationId: string; name: string }) {
-    return this.#dependencies.prompts.tryDeleteTagByName(input);
+  /** Deletes a tag definition by name, refusing when the organization has none. */
+  async deleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag> {
+    try {
+      return await this.#dependencies.prompts.deleteTagByName(input);
+    } catch (error) {
+      asHandledTagError(error);
+    }
   }
 
-  /** One prompt, or null when the project has none by that id or handle. */
+  /**
+   * One prompt, or null when the project has none by that id or handle. The
+   * engine refuses in that case; absence is an answer the two callers here ask
+   * for — a browser query that renders "no such prompt", and a re-read after a
+   * write that falls back to what it already holds — so exactly that refusal is
+   * turned back into null and every other error propagates.
+   */
   async findByIdOrHandle(
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt | null> {
     try {
-      return await this.#dependencies.prompts.tryGetPromptByIdOrHandle(input);
+      return await this.#dependencies.prompts.getPromptByIdOrHandle(input);
     } catch (error) {
+      if (error instanceof PromptNotFoundError) return null;
       asHandledTagError(error);
     }
   }
@@ -362,9 +357,11 @@ export class PromptApp implements PromptApi {
   async getByIdOrHandle(
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt> {
-    const prompt = await this.findByIdOrHandle(input);
-    if (!prompt) throw new PromptNotFoundError();
-    return prompt;
+    try {
+      return await this.#dependencies.prompts.getPromptByIdOrHandle(input);
+    } catch (error) {
+      asHandledTagError(error);
+    }
   }
 
   /** Every stored version of one prompt, newest first. */
@@ -450,10 +447,8 @@ export class PromptApp implements PromptApi {
   /**
    * Where this prompt was copied from, refusing when it was not copied at all.
    */
-  async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
-    const source = await this.#dependencies.prompts.tryGetCopySource(input);
-    if (!source) throw new PromptNotACopyError();
-    return source;
+  getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
+    return this.#dependencies.prompts.getCopySource(input);
   }
 
   getNamesByIds(input: { ids: string[]; projectId: string; organizationId: string }) {
@@ -853,17 +848,7 @@ export class PromptApp implements PromptApi {
   /** Deletes a tag definition, cascading to its assignments. */
   async deleteTagForProject(input: { projectId: string; name: string }): Promise<PromptTag> {
     const organizationId = await this.#organizationOf(input.projectId);
-    const deleted = await this.#tryDeleteTag({ organizationId, name: input.name });
-    if (!deleted) throw new PromptTagMissingError(input.name);
-    return deleted;
-  }
-
-  async #tryDeleteTag(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
-    try {
-      return await this.#dependencies.prompts.tryDeleteTagByName(input);
-    } catch (error) {
-      asHandledTagError(error);
-    }
+    return await this.deleteTagByName({ organizationId, name: input.name });
   }
 
   /** Points a tag at one prompt version, attributed to its caller. */

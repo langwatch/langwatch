@@ -364,13 +364,11 @@ export const promptRest = defineRestRouter(PromptApi)
     );
 
     try {
-      const config = await app.tryGetPromptByIdOrHandle({
+      const config = await app.getByIdOrHandle({
         idOrHandle: id,
         projectId: scope.id,
         organizationId: project.organizationId,
       });
-
-      if (!config) throw new HTTPException(404, { message: `Prompt not found: ${id}` });
 
       // The lookup above also matches org-scoped prompts a SIBLING project
       // owns, so the row's own projectId is not the one the credential was
@@ -504,12 +502,10 @@ export const promptRest = defineRestRouter(PromptApi)
     await app.assertMayManageTagCatalog({ projectId: scope.id, by: credential });
 
     try {
-      const tag = await app.tryDeleteTagByName({
+      await app.deleteTagByName({
         organizationId: project.organizationId,
         name: input.tag,
       });
-
-      if (!tag) throw new HTTPException(404, { message: `Tag not found: ${input.tag}` });
 
       logger.info(
         { organizationId: project.organizationId, tagName: input.tag },
@@ -559,7 +555,10 @@ export const promptRest = defineRestRouter(PromptApi)
 
   // Restore (rollback to) a specific version - a new version of a prompt that
   // already exists, i.e. an update of that prompt.
-  .post("/api/prompts/:id{.+?}/versions/:versionId/restore", "postApiPromptsByIdVersionsByVersionIdRestore")
+  .post(
+    "/api/prompts/:id{.+?}/versions/:versionId/restore",
+    "postApiPromptsByIdVersionsByVersionIdRestore",
+  )
   .withParams(idVersionParamsSchema)
   .withPermission("prompts:update")
   .withOutput(promptWireSchema)
@@ -646,15 +645,13 @@ export const promptRest = defineRestRouter(PromptApi)
 
       logger.info({ projectId: scope.id, id: shorthand.slug, version, tag }, "Getting prompt");
 
-      const config = await app.tryGetPromptByIdOrHandle({
+      const config = await app.getByIdOrHandle({
         idOrHandle: shorthand.slug,
         projectId: scope.id,
         organizationId: project.organizationId,
         ...(version === undefined ? {} : { version }),
         ...(tag === undefined ? {} : { tag }),
       });
-
-      if (!config) throw new HTTPException(404, { message: "Prompt not found" });
 
       return {
         ...apiResponsePromptWithVersionDataSchema.parse(config),
@@ -924,7 +921,7 @@ async function assignInitialTags(options: {
 
   logger.info({ promptId: prompt.id, tags }, "Assigned tags to version");
 
-  const refetched = await app.tryGetPromptByIdOrHandle({
+  const refetched = await app.findByIdOrHandle({
     idOrHandle: prompt.id,
     projectId,
     organizationId,

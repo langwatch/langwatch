@@ -51,15 +51,11 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
     const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.tryGetPromptByIdOrHandle({
+    const config = await promptRepository.getPromptByIdOrHandle({
       idOrHandle,
       projectId,
       organizationId,
     });
-
-    if (!config) {
-      throw new NotFoundError("Prompt config not found.");
-    }
 
     // Get all versions
     return await this.prisma.llmPromptConfigVersion.findMany({
@@ -105,7 +101,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
    * Non-throwing variant intended for read-path enrichment (e.g. deciding whether a returned
    * version is "latest") where a missing row is a legitimate case, not an error.
    */
-  async tryFindLatestId(params: {
+  async findLatestId(params: {
     configId: string;
     projectId: string;
     tx?: Prisma.TransactionClient;
@@ -168,15 +164,11 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     const { versionData, organizationId } = params;
     // Verify the config exists
     const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.tryGetConfigByIdOrHandleWithLatestVersion({
+    const config = await promptRepository.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle: versionData.configId,
       projectId: versionData.projectId,
       organizationId,
     });
-
-    if (!config) {
-      throw new NotFoundError("Prompt config not found.");
-    }
 
     // Omit the version field from the validator since auto-incremented by the database
     const validator = getVersionValidator(versionData.schemaVersion).omit({

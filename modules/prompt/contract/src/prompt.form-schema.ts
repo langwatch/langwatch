@@ -60,7 +60,7 @@ export function refinedFormSchemaWithModelLimits(
     maxOutputTokens?: number;
     maxTokens?: number;
   } | null,
-) {
+): typeof baseFormSchema {
   const schema = baseFormSchemaWithModelLimits(modelLimits);
   return withSystemPromptRequired(schema);
 }
@@ -70,7 +70,7 @@ function baseFormSchemaWithModelLimits(
     maxOutputTokens?: number;
     maxTokens?: number;
   } | null,
-) {
+): typeof baseFormSchema {
   if (!modelLimits) {
     return baseFormSchema;
   }
@@ -131,7 +131,7 @@ export const hasNonEmptySystemMessage = (
  * and the dynamic {@link refinedFormSchemaWithModelLimits} so both code
  * paths enforce the same client-side requirement.
  */
-function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T) {
+function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T): T {
   return schema.superRefine((values, ctx) => {
     const messages = (values as { version?: { configData?: { messages?: unknown } } }).version
       ?.configData?.messages;

@@ -63,19 +63,24 @@ export class PromptTagLookupService {
       );
     }
 
-    const versionTag = await this.tagRepository.tryGetByConfigAndTagId({
-      configId: params.configId,
-      tagId,
-      projectId: params.projectId,
-    });
+    // The repository refuses by config id; the name the caller asked under is
+    // only known here, so the refusal is re-raised carrying it.
+    try {
+      const versionTag = await this.tagRepository.getByConfigAndTagId({
+        configId: params.configId,
+        tagId,
+        projectId: params.projectId,
+      });
 
-    if (!versionTag) {
-      throw new NotFoundError(
-        `Tag "${params.tagName}" not found for prompt "${params.idOrHandle}"`,
-      );
+      return versionTag.versionId;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError(
+          `Tag "${params.tagName}" not found for prompt "${params.idOrHandle}"`,
+        );
+      }
+      throw error;
     }
-
-    return versionTag.versionId;
   }
 
   /** Get all tags for a prompt config. */
@@ -162,7 +167,7 @@ export class PromptTagLookupService {
     tagName: string;
     organizationId: string;
   }): Promise<string | null> {
-    const promptTag = await this.promptTagRepository.tryFindByOrgAndName({
+    const promptTag = await this.promptTagRepository.findByOrgAndName({
       organizationId,
       name: tagName,
     });

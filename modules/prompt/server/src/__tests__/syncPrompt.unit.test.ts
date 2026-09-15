@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
+import { getLatestConfigVersionSchema, NotFoundError } from "@langwatch/prompt-contract";
 import type { z } from "zod";
 import { PromptService, type VersionedPrompt } from "../services/prompt.service.ts";
 import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
@@ -72,8 +72,8 @@ describe("PromptService", () => {
       it("returns up_to_date when max_tokens, top_p, and other params match", async () => {
         const existingPrompt = buildExistingPrompt();
 
-        // Spy on tryGetPromptByIdOrHandle to return our prompt with all params
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+        // Spy on getPromptByIdOrHandle to return our prompt with all params
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         // The local config data matches what the server has (in snake_case DB format)
         const localConfigData: SyncConfigData = {
@@ -139,7 +139,7 @@ describe("PromptService", () => {
           verbosity: undefined,
         });
 
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         const localConfigData: SyncConfigData = {
           model: "gpt-4",
@@ -175,7 +175,7 @@ describe("PromptService", () => {
       it("describes the changed fields instead of a generic message", async () => {
         const existingPrompt = buildExistingPrompt();
 
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         const updateSpy = vi
           .spyOn(promptService.writes, "updatePrompt")
@@ -217,7 +217,7 @@ describe("PromptService", () => {
       it("keeps the caller's commit message when one is provided", async () => {
         const existingPrompt = buildExistingPrompt();
 
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         const updateSpy = vi
           .spyOn(promptService.writes, "updatePrompt")
@@ -260,7 +260,7 @@ describe("PromptService", () => {
           parameters: { max_tokens: 500 },
         });
 
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
         const updateSpy = vi
           .spyOn(promptService.writes, "updatePrompt")
@@ -300,7 +300,9 @@ describe("PromptService", () => {
 
     describe("when prompt does not exist and is created", () => {
       it("does not double-transform camelCase params through transformToDbFormat", async () => {
-        vi.spyOn(promptService.reads, "tryGetPromptByIdOrHandle").mockResolvedValue(null);
+        vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockRejectedValue(
+          new NotFoundError("Prompt config not found."),
+        );
 
         const createdPrompt = buildExistingPrompt({ version: 1 });
         const createSpy = vi

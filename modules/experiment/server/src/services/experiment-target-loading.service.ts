@@ -65,7 +65,7 @@ export class ExperimentTargetLoadingService {
         ? ` version ${target.promptVersionNumber}`
         : "";
       try {
-        const prompt = await services.prompts.tryGetPromptByIdOrHandle({
+        const prompt = await services.prompts.findByIdOrHandle({
           idOrHandle: target.promptId,
           projectId,
           version: target.promptVersionNumber ?? undefined,

@@ -6,6 +6,7 @@ import type {
   PromptTag,
   PromptTagAssignment,
 } from "@langwatch/prisma-client/generated";
+import { NotFoundError } from "@langwatch/prompt-contract";
 import {
   PromptTagAssignmentRepository,
   TagValidationError,
@@ -160,10 +161,11 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
   }
 
   /**
-   * Get a tag assignment by config ID and tagId.
+   * Get a tag assignment by config ID and tagId, refusing when the config
+   * carries no version under that tag.
    * Callers must resolve tag name → tagId before calling this method.
    */
-  async tryGetByConfigAndTagId({
+  async getByConfigAndTagId({
     configId,
     tagId,
     projectId,
@@ -171,7 +173,7 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
     configId: string;
     tagId: string;
     projectId: string;
-  }): Promise<PromptTagAssignment | null> {
+  }): Promise<PromptTagAssignment> {
     const result = await this.prisma.promptTagAssignment.findFirst({
       where: {
         configId,
@@ -179,6 +181,10 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
         projectId,
       },
     });
+
+    if (!result) {
+      throw new NotFoundError(`No prompt version carries this tag. Prompt config: ${configId}`);
+    }
 
     logger.info({ configId, tagId }, "Tag lookup completed");
 

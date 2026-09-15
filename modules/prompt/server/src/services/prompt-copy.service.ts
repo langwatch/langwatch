@@ -3,7 +3,6 @@ import {
   handleSchema,
   hoistSystemMessage,
   HandleGenerationError,
-  NotFoundError,
   type PromptScope,
 } from "@langwatch/prompt-contract";
 import { toHandleSlug } from "../rules/prompt-handle-slug.rules.ts";
@@ -46,11 +45,7 @@ export class PromptCopyService {
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, authorId } = params;
 
-    const source = await this.read.tryGetPromptByIdOrHandle({ idOrHandle, projectId });
-
-    if (!source) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
+    const source = await this.read.getPromptByIdOrHandle({ idOrHandle, projectId });
 
     const baseHandle = this.deriveBaseHandle(source);
     const handle = await this.generateUniqueHandle({
@@ -80,14 +75,10 @@ export class PromptCopyService {
   }): Promise<VersionedPrompt & { copiedFromPromptId: string }> {
     const { idOrHandle, sourceProjectId, targetProjectId, authorId } = params;
 
-    const source = await this.read.tryGetPromptByIdOrHandle({
+    const source = await this.read.getPromptByIdOrHandle({
       idOrHandle,
       projectId: sourceProjectId,
     });
-
-    if (!source) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
 
     const baseHandle = this.deriveBaseHandle(source);
     const handle = await this.generateUniqueHandle({

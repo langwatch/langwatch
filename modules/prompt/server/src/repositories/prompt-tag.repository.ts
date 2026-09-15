@@ -23,14 +23,11 @@ export abstract class PromptTagRepository {
 
   abstract findAll(params: { organizationId: string }): Promise<PromptTag[]>;
 
-  abstract tryFindById(params: { id: string; organizationId: string }): Promise<PromptTag | null>;
+  abstract findById(params: { id: string; organizationId: string }): Promise<PromptTag | null>;
 
   abstract delete(params: { id: string; organizationId: string }): Promise<void>;
 
-  abstract tryFindByName(params: {
-    organizationId: string;
-    name: string;
-  }): Promise<PromptTag | null>;
+  abstract findByName(params: { organizationId: string; name: string }): Promise<PromptTag | null>;
 
   abstract deleteByName(params: { organizationId: string; name: string }): Promise<void>;
 
@@ -42,7 +39,7 @@ export abstract class PromptTagRepository {
 
   abstract existsForOrg(params: { tag: string; organizationId: string }): Promise<boolean>;
 
-  abstract tryFindByOrgAndName(params: {
+  abstract findByOrgAndName(params: {
     organizationId: string;
     name: string;
   }): Promise<PromptTag | null>;

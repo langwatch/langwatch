@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { promptConfigDataSchema, type PromptConfigData } from "@langwatch/prompt-contract";
+import {
+  NotFoundError,
+  promptConfigDataSchema,
+  type PromptConfigData,
+} from "@langwatch/prompt-contract";
 import { PromptService, type VersionedPrompt } from "../services/prompt.service.ts";
 import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
 
@@ -58,7 +62,7 @@ describe("PromptService", () => {
             inputs: [{ identifier: "name", type: "str" as const }],
           });
 
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
           compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -106,7 +110,7 @@ describe("PromptService", () => {
             ],
           });
 
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
           compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -147,7 +151,9 @@ describe("PromptService", () => {
       describe("when synced with template variables", () => {
         /** @scenario CLI hardcoded "input" default is kept only when it appears in the template */
         it("creates the prompt with auto-detected inputs merged", async () => {
-          vi.spyOn(promptService, "tryGetPromptByIdOrHandle").mockResolvedValue(null);
+          vi.spyOn(promptService, "getPromptByIdOrHandle").mockRejectedValue(
+            new NotFoundError("Prompt config not found."),
+          );
 
           const createdPrompt = buildExistingPrompt({ version: 1 });
           const createSpy = vi

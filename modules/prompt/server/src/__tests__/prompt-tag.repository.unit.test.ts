@@ -34,7 +34,7 @@ describe("PrismaPromptTagRepository", () => {
         } as unknown as PromptTagDatabase;
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
-        const result = await repo.tryFindByName({
+        const result = await repo.findByName({
           organizationId,
           name: "canary",
         });
@@ -55,7 +55,7 @@ describe("PrismaPromptTagRepository", () => {
         } as unknown as PromptTagDatabase;
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
-        const result = await repo.tryFindByName({
+        const result = await repo.findByName({
           organizationId,
           name: "nonexistent",
         });

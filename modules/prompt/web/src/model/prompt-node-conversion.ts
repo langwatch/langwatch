@@ -40,7 +40,8 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   return {
     configId: formValues.configId,
     handle: formValues.handle,
-    versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
+    versionMetadata:
+      formValues.versionMetadata && versionMetadataToNodeFormat(formValues.versionMetadata),
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
@@ -118,7 +119,8 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
 
   return {
     configId: llmNode.configId,
-    versionMetadata: versionMetadataToFormFormat(llmNode.versionMetadata),
+    versionMetadata:
+      llmNode.versionMetadata && versionMetadataToFormFormat(llmNode.versionMetadata),
     handle: llmNode.handle ?? null,
     scope: scope ?? PromptScope.PROJECT,
     version: {
@@ -472,7 +474,7 @@ export function versionedPromptToOptimizationStudioNodeData(prompt: WireVersione
       versionId: prompt.versionId,
       versionNumber: prompt.version,
       versionCreatedAt: prompt.versionCreatedAt,
-    })!,
+    }),
     inputs: prompt.inputs,
     outputs: prompt.outputs,
     parameters: [

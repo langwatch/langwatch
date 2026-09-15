@@ -96,7 +96,7 @@ describe("prefetchWithFixture", () => {
     };
 
     const promptFetcher: PromptFetcher = {
-      tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
+      findByIdOrHandle: vi.fn().mockResolvedValue(null),
     };
 
     const agentFetcher: AgentFetcher = {
@@ -250,7 +250,7 @@ describe("prefetchWithFixture", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: mockModelParamsProvider,
           });
@@ -269,7 +269,7 @@ describe("prefetchWithFixture", () => {
         it("never calls the agent-under-test resolver", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
           });
 
@@ -313,7 +313,7 @@ describe("prefetchWithFixture", () => {
 
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
             modelParamsProvider: mockModelParamsProvider,
           });
@@ -348,7 +348,7 @@ describe("prefetchWithFixture", () => {
         it("calls the agent-under-test resolver exactly once", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
           });
 
@@ -369,7 +369,7 @@ describe("prefetchWithFixture", () => {
         it("prepares model params exactly three times — agent, simulator, and judge", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutModel),
             },
           });
 
@@ -908,7 +908,7 @@ describe("prefetchWithFixture", () => {
         it("returns failure with prompt not found error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(null),
+              findByIdOrHandle: vi.fn().mockResolvedValue(null),
             },
           });
 
@@ -1074,7 +1074,7 @@ describe("prefetchWithFixture", () => {
         it("returns failure with model params error", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: {
               prepare: vi.fn().mockResolvedValue({
@@ -1118,7 +1118,7 @@ describe("prefetchWithFixture", () => {
       const depsWhoseResolverThrows = (error: unknown) =>
         createMockDeps({
           promptFetcher: {
-            tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutAModel),
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithoutAModel),
           },
           modelResolver: {
             resolve: vi.fn().mockRejectedValue(error),
@@ -1289,7 +1289,7 @@ describe("prefetchWithFixture", () => {
         it("returns success with complete data", async () => {
           const deps = createMockDeps({
             promptFetcher: {
-              tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
           });
 
@@ -2152,7 +2152,7 @@ describe("prefetchWithFixture", () => {
       return createMockDeps({
         scenarioFetcher: { getById: vi.fn().mockResolvedValue(scenario) },
         promptFetcher: {
-          tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
+          findByIdOrHandle: vi.fn().mockResolvedValue({
             id: "prompt_123",
             prompt: "You are helpful",
             messages: [],
@@ -2401,7 +2401,7 @@ describe("prefetchWithFixture", () => {
           }),
         },
         promptFetcher: {
-          tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
+          findByIdOrHandle: vi.fn().mockResolvedValue({
             id: "prompt_123",
             prompt: "You are helpful",
             messages: [],
@@ -2469,7 +2469,7 @@ describe("prefetchWithFixture", () => {
       it("computes no budget and carries none on the job data", async () => {
         const deps = createMockDeps({
           promptFetcher: {
-            tryGetPromptByIdOrHandle: vi.fn().mockResolvedValue({
+            findByIdOrHandle: vi.fn().mockResolvedValue({
               id: "prompt_123",
               prompt: "You are helpful",
               messages: [],

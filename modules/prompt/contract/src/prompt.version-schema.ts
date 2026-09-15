@@ -80,7 +80,7 @@ export const schemaValidators = {
   [SchemaVersion.V1_0]: configSchemaV1_0,
 };
 
-export function getSchemaValidator(version: SchemaVersion | string) {
+export function getSchemaValidator(version: SchemaVersion | string): typeof configSchemaV1_0 {
   const validator = schemaValidators[version as SchemaVersion];
   if (!validator) {
     throw new Error(`Unknown schema version: ${version}`);
@@ -93,11 +93,11 @@ export type LatestConfigVersionSchema = z.infer<typeof configSchemaV1_0>;
 /**
  * Returns the latest schema version for LlmPromptConfigVersion
  */
-export function getLatestConfigVersionSchema() {
+export function getLatestConfigVersionSchema(): typeof configSchemaV1_0 {
   return configSchemaV1_0;
 }
 
-export function getVersionValidator(schemaVersion: SchemaVersion) {
+export function getVersionValidator(schemaVersion: SchemaVersion): typeof configSchemaV1_0 {
   return schemaValidators[schemaVersion];
 }
 

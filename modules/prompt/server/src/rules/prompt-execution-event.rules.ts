@@ -245,6 +245,8 @@ export function buildPromptExecutionEvent({
 }
 
 /** The output fields a run streams, defaulting to the single `output` field. */
-export function outputConfigsFor(formValues: PromptConfigFormValues) {
+export function outputConfigsFor(
+  formValues: PromptConfigFormValues,
+): NonNullable<PromptConfigFormValues["version"]["configData"]["outputs"]> {
   return formValues.version.configData.outputs ?? [{ identifier: "output", type: "str" as const }];
 }

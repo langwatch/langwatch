@@ -329,17 +329,11 @@ export class PromptWriteService {
       organizationId,
     });
 
-    const newPrompt = await this.read.tryGetPromptByIdOrHandle({
+    return await this.read.getPromptByIdOrHandle({
       idOrHandle: newVersion.configId,
       projectId: params.projectId,
       organizationId,
     });
-
-    if (!newPrompt) {
-      throw new Error("Failed to restore version");
-    }
-
-    return newPrompt;
   }
 
   /** Checks if a handle is unique for a project. */

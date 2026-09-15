@@ -4,7 +4,11 @@
  * not the /api/prompts SDK surface, browser-only endpoint.
  */
 import { deferredScope } from "@langwatch/api/access";
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -58,7 +62,7 @@ export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSess
     referer: string | undefined;
   }): boolean;
   /** The live session behind this request, or null when there is none. */
-  resolveSession(request: Request): Promise<TSession | null>;
+  findSession(request: Request): Promise<TSession | null>;
   /** Whether that session holds `prompts:view` on the project. */
   probeProjectPermission(
     session: TSession,
@@ -95,7 +99,7 @@ export const promptExecuteRestMembers = defineRestMiddleware(
 );
 
 /** The handled CODE an error carries, or nothing. */
-function handledCodeOf(error: unknown): string | undefined {
+function findHandledCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
   const code = (error as { code: unknown }).code;
   return typeof code === "string" ? code : undefined;
@@ -253,7 +257,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
       throw new CrossOriginRefusedError();
     }
 
-    const session = await members.resolveSession(request);
+    const session = await members.findSession(request);
     if (!session) {
       throw new PromptPlaygroundSignInRequiredError();
     }
@@ -288,7 +292,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
       // A dataset still normalising is a client precondition, not a fault.
       // Matched on the handled CODE: the dataset feature's own class is in
       // another feature's server package, which this one may not name.
-      if (handledCodeOf(error) === "dataset_not_ready") {
+      if (findHandledCode(error) === "dataset_not_ready") {
         throw error;
       }
       // A node with no model is fixable in the editor, not a server fault.

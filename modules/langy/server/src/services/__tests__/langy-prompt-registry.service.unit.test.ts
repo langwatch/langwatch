@@ -11,9 +11,9 @@ const PROJECT_ID = "project_system";
 
 /** Build a fake LangyPrompt whose read returns whatever `prompt` is passed. */
 function fakePromptPort(
-  tryGetPromptByIdOrHandle: LangyPrompt["tryGetPromptByIdOrHandle"],
+  findByIdOrHandle: LangyPrompt["findByIdOrHandle"],
 ): LangyPrompt {
-  return { tryGetPromptByIdOrHandle };
+  return { findByIdOrHandle };
 }
 
 describe("LangyPromptRegistryService", () => {

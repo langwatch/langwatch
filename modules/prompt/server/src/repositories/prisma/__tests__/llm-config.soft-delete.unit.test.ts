@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
+import {
+  PrismaLlmConfigRepository,
+  type PromptConfigDatabase,
+} from "../prisma.prompt.repository.ts";
 import type { LlmConfigWithLatestVersion } from "../../prompt.repository.ts";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
@@ -29,10 +32,10 @@ describe("PrismaLlmConfigRepository", () => {
         const mockUpdate = vi.fn(() => Promise.resolve({ id: "prompt_1", deletedAt: new Date() }));
         const prisma = makeMockPrisma({ update: mockUpdate });
 
-        // Mock tryGetConfigByIdOrHandleWithLatestVersion to return a config with
+        // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
         // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -70,7 +73,7 @@ describe("PrismaLlmConfigRepository", () => {
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -109,7 +112,7 @@ describe("PrismaLlmConfigRepository", () => {
         });
 
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "tryGetConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",

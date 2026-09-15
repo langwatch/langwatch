@@ -163,10 +163,10 @@ export class PromptService {
     return this.reads.getAllPrompts(input);
   }
 
-  tryGetPromptByIdOrHandle(
-    input: Parameters<PromptReadService["tryGetPromptByIdOrHandle"]>[0],
-  ): ReturnType<PromptReadService["tryGetPromptByIdOrHandle"]> {
-    return this.reads.tryGetPromptByIdOrHandle(input);
+  getPromptByIdOrHandle(
+    input: Parameters<PromptReadService["getPromptByIdOrHandle"]>[0],
+  ): ReturnType<PromptReadService["getPromptByIdOrHandle"]> {
+    return this.reads.getPromptByIdOrHandle(input);
   }
 
   getAllVersions(
@@ -251,8 +251,8 @@ export class PromptService {
     return this.repository.listCopies(input);
   }
 
-  async tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null> {
-    return this.repository.tryGetCopySource(input);
+  async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
+    return this.repository.getCopySource(input);
   }
 
   getNamesByIds(input: {
@@ -295,12 +295,8 @@ export class PromptService {
     return this.tagService.rename(input);
   }
 
-  tryDeleteTag(input: { id: string; organizationId: string }): Promise<PromptTag | null> {
-    return this.tagService.tryDelete(input);
-  }
-
-  tryDeleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
-    return this.tagService.tryDeleteByName(input);
+  deleteTagByName(input: { organizationId: string; name: string }): Promise<PromptTag> {
+    return this.tagService.deleteByName(input);
   }
 
   /** The repository row in the `VersionedPrompt` shape the API and the service layer return. */

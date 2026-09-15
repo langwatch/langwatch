@@ -131,7 +131,7 @@ export class ScenarioTargetPrefetchService {
     projectId: string,
     promptId: string,
   ): Promise<PromptConfigData | null> {
-    const prompt = await this.options.prompts.tryGetPromptByIdOrHandle({
+    const prompt = await this.options.prompts.findByIdOrHandle({
       projectId,
       idOrHandle: promptId,
     });

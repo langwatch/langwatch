@@ -172,7 +172,7 @@ describe.skipIf(!DB_URL)("Feature: Prompt runtime parameters", () => {
         projectId,
       });
 
-      const fetched = await service.tryGetPromptByIdOrHandle({
+      const fetched = await service.getPromptByIdOrHandle({
         idOrHandle: handle,
         projectId,
         organizationId,
@@ -189,7 +189,7 @@ describe.skipIf(!DB_URL)("Feature: Prompt runtime parameters", () => {
     it("returns each version with its own parameters", async () => {
       const handle = `multi-version-${nanoid()}`;
       await createPrompt({ handle, parameters: { schema: "v1" } });
-      const prompt = await service.tryGetPromptByIdOrHandle({
+      const prompt = await service.getPromptByIdOrHandle({
         idOrHandle: handle,
         projectId,
         organizationId,

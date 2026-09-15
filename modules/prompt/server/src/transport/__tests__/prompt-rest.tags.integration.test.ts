@@ -4,11 +4,12 @@
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
 import type { PromptTag } from "@langwatch/prisma-client/generated";
-import type { PromptApi } from "@langwatch/prompt-contract";
+import { PromptTagNotFoundError, type PromptApi } from "@langwatch/prompt-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaPromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import type { PromptTagDatabase } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PromptTagMissingError } from "../../app/prompt.app.ts";
 import { PromptTagService } from "../../services/prompt-tag.service.ts";
 import { mountPromptRest, PROMPT_TEST_ORGANIZATION } from "./prompt-rest.harness.ts";
 
@@ -105,8 +106,16 @@ function buildApi() {
   const app = {
     listTags: (input: { organizationId: string }) => tags.getAll(input),
     createTag: (input: { organizationId: string; name: string }) => tags.create(input),
-    tryDeleteTagByName: (input: { organizationId: string; name: string }) =>
-      tags.tryDeleteByName(input),
+    deleteTagByName: (input: { organizationId: string; name: string }) =>
+      // `PromptApp` re-raises the tag service's plain domain refusals on the
+      // handled channel; the door reads the handled one, so the delegate does
+      // the same mapping rather than letting a plain error reach it.
+      tags.deleteByName(input).catch((error: unknown) => {
+        if (error instanceof PromptTagNotFoundError) {
+          throw new PromptTagMissingError(input.name);
+        }
+        throw error;
+      }),
     assertMayManageTagCatalog: async () => undefined,
   } as unknown as PromptApi;
 
@@ -125,8 +134,7 @@ function buildApi() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       }),
-    deleteTag: (name: string) =>
-      family.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
+    deleteTag: (name: string) => family.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
   };
 }
 

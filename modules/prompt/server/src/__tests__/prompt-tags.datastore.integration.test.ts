@@ -151,7 +151,7 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
   describe("when the tag was deleted and created again before the assignment", () => {
     /** @scenario "Assigning a recreated tag succeeds" */
     it("records the assignment against the recreated tag", async () => {
-      await tags.tryDeleteByName({ organizationId, name: "staging" });
+      await tags.deleteByName({ organizationId, name: "staging" });
       const recreated = await tags.create({ organizationId, name: "staging" });
 
       const assignment = await prompts.assignTag({
@@ -171,7 +171,7 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
       const canary = await tags.create({ organizationId, name: "canary" });
       await prompts.assignTag({ configId, versionId, tag: "canary", projectId });
 
-      await tags.tryDeleteByName({ organizationId, name: "canary" });
+      await tags.deleteByName({ organizationId, name: "canary" });
 
       await expect(
         prisma.promptTagAssignment.findFirst({ where: { tagId: canary.id, projectId } }),
@@ -188,7 +188,7 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
         "canary-lifecycle",
       );
 
-      await tags.tryDeleteByName({ organizationId, name: "canary-lifecycle" });
+      await tags.deleteByName({ organizationId, name: "canary-lifecycle" });
 
       expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).not.toContain(
         "canary-lifecycle",
@@ -204,7 +204,7 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
   describe("when a seeded tag is deleted and created again", () => {
     /** @scenario Delete and recreate a seeded tag */
     it("lists it again and takes an assignment on the new row", async () => {
-      await tags.tryDeleteByName({ organizationId, name: "production" });
+      await tags.deleteByName({ organizationId, name: "production" });
       const recreated = await tags.create({ organizationId, name: "production" });
 
       expect((await tags.getAll({ organizationId })).map((tag) => tag.name)).toContain(

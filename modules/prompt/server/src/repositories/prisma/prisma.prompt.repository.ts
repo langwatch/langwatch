@@ -7,11 +7,12 @@ import type {
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { uniqueConstraintTargets } from "@langwatch/prisma-client";
+import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import {
   SchemaVersion,
   NotFoundError,
   PromptHandleTakenError,
+  PromptNotACopyError,
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
@@ -150,22 +151,27 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     }));
   }
 
-  async tryGetCopySource(input: { promptId: string }): Promise<PromptCopySource | null> {
+  /**
+   * Where this prompt was copied from. Refuses when it was never copied, and
+   * when the prompt it was copied from has since been deleted: both leave the
+   * caller with no source to sync against.
+   */
+  async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
     const prompt = await this.prisma.llmPromptConfig.findUnique({
       where: { id: input.promptId },
       select: { copiedFromPromptId: true },
     });
 
-    if (!prompt?.copiedFromPromptId) return null;
+    if (!prompt?.copiedFromPromptId) throw new PromptNotACopyError();
 
     const source = await this.prisma.llmPromptConfig.findUnique({
       where: { id: prompt.copiedFromPromptId },
       select: { id: true, projectId: true, deletedAt: true },
     });
 
-    return source && !source.deletedAt
-      ? { sourcePromptId: source.id, sourceProjectId: source.projectId }
-      : null;
+    if (!source || source.deletedAt) throw new PromptNotACopyError();
+
+    return { sourcePromptId: source.id, sourceProjectId: source.projectId };
   }
 
   /**
@@ -225,7 +231,8 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     return configs
       .map((config) => {
         try {
-          config.handle = this.tryRemoveHandlePrefixes(config.handle, projectId, organizationId);
+          config.handle =
+            config.handle && this.removeHandlePrefixes(config.handle, projectId, organizationId);
 
           if (!config.versions?.[0]) {
             throw new Error(`Prompt config ${config.id} has no versions.`);
@@ -251,18 +258,19 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }
 
   /**
-   * Get prompt by id or handle
+   * Get prompt by id or handle, refusing when the project and its organization
+   * carry none under that id or handle.
    */
-  async tryGetPromptByIdOrHandle(params: {
+  async getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
     tx?: Prisma.TransactionClient;
-  }): Promise<LlmPromptConfig | null> {
+  }): Promise<LlmPromptConfig> {
     const { idOrHandle, projectId, organizationId, tx } = params;
     const client = tx ?? this.prisma;
 
-    return await client.llmPromptConfig.findFirst({
+    const config = await client.llmPromptConfig.findFirst({
       where: {
         OR: [
           {
@@ -295,18 +303,25 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
         ],
       },
     });
+
+    if (!config) {
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
+    }
+
+    return config;
   }
 
   /**
-   * Get a single LLM config by ID or handle, either at project or organization level
+   * Get a single LLM config by ID or handle, either at project or organization
+   * level, refusing when there is none.
    */
-  async tryGetConfigByIdOrHandleWithLatestVersion(params: {
+  async getConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
     version?: number;
     versionId?: string;
-  }): Promise<LlmConfigWithLatestVersion | null> {
+  }): Promise<LlmConfigWithLatestVersion> {
     const { idOrHandle, projectId, organizationId } = params;
     const where: Prisma.LlmPromptConfigVersionWhereInput = {};
 
@@ -365,7 +380,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     });
 
     if (!config) {
-      return null;
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
     }
 
     // This should never happen, but if it does, we want to know about it
@@ -383,7 +398,8 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       }
     }
 
-    config.handle = this.tryRemoveHandlePrefixes(config.handle, projectId, organizationId);
+    config.handle =
+      config.handle && this.removeHandlePrefixes(config.handle, projectId, organizationId);
 
     try {
       const rawVersion = config.versions[0]!;
@@ -412,9 +428,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     data: Partial<CreateLlmConfigParams>,
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<LlmPromptConfig> {
-    return this.#refusingTakenHandle(() =>
-      this.#writeConfig(idOrHandle, projectId, data, options),
-    );
+    return this.#refusingTakenHandle(() => this.#writeConfig(idOrHandle, projectId, data, options));
   }
 
   updateConfigAndCreateVersion(
@@ -477,16 +491,12 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     }
 
     // Verify the config exists
-    const existingConfig = await this.tryGetPromptByIdOrHandle({
+    const existingConfig = await this.getPromptByIdOrHandle({
       idOrHandle,
       projectId,
       organizationId,
       tx,
     });
-
-    if (!existingConfig) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
 
     // Format handle with organization/project context if provided
     if (data.handle) {
@@ -514,11 +524,9 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     });
 
     // Remove handle prefixes
-    updatedConfig.handle = this.tryRemoveHandlePrefixes(
-      updatedConfig.handle,
-      projectId,
-      existingConfig.organizationId,
-    );
+    updatedConfig.handle =
+      updatedConfig.handle &&
+      this.removeHandlePrefixes(updatedConfig.handle, projectId, existingConfig.organizationId);
 
     return updatedConfig;
   }
@@ -605,15 +613,11 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     projectId: string;
     organizationId: string;
   }): Promise<{ success: boolean }> {
-    const config = await this.tryGetConfigByIdOrHandleWithLatestVersion({
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
     });
-
-    if (!config) {
-      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
-    }
 
     const isProjectMatch = config.projectId === projectId;
     if (!isProjectMatch) {
@@ -624,9 +628,10 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
 
     // Soft-delete: set deletedAt instead of hard-deleting, so existing suite references can
     // still identify the prompt as deleted.
-    const displayName = this.tryRemoveHandlePrefixes(config.handle, projectId, organizationId);
+    const displayName =
+      config.handle && this.removeHandlePrefixes(config.handle, projectId, organizationId);
     const archivedName =
-      config.name && config.name.trim() !== "" ? config.name : (displayName ?? config.name);
+      config.name && config.name.trim() !== "" ? config.name : displayName || config.name;
 
     await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
@@ -736,11 +741,13 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
         data: { updatedAt: new Date() },
       });
 
-      updatedConfig.handle = this.tryRemoveHandlePrefixes(
-        updatedConfig.handle,
-        configData.projectId,
-        configData.organizationId,
-      );
+      updatedConfig.handle =
+        updatedConfig.handle &&
+        this.removeHandlePrefixes(
+          updatedConfig.handle,
+          configData.projectId,
+          configData.organizationId,
+        );
 
       return {
         ...updatedConfig,
@@ -778,15 +785,8 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     return `${args.projectId}/${handle}`;
   }
 
-  tryRemoveHandlePrefixes(
-    handle: string | null,
-    projectId: string,
-    organizationId: string,
-  ): string | null {
-    if (!handle) {
-      return null;
-    }
-
+  /** The handle as the customer wrote it, with the scope prefix storage adds taken back off. */
+  private removeHandlePrefixes(handle: string, projectId: string, organizationId: string): string {
     if (handle.startsWith(`${projectId}/`)) {
       return handle.slice(projectId.length + 1);
     }
@@ -799,33 +799,36 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }
 
   /**
-   * Get a specific version by version number for a config
+   * Get a specific version by version number for a config, refusing when the
+   * config has no version under that number.
    */
-  async tryGetConfigVersionByNumber(params: {
+  async getConfigVersionByNumber(params: {
     idOrHandle: string;
     versionNumber: number;
     projectId: string;
     organizationId: string;
-  }): Promise<LlmPromptConfigVersion | null> {
+  }): Promise<LlmPromptConfigVersion> {
     const { idOrHandle, versionNumber, projectId, organizationId } = params;
 
-    const config = await this.tryGetConfigByIdOrHandleWithLatestVersion({
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
     });
 
-    if (!config) {
-      return null;
-    }
-
-    return this.prisma.llmPromptConfigVersion.findFirst({
+    const version = await this.prisma.llmPromptConfigVersion.findFirst({
       where: {
         configId: config.id,
         projectId,
         version: versionNumber,
       },
     });
+
+    if (!version) {
+      throw new NotFoundError(`Prompt version ${versionNumber} not found for prompt ${idOrHandle}`);
+    }
+
+    return version;
   }
 
   /**
@@ -838,14 +841,21 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }): Promise<{ hasPermission: boolean; reason?: string }> {
     const { idOrHandle, projectId, organizationId } = params;
 
-    const config = await this.tryGetConfigByIdOrHandleWithLatestVersion({
-      idOrHandle,
-      projectId,
-      organizationId,
-    });
-
-    if (!config) {
-      return { hasPermission: true }; // Can create new
+    // A handle nothing is stored under yet is the ordinary case on a create,
+    // so the refusal the lookup raises for it is read as "nothing owns this
+    // name" rather than propagated.
+    let config: LlmConfigWithLatestVersion;
+    try {
+      config = await this.getConfigByIdOrHandleWithLatestVersion({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return { hasPermission: true }; // Can create new
+      }
+      throw error;
     }
 
     // If it's an organization-level prompt but not created by this project
@@ -1038,9 +1048,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     return configs.map((c) => ({
       id: c.id,
       name: c.handle
-        ? (this.tryRemoveHandlePrefixes(c.handle, input.projectId, input.organizationId) ??
-          c.name ??
-          c.id)
+        ? this.removeHandlePrefixes(c.handle, input.projectId, input.organizationId)
         : (c.name ?? c.id),
     }));
   }

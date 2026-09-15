@@ -9,24 +9,24 @@ import { LangyTurnOverrideService } from "../langy-turn-override.service.ts";
 import type { LangyPrompt } from "../langy-prompt-registry.service.ts";
 
 function fakePrompts(
-  tryGetPromptByIdOrHandle: LangyPrompt["tryGetPromptByIdOrHandle"],
+  findByIdOrHandle: LangyPrompt["findByIdOrHandle"],
 ): LangyPrompt {
-  return { tryGetPromptByIdOrHandle };
+  return { findByIdOrHandle };
 }
 
 describe("LangyTurnOverrideService", () => {
   describe("given no prompt project is configured", () => {
     /** @scenario "A turn runs from the in-repo copy when no registry row exists" */
     it("never consults the registry", async () => {
-      const tryGetPromptByIdOrHandle = vi.fn();
+      const findByIdOrHandle = vi.fn();
       const service = LangyTurnOverrideService.create({
-        prompts: fakePrompts(tryGetPromptByIdOrHandle),
+        prompts: fakePrompts(findByIdOrHandle),
         projectId: undefined,
       });
 
       const result = await service.resolve();
 
-      expect(tryGetPromptByIdOrHandle).not.toHaveBeenCalled();
+      expect(findByIdOrHandle).not.toHaveBeenCalled();
       expect(result).toEqual({
         text: LANGY_TURN_OVERRIDE_FALLBACK,
         source: "unconfigured",
@@ -38,14 +38,14 @@ describe("LangyTurnOverrideService", () => {
     /** @scenario "A read failure after a successful read keeps the text already in use" */
     it("reuses the last text it read when a later read fails, not the constant", async () => {
       let readCount = 0;
-      const tryGetPromptByIdOrHandle = vi.fn(async () => {
+      const findByIdOrHandle = vi.fn(async () => {
         readCount += 1;
         if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
         throw new Error("registry down");
       });
 
       const first = LangyTurnOverrideService.create({
-        prompts: fakePrompts(tryGetPromptByIdOrHandle),
+        prompts: fakePrompts(findByIdOrHandle),
         projectId: "project-system",
       });
       expect(await first.resolve()).toEqual({
@@ -54,7 +54,7 @@ describe("LangyTurnOverrideService", () => {
       });
 
       const second = LangyTurnOverrideService.create({
-        prompts: fakePrompts(tryGetPromptByIdOrHandle),
+        prompts: fakePrompts(findByIdOrHandle),
         projectId: "project-system",
       });
       const result = await second.resolve();
@@ -74,7 +74,7 @@ describe("LangyTurnOverrideService", () => {
       // purpose, and a cache that outlives the miss would serve it back on
       // every failure for the rest of the process's life.
       let readCount = 0;
-      const tryGetPromptByIdOrHandle = vi.fn(async () => {
+      const findByIdOrHandle = vi.fn(async () => {
         readCount += 1;
         if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
         if (readCount === 2) return null;
@@ -82,7 +82,7 @@ describe("LangyTurnOverrideService", () => {
       });
       const resolveOnce = () =>
         LangyTurnOverrideService.create({
-          prompts: fakePrompts(tryGetPromptByIdOrHandle),
+          prompts: fakePrompts(findByIdOrHandle),
           projectId: "project-system",
         }).resolve();
 

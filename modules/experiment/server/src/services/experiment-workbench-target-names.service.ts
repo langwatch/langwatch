@@ -127,7 +127,7 @@ const loadPrompts = async ({
   const found = await Promise.all(
     idsOf(targets, "prompt", (t) => t.promptId).map(async (promptId) => ({
       promptId,
-      prompt: await promptService.tryGetPromptByIdOrHandle({
+      prompt: await promptService.findByIdOrHandle({
         idOrHandle: promptId,
         projectId,
       }),

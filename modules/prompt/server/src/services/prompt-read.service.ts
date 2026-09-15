@@ -1,10 +1,6 @@
 /** Everything a caller reads about a prompt: the listing, one prompt, and its version history. */
 import { createLogger } from "@langwatch/observability";
-import {
-  NotFoundError,
-  parseLlmConfigVersion,
-  parseRuntimeParameters,
-} from "@langwatch/prompt-contract";
+import { parseLlmConfigVersion, parseRuntimeParameters } from "@langwatch/prompt-contract";
 import { TagValidationError } from "../repositories/prompt-tag-assignment.repository.ts";
 import type {
   LlmConfigRepository,
@@ -85,10 +81,11 @@ export class PromptReadService {
   }
 
   /**
-   * Gets a prompt by ID or handle. If a handle is provided, it is formatted
-   * with the organization and project context.
+   * Gets a prompt by ID or handle, refusing when the project and its
+   * organization carry none. If a handle is provided, it is formatted with the
+   * organization and project context.
    */
-  async tryGetPromptByIdOrHandle(params: {
+  async getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     version?: number;
@@ -96,7 +93,7 @@ export class PromptReadService {
     versionId?: string;
     /** Optional: fetch the version pointed to by this tag */
     tag?: string;
-  }): Promise<VersionedPrompt | null> {
+  }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId } = params;
 
     this.assertVersionOrTag(params);
@@ -113,15 +110,11 @@ export class PromptReadService {
     // If a tag is provided, resolve it to a versionId
     let resolvedVersionId = params.versionId;
     if (normalizedTag) {
-      const config = await this.repository.tryGetPromptByIdOrHandle({
+      const config = await this.repository.getPromptByIdOrHandle({
         idOrHandle,
         projectId,
         organizationId,
       });
-
-      if (!config) {
-        return null;
-      }
 
       resolvedVersionId = await this.tagLookup.versionIdForTag({
         idOrHandle,
@@ -132,17 +125,13 @@ export class PromptReadService {
       });
     }
 
-    const config = await this.repository.tryGetConfigByIdOrHandleWithLatestVersion({
+    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
       version: params.version,
       versionId: resolvedVersionId,
     });
-
-    if (!config) {
-      return null;
-    }
 
     const currentVersionId = config.latestVersion.id ?? "";
     const latestVersionId = await this.getLatestVersionIdForConfig({
@@ -220,16 +209,11 @@ export class PromptReadService {
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     // Get the config
-    const config = await this.repository.tryGetPromptByIdOrHandle({
+    const config = await this.repository.getPromptByIdOrHandle({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,
       organizationId,
     });
-
-    // If the config doesn't exist, return an empty array
-    if (!config) {
-      throw new NotFoundError("Prompt not found");
-    }
 
     // Get the versions
     const rawVersions = await this.repository.versions.getVersionsForConfigByIdOrHandle({
@@ -276,7 +260,7 @@ export class PromptReadService {
     projectId: string;
   }): Promise<string> {
     return (
-      (await this.repository.versions.tryFindLatestId({
+      (await this.repository.versions.findLatestId({
         configId: params.configId,
         projectId: params.projectId,
       })) ?? ""

@@ -110,19 +110,24 @@ function parseVariablesBlob(raw: unknown): Record<string, string> | null {
     return null;
   }
 
+  // Only the decode is allowed to fail as "this attribute carries no blob";
+  // anything the shaping below raises is a defect and propagates.
+  let decoded: unknown;
   try {
-    const parsed = promptVariablesEnvelopeSchema.safeParse(JSON.parse(raw));
-
-    if (!parsed.success) {
-      return null;
-    }
-
-    return Object.fromEntries(
-      Object.entries(parsed.data.value).map(([key, entry]) => [key, stringifyVariableValue(entry)]),
-    );
+    decoded = JSON.parse(raw);
   } catch {
     return null;
   }
+
+  const parsed = promptVariablesEnvelopeSchema.safeParse(decoded);
+
+  if (!parsed.success) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.entries(parsed.data.value).map(([key, entry]) => [key, stringifyVariableValue(entry)]),
+  );
 }
 
 function stringifyVariableValue(value: unknown): string {

@@ -54,12 +54,13 @@ export abstract class PromptTagAssignmentRepository {
   }): Promise<(PromptTagAssignmentRow & { promptTag: PromptTag })[]>;
 
   /**
-   * Get a tag assignment by config ID and tagId.
+   * Get a tag assignment by config ID and tagId, refusing when the config
+   * carries no version under that tag.
    * Callers must resolve tag name → tagId before calling this method.
    */
-  abstract tryGetByConfigAndTagId(params: {
+  abstract getByConfigAndTagId(params: {
     configId: string;
     tagId: string;
     projectId: string;
-  }): Promise<PromptTagAssignmentRow | null>;
+  }): Promise<PromptTagAssignmentRow>;
 }

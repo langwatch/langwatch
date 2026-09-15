@@ -23,15 +23,11 @@ export type VersionMetadata = z.infer<typeof versionMetadataSchema>;
  *
  * Single Responsibility: Normalize versionCreatedAt field for node data storage
  */
-export function versionMetadataToNodeFormat(metadata: VersionMetadata | undefined):
-  | {
-      versionId: string;
-      versionNumber: number;
-      versionCreatedAt: string;
-    }
-  | undefined {
-  if (!metadata) return undefined;
-
+export function versionMetadataToNodeFormat(metadata: VersionMetadata): {
+  versionId: string;
+  versionNumber: number;
+  versionCreatedAt: string;
+} {
   return {
     versionId: metadata.versionId,
     versionNumber: metadata.versionNumber,
@@ -47,17 +43,11 @@ export function versionMetadataToNodeFormat(metadata: VersionMetadata | undefine
  *
  * Single Responsibility: Normalize versionCreatedAt field for form state
  */
-export function versionMetadataToFormFormat(
-  metadata:
-    | {
-        versionId: string;
-        versionNumber: number;
-        versionCreatedAt: string | Date;
-      }
-    | undefined,
-): VersionMetadata | undefined {
-  if (!metadata) return undefined;
-
+export function versionMetadataToFormFormat(metadata: {
+  versionId: string;
+  versionNumber: number;
+  versionCreatedAt: string | Date;
+}): VersionMetadata {
   return {
     versionId: metadata.versionId,
     versionNumber: metadata.versionNumber,

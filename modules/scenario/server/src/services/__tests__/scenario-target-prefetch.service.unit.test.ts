@@ -21,7 +21,7 @@ type Answers = {
 
 function serviceAnswering(answers: Answers = {}) {
   const prompts = {
-    tryGetPromptByIdOrHandle: async () => answers.prompt ?? null,
+    findByIdOrHandle: async () => answers.prompt ?? null,
   } as unknown as PromptService;
 
   const agents = createApiFixture<AgentApi>({

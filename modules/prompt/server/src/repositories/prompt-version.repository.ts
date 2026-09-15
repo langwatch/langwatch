@@ -55,7 +55,7 @@ export abstract class LlmConfigVersionsRepository {
     projectId: string;
   }): Promise<PromptVersionRow & { author: PromptVersionAuthor | null }>;
 
-  abstract tryFindLatestId(params: { configId: string; projectId: string }): Promise<string | null>;
+  abstract findLatestId(params: { configId: string; projectId: string }): Promise<string | null>;
 
   abstract getLatestVersion(
     configId: string,
