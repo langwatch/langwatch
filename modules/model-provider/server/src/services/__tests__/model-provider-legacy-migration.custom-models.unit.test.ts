@@ -32,8 +32,8 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
   const registryLookup = (provider: string, mode: "chat" | "embedding") => {
     if (provider === "openai" && mode === "chat") {
       return [
-        { value: "gpt-4o", label: "gpt-4o" },
-        { value: "gpt-4o-mini", label: "gpt-4o-mini" },
+        { value: "gpt-5-mini", label: "gpt-5-mini" },
+        { value: "gpt-5-mini", label: "gpt-5-mini" },
       ];
     }
     if (provider === "openai" && mode === "embedding") {
@@ -52,7 +52,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
     it("returns empty arrays", () => {
       const row = buildRow({
         provider: "openai",
-        customModels: ["gpt-4o", "gpt-4o-mini"],
+        customModels: ["gpt-5-mini", "gpt-5-mini"],
         customEmbeddingsModels: ["text-embedding-3-small"],
       });
 
@@ -68,7 +68,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
     it("drops registry models and converts non-registry to CustomModelEntry objects", () => {
       const row = buildRow({
         provider: "openai",
-        customModels: ["gpt-4o", "ft:gpt-4o:my-org:custom:abc123"],
+        customModels: ["gpt-5-mini", "ft:gpt-5-mini:my-org:custom:abc123"],
         customEmbeddingsModels: ["text-embedding-3-small", "my-custom-embedding"],
       });
 
@@ -77,8 +77,8 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
       expect(result).not.toBeNull();
       expect(result!.customModels).toEqual([
         {
-          modelId: "ft:gpt-4o:my-org:custom:abc123",
-          displayName: "ft:gpt-4o:my-org:custom:abc123",
+          modelId: "ft:gpt-5-mini:my-org:custom:abc123",
+          displayName: "ft:gpt-5-mini:my-org:custom:abc123",
           mode: "chat",
           maxTokens: 8192,
           supportedParameters: ["temperature"],
@@ -100,7 +100,7 @@ describe("ModelProviderLegacyMigrationService.migrateCustomModelsRow()", () => {
     it("returns null to indicate no update needed", () => {
       const alreadyMigrated: CustomModelEntry[] = [
         {
-          modelId: "ft:gpt-4o:my-org:custom:abc123",
+          modelId: "ft:gpt-5-mini:my-org:custom:abc123",
           displayName: "My Fine-tune",
           mode: "chat",
           maxTokens: 4096,

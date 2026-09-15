@@ -51,7 +51,7 @@ describe("Trace span-tree contract", () => {
       endTimeMs: 2,
       durationMs: 1,
       status: "ok",
-      model: "gpt-4o",
+      model: "gpt-5-mini",
       toolName: null,
       cost: 0.01,
       inputTokens: 12,

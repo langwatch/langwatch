@@ -36,7 +36,7 @@ const confirmSpendJob = {
   gateway_request_id: "req_unroutable_probe",
   tenantId: "project-unroutable",
   occurred_at: Date.UTC(2026, 6, 1),
-  model: "gpt-4o-mini",
+  model: "gpt-5-mini",
   model_provider_id: "",
   usage: {
     input_tokens: 53,

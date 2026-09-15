@@ -11,7 +11,7 @@ import type {
 
 const localPromptConfig: LocalPromptConfig = {
   llm: {
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5-mini",
     temperature: 0.5,
     maxTokens: 2048,
   },
@@ -39,7 +39,7 @@ function signatureNode(localConfig?: LocalPromptConfig): StudioNode<LlmPromptCon
         {
           identifier: "llm",
           type: "llm",
-          value: { model: "openai/gpt-4o", temperature: 1, max_tokens: 500 },
+          value: { model: "openai/gpt-5-mini", temperature: 1, max_tokens: 500 },
         },
         { identifier: "instructions", type: "str", value: "You are original." },
         {

@@ -110,7 +110,7 @@ function renderRow({
           totalTokens: 5038,
           inputTokens: 4500,
           outputTokens: 538,
-          models: ["openai/gpt-4o"],
+          models: ["openai/gpt-5-mini"],
           timestamp: Date.now() - ONE_HOUR_MS,
           events: events(eventCount),
         })}

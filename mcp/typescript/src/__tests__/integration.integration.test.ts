@@ -68,7 +68,7 @@ const CANNED_PROMPT_DETAIL = {
   version: 3,
   versionId: "ver_p1v3",
   commitMessage: "Updated tone",
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5-mini",
   messages: [{ role: "system", content: "You are a friendly bot." }],
   parameters: {},
   tags: [{ name: "latest", versionId: "ver_p1v3" }],
@@ -210,7 +210,7 @@ describe("MCP tools integration", () => {
       const { handleGetPrompt } = await import("../tools/get-prompt.js");
       const result = await handleGetPrompt({ idOrHandle: "greeting-bot" });
       expect(result).toContain("Greeting Bot");
-      expect(result).toContain("gpt-4o");
+      expect(result).toContain("gpt-5-mini");
       expect(result).toContain("You are a friendly bot.");
       expect(result).toContain("v3");
     });
@@ -222,7 +222,7 @@ describe("MCP tools integration", () => {
       const result = await handleCreatePrompt({
         name: "New Prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
       expect(result).toContain("created successfully");
       expect(result).toContain("p-new");
@@ -234,7 +234,7 @@ describe("MCP tools integration", () => {
       const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting-bot",
-        model: "openai/gpt-4o-mini",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch to mini",
       });
       expect(result).toContain("updated successfully");

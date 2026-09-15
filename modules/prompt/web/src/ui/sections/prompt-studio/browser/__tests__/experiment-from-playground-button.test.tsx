@@ -184,7 +184,7 @@ const createTabData = (
           messages: [{ role: "system", content: "You are helpful" }],
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
-          llm: { model: "openai/gpt-4o" },
+          llm: { model: "openai/gpt-5-mini" },
         },
       },
       ...overrides?.currentValues,
@@ -367,7 +367,7 @@ describe("ExperimentFromPlaygroundButton", () => {
         expect(targets?.[0]?.type).toBe("prompt");
         // Unsaved prompt MUST have localPromptConfig
         expect(targets?.[0]?.localPromptConfig).toBeDefined();
-        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe("openai/gpt-4o");
+        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe("openai/gpt-5-mini");
         expect(targets?.[0]?.localPromptConfig?.messages).toHaveLength(1);
       });
     });

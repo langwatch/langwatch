@@ -133,26 +133,26 @@ describe("<FacetSection /> server-side value search", () => {
         items: [
           ...PRELOADED,
           {
-            value: "openai/gpt-4o-mini",
-            label: "openai/gpt-4o-mini",
+            value: "openai/gpt-5-mini",
+            label: "openai/gpt-5-mini",
             count: 5,
           },
         ],
       });
-      openSearchAndType("gpt-4o");
+      openSearchAndType("gpt-5-mini");
 
       // Server search goes active (debounced) and prefix-misses → empty result…
       await waitFor(() =>
         expect(apiMock.useQuery).toHaveBeenCalledWith(
           expect.objectContaining({
-            prefix: expect.stringContaining("gpt-4o"),
+            prefix: expect.stringContaining("gpt-5-mini"),
           }),
           expect.objectContaining({ enabled: true }),
         ),
       );
       // …yet the client substring filter over the preloaded∪server union still
       // surfaces it.
-      expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
+      expect(await screen.findByText("openai/gpt-5-mini")).toBeInTheDocument();
     });
   });
 

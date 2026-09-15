@@ -1,22 +1,26 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { bannedTestModelNamesRule } from "../../src/index.mjs";
-import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
+import { createFixtureWorkspace, expectFix, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
 
-function report(code, filename) {
-  return runRule(bannedTestModelNamesRule, { code, cwd: workspace.cwd, filename });
+const filename = "modules/agent/server/src/__tests__/agent.unit.test.ts";
+
+function report(code, file = filename) {
+  return runRule(bannedTestModelNamesRule, { code, cwd: workspace.cwd, filename: file });
+}
+
+function fix(code, output, { errors = 1, file = filename } = {}) {
+  expectFix(bannedTestModelNamesRule, { code, cwd: workspace.cwd, errors, filename: file, output });
 }
 
 describe("given a test file", () => {
-  const filename = "modules/agent/server/src/__tests__/agent.unit.test.ts";
-
   describe("when a string literal names gpt-4o", () => {
     /** @scenario "A gpt-4o literal in a test is a failure" */
     it("reports bannedModelName", () => {
-      const found = report('const model = "openai/gpt-4o";', filename);
+      const found = report('const model = "openai/gpt-4o";');
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("bannedModelName");
@@ -27,7 +31,7 @@ describe("given a test file", () => {
   describe("when a string literal names gpt-4o-mini", () => {
     /** @scenario "A gpt-4o-mini literal is reported under its own name" */
     it("reports bannedModelName for gpt-4o-mini, not gpt-4o", () => {
-      const found = report('const model = "gpt-4o-mini";', filename);
+      const found = report('const model = "gpt-4o-mini";');
 
       expect(found).toHaveLength(1);
       expect(found[0].data.name).toBe("gpt-4o-mini");
@@ -50,7 +54,7 @@ describe("given a test file", () => {
   describe("when a string literal names the allowed model", () => {
     /** @scenario "A gpt-5-mini literal is allowed" */
     it("reports nothing", () => {
-      expect(report('const model = "gpt-5-mini";', filename)).toEqual([]);
+      expect(report('const model = "gpt-5-mini";')).toEqual([]);
     });
   });
 
@@ -60,6 +64,83 @@ describe("given a test file", () => {
       expect(
         report('const model = "gpt-4o";', "modules/model-provider/server/src/model-catalog.ts"),
       ).toEqual([]);
+    });
+  });
+
+  describe("when a bare literal names a banned model", () => {
+    /** @scenario "A banned model literal is rewritten to gpt-5-mini" */
+    it("rewrites the literal to gpt-5-mini", () => {
+      fix('const model = "gpt-4o";', 'const model = "gpt-5-mini";');
+    });
+  });
+
+  describe("when the banned name sits inside a longer string", () => {
+    /** @scenario "A banned model name inside a longer string is rewritten in place" */
+    it("replaces only the matched substring", () => {
+      fix(
+        'const note = "model: gpt-4.1-mini, temp 0";',
+        'const note = "model: gpt-5-mini, temp 0";',
+      );
+    });
+  });
+
+  describe("when two different banned names sit in one literal", () => {
+    /** @scenario "Two banned names in one literal are both rewritten" */
+    it("reports and fixes both occurrences", () => {
+      const code = 'const note = "gpt-4o then gpt-4.1-mini";';
+      const found = report(code);
+
+      expect(found).toHaveLength(2);
+      expect(found.map((entry) => entry.data.name)).toEqual(["gpt-4o", "gpt-4.1-mini"]);
+
+      fix(code, 'const note = "gpt-5-mini then gpt-5-mini";', { errors: 2 });
+    });
+  });
+
+  describe("when a template literal quasi names a banned model", () => {
+    /** @scenario "A template literal naming a banned model is rewritten" */
+    it("rewrites the quasi in place", () => {
+      fix("const model = `openai/gpt-4o`;", "const model = `openai/gpt-5-mini`;");
+    });
+  });
+
+  describe("when the banned name sits in a quasi after an interpolation", () => {
+    /** @scenario "A template literal interpolation next to a banned name is left untouched" */
+    it("rewrites only the literal text, not the interpolated expression", () => {
+      fix(
+        "const model = `${provider}/gpt-4o`;",
+        "const model = `${provider}/gpt-5-mini`;",
+      );
+    });
+  });
+
+  describe("when the fixed source is linted again", () => {
+    /** @scenario "The rewritten literal reports nothing" */
+    it("reports nothing", () => {
+      expect(report('const note = "gpt-5-mini then gpt-5-mini";')).toEqual([]);
+      expect(report("const model = `${provider}/gpt-5-mini`;")).toEqual([]);
+    });
+  });
+
+  describe("when the matched text has no word boundary around it", () => {
+    /** @scenario "A model name with no word boundary is left alone" */
+    it("does not report at all", () => {
+      const code = 'const model = "gpt-4omega";';
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when the banned name anchors a regex matching pattern", () => {
+    /** @scenario "A banned model name inside a regex pattern is reported without a rewrite" */
+    it("reports the literal but declines to fix it", () => {
+      const code = 'const cost = { regex: "^(openai\\\\/)?gpt-4o$" };';
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].data.name).toBe("gpt-4o");
+
+      fix(code, null);
     });
   });
 });

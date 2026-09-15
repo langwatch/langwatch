@@ -160,11 +160,11 @@ describe("modelDisplayLabel()", () => {
     describe("when the label is resolved", () => {
       it("falls back to the model id's family part", () => {
         const label = modelDisplayLabel({
-          fullModelId: "openai/gpt-4o-mini",
+          fullModelId: "openai/gpt-5-mini",
           displayNames: { "custom/gpt-5.1": "Ada Prod Model" },
         });
 
-        expect(label).toBe("gpt-4o-mini");
+        expect(label).toBe("gpt-5-mini");
       });
     });
   });
@@ -172,9 +172,9 @@ describe("modelDisplayLabel()", () => {
   describe("given no map at all", () => {
     describe("when the label is resolved", () => {
       it("falls back to the model id's family part", () => {
-        const label = modelDisplayLabel({ fullModelId: "openai/gpt-4o-mini" });
+        const label = modelDisplayLabel({ fullModelId: "openai/gpt-5-mini" });
 
-        expect(label).toBe("gpt-4o-mini");
+        expect(label).toBe("gpt-5-mini");
       });
     });
   });

@@ -26,7 +26,7 @@ function makeLLMSpan(overrides: Partial<LLMSpan> = {}): LLMSpan {
   return {
     ...makeBaseSpan(),
     type: "llm",
-    model: "gpt-4o",
+    model: "gpt-5-mini",
     vendor: "openai",
     ...overrides,
   };
@@ -280,9 +280,9 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
 
   describe("LLM span fields", () => {
     it("maps model to gen_ai.request.model", () => {
-      const span = makeLLMSpan({ model: "gpt-4o" });
+      const span = makeLLMSpan({ model: "gpt-5-mini" });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
-      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-4o");
+      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
     });
 
     it("maps vendor to gen_ai.system", () => {
@@ -481,8 +481,8 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
         parent_id: "parent-span-1",
         trace_id: "trace-abc",
         type: "llm",
-        name: "gpt-4o-call",
-        model: "gpt-4o",
+        name: "gpt-5-mini-call",
+        model: "gpt-5-mini",
         vendor: "openai",
         input: {
           type: "chat_messages",
@@ -514,7 +514,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
 
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
 
-      expect(result.name).toBe("gpt-4o-call");
+      expect(result.name).toBe("gpt-5-mini-call");
       expect(result.kind).toBe(SpanKind.INTERNAL);
       expect(result.spanContext().spanId).toBe("llm-span-1");
       expect(result.spanContext().traceId).toBe("trace-abc");
@@ -524,7 +524,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
       expect(result.duration).toEqual([2, 500_000_000]);
       expect(result.status.code).toBe(SpanStatusCode.OK);
       expect(result.attributes["langwatch.span.type"]).toBe("llm");
-      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-4o");
+      expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
       expect(result.attributes["gen_ai.system"]).toBe("openai");
       expect(result.attributes["gen_ai.request.temperature"]).toBe(0.5);
       expect(result.attributes["gen_ai.request.max_tokens"]).toBe(256);

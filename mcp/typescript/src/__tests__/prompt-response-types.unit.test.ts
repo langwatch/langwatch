@@ -16,7 +16,7 @@ describe("Prompt response type interfaces", () => {
         version: 3,
         versionId: "ver_abc123",
         commitMessage: "Updated tone",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "You are a friendly bot." }],
         prompt: "You are a friendly bot.",
         temperature: 0.7,

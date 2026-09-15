@@ -38,7 +38,7 @@ const spendEvent = (id: string): SpendEvent => ({
     principal_user_id: null,
     end_user_id: null,
     trace_id: `trace_${id}`,
-    model: "gpt-4o-mini",
+    model: "gpt-5-mini",
     model_provider_id: "openai",
     request_type: "chat",
     usage: {
@@ -233,7 +233,7 @@ describe("SpendEventsApiService cursor paging", () => {
         virtualKeyId: "vk_1",
         endUserId: "user_1",
         projectId: "proj_1",
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         status: "error",
       });
 
@@ -241,7 +241,7 @@ describe("SpendEventsApiService cursor paging", () => {
       expect(query.get("virtual_key_id")).toBe("vk_1");
       expect(query.get("end_user_id")).toBe("user_1");
       expect(query.get("project_id")).toBe("proj_1");
-      expect(query.get("model")).toBe("gpt-4o-mini");
+      expect(query.get("model")).toBe("gpt-5-mini");
       expect(query.get("status")).toBe("error");
     });
 

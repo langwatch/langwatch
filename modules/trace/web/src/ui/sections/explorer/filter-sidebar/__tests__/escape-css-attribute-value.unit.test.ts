@@ -13,7 +13,7 @@ describe("escapeCssAttributeValue", () => {
     });
 
     it("preserves hyphens", () => {
-      expect(escape("gpt-4o")).toBe("gpt-4o");
+      expect(escape("gpt-5-mini")).toBe("gpt-5-mini");
     });
   });
 

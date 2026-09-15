@@ -83,7 +83,7 @@ describe("<ModelSelector /> empty state", () => {
       withProviders(
         <ModelSelector
           model="openai/gpt-5.2"
-          options={["openai/gpt-5.2", "openai/gpt-4o-mini"]}
+          options={["openai/gpt-5.2", "openai/gpt-5-mini"]}
           onChange={() => undefined}
           forFeatureLabel="AI search"
         />,

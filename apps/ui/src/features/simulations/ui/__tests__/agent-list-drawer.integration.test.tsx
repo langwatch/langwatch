@@ -56,7 +56,7 @@ const mockAgents = [
     id: "agent-1",
     name: "GPT-4 Assistant",
     type: "signature",
-    config: { model: "openai/gpt-4o" },
+    config: { model: "openai/gpt-5-mini" },
     workflowId: null,
     projectId: "test-project-id",
     archivedAt: null,

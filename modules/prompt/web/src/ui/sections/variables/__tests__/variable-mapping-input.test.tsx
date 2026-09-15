@@ -27,7 +27,7 @@ const mockSources: AvailableSource[] = [
   },
   {
     id: "runner-1",
-    name: "GPT-4o Runner",
+    name: "gpt-5-mini Runner",
     type: "signature",
     fields: [
       { name: "output", type: "str" },
@@ -86,7 +86,7 @@ describe("VariableMappingInput", () => {
       renderComponent({ mapping });
 
       const tag = screen.getByTestId("source-mapping-tag");
-      expect(tag).toHaveTextContent("GPT-4o Runner.output");
+      expect(tag).toHaveTextContent("gpt-5-mini Runner.output");
       expect(tag.textContent).not.toContain("runner-1");
     });
 
@@ -125,7 +125,7 @@ describe("VariableMappingInput", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Test Data")).toBeInTheDocument();
-        expect(screen.getByText("GPT-4o Runner")).toBeInTheDocument();
+        expect(screen.getByText("gpt-5-mini Runner")).toBeInTheDocument();
       });
     });
 

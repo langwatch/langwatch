@@ -60,7 +60,7 @@ function buildLLMSpan(overrides?: Partial<LLMSpan>): LLMSpan {
     trace_id: "trace-1",
     type: "llm",
     name: "LLM",
-    model: "gpt-4o",
+    model: "gpt-5-mini",
     vendor: "openai",
     input: { type: "text", value: "input" },
     output: { type: "text", value: "output" },

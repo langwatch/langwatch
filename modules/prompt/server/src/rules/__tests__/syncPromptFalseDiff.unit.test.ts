@@ -63,7 +63,7 @@ describe("compareConfigContent()", () => {
   ];
 
   const baseConfig = {
-    model: "openai/gpt-4o",
+    model: "openai/gpt-5-mini",
     prompt:
       "Your job is to take make a mapping dictionary...\n{{ dto_schema }}\n{{ example_candidates }}\n{% for col in column_headers %}...{% endfor %}\n",
     messages: [{ role: "user" as const, content: "{{ input }}" }],

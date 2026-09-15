@@ -23,7 +23,7 @@ describe("handleListModelProviders()", () => {
       provider: "openai",
       enabled: true,
       customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-      models: ["gpt-4o", "gpt-4o-mini"],
+      models: ["gpt-5-mini", "gpt-5-mini"],
       embeddingsModels: ["text-embedding-3-small"],
       deploymentMapping: null,
       extraHeaders: [],
@@ -100,7 +100,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -139,7 +139,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: null,
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -148,12 +148,12 @@ describe("handleSetModelProvider()", () => {
       result = await handleSetModelProvider({
         provider: "openai",
         enabled: true,
-        defaultModel: "gpt-4o",
+        defaultModel: "gpt-5-mini",
       });
     });
 
     it("prepends provider prefix in response", () => {
-      expect(result).toContain("**Default Model**: openai/gpt-4o");
+      expect(result).toContain("**Default Model**: openai/gpt-5-mini");
     });
   });
 
@@ -166,7 +166,7 @@ describe("handleSetModelProvider()", () => {
           provider: "openai",
           enabled: true,
           customKeys: null,
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: null,
           deploymentMapping: null,
           extraHeaders: [],
@@ -175,12 +175,12 @@ describe("handleSetModelProvider()", () => {
       result = await handleSetModelProvider({
         provider: "openai",
         enabled: true,
-        defaultModel: "openai/gpt-4o",
+        defaultModel: "openai/gpt-5-mini",
       });
     });
 
     it("keeps the prefix as-is", () => {
-      expect(result).toContain("**Default Model**: openai/gpt-4o");
+      expect(result).toContain("**Default Model**: openai/gpt-5-mini");
       expect(result).not.toContain("openai/openai/");
     });
   });

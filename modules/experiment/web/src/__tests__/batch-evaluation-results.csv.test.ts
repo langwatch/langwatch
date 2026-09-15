@@ -634,7 +634,7 @@ describe("csvExport", () => {
             id: "gpt-3.5",
             name: "GPT-3.5",
             type: "custom",
-            metadata: { model: "openai/gpt-3.5-turbo" },
+            metadata: { model: "openai/gpt-5-mini" },
           },
           {
             id: "claude",

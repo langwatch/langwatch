@@ -143,7 +143,7 @@ describe("StudioWorkflowEventEnricherService", () => {
 
   it("normalizes a node-owned LLM config and adds LiteLLM parameters", async () => {
     const result = await createEnricher().enrich({
-      event: event([llmNode({ model: "openai/gpt-4o", maxTokens: 64 })]),
+      event: event([llmNode({ model: "openai/gpt-5-mini", maxTokens: 64 })]),
       projectId,
     });
     if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
@@ -151,9 +151,9 @@ describe("StudioWorkflowEventEnricherService", () => {
     const node = result.payload.workflow.nodes[0];
     if (!node) throw new Error("expected LLM node");
     expect(node.data.parameters?.[0]?.value).toMatchObject({
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       max_tokens: 64,
-      litellm_params: { model: "openai/gpt-4o" },
+      litellm_params: { model: "openai/gpt-5-mini" },
     });
   });
 
@@ -176,7 +176,7 @@ describe("StudioWorkflowEventEnricherService", () => {
   it("preserves provider configuration failures", async () => {
     await expect(
       createEnricher({ configured: false }).enrich({
-        event: event([llmNode({ model: "openai/gpt-4o" })]),
+        event: event([llmNode({ model: "openai/gpt-5-mini" })]),
         projectId,
       }),
     ).rejects.toThrow("Model provider not configured: openai");

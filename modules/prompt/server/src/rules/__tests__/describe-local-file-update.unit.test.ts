@@ -11,8 +11,8 @@ describe("describeLocalFileUpdate()", () => {
 
   describe("given the sync changed a single field", () => {
     it("names that field in the commit message", () => {
-      expect(describeLocalFileUpdate(["model: gpt-4 → gpt-4o-mini"])).toBe(
-        "Updated from local file (model: gpt-4 → gpt-4o-mini)",
+      expect(describeLocalFileUpdate(["model: gpt-4 → gpt-5-mini"])).toBe(
+        "Updated from local file (model: gpt-4 → gpt-5-mini)",
       );
     });
   });
@@ -21,12 +21,12 @@ describe("describeLocalFileUpdate()", () => {
     it("lists every changed field in the commit message", () => {
       expect(
         describeLocalFileUpdate([
-          "model: gpt-4 → gpt-4o-mini",
+          "model: gpt-4 → gpt-5-mini",
           "temperature: 0.7 → 0.3",
           "prompt content differs",
         ]),
       ).toBe(
-        "Updated from local file (model: gpt-4 → gpt-4o-mini; temperature: 0.7 → 0.3; prompt content differs)",
+        "Updated from local file (model: gpt-4 → gpt-5-mini; temperature: 0.7 → 0.3; prompt content differs)",
       );
     });
   });

@@ -33,7 +33,7 @@ const createMockRunData = (
   const { targetCount = 2, hasScores = true, hasPassRates = true, metadata } = options ?? {};
 
   const defaultMetadata = (i: number) => ({
-    model: i === 0 ? "openai/gpt-4" : "openai/gpt-3.5-turbo",
+    model: i === 0 ? "openai/gpt-4" : "openai/gpt-5-mini",
   });
 
   const targetColumns = Array.from({ length: targetCount }, (_, i) => ({
@@ -979,7 +979,7 @@ describe("ComparisonCharts", () => {
               name: "GPT-3.5",
               type: "custom" as const,
               outputFields: ["output"],
-              metadata: { model: "openai/gpt-3.5-turbo" },
+              metadata: { model: "openai/gpt-5-mini" },
             },
             {
               id: "claude-3",

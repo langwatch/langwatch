@@ -20,8 +20,8 @@ describe("buildModelChangeValues", () => {
     });
 
     it("handles full model paths", () => {
-      const result = buildModelChangeValues("openai/gpt-4.1");
-      expect(result.model).toBe("openai/gpt-4.1");
+      const result = buildModelChangeValues("openai/gpt-5-mini");
+      expect(result.model).toBe("openai/gpt-5-mini");
     });
 
     it("handles empty string model", () => {
@@ -102,7 +102,7 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
       expect(result.maxTokens).toBe(16384);
     });
 
@@ -110,7 +110,7 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
       expect(result.max_tokens).toBe(16384);
     });
 
@@ -124,7 +124,7 @@ describe("buildModelChangeValues", () => {
 
     it("uses contextLength when maxCompletionTokens not available", () => {
       const metadata = { contextLength: 8192 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-4.1", undefined, metadata);
+      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
       expect(result.maxTokens).toBe(8192);
     });
   });
@@ -137,7 +137,7 @@ describe("buildModelChangeValues", () => {
       const newMetadata = {
         maxCompletionTokens: 128000,
       } as ModelMetadataForFrontend;
-      const previousValues = { model: "openai/gpt-4.1", maxTokens: 32768 };
+      const previousValues = { model: "openai/gpt-5-mini", maxTokens: 32768 };
 
       const result = buildModelChangeValues(
         "openai/gpt-5.2",
@@ -160,7 +160,7 @@ describe("buildModelChangeValues", () => {
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
 
       const result = buildModelChangeValues(
-        "openai/gpt-4.1",
+        "openai/gpt-5-mini",
         undefined,
         newMetadata,
         previousValues,
@@ -177,7 +177,7 @@ describe("buildModelChangeValues", () => {
       const newMetadata = {
         maxCompletionTokens: 128000,
       } as ModelMetadataForFrontend;
-      const previousValues = { model: "openai/gpt-4.1", maxTokens: 8000 };
+      const previousValues = { model: "openai/gpt-5-mini", maxTokens: 8000 };
 
       const result = buildModelChangeValues(
         "openai/gpt-5.2",
@@ -200,7 +200,7 @@ describe("buildModelChangeValues", () => {
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 50000 };
 
       const result = buildModelChangeValues(
-        "openai/gpt-4.1",
+        "openai/gpt-5-mini",
         undefined,
         newMetadata,
         previousValues,
@@ -220,7 +220,7 @@ describe("buildModelChangeValues", () => {
       const previousValues = { model: "openai/gpt-5.2", max_tokens: 128000 };
 
       const result = buildModelChangeValues(
-        "openai/gpt-4.1",
+        "openai/gpt-5-mini",
         undefined,
         newMetadata,
         previousValues,
@@ -237,7 +237,7 @@ describe("buildModelChangeValues", () => {
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
 
       const result = buildModelChangeValues(
-        "openai/gpt-4.1",
+        "openai/gpt-5-mini",
         undefined,
         newMetadata,
         previousValues,

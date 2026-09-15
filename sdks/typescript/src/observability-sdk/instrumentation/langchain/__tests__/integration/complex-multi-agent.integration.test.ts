@@ -84,7 +84,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("multi-agent-collaboration", { root: true }, async () => {
       // Create simple research agent
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 is slow
+      const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 }); // gpt-4.1 is slow
       const tools = [
         new DynamicStructuredTool({
           name: "search",
@@ -141,7 +141,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     expect(llmSpans.length).toBeGreaterThan(0);
 
     llmSpans.forEach((span) => {
-      expect(span.name).toContain("openai gpt-4.1");
+      expect(span.name).toContain("openai gpt-5-mini");
       expect(span.attributes["langwatch.span.type"]).toBe("llm");
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
     });
@@ -161,7 +161,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("nested-agent-execution", { root: true }, async () => {
       // Create agent with multiple tools for tool chaining
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 });
       const tools = [
         new DynamicStructuredTool({
           name: "data_collector",
@@ -262,7 +262,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("conversational-flow", { root: true }, async () => {
       // Create conversational agent with context tools
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 });
       const tools = [
         new DynamicStructuredTool({
           name: "memory_store",
@@ -359,7 +359,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("error-recovery-flow", { root: true }, async () => {
       // Create agent with failing and fallback tools
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 });
       const tools = [
         new DynamicStructuredTool({
           name: "primary_tool",
@@ -449,7 +449,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
     await tracer.withActiveSpan("parallel-execution", { root: true }, async () => {
       // Create two simple agents to run in parallel
       const createAgent = (name: string) => {
-        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+        const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 });
         const tools = [
           new DynamicStructuredTool({
             name: `${name}_analysis`,
@@ -538,7 +538,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("data-integrity-validation", { root: true }, async () => {
       // Create a simple agent to test data capture
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
+      const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 1 });
       const tools = [
         new DynamicStructuredTool({
           name: "test_tool",

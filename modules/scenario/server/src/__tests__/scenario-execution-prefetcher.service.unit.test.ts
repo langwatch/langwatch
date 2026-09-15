@@ -1583,7 +1583,7 @@ describe("prefetchWithFixture", () => {
             prepare: vi.fn().mockResolvedValue({
               success: true as const,
               params: {
-                model: "openai/gpt-4o-mini",
+                model: "openai/gpt-5-mini",
                 api_key: hydratedApiKey,
               },
             }),
@@ -1772,7 +1772,7 @@ describe("prefetchWithFixture", () => {
       it("calls prepare exactly twice for two nodes with different models", async () => {
         const prepareFn = vi.fn().mockResolvedValue({
           success: true as const,
-          params: { model: "openai/gpt-4o-mini", api_key: "sk-key-a" },
+          params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
         });
 
         const multiModelDsl = {
@@ -1787,7 +1787,7 @@ describe("prefetchWithFixture", () => {
                   {
                     identifier: "llm",
                     type: "llm",
-                    value: { model: "openai/gpt-4o-mini" },
+                    value: { model: "openai/gpt-5-mini" },
                   },
                 ],
               },
@@ -1801,7 +1801,7 @@ describe("prefetchWithFixture", () => {
                   {
                     identifier: "llm",
                     type: "llm",
-                    value: { model: "azure/gpt-4o-mini" },
+                    value: { model: "azure/gpt-5-mini" },
                   },
                 ],
               },
@@ -1836,10 +1836,10 @@ describe("prefetchWithFixture", () => {
         // so we check the workflow-level prepare calls via the models passed
         const workflowModels = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini");
+          .filter((m) => m === "openai/gpt-5-mini" || m === "azure/gpt-5-mini");
         expect(workflowModels).toHaveLength(2);
-        expect(workflowModels).toContain("openai/gpt-4o-mini");
-        expect(workflowModels).toContain("azure/gpt-4o-mini");
+        expect(workflowModels).toContain("openai/gpt-5-mini");
+        expect(workflowModels).toContain("azure/gpt-5-mini");
 
         // Verify result is successful (both models resolved)
         expect(result.success).toBe(true);
@@ -1848,7 +1848,7 @@ describe("prefetchWithFixture", () => {
       it("calls prepare only once for two nodes sharing the same model", async () => {
         const prepareFn = vi.fn().mockResolvedValue({
           success: true as const,
-          params: { model: "openai/gpt-4o-mini", api_key: "sk-key-a" },
+          params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
         });
 
         const sameModelDsl = {
@@ -1863,7 +1863,7 @@ describe("prefetchWithFixture", () => {
                   {
                     identifier: "llm",
                     type: "llm",
-                    value: { model: "openai/gpt-4o-mini" },
+                    value: { model: "openai/gpt-5-mini" },
                   },
                 ],
               },
@@ -1877,7 +1877,7 @@ describe("prefetchWithFixture", () => {
                   {
                     identifier: "llm",
                     type: "llm",
-                    value: { model: "openai/gpt-4o-mini" },
+                    value: { model: "openai/gpt-5-mini" },
                   },
                 ],
               },
@@ -1910,7 +1910,7 @@ describe("prefetchWithFixture", () => {
         // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
         const workflowModelCalls = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-4o-mini");
+          .filter((m) => m === "openai/gpt-5-mini");
         expect(workflowModelCalls).toHaveLength(1);
       });
     });

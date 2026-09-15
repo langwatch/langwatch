@@ -77,7 +77,7 @@ describe("buildEvaluatorNode", () => {
 
     // Settings are passed from DB (6th parameter)
     const settings = {
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5-mini",
       prompt: "Custom prompt for evaluation",
       max_tokens: 100,
     };
@@ -103,7 +103,7 @@ describe("buildEvaluatorNode", () => {
     expect(parameters.length).toBe(3);
 
     const modelParam = parameters.find((p) => p.identifier === "model");
-    expect(modelParam?.value).toBe("openai/gpt-4o-mini");
+    expect(modelParam?.value).toBe("openai/gpt-5-mini");
 
     const promptParam = parameters.find((p) => p.identifier === "prompt");
     expect(promptParam?.value).toBe("Custom prompt for evaluation");
@@ -177,7 +177,7 @@ describe("buildSignatureNodeFromAgent", () => {
       outputs: [{ identifier: "output", type: "str" }],
       // Top-level LLM config (agent drawer format)
       llm: {
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         temperature: 0.7,
         max_tokens: 1024,
       },
@@ -211,7 +211,7 @@ describe("buildSignatureNodeFromAgent", () => {
           identifier: "llm",
           type: "llm",
           value: {
-            model: "openai/gpt-4o-mini",
+            model: "openai/gpt-5-mini",
             temperature: 0.5,
             max_tokens: 2048,
           },
@@ -284,7 +284,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
     expect(llmParam).toBeDefined();
     expect(llmParam?.value).toEqual({
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       temperature: 0.7,
       max_tokens: 1024,
     });
@@ -331,7 +331,7 @@ describe("buildSignatureNodeFromAgent", () => {
     const llmParam = node.data.parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
     expect(llmParam).toBeDefined();
     expect(llmParam?.value).toEqual({
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5-mini",
       temperature: 0.5,
       max_tokens: 2048,
     });
@@ -615,7 +615,7 @@ describe("buildEvaluatorTargetNode", () => {
             evaluatorType: "langevals/sentiment",
             settings: {
               threshold: 0.8,
-              model: "openai/gpt-4o-mini",
+              model: "openai/gpt-5-mini",
             },
           },
         },
@@ -632,7 +632,7 @@ describe("buildEvaluatorTargetNode", () => {
     expect(thresholdParam?.value).toBe(0.8);
 
     const modelParam = params.find((p) => p.identifier === "model");
-    expect(modelParam?.value).toBe("openai/gpt-4o-mini");
+    expect(modelParam?.value).toBe("openai/gpt-5-mini");
   });
 
   it("has cls set to LangWatchEvaluator", () => {

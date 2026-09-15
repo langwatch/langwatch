@@ -31,7 +31,7 @@ const { mockUseFeatureFlag, EXISTING_PROVIDER } = vi.hoisted(() => ({
     customKeys: { OPENAI_API_KEY: "sk-stored" },
     deploymentMapping: null,
     scopes: [],
-    models: ["openai/gpt-4o"],
+    models: ["openai/gpt-5-mini"],
     embeddingsModels: ["openai/text-embedding-3-small"],
     customModels: [],
     customEmbeddingsModels: [],

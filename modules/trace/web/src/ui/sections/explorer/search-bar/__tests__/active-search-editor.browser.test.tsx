@@ -146,12 +146,12 @@ describe("SearchBar in real Chromium", () => {
       expect(plainText(editor)).toBe("status:error\u00A0");
 
       // Now extend with AND + another tag — single user space is enough.
-      await userEvent.keyboard("AND model:gpt-4o");
+      await userEvent.keyboard("AND model:gpt-5-mini");
 
       const finalText = plainText(editor);
       expect(finalText).toContain("status:error");
       expect(finalText).toContain("AND");
-      expect(finalText).toContain("model:gpt-4o");
+      expect(finalText).toContain("model:gpt-5-mini");
       expect(editor.querySelector(".filter-keyword-and")).toBeTruthy();
       expect(editor.querySelectorAll(".filter-token").length).toBe(2);
     });
@@ -163,7 +163,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error AND model:gpt-4o");
+      await userEvent.keyboard("status:error AND model:gpt-5-mini");
 
       const deleteButtons = editor.querySelectorAll(
         "[data-filter-delete]",
@@ -179,7 +179,7 @@ describe("SearchBar in real Chromium", () => {
       // The surviving tag is `model:gpt-4o`, the AND keyword is gone.
       const survivingTokens = editor.querySelectorAll(".filter-token");
       expect(survivingTokens.length).toBe(1);
-      expect(survivingTokens[0]?.textContent).toBe("model:gpt-4o");
+      expect(survivingTokens[0]?.textContent).toBe("model:gpt-5-mini");
       expect(editor.querySelector(".filter-keyword-and")).toBeNull();
     });
 
@@ -188,7 +188,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error AND model:gpt-4o AND origin:application");
+      await userEvent.keyboard("status:error AND model:gpt-5-mini AND origin:application");
 
       const deleteButtons = editor.querySelectorAll(
         "[data-filter-delete]",
@@ -384,7 +384,7 @@ describe("SearchBar in real Chromium", () => {
       // The exact sequence the user reported: type a tag, press Enter to
       // accept the dropdown match, type a literal space, then `AND`, then
       // continue with another clause.
-      await userEvent.keyboard("status:error[Enter] AND model:gpt-4o");
+      await userEvent.keyboard("status:error[Enter] AND model:gpt-5-mini");
 
       // The query text in the editor is the typed sequence. Trailing-space
       // from the value-accept is collapsed to one space by the parser when
@@ -392,13 +392,13 @@ describe("SearchBar in real Chromium", () => {
       const text = plainText(editor);
       expect(text).toContain("status:error");
       expect(text).toContain("AND");
-      expect(text).toContain("model:gpt-4o");
+      expect(text).toContain("model:gpt-5-mini");
 
       // Two tags, exactly one AND keyword between them — no merged token.
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(2);
       expect(tokens[0]?.textContent).toBe("status:error");
-      expect(tokens[1]?.textContent).toBe("model:gpt-4o");
+      expect(tokens[1]?.textContent).toBe("model:gpt-5-mini");
 
       const andKeywords = editor.querySelectorAll(".filter-keyword-and");
       expect(andKeywords.length).toBe(1);
@@ -587,24 +587,24 @@ describe("SearchBar in real Chromium", () => {
       }
     });
 
-    it("does NOT need extra spaces — finishing `… AND model:gpt-4o` parses cleanly with one space between AND and the next tag", async () => {
+    it("does NOT need extra spaces — finishing `… AND model:gpt-5-mini` parses cleanly with one space between AND and the next tag", async () => {
       renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error[Enter]AND model:gpt-4o");
+      await userEvent.keyboard("status:error[Enter]AND model:gpt-5-mini");
 
       // Final state: two tags + AND between them. No extra spaces required.
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(2);
       expect(tokens[0]?.textContent).toBe("status:error");
-      expect(tokens[1]?.textContent).toBe("model:gpt-4o");
+      expect(tokens[1]?.textContent).toBe("model:gpt-5-mini");
       expect(editor.querySelectorAll(".filter-keyword-and").length).toBe(1);
     });
   });
 
   describe("regression: submit path (Enter on a value not in the static dict) opens a fresh clause", () => {
-    it("after `model:gpt-4o[Enter]`, the next char lands outside the tag instead of gluing onto the value", async () => {
+    it("after `model:gpt-5-mini[Enter]`, the next char lands outside the tag instead of gluing onto the value", async () => {
       renderEditor();
       const editor = getEditor();
 
@@ -614,7 +614,7 @@ describe("SearchBar in real Chromium", () => {
       // Before the submit-path boundary fix this left the caret flush against
       // the value with no separator, so the next keystroke glued on
       // (`model:gpt-4oX`, the reported "cursor stuck inside the chip" bug).
-      await userEvent.keyboard("model:gpt-4o[Enter]");
+      await userEvent.keyboard("model:gpt-5-mini[Enter]");
 
       // The smoking-gun keystroke: it MUST land outside the tag.
       await userEvent.keyboard("X");
@@ -624,8 +624,8 @@ describe("SearchBar in real Chromium", () => {
       // the visible text without embedding a NBSP literal in the source.
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);
-      expect(tokens[0]?.textContent).toBe("model:gpt-4o");
-      expect(plainText(editor).replace(/\s+/g, " ")).toBe("model:gpt-4o X");
+      expect(tokens[0]?.textContent).toBe("model:gpt-5-mini");
+      expect(plainText(editor).replace(/\s+/g, " ")).toBe("model:gpt-5-mini X");
     });
   });
 
@@ -681,7 +681,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error AND model:gpt-4o");
+      await userEvent.keyboard("status:error AND model:gpt-5-mini");
       expect(editor.querySelectorAll(".filter-token").length).toBe(2);
 
       // Walk backwards with Backspace until the editor is empty. Avoids
@@ -702,15 +702,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("stress: typing a value containing a hyphen", () => {
-    it("`model:gpt-4o-mini` is one token even though the value contains hyphens", async () => {
+    it("`model:gpt-5-mini` is one token even though the value contains hyphens", async () => {
       renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("model:gpt-4o-mini");
+      await userEvent.keyboard("model:gpt-5-mini");
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);
-      expect(tokens[0]?.textContent).toBe("model:gpt-4o-mini");
+      expect(tokens[0]?.textContent).toBe("model:gpt-5-mini");
     });
   });
 
@@ -794,7 +794,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error   AND   model:gpt-4o");
+      await userEvent.keyboard("status:error   AND   model:gpt-5-mini");
 
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(2);
@@ -835,7 +835,7 @@ describe("SearchBar in real Chromium", () => {
 
       await userEvent.click(editor);
       await userEvent.keyboard(
-        "status:error AND model:gpt-4o AND origin:application AND service:web AND user:abc",
+        "status:error AND model:gpt-5-mini AND origin:application AND service:web AND user:abc",
       );
 
       const tokens = editor.querySelectorAll(".filter-token");
@@ -845,12 +845,12 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("stress: typing parentheses around an OR group", () => {
-    it("`(status:error OR status:warning) AND model:gpt-4o` decorates parens, OR, and AND separately", async () => {
+    it("`(status:error OR status:warning) AND model:gpt-5-mini` decorates parens, OR, and AND separately", async () => {
       renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("(status:error OR status:warning) AND model:gpt-4o");
+      await userEvent.keyboard("(status:error OR status:warning) AND model:gpt-5-mini");
 
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(3);
@@ -862,12 +862,12 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("stress: NOT prefix interactions", () => {
-    it("`NOT status:error AND model:gpt-4o` decorates NOT + excluded token + AND + tag", async () => {
+    it("`NOT status:error AND model:gpt-5-mini` decorates NOT + excluded token + AND + tag", async () => {
       renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("NOT status:error AND model:gpt-4o");
+      await userEvent.keyboard("NOT status:error AND model:gpt-5-mini");
 
       const notKeyword = editor.querySelector(".filter-keyword-not");
       expect(notKeyword).toBeTruthy();
@@ -899,7 +899,7 @@ describe("SearchBar in real Chromium", () => {
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error AND model:gpt-4o AND origin:application");
+      await userEvent.keyboard("status:error AND model:gpt-5-mini AND origin:application");
 
       const widgets = editor.querySelectorAll("[data-filter-delete]") as NodeListOf<HTMLElement>;
       expect(widgets.length).toBe(3);
@@ -971,12 +971,12 @@ describe("SearchBar in real Chromium", () => {
       expect(gap).toBeLessThanOrEqual(1);
     });
 
-    it("after typing `status:error AND model:gpt-4o`, every token-X pair is flush", async () => {
+    it("after typing `status:error AND model:gpt-5-mini`, every token-X pair is flush", async () => {
       renderEditor();
       const editor = getEditor();
 
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error AND model:gpt-4o");
+      await userEvent.keyboard("status:error AND model:gpt-5-mini");
 
       const tokens = Array.from(editor.querySelectorAll(".filter-token")) as HTMLElement[];
       const deletes = Array.from(editor.querySelectorAll(".filter-token-delete")) as HTMLElement[];

@@ -183,11 +183,11 @@ describe("PromptService", () => {
 
         compareConfigContent.mockReturnValue({
           isEqual: false,
-          differences: ["model: gpt-4 → gpt-4o-mini", "temperature: 0.7 → 0.3"],
+          differences: ["model: gpt-4 → gpt-5-mini", "temperature: 0.7 → 0.3"],
         });
 
         const localConfigData: SyncConfigData = {
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
           inputs: [{ identifier: "input", type: "str" }],
@@ -208,7 +208,7 @@ describe("PromptService", () => {
           expect.objectContaining({
             data: expect.objectContaining({
               commitMessage:
-                "Updated from local file (model: gpt-4 → gpt-4o-mini; temperature: 0.7 → 0.3)",
+                "Updated from local file (model: gpt-4 → gpt-5-mini; temperature: 0.7 → 0.3)",
             }),
           }),
         );
@@ -225,11 +225,11 @@ describe("PromptService", () => {
 
         compareConfigContent.mockReturnValue({
           isEqual: false,
-          differences: ["model: gpt-4 → gpt-4o-mini"],
+          differences: ["model: gpt-4 → gpt-5-mini"],
         });
 
         const localConfigData: SyncConfigData = {
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           prompt: "You are a helpful assistant",
           messages: [{ role: "user" as const, content: "Hello {{input}}" }],
           inputs: [{ identifier: "input", type: "str" }],

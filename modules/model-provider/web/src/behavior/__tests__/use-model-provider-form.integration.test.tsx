@@ -482,8 +482,8 @@ describe("useModelProviderForm()", () => {
 
   describe("Custom Models", () => {
     const chatModelEntry: CustomModelEntry = {
-      modelId: "ft:gpt-4o:my-org",
-      displayName: "My Fine-Tuned GPT-4o",
+      modelId: "ft:gpt-5-mini:my-org",
+      displayName: "My Fine-Tuned gpt-5-mini",
       mode: "chat",
       maxTokens: 4096,
       supportedParameters: ["temperature", "top_p"],
@@ -572,7 +572,7 @@ describe("useModelProviderForm()", () => {
         });
 
         expect(result.current[0].customModels).toHaveLength(1);
-        expect(result.current[0].customModels[0]!.displayName).toBe("My Fine-Tuned GPT-4o");
+        expect(result.current[0].customModels[0]!.displayName).toBe("My Fine-Tuned gpt-5-mini");
       });
     });
 
@@ -846,7 +846,7 @@ describe("useModelProviderForm()", () => {
         provider: "azure",
         enabled: false,
         customKeys: null,
-        models: ["gpt-4o"],
+        models: ["gpt-5-mini"],
         embeddingsModels: null,
         disabledByDefault: true,
         deploymentMapping: null,

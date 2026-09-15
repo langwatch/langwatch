@@ -33,7 +33,7 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
         topValues: [
           { value: "checkout", count: 50 },
           { value: "billing", count: 40 },
-          { value: "openai/gpt-4o-mini", count: 5 },
+          { value: "openai/gpt-5-mini", count: 5 },
         ],
       },
     ],
@@ -146,21 +146,21 @@ describe("<TokenValuePicker /> server-side search", () => {
         );
 
         const input = screen.getByPlaceholderText(/Filter service values/i);
-        fireEvent.change(input, { target: { value: "gpt-4o" } });
+        fireEvent.change(input, { target: { value: "gpt-5-mini" } });
 
         // Server search goes active (debounced) and prefix-misses → empty result…
         await waitFor(() =>
           expect(apiMock.useQuery).toHaveBeenCalledWith(
             expect.objectContaining({
               facetKey: "service",
-              prefix: expect.stringContaining("gpt-4o"),
+              prefix: expect.stringContaining("gpt-5-mini"),
             }),
             expect.objectContaining({ enabled: true }),
           ),
         );
         // …yet the preloaded value, a substring match over the preloaded∪server
         // union, is still shown. Under a replace-regression it would vanish.
-        expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
+        expect(await screen.findByText("openai/gpt-5-mini")).toBeInTheDocument();
       });
     });
   });

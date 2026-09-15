@@ -279,7 +279,7 @@ describe("transformBatchEvaluationData", () => {
         runId: "run-1",
         projectId: "proj-1",
         targets: [
-          { id: "target-1", name: "GPT-4o", type: "prompt", model: "gpt-4o" },
+          { id: "target-1", name: "gpt-5-mini", type: "prompt", model: "gpt-5-mini" },
           { id: "target-2", name: "Claude", type: "prompt", model: "claude-3" },
         ],
         dataset: [
@@ -310,7 +310,7 @@ describe("transformBatchEvaluationData", () => {
 
       // Should have 2 target columns
       expect(result.targetColumns).toHaveLength(2);
-      expect(result.targetColumns[0]?.name).toBe("GPT-4o");
+      expect(result.targetColumns[0]?.name).toBe("gpt-5-mini");
       expect(result.targetColumns[0]?.type).toBe("prompt");
       expect(result.targetColumns[1]?.name).toBe("Claude");
 
@@ -338,7 +338,7 @@ describe("transformBatchEvaluationData", () => {
         experimentId: "exp-1",
         runId: "run-1",
         projectId: "proj-1",
-        targets: [{ id: "target-1", name: "GPT-4o", type: "prompt" }],
+        targets: [{ id: "target-1", name: "gpt-5-mini", type: "prompt" }],
         dataset: [
           {
             index: 0,
@@ -428,7 +428,7 @@ describe("transformBatchEvaluationData", () => {
             type: "prompt",
             promptId: "prompt-config-123",
             promptVersion: 5,
-            model: "gpt-4o",
+            model: "gpt-5-mini",
           },
         ],
         dataset: [
@@ -447,7 +447,7 @@ describe("transformBatchEvaluationData", () => {
 
       expect(result.targetColumns[0]?.promptId).toBe("prompt-config-123");
       expect(result.targetColumns[0]?.promptVersion).toBe(5);
-      expect(result.targetColumns[0]?.model).toBe("gpt-4o");
+      expect(result.targetColumns[0]?.model).toBe("gpt-5-mini");
     });
   });
 
@@ -884,7 +884,7 @@ describe("transformBatchEvaluationData", () => {
             id: "gpt-3.5",
             name: "GPT-3.5",
             type: "custom",
-            metadata: { model: "openai/gpt-3.5-turbo" },
+            metadata: { model: "openai/gpt-5-mini" },
           },
           {
             id: "claude-3",

@@ -9,9 +9,9 @@ describe("Prompt contract", () => {
         messages: [],
         inputs: [{ identifier: "name", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       }).model,
-    ).toBe("openai/gpt-4o");
+    ).toBe("openai/gpt-5-mini");
   });
 
   /** @scenario invalid handles are rejected at the contract boundary */

@@ -16,7 +16,7 @@ const traces: TraceSearchItem[] = [
     serviceName: "gateway",
     input: "How do I reset my password?",
     output: "Use the reset link.",
-    models: ["gpt-4.1"],
+    models: ["gpt-5-mini"],
     evaluations: [{ evaluatorName: "Helpful", label: "pass" }],
     events: { groups: [{ name: "ticket.created" }] },
   },

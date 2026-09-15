@@ -40,7 +40,7 @@ describe("dynamic attribute prefix translation", () => {
 
   describe("span.attribute.<key>", () => {
     it("answers via a partition-pruned subquery on stored_spans", () => {
-      const result = translate("span.attribute.gen_ai.request.model:gpt-4o");
+      const result = translate("span.attribute.gen_ai.request.model:gpt-5-mini");
       expect(result).not.toBeNull();
       expect(result!.sql).toContain("FROM stored_spans");
       expect(result!.sql).toContain("SpanAttributes[{");
@@ -108,7 +108,7 @@ describe("dynamic attribute prefix translation", () => {
   describe("combined", () => {
     it("composes namespaced prefixes through AND/OR", () => {
       const result = translate(
-        "trace.attribute.langwatch.user.id:u-1 AND span.attribute.gen_ai.request.model:gpt-4o",
+        "trace.attribute.langwatch.user.id:u-1 AND span.attribute.gen_ai.request.model:gpt-5-mini",
       );
       expect(result).not.toBeNull();
       expect(result!.sql).toContain(" AND ");
@@ -117,7 +117,7 @@ describe("dynamic attribute prefix translation", () => {
     });
 
     it("negates a span-attribute filter via NOT", () => {
-      const result = translate("NOT span.attribute.gen_ai.request.model:gpt-3.5-turbo");
+      const result = translate("NOT span.attribute.gen_ai.request.model:gpt-5-mini");
       expect(result).not.toBeNull();
       expect(result!.sql).toContain("NOT");
     });

@@ -315,7 +315,7 @@ describe("isNodeDataEqual", () => {
     };
     const node2: NodeData = {
       ...baseNodeData,
-      parameters: [{ identifier: "llm", type: "llm", value: { model: "gpt-3.5-turbo" } }],
+      parameters: [{ identifier: "llm", type: "llm", value: { model: "gpt-5-mini" } }],
     };
     expect(isNodeDataEqual(node1, node2)).toBe(false);
   });

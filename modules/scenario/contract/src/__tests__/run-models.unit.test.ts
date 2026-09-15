@@ -25,7 +25,7 @@ describe("the models a run resolves", () => {
 
       const models = await resolveRunModels({
         plan: { simulatorModel: "openai/gpt-5-mini" },
-        scenario: { simulatorModel: "openai/gpt-4o-mini" },
+        scenario: { simulatorModel: "openai/gpt-5-mini" },
         resolveFeatureModel,
       });
 

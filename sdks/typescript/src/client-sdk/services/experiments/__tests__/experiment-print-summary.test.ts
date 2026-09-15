@@ -154,8 +154,8 @@ describe("Experiment.printSummary", () => {
       // simulating an explicit log() call outside a withTarget() block.
       const exp = buildExperimentFixture({
         evaluations: [
-          evaluation({ passed: true, target_id: "gpt-4o" }),
-          evaluation({ passed: false, target_id: "gpt-4o", index: 1 }),
+          evaluation({ passed: true, target_id: "gpt-5-mini" }),
+          evaluation({ passed: false, target_id: "gpt-5-mini", index: 1 }),
         ],
         entries: [{ index: 0, entry: null, duration: 100, error: null, trace_id: "t1" }],
       });
@@ -163,7 +163,7 @@ describe("Experiment.printSummary", () => {
       exp.printSummary(false);
 
       const out = output();
-      expect(out).toContain("gpt-4o");
+      expect(out).toContain("gpt-5-mini");
       expect(out).toContain("1 passed, 1 failed");
     });
   });
@@ -228,8 +228,8 @@ describe("Experiment.printSummary", () => {
     it("sums evaluator costs into totalCost and per-target cost", () => {
       const exp = buildExperimentFixture({
         evaluations: [
-          evaluation({ passed: true, cost: 0.0012, target_id: "gpt-4o" }),
-          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-4o", index: 1 }),
+          evaluation({ passed: true, cost: 0.0012, target_id: "gpt-5-mini" }),
+          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-5-mini", index: 1 }),
         ],
       });
 

@@ -789,7 +789,7 @@ describe("MastraCanonicaliserService", () => {
         {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           "mastra.metadata.modelMetadata": JSON.stringify({
-            modelId: "gpt-4o",
+            modelId: "gpt-5-mini",
             modelVersion: "2024-08-06",
             modelProvider: "openai",
           }),
@@ -799,8 +799,8 @@ describe("MastraCanonicaliserService", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("gpt-4o");
-      expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_MODEL]).toBe("gpt-4o");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MODEL]).toBe("gpt-5-mini");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_RESPONSE_MODEL]).toBe("gpt-5-mini");
     });
 
     it("prefers body.model over modelMetadata", () => {
@@ -815,7 +815,7 @@ describe("MastraCanonicaliserService", () => {
           [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_step",
           [ATTR_KEYS.MASTRA_MODEL_STEP_INPUT]: input,
           "mastra.metadata.modelMetadata": JSON.stringify({
-            modelId: "gpt-4o",
+            modelId: "gpt-5-mini",
           }),
         },
         mastraScope,

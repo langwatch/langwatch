@@ -31,7 +31,7 @@ const createTestData = (overrides: Partial<BatchEvaluationData> = {}): BatchEval
   targetColumns: [
     {
       id: "target-1",
-      name: "GPT-4o",
+      name: "gpt-5-mini",
       type: "prompt",
       outputFields: ["response"],
     },
@@ -145,7 +145,7 @@ describe("BatchEvaluationResultsTable", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
     });
   });
 
@@ -289,7 +289,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders columns for each target", () => {
       const data = createTestData({
         targetColumns: [
-          { id: "target-1", name: "GPT-4o", type: "prompt", outputFields: [] },
+          { id: "target-1", name: "gpt-5-mini", type: "prompt", outputFields: [] },
           { id: "target-2", name: "Claude", type: "prompt", outputFields: [] },
         ],
         rows: [
@@ -324,7 +324,7 @@ describe("BatchEvaluationResultsTable", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
       expect(screen.getByText("Claude")).toBeInTheDocument();
       expect(screen.getByText(/Hi from GPT/)).toBeInTheDocument();
       expect(screen.getByText(/Hi from Claude/)).toBeInTheDocument();
@@ -479,7 +479,7 @@ describe("BatchEvaluationResultsTable", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.queryByText("gpt-5-mini")).not.toBeInTheDocument();
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
     });
   });
@@ -548,7 +548,7 @@ describe("BatchEvaluationResultsTable", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.queryByText("gpt-5-mini")).not.toBeInTheDocument();
       expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
     });
   });

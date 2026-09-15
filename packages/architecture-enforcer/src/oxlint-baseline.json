@@ -3,66 +3,6 @@
   "policy": "oxlint",
   "entries": [
     {
-      "key": "banned-test-model-names|apps/ui/src/features/simulations/ui/__tests__/agent-list-drawer.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|apps/worker/src/app/__tests__/worker-trace-processing-pipeline.composition.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/all-tools.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/integration.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/langwatch-api.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/model-provider-tools.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/prompt-response-types.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|mcp/typescript/src/__tests__/tools.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/automation/web/src/features/authoring/__tests__/condition-query.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/automation/web/src/features/authoring/__tests__/draft-reducer.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/experiment/web/src/__tests__/batch-evaluation-results.csv.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/experiment/web/src/__tests__/batch-evaluation-results.types.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/experiment/web/src/ui/sections/batch-results/__tests__/batch-evaluation-results-table.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/experiment/web/src/ui/sections/batch-results/__tests__/comparison-charts.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/experiment/web/src/ui/sections/batch-results/__tests__/win-rate-chart.test.tsx",
       "measured": "2026-09-15"
     },
@@ -72,10 +12,6 @@
     },
     {
       "key": "banned-test-model-names|modules/gateway/web/src/features/routing-policies/__tests__/routing-policy-form.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/contract/src/__tests__/custom-model-display-names.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -99,15 +35,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/model-provider/server/src/__tests__/model-provider-scope-and-multi-instance.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/model-provider/server/src/rules/__tests__/catalog-price-audit.rules.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/server/src/rules/__tests__/legacy-model-provider.execution-shape.rules.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -123,30 +51,6 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/model-provider/server/src/services/__tests__/model-provider-legacy-migration.custom-models.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/server/src/services/__tests__/model-provider.service.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/web/src/behavior/__tests__/use-model-provider-form.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/web/src/behavior/__tests__/use-provider-form-submit.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/web/src/ui/elements/__tests__/model-chip.display-name.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/model-provider/web/src/ui/elements/__tests__/no-models-configured-callout.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/model-provider/web/src/ui/elements/__tests__/provider-model-selector.display-name.integration.test.tsx",
       "measured": "2026-09-15"
     },
@@ -155,51 +59,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/model-provider/web/src/ui/sections/__tests__/model-provider-form.advanced-gateway.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/contract/src/__tests__/prompt-contract.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/prompt/contract/src/__tests__/reasoningBoundary.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/server/src/__tests__/prompt.service.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/server/src/__tests__/syncPrompt.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/server/src/rules/__tests__/describe-local-file-update.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/server/src/rules/__tests__/syncPromptFalseDiff.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/behavior/prompts/__tests__/use-prompt-config-form.dirty-baseline.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/model/prompt-form/__tests__/node-data-comparison.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/llm-parameters/__tests__/max-tokens.utils.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/llm-parameters/__tests__/parameter-config.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/prompt-studio/browser/__tests__/experiment-from-playground-button.test.tsx",
       "measured": "2026-09-15"
     },
     {
@@ -207,71 +67,11 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/prompt-studio/fields/__tests__/runtime-parameters-field.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/variables/__tests__/variable-insert-menu.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/prompt/web/src/ui/sections/variables/__tests__/variable-mapping-input.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/scenario/contract/src/__tests__/run-models.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/scenario/contract/src/__tests__/run-parameters.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/scenario/server/src/__tests__/scenario-execution-prefetcher.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/contract/src/__tests__/trace.contract.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/repositories/clickhouse/__tests__/trace-query-dynamic-prefixes.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/repositories/clickhouse/__tests__/trace-query-evaluation-parity.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/canonicalisers/otel/__tests__/mastra.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/trace/server/src/services/projection/__tests__/trace-projection-collaborators.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/projection/__tests__/trace-projection-lean.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/query/__tests__/trace-export-csv.rules.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/query/__tests__/trace-export-json.rules.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/query/__tests__/trace-export.service.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/read/__tests__/trace-mapping.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/server/src/services/read/__tests__/trace-readable-span.service.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -283,14 +83,6 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/trace/web/src/behavior/__tests__/filter.store.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/behavior/explorer/filter-sidebar/__tests__/facet-section.server-search.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/trace/web/src/behavior/explorer/search-bar/__tests__/filter-highlight.unit.test.ts",
       "measured": "2026-09-15"
     },
@@ -299,87 +91,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/__tests__/find-search-index.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "banned-test-model-names|modules/trace/web/src/ui/sections/__tests__/get-suggestion-state.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/__tests__/handle-key.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/explorer/filter-sidebar/__tests__/escape-css-attribute-value.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/explorer/search-bar/__tests__/active-search-editor.browser.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/explorer/search-bar/__tests__/token-value-picker.server-search.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/__tests__/chat-turn-row.separator.integration.test.tsx",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/__tests__/utils.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/workflow/contract/src/__tests__/merge-local-configs.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/workflow/contract/src/__tests__/workflow-llm-config.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/workflow/server/src/services/__tests__/studio-dataset-materializer.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|modules/workflow/server/src/services/__tests__/studio-workflow-event-enricher.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|packages/eventing/src/__tests__/runtime/eventSourcing.unroutableJob.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/cli/commands/__tests__/push.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment-print-summary.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/client-sdk/services/spend-events/__tests__/spend-events-api.paging.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/observability-sdk/__tests__/e2e/metadata-and-labels.e2e.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/observability-sdk/instrumentation/langchain/__tests__/integration/complex-multi-agent.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/observability-sdk/instrumentation/langchain/__tests__/langchain.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/observability-sdk/span/__tests__/integration/span.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "banned-test-model-names|sdks/typescript/src/observability-sdk/span/__tests__/span.unit.test.ts",
       "measured": "2026-09-15"
     },
     {

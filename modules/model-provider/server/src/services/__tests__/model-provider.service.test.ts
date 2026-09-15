@@ -1319,16 +1319,16 @@ describe("ModelProviderService", () => {
     await expect(
       modelProviders.prepareExecution({
         projectId: "project_1",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       }),
     ).resolves.toEqual({
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       api_key: "stored-openai-key",
       api_base: "https://models.example.test/v1",
     });
     expect(managed.input).toMatchObject({
       projectId: "project_1",
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       provider: "openai",
     });
   });
@@ -1676,7 +1676,7 @@ describe("ModelProviderService", () => {
     class SingleModelCatalog extends Catalog {
       metadata() {
         return {
-          models: ["gpt-4o"],
+          models: ["gpt-5-mini"],
           embeddingsModels: ["text-embedding-3-small"],
         };
       }
@@ -1689,7 +1689,7 @@ describe("ModelProviderService", () => {
     ).resolves.toMatchObject({
       openai: {
         customKeys: { apiKey: "secret" },
-        models: ["gpt-4o"],
+        models: ["gpt-5-mini"],
         embeddingsModels: ["text-embedding-3-small"],
         isSystem: false,
       },
@@ -2177,7 +2177,7 @@ describe("ModelProviderService", () => {
     providers.rows = [
       provider({
         id: "chat-row",
-        customModels: [{ id: "gpt-4o", label: "Chat", type: "chat" }],
+        customModels: [{ id: "gpt-5-mini", label: "Chat", type: "chat" }],
       }),
       provider({
         id: "embedding-row",

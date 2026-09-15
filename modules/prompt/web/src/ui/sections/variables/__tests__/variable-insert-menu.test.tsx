@@ -21,7 +21,7 @@ const mockSources: AvailableSource[] = [
   },
   {
     id: "runner-1",
-    name: "GPT-4o Runner",
+    name: "gpt-5-mini Runner",
     type: "signature",
     fields: [
       { name: "output", type: "str" },
@@ -69,7 +69,7 @@ describe("VariableInsertMenu", () => {
     it("shows all sources grouped by name", () => {
       renderComponent();
       expect(screen.getByText("Test Data")).toBeInTheDocument();
-      expect(screen.getByText("GPT-4o Runner")).toBeInTheDocument();
+      expect(screen.getByText("gpt-5-mini Runner")).toBeInTheDocument();
     });
 
     it("shows all fields from sources", () => {
@@ -156,7 +156,7 @@ describe("VariableInsertMenu", () => {
 
       expect(onSelect).toHaveBeenCalledWith({
         sourceId: "runner-1",
-        sourceName: "GPT-4o Runner",
+        sourceName: "gpt-5-mini Runner",
         sourceType: "signature",
         fieldName: "parsed_result",
         fieldType: "dict",

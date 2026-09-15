@@ -1021,12 +1021,12 @@ describe("Helper Functions", () => {
         setAttribute: vi.fn(),
       } as any;
 
-      const metadata = { kwargs: { model: "gpt-3.5-turbo" } };
+      const metadata = { kwargs: { model: "gpt-5-mini" } };
       const extraParams = { kwargs: { temperature: 0.5 } };
 
       applyGenAIAttrs(span, metadata, extraParams);
 
-      expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.model", "gpt-3.5-turbo");
+      expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.model", "gpt-5-mini");
       expect(span.setAttribute).toHaveBeenCalledWith("gen_ai.request.temperature", 0.5);
     });
   });

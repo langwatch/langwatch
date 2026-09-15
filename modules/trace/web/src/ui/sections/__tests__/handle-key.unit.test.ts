@@ -109,7 +109,7 @@ describe("handleKey", () => {
       it("uses the suggestion's tokenStart so only the active token is replaced", () => {
         const action = handleKey(
           ctx({
-            text: "@model:gpt-4o AND @stat",
+            text: "@model:gpt-5-mini AND @stat",
             cursorPos: 23,
             suggestion: {
               open: true,
@@ -333,7 +333,7 @@ describe("handleKey", () => {
       it("only replaces the token range, leaving surrounding text intact", () => {
         const action = handleKey(
           ctx({
-            text: "@model:gpt-4o AND @status:err AND @user:abc",
+            text: "@model:gpt-5-mini AND @status:err AND @user:abc",
             cursorPos: 29,
             suggestion: {
               open: true,

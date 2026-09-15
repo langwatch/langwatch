@@ -19,9 +19,9 @@ describe("toggleFacet", () => {
   describe("given an existing query and a neutral state with no orGroupLocation", () => {
     describe("when called", () => {
       it("AND-appends the new clause", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini");
         useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe("model:gpt-4o AND status:error");
+        expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini AND status:error");
       });
     });
   });
@@ -34,9 +34,9 @@ describe("toggleFacet", () => {
         // toggle wraps both sides to preserve intent. (Cross-field OR is
         // built by typing in the filter bar — no sidebar click produces
         // this combinator any more — but the store mechanism stays.)
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini");
         useFilterStore.getState().toggleFacet("status", "error", { combinator: "OR" });
-        expect(useFilterStore.getState().queryText).toBe("(model:gpt-4o) OR (status:error)");
+        expect(useFilterStore.getState().queryText).toBe("(model:gpt-5-mini) OR (status:error)");
       });
     });
   });
@@ -44,13 +44,13 @@ describe("toggleFacet", () => {
   describe("given a query with an existing OR group and a neutral state", () => {
     describe("when called with orGroupLocation pointing at the group", () => {
       it("splices the new value into the existing group instead of appending", () => {
-        useFilterStore.getState().applyQueryText("status:error OR model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error OR model:gpt-5-mini");
         const query = useFilterStore.getState().queryText;
         useFilterStore.getState().toggleFacet("origin", "application", {
           orGroupLocation: { start: 0, end: query.length },
         });
         expect(useFilterStore.getState().queryText).toBe(
-          "status:error OR model:gpt-4o OR origin:application",
+          "status:error OR model:gpt-5-mini OR origin:application",
         );
       });
     });
@@ -62,7 +62,7 @@ describe("toggleFacet", () => {
         // `status:error` is already an include — toggling cycles to
         // exclude via the standard toggleFacetInQuery path, NOT the
         // splice path. The orGroupLocation hint is ignored.
-        useFilterStore.getState().applyQueryText("status:error OR model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error OR model:gpt-5-mini");
         useFilterStore.getState().toggleFacet("status", "error", {
           orGroupLocation: { start: 0, end: 28 },
         });
@@ -89,10 +89,10 @@ describe("toggleFacet", () => {
         // Precedence guard: `model:x AND origin:a OR origin:b` would bind
         // as `(model:x AND origin:a) OR origin:b` — the parens keep the
         // OR scoped to the origin field.
-        useFilterStore.getState().applyQueryText("model:gpt-4o AND origin:sample");
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini AND origin:sample");
         useFilterStore.getState().toggleFacet("origin", "application");
         expect(useFilterStore.getState().queryText).toBe(
-          "model:gpt-4o AND (origin:sample OR origin:application)",
+          "model:gpt-5-mini AND (origin:sample OR origin:application)",
         );
       });
     });
@@ -169,9 +169,9 @@ describe("excludeFacet", () => {
   describe("given another field is already filtered", () => {
     describe("when a value is excluded", () => {
       it("AND-combines the NOT clause", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini");
         useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe("model:gpt-4o AND NOT status:error");
+        expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini AND NOT status:error");
       });
     });
   });
@@ -201,7 +201,7 @@ describe("lastAiTranslation lifecycle", () => {
 
     describe("when swapOperator runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("status:error AND model:gpt-4o");
+        useFilterStore.getState().applyQueryText("status:error AND model:gpt-5-mini");
         useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after cleared
         // AND lives at offsets 13..16 in the trimmed string.
         useFilterStore.getState().swapOperator(13, 16);
@@ -237,7 +237,7 @@ describe("lastAiTranslation lifecycle", () => {
 
     describe("when applyQueryText runs with a non-AI mutation", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
+        useFilterStore.getState().applyQueryText("model:gpt-5-mini");
         expect(useFilterStore.getState().lastAiTranslation).toBeNull();
       });
     });

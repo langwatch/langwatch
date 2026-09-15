@@ -44,10 +44,10 @@ describe("<ModelChip/>", () => {
     describe("when the role's saved model has no entry in the displayNames map", () => {
       it("falls back to the model id's family part, unchanged from today", () => {
         renderChip(
-          <ModelChip model="openai/gpt-4o-mini" displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
+          <ModelChip model="openai/gpt-5-mini" displayNames={{ [FULL_ID]: DISPLAY_NAME }} />,
         );
 
-        expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();
+        expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
       });
     });
 

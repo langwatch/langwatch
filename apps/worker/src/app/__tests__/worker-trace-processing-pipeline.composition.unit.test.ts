@@ -212,7 +212,7 @@ describe("given the worker composition root and no application module", () => {
             droppedLinksCount: 0,
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "llm" } },
-              { key: "gen_ai.response.model", value: { stringValue: "openai/gpt-4o" } },
+              { key: "gen_ai.response.model", value: { stringValue: "openai/gpt-5-mini" } },
               { key: "gen_ai.usage.input_tokens", value: { intValue: 1000 } },
               { key: "gen_ai.usage.output_tokens", value: { intValue: 1000 } },
               {

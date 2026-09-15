@@ -193,11 +193,11 @@ describe("useProviderFormSubmit()", () => {
       });
     });
 
-    describe("when projectTopicClusteringModel belongs to a different provider (openai/gpt-4o-mini)", () => {
+    describe("when projectTopicClusteringModel belongs to a different provider (openai/gpt-5-mini)", () => {
       it("does not call updateProjectDefaultModels mutation", async () => {
         const snapshot = buildSnapshot({
           projectDefaultModel: "azure/gpt-5-mini",
-          projectTopicClusteringModel: "openai/gpt-4o-mini",
+          projectTopicClusteringModel: "openai/gpt-5-mini",
         });
         const { result } = renderSubmitHook({ snapshot });
 
@@ -211,7 +211,7 @@ describe("useProviderFormSubmit()", () => {
       it("creates an error toast", async () => {
         const snapshot = buildSnapshot({
           projectDefaultModel: "azure/gpt-5-mini",
-          projectTopicClusteringModel: "openai/gpt-4o-mini",
+          projectTopicClusteringModel: "openai/gpt-5-mini",
         });
         const { result } = renderSubmitHook({ snapshot });
 
@@ -253,7 +253,7 @@ describe("useProviderFormSubmit()", () => {
         const snapshot = buildSnapshot({
           useAsDefaultProvider: false,
           projectDefaultModel: "openai/gpt-5.2",
-          projectTopicClusteringModel: "openai/gpt-4o-mini",
+          projectTopicClusteringModel: "openai/gpt-5-mini",
         });
         const { result } = renderSubmitHook({ snapshot });
 

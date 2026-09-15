@@ -99,12 +99,12 @@ describe("buildSpanFieldChildren", () => {
   });
 
   it("preserves span labels from input", () => {
-    const spanNames = [{ key: "openai/gpt-4o", label: "GPT-4o Model" }];
+    const spanNames = [{ key: "openai/gpt-5-mini", label: "gpt-5-mini Model" }];
 
     const result = buildSpanFieldChildren(spanNames);
 
-    expect(result[1]?.name).toBe("openai/gpt-4o");
-    expect(result[1]?.label).toBe("GPT-4o Model");
+    expect(result[1]?.name).toBe("openai/gpt-5-mini");
+    expect(result[1]?.label).toBe("gpt-5-mini Model");
   });
 });
 
@@ -744,8 +744,8 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
         parent_id: "span-1",
         trace_id: "trace-1",
         type: "llm" as const,
-        name: "gpt-4o",
-        model: "gpt-4o",
+        name: "gpt-5-mini",
+        model: "gpt-5-mini",
         vendor: "openai",
         timestamps: { started_at: 1700000000500, finished_at: 1700000001500 },
         input: {
@@ -766,7 +766,7 @@ describe("TraceReadableSpanService.formatSpansDigest", () => {
 
     expect(typeof result).toBe("string");
     expect(result).toContain("my-agent");
-    expect(result).toContain("gpt-4o");
+    expect(result).toContain("gpt-5-mini");
   });
 
   it("returns empty digest for empty spans array", async () => {

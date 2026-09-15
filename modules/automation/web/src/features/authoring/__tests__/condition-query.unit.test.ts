@@ -33,8 +33,8 @@ describe("serializeConditions", () => {
 
     it("leaves a wildcard value bare", () => {
       expect(
-        serializeConditions([cond({ field: "model", operator: "is", value: "gpt-4o*" })]),
-      ).toBe("model:gpt-4o*");
+        serializeConditions([cond({ field: "model", operator: "is", value: "gpt-5-mini*" })]),
+      ).toBe("model:gpt-5-mini*");
     });
   });
 
@@ -67,9 +67,9 @@ describe("serializeConditions", () => {
       expect(
         serializeConditions([
           cond({ id: "a", field: "status", operator: "is", value: "error" }),
-          cond({ id: "b", field: "model", operator: "is", value: "gpt-4o" }),
+          cond({ id: "b", field: "model", operator: "is", value: "gpt-5-mini" }),
         ]),
-      ).toBe("status:error AND model:gpt-4o");
+      ).toBe("status:error AND model:gpt-5-mini");
     });
   });
 
@@ -108,10 +108,10 @@ describe("queryToConditions", () => {
 
   describe("given a simple AND chain", () => {
     it("parses each clause into a condition", () => {
-      const conditions = queryToConditions("status:error AND model:gpt-4o");
+      const conditions = queryToConditions("status:error AND model:gpt-5-mini");
       expect(conditions).toEqual([
         { id: "c0", field: "status", operator: "is", value: "error" },
-        { id: "c1", field: "model", operator: "is", value: "gpt-4o" },
+        { id: "c1", field: "model", operator: "is", value: "gpt-5-mini" },
       ]);
     });
 

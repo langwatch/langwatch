@@ -75,7 +75,7 @@ describe("pushPrompts", () => {
       };
 
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         modelParameters: { temperature: 0 },
         messages: [
           { role: "system", content: "You are a mapping assistant." },
@@ -124,7 +124,7 @@ describe("pushPrompts", () => {
 
     it("uses response_format name as output identifier", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: {
           name: "custom_output_name",
@@ -157,7 +157,7 @@ describe("pushPrompts", () => {
 
     it("defaults to 'output' when response_format has no name", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: {
           // A rich (non-flat) schema stays a single json_schema output, so the
@@ -200,7 +200,7 @@ describe("pushPrompts", () => {
   describe("when local config has no response_format", () => {
     it("sends default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         modelParameters: { temperature: 0.7 },
         messages: [{ role: "system", content: "You are a helpful assistant." }],
       } as any);
@@ -237,7 +237,7 @@ describe("pushPrompts", () => {
   describe("when response_format has no schema", () => {
     it("falls back to default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         response_format: { name: "my_format" },
       } as any);
@@ -309,7 +309,7 @@ describe("pushPrompts", () => {
        * @scenario TypeScript local prompt files preserve runtime parameters
        */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "test" }],
         parameters: { cli: true },
       } as any);
@@ -345,7 +345,7 @@ describe("pushPrompts", () => {
        * @scenario Syncing a local prompt detects runtime parameters conflicts
        */
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "local" }],
         parameters: { local: true },
       } as any);
@@ -357,7 +357,7 @@ describe("pushPrompts", () => {
           remoteVersion: 1,
           differences: ["parameters changed"],
           remoteConfigData: {
-            model: "openai/gpt-4o",
+            model: "openai/gpt-5-mini",
             prompt: "remote",
             messages: [],
           },

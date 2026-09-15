@@ -66,7 +66,7 @@ function buildLLMSpan(overrides?: Partial<LLMSpan>): LLMSpan {
     trace_id: "trace-1",
     type: "llm",
     name: "ChatCompletion",
-    model: "gpt-4o",
+    model: "gpt-5-mini",
     vendor: "openai",
     input: {
       type: "chat_messages",
@@ -327,7 +327,7 @@ describe("serializeTracesToFullCsv()", () => {
   describe("when trace has an LLM span", () => {
     it("includes model, vendor, and LLM-specific fields", () => {
       const llmSpan = buildLLMSpan({
-        model: "gpt-4o",
+        model: "gpt-5-mini",
         vendor: "openai",
       });
       const trace = buildTrace({ spans: [llmSpan] });
@@ -339,7 +339,7 @@ describe("serializeTracesToFullCsv()", () => {
 
       const result = parseCsv(csv);
       const row = result.data[0] as Record<string, string>;
-      expect(row.span_model).toBe("gpt-4o");
+      expect(row.span_model).toBe("gpt-5-mini");
       expect(row.span_vendor).toBe("openai");
       expect(row.span_type).toBe("llm");
       expect(row.span_name).toBe("ChatCompletion");

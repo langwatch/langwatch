@@ -174,12 +174,12 @@ describe("span.ts", () => {
 
     it("sets response model attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      const result = langwatchSpan.setResponseModel("gpt-4-turbo");
+      const result = langwatchSpan.setResponseModel("gpt-5-mini");
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
         semconv.ATTR_GEN_AI_RESPONSE_MODEL,
-        "gpt-4-turbo",
+        "gpt-5-mini",
       );
     });
   });
@@ -371,7 +371,7 @@ describe("span.ts", () => {
       const result = langwatchSpan
         .setType("llm")
         .setRequestModel("gpt-4")
-        .setResponseModel("gpt-4-turbo")
+        .setResponseModel("gpt-5-mini")
         .setInput("Hello")
         .addEvent("hehe")
         .setOutput("Hi there!")

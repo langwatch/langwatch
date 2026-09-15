@@ -9,7 +9,7 @@ function makeTurn(opts: { output: string; assistantText: string; userText?: stri
       traceId: "t1",
       timestamp: 1_700_000_000_000,
       durationMs: 1000,
-      models: ["gpt-4o"],
+      models: ["gpt-5-mini"],
       totalCost: 0.01,
       totalTokens: 100,
       output: opts.output,

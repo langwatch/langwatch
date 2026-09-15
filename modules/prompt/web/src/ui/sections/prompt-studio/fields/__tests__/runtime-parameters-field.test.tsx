@@ -27,7 +27,7 @@ function renderField(initialParameters: Record<string, unknown> = {}) {
         version: {
           parameters: initialParameters,
           configData: {
-            llm: { model: "openai/gpt-4o" },
+            llm: { model: "openai/gpt-5-mini" },
             messages: [],
             inputs: [],
             outputs: [{ identifier: "output", type: "str" }],

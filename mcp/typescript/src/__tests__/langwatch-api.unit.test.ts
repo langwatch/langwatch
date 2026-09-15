@@ -216,7 +216,7 @@ describe("langwatch-api", () => {
       const data = {
         handle: "test-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       };
       const responseData = { id: "new-id", ...data };
       mockJsonResponse(responseData);

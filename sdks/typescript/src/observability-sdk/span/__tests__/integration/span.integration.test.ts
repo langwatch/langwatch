@@ -435,8 +435,8 @@ describe("Span Integration Tests", () => {
       await tracer.withActiveSpan("model-span", async (span) => {
         span
           .setType("llm")
-          .setRequestModel("gpt-4-turbo-preview")
-          .setResponseModel("gpt-4-turbo-preview-20240125");
+          .setRequestModel("gpt-5-mini-preview")
+          .setResponseModel("gpt-5-mini-preview-20240125");
       });
 
       await spanProcessor.forceFlush();
@@ -448,8 +448,8 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected span to be exported");
       }
 
-      expect(span.attributes["gen_ai.request.model"]).toBe("gpt-4-turbo-preview");
-      expect(span.attributes["gen_ai.response.model"]).toBe("gpt-4-turbo-preview-20240125");
+      expect(span.attributes["gen_ai.request.model"]).toBe("gpt-5-mini-preview");
+      expect(span.attributes["gen_ai.response.model"]).toBe("gpt-5-mini-preview-20240125");
     });
   });
 

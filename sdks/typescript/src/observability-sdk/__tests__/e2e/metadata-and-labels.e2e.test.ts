@@ -187,7 +187,7 @@ describe("Metadata and Labels E2E", () => {
               type: "llm",
               span_id: opts.spanId,
               name: "rest-api-test",
-              model: "gpt-4o-mini",
+              model: "gpt-5-mini",
               input: { type: "text", value: "Hello" },
               output: { type: "text", value: "Hi there!" },
               timestamps: {

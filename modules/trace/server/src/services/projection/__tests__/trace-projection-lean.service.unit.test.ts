@@ -877,7 +877,7 @@ describe("given a span with a small structured non-IO attribute", () => {
             value: {
               kvlistValue: {
                 values: [
-                  { key: "model", value: { stringValue: "gpt-4o" } },
+                  { key: "model", value: { stringValue: "gpt-5-mini" } },
                   { key: "temperature", value: { stringValue: "0.7" } },
                 ],
               },

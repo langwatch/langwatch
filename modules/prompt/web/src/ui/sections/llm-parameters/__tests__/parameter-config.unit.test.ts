@@ -106,7 +106,7 @@ describe("Parameter Config", () => {
       expect(params.indexOf("temperature")).toBeLessThan(params.indexOf("max_tokens"));
     });
 
-    it("handles GPT-4.1 style parameters", () => {
+    it("handles gpt-5-mini style parameters", () => {
       const params = getDisplayParameters([
         "temperature",
         "top_p",

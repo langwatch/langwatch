@@ -568,7 +568,7 @@ describe("handleGetPrompt()", () => {
         name: "Greeting Prompt",
         version: 2,
         versionId: "ver_002",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: "You are a greeter." },
           { role: "user", content: "Hello!" },
@@ -582,7 +582,7 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("**Handle**: greeting");
       expect(result).toContain("**ID**: p1");
       expect(result).toContain("**Version**: v2");
-      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).not.toContain("**Provider**");
     });
 
@@ -607,13 +607,13 @@ describe("handleGetPrompt()", () => {
     it("uses prompt-level model config", async () => {
       mockGetPrompt.mockResolvedValue({
         name: "Simple",
-        model: "openai/gpt-3.5-turbo",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "Be brief." }],
       });
 
       const result = await handleGetPrompt({ idOrHandle: "simple" });
 
-      expect(result).toContain("**Model**: openai/gpt-3.5-turbo");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).not.toContain("**Provider**");
       expect(result).toContain("### system\nBe brief.");
     });
@@ -634,14 +634,14 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "my-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(result).toContain("Prompt created successfully!");
       expect(result).toContain("**ID**: new-id-123");
       expect(result).toContain("**Handle**: my-prompt");
       expect(result).toContain("**Name**: My Prompt");
-      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).toContain("**Model**: openai/gpt-5-mini");
       expect(result).toContain("**Version**: v1");
     });
 
@@ -654,13 +654,13 @@ describe("handleCreatePrompt()", () => {
       await handleCreatePrompt({
         name: "My Prompt!",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(mockCreatePrompt).toHaveBeenCalledWith({
         handle: "my-prompt",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
     });
 
@@ -674,13 +674,13 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "custom-handle",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(mockCreatePrompt).toHaveBeenCalledWith({
         handle: "custom-handle",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
     });
   });
@@ -692,7 +692,7 @@ describe("handleCreatePrompt()", () => {
       const result = await handleCreatePrompt({
         name: "Fallback Name",
         messages: [{ role: "system", content: "test" }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       });
 
       expect(result).toContain("**Name**: Fallback Name");
@@ -734,12 +734,12 @@ describe("handleUpdatePrompt()", () => {
 
       await handleUpdatePrompt({
         idOrHandle: "greeting",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch model",
       });
 
       expect(mockUpdatePrompt).toHaveBeenCalledWith("greeting", {
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         commitMessage: "Switch model",
       });
     });

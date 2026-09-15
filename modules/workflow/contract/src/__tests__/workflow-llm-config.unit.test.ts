@@ -30,7 +30,7 @@ describe("buildWorkflowLlmConfig", () => {
   it("maps every camel-case sampling field", () => {
     expect(
       buildWorkflowLlmConfig({
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         temperature: 0.7,
         maxTokens: 4096,
         topP: 0.9,
@@ -42,7 +42,7 @@ describe("buildWorkflowLlmConfig", () => {
         repetitionPenalty: 1.2,
       }),
     ).toEqual({
-      model: "openai/gpt-4o",
+      model: "openai/gpt-5-mini",
       temperature: 0.7,
       max_tokens: 4096,
       top_p: 0.9,

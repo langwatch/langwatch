@@ -455,9 +455,9 @@ describe("SET_FILTER_QUERY", () => {
   it("sets the trace-subject query", () => {
     const next = reducer(INITIAL_DRAFT, {
       type: "SET_FILTER_QUERY",
-      value: "model:gpt-4o",
+      value: "model:gpt-5-mini",
     });
-    expect(next.filterQuery).toBe("model:gpt-4o");
+    expect(next.filterQuery).toBe("model:gpt-5-mini");
   });
 
   it("is cleared when switching to an alert, which watches a metric", () => {

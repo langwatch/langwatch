@@ -209,20 +209,20 @@ const cases: Case[] = [
   // List membership + wildcard
   {
     name: "model membership matches",
-    query: "model:gpt-4o",
-    trace: makeTrace({ models: ["gpt-4o", "gpt-3.5"] }),
+    query: "model:gpt-5-mini",
+    trace: makeTrace({ models: ["gpt-5-mini", "gpt-3.5"] }),
     expected: true,
   },
   {
     name: "model membership misses",
     query: "model:claude-3",
-    trace: makeTrace({ models: ["gpt-4o"] }),
+    trace: makeTrace({ models: ["gpt-5-mini"] }),
     expected: false,
   },
   {
     name: "model wildcard matches by prefix",
     query: "model:gpt*",
-    trace: makeTrace({ models: ["gpt-4o"] }),
+    trace: makeTrace({ models: ["gpt-5-mini"] }),
     expected: true,
   },
   {
@@ -523,26 +523,26 @@ const cases: Case[] = [
   // Boolean composition
   {
     name: "AND requires both sides",
-    query: "topic:t1 AND model:gpt-4o",
-    trace: makeTrace({ topicId: "t1", models: ["gpt-4o"] }),
+    query: "topic:t1 AND model:gpt-5-mini",
+    trace: makeTrace({ topicId: "t1", models: ["gpt-5-mini"] }),
     expected: true,
   },
   {
     name: "AND fails when one side misses",
-    query: "topic:t1 AND model:gpt-4o",
+    query: "topic:t1 AND model:gpt-5-mini",
     trace: makeTrace({ topicId: "t1", models: ["claude-3"] }),
     expected: false,
   },
   {
     name: "OR passes when either side matches",
-    query: "topic:t9 OR model:gpt-4o",
-    trace: makeTrace({ topicId: "t1", models: ["gpt-4o"] }),
+    query: "topic:t9 OR model:gpt-5-mini",
+    trace: makeTrace({ topicId: "t1", models: ["gpt-5-mini"] }),
     expected: true,
   },
   {
     name: "parenthesised grouping",
-    query: "(topic:t1 OR topic:t2) AND model:gpt-4o",
-    trace: makeTrace({ topicId: "t2", models: ["gpt-4o"] }),
+    query: "(topic:t1 OR topic:t2) AND model:gpt-5-mini",
+    trace: makeTrace({ topicId: "t2", models: ["gpt-5-mini"] }),
     expected: true,
   },
   // has / none existence
@@ -597,7 +597,7 @@ const cases: Case[] = [
   },
   {
     name: "UNSUPPORTED span.attribute prefix fails closed",
-    query: "span.attribute.gen_ai.request.model:gpt-4o",
+    query: "span.attribute.gen_ai.request.model:gpt-5-mini",
     trace: makeTrace({}),
     expected: false,
   },
@@ -818,7 +818,7 @@ describe("queryNeeds", () => {
 
   describe("when a query is summary-only or invalid", () => {
     it("returns an empty set for trace-summary fields", () => {
-      expect(queryNeeds("topic:t1 AND model:gpt-4o").size).toBe(0);
+      expect(queryNeeds("topic:t1 AND model:gpt-5-mini").size).toBe(0);
     });
 
     it("returns an empty set for an unparseable query", () => {

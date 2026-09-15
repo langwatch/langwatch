@@ -237,7 +237,7 @@ describe.skipIf(!DB_URL)(
             AZURE_OPENAI_API_KEY: `sk-project-azure-${ns}`,
             AZURE_OPENAI_ENDPOINT: "https://old-resource.openai.azure.com",
           },
-          customModels: [{ id: "gpt-4o", label: "gpt-4o", type: "chat" }],
+          customModels: [{ id: "gpt-5-mini", label: "gpt-5-mini", type: "chat" }],
           scopes: [{ scopeType: "PROJECT", scopeId: fixture.projectId }],
         } as never);
       });

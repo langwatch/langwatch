@@ -44,7 +44,7 @@ const makeEvent = (
         description: "x",
         version: "1.0",
         template_adapter: "default",
-        default_llm: { model: "openai/gpt-4o" },
+        default_llm: { model: "openai/gpt-5-mini" },
         nodes: [makeEntryNode(entryDataset)],
         edges: [],
         state: { execution: { status: "idle" } },

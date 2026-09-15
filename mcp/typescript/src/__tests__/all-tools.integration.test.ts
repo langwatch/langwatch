@@ -100,7 +100,7 @@ const CANNED_PROMPT_DETAIL = {
   version: 3,
   versionId: "ver_p1v3",
   commitMessage: "Updated tone",
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5-mini",
   messages: [{ role: "system", content: "You are a friendly bot." }],
   parameters: {},
   tags: [{ name: "latest", versionId: "ver_p1v3" }],
@@ -258,7 +258,7 @@ const CANNED_MODEL_PROVIDERS_LIST = {
     provider: "openai",
     enabled: true,
     customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-    models: ["gpt-4o", "gpt-4o-mini"],
+    models: ["gpt-5-mini", "gpt-5-mini"],
     embeddingsModels: ["text-embedding-3-small"],
     deploymentMapping: null,
     extraHeaders: [],
@@ -443,7 +443,7 @@ const CANNED_MODEL_PROVIDER_SET = {
     provider: "openai",
     enabled: true,
     customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-    models: ["gpt-4o"],
+    models: ["gpt-5-mini"],
     embeddingsModels: null,
     deploymentMapping: null,
     extraHeaders: [],
@@ -1197,13 +1197,13 @@ describe("All MCP tools integration", () => {
         const result = await handleCreatePrompt({
           name: "New Prompt",
           messages: [{ role: "system", content: "You are helpful." }],
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
         });
 
         expect(result).toContain("created successfully");
         expect(result).toContain("p-new");
         expect(result).toContain("**Name**: New Prompt");
-        expect(result).toContain("**Model**: openai/gpt-4o");
+        expect(result).toContain("**Model**: openai/gpt-5-mini");
       });
     });
   });
@@ -1238,7 +1238,7 @@ describe("All MCP tools integration", () => {
         });
 
         expect(result).toContain("# Prompt: Greeting Bot");
-        expect(result).toContain("gpt-4o");
+        expect(result).toContain("gpt-5-mini");
         expect(result).toContain("You are a friendly bot.");
         expect(result).toContain("v3");
         expect(result).toContain("## Deployments");
@@ -1256,7 +1256,7 @@ describe("All MCP tools integration", () => {
         const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
         const result = await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o-mini",
+          model: "openai/gpt-5-mini",
           commitMessage: "Switch to mini",
         });
 
@@ -1294,7 +1294,7 @@ describe("All MCP tools integration", () => {
         const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
           commitMessage: "No tag change requested",
         });
 
@@ -1311,7 +1311,7 @@ describe("All MCP tools integration", () => {
         const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
           commitMessage: "Deploy new version to production",
           tags: ["production"],
         });
@@ -1560,10 +1560,10 @@ describe("All MCP tools integration", () => {
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
-          defaultModel: "gpt-4o",
+          defaultModel: "gpt-5-mini",
         });
 
-        expect(result).toContain("**Default Model**: openai/gpt-4o");
+        expect(result).toContain("**Default Model**: openai/gpt-5-mini");
       });
     });
   });
