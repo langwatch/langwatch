@@ -39,7 +39,8 @@ export function useHydrateViewFromUrl(): void {
   useEffect(() => {
     if (!router.isReady) return;
     hydrateFromUrl(router.query);
-  }, [router.isReady, viewParam, hydrateFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, viewParam, hydrateFromUrl]);
 }
 
 /**
