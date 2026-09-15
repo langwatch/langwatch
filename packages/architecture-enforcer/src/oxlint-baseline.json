@@ -735,27 +735,27 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/coding-agent/server/src/projections/coding-agent-session-log.projection.ts",
+      "key": "cognitive-complexity|modules/coding-agent/server/src/eventing/coding-agent-log-facts-dispatch.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/coding-agent/server/src/projections/coding-agent-session-metric.projection.ts",
+      "key": "cognitive-complexity|modules/coding-agent/server/src/eventing/coding-agent-metric-facts-dispatch.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts",
+      "key": "cognitive-complexity|modules/coding-agent/server/src/eventing/coding-agent-session-log.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/coding-agent/server/src/eventing/coding-agent-session-metric.projection.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "cognitive-complexity|modules/coding-agent/server/src/eventing/coding-agent-session-span.projection.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/coding-agent/server/src/subscribers/coding-agent-log-facts-dispatch.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/coding-agent/server/src/subscribers/coding-agent-metric-facts-dispatch.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
@@ -999,11 +999,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/experiment/server/src/processes/experiment-cell-workflow.process.ts",
+      "key": "cognitive-complexity|modules/experiment/server/src/eventing/experiment-cell-workflow.process.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/experiment/server/src/processes/experiment-result-mapping.process.ts",
+      "key": "cognitive-complexity|modules/experiment/server/src/eventing/experiment-result-mapping.process.ts",
       "measured": "2026-09-06"
     },
     {
@@ -1291,15 +1291,15 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "cognitive-complexity|modules/langy/server/src/eventing/langy-conversation.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "cognitive-complexity|modules/langy/server/src/repositories/prisma/prisma.langy-turn-admission.repository.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "cognitive-complexity|modules/langy/server/src/services/langy-conversation-memory.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
@@ -2019,7 +2019,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
+      "key": "cognitive-complexity|modules/topic/server/src/eventing/topic-clustering-runner.intent.ts",
       "measured": "2026-09-06"
     },
     {
@@ -3303,7 +3303,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/coding-agent/server/src/projections/coding-agent-session-log.projection.ts",
+      "key": "complexity|modules/coding-agent/server/src/eventing/coding-agent-session-log.projection.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4459,8 +4459,16 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts",
+      "key": "condition-shape|modules/coding-agent/server/src/eventing/coding-agent-session-span.projection.ts",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "condition-shape|modules/coding-agent/server/src/eventing/coding-agent-span-facts-dispatch.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "condition-shape|modules/coding-agent/server/src/eventing/pull-request-mapping.subscriber.ts",
+      "measured": "2026-09-06"
     },
     {
       "key": "condition-shape|modules/coding-agent/server/src/repositories/__tests__/coding-agent-session-clickhouse-dedup.unit.test.ts",
@@ -4472,14 +4480,6 @@
     },
     {
       "key": "condition-shape|modules/coding-agent/server/src/services/coding-agent-pull-request-read.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/coding-agent/server/src/subscribers/coding-agent-span-facts-dispatch.subscriber.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "condition-shape|modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
@@ -4871,7 +4871,7 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/identity/server/src/intents/identity-events.intent.ts",
+      "key": "condition-shape|modules/identity/server/src/eventing/identity-events.intent.ts",
       "measured": "2026-09-07"
     },
     {
@@ -5147,7 +5147,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/scenario/server/src/processes/simulation-run-execution-evolution.process.ts",
+      "key": "condition-shape|modules/scenario/server/src/eventing/simulation-run-execution-evolution.process.ts",
       "measured": "2026-09-06"
     },
     {
@@ -6687,7 +6687,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "empty-catch|modules/experiment/server/src/projections/experiment-run-state.projection.ts",
+      "key": "empty-catch|modules/experiment/server/src/eventing/experiment-run-state.projection.ts",
       "measured": "2026-09-10"
     },
     {
@@ -6871,7 +6871,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "empty-catch|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
+      "key": "empty-catch|modules/topic/server/src/eventing/topic-clustering-runner.intent.ts",
       "measured": "2026-09-10"
     },
     {
@@ -6884,6 +6884,10 @@
     },
     {
       "key": "empty-catch|modules/trace/contract/src/trace-rag-extraction.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "empty-catch|modules/trace/server/src/eventing/evaluation-trigger.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -6948,10 +6952,6 @@
     },
     {
       "key": "empty-catch|modules/trace/server/src/services/support/trace-ttl-cache.service.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "empty-catch|modules/trace/server/src/subscribers/evaluation-trigger.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -8347,7 +8347,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "feature-source-layout|modules/langy/server/src/processes/langy-conversation-process.types.ts",
+      "key": "feature-source-layout|modules/langy/server/src/eventing/langy-conversation-process.schemas.ts",
       "measured": "2026-09-10"
     },
     {
@@ -9455,7 +9455,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/experiment/server/src/processes/experiment-cell-workflow.process.ts",
+      "key": "id-generation-origin|modules/experiment/server/src/eventing/experiment-cell-workflow.process.ts",
       "measured": "2026-09-08"
     },
     {
@@ -10463,6 +10463,18 @@
       "measured": "2026-09-11"
     },
     {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/__tests__/scenarioEvaluations.subscriber.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/__tests__/simulationRunState.evaluationPending.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/__tests__/simulationRunState.evaluations.unit.test.ts",
+      "measured": "2026-09-11"
+    },
+    {
       "key": "legacy-monolith-path|modules/scenario/server/src/eventing/queueRun.command.ts",
       "measured": "2026-09-11"
     },
@@ -10471,11 +10483,7 @@
       "measured": "2026-09-11"
     },
     {
-      "key": "legacy-monolith-path|modules/scenario/server/src/projections/__tests__/simulationRunState.evaluationPending.unit.test.ts",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|modules/scenario/server/src/projections/__tests__/simulationRunState.evaluations.unit.test.ts",
+      "key": "legacy-monolith-path|modules/scenario/server/src/eventing/scenarioEvaluations.subscriber.ts",
       "measured": "2026-09-11"
     },
     {
@@ -10484,14 +10492,6 @@
     },
     {
       "key": "legacy-monolith-path|modules/scenario/server/src/repositories/clickhouse/__tests__/simulation-run.mappers.unit.test.ts",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|modules/scenario/server/src/subscribers/__tests__/scenarioEvaluations.subscriber.unit.test.ts",
-      "measured": "2026-09-11"
-    },
-    {
-      "key": "legacy-monolith-path|modules/scenario/server/src/subscribers/scenarioEvaluations.subscriber.ts",
       "measured": "2026-09-11"
     },
     {
@@ -11595,23 +11595,23 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|modules/coding-agent/server/src/projections/__tests__/coding-agent-session.unit.test.ts",
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/eventing/__tests__/coding-agent-cost-drift.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-cost-drift.subscriber.redelivery.test.ts",
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/eventing/__tests__/coding-agent-log-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-log-facts-dispatch.subscriber.redelivery.test.ts",
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/eventing/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/eventing/__tests__/coding-agent-session.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
+      "key": "module-app-only-across-packages|modules/coding-agent/server/src/eventing/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -11883,7 +11883,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/automation/server/src/processes/trigger-settlement.process.ts",
+      "key": "namespace-class|modules/automation/server/src/eventing/trigger-settlement.process.ts",
       "measured": "2026-09-08"
     },
     {
@@ -11903,7 +11903,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/coding-agent/server/src/projections/coding-agent-session.projection.ts",
+      "key": "namespace-class|modules/coding-agent/server/src/eventing/coding-agent-session.projection.ts",
       "measured": "2026-09-08"
     },
     {
@@ -11927,7 +11927,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/experiment/server/src/processes/experiment-run-id.process.ts",
+      "key": "namespace-class|modules/experiment/server/src/eventing/experiment-run-id.process.ts",
       "measured": "2026-09-08"
     },
     {
@@ -11995,7 +11995,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/scenario/server/src/processes/simulation-run-execution-evolution.process.ts",
+      "key": "namespace-class|modules/scenario/server/src/eventing/simulation-run-execution-evolution.process.ts",
       "measured": "2026-09-08"
     },
     {
@@ -12003,7 +12003,19 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/topic/server/src/processes/topic-clustering.process.ts",
+      "key": "namespace-class|modules/topic/server/src/eventing/topic-clustering.process.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|modules/trace/server/src/eventing/custom-evaluation-sync.subscriber.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|modules/trace/server/src/eventing/project-metadata.subscriber.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "namespace-class|modules/trace/server/src/eventing/tracked-event-sync.subscriber.ts",
       "measured": "2026-09-08"
     },
     {
@@ -12148,18 +12160,6 @@
     },
     {
       "key": "namespace-class|modules/trace/server/src/services/support/trace-ttl-cache.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|modules/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|modules/trace/server/src/subscribers/project-metadata.subscriber.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "namespace-class|modules/trace/server/src/subscribers/tracked-event-sync.subscriber.ts",
       "measured": "2026-09-08"
     },
     {
@@ -13071,7 +13071,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/automation/server/src/processes/trigger-settlement.process.ts",
+      "key": "no-nested-ternary|modules/automation/server/src/eventing/trigger-settlement.process.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13119,19 +13119,19 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts",
+      "key": "no-nested-ternary|modules/coding-agent/server/src/eventing/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "no-nested-ternary|modules/coding-agent/server/src/eventing/coding-agent-metric-facts-dispatch.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
+      "key": "no-nested-ternary|modules/coding-agent/server/src/eventing/coding-agent-session-state.projection.ts",
       "measured": "2026-09-06"
     },
     {
       "key": "no-nested-ternary|modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/coding-agent/server/src/subscribers/coding-agent-metric-facts-dispatch.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13255,7 +13255,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/experiment/server/src/processes/experiment-connected-target.process.ts",
+      "key": "no-nested-ternary|modules/experiment/server/src/eventing/experiment-connected-target.process.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13427,6 +13427,10 @@
       "measured": "2026-09-06"
     },
     {
+      "key": "no-nested-ternary|modules/langy/server/src/eventing/langy-conversation.subscriber.ts",
+      "measured": "2026-09-06"
+    },
+    {
       "key": "no-nested-ternary|modules/langy/server/src/services/langy-local-session.service.ts",
       "measured": "2026-09-06"
     },
@@ -13436,10 +13440,6 @@
     },
     {
       "key": "no-nested-ternary|modules/langy/server/src/services/langy-turn-start.service.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
       "measured": "2026-09-06"
     },
     {
@@ -13631,7 +13631,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
+      "key": "no-nested-ternary|modules/topic/server/src/eventing/topic-clustering-runner.intent.ts",
       "measured": "2026-09-06"
     },
     {
@@ -16391,31 +16391,47 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/__tests__/evaluation-alert-trigger-match.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/__tests__/graph-alert-sweep.process.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/__tests__/graph-trigger-activity.subscriber.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/__tests__/trigger-settlement.process.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/__tests__/webhook-delivery-prune.process.unit.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/evaluation-alert-trigger-match.subscriber.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/graph-alert-sweep.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/graph-trigger-activity.subscriber.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/automation/server/src/eventing/webhook-delivery-prune.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "no-port-vocabulary|modules/automation/server/src/fixtures/graph-activity.fixture.ts",
       "measured": "2026-09-10"
     },
     {
       "key": "no-port-vocabulary|modules/automation/server/src/index.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/intents/graph-alert-sweep.intent.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/intents/webhook-delivery-prune.intent.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/processes/__tests__/graph-alert-sweep.process.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/processes/__tests__/trigger-settlement.process.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/processes/__tests__/webhook-delivery-prune.process.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -16575,22 +16591,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/automation/server/src/subscribers/__tests__/evaluation-alert-trigger-match.subscriber.redelivery.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/subscribers/__tests__/graph-trigger-activity.subscriber.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/subscribers/evaluation-alert-trigger-match.subscriber.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/automation/server/src/subscribers/graph-trigger-activity.subscriber.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|modules/automation/server/src/testing.ts",
       "measured": "2026-09-10"
     },
@@ -16612,6 +16612,14 @@
     },
     {
       "key": "no-port-vocabulary|modules/coding-agent/server/src/app/coding-agent.infrastructure.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/coding-agent/server/src/eventing/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/coding-agent/server/src/eventing/coding-agent-span-facts-dispatch.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -16660,14 +16668,6 @@
     },
     {
       "key": "no-port-vocabulary|modules/coding-agent/server/src/services/coding-agent-read-metrics-otel.service.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/coding-agent/server/src/subscribers/coding-agent-span-facts-dispatch.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -16931,7 +16931,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/evaluation/server/src/intents/evaluation-execution.intent.ts",
+      "key": "no-port-vocabulary|modules/evaluation/server/src/eventing/evaluation-execution.intent.ts",
       "measured": "2026-09-10"
     },
     {
@@ -17032,6 +17032,10 @@
     },
     {
       "key": "no-port-vocabulary|modules/evaluator/web/src/testing.tsx",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/experiment/server/src/eventing/experiment-run-item.store.ts",
       "measured": "2026-09-10"
     },
     {
@@ -17155,10 +17159,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/experiment/server/src/stores/eventing/eventing.experiment-run-item.store.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|modules/experiment/server/src/transport/__tests__/experiment.trpc.wire-regressions.unit.test.ts",
       "measured": "2026-09-10"
     },
@@ -17231,11 +17231,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/gateway/server/src/index.ts",
+      "key": "no-port-vocabulary|modules/gateway/server/src/eventing/gateway-spend-settlement.intent.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/gateway/server/src/intents/gateway-spend-settlement.intent.ts",
+      "key": "no-port-vocabulary|modules/gateway/server/src/index.ts",
       "measured": "2026-09-10"
     },
     {
@@ -17423,23 +17423,23 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/intents/connection-teardown.intent.ts",
+      "key": "no-port-vocabulary|modules/identity/server/src/eventing/__tests__/connection-teardown.process.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/intents/join-request-lifecycle.intent.ts",
+      "key": "no-port-vocabulary|modules/identity/server/src/eventing/connection-teardown.intent.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/processes/__tests__/connection-teardown.process.unit.test.ts",
+      "key": "no-port-vocabulary|modules/identity/server/src/eventing/connection-teardown.process.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/processes/connection-teardown.process.ts",
+      "key": "no-port-vocabulary|modules/identity/server/src/eventing/join-request-lifecycle.intent.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/processes/join-request-lifecycle.process.ts",
+      "key": "no-port-vocabulary|modules/identity/server/src/eventing/join-request-lifecycle.process.ts",
       "measured": "2026-09-10"
     },
     {
@@ -17651,11 +17651,15 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/langy/server/src/intents/langy-conversation.intent.ts",
+      "key": "no-port-vocabulary|modules/langy/server/src/eventing/langy-conversation.intent.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/langy/server/src/processes/langy-conversation.process.ts",
+      "key": "no-port-vocabulary|modules/langy/server/src/eventing/langy-conversation.process.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/langy/server/src/eventing/langy-conversation.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -17888,10 +17892,6 @@
     },
     {
       "key": "no-port-vocabulary|modules/langy/server/src/services/langy-worker-unavailable.service.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/langy/server/src/subscribers/langy-conversation.subscriber.ts",
       "measured": "2026-09-10"
     },
     {
@@ -18839,15 +18839,15 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "no-port-vocabulary|modules/topic/server/src/eventing/topic-clustering-runner.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "no-port-vocabulary|modules/topic/server/src/eventing/topic-clustering.intent.ts",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "no-port-vocabulary|modules/topic/server/src/index.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/topic/server/src/intents/topic-clustering-runner.intent.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|modules/topic/server/src/intents/topic-clustering.intent.ts",
       "measured": "2026-09-10"
     },
     {
@@ -18887,7 +18887,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/trace/server/src/projections/__tests__/trace-summary.fold-coalescing.integration.test.ts",
+      "key": "no-port-vocabulary|modules/trace/server/src/eventing/__tests__/trace-summary.fold-coalescing.integration.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -20663,11 +20663,11 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "shared-setup-is-a-hook|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.integration.test.ts",
+      "key": "shared-setup-is-a-hook|modules/experiment/server/src/eventing/__tests__/experiment-cell-workflow.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "shared-setup-is-a-hook|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.unit.test.ts",
+      "key": "shared-setup-is-a-hook|modules/experiment/server/src/eventing/__tests__/experiment-cell-workflow.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -20723,15 +20723,15 @@
       "measured": "2026-09-15"
     },
     {
+      "key": "shared-setup-is-a-hook|modules/langy/server/src/eventing/__tests__/langy-conversation.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "shared-setup-is-a-hook|modules/langy/server/src/services/__tests__/langy-local-call-permission-envelope.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
       "key": "shared-setup-is-a-hook|modules/langy/server/src/services/__tests__/langy-ui-action.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/langy/server/src/subscribers/__tests__/langy-conversation.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -20923,11 +20923,31 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "shared-setup-is-a-hook|modules/topic/server/src/intents/__tests__/topic-clustering.intent.unit.test.ts",
+      "key": "shared-setup-is-a-hook|modules/topic/server/src/eventing/__tests__/topic-clustering.intent.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "shared-setup-is-a-hook|modules/topic/server/src/intents/__tests__/topic-clustering.runner.unit.test.ts",
+      "key": "shared-setup-is-a-hook|modules/topic/server/src/eventing/__tests__/topic-clustering.runner.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/eventing/__tests__/custom-evaluation-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/eventing/__tests__/project-metadata.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/eventing/__tests__/project-metadata.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/eventing/__tests__/simulation-metrics-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/eventing/__tests__/tracked-event-sync.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -20964,26 +20984,6 @@
     },
     {
       "key": "shared-setup-is-a-hook|modules/trace/server/src/services/query/__tests__/trace-export.service.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/custom-evaluation-sync.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/project-metadata.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/project-metadata.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/simulation-metrics-sync.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/tracked-event-sync.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22003,6 +22003,10 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "stand-in-cast|modules/authz/server/src/eventing/__tests__/authz-grant.projection.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "stand-in-cast|modules/authz/server/src/eventing/__tests__/eventing.authz-audit.adapter.unit.test.ts",
       "measured": "2026-09-15"
     },
@@ -22016,10 +22020,6 @@
     },
     {
       "key": "stand-in-cast|modules/authz/server/src/eventing/__tests__/support/eventing.authz-ledger-fork.harness.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/authz/server/src/projections/__tests__/authz-grant.projection.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22091,6 +22091,10 @@
       "measured": "2026-09-15"
     },
     {
+      "key": "stand-in-cast|modules/automation/server/src/eventing/__tests__/graph-trigger-activity.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "stand-in-cast|modules/automation/server/src/repositories/__tests__/graph-trigger-heartbeat-source-aware.unit.test.ts",
       "measured": "2026-09-15"
     },
@@ -22123,10 +22127,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "stand-in-cast|modules/automation/server/src/subscribers/__tests__/graph-trigger-activity.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
       "key": "stand-in-cast|modules/automation/server/src/transport/__tests__/automation.rest.integration.test.ts",
       "measured": "2026-09-15"
     },
@@ -22147,19 +22147,35 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/coding-agent/server/src/projections/__tests__/coding-agent-session-events.unit.test.ts",
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/coding-agent-log-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/coding-agent/server/src/projections/__tests__/coding-agent-session.unit.test.ts",
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/coding-agent/server/src/projections/__tests__/contribution-coalescing.unit.test.ts",
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/coding-agent-session-events.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/coding-agent/server/src/projections/__tests__/pull-request-mapping-throttle.integration.test.ts",
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/coding-agent-session.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/contribution-coalescing.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/pull-request-mapping-throttle.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/coding-agent/server/src/eventing/__tests__/pull-request-mapping.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22176,22 +22192,6 @@
     },
     {
       "key": "stand-in-cast|modules/coding-agent/server/src/repositories/redis/__tests__/redis.coding-agent-processing.repository.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-log-facts-dispatch.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-metric-facts-dispatch.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/coding-agent/server/src/subscribers/__tests__/coding-agent-span-facts-dispatch.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/coding-agent/server/src/subscribers/__tests__/pull-request-mapping.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22463,11 +22463,11 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.integration.test.ts",
+      "key": "stand-in-cast|modules/experiment/server/src/eventing/__tests__/experiment-cell-workflow.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/experiment/server/src/projections/__tests__/experiment-run-state-ordering.unit.test.ts",
+      "key": "stand-in-cast|modules/experiment/server/src/eventing/__tests__/experiment-run-state-ordering.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22655,7 +22655,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/gateway/server/src/projections/__tests__/gateway-spend.fold-projection.unit.test.ts",
+      "key": "stand-in-cast|modules/gateway/server/src/eventing/__tests__/gateway-spend.fold-projection.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22731,7 +22731,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/identity/server/src/processes/__tests__/connection-teardown.process.unit.test.ts",
+      "key": "stand-in-cast|modules/identity/server/src/eventing/__tests__/connection-teardown.process.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22859,23 +22859,31 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/langy/server/src/projections/__tests__/langy-turn-admission-lifecycle.subscriber.unit.test.ts",
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langy-conversation-update-broadcast.waits.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/langy/server/src/projections/__tests__/langyConversationState.foldProjection.unit.test.ts",
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langy-conversation.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/langy/server/src/projections/__tests__/langyConversationTurn.clientServerParity.unit.test.ts",
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langy-turn-admission-lifecycle.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/langy/server/src/projections/__tests__/langyConversationTurn.foldProjection.unit.test.ts",
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langyConversationState.foldProjection.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/langy/server/src/projections/__tests__/langyRunTokenExclusion.unit.test.ts",
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langyConversationTurn.clientServerParity.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langyConversationTurn.foldProjection.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/langy/server/src/eventing/__tests__/langyRunTokenExclusion.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -22944,14 +22952,6 @@
     },
     {
       "key": "stand-in-cast|modules/langy/server/src/services/__tests__/langyTurnFacade.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/langy/server/src/subscribers/__tests__/langy-conversation-update-broadcast.waits.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/langy/server/src/subscribers/__tests__/langy-conversation.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -23599,6 +23599,10 @@
       "measured": "2026-09-15"
     },
     {
+      "key": "stand-in-cast|modules/scenario/server/src/eventing/__tests__/scenarioEvaluations.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "stand-in-cast|modules/scenario/server/src/repositories/clickhouse/__tests__/clickhouse.run-configurations.repository.integration.test.ts",
       "measured": "2026-09-15"
     },
@@ -23644,10 +23648,6 @@
     },
     {
       "key": "stand-in-cast|modules/scenario/server/src/services/__tests__/voice-session.infrastructure.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/scenario/server/src/subscribers/__tests__/scenarioEvaluations.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -23843,40 +23843,88 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/fixtures/trace-summary-test.fixtures.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/custom-evaluation-sync.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-derived.projection.fold-equivalence.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/evaluation-trigger.per-span-guard.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-derived.projection.log-led-resume.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/evaluation-trigger.subscriber.redelivery.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-derived.projection.storage-anchor.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/evaluation-trigger.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-summary.projection.claude-code-log-lift.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/experiment-metrics-sync.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-summary.projection.origin.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/project-metadata.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-summary.projection.refold-policy.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/simulation-metrics-sync.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-summary.projection.storage-anchor.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-derived.projection.fold-equivalence.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "stand-in-cast|modules/trace/server/src/projections/__tests__/trace-summary.projection.trace-name.unit.test.ts",
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-derived.projection.log-led-resume.unit.test.ts",
       "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-derived.projection.storage-anchor.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-subscriber.fixtures.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary-test.fixtures.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.projection.claude-code-log-lift.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.projection.origin.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.projection.refold-policy.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.projection.storage-anchor.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.projection.trace-name.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/trace-summary.store.persist-gate.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/tracked-event-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/__tests__/tracked-event-sync.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "stand-in-cast|modules/trace/server/src/eventing/custom-evaluation-sync.subscriber.ts",
+      "measured": "2026-09-10"
     },
     {
       "key": "stand-in-cast|modules/trace/server/src/repositories/clickhouse/__tests__/clickhouse.trace-span-storage.adapter.unit.test.ts",
@@ -24113,54 +24161,6 @@
     {
       "key": "stand-in-cast|modules/trace/server/src/services/viewer/__tests__/trace-viewer.service.unit.test.ts",
       "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/stores/eventing/__tests__/eventing.trace-summary.store.persist-gate.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/custom-evaluation-sync.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/evaluation-trigger.per-span-guard.integration.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/evaluation-trigger.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/evaluation-trigger.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/experiment-metrics-sync.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/project-metadata.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/simulation-metrics-sync.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/subscribers/support/trace-subscriber.fixtures.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/tracked-event-sync.subscriber.redelivery.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/__tests__/tracked-event-sync.subscriber.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "stand-in-cast|modules/trace/server/src/subscribers/custom-evaluation-sync.subscriber.ts",
-      "measured": "2026-09-10"
     },
     {
       "key": "stand-in-cast|modules/trace/server/src/transport/api-rest/collector-body.api.ts",
@@ -25203,7 +25203,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/scenario/server/src/intents/simulation-run-execution.intent.ts",
+      "key": "temporal-only|modules/scenario/server/src/eventing/simulation-run-execution.intent.ts",
       "measured": "2026-09-06"
     },
     {
@@ -25411,7 +25411,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/trace/server/src/projections/trace-rollup.projection.ts",
+      "key": "temporal-only|modules/trace/server/src/eventing/trace-rollup.projection.ts",
       "measured": "2026-09-06"
     },
     {
@@ -26119,11 +26119,11 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/coding-agent/server/src/projections/__tests__/coding-agent-session-events.unit.test.ts",
+      "key": "test-description-is-an-action|modules/coding-agent/server/src/eventing/__tests__/coding-agent-session-events.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/coding-agent/server/src/projections/__tests__/coding-agent-session.unit.test.ts",
+      "key": "test-description-is-an-action|modules/coding-agent/server/src/eventing/__tests__/coding-agent-session.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -26187,19 +26187,19 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.integration.test.ts",
+      "key": "test-description-is-an-action|modules/experiment/server/src/eventing/__tests__/experiment-cell-workflow.integration.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/experiment/server/src/processes/__tests__/experiment-evaluator-score-filter.unit.test.ts",
+      "key": "test-description-is-an-action|modules/experiment/server/src/eventing/__tests__/experiment-evaluator-score-filter.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/experiment/server/src/processes/__tests__/experiment-run-event-guards.unit.test.ts",
+      "key": "test-description-is-an-action|modules/experiment/server/src/eventing/__tests__/experiment-run-event-guards.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/experiment/server/src/processes/__tests__/experiment-run-id.unit.test.ts",
+      "key": "test-description-is-an-action|modules/experiment/server/src/eventing/__tests__/experiment-run-id.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -26335,7 +26335,7 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/langy/server/src/projections/__tests__/langyConversationTurn.foldProjection.unit.test.ts",
+      "key": "test-description-is-an-action|modules/langy/server/src/eventing/__tests__/langyConversationTurn.foldProjection.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -26691,7 +26691,11 @@
       "measured": "2026-09-15"
     },
     {
-      "key": "test-description-is-an-action|modules/trace/server/src/projections/__tests__/trace-summary.projection.claude-code-log-lift.unit.test.ts",
+      "key": "test-description-is-an-action|modules/trace/server/src/eventing/__tests__/evaluation-trigger.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "test-description-is-an-action|modules/trace/server/src/eventing/__tests__/trace-summary.projection.claude-code-log-lift.unit.test.ts",
       "measured": "2026-09-15"
     },
     {
@@ -26752,10 +26756,6 @@
     },
     {
       "key": "test-description-is-an-action|modules/trace/server/src/services/span/__tests__/span-cost-non-billable-classification.unit.test.ts",
-      "measured": "2026-09-15"
-    },
-    {
-      "key": "test-description-is-an-action|modules/trace/server/src/subscribers/__tests__/evaluation-trigger.subscriber.unit.test.ts",
       "measured": "2026-09-15"
     },
     {

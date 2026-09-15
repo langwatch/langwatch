@@ -63,6 +63,20 @@ diff, only oxlint's own flat message.
 build, verified. Nor can it express `require-bdd-describe-context`, which needs
 the nesting depth of the `describe` it is looking at.
 
+## Amendment, 2026-09-15: `vitest/require-mock-type-parameters` is off
+
+Enabling the `vitest` plugin to name the test-quality rules brought its whole
+ruleset, and one member of it reported 11,741 findings across 1,700 files -- half
+of every finding in the repository -- each one a `vi.fn()` written without a type
+parameter. It has no fixer and can have none: the type argument has to be the
+mocked function's real signature, so there is no codemod, only 1,700 files of
+hand-resolution. `vi.fn()` bare is the idiom the whole suite is written in.
+
+It is off rather than baselined. The rule only ever fires in tests, so a baseline
+covering the existing files and an off switch are the same decision said at
+different lengths -- and a rule that can never reach zero teaches people to read
+past the linter, which costs more than the rule was ever going to earn.
+
 ## Consequences
 
 The two failure modes these rules cannot catch are the important ones: a test

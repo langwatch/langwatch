@@ -565,8 +565,9 @@ touched 855 module specifiers and nothing else.
 `@langwatch/identity-eventing` did NOT move, and the reason is worth stating
 here because this ADR is where someone will look for it. The layout has three
 roles — contract, server, web — and event-sourcing code normally belongs in
-`server`; the strict layout has `projections/`, `processes/`, `intents/`,
-`stores/` and `subscribers/` for exactly that. But `identity-contract` and
+`server`; the strict layout has `eventing/` for exactly that (it had
+`projections/`, `processes/`, `intents/`, `stores/` and `subscribers/` when this
+was written -- all five folded into `eventing/` on 2026-09-15). But `identity-contract` and
 `identity-server` were on `zod@^3.25.76` while `identity-eventing` is on
 `zod@^4.4.3`, and one package cannot hold both majors: schemas built on one
 side stop satisfying `instanceof` on the other, which surfaces as a 500 rather

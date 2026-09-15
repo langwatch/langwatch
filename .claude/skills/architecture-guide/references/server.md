@@ -54,11 +54,14 @@ Inventoried by `feature-shape` and gone when a module converts: `testing.ts`,
 `fixtures/`, `ports/<name>.port.ts` (members and channels replace technical ports),
 `adapters/postgres.*.adapter.ts` (and any other persistence adapter),
 `transport/<surface>/<name>.api.ts` (`api-trpc`, `api-rest`, `public-rest`, `api-mcp`,
-`api-ws`), and free-standing `stores/`, `projections/`, `subscribers/`, `processes/`
-and `intents/` folders (their roles now live under `eventing/`). Do not add new ones.
+`api-ws`). The free-standing `stores/`, `projections/`, `subscribers/`, `processes/`
+and `intents/` folders are GONE, not merely discouraged: all 259 files moved under
+`eventing/` and the empty folders were deleted. Event sourcing is one folder, not six.
+Do not reintroduce them.
 
-There is no `composition/`, `registration/`, `lifecycle/`, `eventing/`, `utils/`,
-`helpers/`, `lib/` or `domain/`. Anything under `__tests__/` at any depth is exempt from
+There is no `composition/`, `registration/`, `lifecycle/`, `utils/`,
+`helpers/`, `lib/` or `domain/`. (`eventing/` used to be listed here and is not:
+the grammar above names it, and it is where event sourcing now lives.) Anything under `__tests__/` at any depth is exempt from
 the grammar. Server packages declare `"imports": { "#*": { "types": "./dist/*.d.ts", "default": "./src/*.ts" } }`
 so internal imports read `import { AnnotationApp } from "#app/annotation.app"`.
 
@@ -375,5 +378,5 @@ Every ClickHouse query starts `WHERE TenantId = {tenantId:String}` and filters t
 partition key column when a date range exists; read
 `dev/docs/best_practices/clickhouse-queries.md` first. On the API, eventing is producer
 only: a service may send a command on a pipeline; process managers, appends and folds
-run in the worker. A `subscribers/*.subscriber.ts` must be idempotent
+run in the worker. An `eventing/*.subscriber.ts` must be idempotent
 (`eventing-subscriber-idempotency`).

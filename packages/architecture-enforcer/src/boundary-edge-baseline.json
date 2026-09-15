@@ -1023,12 +1023,32 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./projections/trace-derived.projection.ts",
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/span-storage.store.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./projections/trace-summary.projection.ts",
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/trace-derived.projection.ts",
+      "measured": "2026-09-10",
+      "expires": "2026-10-01"
+    },
+    {
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/trace-derived.store.ts",
+      "measured": "2026-09-10",
+      "expires": "2026-10-01"
+    },
+    {
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/trace-rollup.store.ts",
+      "measured": "2026-09-10",
+      "expires": "2026-10-01"
+    },
+    {
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/trace-summary.projection.ts",
+      "measured": "2026-09-10",
+      "expires": "2026-10-01"
+    },
+    {
+      "key": "private-runtime-export|modules/trace/server/src/index.ts|./eventing/trace-summary.store.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1649,26 +1669,6 @@
     },
     {
       "key": "private-runtime-export|modules/trace/server/src/index.ts|./services/viewer/trace-visibility-window.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./stores/eventing/eventing.span-storage.store.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./stores/eventing/eventing.trace-derived.store.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./stores/eventing/eventing.trace-rollup.store.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/trace/server/src/index.ts|./stores/eventing/eventing.trace-summary.store.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

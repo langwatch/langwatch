@@ -711,7 +711,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/api-key/server/src/processes/agent-sandbox-key-reap.process.ts|AgentSandboxKeyReapIntents",
+      "key": "modules/api-key/server/src/eventing/agent-sandbox-key-reap.process.ts|AgentSandboxKeyReapIntents",
       "measured": "2026-09-10"
     },
     {
@@ -755,6 +755,14 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "modules/authz/server/src/eventing/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_EVENT_TYPES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/eventing/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_PROJECTION_NAME",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|AuthzEngineDiff",
       "measured": "2026-09-10"
     },
@@ -788,14 +796,6 @@
     },
     {
       "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|LegacyImportAuthzGrantMigrationOptions",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/authz/server/src/projections/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_EVENT_TYPES",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/authz/server/src/projections/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_PROJECTION_NAME",
       "measured": "2026-09-10"
     },
     {
@@ -939,35 +939,35 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "modules/automation/server/src/eventing/graph-alert-sweep.process.ts|GRAPH_ALERT_SWEEP_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/trigger-settlement.process.ts|OverflowFlush",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/trigger-settlement.process.ts|PendingMatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/trigger-settlement.process.ts|PersistPage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/trigger-settlement.process.ts|TRIGGER_SETTLEMENT_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/trigger-settlement.process.ts|TriggerSettlementState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/eventing/webhook-delivery-prune.process.ts|WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "modules/automation/server/src/fixtures/graph-activity.fixture.ts|TriggerRow",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/graph-alert-sweep.process.ts|GRAPH_ALERT_SWEEP_PROCESS_NAME",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|OverflowFlush",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|PendingMatch",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|PersistPage",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|TRIGGER_SETTLEMENT_PROCESS_NAME",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|TriggerSettlementState",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/automation/server/src/processes/webhook-delivery-prune.process.ts|WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME",
       "measured": "2026-09-10"
     },
     {
@@ -1055,43 +1055,59 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-log.projection.ts|CodingAgentSessionLogProjectionInput",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-log.projection.ts|CodingAgentSessionLogProjectionInput",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-metric.projection.ts|CodingAgentSessionMetricProjectionInput",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-metric.projection.ts|CodingAgentSessionMetricProjectionInput",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-metric.projection.ts|MetricFactsView",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-metric.projection.ts|MetricFactsView",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|CodingAgentSessionSpanCandidate",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-span.projection.ts|CodingAgentSessionSpanCandidate",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|CodingAgentSessionSpanProjectionInput",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-span.projection.ts|CodingAgentSessionSpanProjectionInput",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|SpanFactsView",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-span.projection.ts|SpanFactsView",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts|SessionStep",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session-state.projection.ts|SessionStep",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CODING_AGENT_SESSION_COALESCE_MAX_BATCH",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session.projection.ts|CODING_AGENT_SESSION_COALESCE_MAX_BATCH",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CODING_AGENT_SESSION_READ_WINDOW_MS",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session.projection.ts|CODING_AGENT_SESSION_READ_WINDOW_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CodingAgentSessionMetricSeriesRow",
+      "key": "modules/coding-agent/server/src/eventing/coding-agent-session.projection.ts|CodingAgentSessionMetricSeriesRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/eventing/pull-request-mapping.subscriber.ts|PULL_REQUEST_MAPPING_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/eventing/pull-request-mapping.subscriber.ts|pullRequestMappingGroupKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/eventing/pull-request-mapping.subscriber.ts|pullRequestMappingJobId",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/eventing/pull-request-mapping.subscriber.ts|pullRequestMappingStateSchema",
       "measured": "2026-09-10"
     },
     {
@@ -1156,22 +1172,6 @@
     },
     {
       "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts|CodingAgentUsageTotals",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|PULL_REQUEST_MAPPING_WINDOW_MS",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingGroupKey",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingJobId",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingStateSchema",
       "measured": "2026-09-10"
     },
     {
@@ -1339,23 +1339,23 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_COALESCE_MAX_BATCH",
+      "key": "modules/evaluation/server/src/eventing/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_COALESCE_MAX_BATCH",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_READ_WINDOW_MS",
+      "key": "modules/evaluation/server/src/eventing/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_READ_WINDOW_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EvaluationAnalyticsRow",
+      "key": "modules/evaluation/server/src/eventing/evaluation-analytics-fold.projection.ts|EvaluationAnalyticsRow",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/evaluation/server/src/projections/evaluation-run.projection.ts|EvaluationRun",
+      "key": "modules/evaluation/server/src/eventing/evaluation-run.projection.ts|EvaluationRun",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/evaluation/server/src/projections/evaluation-run.projection.ts|EvaluationRunData",
+      "key": "modules/evaluation/server/src/eventing/evaluation-run.projection.ts|EvaluationRunData",
       "measured": "2026-09-10"
     },
     {
@@ -1395,55 +1395,55 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "modules/experiment/server/src/eventing/experiment-cell-error-events.process.ts|NO_INPUTS_RESOLVED",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-cell-error-events.process.ts|evaluatorDisplayName",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-comparison-candidates.process.ts|variantDisplayNameFor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-comparison-candidates.process.ts|variantIdentifierFor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-connected-target.process.ts|ConnectedTargetCall",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-result-mapping.process.ts|isEvaluatorNode",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-event-guards.process.ts|isTraceMetricsComputedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-event-stream.process.ts|EventStream",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-events.process.ts|ExperimentRunCompletedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-events.process.ts|ExperimentRunStartedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-events.process.ts|TraceMetricsComputedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/eventing/experiment-run-semaphore.process.ts|Semaphore",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "modules/experiment/server/src/experiment.server.ts|ExperimentAppDependencies",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-cell-error-events.process.ts|NO_INPUTS_RESOLVED",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-cell-error-events.process.ts|evaluatorDisplayName",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-comparison-candidates.process.ts|variantDisplayNameFor",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-comparison-candidates.process.ts|variantIdentifierFor",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-connected-target.process.ts|ConnectedTargetCall",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-result-mapping.process.ts|isEvaluatorNode",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-event-guards.process.ts|isTraceMetricsComputedEvent",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-event-stream.process.ts|EventStream",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|ExperimentRunCompletedEventData",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|ExperimentRunStartedEventData",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|TraceMetricsComputedEventData",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/experiment/server/src/processes/experiment-run-semaphore.process.ts|Semaphore",
       "measured": "2026-09-10"
     },
     {
@@ -1523,15 +1523,15 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "modules/gateway/server/src/eventing/gateway-spend.projection.ts|GATEWAY_SPEND_PIPELINE_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/eventing/gateway-spend.projection.ts|GatewaySpendStatus",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "modules/gateway/server/src/gateway.server.ts|GatewayInfrastructure",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/projections/gateway-spend.projection.ts|GATEWAY_SPEND_PIPELINE_NAME",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/projections/gateway-spend.projection.ts|GatewaySpendStatus",
       "measured": "2026-09-10"
     },
     {
@@ -1847,11 +1847,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/github/server/src/github.server.ts|GithubInfrastructure",
+      "key": "modules/github/server/src/eventing/github-branch-recheck.intent.ts|GithubBranchRecheckDeps",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/github/server/src/intents/github-branch-recheck.intent.ts|GithubBranchRecheckDeps",
+      "key": "modules/github/server/src/github.server.ts|GithubInfrastructure",
       "measured": "2026-09-10"
     },
     {
@@ -1883,431 +1883,431 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/join-request.intent.ts|ApproveJoinPayload",
+      "key": "modules/identity/server/src/eventing/connection-teardown.process.ts|CONNECTION_TEARDOWN_GRACE_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/join-request.intent.ts|ExpireJoinPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|IdentifierAttachedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/join-request.intent.ts|RejectJoinPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|IdentifierDeadEndedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/join-request.intent.ts|RequestJoinPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|IdentifierDetachedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/join-request.intent.ts|WithdrawJoinPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|IdentifierVerifiedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ActivateConnectionPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|LinkProposedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ApproveDomainClaimPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|PrimaryChangedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|AttestDomainPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|UserErasedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ClaimDomainPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|identifierAttachedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|CompleteTeardownPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|identifierDeadEndedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|DiscardConnectionPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|identifierDetachedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|GrandfatherConnectionPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|identifierVerifiedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RegisterConnectionPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|identityEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RejectDomainClaimPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|linkProposedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RequestTeardownPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|primaryChangedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RequestVerificationPayload",
+      "key": "modules/identity/server/src/eventing/identity-state.projection.ts|userErasedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ResumeConnectionPayload",
+      "key": "modules/identity/server/src/eventing/join-request-lifecycle.process.ts|JoinRequestLifecycleIntents",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|SuspendConnectionPayload",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JOIN_REQUEST_PROJECTION_NAME",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|VerifyDomainPayload",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JoinApprovedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/processes/connection-teardown.process.ts|CONNECTION_TEARDOWN_GRACE_MS",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JoinExpiredEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/processes/join-request-lifecycle.process.ts|JoinRequestLifecycleIntents",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JoinRejectedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierAttachedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JoinRequestedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierDeadEndedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|JoinWithdrawnEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierDetachedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinApprovedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierVerifiedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinExpiredEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|LinkProposedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinRejectedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|PrimaryChangedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinRequestEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|UserErasedEvent",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinRequestedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierAttachedEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request-state.projection.ts|joinWithdrawnEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierDeadEndedEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request.intent.ts|ApproveJoinPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierDetachedEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request.intent.ts|ExpireJoinPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierVerifiedEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request.intent.ts|RejectJoinPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identityEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request.intent.ts|RequestJoinPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|linkProposedEventSchema",
+      "key": "modules/identity/server/src/eventing/join-request.intent.ts|WithdrawJoinPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|primaryChangedEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|BackupCodeConsumedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/identity-state.projection.ts|userErasedEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|BackupCodesRegeneratedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JOIN_REQUEST_PROJECTION_NAME",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|MfaConfirmedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinApprovedEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|MfaDisabledEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinExpiredEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|MfaEnrolledEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinRejectedEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|MfaEnrollmentExpiredEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinRequestedEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|MfaVerificationFailedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinWithdrawnEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|backupCodeConsumedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinApprovedEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|backupCodesRegeneratedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinExpiredEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaConfirmedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRejectedEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaDisabledEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRequestEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaEnrolledEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRequestedEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaEnrollmentExpiredEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinWithdrawnEventSchema",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|BackupCodeConsumedEvent",
+      "key": "modules/identity/server/src/eventing/mfa-enrollment-state.projection.ts|mfaVerificationFailedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|BackupCodesRegeneratedEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|SCIM_SYNC_PROJECTION_NAME",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaConfirmedEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimApplyFailedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaDisabledEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimApplyRecoveredEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaEnrolledEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimApplyRetiredEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaEnrollmentExpiredEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimGroupMappedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaVerificationFailedEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimTokenIssuedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|backupCodeConsumedEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimTokenRevokedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|backupCodesRegeneratedEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|ScimUserPushedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaConfirmedEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimApplyFailedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaDisabledEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimApplyRecoveredEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEnrolledEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimApplyRetiredEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEnrollmentExpiredEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimGroupMappedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimSyncEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaVerificationFailedEventSchema",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimTokenIssuedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|SCIM_SYNC_PROJECTION_NAME",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimTokenRevokedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyFailedEvent",
+      "key": "modules/identity/server/src/eventing/scim-sync-state.projection.ts|scimUserPushedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyRecoveredEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionActivatedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyRetiredEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionDiscardedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimGroupMappedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionRegisteredEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimTokenIssuedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionResumedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimTokenRevokedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionSuspendedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimUserPushedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ConnectionTornDownEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyFailedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|DomainAttestedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyRecoveredEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|DomainClaimApprovedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyRetiredEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|DomainClaimRejectedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimGroupMappedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|DomainClaimedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimSyncEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|DomainVerifiedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimTokenIssuedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|SSO_CONNECTION_PROJECTION_NAME",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimTokenRevokedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|TeardownRequestedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimUserPushedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|VerificationRequestedEvent",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionActivatedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionActivatedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionDiscardedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionDiscardedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionRegisteredEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionRegisteredEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionResumedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionResumedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionSuspendedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionSuspendedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionTornDownEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|connectionTornDownEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainAttestedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|domainAttestedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimApprovedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|domainClaimApprovedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimRejectedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|domainClaimRejectedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|domainClaimedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainVerifiedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|domainVerifiedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|SSO_CONNECTION_PROJECTION_NAME",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|ssoConnectionEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|TeardownRequestedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|teardownRequestedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|VerificationRequestedEvent",
+      "key": "modules/identity/server/src/eventing/sso-connection-state.projection.ts|verificationRequestedEventSchema",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionActivatedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|ActivateConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionDiscardedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|ApproveDomainClaimPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionRegisteredEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|AttestDomainPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionResumedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|ClaimDomainPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionSuspendedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|CompleteTeardownPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionTornDownEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|DiscardConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainAttestedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|GrandfatherConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimApprovedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|RegisterConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimRejectedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|RejectDomainClaimPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|RequestTeardownPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainVerifiedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|RequestVerificationPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ssoConnectionEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|ResumeConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|teardownRequestedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|SuspendConnectionPayload",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|verificationRequestedEventSchema",
+      "key": "modules/identity/server/src/eventing/sso-connection.intent.ts|VerifyDomainPayload",
       "measured": "2026-09-10"
     },
     {
@@ -2419,71 +2419,79 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|LangyAcceptAgentTurnCommandData",
+      "key": "modules/langy/server/src/eventing/langy-conversation-process.schemas.ts|LANGY_OUTBOX_LEASE_MARGIN_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|langyGenerateTitleIntentSchema",
+      "key": "modules/langy/server/src/eventing/langy-conversation-state.projection.ts|LangyConversationState",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|langyWorkerDispatchIntentSchema",
+      "key": "modules/langy/server/src/eventing/langy-conversation-turn.projection.ts|LangyConversationTurn",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.intent.ts|LangyAcceptAgentTurnCommandData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.intent.ts|langyGenerateTitleIntentSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.intent.ts|langyWorkerDispatchIntentSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|INITIAL_LANGY_PROCESS_STATE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleAgentResponded",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleAgentResponseFailed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleAgentTurnAccepted",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleArchived",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleHandoffConsumed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleHandoffPending",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleMetadataUpdated",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleNoDecision",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.process.ts|handleTitleGenerated",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.subscriber.ts|LangyTurnHandoffReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/eventing/langy-conversation.subscriber.ts|LangyTurnHandoffRecord",
       "measured": "2026-09-10"
     },
     {
       "key": "modules/langy/server/src/langy.server.ts|LangyInfrastructure",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation-process.types.ts|LANGY_OUTBOX_LEASE_MARGIN_MS",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|INITIAL_LANGY_PROCESS_STATE",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentResponded",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentResponseFailed",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentTurnAccepted",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleArchived",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleHandoffConsumed",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleHandoffPending",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleMetadataUpdated",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleNoDecision",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleTitleGenerated",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/projections/langy-conversation-state.projection.ts|LangyConversationState",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/projections/langy-conversation-turn.projection.ts|LangyConversationTurn",
       "measured": "2026-09-10"
     },
     {
@@ -2656,14 +2664,6 @@
     },
     {
       "key": "modules/langy/server/src/services/langy.service.ts|LangyTrustedMessageReader",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/subscribers/langy-conversation.subscriber.ts|LangyTurnHandoffReader",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/server/src/subscribers/langy-conversation.subscriber.ts|LangyTurnHandoffRecord",
       "measured": "2026-09-10"
     },
     {
@@ -3123,7 +3123,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/scenario/server/src/projections/simulation-run-state.projection.ts|SimulationMessageRow",
+      "key": "modules/scenario/server/src/eventing/simulation-run-state.projection.ts|SimulationMessageRow",
       "measured": "2026-09-10"
     },
     {
@@ -3311,7 +3311,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/suite/server/src/projections/suite-run-state.projection.ts|SuiteRunState",
+      "key": "modules/suite/server/src/eventing/suite-run-state.projection.ts|SuiteRunState",
       "measured": "2026-09-10"
     },
     {
@@ -3359,15 +3359,15 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|INITIAL_TOPIC_CLUSTERING_STATE",
+      "key": "modules/topic/server/src/eventing/topic-clustering.process.ts|INITIAL_TOPIC_CLUSTERING_STATE",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|TopicClusteringProcessEventView",
+      "key": "modules/topic/server/src/eventing/topic-clustering.process.ts|TopicClusteringProcessEventView",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|topicClusteringProcessEventViewSchema",
+      "key": "modules/topic/server/src/eventing/topic-clustering.process.ts|topicClusteringProcessEventViewSchema",
       "measured": "2026-09-10"
     },
     {
@@ -3407,39 +3407,51 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_ATTR_KEYS",
+      "key": "modules/trace/server/src/eventing/span-storage-broadcast.subscriber.ts|SpanStorageBroadcastSubscriberDeps",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_COALESCE_MAX_BATCH",
+      "key": "modules/trace/server/src/eventing/trace-derived.projection.ts|TRACE_ANALYTICS_ATTR_KEYS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_HAS_SIGNAL_SQL",
+      "key": "modules/trace/server/src/eventing/trace-derived.projection.ts|TRACE_ANALYTICS_COALESCE_MAX_BATCH",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_READ_WINDOW_MS",
+      "key": "modules/trace/server/src/eventing/trace-derived.projection.ts|TRACE_ANALYTICS_HAS_SIGNAL_SQL",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CACHE_CREATION_1H_TOKENS",
+      "key": "modules/trace/server/src/eventing/trace-derived.projection.ts|TRACE_ANALYTICS_READ_WINDOW_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CACHE_CREATION_5M_TOKENS",
+      "key": "modules/trace/server/src/eventing/trace-summary.projection.ts|RESERVED_CACHE_CREATION_1H_TOKENS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_AT_MS",
+      "key": "modules/trace/server/src/eventing/trace-summary.projection.ts|RESERVED_CACHE_CREATION_5M_TOKENS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_TOKENS",
+      "key": "modules/trace/server/src/eventing/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_AT_MS",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|TRACE_SUMMARY_READ_WINDOW_MS",
+      "key": "modules/trace/server/src/eventing/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_TOKENS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/eventing/trace-summary.projection.ts|TRACE_SUMMARY_READ_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/eventing/trace-update-broadcast.subscriber.ts|TraceUpdateBroadcastSubscriberDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/eventing/tracked-event-sync.subscriber.ts|ReconstructedTrackedEvent",
       "measured": "2026-09-10"
     },
     {
@@ -3784,18 +3796,6 @@
     },
     {
       "key": "modules/trace/server/src/services/support/trace-evaluation-mapping.service.ts|EVALUATION_RUN_COLUMNS_LIGHT",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/trace/server/src/subscribers/span-storage-broadcast.subscriber.ts|SpanStorageBroadcastSubscriberDeps",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/trace/server/src/subscribers/trace-update-broadcast.subscriber.ts|TraceUpdateBroadcastSubscriberDeps",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/trace/server/src/subscribers/tracked-event-sync.subscriber.ts|ReconstructedTrackedEvent",
       "measured": "2026-09-10"
     },
     {

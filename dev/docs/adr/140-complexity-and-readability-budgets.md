@@ -148,3 +148,32 @@ Two consequences worth stating, because both were bugs in the first draft:
   tier. It is contiguous with the block, so it merges into it and makes it one
   line longer, it does not suppress a report anchored at the block's first
   line, and its own length trips the 100-column error.
+
+## Amendment, 2026-09-15: complexity is attributed to a block, not to a leaf
+
+`cognitive-complexity` reported the score and then named "the heaviest
+contributor", picked as the single AST node with the largest delta. That is the
+wrong question, and it answered badly in exactly the case the rule exists for.
+
+A function whose score is nesting spread thin has many nodes tied at the top
+delta, and the tie broke on walk order — first one wins. A device-flow poll loop
+scoring 25 was reported against a `spent ? null : approval` ternary worth 3,
+with the fix "extract that ternary expression into its own named function": an
+extraction that removes 3 of 25 and leaves the shape untouched. The if/else
+chain worth 11 and the catch block worth 11 went unmentioned.
+
+Score is now accumulated per block — each nesting construct carries what its
+whole subtree contributed, an `else if` continuing the chain its head opened
+rather than starting one of its own — and the report names the block with the
+largest share, printing the share so the reader can judge it. Two guards follow
+from that:
+
+- A block accounting for the **entire** score is never named. It contains every
+  other construct, so extracting it only renames the function.
+- When even the largest block carries less than a third, there is no target to
+  name, and inventing one prescribes a refactor that will not pay. The rule
+  reports `tooComplexSpread` instead, says how many blocks the score is spread
+  across, and asks for the nesting to come down rather than for an extraction.
+
+The poll loop now reads: complexity 25, the if/else chain at line 345 carries 11
+of it — which is both true and actionable.

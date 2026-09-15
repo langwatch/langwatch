@@ -77,6 +77,45 @@ and layout version. The per-module half is architecture-enforcer, because it nee
 the catalogue, the manifests and the whole tree of a module at once. Neither
 half can be expressed in oxlint configuration at all.
 
+## Amendment, 2026-09-15: event sourcing is one folder, not six
+
+The grammar always named `eventing/<subject>.<kind>.ts` and always allowed eight
+kinds under it -- `events`, `commands`, `schemas`, `projection`, `subscriber`,
+`process`, `intent`, `store` -- but around fifty modules still kept those artifacts
+in free-standing `projections/`, `intents/`, `processes/`, `subscribers/` and
+`stores/eventing/` folders, which the grammar did not name at all. 259 files moved
+into `eventing/` and 528 import specifiers followed them; the emptied folders are
+deleted. `feature-source-layout` fell by 133 and the whole oxlint total fell by
+102, typecheck unchanged at its 114-error baseline across the same 40 files.
+
+Two consequences are worth recording because neither is obvious:
+
+**A path-keyed baseline does not survive a rename, and it fails silently.**
+The move appeared to add 208 findings across `stand-in-cast` (98),
+`test-description-is-an-action` (23), `shared-setup-is-a-hook` (17),
+`cognitive-complexity` (12), `temporal-only` (5) and others. None of it was real.
+Every one of those rules reads the shrink-only register, whose rows are keyed
+`rule|path`, and 325 of those rows named a path that had just stopped existing.
+A row that matches nothing does not announce itself -- the rule simply reports
+debt that was already measured and accepted, as if it were new. Re-keying the
+rows to the moved paths (and re-sorting the register, which the rename had put
+out of codepoint order) returned every one of those rules to its pre-move count.
+The lesson is the rename discipline: **moving a file is also an edit to every
+baseline that names it**, and the only signal you get otherwise is a count that
+went up for no stated reason.
+
+**The layer table is keyed by folder, so one folder cannot mean eight things.**
+`repository-takes-only-its-store` reads `LAYER_MAY_TAKE`, whose rows are folder
+names. While stores sat in `stores/` -- a folder absent from the table -- a
+repository naming its store was allowed by accident rather than by decision. Under
+`eventing/` the same import reads as a crossing into the eventing pipeline, and the
+rule named after letting a repository take its store began refusing exactly that.
+The exemption is narrow and lives in `crossingFor`: a repository may name an
+`eventing/*.store.ts` and nothing else in that folder. A projection, process,
+subscriber, intent or pipeline is still a crossing, and 22 such imports now
+report. These are the move's only genuine new findings -- pre-existing coupling
+that was invisible because it lived in folders the layer table never named.
+
 ## Consequences
 
 The grammar is what makes the module skills work: `module`, `module-review` and
