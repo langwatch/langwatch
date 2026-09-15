@@ -8,11 +8,10 @@ export {
   storedObjectRest,
 } from "./transport/stored-object.rest.ts";
 export { storedObjectTrpcTransport } from "./transport/stored-object.trpc.ts";
-export {
-  StoredObjectApp,
-  type StoredObjectFileReader,
-  type StoredObjectFileStreamRead,
-  type StoredObjectInfrastructure,
+export type {
+  StoredObjectFileReader,
+  StoredObjectFileStreamRead,
+  StoredObjectInfrastructure,
 } from "./app/stored-object.app.ts";
 export {
   FILE_VIEW_PERMISSIONS,
@@ -26,19 +25,16 @@ export {
   type StoredObjectFileCaller,
   type StoredObjectFileViewPermission,
 } from "./transport/stored-object-file.rest.ts";
-export { ClickhouseStoredObjectOwnerLookupRuntimeRepository as StoredObjectOwnerLookupRuntimeAdapter } from "./repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts";
 export {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectAzureDestination,
   StoredObjectProjectS3Config,
   type StoredObjectStorageSelection,
 } from "./services/stored-object-destination-policy.service.ts";
-export { StoredObjectStorageRegistryAdapter } from "./services/stored-object-storage-registry.service.ts";
 export type {
   StoredObjectStorageDriver,
   StoredObjectStorageDriverFactory,
 } from "./repositories/stored-object-blob.repository.ts";
-export { StoredObjectStoragePortAdapter } from "./services/stored-object-storage.service.ts";
 export { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
 export {
   ALLOW_INSECURE_TOKEN_ENDPOINT_ENV,
@@ -49,10 +45,8 @@ export {
   type AzureInjectedIdentity,
   type AzureTokenAuthMode,
 } from "./services/azure-blob-credentials.service.ts";
-export {
-  AzureBlobTokenProviderAdapter,
-  AzureTokenExchangeError,
-  type TokenModeCredentials,
+export type {
+  TokenModeCredentials,
 } from "./services/azure-blob-token-provider.service.ts";
 export {
   StoredObjectProjectDestinationResolver,
@@ -72,17 +66,12 @@ export {
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "./app/stored-object.members.ts";
-export { StoredObjectLegacyLocation } from "./repositories/stored-object-legacy-location.repository.ts";
-export {
-  StoredObjectLegacySource,
-  type LegacyStoredObjectRow,
+export type {
+  LegacyStoredObjectRow,
 } from "./repositories/stored-object-legacy-source.repository.ts";
-export { StoredObjectLegacyWriterDrain } from "./repositories/stored-object-legacy-writer-drain.repository.ts";
-export { StoredObjectProjectSource } from "./repositories/stored-object-project-source.repository.ts";
-export {
-  StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectory,
-  type StoredObjectOwnerClickHouseClient,
-  type StoredObjectOwnerClickHouseInstance,
+export type {
+  StoredObjectOwnerClickHouseClient,
+  StoredObjectOwnerClickHouseInstance,
 } from "./repositories/stored-object-owner-instance-directory.repository.ts";
 export {
   type StoredObjectOwnerLookupTelemetry,
@@ -101,7 +90,7 @@ export {
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
 } from "./app/stored-object.members.ts";
-export { storedObjectSchema, type StoredObject } from "./rules/stored-object-row.rules.ts";
+export type { StoredObject } from "./rules/stored-object-row.rules.ts";
 export {
   StoredObjectsService,
   deriveStoredObjectId,
@@ -129,15 +118,13 @@ export {
   type MigrationPageRequest,
   type MigrationProject,
 } from "./repositories/object-storage-migration-inventory.repository.ts";
-export {
-  MigrationBlockedError,
-  ObjectStorageMigrationService,
-  type MigrationCopyReport,
-  type MigrationFinalizeReport,
-  type MigrationPlan,
-  type MigrationProvider,
-  type MigrationStorageEndpoint,
-  type QueueMigrationBlocker,
+export type {
+  MigrationCopyReport,
+  MigrationFinalizeReport,
+  MigrationPlan,
+  MigrationProvider,
+  MigrationStorageEndpoint,
+  QueueMigrationBlocker,
 } from "./services/object-storage-migration.service.ts";
 export {
   MigrationBlobS3Repository,
@@ -148,9 +135,8 @@ export {
   MigrationCutoverAuditRedisRepository,
   type MigrationCutoverRedisConfig,
 } from "#repositories/redis/redis.object-storage-migration-audit.repository";
-export {
-  GroupQueueObjectStorageMigrationAdapter,
-  type QueueAuditRedis,
+export type {
+  QueueAuditRedis,
 } from "./services/group-queue.object-storage-migration.service.ts";
 export { PayloadStaging, type StagedPayload } from "./repositories/payload-staging.repository.ts";
 export {
@@ -158,7 +144,12 @@ export {
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
 } from "#repositories/s3/s3.payload-staging.repository";
+export { AbsentPayloadStagingAdapter } from "./services/absent-payload-staging.service.ts";
 export {
-  AbsentPayloadStagingAdapter,
-  PayloadStagingUnavailableError,
-} from "./services/absent-payload-staging.service.ts";
+  createAbsentPayloadStaging,
+  createPrometheusStoredObjectsTelemetry,
+  createStoredObjectDestinationPolicy,
+  createStoredObjectStorageRuntime,
+  createStoredObjectsService,
+  resolveAzureBlobCredentials,
+} from "./stored-object.server.ts";

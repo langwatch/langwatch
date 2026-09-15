@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  StoredObjectOwnerLookupRuntimeAdapter,
-  StoredObjectOwnerInstanceDirectory,
-  StoredObjectOwnerLookupTelemetry,
+  type StoredObjectOwnerLookupTelemetry,
   type StoredObjectOwnerLookupSpan,
 } from "../index.ts";
+import { ClickhouseStoredObjectOwnerLookupRuntimeRepository as StoredObjectOwnerLookupRuntimeAdapter } from "../repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts";
+import { StoredObjectOwnerInstanceDirectoryRepository as StoredObjectOwnerInstanceDirectory } from "../repositories/stored-object-owner-instance-directory.repository.ts";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
 
 const resolveInstances = vi.fn();

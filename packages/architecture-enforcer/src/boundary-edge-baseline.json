@@ -1138,37 +1138,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./rules/dataset-chunk-lines.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./rules/dataset-chunking.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./rules/dataset-sanitize.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./rules/presigned-upload.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/azure.dataset-storage.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/dataset-chunk.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/dataset-content.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1184,16 +1154,6 @@
     },
     {
       "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/dataset-object-storage-resolver.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/dataset-upload.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/dataset/server/src/index.ts|./services/dataset.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2168,52 +2128,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./app/stored-object.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/clickhouse/clickhouse.stored-object-owner-lookup-runtime.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/object-storage-migration-inventory.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
       "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/payload-staging.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/stored-object-legacy-location.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/stored-object-legacy-source.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/stored-object-legacy-writer-drain.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/stored-object-owner-instance-directory.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./repositories/stored-object-project-source.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./rules/stored-object-row.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2228,21 +2148,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/azure-blob-token-provider.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/group-queue.object-storage-migration.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/object-storage-migration.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/prometheus.stored-objects-telemetry.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -2253,17 +2158,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/stored-object-storage-registry.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/stored-object-storage-runtime.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./services/stored-object-storage.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

@@ -3,8 +3,8 @@ import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
-  StoredObjectStorageRegistryAdapter,
 } from "../index.ts";
+import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
 
 class ProjectConfig extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {

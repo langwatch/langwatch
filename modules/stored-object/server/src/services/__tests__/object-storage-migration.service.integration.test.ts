@@ -5,10 +5,10 @@ import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import {
-  StoredObjectStorageRegistryAdapter,
   type StoredObject,
   type StoredObjectStorageDriver,
 } from "@langwatch/stored-object-server";
+import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
 import type {
   MigrationDataset,
   MigrationProject,
