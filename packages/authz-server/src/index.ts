@@ -89,7 +89,6 @@ export {
   RESOURCE_KIND_TO_DB,
   roleFactToRow,
   roleRowToFact,
-  SHARE_LINK_PERMISSION,
   SHARE_VISIBILITY_BY_PRINCIPAL,
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
   shareVisibilityAudience,

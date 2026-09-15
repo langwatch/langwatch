@@ -1,7 +1,7 @@
 -- ADR-092 §8: a share link states the permission it confers.
 --
 -- Until now every link conferred exactly `traces:view`, spelled as a constant
--- in two places (`SHARE_LINK_PERMISSION` in the ledger's projection mapping,
+-- in two places (`DEFAULT_SHARE_LINK_PERMISSION` in `@langwatch/authz`,
 -- and a literal in the collector). The ledger head already had a column for
 -- the fact - `Grant.permission` - and the compat head did not, so a link that
 -- said anything else could not survive a rollback onto the legacy table.
