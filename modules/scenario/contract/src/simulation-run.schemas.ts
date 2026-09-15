@@ -39,6 +39,7 @@ export const scenarioRunRestResponseSchema = z.object({
   note: z
     .string()
     .nullable()
+    .optional()
     .describe(
       "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
     ),
@@ -46,6 +47,7 @@ export const scenarioRunRestResponseSchema = z.object({
     .number()
     .int()
     .nullable()
+    .optional()
     .describe(
       "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
     ),
@@ -77,6 +79,7 @@ export const simulationBatchSummaryRestSchema = z.object({
   note: z
     .string()
     .nullable()
+    .optional()
     .describe(
       "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
     ),
