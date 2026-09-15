@@ -1,17 +1,7 @@
 /**
- * A ClickHouse endpoint carrying the *shipped* migrations, for analytics
- * suites that must read the real `trace_summaries` / `stored_spans` /
- * `evaluation_runs` schema rather than a transcription of it.
- *
- * The endpoint comes from `startTestClickHouseEndpoints`, so the suite runs
- * against the always-on native server when one is configured and a reusable
- * container otherwise, and the schema comes from `ClickHouseMigrateTask` —
- * the same goose run production performs. A suite that carried its own DDL
- * would prove the transcription, not the tables the product deploys.
- *
- * Every suite here shares one endpoint name on purpose: the migrations take
- * far longer than the assertions, and per-tenant ids already keep the suites'
- * rows apart. The run is memoised per URL per process for the same reason.
+ * A ClickHouse endpoint on the *shipped* migrations, not a hand DDL transcription, so tests read
+ * the schema production actually deploys. One endpoint name is shared across every suite here --
+ * migrations are slow and tenant ids keep rows apart -- and the run is memoised per URL/process.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
@@ -31,10 +21,9 @@ export interface MigratedClickHouse {
 let endpoint: MigratedClickHouse | undefined;
 
 /**
- * Starts (or reuses) the migrated endpoint and returns a client bound to it.
- *
- * `CLICKHOUSE_CLUSTER` is unset for the migration: it switches every engine to
- * its `Replicated` form, which needs a Keeper no test server has.
+ * Starts (or reuses) the migrated endpoint and returns a client bound to it. `CLICKHOUSE_CLUSTER`
+ * is unset for the migration: it switches every engine to `Replicated`, which needs a Keeper no
+ * test server has.
  */
 export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
   if (endpoint) return endpoint;
@@ -80,10 +69,8 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
 }
 
 /**
- * Deletes one tenant's rows from the migrated tables.
- *
- * Mutations rather than a dropped database: the endpoint is shared, and the
- * suites key their rows on ids unique per run.
+ * Deletes one tenant's rows from the migrated tables. Mutations rather than a dropped database:
+ * the endpoint is shared, and suites key their rows on ids unique per run.
  */
 export async function deleteMigratedTenantRows({
   client,
@@ -126,10 +113,8 @@ function generateAttributes(keyCount: number, valueSize: number): Record<string,
 }
 
 /**
- * Seeds `trace_summaries` and `stored_spans` at a chosen attribute width.
- *
- * The width is the point: an unnecessary `SpanAttributes` read only shows up
- * as a memory failure once the column is genuinely wide.
+ * Seeds `trace_summaries` and `stored_spans` at a chosen attribute width -- the point, since an
+ * unnecessary `SpanAttributes` read only shows up as a memory failure once the column is wide.
  */
 export async function seedSpans(
   client: ClickHouseClient,
@@ -245,10 +230,8 @@ export async function seedSpans(
 const MAX_INSERT_BATCH_ROWS = 1000;
 
 /**
- * Rows per insert, from the width of one row.
- *
- * An insert block is held whole, and the test server has a 1 GiB ceiling:
- * sizing the batch by width keeps the block near 8 MB whatever a case seeds.
+ * Rows per insert, from the width of one row: an insert block is held whole and the test server
+ * has a 1 GiB ceiling, so sizing by width keeps the block near 8 MB whatever a case seeds.
  */
 function batchSizeForRowWidth(attributeBytes: number): number {
   const approximateRowBytes = attributeBytes + 500;
@@ -277,10 +260,8 @@ async function insertInBatches({
 }
 
 /**
- * Releases the caches the shared endpoint has accumulated.
- *
- * Every suite in the lane shares one 1 GiB server, so a wide seed can be
- * refused for memory an earlier file left behind. This makes its budget its own.
+ * Releases the caches the shared endpoint has accumulated. Every suite in the lane shares one 1
+ * GiB server, so a wide seed can be refused for memory an earlier file left behind.
  */
 export async function releaseMigratedCaches(client: ClickHouseClient): Promise<void> {
   for (const cache of ["MARK CACHE", "UNCOMPRESSED CACHE", "COMPILED EXPRESSION CACHE"]) {

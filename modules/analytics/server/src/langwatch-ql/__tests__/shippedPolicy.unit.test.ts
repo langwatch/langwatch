@@ -151,11 +151,10 @@ describe("what the LangWatchQL API ships", () => {
       expect(policy.text, "names the AST half").toMatch(/AST/);
       expect(policy.text, "names the grants half").toMatch(/grant/i);
 
-      // Uniqueness second, and it means something different: a reader who follows the index must land on one
-      // answer, not two that could diverge. Read off the *filename*, not the body. A body search cannot tell
-      // an ADR that owns the policy from one that cites it, and the sibling LangWatchQL ADRs legitimately
-      // cite it — 082 and 084 both name table functions and SSRF while deciding something else entirely. An
-      // ADR *titled* for the policy is the ambiguity worth failing on.
+      // Uniqueness second: a reader following the index must land on one answer. Read off the
+      // *filename*, not the body -- a body search can't tell an ADR that owns the policy from one
+      // that merely cites it (082/084 both cite it while deciding something else). An ADR
+      // *titled* for the policy is the real ambiguity worth failing on.
       expect(
         adrs
           .filter(({ name }) => TABLE_FUNCTION_PATTERN.test(name) && /ssrf/i.test(name))

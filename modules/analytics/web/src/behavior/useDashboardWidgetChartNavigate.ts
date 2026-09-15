@@ -1,8 +1,7 @@
 /**
- * Resolves an `LW.navigate(target, params)` call from a sandboxed,
- * semi-trusted chart frame into a real page navigation. `projectId` always
- * comes from host context, never the frame's params, so a widget cannot
- * navigate into a different project's traces.
+ * Resolves an `LW.navigate(target, params)` call from a sandboxed, semi-trusted chart frame
+ * into a real page navigation. `projectId` always comes from host context, never the frame's
+ * params, so a widget cannot navigate into a different project's traces.
  */
 
 import { useCallback } from "react";
@@ -19,12 +18,9 @@ const TRACE_EXPLORER_LENS = "all-traces";
 const KNOWN_LIQE_FIELDS = new Set(Object.keys(SEARCH_FIELDS));
 
 /**
- * Legacy registry field id -> liqe field name (`query-language/metadata.ts`
- * `SEARCH_FIELDS` keys), for the field ids chart authors are known to write
- * and that have a confirmed liqe counterpart. Deliberately NOT exhaustive:
- * legacy fields with no liqe equivalent (e.g. `metadata.value`/`metadata.key`
- * generic KV search, `traces.error`, `events.*`) are left unmapped so they
- * warn-and-drop instead of guessing a wrong field.
+ * Legacy registry field id -> liqe field name (`SEARCH_FIELDS` keys), for ids with a confirmed
+ * liqe counterpart. Deliberately NOT exhaustive: fields with no equivalent (KV search,
+ * `traces.error`, `events.*`) are left unmapped so they warn-and-drop, not guess wrong.
  */
 const FIELD_ID_TO_LIQE_FIELD: Readonly<Record<string, string>> = {
   "metadata.user_id": "user",
@@ -74,9 +70,8 @@ function buildClause({
 }
 
 /**
- * Builds the liqe `q` expression from author params, dropping `projectId`,
- * `startDate`/`endDate` (handled separately for `from`/`to`), and anything
- * unresolvable to a known liqe field (warn-and-drop).
+ * Builds the liqe `q` expression from author params, dropping `projectId`, `startDate`/`endDate`
+ * (handled separately), and anything unresolvable to a known liqe field (warn-and-drop).
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: loops params applying independent per-key resolution/escaping rules; the branches don't interact.
 function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
@@ -135,14 +130,10 @@ function buildTracesFragment(
     fragmentParams.set("from", String(from));
     fragmentParams.set("to", String(to));
   } else if (params.startDate !== undefined || params.endDate !== undefined) {
-    // A bound was named but the pair did not resolve — either only one was
-    // given, or one is unreadable (a malformed date fails `readEpochMs` and
-    // returns undefined). Branch on the parsed values, not on key presence:
-    // a present-but-malformed bound would slip past a key-presence XOR and be
-    // discarded silently. Carrying a lone bound would misrepresent the window
-    // (see `traceExplorerLink.ts`'s identical reasoning), so drop it,
-    // warn-and-drop rather than silently produce a wrong query, and let the
-    // Explorer's own default window stand.
+    // A bound was named but the pair did not resolve -- branch on parsed values, not key
+    // presence, since a present-but-malformed bound would slip past a key-presence XOR silently.
+    // Carrying a lone bound would misrepresent the window (see `traceExplorerLink.ts`), so
+    // warn-and-drop and let the Explorer's own default window stand.
     console.warn(
       "[playground] dropped time range: startDate and endDate must both be set to a readable epoch-ms or date string",
     );

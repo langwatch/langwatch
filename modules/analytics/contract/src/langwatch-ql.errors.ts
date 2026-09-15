@@ -105,11 +105,9 @@ export class LangWatchQLProvisioningIncompleteError extends HandledError {
 }
 
 /**
- * The query declares a bound parameter the request supplied no value for.
- *
- * Caught at the gateway rather than left to the database: ClickHouse answers a
- * missing substitution with `UNKNOWN_QUERY_PARAMETER`, which would reach the
- * caller as an unknown 500 for something they can fix in one edit.
+ * The query declares a bound parameter the request supplied no value for. Caught at the
+ * gateway, not left to the database: ClickHouse answers a missing substitution with
+ * `UNKNOWN_QUERY_PARAMETER`, reaching the caller as an unknown 500 for a one-edit fix.
  */
 export class LangWatchQLParameterMissingError extends HandledError {
   declare readonly code: "lwql_parameter_missing";
@@ -135,12 +133,9 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
- * The refusal sentence for exactly the names the request carried, agreeing in
- * number so a single supplied name does not read as "values for dashboard_context_period_start".
- *
- * Built from the supplied names rather than a fixed phrase because the same
- * code covers the two window bounds and the granularity step, and naming the
- * wrong one tells a caller to remove a parameter it never sent.
+ * The refusal sentence for exactly the names the request carried, agreeing in number so one
+ * name doesn't read as plural. Built from the names, not a fixed phrase, since one code covers
+ * two window bounds and the granularity step -- naming the wrong one misdirects the caller.
  */
 function suppliedParameterSentence(supplied: readonly string[]): string {
   if (supplied.length === 0) {
@@ -204,11 +199,9 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
 }
 
 /**
- * Which of the two granularity failures this is. They share a code because a
- * caller acts on both the same way — fix the granularity declaration or the
- * step behind it — but they are not the same fact, and a message claiming a
- * type mismatch for a well-typed declaration carrying a fractional step sends
- * the reader to the wrong line.
+ * Which of the two granularity failures this is. They share a code -- a caller fixes either
+ * the declaration or the step behind it the same way -- but they are not the same fact: a type
+ * mismatch message for a well-typed, fractional-step declaration points to the wrong line.
  */
 export type LangWatchQLGranularityFault =
   /** Declared as something other than `UInt32`. */

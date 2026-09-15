@@ -1,8 +1,7 @@
 /**
- * The LangWatchQL schema, shaped for the browser and the editor's assistance.
- * A pure projection of the schema response — nothing hard-coded — since a
- * fixed list would survive a permission change, a catalog change, or fewer
- * published datasets, each promising access the validator then refuses.
+ * The LangWatchQL schema, shaped for the browser and editor's assistance -- a pure projection
+ * of the schema response, nothing hard-coded, since a fixed list would survive a permission or
+ * catalog change while promising access the validator then refuses.
  */
 
 import type {
@@ -73,12 +72,9 @@ function columnModel({
 }
 
 /**
- * Maps a schema response onto the model the workbench renders.
- *
- * Total over the response: every dataset it carries becomes a dataset, every
- * column a column, in the order they arrived. Nothing is added and nothing is
- * dropped, so a diff between the response and the surface is a bug in one of
- * them rather than a policy this file quietly applies.
+ * Maps a schema response onto the model the workbench renders -- total over the response: every
+ * dataset and column becomes one, in arrival order. A diff from the response is a bug, not a
+ * policy this file applies.
  */
 export function lwqlSchemaModel(schema: LangWatchQLSchema | undefined): LangWatchQLSchemaModel {
   if (!schema) return EMPTY_LWQL_SCHEMA_MODEL;
@@ -103,12 +99,9 @@ function matches({ haystack, needle }: { haystack: string; needle: string }): bo
 }
 
 /**
- * The model narrowed to what a search term names.
- *
- * A dataset whose own name or description matches keeps all of its columns —
- * the member asked for the dataset, not for part of it. A dataset that matches
- * only through its columns keeps just those columns, so the result reads as an
- * answer rather than as the whole schema with one row highlighted.
+ * The model narrowed to what a search term names. A dataset matching by name/description keeps
+ * all its columns -- the member asked for the dataset. One matching only via columns keeps just
+ * those, so the result reads as an answer, not the whole schema with one row highlighted.
  */
 export function filterLangWatchQLSchemaModel({
   model,
@@ -161,11 +154,9 @@ function columnDocumentation(column: LangWatchQLSchemaColumnModel): string {
 }
 
 /**
- * Every completion the editor offers, derived from the response.
- *
- * Columns the response marks unavailable are left out: they are listed in the
- * browser so the member can see which permission would unlock them, but
- * suggesting one in the editor would be offering a name the validator refuses.
+ * Every completion the editor offers, derived from the response. Columns marked unavailable are
+ * left out: listed in the browser so a member sees which permission unlocks them, but suggesting
+ * one in the editor would offer a name the validator refuses.
  */
 export function lwqlCompletionItems(
   model: LangWatchQLSchemaModel,
@@ -204,12 +195,9 @@ export interface LangWatchQLHover {
 }
 
 /**
- * Hover copy for one identifier, or nothing when the schema does not name it.
- *
- * Matches a dataset by its qualified name or by its bare name, and a column by
- * its bare name or its `<dataset>.<column>` form — the three spellings a member
- * actually writes. An unavailable column resolves to nothing, for the same
- * reason it is never suggested.
+ * Hover copy for one identifier, or nothing when the schema does not name it. Matches a dataset
+ * by qualified or bare name, a column by bare or `<dataset>.<column>` form -- the three spellings
+ * a member writes. An unavailable column resolves to nothing, same as never suggested.
  */
 export function lwqlHoverFor({
   model,

@@ -23,17 +23,15 @@ export interface LangWatchQLExecuteRequest {
   readonly sql: string;
   readonly parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
-   * The period this submission reports over. Travels in its own field, never
-   * among the named parameters — the backend refuses a request that puts a
-   * reserved name there, because that is a chart pinning a window the surface
-   * was supposed to own.
+   * The period this submission reports over, in its own field -- never a named parameter,
+   * since the backend refuses a reserved name there: that would be a chart pinning a window
+   * the surface was supposed to own.
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
   /**
-   * The bucketing step this submission asks for. Travels in its own field for
-   * the same reason the window does — the backend refuses it as a named
-   * parameter, because a chart pinning its own step would ignore the one the
-   * surface showing it chose.
+   * The bucketing step this submission asks for, in its own field for the same reason as the
+   * window: the backend refuses it as a named parameter, since a chart pinning its own step
+   * would ignore the one the surface chose.
    */
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
@@ -51,35 +49,29 @@ export interface LangWatchQLRequestController {
   setSql(sql: string): void;
   setParameters(parameters: Readonly<Record<string, LangWatchQLParameterValue>>): void;
   /**
-   * Sets the period the next submission reports over, or clears it.
-   *
-   * Separate from {@link LangWatchQLRequestController.setParameters} because it
-   * is not a parameter: the surface supplies it, and the backend refuses a
-   * caller that tries to send it as one.
+   * Sets the period the next submission reports over, or clears it. Separate from
+   * `setParameters` because it is not a parameter: the surface supplies it, and the backend
+   * refuses a caller that sends it as one.
    */
   setTimeWindow(timeWindow: LangWatchQLTimeWindowValues | undefined): void;
   /**
-   * Sets the step the next submission buckets at, or clears it.
-   *
-   * Separate from {@link LangWatchQLRequestController.setParameters} for the
-   * same reason the window is: the surface supplies it, and the backend refuses
-   * a caller that sends it as a parameter of its own.
+   * Sets the step the next submission buckets at, or clears it -- separate from
+   * `setParameters` for the same reason as the window: the surface supplies it, and the
+   * backend refuses a caller that sends it as a parameter of its own.
    */
   setGranularity(granularitySeconds: LangWatchQLGranularityStep | undefined): void;
   /** Submits the current draft. No-op while a request is in flight. */
   runQuery(): void;
   /**
-   * Re-sends the LAST SUBMITTED snapshot, whatever the draft now says. Not
-   * what the toolbar calls, deliberately: `submitted` can be ahead of the
-   * visible result (run A, edit to B, run B, cancel — `submitted` is B while
-   * A's rows show), so the toolbar always resubmits the draft instead.
+   * Re-sends the LAST SUBMITTED snapshot, whatever the draft now says -- not what the toolbar
+   * calls, since `submitted` can be ahead of the visible result (run A, edit B, run B, cancel:
+   * `submitted` is B while A's rows still show). The toolbar always resubmits the draft.
    */
   reload(): void;
   /**
-   * Abandons the in-flight request, keeping whatever result was already on
-   * screen. A no-op when nothing is in flight. The aborted request's answer,
-   * should the transport deliver one anyway, carries a superseded submission id
-   * and is dropped by the reducer.
+   * Abandons the in-flight request, keeping whatever result is already on screen; a no-op when
+   * nothing is in flight. If the transport still delivers an answer, it carries a superseded
+   * submission id and is dropped by the reducer.
    */
   cancel(): void;
   /** Aborts anything in flight and stops publishing. */

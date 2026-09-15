@@ -1,9 +1,7 @@
 /**
- * The period a submission reports over. `period_start`/`period_end` are NOT
- * parameters: the backend refuses a request sending either among its own
- * named parameters, so a member's override adjusts the *window*, not a
- * pinned parameter that would ignore the dashboard. Shown as
- * `YYYY-MM-DD HH:MM:SS` UTC, matching what a `WHERE` clause compares against.
+ * The period a submission reports over. `period_start`/`period_end` are NOT parameters --
+ * the backend refuses either as a named parameter, so an override adjusts the *window*, not a
+ * pinned value. Shown as `YYYY-MM-DD HH:MM:SS` UTC, matching what a `WHERE` clause compares.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -26,12 +24,9 @@ import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state
 const TYPED_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
 
 /**
- * A typed instant as epoch milliseconds, or `undefined` when it is not one
- * yet, read as UTC to match what is displayed and what the database is bound
- * with. Shape alone is not enough: `Date.UTC` silently rolls over an
- * out-of-range part (`2026-13-45` becomes 2027-02-14), so the parsed instant
- * must format back to the text that produced it, or it is refused — this also
- * catches halfway-typed states like `09:60` rolling into an hour never shown.
+ * A typed instant as epoch milliseconds, or `undefined`, read as UTC to match the database.
+ * Shape alone isn't enough: `Date.UTC` silently rolls over an out-of-range part, so the parsed
+ * instant must format back to the text that produced it, or it is refused (catches `09:60` too).
  */
 export function parseLangWatchQLTimeWindowText(text: string): number | undefined {
   const match = TYPED_INSTANT.exec(text.trim());
@@ -80,10 +75,9 @@ export interface LangWatchQLTimeWindowEditorProps {
    */
   followsTimeWindow?: boolean | undefined;
   /**
-   * Told whether the visible text names a sendable window — both fields parse
-   * and the start precedes the end. While it is `false` the last committed
-   * window no longer matches what is on screen, and the caller must hold Run
-   * rather than execute a window the member is no longer looking at.
+   * Told whether the visible text names a sendable window -- both fields parse and start
+   * precedes end. While `false`, the last committed window no longer matches the screen, so
+   * the caller must hold Run rather than execute a window the member isn't looking at.
    */
   onSendableChange: (sendable: boolean) => void;
 }
@@ -147,12 +141,9 @@ export function LangWatchQLTimeWindowEditor({
   const [text, setText] = useState<WindowText>(displayed);
   const [shown, setShown] = useState<WindowText>(displayed);
 
-  // The window moved underneath the member — the page's period changed, or they
-  // dropped their override — so what the fields show has to move with it.
-  // Derived during render rather than in an effect, so the fields never paint
-  // one window while the request would carry another. The one divergence left
-  // is the member's own typing, and `onSendableChange` below is what keeps it
-  // from executing.
+  // The window moved underneath the member -- period changed, or they dropped their override --
+  // so the fields must move with it. Derived during render, not an effect, so fields never paint
+  // one window while the request carries another; `onSendableChange` guards the member's typing.
   if (shown.start !== displayed.start || shown.end !== displayed.end) {
     setShown(displayed);
     setText(displayed);

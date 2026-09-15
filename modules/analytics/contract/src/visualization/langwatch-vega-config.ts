@@ -8,11 +8,9 @@
 export type LangWatchQLVegaColorMode = "light" | "dark";
 
 /**
- * The theme values a chart needs, already resolved to literals.
- *
- * Chakra tokens are resolved by the component layer (`useLangwatchVegaTokens`)
- * and handed in, so this module stays a pure function of its inputs and the
- * whole of the chart's appearance can be asserted without rendering anything.
+ * The theme values a chart needs, already resolved to literals. Chakra tokens are resolved
+ * by the component layer (`useLangwatchVegaTokens`) and handed in, so this module stays a pure
+ * function whose whole appearance can be asserted without rendering anything.
  */
 export interface LangwatchVegaTokens {
   readonly fontFamily: string;
@@ -42,10 +40,9 @@ export interface LangwatchVegaTokens {
 export type LangWatchQLVegaConfig = Readonly<Record<string, unknown>>;
 
 /**
- * Sequential and diverging schemes, which are the one part of the palette that
- * cannot be resolved from a token: a ramp has to run *away* from the surface it
- * is drawn on, so light and dark need schemes with opposite luminance
- * direction rather than the same scheme in two colours.
+ * Sequential/diverging schemes, the one palette part no token resolves: a ramp must run
+ * *away* from the surface it's drawn on, so light and dark need opposite luminance direction,
+ * not the same scheme in two colours.
  */
 const CONTINUOUS_SCHEMES: Record<
   LangWatchQLVegaColorMode,
@@ -56,11 +53,9 @@ const CONTINUOUS_SCHEMES: Record<
 };
 
 /**
- * The values a member's own `config` can never override.
- *
- * Kept separate from the rest so the merge in `buildLangWatchQLVegaSpec` has one
- * obvious "and these win" step rather than a hand-audited diff of two large
- * objects.
+ * The values a member's own `config` can never override. Kept separate from the rest so
+ * the merge in `buildLangWatchQLVegaSpec` has one obvious "and these win" step, not a
+ * hand-audited diff of two large objects.
  */
 export function langwatchVegaPinnedConfig({
   tokens,

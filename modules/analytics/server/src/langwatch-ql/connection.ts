@@ -1,14 +1,7 @@
 /**
- * LangWatchQL analytics SQL — the connection shape and how it is derived.
- *
- * The one thing the query path and the provisioning path both need is the
- * restricted identity's connection: the executor serves with it, and
- * provisioning converges the access model that makes it work. Holding the type
- * and its env derivation here keeps that dependency one-way — `executor.ts` and
- * everything under `provisioning/` reach *down* to this leaf, and this leaf
- * reaches back up to neither. Nothing here opens a socket, emits DDL, or knows
- * the view catalog; it is connection shape and connection shape only.
- *
+ * LangWatchQL SQL: the connection shape and its derivation. Both the query path and
+ * provisioning need the restricted identity's connection; holding it here keeps the dependency
+ * one-way -- executor.ts and provisioning/ reach down to this leaf, never the reverse.
  * @see ./executor.ts — builds the client from this connection
  * @see ./provisioning/selfProvisioning.ts — the deploy path that converges it
  * @see specs/analytics/lwql-api.feature
@@ -32,14 +25,9 @@ export interface LangWatchQLConnection {
 }
 
 /**
- * The connection-shape defaults self-provisioning falls back to, mirroring what
- * terraform provisions in the cloud (`langwatch-saas#1126`).
- *
- * Only the two values that describe the *connection* — the restricted identity
- * and the tenant setting — live here. The provisioning-shape defaults (the
- * PostgreSQL reader role, the named collection) stay in `selfProvisioning.ts`
- * with the DDL that uses them, so this leaf carries no dependency on the
- * provisioning modules.
+ * Connection-shape defaults self-provisioning falls back to, mirroring terraform
+ * (`langwatch-saas#1126`). Only the two *connection* values -- restricted identity, tenant
+ * setting -- live here; provisioning-shape defaults stay in `selfProvisioning.ts`.
  */
 export const LWQL_CONNECTION_DEFAULTS = {
   restrictedUser: "langwatch_lwql",
@@ -47,15 +35,9 @@ export const LWQL_CONNECTION_DEFAULTS = {
 } as const;
 
 /**
- * Whether an explicitly-set `LWQL_CLICKHOUSE_URL` names a different server than
- * the one self-provisioning derived, which is refused for the same reason
- * `LWQL_DATABASE` is: provisioning creates the access model on the derived
- * server, so querying another would find none of it.
- *
- * Compared by origin rather than by string — the derived URL is normalised
- * (trailing slash, credentials and path stripped) and an operator's value
- * usually is not, so equal servers rarely spell the same. An unparseable value
- * disagrees with everything, which is the safe direction.
+ * Whether an explicit `LWQL_CLICKHOUSE_URL` names a different server than the derived one --
+ * refused, since provisioning creates the access model on the derived server only. Compared by
+ * origin, not string, since the derived URL is normalised and an operator's rarely is.
  */
 function disagreesWithDerivedServer({
   explicitUrl,
@@ -80,11 +62,9 @@ function disagreesWithDerivedServer({
 }
 
 /**
- * `CLICKHOUSE_URL` reduced to the two things provisioning needs: the server to
- * reach, stripped of its admin credentials and path, and the database that URL
- * names. Every way the value can fail to yield both is refused here, with the
- * reason logged, so the caller carries one "unconfigured" branch instead of
- * six.
+ * `CLICKHOUSE_URL` reduced to what provisioning needs: the server (stripped of admin
+ * credentials and path) and the database it names. Every failure to yield both is refused and
+ * logged here, so the caller carries one "unconfigured" branch instead of six.
  */
 function derivedAdminTarget({
   env,
@@ -134,17 +114,9 @@ function derivedAdminTarget({
 }
 
 /**
- * Derives the restricted ClickHouse connection from the admin URL under
- * `LWQL_SELF_PROVISION`, or reports that this deployment has none.
- *
- * The LangWatchQL database is the admin URL's own database, exactly as the
- * cloud deploys it: the views live beside the fact tables, and the key-map row
- * policies reference the same database the migration created the table in. An
- * explicit `LWQL_DATABASE` or `LWQL_CLICKHOUSE_URL` naming a *different* target
- * is refused (null, logged) rather than honoured — the backfill would write one
- * key map while every row policy reads another, which is a silent
- * all-queries-refused outage, the exact class of misconfiguration
- * self-provisioning exists to remove.
+ * Derives the restricted connection from the admin URL under `LWQL_SELF_PROVISION`, or null.
+ * The database is the admin URL's own -- views sit beside fact tables, row policies reference it
+ * -- so a different `LWQL_DATABASE`/`_URL` is refused: a mismatch is a silent outage.
  */
 export function lwqlDerivedConnectionFromEnv(
   env: NodeJS.ProcessEnv = process.env,

@@ -9,18 +9,9 @@ import {
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
- * Every table subquery the analytics builders emit sits inside a query over
- * `trace_summaries`. ClickHouse resolves an identifier the inner table does not
- * have against the OUTER scope rather than failing, so a range bound naming the
- * wrong column silently becomes a correlated reference to `trace_summaries`.
- * That is accepted in a plain read and only rejected once it lands inside an
- * `IN`, at query time, with "Correlated subqueries are not supported as IN
- * function arguments yet", so the mistake reaches production as a 500 on every
- * evaluation graph rather than as a build or typecheck error.
- *
- * A range bound therefore has to name the bounded table's own partition column.
- * {@link TIME_PARTITIONED_TABLES} holds those, and is itself kept honest against
- * the migrations by `trace-cold-scan-detector.service.unit.test.ts`.
+ * ClickHouse resolves an unknown identifier against the OUTER scope rather than failing, so a
+ * wrong-column bound silently becomes a correlated `trace_summaries` reference, rejected only
+ * at query time as a production 500. Bounds must name `TIME_PARTITIONED_TABLES`'s own column.
  */
 
 const RANGE_BOUND_OR_TABLE =
@@ -62,12 +53,9 @@ const NOT_AN_ALIAS = new Set([
 ]);
 
 /**
- * Columns a table was partitioned by before the current DDL, which long-lived
- * deployments still run on. A bound on one prunes nothing on the unified schema
- * but is what makes the subquery prune on those installs, so it is allowed
- * here. It does NOT belong in {@link TIME_PARTITIONED_TABLES}: that map tells
- * the cold-scan detector which predicate is enough to prune today, and a legacy
- * column there would clear the flag on queries that still scan everything.
+ * Columns a table was partitioned by before the current DDL, which long-lived deployments
+ * still run on -- allowed here though it prunes nothing on the unified schema. Excluded from
+ * `TIME_PARTITIONED_TABLES`: a legacy column there would clear the cold-scan flag wrongly.
  */
 const LEGACY_PARTITION_COLUMNS: Record<string, readonly string[]> = {
   evaluation_runs: ["UpdatedAt"],
@@ -103,13 +91,9 @@ interface RangeBound {
 }
 
 /**
- * The range bound a match represents, if it is one.
- *
- * A bare identifier belongs to the nearest preceding `FROM <table>` — that is
- * the scope ClickHouse would resolve it in, or fail to. A qualified one belongs
- * to its qualifier when the qualifier names a table or an alias of one, since
- * qualifying pins the reference to that table's own column; any other qualifier
- * is an alias of the outer query and is skipped.
+ * The range bound a match represents, if it is one. A bare identifier belongs to the nearest
+ * preceding `FROM <table>` -- ClickHouse's own resolution scope. A qualified one belongs to its
+ * qualifier only when it names a table or an alias of one; any other qualifier is skipped.
  */
 function boundOf({ match, scope }: { match: RegExpExecArray; scope: Scope }): RangeBound | null {
   const [, fromTable, , qualifier, column] = match;
@@ -172,11 +156,9 @@ function rangeBoundColumnsByTable(sql: string): Map<string, Set<string>> {
 }
 
 /**
- * One message per bound that names a column the table cannot prune on, saying
- * which of the two failures it is. A bare name the table lacks is the dangerous
- * one: ClickHouse resolves it outward and the query dies at runtime. A
- * qualified one cannot be captured by the outer scope, so it costs only the
- * pruning it was written to buy.
+ * One message per bound naming a column the table cannot prune on. A bare name is the
+ * dangerous failure -- ClickHouse resolves it outward and the query dies at runtime. A qualified
+ * one only costs the pruning it was written to buy.
  */
 function partitionBoundViolations(sql: string): string[] {
   const violations: string[] = [];
@@ -219,10 +201,9 @@ const EVAL_SERIES = {
 } as const;
 
 /**
- * The bound check reports nothing when a query never reaches the table, so each
- * case has to prove it emitted the subquery it claims to be guarding. Without
- * this the suite passes just as happily on a build that stopped joining
- * evaluation data at all.
+ * The bound check reports nothing when a query never reaches the table, so each case must
+ * prove it emitted the subquery it claims to guard -- otherwise the suite passes just as
+ * happily on a build that stopped joining evaluation data at all.
  */
 function missingJoinViolations(sql: string, table: string): string[] {
   if (sql.includes(`FROM ${table}`)) return [];

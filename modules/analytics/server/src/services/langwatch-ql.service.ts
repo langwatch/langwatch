@@ -1,7 +1,7 @@
 /**
- * Orders catalog-derived policy, validation, reserved-window resolution, restricted execution, then advisory diagnostics. It
- * does not recreate their decisions. Database row policy is the isolation boundary; this service is defence in depth. Server
- * ceilings throw coded errors, result ceilings truncate and mark the response, and neither is caller-controlled.
+ * Orders catalog policy, validation, reserved-window resolution, restricted execution, then
+ * advisory diagnostics -- defence in depth, since the database row policy is the real isolation
+ * boundary. Server and result ceilings throw or truncate on overflow; neither is caller-set.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -50,9 +50,9 @@ const lwqlValidationErrors = LangWatchQLValidationErrorService.create();
 const logger = createLogger("langwatch:analytics:lwql");
 
 /**
- * The run-path half of the reserved-parameter contract, as one step: resolve what the caller's window and step
- * mean for this request, then refuse when any declared reserved name would still reach the database without a
- * value — one refusal naming everything the surface forgot rather than only its first omission.
+ * The run-path half of the reserved-parameter contract: resolve what the caller's window and
+ * step mean for this request, then refuse when any declared reserved name would still reach the
+ * database unfilled -- one refusal naming everything the surface forgot, not just the first.
  */
 function resolveRunGranularityOrRefuseUnfilled({
   declared,
@@ -132,8 +132,8 @@ export interface LangWatchQLExecuteInput {
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /**
-   * The period the surface is showing, supplied by the surface and never by the caller's own parameters. Injected
-   * into the reserved names the statement declares, and ignored by a statement that declares neither.
+   * The period the surface is showing, supplied by the surface and never by the caller's
+   * parameters. Injected into the reserved names the statement declares; ignored otherwise.
    * @see ./timeWindow.ts
    */
   readonly timeWindow?: LangWatchQLTimeWindow;

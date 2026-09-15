@@ -111,11 +111,9 @@ export const lwqlTimeWindowSchema: z.ZodType<LangWatchQLTimeWindow> = z
   })
   .strict();
 /**
- * Deliberately NOT a second `LangWatchQLTimeWindow`. The name belongs to
- * `./analytics.lwql-time-window`, which is import-free and is what the browser
- * loads; this module only adds the zod validator for the same shape. The
- * annotation on the schema above is what stops the two drifting — change one
- * side's shape and it stops compiling here rather than at a call site.
+ * Deliberately NOT a second `LangWatchQLTimeWindow`: that name belongs to the import-free
+ * `./analytics.lwql-time-window` the browser loads; this only adds the zod validator. The
+ * schema's type annotation above stops the two drifting -- a mismatch fails to compile here.
  */
 
 /** The tenant identity a restricted LangWatchQL execution runs as. */
@@ -134,10 +132,9 @@ export type LangWatchQLProtections = Readonly<{
 }>;
 
 /**
- * Who a session-authenticated restricted execution runs as, together with
- * what that member may see. Dashboard reads both off `AnalyticsApi` rather
- * than resolving either itself, so a chart and the workbench agree on one
- * caller's protections.
+ * Who a session-authenticated restricted execution runs as, plus what that member may see.
+ * Dashboard reads both off `AnalyticsApi` rather than resolving either itself, so a chart and
+ * the workbench agree on one caller's protections.
  */
 export type LangWatchQLRunCaller = Readonly<{
   project: LangWatchQLCaller;
@@ -173,12 +170,9 @@ export type LangWatchQLValidationInput = Readonly<{
 }>;
 
 /**
- * Analytics' separate restricted-query lifecycle and trust boundary.
- *
- * Ordinary Analytics reads use AnalyticsService. LangWatchQL owns a distinct
- * tenant capability, restricted database identity, query ceilings, and one
- * process-owned close lifecycle, so consumers such as Dashboard depend only on
- * this contract and never on an Analytics server implementation.
+ * Analytics' separate restricted-query lifecycle and trust boundary. Ordinary Analytics reads
+ * use AnalyticsService; LangWatchQL owns its own tenant capability, restricted identity, query
+ * ceilings and close lifecycle, so consumers depend only on this contract, never a server impl.
  */
 export abstract class LangWatchQLService {
   abstract get available(): boolean;
@@ -189,12 +183,9 @@ export abstract class LangWatchQLService {
 }
 
 /**
- * Which gate closed, when one did.
- *
- * `disabled` is the project's own switch being off, which its administrator can
- * change; `unprovisioned` is a deployment with no LangWatchQL identity to run
- * as, which they cannot. They read as different refusals, so the page has to be
- * able to tell them apart.
+ * Which gate closed, when one did. `disabled` is the project's own switch, which an
+ * administrator can change; `unprovisioned` is a deployment with no LangWatchQL identity, which
+ * they cannot -- different refusals the page has to tell apart.
  */
 export const langWatchQLUnavailableReasonSchema = z.enum(["disabled", "unprovisioned"]);
 export type LangWatchQLUnavailableReason = z.infer<typeof langWatchQLUnavailableReasonSchema>;

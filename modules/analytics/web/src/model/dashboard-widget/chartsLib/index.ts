@@ -1,10 +1,7 @@
 /**
- * `@langwatch/charts` — the chart library a playground widget imports,
- * bundled into the sandboxed frame as `window.LWCharts` (see
- * `buildSrcdoc.ts`). Reads `window.React`/`window.Recharts` directly instead
- * of importing them, so every hook here lands on the SAME React instance the
- * author's component tree uses — a bundled second copy would violate the
- * rules of hooks. No JSX either, for the same build-free reason.
+ * `@langwatch/charts`, bundled into the sandboxed frame as `window.LWCharts` (see
+ * `buildSrcdoc.ts`). Reads `window.React`/`window.Recharts` directly rather than importing
+ * them, so hooks share the author's own instance -- a bundled copy would break the rules of hooks.
  */
 
 type Row = Record<string, unknown>;
@@ -981,9 +978,8 @@ export interface HeatmapProps {
 const HEATMAP_FALLBACK_SCALE: [string, string] = ["#eef2ff", "#4338ca"];
 
 /**
- * Parses `#rgb` or `#rrggbb` to an [r, g, b] triple, or null for anything
- * else. Author `colorScale` is compiled by Babel with no type checking, so a
- * 3-digit shorthand (`#abc`) reaches here as ordinary CSS — expand it rather
+ * Parses `#rgb`/`#rrggbb` to an [r, g, b] triple, or null. Author `colorScale` is Babel-compiled
+ * with no type checking, so a 3-digit shorthand reaches here as ordinary CSS -- expand it rather
  * than let `parseInt("", 16)` produce NaN and blank every cell.
  */
 export function parseHexRgb(hex: string): [number, number, number] | null {
@@ -1197,9 +1193,8 @@ function inferShape(
 }
 
 /**
- * Picks a concrete component from `data`'s shape (or the caller's explicit
- * `kind`/`x`/`y`/`series`) and renders it. See the file header and the
- * per-kind rules in the module docstring at the top of this file.
+ * Picks a concrete component from `data`'s shape (or the caller's explicit `kind`/`x`/`y`/
+ * `series`) and renders it -- see the file header and the per-kind rules in this module.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dispatches on kind/x/y/series through independent fallback checks; the branches don't interact.
 export function LwqlChart({

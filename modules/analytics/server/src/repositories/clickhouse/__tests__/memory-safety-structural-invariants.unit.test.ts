@@ -294,11 +294,11 @@ describe("memory-safety", () => {
         }
       });
 
-      // PORT NOTE (needs-design-review, spec-rebind): the original assertion pinned that the trace service resolved clients through `clickhouse.resolveClient(` — the
-      // one construction path that wrapped every client with `wrapWithDefaultSettings` so memory-safety defaults were injected automatically. `wrapWithDefaultSettings`
-      // no longer exists anywhere in the tree (grepped `packages/` and `apps/`), and `trace-legacy-read.repository.ts` now resolves its client via an injected
-      // `resolveClickHouseClient` factory instead. Whether that factory still guarantees the memory-safety defaults needs a design decision, not a mechanical rename —
-      // left unported rather than rewriting the claim to fit the new shape.
+      // PORT NOTE (needs-design-review, spec-rebind): resolution was pinned through
+      // `clickhouse.resolveClient(`, which wrapped every client with `wrapWithDefaultSettings`
+      // for memory-safety defaults. That function is gone; `trace-legacy-read.repository.ts`
+      // now injects `resolveClickHouseClient` instead, and whether it still guarantees those
+      // defaults is a design decision, not a mechanical rename -- left unported.
       it.skip("clickhouse-trace.service.ts resolves through the App, which wraps with default settings", () => {});
     });
   });

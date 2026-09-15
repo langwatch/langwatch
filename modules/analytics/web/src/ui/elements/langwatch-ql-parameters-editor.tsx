@@ -1,9 +1,7 @@
 /**
- * Named scalar values that travel beside the SQL. The statement is never rewritten to carry
- * them — a placeholder stays a placeholder, keeping the text that runs identical to the text
- * that was written; the only check here is the shape a value has to have to be sendable. When
- * the backend refuses a submission for missing parameters, the names it gave are listed here
- * (not in a page-level message), since the member fixes it in this form.
+ * Named scalar values that travel beside the SQL -- the statement is never rewritten, so a
+ * placeholder stays a placeholder and the text that runs matches what was written; this only
+ * checks a value's shape. Missing-parameter refusals list names here, not in a page message.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -38,11 +36,9 @@ function newRow(): ParameterRow {
 }
 
 /**
- * A row's value, or `undefined` when its text cannot be one.
- *
- * The whole of the local validation: a number has to be a number. Everything
- * else about the value, including whether the statement wanted it at all, is
- * the backend's to decide.
+ * A row's value, or `undefined` when its text cannot be one. The whole of the local
+ * validation: a number has to be a number. Everything else, including whether the statement
+ * wanted it at all, is the backend's to decide.
  */
 function valueOf(row: ParameterRow): LangWatchQLParameterValue | undefined {
   switch (row.kind) {
@@ -80,12 +76,9 @@ function valueTyped(row: ParameterRow): boolean {
 }
 
 /**
- * What stops a row being sent, or `undefined` when it can be — an empty row is not a
- * parameter yet, not a broken one. These are exactly the rows {@link recordOf} drops or
- * collapses, so surfacing them here (and holding Run back) keeps a dropped row from becoming
- * a round-trip naming a parameter the member can see they filled in. A repeated name needs
- * the whole set to see: {@link recordOf} keys by name, so two rows called `limit` collapse to
- * one and the later row silently wins — invisible from either row alone.
+ * What stops a row being sent, or `undefined` when it can be -- an empty row is not a
+ * parameter yet, not a broken one. These are exactly the rows `recordOf` drops or collapses,
+ * including a repeated name: `recordOf` keys by name, so duplicates silently collapse to one.
  */
 function rowProblem({
   row,
@@ -260,12 +253,9 @@ export interface LangWatchQLParametersEditorProps {
    */
   reservedParameters: readonly string[];
   /**
-   * Values to start from — a saved chart's, when one has been opened.
-   *
-   * Read once, at mount. The workbench remounts this form (by key) when it
-   * opens a chart, which is what makes "opening restores the values" true
-   * without this form having to arbitrate between a saved value and one the
-   * member is halfway through typing.
+   * Values to start from -- a saved chart's, when one is open. Read once, at mount: the
+   * workbench remounts this form (by key) on opening a chart, so this form never has to
+   * arbitrate between a saved value and one the member is halfway through typing.
    */
   initialParameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
 }

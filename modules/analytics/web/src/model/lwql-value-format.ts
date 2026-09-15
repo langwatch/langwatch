@@ -6,11 +6,9 @@
 import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
 
 /**
- * Longest rendering a single cell may put on screen before it is clipped.
- *
- * A result cell can hold a whole nested document; a table row that grows to
- * fit one is a table nobody can scan. Clipping is always visible (the token
- * ends in an ellipsis) and never reaches the clipboard.
+ * Longest rendering a single cell may put on screen before it is clipped -- a result cell can
+ * hold a whole nested document, and a table row that grows to fit one is unscannable. Clipping
+ * is always visible (ends in an ellipsis) and never reaches the clipboard.
  */
 export const LWQL_VALUE_PREVIEW_LIMIT = 120;
 
@@ -50,12 +48,9 @@ export type LangWatchQLCell =
     };
 
 /**
- * Reads one column's value out of a result row.
- *
- * Uses `Object.hasOwn` rather than an `undefined` check so that a column the
- * row simply does not carry is distinguishable from one carrying `NULL`. A key
- * present but holding `undefined` says no more than an absent one and is
- * reported the same way. Plain JSON drops such a key on the wire regardless.
+ * Reads one column's value out of a result row, via `Object.hasOwn` rather than an `undefined`
+ * check, so a column the row does not carry is distinguishable from one carrying `NULL`. A key
+ * holding `undefined` reports the same as an absent one -- plain JSON drops it regardless.
  */
 export function readLangWatchQLCell({
   row,
@@ -105,10 +100,9 @@ function scalarCell(text: string): LangWatchQLCell {
 }
 
 /**
- * The indented form is built on first read, not on construction: `pretty` is
- * read only by the expanded view (one cell at a time), so building it eagerly
- * for every row would indent documents nobody looked at. Memoised behind a
- * getter so a re-render of an open cell does not pay for it twice.
+ * The indented form is built on first read, not construction: `pretty` is read only by the
+ * expanded view, so building it eagerly for every row would indent documents nobody looked at.
+ * Memoised behind a getter so a re-render of an open cell does not pay twice.
  */
 function structuredCell(value: unknown): LangWatchQLCell {
   const compact = safeJson(value);
@@ -127,12 +121,9 @@ function structuredCell(value: unknown): LangWatchQLCell {
 }
 
 /**
- * JSON for a value that came off a database response.
- *
- * Guarded because `JSON.stringify` throws on a circular structure and returns
- * `undefined` for a value it cannot represent. Neither can come out of
- * `JSON.parse`, but this function is also reachable from a caller holding a
- * value it built itself, and a cell that throws takes the whole table down.
+ * JSON for a value off a database response, guarded: `JSON.stringify` throws on a circular
+ * structure and returns `undefined` for a value it can't represent. Also reachable from a
+ * caller's own built value, and a cell that throws takes the whole table down.
  */
 function safeJson(value: unknown, space?: number): string {
   try {
@@ -143,11 +134,9 @@ function safeJson(value: unknown, space?: number): string {
 }
 
 /**
- * The preview, and whether it is the whole value. Either an over-cap length
- * or an embedded line break sets `clipped`, putting the expander on the
- * cell. Line breaks are collapsed here rather than left to `white-space`
- * because the table sizes its fixed row height from this constant, not
- * measurement — and CSS would still leave them in the DOM for copy/reader.
+ * The preview, and whether it is the whole value. An over-cap length or an embedded line
+ * break sets `clipped`, adding the expander. Breaks are collapsed here, not left to
+ * `white-space`, since row height comes from this constant, not measurement.
  */
 function clip(text: string): { display: string; clipped: boolean } {
   // \r\n first, so a Windows line ending collapses to one space and not two.
@@ -187,10 +176,9 @@ export function lwqlCellText(cell: LangWatchQLCell): string {
 }
 
 /**
- * What copying a cell puts on the clipboard, or `null` for nothing to copy.
- * A scalar copies its exact text (keeping every digit of a wide number that
- * arrived as a string); an absent value copies as nothing, never the word
- * `missing`, so a paste can't turn "no such key" into that literal text.
+ * What copying a cell puts on the clipboard, or `null` for nothing. A scalar copies its exact
+ * text (every digit of a wide number that arrived as a string); an absent value copies as
+ * nothing, never the word `missing`, so a paste can't manufacture that literal text.
  */
 export function lwqlCellCopyText(cell: LangWatchQLCell): string | null {
   switch (cell.kind) {

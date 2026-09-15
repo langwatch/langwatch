@@ -238,9 +238,9 @@ describe("given the LangWatchQL schema catalog", () => {
   });
 
   /**
-   * A dataset a caller may read nothing in. Exercised on the shared fixture (`./gatedDatasetFixture`), because no
-   * shipped dataset is gated as a whole — the catalog suite pins that — and a case written against the shipped
-   * catalog would be asserting that nothing happens. The code under test is the endpoint's, and it is the same code.
+   * A dataset a caller may read nothing in. Exercised on the shared fixture
+   * (`./gatedDatasetFixture`): no shipped dataset is gated as a whole (the catalog suite pins
+   * that), so a case against the real catalog would assert that nothing happens.
    */
   describe("when a dataset is outside the caller's permissions", () => {
     const views = [...LWQL_VIEW_CATALOG, GATED_DATASET];

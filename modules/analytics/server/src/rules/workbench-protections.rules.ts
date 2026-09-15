@@ -1,10 +1,7 @@
 /**
- * What one member may read of a project's content, as LangWatchQL's catalogue
- * asks it. Three booleans, from two independent sources, and they are
- * independent on purpose: costs come from AuthZ, captured content from the
- * SAME resolved data-privacy policy the trace read stack redacts by — taken
- * rather than built, so a chart and the traces behind it never disagree about
- * which fields a project keeps.
+ * What one member may read of a project's content, per LangWatchQL's catalogue: three booleans
+ * from two independent sources -- costs from AuthZ, captured content from the SAME resolved
+ * data-privacy policy the trace stack redacts by, so a chart never disagrees with the traces.
  */
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -23,11 +20,9 @@ import type { LangWatchQLProtections, LangWatchQLRunCaller } from "@langwatch/an
 const logger: Pick<Logger, "error"> = createLogger("langwatch:analytics:workbench-protections");
 
 /**
- * Resolves what a signed-in project member may see on the Workbench.
- *
- * Fail-closed: a data-privacy read that throws must hide captured content
- * rather than default it open — a resolver or database failure narrows what a
- * member can see, it never widens it.
+ * Resolves what a signed-in project member may see on the Workbench. Fail-closed: a
+ * data-privacy read that throws must hide captured content rather than default it open --
+ * a resolver or database failure narrows what a member can see, never widens it.
  */
 export async function resolveWorkbenchProtections(input: {
   authz: Pick<AuthzApi, "hasPermission">;
@@ -76,10 +71,9 @@ export async function resolveWorkbenchProtections(input: {
 }
 
 /**
- * The restricted tenant identity a member's own LangWatchQL statement runs
- * as, together with their protections. Reads the project through the SAME
- * peer the rollout gate reads — never a raw Prisma client here — and refuses
- * with `project_not_found` when it no longer exists.
+ * The restricted tenant identity a member's own LangWatchQL statement runs as, with their
+ * protections. Reads the project through the SAME peer the rollout gate reads -- never a raw
+ * Prisma client -- and refuses with `project_not_found` when it no longer exists.
  */
 export async function resolveWorkbenchRunCaller(input: {
   authz: Pick<AuthzApi, "hasPermission">;
@@ -98,20 +92,9 @@ export async function resolveWorkbenchRunCaller(input: {
 }
 
 /**
- * What an API KEY may see, which is a different question from what a person
- * may see.
- *
- * Content categories resolve as they do for a caller with no session,
- * because a key is not a member. Costs are the credential's OWN question: a
- * scoped key holds `cost:view` or it does not, asked here through the same
- * `hasApiKeyPermission` the route chain enforces a declared permission with.
- * A legacy project key predates RBAC and carries full project access by
- * design, so for that credential class alone the answer is yes without a
- * lookup.
- *
- * Fail-closed, the same as {@link resolveWorkbenchProtections}: a
- * data-privacy read that throws hides captured content rather than
- * defaulting it open.
+ * What an API KEY may see -- a different question from a person. Content categories resolve as
+ * for a no-session caller (a key is not a member); costs are the credential's OWN `cost:view` via
+ * `hasApiKeyPermission`, except a legacy project key, which predates RBAC and always answers yes.
  */
 export async function resolveApiKeyProtections(input: {
   authz: Pick<AuthzApi, "hasApiKeyPermission">;

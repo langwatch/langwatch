@@ -1,9 +1,7 @@
 /**
- * One cell of the LangWatchQL result table: classification and words come
- * from `../logic/lwql-value-format`, this decides how each kind looks. Six
- * empty/non-finite states get `data-cell-kind` so "null" and a literal "null"
- * string stay tellable apart; only cells whose display isn't the whole truth
- * grow controls, sparing a keyboard user a tab stop for an already-visible value.
+ * One cell of the LangWatchQL result table: classification/words come from `lwql-value-format`,
+ * this decides how each kind looks. `data-cell-kind` keeps "null" and literal "null" tellable
+ * apart; only cells whose display isn't the whole truth grow controls, sparing a keyboard tab stop.
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
@@ -64,21 +62,16 @@ export function LangWatchQLValueCell({ cell, columnName }: LangWatchQLValueCellP
 }
 
 /**
- * The whole value, on request.
- *
- * Controlled rather than left to the popover's own trigger handling so that
- * opening it is one state change a test can drive the same way a member does,
- * and so the content mounts only while it is open — a table window holds
- * dozens of these.
+ * The whole value, on request. Controlled rather than left to the popover's own trigger
+ * handling, so opening it is one state change a test can drive like a member, and the content
+ * mounts only while open -- a table window holds dozens of these.
  */
 function ExpandedValue({ cell, columnName }: { cell: LangWatchQLCell; columnName: string }) {
   const [open, setOpen] = useState(false);
   /**
-   * A structured cell is shown indented and copied compact, and the difference
-   * is deliberate: reading JSON in a popover wants the line breaks, pasting it
-   * somewhere else usually does not. `pretty` is a getter, so the indented form
-   * is only built for the one cell a member opens, never for the other ten
-   * thousand in the table. Every other kind shows exactly what it copies.
+   * A structured cell shows indented, copies compact -- reading JSON wants line breaks,
+   * pasting usually doesn't. `pretty` is a getter, built only for the one cell a member opens,
+   * never the other ten thousand in the table. Every other kind shows exactly what it copies.
    */
   const full = cell.kind === "structured" ? cell.pretty : (lwqlCellCopyText(cell) ?? "");
 
@@ -127,12 +120,9 @@ function ExpandedValue({ cell, columnName }: { cell: LangWatchQLCell; columnName
 }
 
 /**
- * Copies the underlying value, never the clipped rendering of it.
- *
- * `navigator.clipboard` is absent on an insecure origin and rejects when the
- * document is not focused, so the failure is swallowed rather than allowed to
- * reject unhandled — a cell copy is not worth an error boundary, and the value
- * stays selectable either way.
+ * Copies the underlying value, never its clipped rendering. `navigator.clipboard` is absent
+ * on an insecure origin and rejects when unfocused, so the failure is swallowed rather than
+ * left unhandled -- not worth an error boundary, and the value stays selectable either way.
  */
 function CopyValueButton({ cell, columnName }: { cell: LangWatchQLCell; columnName: string }) {
   const copyText = lwqlCellCopyText(cell);

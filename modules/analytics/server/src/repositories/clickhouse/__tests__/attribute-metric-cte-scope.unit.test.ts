@@ -1,24 +1,7 @@
 /**
- * @regression
- *
- * Metrics backed by the trace-level `Attributes` map — metadata.thread_id,
- * user_id, customer_id, labels, prompt_ids — are aggregated in the OUTER query
- * of the arrayJoin CTE path, which reads `FROM deduped_traces` and has no `ts`
- * alias in scope. Only three hardcoded `langwatch.reserved.*` token keys were
- * hoisted into the CTE, so every other Attributes-backed metric emitted a raw
- * `ts.Attributes[…]` into that outer SELECT and ClickHouse rejected the whole
- * query:
- *
- *   "Unknown expression or function identifier `ts.Attributes` in scope
- *    WITH deduped_traces AS (SELECT DISTINCT ts.TraceId AS trace_id, …"
- *
- * Observed in production 2026-08-10: a thread-id count grouped by label.
- *
- * `transformMetricForDedup` already had a guard for exactly this — it throws
- * when a rewritten expression still references `ts` — but the guard only ran
- * when a substitution had ALREADY matched. The expression that reaches
- * production unrewritten is precisely the one that matches nothing, so the
- * guard's own precondition excluded the failing case.
+ * @regression Attributes-backed metrics (thread_id, user_id, etc.) emit `ts.Attributes[...]`
+ * into the outer arrayJoin-CTE query, which has no `ts` in scope -- only 3 metrics were hoisted.
+ * `transformMetricForDedup`'s guard only fired after a match, so the never-matching case slipped.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
@@ -31,18 +14,9 @@ import { fieldMappings } from "../clickhouse.field-mappings.mapper.ts";
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
- * The metrics whose translation actually emits a trace-level `Attributes` read
- * — i.e. the ones that can reach the outer aggregation this suite is about.
- * `metric-translator.ts` has a case for each (`translateMetadataMetric`).
- *
- * Deliberately NOT here, despite mapping to `Attributes` in `fieldMappings`:
- * `metadata.customer_id` has no translator case, so it falls through to
- * `count()` and would exercise an early return rather than an attribute read;
- * `metadata.labels` and `metadata.prompt_ids` are group-by / filter fields
- * rather than metrics (`metadata.labels` is in fact the group-by that puts
- * these queries on the CTE path). All three are still covered by the hoist
- * table, and the field-mapping invariant at the bottom is what keeps that
- * honest.
+ * Metrics whose translation actually emits a trace-level `Attributes` read (each has a
+ * `translateMetadataMetric` case) -- excludes `customer_id` (no case, falls to `count()`) and
+ * `labels`/`prompt_ids` (group-by/filter fields). All three are still covered by the hoist table.
  */
 const ATTRIBUTE_METRICS = ["metadata.thread_id", "metadata.user_id"] as const;
 
@@ -55,12 +29,9 @@ const baseInput = {
 };
 
 /**
- * Everything after the CTE closes — the scope where `ts` does not exist.
- *
- * Anchored on `FROM deduped_traces` (as the sibling event-metric suite is) so
- * a failed match cannot fail OPEN: an unanchored regex that missed would
- * return `""`, and `expect("").not.toContain("ts.")` passes, which is a
- * leak-detector that reports success when it cannot see.
+ * Everything after the CTE closes, where `ts` does not exist. Anchored on `FROM
+ * deduped_traces` (as the sibling event-metric suite is) so a failed match cannot fail OPEN --
+ * an unanchored regex returning `""` would let `expect("").not.toContain("ts.")` pass vacuously.
  */
 function outerQuery(sql: string): string {
   const match = sql.match(/\)\s*SELECT\s+([\s\S]+?)FROM\s+deduped_traces/i);
@@ -127,12 +98,9 @@ describe("buildTimeseriesQuery()", () => {
     });
   });
 
-  // The guard relocation is the other half of the fix, and it needs its own
-  // test: every expression the SQL-shape cases above exercise now DOES rewrite,
-  // so the guard fires from either position and moving it back inside
-  // `if (rewritten !== selectExpression)` leaves them all green. The case that
-  // distinguishes the two positions — and the one that reached production — is
-  // the expression that matches NO substitution at all.
+  // The guard relocation is the fix's other half: every SQL-shape case above now rewrites, so
+  // the guard fires from either position, and moving it back inside the old condition leaves
+  // them green. The distinguishing case -- the one that reached production -- matches nothing.
   describe("given a metric expression no substitution matches", () => {
     describe("when it is transformed for the dedup CTE", () => {
       it("refuses it instead of emitting a ts reference the outer query cannot resolve", () => {
@@ -169,12 +137,9 @@ describe("buildTimeseriesQuery()", () => {
           .filter(
             (mapping) =>
               mapping.table === "trace_summaries" &&
-              // `includes`, not `startsWith`: every mapping is a bare map read
-              // today, but one written as `toFloat64(Attributes['x'])` would
-              // slip past a prefix test and the invariant would still read
-              // green — reintroducing the very "someone must remember" gap
-              // this test exists to close. `SpanAttributes[` is excluded by
-              // the `trace_summaries` table check above.
+              // `includes`, not `startsWith`: a mapping written as `toFloat64(Attributes['x'])`
+              // would slip past a prefix test and this invariant would read green regardless.
+              // `SpanAttributes[` is excluded by the `trace_summaries` check above.
               mapping.column.includes("Attributes["),
           )
           .map((mapping) => {

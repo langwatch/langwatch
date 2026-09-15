@@ -1,24 +1,7 @@
 /**
- * Rollup SQL builder for `trace_analytics_rollup` (ADR-034 Phase 3
- * app-layer module).
- *
- * Single source of truth for the SQL emitted against the rollup. Deliberately
- * separate from the legacy `~/server/analytics/clickhouse/aggregation-builder.ts`
- * (which targets `trace_summaries` and is left UNTOUCHED by this rewrite): the
- * legacy path threads JOINs to `stored_spans` / `evaluation_runs`,
- * deduplication CTEs around `ReplacingMergeTree(UpdatedAt)`, mixed eval/trace
- * fan-out fixes, and arrayJoin grouping; none of that applies here. The rollup
- * is bucketed and additive.
- *
- * Routing decides whether to call this builder (see `routing/route-table.ts`);
- * the builder only handles what the rollup supports — any unsupported shape
- * is a programmer error and throws.
- *
- * All queries:
- *   * include `WHERE TenantId = {tenantId:String}` as the FIRST predicate
- *     (multi-tenancy contract, CLAUDE.md);
- *   * filter on the partition column `BucketStart` so ClickHouse prunes
- *     partitions (clickhouse-queries best-practices).
+ * Rollup SQL builder for `trace_analytics_rollup` (ADR-034 Phase 3), deliberately separate
+ * from legacy `aggregation-builder.ts` (`trace_summaries`): the rollup is bucketed and additive,
+ * so none of legacy's JOINs, dedup or fan-out apply. Unsupported shapes throw as routing bugs.
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
@@ -38,21 +21,15 @@ const ROLLUP_TABLE = "trace_analytics_rollup" as const;
 const ra = "ra";
 
 /**
- * Aggregations the rollup can serve from its SimpleAggregateFunction(sum, …)
- * columns. Exactly mirrors the router's eligibility (route-table.ts): `sum`
- * for every rollable metric; `avg` only for ROLLUP_AVG_METRIC_KEYS and only
- * ungrouped (TraceCount denominator — see rollupAggExpression). min/max are
- * NOT servable (min/max of per-part sums is merge-state-dependent) and THROW
- * here rather than silently returning wrong numbers if routing ever regresses.
+ * Aggregations the rollup can serve, mirroring the router's eligibility (route-table.ts): `sum`
+ * for every rollable metric, `avg` only for `ROLLUP_AVG_METRIC_KEYS` ungrouped. min/max are NOT
+ * servable -- merge-state-dependent -- and throw rather than silently return wrong numbers.
  */
 export type RollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg">;
 
 /**
- * Map an additive registry metric to its rollup column expression.
- *
- * Narrowed to `TraceRollupMetricKey` so the compiler enforces the
- * complete switch — no chance of a typo silently throwing at runtime.
- * The caller (`buildRollupTimeseriesQuery`) validates each metric via
+ * Maps an additive registry metric to its rollup column expression. Narrowed to
+ * `TraceRollupMetricKey` so the compiler enforces the complete switch; the caller validates via
  * `isRollupRollableTraceMetricKey` before dispatching.
  */
 function rollupColumnFor(metric: TraceRollupMetricKey): string {
@@ -93,15 +70,9 @@ function rollupColumnFor(metric: TraceRollupMetricKey): string {
 }
 
 /**
- * The rollup serves UNGROUPED queries only.
- *
- * Its `Model` / `SpanType` sort keys look like group-by targets but are not:
- * the rollup attributes metrics per span, while legacy and slim attribute them
- * per trace, and its `DurationSum` / `TraceCount` / `ErrorCount` columns are
- * recorded on the root span alone — so any grouping on those keys silently
- * changes what the number means. The router (`ROLLUP_TRACE_GROUP_BY_KEYS`)
- * already sends every grouped query to slim or `trace_summaries`; this throw
- * is the backstop for a routing regression.
+ * Rollup serves UNGROUPED queries only: `Model`/`SpanType` look like group-by keys but attribute
+ * metrics per span (legacy/slim do per trace), and root-only columns change meaning if grouped.
+ * The router already redirects grouped queries elsewhere; this throw backstops a regression.
  */
 function assertRollupUngrouped(groupBy?: string): void {
   if (!groupBy) return;
@@ -115,15 +86,9 @@ function isRollupAggregation(agg: AnalyticsAggregation): agg is RollupAggregatio
 }
 
 /**
- * Aggregations supported by the rollup. NO `*Merge` combinator — the simple
- * variant takes plain `sum(col)`.
- *
- *   - `sum` → the additive total over every span increment in range.
- *   - `avg` → a true PER-TRACE mean: `sum(col) / nullIf(sum(TraceCount), 0)`.
- *     TraceCount is 1 per root span (migration 00038), so the denominator is
- *     the number of rooted traces in the bucket. Only the metrics in
- *     `ROLLUP_AVG_METRIC_KEYS` divide correctly. Grouped queries never reach
- *     here — `assertRollupUngrouped` rejects them first.
+ * Aggregations supported: NO `*Merge` combinator, just plain `sum(col)`. `sum` is the additive
+ * total; `avg` is `sum(col) / nullIf(sum(TraceCount), 0)`, a true per-trace mean since TraceCount
+ * is 1 per root span (migration 00038) -- only `ROLLUP_AVG_METRIC_KEYS` divide correctly.
  */
 function rollupAggExpression({
   agg,
@@ -155,22 +120,9 @@ function rollupAggExpression({
 }
 
 /**
- * Build a rollup query for `trace_analytics_rollup`.
- *
- * Shape:
- *
- *   SELECT
- *     CASE … END AS period,
- *     <toStartOf… on BucketStart> AS date,        -- when timeScale numeric
- *     <agg(<rollup col>)> AS <alias>,             -- per series
- *     …
- *   FROM trace_analytics_rollup ra
- *   WHERE ra.TenantId = {tenantId:String}
- *     AND BucketStart in [previousStart, currentEnd)
- *   GROUP BY period [, date]
- *   ORDER BY period [, date]
- *
- * Ungrouped only — see `assertRollupUngrouped`.
+ * Builds a rollup query for `trace_analytics_rollup`: CASE-based period, optional date bucket,
+ * one aggregate per series, ungrouped only.
+ * @see assertRollupUngrouped
  */
 export function buildRollupTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,
