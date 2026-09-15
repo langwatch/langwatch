@@ -18,7 +18,10 @@
  */
 
 import { LWQL_COLUMNS_MANIFEST } from "./columnsManifest";
-import { deriveDefaultCatalog } from "./defineDatasetFromTable";
+import {
+  type DatasetOverride,
+  deriveDefaultCatalog,
+} from "./defineDatasetFromTable";
 import { AUDIT_OVERRIDES } from "./overrides/audit";
 import { CODING_OVERRIDES } from "./overrides/coding";
 import { EXPERIMENTS_OVERRIDES } from "./overrides/experiments";
@@ -58,7 +61,7 @@ export const LWQL_HAND_WRITTEN_SOURCE_TABLES = [
 ] as const;
 
 /** Every domain override, merged into the single map `deriveDefaultCatalog` reads. */
-const ALL_OVERRIDES = {
+export const LWQL_ALL_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   ...OBSERVABILITY_OVERRIDES,
   ...LANGY_OVERRIDES,
   ...CODING_OVERRIDES,
@@ -81,6 +84,6 @@ export const LWQL_DERIVED_CATALOG: readonly LangWatchQLViewDefinition[] = [
     manifest: LWQL_COLUMNS_MANIFEST,
     skip: LWQL_CATALOG_SKIPPED_TABLES,
     handWritten: LWQL_HAND_WRITTEN_SOURCE_TABLES,
-    overrides: ALL_OVERRIDES,
+    overrides: LWQL_ALL_OVERRIDES,
   }),
 ].sort((a, b) => a.name.localeCompare(b.name));

@@ -59,6 +59,7 @@ import {
   type LangWatchQLViewColumn,
   type LangWatchQLViewDefinition,
   lwqlGrainColumns,
+  lwqlPhysicalColumn,
   lwqlPostgresViews,
   lwqlViewSourceColumns,
 } from "../catalog/types";
@@ -392,7 +393,11 @@ function dedupPredicate(
         : `LangWatchQL view ${view.name} deduplicates on a version column it does not declare`,
     );
   }
-  const grain = lwqlGrainColumns(view);
+  // Grain is exposed names; the subquery runs against the source table, so map
+  // each to the physical column its view column reads (an alias renames it).
+  const grain = lwqlGrainColumns(view).map((column) =>
+    lwqlPhysicalColumn(view, column),
+  );
   const outerKeys = grain.map(sourceColumn);
   const innerKeys = grain.map(quotedColumn);
   const version = quotedColumn(versionColumn);
@@ -422,6 +427,16 @@ function groupedColumnExpression(
   const grain = lwqlGrainColumns(view);
   if (grain.includes(column.name)) {
     return columnExpression({ column, source: sourceColumn });
+  }
+  // An aggregate-function column carries its own combinator in its expression
+  // (`sumMerge`, `argMaxMerge`, a plain `max` for a SimpleAggregateFunction) —
+  // itself an aggregate, so it is well-defined under the group.
+  if (column.aggregate) {
+    return columnExpression({
+      column,
+      source: sourceColumn,
+      joined: joinedColumnQualifier(view),
+    });
   }
   if (!column.summed) {
     throw new Error(
@@ -559,10 +574,13 @@ export function lwqlViewStatement({
   // surplus key columns would surface as extra rows per logical row. The view
   // aggregates instead — `GROUP BY` the grain with every measure summed —
   // which subsumes the merge, so `FINAL` is dropped rather than paid twice.
-  const grouped =
-    !postgres &&
-    view.dedup.aggregating === true &&
-    view.dedup.keyColumns.some((key) => !grain.includes(key));
+  // Any aggregating source renders as a `GROUP BY`, whether its published grain
+  // is narrower than the engine key (the `*_by_minute` rollups, which group away
+  // a breakdown column) or equal to it (a per-key rollup whose every measure is
+  // an `AggregateFunction` state that only a merge combinator can read). `FINAL`
+  // is not an option for the latter: even after a merge the state column is
+  // still binary and needs `-Merge` to finalise, so the view aggregates.
+  const grouped = !postgres && view.dedup.aggregating === true;
   const projection = view.columns
     .map((column) => {
       // The engine table already carries the catalog's names and types — the
@@ -595,7 +613,9 @@ export function lwqlViewStatement({
       : "";
   const preFilter = preFilterClause(view, where);
   const groupBy = grouped
-    ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}`
+    ? `\nGROUP BY ${grain
+        .map((column) => sourceColumn(lwqlPhysicalColumn(view, column)))
+        .join(", ")}`
     : "";
   return (
     `CREATE OR REPLACE VIEW ` +

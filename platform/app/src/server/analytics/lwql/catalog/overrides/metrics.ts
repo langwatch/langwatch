@@ -1,14 +1,17 @@
 /**
  * Overrides for metrics-related datasets.
  *
- * All metric tables are typed-scalar only: timestamps, numeric measures, and
- * low-cardinality enums. No content or cost gating applies.
+ * Most metric tables are typed-scalar: timestamps, numeric measures, and
+ * low-cardinality enums. Their `Map` columns (`session_metrics.Attributes`,
+ * `simulation_trace_metrics.RoleCosts`/`RoleLatencies`) are exposed
+ * content-filtered by the builder, the way `spans.SpanAttributes` is — never
+ * dropped.
  *
- * `metric_time_rollups` and `simulation_run_metrics_rollup` are NOT here:
- * both are `AggregatingMergeTree` sources whose engine-key columns need a
- * genuine measure/merge split (`summed`, argMax-style merges) the derived
- * builder does not synthesize — skipped with a reason in `../skippedTables.ts`
- * as a follow-up, same as `gateway_budget_scope_totals`.
+ * `metric_rollups` is a `ReplacingMergeTree`, so it dedups on `UpdatedAt` like
+ * any superseding source. `simulation_metric_rollups` is an
+ * `AggregatingMergeTree`: it declares `aggregating`, and the builder finalises
+ * each `AggregateFunction` state with its merge combinator under a `GROUP BY`
+ * the engine key.
  */
 
 import type { Partial } from "lodash";
@@ -34,6 +37,14 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       TimeUnixMs: "ms",
     },
   },
+  metric_time_rollups: {
+    name: "metric_rollups",
+    description:
+      "Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets.",
+    grain: "one row per (SeriesId, BucketStart)",
+    timeColumn: "BucketStart",
+    dedup: { versionColumn: "UpdatedAt" },
+  },
   metric_usage_estimates: {
     name: "metric_ingestion_usage",
     description: "Per-tenant metric ingestion usage estimates",
@@ -44,10 +55,9 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description: "Per-session time-series metrics with aggregate statistics",
     grain: "one row per (SessionId, SeriesId)",
     timeColumn: "AsOf",
-    dedup: { versionColumn: "UpdatedAt" },
-    // See gateway.ts's gateway_spend for why an unfiltered Map is dropped
-    // rather than exposed.
-    skipColumns: ["Attributes"],
+    // `ReplacingMergeTree(AsOf)`: the engine collapses on AsOf, so that is the
+    // version — not the bookkeeping UpdatedAt.
+    dedup: { versionColumn: "AsOf" },
   },
   simulation_run_metrics: {
     name: "simulation_trace_metrics",
@@ -55,6 +65,15 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     grain: "one row per (ScenarioRunId, TraceId)",
     timeColumn: "OccurredAt",
     dedup: { versionColumn: "OccurredAt" },
-    skipColumns: ["RoleCosts", "RoleLatencies"],
+  },
+  simulation_run_metrics_rollup: {
+    name: "simulation_metric_rollups",
+    description:
+      "Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps.",
+    // AggregatingMergeTree: each measure is an AggregateFunction state the
+    // builder finalises with its merge combinator (argMaxMerge, maxMerge) under
+    // a GROUP BY the engine key.
+    dedup: { aggregating: true },
+    timeColumn: "OccurredAt",
   },
 };

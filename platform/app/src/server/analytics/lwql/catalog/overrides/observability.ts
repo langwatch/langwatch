@@ -37,7 +37,7 @@ export const OBSERVABILITY_OVERRIDES: Record<
     description:
       "Canonical OpenTelemetry log records: requests, responses and " +
       "provider events, correlated to their trace and span.",
-    grain: "one row per (TenantId, CorrelationTraceId, TimeUnixMs, RecordId)",
+    grain: "one row per (TenantId, TraceId, TimeUnixMs, RecordId)",
     timeColumn: "OccurredAt",
     joinKeys: ["TraceId", "SpanId"],
     dedup: { versionColumn: "DedupVersion" },

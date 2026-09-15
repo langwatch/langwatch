@@ -4,9 +4,9 @@
  * All tables track spend in USD (decimal and nano-USD formats) and are costs-gated
  * where applicable. Billable events are metadata events without cost gating.
  *
- * `gateway_budget_scope_totals` is NOT here: it is an `AggregatingMergeTree`
- * with `AggregateFunction`-state columns (sum/count/max) the derived builder
- * cannot merge correctly — skipped with a reason in `../skippedTables.ts`.
+ * `gateway_budget_totals` is the `AggregatingMergeTree` scope-totals rollup: it
+ * declares `aggregating`, and the builder finalises each `AggregateFunction`
+ * state (sum/count) with its merge combinator under a `GROUP BY` the engine key.
  */
 
 import type { Partial } from "lodash";
@@ -19,16 +19,18 @@ export const GATEWAY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     grain: "one row per GatewayRequestId",
     timeColumn: "OccurredAt",
     dedup: { versionColumn: "EventTimestamp" },
-    // The derived builder exposes a Map column as a plain pass-through, with
-    // no per-key content filter — the catalog-wide guard
-    // (lwqlViewCatalog.unit.test.ts, "filters the content keys out of every
-    // map column") requires every exposed map to filter, which only a
-    // hand-written `contentFilteredMapSql` expression can do. Dropped rather
-    // than exposed unfiltered; nothing else on this dataset reads it.
-    skipColumns: ["MetadataMap"],
     columnGates: {
       CostNanoUSD: ["costs"],
     },
+  },
+  gateway_budget_scope_totals: {
+    name: "gateway_budget_totals",
+    description:
+      "Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window.",
+    // AggregatingMergeTree: each measure is an AggregateFunction(sum/count)
+    // state finalised with sumMerge/countMerge under a GROUP BY the engine key.
+    dedup: { aggregating: true },
+    timeColumn: "PeriodStart",
   },
   gateway_budget_ledger_events: {
     name: "gateway_budget_ledger",

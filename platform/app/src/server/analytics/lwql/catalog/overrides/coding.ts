@@ -25,11 +25,18 @@ import type { LangWatchQLViewDefinition } from "../types";
 
 export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   coding_agent_trace_sessions: {
+    // The default name is the physical table name, which collides with it (the
+    // view lives in the same ClickHouse database as the fact table on
+    // self-hosted — see `selfProvisioning.ts`'s same-database requirement).
+    name: "coding_trace_sessions",
     description:
       "Correlates a trace to the coding-agent session it belongs to.",
     grain: "one row per (TenantId, TraceId)",
     timeColumn: "OccurredAt",
     joinKeys: ["TraceId", "SessionId"],
+    // `ReplacingMergeTree(UpdatedAt)` (migration 00051): a re-contribution of the
+    // same trace writes a newer version, collapsed on `UpdatedAt`.
+    dedup: { versionColumn: "UpdatedAt" },
   },
   stored_objects: {
     name: "objects",
@@ -37,6 +44,8 @@ export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     grain: "one row per id",
     timeColumn: "created_at",
     tenantColumn: "project_id",
+    // `ReplacingMergeTree(inserted_at)` (migration 00023).
+    dedup: { versionColumn: "inserted_at" },
     aliases: {
       TenantId: "project_id",
     },
@@ -78,7 +87,10 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
   grain: "one row per (TenantId, TraceId, SpanId), latest version only",
   grainColumns: ["TenantId", "TraceId", "SpanId"],
   joinKeys: ["TenantId", "TraceId", "SpanId", "SessionId", "ToolUseId"],
-  timeColumn: "CapturedAt",
+  // The span's own start, which `stored_spans` partitions by — filter on it to
+  // prune partitions, like `spans.StartTime`. `CapturedAt` (the joined body's
+  // write time) is not a partition column of either source.
+  timeColumn: "StartTime",
   freshness: "seconds behind ingestion",
   where: `${LWQL_SOURCE_ALIAS}.\`SpanName\` = 'claude_code.tool'`,
   whereSourceColumns: ["SpanName"],
@@ -133,11 +145,20 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       sourceColumns: ["SpanId"],
     },
     {
+      name: "StartTime",
+      type: "DateTime64(3)",
+      description:
+        "When the tool-call span started. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["StartTime"],
+    },
+    {
       name: "SessionId",
       type: "String",
       description: "Coding-agent session the captured request belongs to.",
       gates: [],
       sourceColumns: [],
+      joinedSourceColumns: ["ProviderSessionId"],
       expression: (_source, joined) => joined!("ProviderSessionId"),
     },
     {
@@ -175,6 +196,11 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
         "request body was captured for this trace.",
       gates: ["output"],
       sourceColumns: ["SpanAttributes"],
+      // Its content comes from the joined request body, not from the primary
+      // side's `SpanAttributes` map (which it reads only to match `tool_use_id`)
+      // — so its `output` gate is justified by the join, and the primary-side
+      // key it reads is a filter, not the content.
+      joinedSourceColumns: ["AttributesJson"],
       expression: (source, joined) => {
         const toolUseId = `${source("SpanAttributes")}['tool_use_id']`;
         const body = `JSONExtractString(${joined!("AttributesJson")}, 'body')`;
@@ -205,6 +231,7 @@ export const CODING_TOOL_RESULTS: LangWatchQLViewDefinition = {
       description: "When the captured request body was written.",
       gates: [],
       sourceColumns: [],
+      joinedSourceColumns: ["TimeUnixMs"],
       expression: (_source, joined) => joined!("TimeUnixMs"),
     },
   ],

@@ -146,6 +146,32 @@ export interface LangWatchQLViewColumn {
     source: (column: string) => string,
     joined?: (column: string) => string,
   ) => string;
+  /**
+   * Columns of the view's {@link LangWatchQLViewJoin} table this column reads.
+   *
+   * The joined-side analogue of {@link sourceColumns}: a column built entirely
+   * from the joined relation (its {@link sourceColumns} empty, its
+   * {@link expression} reading only `joined(...)`) is not a constant — it reads
+   * a real column, just on the other table. Declared so the shape guard can see
+   * it reads *something*, and so the map-content guard knows a gate on this
+   * column is justified by the joined content it pulls rather than by any key it
+   * reads on the primary side. The grant on those columns is driven by
+   * {@link LangWatchQLViewJoin.sourceColumns}, not by this list.
+   */
+  readonly joinedSourceColumns?: readonly string[];
+  /**
+   * Set when this column reads an aggregate-function state and is finalised
+   * with a merge combinator (or a plain simple-aggregate) under the view's
+   * `GROUP BY`.
+   *
+   * Like {@link summed} it marks a column safe to project under a grouped
+   * render, but where `summed` re-sums a `SimpleAggregateFunction(sum, T)` this
+   * carries an {@link expression} that names the exact combinator the state
+   * requires — `sumMerge`, `argMaxMerge`, `countMerge`, a plain `max` for a
+   * `SimpleAggregateFunction`. The grouped render calls that expression rather
+   * than refusing the column as an arbitrary value from its group.
+   */
+  readonly aggregate?: boolean;
 }
 
 /**
@@ -477,6 +503,24 @@ export function lwqlGrainColumns(
 }
 
 /**
+ * The physical source column an exposed grain/key column reads.
+ *
+ * Grain and key columns are named the way a caller sees them (`TraceId`), but
+ * the dedup body and `GROUP BY` run against the source table, whose column may
+ * be aliased (`CorrelationTraceId`). Resolves the exposed name to the single
+ * source column its view column reads, falling back to the name itself for a
+ * key column no exposed column renames.
+ */
+export function lwqlPhysicalColumn(
+  view: LangWatchQLViewDefinition,
+  exposedName: string,
+): string {
+  const column = view.columns.find((candidate) => candidate.name === exposedName);
+  const source = column?.sourceColumns[0];
+  return source && source.length > 0 ? source : exposedName;
+}
+
+/**
  * SQL producing a column from the source table.
  *
  * `source` qualifies one of the source table's columns — see
@@ -553,7 +597,7 @@ export function lwqlViewSourceColumns(
   return [
     ...new Set([
       ...view.columns.flatMap((column) => column.sourceColumns),
-      ...view.dedup.keyColumns,
+      ...view.dedup.keyColumns.map((key) => lwqlPhysicalColumn(view, key)),
       ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
       // A column read only to filter (`where`) or to match the join (`on`, its
       // primary side) is a source column the view reads just as a projected one

@@ -40,19 +40,6 @@ export const LWQL_CATALOG_SKIPPED_TABLES: Record<string, string> = {
   goose_db_version:
     "the goose migration-version table, engine-internal tooling state — no " +
     "tenant column at all",
-  gateway_budget_scope_totals:
-    "AggregatingMergeTree with AggregateFunction/SimpleAggregateFunction " +
-    "state columns (sum/count/max/argMax) — the derived builder only knows " +
-    "how to pass a column through or sum a plain numeric measure, not merge " +
-    "an aggregate-function state; needs a hand-written view like the " +
-    "existing *_by_minute rollups. Follow-up, not customer-data omission.",
-  metric_time_rollups:
-    "AggregatingMergeTree whose rollup columns (Min/Max/Sum/GaugeLast/...) " +
-    "are plain-typed but semantically merge via a domain-specific rule the " +
-    "derived builder cannot infer from the column type alone. Follow-up.",
-  simulation_run_metrics_rollup:
-    "AggregatingMergeTree with AggregateFunction(argMax, ...) state columns " +
-    "— same gap as gateway_budget_scope_totals. Follow-up.",
 };
 
 /**
