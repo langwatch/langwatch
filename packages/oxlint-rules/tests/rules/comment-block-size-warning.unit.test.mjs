@@ -29,7 +29,16 @@ describe("given a comment block between 6 and 8 lines", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("commentBlockSize");
-      expect(found[0].data).toEqual({ lines: 7, max: 5, words: 3 });
+      expect(found[0].data).toEqual({ error: 9, lines: 7, max: 5, words: 3 });
+    });
+
+    /** @scenario "The warning names the real 5-line maximum, not the 9-line error threshold" */
+    it("says trimming under 9 lines does not itself clear the warning", () => {
+      const found = report(`${commentLines(7)}\nexport const x = 1;`);
+
+      expect(found[0].message).toContain("The real maximum is 5");
+      expect(found[0].message).toContain("Trimming to under 9 lines does not clear this warning");
+      expect(found[0].message).toContain("only 5 lines or fewer does");
     });
   });
 
@@ -59,7 +68,7 @@ describe("given a comment block between 6 and 8 lines", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("commentKeepReason");
-      expect(found[0].data).toEqual({ lines: 7, max: 5, words: 3 });
+      expect(found[0].data).toEqual({ error: 9, lines: 7, max: 5, words: 3 });
     });
   });
 

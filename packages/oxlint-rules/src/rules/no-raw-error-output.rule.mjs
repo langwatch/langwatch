@@ -57,7 +57,7 @@ export const noRawErrorOutputRule = defineRule({
   messages: {
     rawErrorOutput: {
       what: "`{{call}}` dumps `{{name}}` straight to the console.",
-      fix: "Log through `createLogger` with the error as a field instead of a raw console dump.",
+      fix: "Call `createLogger` from `@langwatch/observability` and log the error as a field instead of a raw console dump.",
     },
   },
   create(context, file) {

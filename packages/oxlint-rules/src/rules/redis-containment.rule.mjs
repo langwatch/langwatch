@@ -96,7 +96,7 @@ export const redisContainmentRule = defineRule({
   messages: {
     redisClient: {
       what: "`{{name}}` is value-imported outside a Redis repository, adapter or composition root.",
-      fix: "Move the command into a `repositories/redis/*.repository.ts` file and call it through the service, or import the type only.",
+      fix: "Move the command into a `repositories/redis/*.repository.ts` file and call it through the service. If this file only ever needed the type, change the import to `import type` instead.",
     },
   },
   create(context, file) {

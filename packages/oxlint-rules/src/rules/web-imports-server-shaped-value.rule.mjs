@@ -58,7 +58,7 @@ export const webImportsServerShapedValueRule = defineRule({
     serverShaped: {
       what: "A browser module value-imports `{{name}}`, whose declarations are the server's and pull a database graph into the browser program.",
       why: "Loading declaration files is the largest bucket in a type-check, and this class of import is invisible in the bundle.",
-      fix: "Import it as a type only, or reach the capability through a first-party module that the browser already owns.",
+      fix: "Import it as a type only when only the type is needed here. Otherwise, add a server endpoint or a first-party wrapper module the browser calls instead of importing this package's value directly.",
     },
   },
   applies: (file) => isBrowserSource(file.workspacePath) && file.isProduction,

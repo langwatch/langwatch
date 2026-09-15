@@ -102,7 +102,7 @@ export const clickhouseContainmentRule = defineRule({
   messages: {
     clickhouseClient: {
       what: "`{{name}}` is value-imported outside a ClickHouse repository, adapter or composition root.",
-      fix: "Move the query into a `repositories/clickhouse/*.repository.ts` file and call it through the service, or import the type only.",
+      fix: "Move the query into a `repositories/clickhouse/*.repository.ts` file and call it through the service. If this file only ever needed the type, change the import to `import type` instead.",
     },
   },
   create(context, file) {

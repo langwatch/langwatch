@@ -1,10 +1,6 @@
 import {
   COMMENT_BLOCK_ERROR_LINES,
-  COMMENT_BLOCK_SIZE_FIX,
-  COMMENT_BLOCK_SIZE_WHAT,
   COMMENT_BLOCK_WARN_LINES,
-  COMMENT_KEEP_REASON_FIX,
-  COMMENT_KEEP_REASON_WHAT,
   LINT_KEEP_REASON_WORDS,
   MAX_COMMENT_BLOCK_LINES,
 } from "../../grammar/comment-block-policy.mjs";
@@ -20,6 +16,11 @@ import {
 // comments a second time. This is the only tier `@lint-keep` can silence, and
 // only when it gives a reason AND names the ADR holding the narrative - almost
 // every long block should be deleted or moved instead.
+//
+// The messages below are written locally rather than shared with the error
+// tier's text: a reader who trims a 9-line block to 7 lines is still over the
+// real 5-line maximum, only now warned instead of errored, and that has to be
+// said explicitly here or the trim reads as "done".
 
 /** Whether a `@lint-keep` earns its silence: a real reason, and the ADR that records it. */
 function isJustified(keep) {
@@ -31,12 +32,23 @@ export const commentBlockSizeWarningRule = defineRule({
   kind: "style",
   messages: {
     commentBlockSize: {
-      what: COMMENT_BLOCK_SIZE_WHAT,
-      fix: COMMENT_BLOCK_SIZE_FIX,
+      what:
+        "Comment block has {{lines}} lines. The real maximum is {{max}}; this is only a warning" +
+        " and not an error because it has not reached {{error}} lines yet.",
+      fix:
+        "Delete it when the code already says it, or move the narrative into an ADR under" +
+        " `dev/docs/adr/` and leave one line here linking it. Trimming to under {{error}} lines" +
+        " does not clear this warning — only {{max}} lines or fewer does. Keeping it with" +
+        " `@lint-keep <reason> dev/docs/adr/<file>.md` inside it is almost never right; see ADR-140.",
     },
     commentKeepReason: {
-      what: COMMENT_KEEP_REASON_WHAT,
-      fix: COMMENT_KEEP_REASON_FIX,
+      what:
+        "The `@lint-keep` on this {{lines}}-line block is missing either a reason of {{words}}+" +
+        " words or the ADR recording it, so the block still counts as over the {{max}}-line limit.",
+      fix:
+        "Delete the block and move its narrative into that ADR — that clears this permanently." +
+        " Keeping it with `@lint-keep <reason> dev/docs/adr/<file>.md` inside it is almost never" +
+        " right, but if you do, that line needs a full clause of {{words}}+ words plus the ADR path.",
     },
   },
   create(context, file) {
@@ -59,6 +71,7 @@ export const commentBlockSizeWarningRule = defineRule({
             loc: { line: block.line, column: 0 },
             messageId: block.keep.present ? "commentKeepReason" : "commentBlockSize",
             data: {
+              error: COMMENT_BLOCK_ERROR_LINES,
               lines: block.lines,
               max: MAX_COMMENT_BLOCK_LINES,
               words: LINT_KEEP_REASON_WORDS,

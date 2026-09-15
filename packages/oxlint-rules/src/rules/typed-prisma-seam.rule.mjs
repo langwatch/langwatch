@@ -36,7 +36,7 @@ export const typedPrismaSeamRule = defineRule({
   messages: {
     cast: {
       what: "`as PrismaClient` is not permitted.",
-      fix: "The composition adapter takes a typed PrismaClient and hands it to the repository.",
+      fix: "Delete the cast and type the parameter itself as `PrismaClient` — the composition root already holds a typed client to pass in.",
     },
     databaseObject: {
       what: "`database: object` in a `.create(` argument list forces a cast at the seam.",
