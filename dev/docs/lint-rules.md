@@ -387,6 +387,9 @@ Messages:
 - `nullableWithoutFind`
   - what: `{{name}}` can answer null or undefined, but only a `find*` method may answer with absence.
   - fix: Choose by what absence means here. If the caller branches on it, rename `{{name}}` to `find<Noun>` for the thing it looks up — never `find` bolted onto this name — and keep the nullable. If absence means the domain refused, throw the domain error and drop null and undefined from the return type. If this is a write whose target may normally be absent, return an explicit result union instead of null.
+- `repositoryServiceVocabulary`
+  - what: Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.
+  - fix: Rename it `find{{rest}}` here and in the repository interface this class implements.
 - `requirePrefix`
   - what: `{{name}}` carries a redundant `require` prefix: a method already answers or throws.
   - fix: Name it `{{plain}}` and leave the body as it is.
@@ -1293,16 +1296,16 @@ Messages:
 - Kind: problem
 - Applies to: every file
 - Fixable: no
-- Spec: none yet
-- Enforced: **no** — registered here but not enabled in `oxlint.architecture.jsonc`, so it reports nothing
+- Spec: `specs/tooling/lint-test-description-is-an-action.feature`
+- Enforced: yes, at `error`
 
 Options: none.
 
 Messages:
 
 - `nestedDescribeMissingGivenWhen`
-  - what: This nested `describe` title does not start with "given " or "when ".
-  - fix: Rename it to start with "given " or "when ".
+  - what: This nested `describe` title does not start with "given ", "when " or "and ", and does not name the unit under test.
+  - fix: Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test.
   - why: Nested `describe` blocks read as BDD structure: an outer `given <precondition>`, an inner `when <action>`.
 - `titleStartsWithShould`
   - what: This test title starts with "should".

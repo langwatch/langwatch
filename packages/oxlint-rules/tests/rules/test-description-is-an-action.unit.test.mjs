@@ -80,6 +80,75 @@ describe("given a test file", () => {
     });
   });
 
+  describe("when a nested describe is titled \"and \"", () => {
+    /** @scenario "An and-prefixed nested describe is left alone" */
+    it("reports nothing", () => {
+      const code = `
+        describe("AgentService", () => {
+          describe("given a warm cache", () => {
+            describe("and the cache is warm", () => {
+              it("returns the cached value", () => {});
+            });
+          });
+        });
+      `;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a nested describe names a method under test MDN-style", () => {
+    /** @scenario "A nested describe naming the unit under test is left alone" */
+    it("reports nothing", () => {
+      const code = `
+        describe("AgentService", () => {
+          describe("submitRequest()", () => {
+            describe("when the request is valid", () => {
+              it("returns the response", () => {});
+            });
+          });
+        });
+      `;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a nested describe names a component under test MDN-style", () => {
+    /** @scenario "A nested describe naming a component under test is left alone" */
+    it("reports nothing", () => {
+      const code = `
+        describe("<DatePicker/>", () => {
+          describe("useFeatureFlag()", () => {
+            describe("when the flag is enabled", () => {
+              it("returns true", () => {});
+            });
+          });
+        });
+      `;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a nested describe title is a capitalized phrase, not a unit name", () => {
+    /** @scenario "A capitalized phrase is still a failure, not a unit name" */
+    it("reports nestedDescribeMissingGivenWhen", () => {
+      const code = `
+        describe("AgentService", () => {
+          describe("Basic rendering", () => {
+            it("does something", () => {});
+          });
+        });
+      `;
+
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].messageId).toBe("nestedDescribeMissingGivenWhen");
+    });
+  });
+
   describe("when the file is not a *.test.ts file", () => {
     /** @scenario "A should-prefixed title outside a test file is not governed" */
     it("reports nothing", () => {

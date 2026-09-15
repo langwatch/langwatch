@@ -150,17 +150,12 @@
     // change, so the baseline holds them until each is converted
     // deliberately.
     "langwatch/no-inline-dynamic-import": "error",
-    // NOT enabled: `test-description-is-an-action` is registered in the
-    // plugin above but deliberately left out of this map. Measured the same
-    // way: 1658 reports across 393 files, all `nestedDescribeMissingGivenWhen`
-    // (no in-scope `should` titles). The rule's `enclosingDescribe` check
-    // treats any nested `describe` as needing a "given "/"when " prefix, but
-    // dev/docs/TESTING_PHILOSOPHY.md blesses one further level of nesting for
-    // an MDN-style unit name (`describe(ClassName) > describe(methodName)`)
-    // before the given/when pair starts - that pattern is a false positive
-    // today. Enabling or baselining as-is would launder an unknown share of
-    // those 393 files into shrink-only debt as if they were real violations.
-    // Fix the rule's exemption first, then measure and enable for real.
+    // Enabled 2026-09-15 after exempting the false-positive class: 1349
+    // reports across 336 files, baselined. The nested-describe check now
+    // permits the MDN-style unit nesting TESTING_PHILOSOPHY.md blesses
+    // (`describe(ClassName) > describe(methodName())`) and an "and "-prefixed
+    // title, which together accounted for 309 of the 1658 it used to report.
+    "langwatch/test-description-is-an-action": "error",
     "langwatch/awaited-return-chain": "error",
     "langwatch/max-statements-per-line": "error",
     // Measured 2026-09-15 over the `lint:oxlint` paths: 34 reports across 12

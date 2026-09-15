@@ -10,7 +10,12 @@ import { defineRule } from "../define-rule.mjs";
 // the unit under test and is exempt from the given/when requirement.
 
 const TEST_FILE = /\.test\.tsx?$/;
-const GIVEN_OR_WHEN = /^(?:given|when)\s/;
+const GIVEN_WHEN_AND = /^(?:given|when|and)\s/;
+// TESTING_PHILOSOPHY.md blesses one further level of nesting before given/when
+// starts: a `describe` naming the unit MDN-style (`ClassName`, `methodName()`,
+// `<Component/>`, `useHook()`). Each form is one token with no spaces, so a
+// condition title ("given a warm cache", "submit behavior") never matches.
+const MDN_UNIT_NAME = /^(?:<\w+\s*\/?>|[\w.$]+\(\)|use[A-Z]\w*|[A-Z][A-Za-z0-9]*)$/;
 const SHOULD = /^should\b/i;
 
 function isGoverned(file) {
@@ -65,9 +70,11 @@ export const testDescriptionIsAnActionRule = defineRule({
       fix: 'Rename it to state what the test does, dropping the leading "should".',
     },
     nestedDescribeMissingGivenWhen: {
-      what: 'This nested `describe` title does not start with "given " or "when ".',
+      what:
+        'This nested `describe` title does not start with "given ", "when " or "and ", and does not name the unit under test.',
       why: "Nested `describe` blocks read as BDD structure: an outer `given <precondition>`, an inner `when <action>`.",
-      fix: 'Rename it to start with "given " or "when ".',
+      fix:
+        'Rename it to a condition: "given <precondition>" if it sets up state, "when <action>" if it performs the behaviour under test.',
     },
   },
   create(context, file) {
@@ -87,7 +94,12 @@ export const testDescriptionIsAnActionRule = defineRule({
         if (isDescribeCall(node)) {
           const title = node.arguments[0];
           const text = titleText(title);
-          if (text !== undefined && enclosingDescribe(node) && !GIVEN_OR_WHEN.test(text)) {
+          if (
+            text !== undefined &&
+            enclosingDescribe(node) &&
+            !GIVEN_WHEN_AND.test(text) &&
+            !MDN_UNIT_NAME.test(text)
+          ) {
             context.report({ node: title, messageId: "nestedDescribeMissingGivenWhen" });
           }
           return;
