@@ -76,6 +76,12 @@ export const activityMonitorRouter = createTRPCRouter({
           .enum(["spend", "requests", "lastActivity", "tokens"])
           .default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
+        // Which population the figures cover. The default is the scope every
+        // caller had before this existed, so the three screens that lead with
+        // dollars are answered exactly as before; the cost screen opts into
+        // "organization" so its person panel covers the same people as the
+        // department panel beside it.
+        scope: z.enum(["governance", "organization"]).default("governance"),
       }),
     )
     .permission("activityMonitor:view")
@@ -92,6 +98,7 @@ export const activityMonitorRouter = createTRPCRouter({
         offset: input.offset,
         sortBy: input.sortBy,
         sortDir: input.sortDir,
+        scope: input.scope,
       });
     }),
 

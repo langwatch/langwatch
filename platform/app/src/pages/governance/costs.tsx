@@ -963,8 +963,23 @@ function useBreakdownQueries({
   // people from the top 8 by tokens, and ranking a money-picked page by
   // tokens in the browser would quietly drop the people who belong on it.
   // Every other reader of `spendByUser` keeps the spend sort.
+  //
+  // The scope rides the same seam, and for the same reason the unit did. The
+  // department panel beside this one covers every project of the organization;
+  // this read covered the hidden governance project alone and only traffic
+  // that arrived through a governance source, so the two panels reported the
+  // same unit off the same table over different people — the department one
+  // printing a token count while this one said nothing was recorded, over the
+  // very same rows. The other three readers name no scope and keep the
+  // governance one, because they still lead with dollars and a money figure
+  // must not move as a side effect of this.
   const byUser = api.activityMonitor.spendByUser.useQuery(
-    { ...args, limit: 8, sortBy: "tokens" as const },
+    {
+      ...args,
+      limit: 8,
+      sortBy: "tokens" as const,
+      scope: "organization" as const,
+    },
     options,
   );
   // The PULLED rollup, not the metered trace store the panels around it read.

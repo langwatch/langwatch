@@ -27,6 +27,7 @@ import {
   type SpendByDepartmentChRow,
   type SpendByTeamSourceChRow,
   type SpendByUserChRow,
+  type SpendByUserScope,
   type SpendByUserSortField,
   type SpendOverTimeChRow,
   type SpendOverTimeGroupBy,
@@ -184,7 +185,16 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
-   * Per-user spend rollup with pagination + sort.
+   * Per-user spend rollup with pagination + sort, over the population `scope`
+   * names.
+   *
+   * `governance` reads the one hidden governance project and only the traffic
+   * that arrived through a governance ingestion source. `organization` reads
+   * every project it is handed and filters on no source at all, which is the
+   * population `findSpendByDepartment` below already reads — so the cost
+   * screen's two people-facing panels cover the same people. See
+   * `SpendByUserScope` for why this is a caller's choice rather than a
+   * widening of the read.
    *
    * ClickHouse 25.x resolves bare column names in ORDER BY to outer
    * aliases when the alias shadows a subquery column — so
@@ -195,7 +205,8 @@ export class ActivityMonitorSpendClickHouseRepository {
    * subquery's Float64 spendUsd column.
    */
   async findSpendByUser({
-    tenantId,
+    tenantIds,
+    scope,
     windowStart,
     windowEnd,
     sortBy,
@@ -203,7 +214,8 @@ export class ActivityMonitorSpendClickHouseRepository {
     limit,
     offset,
   }: {
-    tenantId: string;
+    tenantIds: string[];
+    scope: SpendByUserScope;
     windowStart: number;
     windowEnd: number;
     sortBy: SpendByUserSortField;
@@ -211,7 +223,10 @@ export class ActivityMonitorSpendClickHouseRepository {
     limit: number;
     offset: number;
   }): Promise<SpendByUserChRow[]> {
-    const ch = await this.resolveClient(tenantId);
+    // Multi-tenant read in the organization scope; the shared client serves
+    // every project, so resolving by any one of them routes identically —
+    // the same resolution `findSpendByDepartment` does.
+    const ch = await this.resolveClient(tenantIds[0] ?? "");
     // Fails closed: SORT_FIELD_TO_AGG_EXPR is
     // Record<SpendByUserSortField, string>
     // so this is exhaustive at compile time, but sortBy crosses a tRPC
@@ -220,6 +235,26 @@ export class ActivityMonitorSpendClickHouseRepository {
     const orderExpr =
       SORT_FIELD_TO_AGG_EXPR[sortBy] ?? SORT_FIELD_TO_AGG_EXPR.spend;
     const orderDir = sortDir === "asc" ? "ASC" : "DESC";
+
+    // Both fragments below are CODE, chosen by `scope`, never caller text —
+    // the same boundary SORT_FIELD_TO_AGG_EXPR is for the ORDER BY. The values
+    // they name stay bound parameters.
+    //
+    // The governance branch keeps `TenantId = {tenantId:String}` rather than a
+    // one-element IN so the SQL the three dollar-reporting screens send is
+    // unchanged by this, character for character.
+    const governanceScoped = scope === "governance";
+    const tenantPredicate = governanceScoped
+      ? "TenantId = {tenantId:String}"
+      : "TenantId IN ({tenantIds:Array(String)})";
+    // The source filter travels with the scope. Keeping it in the organization
+    // scope would drop every row that did not arrive through a governance
+    // ingestion source, which is most of an organization's own traffic — and
+    // `findSpendByDepartment`, the panel beside this one, filters on nothing of
+    // the kind. Two panels over the same table would still disagree.
+    const originPredicate = governanceScoped
+      ? "AND ts.Attributes[{originKey:String}] = {originValue:String}"
+      : "";
 
     const result = await ch.query({
       query: `
@@ -252,15 +287,15 @@ export class ActivityMonitorSpendClickHouseRepository {
             ts.TotalCompletionTokenCount AS completionTokens,
             ts.TokensEstimated AS tokensEstimated
           FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
+          WHERE ts.${tenantPredicate}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
             AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
+            ${originPredicate}
             AND ts.Attributes[{userKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
               SELECT TenantId, TraceId, max(UpdatedAt)
               FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantPredicate}
                 AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
                 AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
@@ -271,11 +306,18 @@ export class ActivityMonitorSpendClickHouseRepository {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       query_params: {
-        tenantId,
+        // Only the parameters the chosen branch names are bound: an unbound
+        // `originValue` in the organization scope is what proves the filter is
+        // gone rather than merely matching everything.
+        ...(governanceScoped
+          ? {
+              tenantId: tenantIds[0] ?? "",
+              originKey: ATTR_ORIGIN_KIND,
+              originValue: ORIGIN_KIND_VALUE,
+            }
+          : { tenantIds }),
         windowStart,
         windowEnd,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
         limit,
         offset,

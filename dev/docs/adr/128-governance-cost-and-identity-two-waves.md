@@ -2070,6 +2070,95 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.21 (2026-09-15, captain: Sergio Esteban).** Finishes Ruling 8. The cost
+  screen's two people-facing panels now cover the same people, not only the
+  same unit. Completes Ruling 8 rather than superseding it; narrows the reach
+  of Ruling 6's **First** limit, which still stands where it was written. No
+  schema change.
+
+  - **What was wrong.** Ruling 8 gave the person panel the department panel's
+    unit "so the two people-facing panels on the cost screen agree on what they
+    measure", and stopped there. They read the same table and report the same
+    unit over different populations. `spendByDepartment` resolves every live
+    project of the organization and passes `tenantIds`
+    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:714`);
+    `spendByUser` resolved the one hidden governance project, and the read
+    additionally filtered
+    `Attributes['langwatch.origin.kind'] = 'ingestion_source'`, which
+    `findSpendByDepartment` does not
+    (`...spend.clickhouse.repository.ts:344`). Side by side over the same rows
+    the department panel therefore printed a token count and the person panel
+    beside it said nothing had been recorded. Measured on a development store
+    holding seven traces in the window: every one carried `langwatch.user_id`,
+    none carried the origin attribute, none sat under the hidden governance
+    project, and the two panels read 545 tokens and nothing at all.
+
+  - **Why Ruling 6's carve-out does not cover this read.** That limit is
+    written about `findSummarySpend` and the five outputs `summary()` derives
+    from it, and it stands there untouched. Its principle — a money figure must
+    not move as a side effect of a fix aimed elsewhere — is what shapes this
+    change rather than what forbids it. Ruling 8 had already stopped the cost
+    screen's person panel leading with money; three other render sites still
+    lead with dollars, and those are what the principle protects.
+
+  - **The decision: scope is a caller's choice, at the render layer.** The same
+    seam Rulings 7 and 8 used for the unit. `spendByUser` gains
+    `scope: "governance" | "organization"`
+    (`...activityMonitor.clickhouse.schemas.ts:62`), defaulting to
+    `"governance"` at the procedure
+    (`platform/app/ee/governance/routers/activityMonitor.ts:84`) and at the
+    service (`...activityMonitor.service.ts:638`). `"governance"` is the
+    behaviour every caller had: the hidden governance project, and only traffic
+    that arrived through a governance source. `"organization"` is every live
+    project of the org with no source filter — `findSpendByDepartment`'s
+    population exactly. Only `platform/app/src/pages/governance/costs.tsx:981`
+    opts in, riding the same argument that already carries `sortBy: "tokens"`.
+    The other three render sites name no scope and are answered as before, down
+    to the SQL: the governance branch keeps `TenantId = {tenantId:String}`
+    rather than a one-element `IN`
+    (`...spend.clickhouse.repository.ts:247`).
+
+  - **Two things that stay where they are.** The `ORDER BY` remains a lookup
+    into `SORT_FIELD_TO_AGG_EXPR`; the scope is a code branch choosing between
+    two literal fragments, never caller-supplied text
+    (`...spend.clickhouse.repository.ts:247-258`). And the project ids come
+    from Prisma scoped to the organization, so a ClickHouse read in the
+    organization scope can only ever reach this org's own projects — the same
+    construction `spendByDepartment` relies on.
+
+  - **The gate does not travel to the new scope.** In the organization scope
+    the read never consults `resolveGovProjectId`. That project is minted by
+    connecting a provider bill (`platform/app/ee/governance/services/govProject.ts:10-13`),
+    so its absence says nothing about an organization's people — the lesson
+    v3.20 recorded when it deleted the same gate from the adoption read. The
+    governance scope keeps its empty answer, because there the missing project
+    genuinely is the whole question.
+
+  - **A money figure this does move, stated rather than glossed.** Ruling 8
+    kept a small per-request dollar second line under each person's token
+    count. It is summed from the same rows, so widening the population widens
+    it too: a person's second line on the cost screen now covers the
+    organization's traffic rather than the governance silo's. This is
+    deliberate and is the point — it is the same figure, over the same rows, as
+    the department panel's own second line, so the two agree instead of
+    disagreeing. It is not a side effect of a headcount fix, and it is
+    confined to the panel Ruling 8 already moved; the three dollar-leading
+    screens are untouched.
+
+  - **What is pinned.** Three scenarios under *A people panel measures tokens
+    and says which store it read* in
+    `specs/governance/governance-cost-screen.feature:1931`, `:1942` and
+    `:1952`. The scope choice is proved at the service
+    (`activityMonitorSpendByUserScope.unit.test.ts`), the source filter and the
+    tenant predicate at the repository, against the SQL actually sent
+    (`activityMonitorSpendByUserOriginFilter.unit.test.ts`), the opt-in at the
+    one call site allowed to make it
+    (`spendByUserScopeCallSites.unit.test.ts`, which walks every caller so a
+    fifth one added later cannot opt in unnoticed), and the cost screen's own
+    request (`costPersonPanelScope.integration.test.tsx`). The organization
+    scope is a second query shape, so it takes its own row in the query-bounds
+    table rather than riding on the governance one's.
+
 - **v3.20 (2026-09-14, captain: Sergio Esteban).** Removes the two null-gates
   that answered an organization question with the existence of one hidden
   project, and records why the invariant they were defending survives without
@@ -2442,6 +2531,14 @@ money tables, only the identity tables and read paths.
     > limits, and the ruling itself, stand. The reasoning is kept because the
     > mistake is easy to make twice.
 
+    > **[NARROWED in reach — see revision v3.21.]** The **First** limit below
+    > is about `findSummarySpend` and the outputs `summary()` derives from it,
+    > and it stands there. It was never a rule about `findSpendByUser`, whose
+    > scope no ruling in this document had addressed. v3.21 gives that read an
+    > explicit scope; the principle the limit states — a money figure must not
+    > move as a side effect of a fix aimed elsewhere — is what keeps the three
+    > dollar-reporting screens on the scope they have.
+
     **Three limits on the widening, none of which an earlier draft stated.**
     First, `findSummarySpend` returns `thisSpend`, `prevSpend` and `thisUsers`
     from one row, and `summary()` derives five outputs from it
@@ -2505,10 +2602,21 @@ money tables, only the identity tables and read paths.
     identity work.
 
   - **Ruling 8 — spend by person becomes tokens by person on the cost screen,
-    on the same reasoning.** `findSpendByUser` (`repository.ts:121-194`) gains a
-    token figure alongside its dollar figure for the same subscription
-    argument as ruling 7, so the two people-facing panels on the cost screen
-    agree on what they measure. The three other render sites listed under
+    on the same reasoning.**
+
+    > **[COMPLETED — see revision v3.21.]** This ruling took only half of
+    > Ruling 7. The panels agree on the unit and not on the population: the
+    > department read covers every project of the organization and filters on
+    > no origin, while this one stayed on the hidden governance project and the
+    > governance ingestion origin. The cost screen's panel now takes the
+    > department read's population through an explicit `scope` argument. The
+    > three render sites named below keep the governance scope along with their
+    > dollars, so nothing here is superseded.
+
+    `findSpendByUser` (`repository.ts:121-194`) gains a token figure alongside
+    its dollar figure for the same subscription argument as ruling 7, so the
+    two people-facing panels on the cost screen agree on what they measure.
+    The three other render sites listed under
     *blast radius* keep dollars. The dollar figure is likewise kept as a small
     second line — applied by symmetry with ruling 7 rather than separately
     asked, and recorded here so the symmetry is deliberate and not an accident

@@ -40,6 +40,26 @@ export type SpendSortField = "spend" | "requests" | "lastActivity";
  */
 export type SpendByUserSortField = SpendSortField | "tokens";
 export type SortDir = "asc" | "desc";
+
+/**
+ * Which population the PERSON read answers over.
+ *
+ * `governance` is the hidden governance project alone, and only the traffic
+ * that arrived through a governance ingestion source — the money scope every
+ * caller had before this existed, and the one the three dollar-reporting
+ * screens keep.
+ *
+ * `organization` is every live project of the org with no source filter, which
+ * is exactly the population `findSpendByDepartment` already reads. The cost
+ * screen takes it so its two people-facing panels, which ADR-128 ruling 8 put
+ * on the same unit and the same table, also cover the same people.
+ *
+ * It is a choice and not a widening because `spendByUser` feeds four screens
+ * and three of them still lead with dollars: moving them would change a money
+ * figure as a side effect, which ruling 6 forbids. The decision therefore
+ * lives with the caller, the same seam ADR-128 used for the unit.
+ */
+export type SpendByUserScope = "governance" | "organization";
 export type SpendOverTimeGroupBy = "team" | "user" | "model";
 
 // ---------------------------------------------------------------------------

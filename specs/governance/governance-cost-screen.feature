@@ -1921,6 +1921,40 @@ Feature: One cost screen, three honest lanes
       # without the sort key leaves page one ordered by dollars while showing
       # tokens, and a "top ten" that is not the top ten.
 
+    # The two people-facing panels agreed on the unit and disagreed on who
+    # they counted. The department one covers every project of the
+    # organization; the person one covered the hidden governance project
+    # alone, and within it only traffic that arrived through a governance
+    # source. Side by side over the same rows, one printed a token count and
+    # the other said nothing had been recorded.
+    @integration
+    Scenario: The panel counting people covers every project of the organization
+      Given people whose traffic ran under a project of the organization other than the governance one
+      And none of that traffic arrived through a governance source
+      When a permitted viewer opens the cost screen
+      Then those people appear on the panel ranking people by their tokens
+      And the tokens it counts for them are the tokens the department panel counts
+
+    # Only this screen's panel widens. Three other screens read the same
+    # per-person figures and still lead with dollars, and a spend figure must
+    # not move as a side effect of a fix aimed at this panel.
+    @unit
+    Scenario: A reader of the person figures other than the cost screen keeps the governance scope
+      Given a screen reading the per-person figures without naming a population
+      When it asks for them
+      Then it is answered over the hidden governance project alone
+      And only over traffic that arrived through a governance source
+
+    # The hidden governance project is minted by connecting a provider bill,
+    # so an organization that never connected one has none — and that says
+    # nothing about whether its people ran any traffic.
+    @unit
+    Scenario: People active in an organization with no governance project appear on the person panel
+      Given an organization whose people ran traffic in its own projects
+      And no hidden governance project has ever been minted for it
+      When a permitted viewer opens the cost screen
+      Then those people appear on the panel ranking people by their tokens
+
   # =========================================================================
   # SEATS ARE BOUGHT PER PRODUCT. An organization holds a pool per product,
   # and the pools are separate purchases that renew on their own dates. Two

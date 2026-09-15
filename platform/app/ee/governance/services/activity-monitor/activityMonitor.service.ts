@@ -22,6 +22,13 @@
  * project of the org, resolved from Prisma so they can only ever read this
  * org's own projects, and run whether or not a Gov Project exists.
  *
+ * `spendByUser` is the one read that answers EITHER question, because its
+ * four callers do not all ask the same one: the cost screen's token panel
+ * wants the organization and the three screens that lead with dollars want
+ * the governance project. It takes a `scope` naming which, defaulting to the
+ * governance one, and the origin filter travels with it - see
+ * `SpendByUserScope` and ADR-128 v3.21.
+ *
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
  * `prisma.anomalyAlert` - unaffected by the trace-store path.
  *
@@ -59,6 +66,7 @@ import type {
   SortDir,
   SpendByDepartmentChRow,
   SpendByTeamSourceChRow,
+  SpendByUserScope,
   SpendByUserSortField,
   SpendOverTimeChRow,
   SpendOverTimeGroupBy,
@@ -484,6 +492,16 @@ export class ActivityMonitorService {
   }
 
   /**
+   * The hidden governance project as a tenant list, empty when the org has
+   * never minted one. The list shape is what lets a scoped read take either
+   * population without the caller branching on which it asked for.
+   */
+  private async governanceTenantIds(organizationId: string): Promise<string[]> {
+    const govProjectId = await this.resolveGovProjectId(organizationId);
+    return govProjectId ? [govProjectId] : [];
+  }
+
+  /**
    * Every live project of the org - the tenant scope for the reads that
    * answer an organization question rather than a governance-project one
    * (the department rollup, the adoption headcount). Archived projects are
@@ -602,6 +620,26 @@ export class ActivityMonitorService {
   // Spend by user
   // -----------------------------------------------------------------------
 
+  /**
+   * Per-person figures over the population `scope` names, defaulting to the
+   * governance scope every caller had before the choice existed.
+   *
+   * The cost screen takes `organization`, so its "tokens by person" panel
+   * covers the same people as the "tokens by department" panel beside it —
+   * ADR-128 ruling 8 put the two on the same unit and the same table, and this
+   * is the other half of them agreeing. The three screens that still lead with
+   * dollars name no scope and are answered exactly as before, because moving a
+   * money figure as a side effect of this is what ruling 6 forbids.
+   *
+   * The organization scope does NOT consult the hidden governance project. It
+   * is minted by connecting a provider bill, so its absence says nothing about
+   * an organization's people — the lesson ADR-128 v3.20 recorded when it
+   * deleted the same gate from the adoption read.
+   *
+   * Tenancy: the project ids come from Prisma scoped to the org, so the
+   * ClickHouse read can only ever reach this org's own projects — the same
+   * construction `spendByDepartment` relies on.
+   */
   async spendByUser(input: {
     organizationId: string;
     windowDays: number;
@@ -609,16 +647,28 @@ export class ActivityMonitorService {
     offset?: number;
     sortBy?: SpendByUserSortField;
     sortDir?: SortDir;
+    scope?: SpendByUserScope;
   }): Promise<SpendByUserRow[]> {
-    const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) return [];
+    const scope = input.scope ?? "governance";
+    const tenantIds =
+      scope === "organization"
+        ? (await this.organizationProjects(input.organizationId)).map(
+            (project) => project.id,
+          )
+        : await this.governanceTenantIds(input.organizationId);
+    // Nothing to read: no live project in the organization scope, no hidden
+    // governance project in the governance one. Both are a true emptiness
+    // rather than a gate — neither answers a question about people with the
+    // existence of a project.
+    if (tenantIds.length === 0) return [];
     if (!this.repository) return [];
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
 
     const rows = await this.repository.findSpendByUser({
-      tenantId: govProjectId,
+      tenantIds,
+      scope,
       windowStart: now - windowMs,
       windowEnd: now,
       sortBy: input.sortBy ?? "spend",

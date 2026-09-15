@@ -25,6 +25,7 @@ import type {
   SpendByDepartmentChRow,
   SpendByTeamSourceChRow,
   SpendByUserChRow,
+  SpendByUserScope,
   SpendByUserSortField,
   SpendOverTimeChRow,
   SpendOverTimeGroupBy,
@@ -65,7 +66,8 @@ export class ActivityMonitorClickHouseRepository {
   }
 
   findSpendByUser(params: {
-    tenantId: string;
+    tenantIds: string[];
+    scope: SpendByUserScope;
     windowStart: number;
     windowEnd: number;
     sortBy: SpendByUserSortField;
