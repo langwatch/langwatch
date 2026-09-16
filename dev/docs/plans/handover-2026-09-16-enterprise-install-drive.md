@@ -288,29 +288,75 @@ Neither apidiff path does this today. Fixing apidiff properly means making the
 tier an input to boot and moving generation ahead of install; that is its own
 task and it is **not** needed to prove the routes are served (below).
 
-### Proving the routes without booting anything
+### Proved: all 25 are served at the enterprise tier
 
 `apps/api/src/tasks/openapi-document/openapi-generate.task.ts` builds the OpenAPI
 document from `serverModules` and the modules' own REST declarations - no
 database, no server, no stack. apidiff compares that same document, fetched from
-a running instance at `/api/openapi.json` (`tools/apidiff/spec.go:18`). So an
-operation present in the generated document is an operation apidiff will see.
+a running instance at `/api/openapi.json` (`tools/apidiff/spec.go:18`), so an
+operation in the generated document is one apidiff will see.
 
-Run it in a throwaway worktree, after the generate-then-install order above, and
-grep the document for the 25 paths. That is minutes rather than an hour, touches
-no peer session, and answers the only question the drive is asking.
+Run in a throwaway worktree at `9c250e6ea9`, both tiers, same tree:
+
+| | core | enterprise |
+| --- | --- | --- |
+| families | 71 | 75 |
+| declared routes | 314 | 340 |
+| operations written | 285 | 311 |
+| **the 25 this drive owns** | **0** | **25** |
+
+The core column is the control: without it the enterprise column proves only that
+the document contains routes, not that the tier is what put them there.
+
+**Recount the way apidiff does, or you will read 15/25.** `CanonicalAliasPath`
+(`tools/apidiff/spec.go:54`) collapses `/api/v1/<rest>` onto `/api/<rest>`, and
+the branch publishes the governance and scim-token families under `/api/v1/`.
+Paths carrying their own versioning (`/api/scim/v2/...`, `/api/otel/v1/...`) are
+exempt and match literally. A naive string comparison finds the 15 `/api/scim/v2/*`
+and misses the other ten, which are present and correctly spelled.
+
+The recipe, which no apidiff path performs for you:
+
+```bash
+git worktree add --detach .claude/worktrees/ent-parity HEAD
+cd .claude/worktrees/ent-parity
+LANGWATCH_BUILD_TIER=enterprise node dev/scripts/generate-modules.mjs
+env -u CI pnpm install --no-frozen-lockfile
+pnpm --filter @langwatch/prisma-client run prisma:generate
+pnpm --filter langwatch build && pnpm --filter @langwatch/mcp-server run build
+pnpm run ensure:built
+pnpm --filter @langwatch/platform-api task openapi-generate /tmp/openapi-enterprise.json
+```
+
+**What this does and does not establish.** It establishes that the enterprise
+build declares and publishes all 25 operations, which is what apidiff measures.
+It does **not** establish that they answer correctly at runtime: the document is
+built from declarations without constructing an app or opening a connection. The
+app's own evidence is separate and also green - 65 unit tests over the app and
+its REST transport, and `tslsp-cli diagnostics` clean on both
+`governance.server.ts` and `app/governance.app.ts`, which is the installer seam
+the package's own `tsc --noEmit` never reaches because the declarations gate
+fails first. A real boot is still owed.
 
 ### Then
 
-1. Collect `gov-rest-serves-25`; run the package suite and `typecheck:one`
-   yourself before committing.
-2. `LANGWATCH_BUILD_TIER=enterprise` apidiff run; expect the 25 to clear.
-3. Follow-ups, in the user's stated order of preference: the two-image split
-   (OSS and enterprise), then option A, collapsing the four
-   `moduleApi("governance")` tokens into one.
+1. **Teach apidiff the tier.** Generation must move ahead of the install, and the
+   install cannot be frozen at the enterprise tier. Until that lands, apidiff
+   measures the core build and will keep reporting the 25 as missing - which is
+   now a limitation of the harness, not of the branch.
+2. **A real boot.** The document proves declaration, not behaviour.
+3. **The `/api/auth/cli/*` surface**, eleven routes main serves and apidiff does
+   not measure. Needs the 102-operation facade; its own drive.
+4. Follow-ups in the user's stated order: the two-image split (OSS and
+   enterprise), then option A, collapsing the four `moduleApi("governance")`
+   tokens into one.
 
 **Known and deferred:** `@langwatch/infrastructure` is still not a dependency of
 the governance server package. Adding it regenerates the lockfile, which absorbs
 every other session's uncommitted `package.json` edits, and three peer sessions
 are live in this checkout. It is not needed for the 25 - the app reads no process
 member - so it waits for the lane that genuinely imports it.
+
+The throwaway worktree is left at `.claude/worktrees/ent-parity`, installed and
+built, so the check above is one command to repeat. `git worktree remove
+.claude/worktrees/ent-parity --force` when it is no longer wanted.
