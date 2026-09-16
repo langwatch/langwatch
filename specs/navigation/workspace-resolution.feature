@@ -48,6 +48,13 @@ Feature: Workspace resolution
     When a screen asks for my workspace
     Then it is told the workspace has resolved
 
+  @integration
+  Scenario: An address anybody can open does not wait for the session either
+    Given I am on an address anybody can open
+    And my session has not resolved yet
+    When a screen asks for my workspace
+    Then it is told the workspace has resolved
+
   @unit
   Scenario: Belonging to no organization is something the graph said
     Given the organization graph answered with no organizations

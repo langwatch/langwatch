@@ -223,5 +223,18 @@ describe("given a screen asking what workspace it is in", () => {
 
       expect(workspaceIsResolving(mount())).toBe(false);
     });
+
+    // The session is still in flight on the first render of every page, this
+    // one included. Counting that wait here would hold the share page and the
+    // sign-in screen behind a read whose answer cannot change what they draw.
+    /** @scenario "An address anybody can open does not wait for the session either" */
+    it("reports the workspace as resolved while the session is still being read", () => {
+      mockRouter.route = "/share/[id]";
+      session.status = "loading";
+      session.data = null;
+      mockOrganizationsQuery.mockReturnValue(switchedOff());
+
+      expect(workspaceIsResolving(mount())).toBe(false);
+    });
   });
 });

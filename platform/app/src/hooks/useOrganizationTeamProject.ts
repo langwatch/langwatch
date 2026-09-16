@@ -665,13 +665,16 @@ export const useOrganizationTeamProject = (
   // /onboarding/welcome before correcting itself.
   //
   // So the question is "has this read answered", not "is it in flight" — with
-  // the wait for the session counted as part of the read. An address that asks
-  // for no graph at all (public, signed out) is resolved immediately, which is
-  // what keeps the share page from waiting forever on a read it never makes.
+  // the wait for the session counted as part of the read, but only on an
+  // address that will need the graph whatever the session turns out to say.
+  // An address anybody can open needs none, so it resolves immediately rather
+  // than holding the share page and the sign-in screen behind a session fetch
+  // whose answer cannot change what they draw.
   const isAwaitingOrganizations =
     !organizations.isFetched &&
     !organizations.isError &&
-    (isOrganizationsQueryEnabled || session.status === "loading");
+    (isOrganizationsQueryEnabled ||
+      (session.status === "loading" && !isPublicRoute));
 
   if (isAwaitingOrganizations) {
     return {
