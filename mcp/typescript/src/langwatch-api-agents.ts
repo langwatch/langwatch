@@ -157,10 +157,9 @@ export interface AgentTestRunResponse {
 }
 
 /**
- * Runs one scripted scenario against an agent: the user sends "ping", the
- * agent answers, and the run succeeds when the answer arrives. The project
- * gains no scenario, run plan or test suite, and the answer carries the run
- * ids to follow.
+ * Runs one scripted "ping" scenario against an agent and succeeds when
+ * the answer arrives. Creates no scenario, run plan or test suite; the
+ * response carries the run ids to follow.
  */
 export async function testAgent(id: string): Promise<AgentTestRunResponse> {
   return makeRequest(
@@ -180,10 +179,9 @@ const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   );
 
 /**
- * The relay body for a connected agent: `message` is one user turn, `input`
- * is the body itself (it must carry `messages`), `parameters` are the run
- * parameters and `threadId` continues a conversation. A string is the
- * refusal, so the tool can answer it.
+ * The relay body for a connected agent: `message` is one user turn,
+ * `input` is the raw body (must carry `messages`), `parameters` are run
+ * parameters, `threadId` continues a conversation. A string is a refusal.
  */
 export function buildRelayBody({
   input,

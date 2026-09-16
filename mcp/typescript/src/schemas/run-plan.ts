@@ -1,11 +1,9 @@
 import { z } from "zod";
 
 /**
- * Typed inputs for the run plan tools.
- *
- * Each one mirrors the zod the platform validates the REST body with, so an
- * agent is told what is accepted before the request goes out rather than
- * after: `suiteScopeSchema` and `suiteTargetSchema` on the server side.
+ * Typed inputs for the run plan tools, mirroring the platform's REST
+ * validation (`suiteScopeSchema` and `suiteTargetSchema`) so an agent
+ * learns what's accepted before the request goes out.
  */
 
 /** What a run plan covers. */
@@ -35,12 +33,9 @@ export const runParametersSchema = z.record(
 );
 
 /**
- * One thing a plan runs its scenarios against, and the values that target
- * alone runs with.
- *
- * The parameters are what makes a comparison run: two targets may name the
- * same agent with different values, and the platform runs and reports each one
- * on its own.
+ * One thing a plan runs its scenarios against, and the values it alone
+ * runs with. Parameters make a comparison run: two targets may name the
+ * same agent with different values, each run and reported on its own.
  */
 export const runPlanTargetSchema = z.object({
   type: z
@@ -61,12 +56,9 @@ export const runPlanTargetSchema = z.object({
 });
 
 /**
- * One target as `/api/v1` carries it.
- *
- * The tool input spells the per-target values `parameters`, beside the
- * run-level `parameters` an agent already knows. The REST body spells them
- * `runParameters`, because a target holds the values it runs with rather than
- * the values of a run.
+ * One target as `/api/v1` carries it. Tool input spells per-target
+ * values `parameters`, beside run-level `parameters`; the REST body
+ * spells them `runParameters` since a target holds the values it runs with.
  */
 export interface RunPlanTargetWire {
   type: z.infer<typeof runPlanTargetSchema>["type"];

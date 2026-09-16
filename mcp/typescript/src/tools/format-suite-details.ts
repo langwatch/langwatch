@@ -41,10 +41,9 @@ export function formatEvaluatorAttachments(
 }
 
 /**
- * The status the platform reports while a run's evaluators have not been
- * recorded yet. The conversation is over and the judge has decided, but a
- * required evaluator can still turn the run red, so a caller must not read
- * the verdict as final.
+ * Reported while a run's evaluators haven't recorded yet: the judge has
+ * decided, but a required evaluator can still turn the run red — a
+ * caller must not read this as final.
  */
 export const PENDING_EVALUATION_STATUS = "PENDING_EVALUATION";
 

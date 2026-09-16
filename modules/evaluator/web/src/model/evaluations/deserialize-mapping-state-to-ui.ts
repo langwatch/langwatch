@@ -1,9 +1,7 @@
 /**
- * Deserialize a persisted MappingState back to UI field mappings.
- *
- * The `monitorLevel` determines the default sourceId. Thread-typed mappings
- * always get sourceId "thread", even when the monitor level is "trace"
- * (mixed trace + thread scenario).
+ * Deserializes a persisted MappingState to UI field mappings.
+ * `monitorLevel` sets the default sourceId; thread-typed mappings
+ * always get sourceId "thread", even for a "trace"-level monitor.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import type { MappingState } from "@langwatch/dataset-contract";

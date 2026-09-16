@@ -34,12 +34,9 @@ export function EvaluatorPushToCopiesDialog({
   const pushToCopies = evaluatorApi.evaluators.pushToCopies.useMutation();
 
   /**
-   * Every replica starts selected, and the selection is keyed by the IDS rather
-   * than by the query result's identity. `platform/app` depended on the result
-   * object, so a refetch — a window refocus, an invalidation from a push — reset
-   * a reader's choices under them while the dialog was open. Comparing the ids
-   * as a value means the reset happens when the list of replicas actually
-   * changes and not when the same list arrives again.
+   * Selection keys off the IDS, not the query result's identity: keying
+   * by identity reset a reader's mid-dialog choices on every refetch
+   * (refocus, push invalidation). IDs only change when replicas do.
    */
   const copyIds = (copies.data ?? []).map((copy) => copy.id).join(",");
   useEffect(() => {

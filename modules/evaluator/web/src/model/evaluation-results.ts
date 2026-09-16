@@ -1,11 +1,8 @@
 import type { ParsedEvaluationResult } from "@langwatch/evaluator-contract";
 
 /**
- * Status indicator colors for evaluation results — single source of
- * truth for dots, popover accents, score-bar fills, and any other
- * "one colour per status" rendering across the trace list, the v2
- * drawer header, the Evals accordion cards, and the v3 evaluator
- * chips. Update here and every surface follows.
+ * Status colors for evaluation results — single source of truth across
+ * the trace list, drawer header, Evals accordion, and evaluator chips.
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.400",
@@ -24,11 +21,9 @@ export const EVALUATION_STATUS_COLORS = {
 } as const;
 
 /**
- * Tag rendering pairs for evaluation statuses — bg / fg combinations
- * tuned for readability on light surfaces, used by the Evals accordion
- * card's status pill and any future "filled chip" surface. Always
- * derived from the same enum as `EVALUATION_STATUS_COLORS` so the
- * dot colour and the tag colour can't drift out of step.
+ * Tag bg/fg pairs for evaluation statuses, used by the Evals accordion
+ * status pill. Derived from the same enum as `EVALUATION_STATUS_COLORS`
+ * so dot and tag colors can't drift out of step.
  */
 export const EVALUATION_STATUS_TONES = {
   pending: { bg: "gray.subtle", fg: "fg.muted" },
@@ -66,18 +61,15 @@ export const getStatusLabel = (status: ParsedEvaluationResult["status"]): string
 };
 
 /**
- * Shape of any of the evaluation result variants we display as chips.
- * Tolerates the slightly different status enums used by the legacy
- * v1 trace summary (`pass`/`fail`/`warning`) and the v3 evaluator
- * runner (`passed`/`failed`/`processed`/`running`/`pending`).
+ * Chip-display shape tolerating both the legacy v1 status enum
+ * (pass/fail/warning) and the v3 evaluator runner enum
+ * (passed/failed/processed/running/pending).
  */
 export interface EvalChipInput {
   name?: string | null;
   /**
-   * Alias for `name` matching the trace-list `TraceEvalResult` shape
-   * (which mirrors the ClickHouse `EvaluatorName` column). The drawer
-   * header chip passes `name`; the trace list passes a TraceEvalResult
-   * directly. Accept both so neither surface has to remember to remap.
+   * Alias for `name` matching `TraceEvalResult` (mirrors the ClickHouse
+   * `EvaluatorName` column). Accept both so callers don't remap.
    */
   evaluatorName?: string | null;
   evaluatorId?: string | null;
@@ -123,10 +115,8 @@ export interface EvalChipDisplay {
   /** Whether the verdict is "no real score" (skipped or error). */
   noVerdict: boolean;
   /**
-   * Color-coded pass/fail label when the evaluator returned an explicit
-   * boolean verdict (not a numeric score). `null` for numeric / skipped /
-   * error, and for a categorising evaluator, which passed no judgement to
-   * label.
+   * Color-coded pass/fail label for an explicit boolean verdict; `null`
+   * for numeric, skipped, error, or categorising results.
    */
   passLabel: { text: string; color: string } | null;
   /**
@@ -180,10 +170,8 @@ export function formatEvalScoreText(score: number | boolean | null | undefined):
 }
 
 /**
- * Resolve any evaluation result variant into the chip-display contract.
- * Centralized so the trace-table chip, the drawer header chip and any
- * future surface (Evals accordion list, etc.) render identical visuals
- * for the same input.
+ * Resolves any evaluation result variant into the chip-display contract,
+ * so every surface renders identical visuals for the same input.
  */
 export function getEvalChipDisplay(input: EvalChipInput): EvalChipDisplay {
   const status = normalizeEvalStatus(input);

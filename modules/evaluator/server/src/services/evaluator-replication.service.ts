@@ -1,7 +1,6 @@
 /**
- * Copying an evaluator from one project into another. Shared by
- * `evaluators.copy` and `monitors.copy`, so either produces an identical,
- * independently-editable evaluator. The caller owns the permission checks.
+ * Copying an evaluator between projects. Shared by `evaluators.copy`
+ * and `monitors.copy`, producing an independent, editable copy.
  * Spec: specs/monitors/replicate-monitor-to-project.feature.
  */
 import {

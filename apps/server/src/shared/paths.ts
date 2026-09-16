@@ -8,12 +8,9 @@ const root = process.env.LANGWATCH_HOME?.length
 export const paths = {
   root,
   bin: join(root, "bin"),
-  // The @langwatch/server tree (apps/, packages/, services/langevals/, sdks/python/, etc.)
-  // is relocated here on first run. tsx 4.x bypasses
-  // tsconfig path-alias resolution for any source file whose parent path
-  // includes "/node_modules/" (its guard against transpiling 3rd-party
-  // deps), and npx unpacks INTO node_modules — so we have to move the app
-  // out before pnpm scripts that depend on `~/...` aliases can work.
+  // Relocated here on first run: tsx 4.x won't resolve tsconfig path
+  // aliases for source under "/node_modules/" (its 3rd-party guard), and
+  // npx unpacks there — so pnpm scripts using `~/...` aliases need this.
   app: join(root, "app"),
   data: join(root, "data"),
   redisData: join(root, "data", "redis"),

@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The `/api/evaluators` family over the runtime a process mounts it on: the
- * addresses, the statuses and the bodies the public API has answered since it
+ * The `/api/evaluators` family over the runtime a process mounts it on:
+ * addresses, statuses and bodies the public API has answered since it
  * shipped, against a stubbed application.
  */
 import {

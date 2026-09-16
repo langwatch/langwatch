@@ -1,8 +1,7 @@
 /**
- * A port interface for the evaluators screen, required because it cannot import
- * @langwatch/ui, the router, or singleton clients (ADR-004). Unlike other host ports,
- * this one uniquely asks for openOverlay to support drawer registration outside the
- * page-family hierarchy.
+ * A port interface for the evaluators screen — it cannot import
+ * @langwatch/ui, the router, or singleton clients (ADR-004). Also asks for
+ * openOverlay for drawer registration outside the page-family hierarchy.
  */
 
 import { createContext, useContext } from "react";
@@ -23,12 +22,9 @@ export type EvaluatorCopyTarget = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error IS its code slug since #5984, so a screen that
- * wrote its own copy would print the slug at the customer. `fallbackTitle`
- * names the action that failed.
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * screen-composed sentence — the wire message of a handled error IS its
+ * code slug since #5984. `fallbackTitle` names the action that failed.
  */
 export type EvaluatorFailureNotice = {
   error: unknown;
@@ -78,11 +74,9 @@ export abstract class EvaluatorHostApi {
   ): void;
 
   /**
-   * Asks for an overlay this family does not own.
-   *
-   * Separate from `setQuery` on purpose: the screen states WHICH overlay it
-   * wants and the application decides how an overlay is addressed, so a change
-   * in the drawer registry's URL convention does not reach into a screen.
+   * Asks for an overlay this family does not own, separate from
+   * `setQuery`: the screen states WHICH overlay it wants and the
+   * application decides how it's addressed, keeping URL conventions out.
    */
   abstract openOverlay(request: EvaluatorOverlayRequest): void;
 
@@ -96,11 +90,9 @@ const EvaluatorHostContext = createContext<EvaluatorHostApi | undefined>(void 0)
 export const EvaluatorHostProvider = EvaluatorHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means the screen was
+ * rendered outside the frontend feature that owns it — a composition
+ * fault, not something a screen can degrade around.
  */
 export function useEvaluatorHost(): EvaluatorHostApi {
   const host = useContext(EvaluatorHostContext);

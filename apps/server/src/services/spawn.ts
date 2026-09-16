@@ -155,12 +155,10 @@ function spawnAttempt(state: SupervisionState): void {
     writeFileSync(state.pidPath, String(child.pid));
   }
 
-  // Track stdout + stderr "end" events so we can drain any buffered lines
-  // BEFORE closing the log file. If we end() the logStream synchronously
-  // on child 'exit', the readline transformer may still be flushing the
-  // last chunk and we lose tail data, caught by spawn.integration.test
-  // intermittently failing on the 'row-2' assertion. Wait for both pipes
-  // to finish before closing.
+  // Track stdout/stderr "end" so buffered lines drain BEFORE closing the
+  // log file — ending it synchronously on child 'exit' can lose the tail
+  // chunk still flushing through readline (spawn.integration.test's
+  // flaky 'row-2' assertion).
   const pipesDrained: Promise<void>[] = [
     pipeLines(child, "stdout", state.spec.name, logStream, state.bus),
     pipeLines(child, "stderr", state.spec.name, logStream, state.bus),

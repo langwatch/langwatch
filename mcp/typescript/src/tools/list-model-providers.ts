@@ -1,10 +1,8 @@
 import { listModelProviders as apiListModelProviders } from "../langwatch-api-model-providers.js";
 
 /**
- * Handles the platform_list_model_providers MCP tool invocation.
- *
- * Lists all model providers for the project, showing provider name,
- * enabled status, and which key fields are set (masked).
+ * Handles the platform_list_model_providers MCP tool: lists providers
+ * with name, enabled status, and which key fields are set (masked).
  */
 export async function handleListModelProviders(): Promise<string> {
   const providers = await apiListModelProviders();

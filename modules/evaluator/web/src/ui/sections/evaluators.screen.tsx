@@ -1,9 +1,7 @@
 /**
- * `/:project/evaluators` — every reusable scoring function in the project: list,
- * delete (naming the cascade first), replicate, push, sync, history, snippets.
- * Creating and editing are drawers this family does not own, so the screen
- * writes their ADDRESS through `host.openOverlay` and the owning frontend
- * feature mounts the registry that answers it.
+ * `/:project/evaluators`: list, delete (naming the cascade), replicate,
+ * push, sync, history, snippets. Creating/editing are drawers this
+ * family doesn't own — written via `host.openOverlay`.
  */
 
 import { Center, EmptyState, Grid, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";

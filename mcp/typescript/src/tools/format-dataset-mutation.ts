@@ -2,11 +2,8 @@ import type { DatasetMutationResponse } from "../langwatch-api-datasets.js";
 import { escapeMarkdown } from "../utils/escape-markdown.js";
 
 /**
- * Formats the common detail lines for a dataset mutation response
- * (name, slug, id, and column types).
- *
- * Used by both create-dataset and update-dataset handlers to avoid
- * duplicating the formatting logic.
+ * Formats the common detail lines (name, slug, id, column types) for a
+ * dataset mutation response, shared by create-dataset and update-dataset.
  */
 export function formatDatasetMutationDetails(result: DatasetMutationResponse): string[] {
   const lines: string[] = [];

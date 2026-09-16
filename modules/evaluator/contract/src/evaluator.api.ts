@@ -1,10 +1,7 @@
 /**
- * Everything a door may ask about a project's evaluators.
- *
- * Two doors ask: the `evaluators.*` tRPC namespace the editor calls, and the
- * `/api/evaluators` REST family. Both reach this one object, so a rule written
- * on it is the rule both doors get, and a caller arrives as an argument —
- * `actorId` — never read from a session or a request.
+ * Everything a door may ask about a project's evaluators. Two doors
+ * reach it — `evaluators.*` tRPC and `/api/evaluators` REST — so a rule
+ * here binds both; callers arrive as `actorId`, never a session.
  */
 import { moduleApi } from "@langwatch/runtime-composition";
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
@@ -137,10 +134,9 @@ export interface EvaluatorApi {
     input: EvaluatorLineageScope & { actorId: string },
   ): Promise<EvaluatorSyncFromSourceResult>;
   /**
-   * The platform's own address for one evaluator resource, built from the
-   * project's slug and the path the caller already resolved. The REST
-   * declaration is a static object with no request-scoped builder to
-   * receive, so the app composes the link itself.
+   * The platform's own address for one evaluator resource, from the
+   * project's slug and an already-resolved path. The REST declaration is
+   * static with no request-scoped builder, so the app composes the link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
 }

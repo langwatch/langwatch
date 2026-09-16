@@ -3,10 +3,8 @@ import type { ScenarioFieldValues } from "../schemas/suite-fields.js";
 import { formatScenarioFields } from "./format-scenario.js";
 
 /**
- * Handles the platform_update_scenario MCP tool invocation.
- *
- * Updates an existing scenario and returns a confirmation
- * with the updated details.
+ * Handles the platform_update_scenario MCP tool: updates a scenario and
+ * returns a confirmation with the updated details.
  */
 export async function handleUpdateScenario(params: {
   scenarioId: string;

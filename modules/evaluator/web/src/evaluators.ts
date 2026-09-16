@@ -1,8 +1,7 @@
 /**
- * The evaluators family, as the browser application mounts it: one screen at
- * `/:project/evaluators`. The owning frontend feature mounts the tRPC Provider
- * these hooks run on and the host port that answers for the project, the
- * reader's grants, the replication targets, the address and the overlays.
+ * The evaluators family: one screen at `/:project/evaluators`. The
+ * owning feature mounts the tRPC Provider and the host port answering
+ * for the project, grants, replication targets and overlays.
  */
 
 import type { ComponentType } from "react";

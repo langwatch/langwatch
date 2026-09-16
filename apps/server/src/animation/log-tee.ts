@@ -66,10 +66,8 @@ export function renderEvent(ev: RuntimeEvent): string | null {
 }
 
 /**
- * Drain the runtime's event stream to the user's TTY, never blocking the
- * CLI's main flow. Returns an awaitable that resolves once the stream
- * closes, typically after `runtime.stopAll` is called and every
- * supervised child has exited.
+ * Drains the runtime's event stream to the user's TTY without blocking
+ * the CLI's main flow. Resolves once the stream closes.
  */
 export async function streamEventsToTTY(
   events: AsyncIterable<RuntimeEvent>,

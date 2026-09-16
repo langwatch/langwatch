@@ -4,10 +4,8 @@ import {
 } from "../langwatch-api-evaluators.js";
 
 /**
- * Handles the platform_list_evaluators MCP tool invocation.
- *
- * Lists all evaluators in the LangWatch project, formatted as an
- * AI-readable digest.
+ * Handles the platform_list_evaluators MCP tool: lists evaluators in
+ * the project as an AI-readable digest.
  */
 export async function handleListEvaluators(): Promise<string> {
   const evaluators = await apiListEvaluators();

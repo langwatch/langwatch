@@ -6,12 +6,12 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The Go-native NLP service (services/nlpgo) — the only NLP engine. Reuses
- * the same in-binary mono-binary we already download for aigateway, just
- * dispatched as `nlpgo`.
- *
- * Health: /healthz (chi-routed liveness in services/nlpgo/adapters/httpapi).
+ * The Go-native NLP service (services/nlpgo) — the only NLP engine.
+ * Reuses the mono-binary already downloaded for aigateway, dispatched as
+ * `nlpgo`.
  */
+
+/** Health: /healthz (chi-routed liveness in services/nlpgo/adapters/httpapi). */
 export async function startNlpgo(
   ctx: RuntimeContext,
   bus: EventBus,

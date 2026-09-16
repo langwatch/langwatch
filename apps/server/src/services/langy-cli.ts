@@ -6,12 +6,10 @@ import type { EventBus } from "./event-bus.ts";
 import { resolvePnpm } from "./node-deps.ts";
 import { nowInstant } from "@langwatch/time";
 
-// The `langwatch` CLI is the assistant's ONLY interface to LangWatch, every
-// skill is written against its command grammar, and a worker with no CLI can
-// answer from the model alone but cannot look anything up. Pinned rather than
-// tracking latest so the grammar the skills were written against is the
-// grammar that gets installed; bump in lockstep with a tested release, the
-// same rule Dockerfile.langyagent follows for the container image.
+// The `langwatch` CLI is the assistant's ONLY interface to LangWatch;
+// skills are written against its grammar. Pinned rather than tracking
+// latest, bumped in lockstep with a tested release — same rule
+// Dockerfile.langyagent follows for the container image.
 export const LANGY_CLI_VERSION = "1.0.0";
 
 // Install langwatch CLI from npm. Idempotent via version marker.
@@ -54,12 +52,12 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
     throw new Error(`langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`);
   }
 
-  // A shell shim rather than a symlink into node_modules/.bin: the workers get
-  // a PATH, not a package manager, and the shim keeps the resolved entrypoint
-  // readable when someone goes looking for what the assistant just ran.
-  // Paths are single-quoted (with embedded quotes escaped) because they derive
-  // from LANGWATCH_HOME: inside double quotes the shell would expand a $ or a
-  // backtick that the directory name happens to contain.
+  // A shell shim rather than a symlink into node_modules/.bin: workers get
+  // a PATH, not a package manager, and it keeps the entrypoint readable.
+
+  // Paths are single-quoted (embedded quotes escaped) because they derive
+  // from LANGWATCH_HOME, and double quotes would let the shell expand a
+  // $ or backtick the directory name happens to contain.
   mkdirSync(ctx.paths.bin, { recursive: true });
   const sq = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
   writeFileSync(shim, `#!/bin/sh\nexec ${sq(process.execPath)} ${sq(entry)} "$@"\n`, {

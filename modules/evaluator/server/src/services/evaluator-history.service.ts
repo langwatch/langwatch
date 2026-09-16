@@ -1,9 +1,12 @@
 /**
  * The change history one evaluator's detail panel renders, read off the
  * deployment's audit trail and named against the user directory.
- *
- * All three argument names are load bearing: an evaluator's id appears under
- * `id` on a rename, `evaluatorId` on a run and `newEvaluatorId` on a copy.
+ */
+
+/**
+ * All three argument names are load bearing: an evaluator's id appears
+ * under `id` on a rename, `evaluatorId` on a run and `newEvaluatorId` on
+ * a copy.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EvaluatorHistoryEntry } from "@langwatch/evaluator-contract";

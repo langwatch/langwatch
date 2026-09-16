@@ -1,9 +1,7 @@
 /**
- * The inputs the `evaluators.*` tRPC surface publishes.
- *
- * They live in the contract so the wire shape a client is typed against is
- * stated once, and the two schemas that mint an identifier read the one
- * evaluator-id scheme rather than a second of their own.
+ * The inputs the `evaluators.*` tRPC surface publishes, kept in the
+ * contract so the wire shape a client is typed against is stated once,
+ * and identifier-minting schemas share one evaluator-id scheme.
  */
 import { z } from "zod";
 import {
@@ -90,11 +88,9 @@ export type EvaluatorApiCreateInput = z.input<typeof evaluatorApiCreateInputSche
 export type EvaluatorApiCopyInput = z.infer<typeof evaluatorApiCopyInputSchema>;
 
 /**
- * What the five reads and writes the studio borrows answer, as this contract's
- * own zod-inferred shapes — so nothing here leaks a Prisma row.
- *
- * `getById` answers `null` rather than refusing: the studio opens the drawer
- * on an evaluator the project may no longer have.
+ * The five studio-borrowed reads/writes answer as this contract's own
+ * zod shapes, so nothing leaks a Prisma row. `getById` returns `null`
+ * for a since-deleted evaluator instead of refusing.
  */
 export type EvaluatorApiGetAllOutput = EvaluatorWithFields[];
 export type EvaluatorApiGetByIdOutput = EvaluatorWithFields | null;

@@ -22,11 +22,9 @@ function gitLsFiles(pattern: string): string[] {
 }
 
 /**
- * The `packages:` list from pnpm-workspace.yaml. A line scan rather than a
- * YAML parser: the list is flat quoted strings, and pulling in a parser as a
- * devDependency for one test buys nothing over twelve lines that fail loudly —
- * an empty result fails both the member-count assertion and the sanity check
- * below.
+ * The `packages:` list from pnpm-workspace.yaml, via a line scan rather
+ * than a YAML parser — not worth a devDependency for one test, and an
+ * empty result fails loudly on the assertions below.
  */
 function workspaceMembers(): string[] {
   const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
@@ -160,13 +158,10 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario The application links the SDK working copy */
     it("links the SDK working copy rather than a published release", () => {
-      // The deployables reach the SDK through the feature packages rather than
-      // declaring it themselves, so the invariant is asserted where the
-      // specifier lives: every `langwatch` dependency in the workspace names
-      // the working copy. So an SDK edit reaches the applications — and the
-      // production image built from them — without a publish.
-      // `linkWorkspacePackages` stays false, so this only happens for the
-      // specifiers that ask for it.
+      // The invariant is asserted where the specifier lives: every
+      // `langwatch` dependency names the working copy, so an SDK edit
+      // reaches the applications and the production image without a
+      // publish. `linkWorkspacePackages` stays false otherwise.
       const specifiers = execFileSync(
         "git",
         ["grep", "-h", "--", '"langwatch": "', "--", "packages", "apps"],
@@ -235,13 +230,10 @@ describe("the repo is a single pnpm workspace", () => {
   describe("when the root overrides are read", () => {
     /** @scenario A pin that suits one project is not forced onto the others */
     it("carries no unconditional pin for the packages the projects disagree on", () => {
-      // Three projects legitimately sit on three zod majors (app 3.x,
-      // SDK 4.0, MCP server 4.3), and the SDK's OTel logs pins are older
-      // than the app's stack. Each was deliberately NOT carried into the
-      // root list — as a direct dependency, the owning project's own
-      // declaration governs it. An unconditional root pin (a bare package
-      // name, no `@range` selector) would drag every project onto one
-      // version; a future merge adding one back must fail here.
+      // Three projects legitimately sit on different zod majors (app 3.x,
+      // SDK 4.0, MCP server 4.3) via their own direct dependency — an
+      // unconditional root pin (no `@range` selector) would drag them onto
+      // one version, so a future merge adding one back must fail here.
       const disputed = ["zod", "@opentelemetry/api-logs", "@opentelemetry/sdk-logs"];
       const unconditional = rootOverrideKeys().filter((k) => !k.replace(/^@/, "").includes("@"));
 
@@ -258,12 +250,10 @@ describe("the repo is a single pnpm workspace", () => {
   describe("when a member depends on an internal package", () => {
     /** @scenario A shared internal package is reachable from every project */
     it("resolves every internal dependency to the working copy", () => {
-      // Generalised over every member and every internal name, because the
-      // invariant is about the workspace, not about one pair: any member
-      // declaring a dependency on a package that lives in this repo must
-      // take the working copy. The one documented exception is `langwatch`
-      // — the published SDK — which the app consumes from the registry on
-      // purpose (see "keeps the app on the published SDK" above).
+      // Generalised over every member and internal name: any dependency on
+      // a package that lives in this repo must take the working copy. The
+      // one exception is `langwatch` (the published SDK), consumed from
+      // the registry on purpose (see "keeps the app on the published SDK").
       const internalNames = new Set(
         trackedManifests()
           .map((m) => readJson(m).name)
@@ -354,12 +344,10 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario The published package carries every input its install reads */
     it("lists every extends target of a listed package's tsconfig", () => {
-      // A tsconfig `extends` chain can reach a repo-root file that is not
-      // application SOURCE at all — tsconfig.base.json isn't tracked as a
-      // shipped-tree file anywhere, so the sibling completeness checks above
-      // never looked for it. Missing it passed staging cleanly and crashed
-      // `prisma generate` at first boot with "File '../../tsconfig.base.json'
-      // not found".
+      // A tsconfig `extends` chain can reach a repo-root file (like
+      // tsconfig.base.json) that the sibling completeness checks above
+      // don't track as shipped — missing it crashes `prisma generate` at
+      // first boot.
       const shipped = readJson("apps/server/distribution-files.json") as unknown as string[];
       const isShipped = (relPath: string): boolean =>
         shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));

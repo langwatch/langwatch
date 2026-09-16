@@ -35,11 +35,9 @@ function toolNamesInFeatureMap(): Set<string> {
 }
 
 /**
- * Every name passed as the first argument of a `server.tool(` registration.
- *
- * Read from the source rather than by constructing a server: building one
- * needs config and credentials this test has no business holding, and the
- * registration is a string literal in every case.
+ * Every name passed as the first argument of a `server.tool(`
+ * registration, read from source: building a server needs config
+ * and credentials this test has no business holding.
  */
 function registeredToolNames(): Set<string> {
   const source = readFileSync(join(__dirname, "../create-mcp-server.ts"), "utf-8");

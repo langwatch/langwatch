@@ -3,11 +3,9 @@ import { createPrompt as apiCreatePrompt } from "../langwatch-api.js";
 const HANDLE_PATTERN = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;
 
 /**
- * Converts a human-readable name into a URL-friendly handle.
- *
- * Lowercases the input, replaces non-alphanumeric runs with hyphens,
- * and strips leading/trailing hyphens. May return an empty string
- * for inputs with no alphanumeric characters — callers must validate.
+ * Converts a human-readable name into a URL-friendly handle: lowercased,
+ * non-alphanumeric runs replaced with hyphens, leading/trailing hyphens
+ * stripped. May return empty — callers must validate.
  */
 function toHandle(name: string): string {
   return name
@@ -16,12 +14,7 @@ function toHandle(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/**
- * Handles the platform_create_prompt MCP tool invocation.
- *
- * Creates a new prompt in the LangWatch project and returns a
- * confirmation with the created prompt's details.
- */
+/** Handles the platform_create_prompt MCP tool: creates a prompt and returns its details. */
 export async function handleCreatePrompt(params: {
   name: string;
   handle?: string;

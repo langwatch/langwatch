@@ -17,21 +17,14 @@ import { nowInstant } from "@langwatch/time";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Where the @langwatch/server tree was unpacked or checked out — used as
- * the COPY SOURCE for ensureAppDir. After bundling, apps/server/dist/cli.cjs
- * lives under the workspace root in both layouts:
- *   - dev workspace:   <repo>/apps/server/dist/cli.cjs
- *   - published tarball: node_modules/@langwatch/server/app/apps/server/dist/cli.cjs
- * So `dirname(cli.cjs)/../../..` == package root in both.
+ * Where @langwatch/server was unpacked/checked out — the COPY SOURCE for
+ * ensureAppDir. apps/server/dist/cli.cjs sits 3 levels under the package
+ * root in both the dev workspace and the published tarball layout.
  */
 function locatePackageSource(): string | null {
-  // Walk up rather than counting levels: the bundled entrypoint sits at
-  // apps/server/dist/cli.cjs and this module at apps/server/src/
-  // services/app-dir.ts, which are different depths. A fixed `../../..`
-  // resolves correctly from the bundle and one directory short from source,
-  // so running the CLI from a checkout (`tsx src/cli.ts`) died with "could
-  // not locate @langwatch/server package source" after every predep had
-  // already been downloaded.
+  // Walk up rather than counting levels: the bundled entrypoint and this
+  // module sit at different depths, so a fixed `../../..` resolves from
+  // the bundle but falls short running from source (`tsx src/cli.ts`).
   let dir = __dirname;
   for (let i = 0; i < 6; i++) {
     if (existsSync(join(dir, "apps", "api", "package.json"))) return dir;

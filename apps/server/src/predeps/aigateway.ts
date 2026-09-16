@@ -85,14 +85,14 @@ export function makeAigatewayPredep({
       const bundled = join(paths.bin, "aigateway");
       if (existsSync(bundled)) {
         const v = await resolveVersion(bundled);
-        // The monobinary carries three services that evolve with every
-        // release, so an install that upgrades the CLI must upgrade the
-        // binary with it: accepting any old binary here is how a langyagent
-        // subcommand (or a gateway fix) silently never arrives. Two dev
-        // exemptions: a CLI running from source expects 0.0.0-dev (matches
-        // nothing real, keep whatever is there), and a binary reporting
-        // "dev" was built from a checkout on purpose via
-        // LANGWATCH_AIGATEWAY_DEV_BUILD and stays until its owner rebuilds.
+        // The monobinary carries three services that evolve together, so
+        // an install upgrading the CLI must upgrade the binary too —
+        // otherwise a langyagent subcommand or gateway fix silently never
+        // arrives.
+
+        // Two dev exemptions: source builds expect 0.0.0-dev (matches
+        // nothing real, kept as-is), and a "dev" binary built on purpose
+        // via LANGWATCH_AIGATEWAY_DEV_BUILD stays until its owner rebuilds.
         if (v && v !== "dev" && version !== "0.0.0-dev" && v !== version) {
           return {
             installed: false,

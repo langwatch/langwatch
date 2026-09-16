@@ -5,24 +5,16 @@ import * as tar from "tar";
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
-// Pinned to a specific LTS tag rather than `master`. The previous
-// `builds.clickhouse.com/master/...` URLs shipped whatever the trunk was
-// at install time, and master rolled out an instruction (likely SVE/SME-
-// related) that the CPU on a stock M1/M2 mac doesn't support — clickhouse
-// crashed mid-query with SIGILL (exit 132). LTS releases are vetted for
-// the supported instruction set and pinned here so an end user's install
-// is reproducible across reboots.
+// Pinned to an LTS tag, not `master`: master once shipped an instruction
+// (SVE/SME) that crashes on stock M1/M2 macs (SIGILL, exit 132). LTS
+// releases are vetted for the supported instruction set.
 const CH_VERSION = "25.8.22.28";
 
 type Source = { kind: "binary"; url: string } | { kind: "tarball"; url: string; pathInTar: string };
 
-// LTS releases ship as:
-//   - macos:   single self-contained binary at the GH release
-//   - linux:   .tgz from the GH release containing
-//              clickhouse-common-static-${VERSION}/usr/bin/clickhouse
-// We treat both uniformly via a Source ADT; the tarball path strips the
-// version-named root and a usr/bin/ prefix to land the binary at
-// ~/.langwatch/bin/clickhouse.
+// LTS releases ship as a macOS binary or a linux .tgz containing
+// clickhouse-common-static-${VERSION}/usr/bin/clickhouse. The tarball
+// path strips both prefixes to land the binary at ~/.langwatch/bin/clickhouse.
 function downloadSource(platform: string): Source {
   const releaseBase = `https://github.com/ClickHouse/ClickHouse/releases/download/v${CH_VERSION}-lts`;
   const map: Record<string, Source> = {

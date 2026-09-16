@@ -5,10 +5,8 @@ import { analyticsGroups } from "../schemas/analytics-groups.js";
 export type Category = "filters" | "metrics" | "aggregations" | "groups" | "all";
 
 /**
- * Formats the LangWatch analytics schema into human-readable markdown.
- *
- * Returns documentation for the requested category of schema elements
- * (filter fields, metrics, aggregation types, or group-by options).
+ * Formats the LangWatch analytics schema into human-readable markdown
+ * for the requested category (filters, metrics, aggregations, groups).
  */
 export function formatSchema(category: Category): string {
   const sections: string[] = [];

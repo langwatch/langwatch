@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The evaluator-row contract, stated once and run against both backends: the
- * memory twin always, and the Postgres one when a test database is named at
- * `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
+ * The evaluator-row contract, run against both backends: the memory
+ * twin always, and Postgres when `LANGWATCH_TEST_DATABASE_URL` names a
+ * test database. Both run together in the datastore lane.
  * @see specs/evaluators/evaluator-management.feature
  */
 import {

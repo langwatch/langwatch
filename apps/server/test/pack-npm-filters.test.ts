@@ -307,12 +307,10 @@ describe("npm pack staging filters", () => {
   describe("the workspace: dependency shim", () => {
     /** @scenario "The self-host command remains compatible" */
     it("resolves every workspace: dependency apps/server declares", () => {
-      // pnpm 10.24's pack resolves a `workspace:` specifier for a package
-      // with no local node_modules by reading <cwd>/node_modules/<dep>'s own
-      // manifest, and the staged tree carries none — ADR-076 stages a plain
-      // copy, not an install. Give the fixture manifest a real `workspace:`
-      // dependency and run a REAL pack (not --check-filters, which stops
-      // before this matters) to prove the script's symlink shim covers it.
+      // pnpm's pack resolves a `workspace:` specifier for a
+      // node_modules-less package by reading <cwd>/node_modules/<dep>'s
+      // manifest — a REAL pack (not --check-filters) proves the script's
+      // symlink shim covers the staged, install-less tree (ADR-076).
       const root = buildFixture(["apps/api/src/config.ts"]);
       const serverManifestPath = join(root, "apps/server/package.json");
       const serverManifest = JSON.parse(readFileSync(serverManifestPath, "utf8")) as Record<

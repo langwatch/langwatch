@@ -9,10 +9,9 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { EvaluatorGraph } from "../../app/evaluator.app.ts";
 
 /**
- * The workflow and monitor rows an evaluator is entangled with. Four of the
- * six methods are row reads and writes on this process's own connection; the
- * replication pair goes through `workflows` because a replicated evaluator's
- * workflow is a Studio-graph copy, never a row copy.
+ * Workflow/monitor rows an evaluator is entangled with. Four of six
+ * methods read/write this connection; replication goes through
+ * `workflows`, since it's a Studio-graph copy, never a row copy.
  */
 export class EvaluatorGraphAdapter implements EvaluatorGraph {
   static create(options: { prisma: PrismaClient; workflows: WorkflowApi }): EvaluatorGraphAdapter {

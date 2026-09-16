@@ -166,13 +166,11 @@ const runtimeImpl: RuntimeApi = {
     }
 
     try {
-      // Phase 3b: workers. Spawned AFTER the app is healthy so it can
-      // share the same boot env (Redis + Prisma already migrated, app
-      // listening). Without these, the BullMQ collector/evaluations/
-      // track-event/topic-clustering queues fill up with no consumer and
-      // the UI sits forever on "Waiting for first trace…". The await is
-      // for resolvePnpm() inside startLangwatchWorkers — the spawn itself
-      // is non-blocking; lifecycle is inferred from process state.
+      // Phase 3b: workers, spawned AFTER the app is healthy so they share
+      // its boot env (Redis + Prisma migrated). Without them the BullMQ
+      // queues fill up with no consumer and the UI waits forever for a
+      // first trace. The await is only for resolvePnpm(); the spawn itself
+      // is non-blocking.
       const workers = await startLangwatchWorkers(ctx, bus, childEnv);
       handles.push(workers);
     } catch (err) {

@@ -1,10 +1,10 @@
 /**
- * The evaluator tRPC wire, pinned: every procedure name, its kind and the
- * permission the server binds to it. A rename here is a cache-key change in
- * every browser that calls it.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * The evaluator tRPC wire, pinned: every procedure name, its kind and
+ * the permission the server binds to it. A rename here is a cache-key
+ * change in every browser that calls it.
  */
+
+/** Spec: packages/api/specs/transport-declaration-split.feature. */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

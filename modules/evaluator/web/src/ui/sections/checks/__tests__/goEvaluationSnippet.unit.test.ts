@@ -226,12 +226,10 @@ describe("buildGoEvaluationSnippet", () => {
       });
     });
 
-    // The extracted signature widened `checkSlug` to `string | undefined`, but
-    // the only call site derives it from `slugify(name)`, which always returns
-    // a string. Nothing reachable today produces this path. If something ever
-    // does, the Go tab prints the missing slug exactly as the Python,
-    // TypeScript and curl tabs already do, so the fix belongs to all four at
-    // once rather than to this builder alone.
+    // `checkSlug` is `string | undefined`, but the only call site
+    // (`slugify(name)`) always returns a string, so this path is
+    // unreachable today. If it ever isn't, all four tabs (Go, Python,
+    // TypeScript, curl) need the same fix, not just this builder.
     describe("when no slug reaches the builder", () => {
       it("interpolates the absent slug the way every other language tab does", () => {
         expect(buildSnippet({ checkSlug: undefined })).toContain(

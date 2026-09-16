@@ -70,11 +70,9 @@ export type EvaluatorMappingsConfig = {
 };
 
 /**
- * Whether a failing result of this evaluator fails what it is attached to.
- *
- * An evaluator that produces a pass or fail verdict can be required. A score
- * only evaluator reports and never gates, so its switch stays off and
- * disabled.
+ * Whether a failing result of this evaluator fails what it is attached
+ * to. A pass/fail evaluator can be required; a score-only evaluator
+ * reports but never gates, so its switch stays off and disabled.
  */
 export type EvaluatorGateConfig = {
   required: boolean;

@@ -1,9 +1,7 @@
 /**
- * Real-Chromium QA for the Zod-first evaluator catalog. The settings forms in
- * the app are driven by `evaluatorsSchema.shape[type].shape.settings` and the
- * `AVAILABLE_EVALUATORS` metadata — both now generated as Zod, not via
- * ts-to-zod. This renders the real (unmocked) catalog so we can see the fields,
- * types and defaults the forms build from, and captures a screenshot for the PR.
+ * Real-Chromium QA for the Zod-first evaluator catalog: driven by
+ * `evaluatorsSchema.shape[type].shape.settings` and
+ * `AVAILABLE_EVALUATORS` (now Zod, not ts-to-zod); captures a screenshot.
  */
 
 import {

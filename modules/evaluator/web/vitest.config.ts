@@ -5,11 +5,9 @@ export default defineModuleVitestConfig({
   kind: "jsdom",
   test: {
     /**
-     * The real-browser lane is excluded, exactly as `platform/app` excluded it.
-     * `evaluator-form-zod-source.browser.test.tsx` drives a live form through
-     * `vitest/browser`, which jsdom cannot host; that application ran it from a
-     * separate `vitest.browser.config.ts` CI never ran, and the analytics and
-     * traces families each recorded the same about their own.
+     * Real-browser lane excluded, as `platform/app` did: the browser
+     * test drives `vitest/browser`, which jsdom can't host — needs a
+     * separate config CI never ran, same as analytics and traces.
      */
     exclude: [...configDefaults.exclude, "src/**/__tests__/**/*.browser.test.tsx"],
     environment: "jsdom",

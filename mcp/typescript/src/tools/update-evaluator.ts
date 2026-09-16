@@ -4,10 +4,8 @@ import {
 } from "../langwatch-api-evaluators.js";
 
 /**
- * Handles the platform_update_evaluator MCP tool invocation.
- *
- * Updates an existing evaluator and returns a confirmation
- * with the updated details.
+ * Handles the platform_update_evaluator MCP tool: updates an evaluator
+ * and returns a confirmation with the updated details.
  */
 export async function handleUpdateEvaluator(params: {
   evaluatorId: string;

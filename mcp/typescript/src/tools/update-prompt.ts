@@ -39,10 +39,9 @@ interface IdentifiedVersion {
 }
 
 /**
- * Finds the version created by this update. The GET detail response IS the
- * latest version, so a top-level commitMessage match identifies it directly;
- * otherwise (e.g. a concurrent update landed after ours) the versions
- * listing is consulted, best-effort.
+ * Finds the version created by this update. The GET detail response IS
+ * the latest version, so a commitMessage match identifies it directly;
+ * otherwise the versions listing is consulted, best-effort.
  */
 async function identifyNewVersion({
   idOrHandle,

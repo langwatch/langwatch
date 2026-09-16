@@ -34,10 +34,8 @@ export const datasetColumnDefinitionSchema = z.object({
 });
 
 /**
- * Zod schema for the platform_create_dataset MCP tool parameters.
- *
- * Extracted so it can be shared between the MCP tool registration
- * (create-mcp-server.ts) and unit tests.
+ * Zod schema for the platform_create_dataset MCP tool parameters,
+ * extracted so it's shared between create-mcp-server.ts and unit tests.
  */
 export const createDatasetSchema = z.object({
   name: z.string().min(1).describe("Dataset name"),

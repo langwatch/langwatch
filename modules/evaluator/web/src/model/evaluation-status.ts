@@ -1,10 +1,7 @@
 /**
- * What a verdict MEANS, apart from what it looks like.
- *
- * `evaluationPassed` and `evaluationStatusColor` are read by a count, by a
- * trace tag and by a status icon, and only the last of the three renders
- * anything. They sit in `model` so `evaluation-summary-counts` can read them:
- * a pure counter may depend on pure vocabulary and never on an element.
+ * What a verdict MEANS, apart from what it looks like. `evaluationPassed`
+ * and `evaluationStatusColor` feed a count, a trace tag and a status icon,
+ * kept here so a pure counter depends on vocabulary, never an element.
  */
 
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";

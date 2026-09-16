@@ -5,12 +5,10 @@ import * as tar from "tar";
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep, PredepTask } from "./types.ts";
 
-// The runtime each Langy conversation runs inside. Pinned to an exact release
-// rather than tracking latest: this binary executes model-written shell with
-// the user's own credentials in its environment, so every rebuild silently
-// re-evaluating trust in an upstream release is not a trade worth making.
-// Keep in lockstep with the OPENCODE_VERSION pin in Dockerfile.langyagent:
-// the skills and AGENTS.md are written against one grammar, not two.
+// Pinned to an exact release, not latest: this binary executes
+// model-written shell with the user's credentials, so silently trusting
+// a new upstream release isn't a trade worth making. Keep in lockstep
+// with the OPENCODE_VERSION pin in Dockerfile.langyagent.
 export const OPENCODE_VERSION = "1.17.11";
 
 // darwin ships zips, linux ships tarballs. The `-baseline` variants target
@@ -44,12 +42,9 @@ async function resolveVersion(bin: string): Promise<string | null> {
 }
 
 /**
- * The Langy assistant's worker runtime.
- *
- * Skipped entirely when the assistant is turned off, because it is the only
- * part of the install that exists solely for it, everything else Langy needs
- * (the manager itself) already ships inside the mono-binary we download for
- * the gateway.
+ * The Langy assistant's worker runtime. Skipped when the assistant is
+ * off — it's the only install piece that exists solely for it; the
+ * manager itself ships inside the gateway's mono-binary.
  */
 async function detectOpencode(
   binDir: string,

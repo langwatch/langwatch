@@ -3,10 +3,8 @@ import type { DatasetColumnType } from "../langwatch-api-datasets.js";
 import { formatDatasetMutationDetails } from "./format-dataset-mutation.js";
 
 /**
- * Handles the platform_create_dataset MCP tool invocation.
- *
- * Creates a new dataset in the LangWatch project and returns a
- * confirmation with the created dataset's details.
+ * Handles the platform_create_dataset MCP tool: creates a dataset and
+ * returns a confirmation with its details.
  */
 export async function handleCreateDataset(params: {
   name: string;

@@ -2,10 +2,8 @@ import { getScenario as apiGetScenario } from "../langwatch-api-scenarios.js";
 import { formatScenarioFields } from "./format-scenario.js";
 
 /**
- * Handles the get_scenario MCP tool invocation.
- *
- * Retrieves a specific scenario by ID and formats it as
- * AI-readable markdown or raw JSON.
+ * Handles the get_scenario MCP tool: retrieves a scenario by ID and
+ * formats it as AI-readable markdown or raw JSON.
  */
 export async function handleGetScenario(params: {
   scenarioId: string;

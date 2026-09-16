@@ -113,10 +113,9 @@ export class EvaluatorWorkflowVersionRequiredError extends HandledError {
 }
 
 /**
- * The wizard asked to attach a second evaluator to a workflow that already has
- * one. 400 rather than the 409 `EvaluatorWorkflowAlreadyAssignedError` answers,
- * because this is the status the `evaluators.create` door has answered since it
- * shipped and a client branches on it.
+ * A second evaluator attached to a workflow that already has one: 400,
+ * not the 409 `EvaluatorWorkflowAlreadyAssignedError` uses — the status
+ * `evaluators.create` has answered since shipping, and a client branches on it.
  */
 export class EvaluatorWorkflowEvaluatorExistsError extends HandledError {
   declare readonly code: "evaluator_workflow_evaluator_exists";
@@ -150,10 +149,9 @@ export class EvaluatorTypeImmutableError extends HandledError {
 }
 
 /**
- * Replicating reads the source project, and the caller may not manage it. 401
- * rather than 403, which is the status this refusal has answered since it
- * shipped; `AgentSourcePermissionDeniedError` keeps the same one for the same
- * reason.
+ * Replicating reads the source project, which the caller may not manage:
+ * 401, not 403 — the status this refusal has answered since shipping.
+ * `AgentSourcePermissionDeniedError` keeps the same one for the same reason.
  */
 export class EvaluatorSourcePermissionDeniedError extends HandledError {
   declare readonly code: "evaluator_source_permission_denied";

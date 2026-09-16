@@ -21,12 +21,10 @@ export async function startClickhouse(
   const sp = servicePaths(ctx.paths);
   const configFile = join(sp.clickhouseConfigDir, "config.xml");
 
-  // Always regenerate — the config is purely derived from ctx.ports +
-  // ctx.paths, both of which can change between runs (auto-port-shift
-  // when the default base is already bound, or LANGWATCH_HOME override).
-  // Skipping when the file exists baked the FIRST run's ports into the
-  // config forever; subsequent ports-shifted runs would try to bind to
-  // the stale port and crash with exit 210 (NETWORK_ERROR).
+  // Always regenerate — ctx.ports/paths can shift between runs
+  // (auto-port-shift, LANGWATCH_HOME override). Skipping when the file
+  // exists baked in the FIRST run's ports, crashing later runs with a
+  // stale-port bind (exit 210, NETWORK_ERROR).
   writeClickhouseConfig(configFile, ctx);
 
   const handle = supervise({

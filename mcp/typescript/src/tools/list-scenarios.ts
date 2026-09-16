@@ -1,10 +1,8 @@
 import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.js";
 
 /**
- * Handles the platform_list_scenarios MCP tool invocation.
- *
- * Lists all scenarios in the LangWatch project, formatted as an
- * AI-readable digest or raw JSON.
+ * Handles the platform_list_scenarios MCP tool: lists scenarios in the
+ * project as an AI-readable digest or raw JSON.
  */
 export async function handleListScenarios(params: {
   testSuiteId?: string;

@@ -47,10 +47,9 @@ interface ServerRuntime {
 }
 
 /**
- * Resolves and verifies the caller's Bearer token. When `expectedApiKey` is
- * given the token has to resolve to that same key, so possession of a session
- * id grants nothing on its own. Sends the error response itself and resolves to
- * null when the request must not proceed.
+ * Resolves and verifies the caller's Bearer token; when `expectedApiKey`
+ * is given, it must resolve to that same key. Sends the error response
+ * itself and resolves to null when the request must not proceed.
  */
 type Authenticate = (args: {
   req: Request;
@@ -91,10 +90,9 @@ function rateLimitKey(req: Request): string {
 }
 
 /**
- * Resolves a Bearer token to the API key it stands for. OAuth-issued access
- * tokens map back to the key they were minted from; anything else is treated as
- * a direct API key. This only translates the token, it does not decide whether
- * the key is valid.
+ * Resolves a Bearer token to its API key. OAuth-issued access tokens map
+ * back to the key they were minted from; anything else is treated as a
+ * direct key. Only translates — does not validate.
  */
 function resolveApiKey({
   token,
@@ -494,12 +492,12 @@ function registerSseRoutes({
     }
   });
 
-  // Mounted at both /messages and /sse/messages because some clients resolve
-  // the relative /messages URL differently.
-  //
-  // The session id travels in the query string because the SSE transport hands
-  // the client its POST endpoint as a URI. It identifies the session and
-  // nothing more: the Bearer token is what authorizes the request.
+  // Mounted at both /messages and /sse/messages because some clients
+  // resolve the relative /messages URL differently.
+
+  // The session id in the query string only identifies the session; it's
+  // how the SSE transport hands the client its POST endpoint as a URI.
+  // The Bearer token is what authorizes the request.
   const handleSseMessage = async (req: Request, res: Response) => {
     const apiKey = await authenticate({ req, res });
     if (!apiKey) return;

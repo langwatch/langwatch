@@ -13,10 +13,8 @@ function getGroupedData(bucket: AnalyticsBucket, groupBy: string): GroupedData |
 }
 
 /**
- * Handles the get_analytics MCP tool invocation.
- *
- * Queries analytics timeseries from LangWatch and formats the results
- * as an AI-readable markdown table.
+ * Handles the get_analytics MCP tool: queries analytics timeseries and
+ * formats them as an AI-readable markdown table.
  */
 export async function handleGetAnalytics(params: {
   metric: string;

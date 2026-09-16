@@ -50,12 +50,10 @@ function detectLibc(): "glibc" | "musl" {
     }).toLowerCase();
     if (out.includes("musl")) return "musl";
   } catch {
-    // ldd missing or unreadable: rare. Glibc-based distros always ship
-    // ldd with libc, so a missing probe more likely means an unusual /
-    // minimal container. Default to glibc — the wrong guess on a real
-    // musl host produces an immediate, obvious "cannot execute" error,
-    // whereas guessing musl on glibc would download a smaller-fanout
-    // binary that nobody else uses.
+    // ldd missing/unreadable is rare (glibc distros ship it with libc).
+    // Default to glibc: a wrong glibc guess on a musl host fails loudly
+    // ("cannot execute"), while guessing musl on glibc downloads a
+    // smaller-fanout binary nobody else uses.
   }
   return "glibc";
 }

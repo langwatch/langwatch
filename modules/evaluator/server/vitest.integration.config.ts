@@ -1,11 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: `*.integration.test.ts` and the repository contract suites
- * under `src/`. Needs Postgres, at `LANGWATCH_TEST_DATABASE_URL` — this is the
- * lane where the contract suite runs its cases against the Prisma repository
- * rather than the memory twin alone. The memory cases run here too, which is
- * what makes the two answers comparable in one report.
+ * Integration lane: `*.integration.test.ts` and repository contract
+ * suites, needing Postgres at `LANGWATCH_TEST_DATABASE_URL`. Runs
+ * Prisma and the memory twin together for one comparable report.
  */
 export default defineConfig({
   test: {

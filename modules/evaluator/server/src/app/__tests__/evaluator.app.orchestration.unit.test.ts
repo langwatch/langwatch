@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
- * What the application does beyond passing a call on: the config validation, the
- * workflow a second evaluator may not claim, the archive cascade and the
- * per-project filtering every replication path applies. These rules used to
- * live in the tRPC class, so the assertions are on their stable error codes.
+ * What the application does beyond passing a call on: config
+ * validation, workflow/archive rules, and per-project filtering. These
+ * moved out of the tRPC class, so assertions target stable error codes.
  */
 import { describe, expect, it, vi } from "vitest";
 

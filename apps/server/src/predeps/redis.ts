@@ -36,12 +36,10 @@ export const redisPredep: Predep = {
   label: "redis-server",
   required: true,
 
-  // Always use the embedded redis. NOT checking `which redis-server` —
-  // a user with a system redis installed (debian's redis 6.x, brew's
-  // 7.x, etc.) would otherwise have us spawn THEIR binary against our
-  // config, risking version-drift surprises (renamed commands, default
-  // changes, ACL behavior). Tarball is ~1.5MB so the cost of always
-  // downloading is negligible vs. an unreproducible version mismatch.
+  // Always use the embedded redis, never `which redis-server` — a
+  // system redis (debian 6.x, brew 7.x) risks version-drift surprises
+  // against our config. The tarball is ~1.5MB, so downloading always
+  // costs less than an unreproducible mismatch.
   async detect(paths) {
     const bundled = join(paths.bin, "redis-server");
     if (existsSync(bundled)) {
@@ -74,12 +72,9 @@ export const redisPredep: Predep = {
     }
 
     task.output = "extracting";
-    // Tarball contains redis-server + redis-cli at the root. Both are
-    // needed: the supervisor uses redis-cli for the readiness probe.
-    // sync: true so files are fully flushed before we chmod — async tar.x
-    // resolved while redis-cli was still in-flight on a CI run, and the
-    // subsequent chmodSync hit ENOENT. Sync extraction blocks until every
-    // entry is on disk and stat-visible.
+    // Tarball has redis-server + redis-cli (readiness probe needs both).
+    // sync: true — async extraction once raced chmodSync with cli still
+    // in-flight (CI hit ENOENT); sync blocks until every entry is on disk.
     tar.x({ sync: true, file: tmp, cwd: paths.bin });
     const serverBin = join(paths.bin, "redis-server");
     const cliBin = join(paths.bin, "redis-cli");

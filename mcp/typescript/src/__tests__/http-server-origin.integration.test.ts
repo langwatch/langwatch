@@ -1,8 +1,7 @@
 /**
- * Origin validation and bind address for the standalone MCP HTTP server.
- *
- * The MCP transport specification requires servers to validate Origin on every
- * incoming connection and to bind loopback when running locally.
+ * Origin validation and bind address for the standalone MCP HTTP
+ * server, per the MCP transport spec: validate Origin on every
+ * connection and bind loopback when running locally.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

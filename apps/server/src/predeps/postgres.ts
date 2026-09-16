@@ -43,12 +43,9 @@ export function makePostgresPredep(development: LocalOrchestratorDevelopmentConf
     required: true,
 
     async detect(paths) {
-      // LANGWATCH_FORCE_BUNDLED_POSTGRES=1 skips system-postgres detection so
-      // the bundled tarball path is exercised. Use case: dogfooding the
-      // bundled binary on machines that have brew/apt postgres on PATH (mac
-      // dev machines, GitHub runners) — without this we'd always reuse the
-      // host install and never test the bundled lifecycle. Empty / unset /
-      // "0" / "false" all mean default behavior.
+      // LANGWATCH_FORCE_BUNDLED_POSTGRES=1 skips system-postgres detection,
+      // to dogfood the bundled binary on machines with brew/apt postgres on
+      // PATH — otherwise we'd never exercise the bundled lifecycle.
       const forceBundled = development.forceBundledPostgres;
       const bundled = join(paths.bin, "postgres", "bin", "postgres");
       if (existsSync(bundled)) {

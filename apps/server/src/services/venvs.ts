@@ -75,12 +75,9 @@ const LANGEVALS_BASE_EXTRAS = ["azure", "langevals", "openai", "ragas", "topic_c
 
 function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
-  // Two evaluator families are opt-in, both for weight: the PII detector
-  // brings a ~620MB spacy model and language detection ~95MB of language
-  // models. The product tells anyone who reaches for one of these how to get
-  // it. Nothing about redaction depends on the PII toggle: LangWatch's own
-  // secret and PII redaction in the ingestion pipeline is not implemented
-  // with presidio.
+  // Two evaluator families are opt-in for weight: PII detection (~620MB
+  // spacy) and language detection (~95MB). Unrelated to LangWatch's own
+  // ingestion-pipeline PII redaction, which doesn't use presidio.
   const features = resolveEffectiveFeatures(ctx.envFile);
   const extras = [
     ...LANGEVALS_BASE_EXTRAS,

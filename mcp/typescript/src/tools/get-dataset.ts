@@ -41,10 +41,8 @@ export function formatDatasetResponse(dataset: DatasetDetailResponse): string {
 }
 
 /**
- * Handles the platform_get_dataset MCP tool invocation.
- *
- * Retrieves a specific dataset by slug or ID and formats it as
- * AI-readable markdown or raw JSON.
+ * Handles the platform_get_dataset MCP tool: retrieves a dataset by
+ * slug or ID and formats it as AI-readable markdown or raw JSON.
  */
 export async function handleGetDataset(params: {
   slugOrId: string;

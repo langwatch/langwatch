@@ -1,10 +1,8 @@
 import { setModelProvider as apiSetModelProvider } from "../langwatch-api-model-providers.js";
 
 /**
- * Handles the platform_set_model_provider MCP tool invocation.
- *
- * Creates or updates a model provider configuration, including API keys.
- * Returns confirmation with the updated provider status.
+ * Handles the platform_set_model_provider MCP tool: creates or updates
+ * a provider config (including API keys) and returns its status.
  */
 export async function handleSetModelProvider(params: {
   provider: string;

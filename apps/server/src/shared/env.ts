@@ -32,10 +32,8 @@ type PortBoundEnvEntry = {
   /** The value the current port allocation calls for. */
   expected: string;
   /**
-   * What a scaffold-written value looks like for ANY port base. Reconcile
-   * only rewrites a value that still matches this shape: a user who pointed
-   * the key somewhere else on purpose (a LAN hostname, an external store)
-   * never matches, so their edit survives every port shift.
+   * A user-pointed value (LAN hostname, external store) won't match this
+   * shape, so reconcile leaves it alone across port shifts.
    */
   scaffoldShape: RegExp;
 };
@@ -43,12 +41,9 @@ type PortBoundEnvEntry = {
 const LOCALHOST_URL_SHAPE = /^http:\/\/localhost:\d+$/;
 
 /**
- * Every .env key whose value embeds an allocated port, with the value the
- * given allocation expects. buildEnv writes these on first scaffold and
- * reconcileEnvFile rewrites them when a later run lands on a different port
- * base (a stray process on one port of the old slot is enough) — without
- * this, the .env keeps the old slot's URLs and the app dials data stores
- * that this very run started somewhere else.
+ * Every .env key with a port-bound value. buildEnv writes these on
+ * scaffold; reconcileEnvFile rewrites them when a later run lands on a
+ * different port base, so the app doesn't dial stores from an old slot.
  */
 export function portBoundEnv(ports: PortAllocation) {
   const host = `http://localhost:${ports.langwatch}`;
@@ -90,12 +85,9 @@ export function portBoundEnv(ports: PortAllocation) {
 }
 
 /**
- * Builds the .env body for ~/.langwatch/.env. Mirrors the helm chart's
- * "basic" preset: every secret that the app refuses to start without is
- * generated locally; every optional integration (OpenAI, Sendgrid, …) is
- * left blank for the user to fill in later. Every URL is keyed off the
- * allocated port table so a `--port-base 5570` shift cascades to every
- * service consistently.
+ * Builds .env for ~/.langwatch/.env, mirroring the helm chart's "basic"
+ * preset: required secrets generated locally, optional integrations left
+ * blank for the user to fill in.
  */
 export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput): string {
   const host = baseHost ?? `http://localhost:${ports.langwatch}`;
@@ -129,25 +121,19 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   sectionBreak("LANGWATCH INTERNAL SERVICES");
   set("LANGWATCH_NLP_SERVICE", portBound.LANGWATCH_NLP_SERVICE.expected);
   set("LANGEVALS_ENDPOINT", portBound.LANGEVALS_ENDPOINT.expected);
-  // The engine reads `LANGWATCH_ENDPOINT` to decide where to POST evaluator
-  // runs and dataset uploads. The default is https://app.langwatch.ai
-  // (cloud) — which is wrong for self-host: callbacks then 401 against the
-  // hosted API, evaluators produce no scores, and the experiments workbench
-  // just shows the evaluator title with no value. Pinning to our local
-  // langwatch app routes those callbacks to the running stack.
+  // LANGWATCH_ENDPOINT is where the engine POSTs evaluator runs and dataset
+  // uploads; the default is the cloud app, which 401s for self-host. Pin it
+  // to the local app so those calls hit the running stack.
   set("LANGWATCH_ENDPOINT", host);
 
   sectionBreak("AI GATEWAY");
   set("LW_VIRTUAL_KEY_PEPPER", hex(32));
   set("LW_GATEWAY_INTERNAL_SECRET", hex(32));
   set("LW_GATEWAY_JWT_SECRET", hex(32));
-  // Where the gateway is, from the app's point of view. The gateway process
-  // reads this same name to mean the opposite direction (where the CONTROL
-  // PLANE is) and services/aigateway.ts sets it explicitly in that child's
-  // env, so this value only ever reaches the app — which uses it to hand
-  // Langy's workers, and CLI users, an OpenAI-compatible base URL. Pointed at
-  // the app itself, every one of those callers dialled a server with no /v1
-  // surface.
+  // Where the gateway is, from the app's side. The gateway process reads
+  // the same name to mean the opposite (its own control plane) and sets it
+  // explicitly for itself, so this value only ever reaches the app, which
+  // hands it out as the OpenAI-compatible base URL for Langy and the CLI.
   set("LW_GATEWAY_BASE_URL", portBound.LW_GATEWAY_BASE_URL.expected);
 
   sectionBreak("LANGY ASSISTANT");
@@ -201,14 +187,10 @@ export function scaffoldEnvFile(
     if (!existsSync(secretsPath)) {
       writePersistedSecrets(secretsPath, readFileSync(input.path, "utf8"));
     }
-    // The file stays the user's — except the port-bound URLs, which belong
-    // to whatever allocation THIS run got. A run that auto-shifted (one
-    // stray process on the old slot is enough) otherwise boots services on
-    // the new slot while the app reads the old slot's URLs from here and
-    // dials data stores that aren't there. Only callers whose ports are a
-    // real, conflict-checked allocation ask for this — a default-port guess
-    // (the bare `install` command) must not rewrite a shifted install
-    // backwards.
+    // Port-bound URLs belong to this run's allocation; the rest of the file
+    // stays the user's. Only callers with a real, conflict-checked
+    // allocation reconcile — a default-port guess (bare `install`) must not
+    // rewrite a shifted install backwards.
     const reconciledKeys = input.shouldReconcilePorts ? reconcileEnvFile(input) : [];
     return { written: false, path: input.path, reconciledKeys };
   }
@@ -229,11 +211,9 @@ export function scaffoldEnvFile(
 }
 
 /**
- * Rewrites the port-bound URLs of an existing .env to the given allocation.
- * Only values still in their scaffold shape are touched (see portBoundEnv);
- * anything a user pointed elsewhere is kept, and the rest of the file —
- * secrets, model keys, toggles, comments — is preserved byte for byte.
- * Returns the keys it rewrote.
+ * Rewrites port-bound URLs to the given allocation. Only values still in
+ * their scaffold shape are touched (see portBoundEnv), so a user override
+ * survives. Returns the keys it rewrote.
  */
 export function reconcileEnvFile(input: { ports: PortAllocation; path: string }): string[] {
   if (!existsSync(input.path)) return [];

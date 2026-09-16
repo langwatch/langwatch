@@ -1,8 +1,7 @@
 /**
- * Verdict counting for the legacy messages list tag and trace list pills
- * (#6835 item 2). A skipped evaluation is not a pass, and a crashed
- * evaluator is not a fail verdict — the counts must keep the three states
- * apart instead of coercing them into pass/fail.
+ * Verdict counting for message-list tags and trace-list pills (#6835
+ * item 2): skipped isn't a pass and crashed isn't a fail — the three
+ * states stay apart, never coerced into pass/fail.
  */
 import { describe, expect, it } from "vitest";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";

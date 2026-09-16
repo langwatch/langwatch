@@ -49,10 +49,9 @@ export type RuntimeEvent =
   | { type: "stopped"; service: string };
 
 /**
- * Format a process exit the same way everywhere it is reported: the
- * supervisor's log-file marker lines (spawn.ts) and the CLI's TTY render
- * (log-tee.ts) must read identically, so both call this instead of keeping
- * their own copy.
+ * Formats a process exit identically everywhere it's reported —
+ * spawn.ts's log markers and log-tee.ts's TTY render both call this
+ * instead of keeping their own copy.
  */
 export function exitCause({
   code,

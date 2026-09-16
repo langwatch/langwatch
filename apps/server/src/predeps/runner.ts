@@ -42,12 +42,9 @@ export async function runPredeps({
     return collectResult(predeps, detection, {});
   }
 
-  // Only `uv` warrants a confirmation prompt — it's the one predep that
-  // installs into the user's home (`~/.local/bin/uv` via the official
-  // installer) instead of being a self-contained binary under
-  // `~/.langwatch/bin`. Every other predep is a static binary we drop into
-  // `~/.langwatch/bin` and which `rm -rf ~/.langwatch` cleans up — no need
-  // to bother the user about it.
+  // Only `uv` warrants a confirmation: it installs into the user's home
+  // (`~/.local/bin/uv`) rather than `~/.langwatch/bin`, where every other
+  // predep lives and `rm -rf ~/.langwatch` fully cleans up.
   if (!skipConfirm && !yes && missing.some((p) => p.id === "uv")) {
     await confirmUvInstallPrompt();
   }

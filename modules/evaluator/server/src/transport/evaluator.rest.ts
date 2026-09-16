@@ -1,10 +1,7 @@
 /**
- * The `/api/evaluators` REST family: the evaluators a project defines, as the
- * public API publishes them. Dated addressing, so every route answers at its
- * dated path, at `latest`, at the bare path and at the `/api/v1` twin.
- *
- * Every verb dispatches through the feature's application — the same object the
- * tRPC door reaches — and this file owns the wire contract and nothing else.
+ * The `/api/evaluators` REST family: evaluators a project defines, at
+ * dated, `latest`, bare and `/api/v1` paths. Dispatches through the
+ * feature's application — this file owns the wire contract only.
  */
 import {
   badRequestSchema,

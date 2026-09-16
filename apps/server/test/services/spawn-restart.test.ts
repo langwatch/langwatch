@@ -130,12 +130,9 @@ describe("supervise restart policy", () => {
 
   afterEach(async () => {
     vi.useRealTimers();
-    // Every spawnAttempt() opens a real log-file write stream; fake-timer
-    // advances resolve the assertions long before that real, unfaked disk
-    // I/O necessarily finishes. Give it a moment before the recursive
-    // rmSync below, and retry rmSync itself, so a write that is still
-    // landing does not race the directory out from under it (ENOENT/
-    // ENOTEMPTY) and fail a later, unrelated test instead of this one.
+    // spawnAttempt() opens a real log write stream; fake-timer advances
+    // resolve before that real I/O finishes. Wait briefly, then retry
+    // rmSync, so a still-landing write doesn't race the directory away.
     await new Promise((resolve) => setTimeout(resolve, 20));
     await removeDirWithRetry(root);
   });

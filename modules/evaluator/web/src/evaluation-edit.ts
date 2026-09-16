@@ -1,9 +1,7 @@
 /**
- * The legacy online-evaluation edit form, as the browser application mounts it.
- * Two addresses, one screen: `/:project/evaluations/:id/edit` and
- * `.../edit/choose`. The owning frontend feature mounts the WORKFLOW host —
- * the form reads `@langwatch/workflow-web/studio-host/*` for the project, the
- * transport, the router and the toasts.
+ * The legacy online-evaluation edit form: one screen, two addresses
+ * (`/:project/evaluations/:id/edit`, `.../edit/choose`). Mounts the
+ * WORKFLOW host (`@langwatch/workflow-web/studio-host/*`).
  */
 
 import type { ComponentType } from "react";

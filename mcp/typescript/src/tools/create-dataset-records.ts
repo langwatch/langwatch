@@ -1,10 +1,8 @@
 import { createDatasetRecords as apiCreateDatasetRecords } from "../langwatch-api-datasets.js";
 
 /**
- * Handles the platform_create_dataset_records MCP tool invocation.
- *
- * Creates records in a dataset in batch and returns a confirmation
- * with the count of records created.
+ * Handles the platform_create_dataset_records MCP tool: creates records
+ * in batch and returns a confirmation with the count created.
  */
 export async function handleCreateDatasetRecords(params: {
   slugOrId: string;

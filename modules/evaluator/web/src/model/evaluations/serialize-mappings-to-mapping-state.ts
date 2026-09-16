@@ -1,8 +1,7 @@
 /**
- * Serialize UI field mappings to the MappingState format persisted on monitors.
- *
- * Thread sources (sources found in THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
- * or with sourceId "thread") are marked with `type: "thread"`.
+ * Serializes UI field mappings to the MappingState persisted on
+ * monitors. Thread sources (THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
+ * or sourceId "thread") are marked `type: "thread"`.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {

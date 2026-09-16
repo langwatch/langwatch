@@ -10,12 +10,14 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The langwatch API process. Launched via `pnpm run start` in apps/api, which
- * is the same entry the Docker image's CMD and the Helm chart run — and the
- * same process that serves the browser bundle apps/ui built, so this one
- * handle covers both halves of what a user opens. node_modules is installed on
- * first run if missing: the npm tarball ships source, not deps, to keep the
- * package small.
+ * The langwatch API process, launched via `pnpm run start` in apps/api —
+ * the same entry the Docker image and Helm chart run, serving both the
+ * API and the browser bundle apps/ui built.
+ */
+
+/**
+ * node_modules is installed on first run if missing: the npm tarball
+ * ships source, not deps, to keep the package small.
  */
 export async function startLangwatch(
   ctx: RuntimeContext,

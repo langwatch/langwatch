@@ -107,13 +107,9 @@ program
     });
     const ports = allocatePorts(resolvedBase);
 
-    // First-run signpost — predep tarballs + langwatch app deps are cached
-    // after the initial install, so warm starts complete in <30s. Cold
-    // first-run can take 3-5 min (clickhouse 178MB download, uv venv
-    // builds, pnpm install). Tell the user up front so the wait isn't
-    // silent. Both gates have to be empty: paths.bin holds the predep
-    // binaries, install-manifest.json is written after the langwatch app
-    // relocation completes.
+    // First-run signpost: cold start can take 3-5 min (clickhouse
+    // download, uv venv, pnpm install); warm starts are <30s. Both gates
+    // (paths.bin, install-manifest.json) must be empty to show it.
     if (!existsSync(paths.bin) && !existsSync(paths.installManifest)) {
       console.log("");
       console.log(
@@ -158,14 +154,9 @@ program
       },
     });
 
-    // Register the shutdown handler BEFORE installServices/startAll so a
-    // Ctrl+C during install or boot still tears down anything we've
-    // already spawned. The handles array is populated by `startAll` after
-    // each service comes up; until then the handler closes the events
-    // stream and exits cleanly. Without an early registration, SIGINT
-    // during boot would orphan supervised children (they get reparented
-    // to launchd/init and keep running) and leak postgres/redis/clickhouse
-    // ports across runs.
+    // Registered BEFORE installServices/startAll so Ctrl+C during install
+    // or boot still tears down anything spawned so far — otherwise SIGINT
+    // orphans supervised children and leaks postgres/redis/clickhouse ports.
     let handles: ServiceHandle[] = [];
     let shuttingDown = false;
     const onShutdown = async () => {

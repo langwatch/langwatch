@@ -3,11 +3,9 @@ import { parseRelativeDate } from "../utils/date-parsing.js";
 import { formatEvaluationLines } from "../utils/format-evaluations.js";
 
 /**
- * Handles the search_traces MCP tool invocation.
- *
- * Searches LangWatch traces with optional filters, text query, and date range.
- * In digest mode (default), returns AI-readable formatted digests per trace.
- * In json mode, returns the full raw JSON.
+ * Handles the search_traces MCP tool: searches with optional filters,
+ * text query and date range. Digest mode (default) returns AI-readable
+ * digests per trace; json mode returns the full raw JSON.
  */
 export async function handleSearchTraces(params: {
   query?: string;

@@ -7,11 +7,9 @@ import type {
 } from "./schemas/suite-fields.js";
 
 /**
- * Client for `/api/v1/test-suites`.
- *
- * A test suite groups scenarios: a name and the scenarios filed in it.
- * Running one is sugar over a run plan, so the run returns the same result a
- * run plan does.
+ * Client for `/api/v1/test-suites`. A test suite groups scenarios by
+ * name; running one is sugar over a run plan, returning the same
+ * result shape.
  */
 
 export interface TestSuite {

@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- * Creating a workflow evaluator creates TWO things, and either one can be over
- * its plan's limit. The upgrade dialog is opened by the application's licence
- * interceptor; what this file proves is the drawer's half — which limit it runs
- * into first, and that it says nothing on top of an answered refusal.
+ * Creating a workflow evaluator creates TWO things, either of which can
+ * be over its plan's limit. This proves the drawer's half: which limit
+ * it hits first, and that it adds nothing atop an answered refusal.
  * @see specs/licensing/enforcement-resources.feature
  */
 import "@testing-library/jest-dom/vitest";

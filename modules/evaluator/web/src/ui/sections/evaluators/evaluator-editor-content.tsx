@@ -93,14 +93,10 @@ export function EvaluatorEditorContent({
           />
         </Field.Root>
 
-        {/* Settings fields using DynamicZodForm.
-            For pairwise_compare, the `prompt` field is a golden-answer-aware
-            template. When "Has golden answer" is turned OFF, editing that
-            template is meaningless (the {golden} slot is stubbed out and the
-            ComparisonConfigForm auto-swaps to a golden-free default), so hide
-            the field entirely — no reason to show an editor whose changes
-            are always ignored (dogfood: "if golden is off, don't show the
-            prompt"). */}
+        {/* pairwise_compare's `prompt` field is golden-answer-aware; when
+            "Has golden answer" is off, the {golden} slot is stubbed and
+            ComparisonConfigForm swaps in a golden-free default, so hiding
+            the field avoids showing an editor whose edits are ignored. */}
         {hasSettings && evaluatorType && settingsSchema && (
           <PairwiseAwareDynamicZodForm
             schema={settingsSchema}

@@ -9,11 +9,9 @@ export class EventBus implements AsyncIterable<RuntimeEvent> {
   private done = false;
 
   /**
-   * Observe every event synchronously at emit time without consuming the
-   * single-consumer iterator. Supervision uses this to notice its own
-   * service's "healthy" event (emitted by the start helpers) so it knows a
-   * later crash happened in steady state, not during boot. Returns an
-   * unsubscribe function. Events emitted after end() are not observed.
+   * Observes every event synchronously without consuming the
+   * single-consumer iterator, so supervision can notice its own
+   * "healthy" event and tell a later crash from a boot failure.
    */
   tap(listener: (event: RuntimeEvent) => void): () => void {
     this.taps.add(listener);

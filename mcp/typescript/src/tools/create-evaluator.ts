@@ -4,10 +4,8 @@ import {
 } from "../langwatch-api-evaluators.js";
 
 /**
- * Handles the platform_create_evaluator MCP tool invocation.
- *
- * Creates a new evaluator in the LangWatch project and returns a
- * confirmation with the created evaluator's details.
+ * Handles the platform_create_evaluator MCP tool: creates an evaluator
+ * and returns a confirmation with its details.
  */
 export async function handleCreateEvaluator(params: {
   name: string;

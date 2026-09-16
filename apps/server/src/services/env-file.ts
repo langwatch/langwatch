@@ -21,12 +21,9 @@ export function readEnvFile(path: string): Record<string, string> {
     if (isQuoted) {
       value = value.slice(1, -1);
     }
-    // A `KEY=` line means "not configured", and must stay that way in the
-    // child processes. Passing it through as an empty string is worse than
-    // absence: code guarding with `?? fallback` sees the empty value as
-    // present and hands it to clients that then refuse to construct (the
-    // scaffolded .env ships blank OPENAI_API_KEY etc. as fill-me-in lines,
-    // and the app died at boot on exactly this).
+    // A `KEY=` line means "not configured" — passing it through as "" is
+    // worse: `?? fallback` treats empty as present, and a scaffolded
+    // blank OPENAI_API_KEY etc. then crashes construction at boot.
     if (value === "") continue;
     out[key] = value;
   }

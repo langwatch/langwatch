@@ -1,8 +1,7 @@
 /**
- * The evaluator module's application: what both of its doors call - the
- * `/api/evaluators` REST family and the `evaluators.*` tRPC namespace. Every
- * rule either door used to hold is a method here, and a caller arrives as
- * `actorId`, never read from a session or a request.
+ * The evaluator module's application: what both doors call — the
+ * `/api/evaluators` REST family and `evaluators.*` tRPC. A caller arrives
+ * as `actorId`, never read from a session or a request here.
  */
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
@@ -88,11 +87,9 @@ export interface EvaluatorGraph {
 }
 
 /**
- * Config: the models a deployment falls back to when a project configured
- * none, and the platform's own public origin for `platformUrl`. Both default
- * to `undefined` — the deleted composition never set either, so a deployment
- * that configures nothing keeps its exact absence: no fallback models, and
- * `platformUrl` refuses by name.
+ * Config: fallback models for a project that configured none, and the
+ * platform's public origin for `platformUrl`. Both default to `undefined`
+ * — an unconfigured deployment keeps that exact absence.
  */
 const evaluatorAppConfigSchema = z.object({
   fallbackModels: z
@@ -242,10 +239,9 @@ export class EvaluatorApp implements EvaluatorApi {
   }
 
   /**
-   * One evaluator addressed the way the public API addresses it: by id, and
-   * failing that by slug. The two-step lookup is the feature's rule rather than
-   * the REST door's, and a door that reimplemented it would answer differently
-   * for a slug that looks like an id.
+   * Addressed by id, falling back to slug. This two-step lookup is the
+   * feature's rule, not the REST door's — reimplementing it there could
+   * answer differently for a slug that looks like an id.
    */
   async findByIdOrSlugWithFields(input: {
     idOrSlug: string;
@@ -536,10 +532,9 @@ export class EvaluatorApp implements EvaluatorApi {
   }
 
   /**
-   * The project's embeddings model, or null when it configured none AND the
-   * evaluator being created declares none (#7556). For a type that DOES
-   * declare one the absence stays a failure: swallowing it fills the field
-   * from the catalog fallback and the evaluator fails at RUN time instead.
+   * Null only when the project has no default AND the evaluator type
+   * declares none (#7556); when the type DOES declare one, absence stays a
+   * failure rather than silently falling back to the catalog at RUN time.
    */
   async #resolveEmbeddingsModel(
     projectId: string,

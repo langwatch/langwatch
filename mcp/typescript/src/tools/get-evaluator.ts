@@ -1,10 +1,8 @@
 import { getEvaluator as apiGetEvaluator, getEvaluatorType } from "../langwatch-api-evaluators.js";
 
 /**
- * Handles the platform_get_evaluator MCP tool invocation.
- *
- * Retrieves a specific evaluator by ID or slug and formats it as
- * AI-readable markdown.
+ * Handles the platform_get_evaluator MCP tool: retrieves an evaluator by
+ * ID or slug and formats it as AI-readable markdown.
  */
 export async function handleGetEvaluator(params: { idOrSlug: string }): Promise<string> {
   const evaluator = await apiGetEvaluator(params.idOrSlug);

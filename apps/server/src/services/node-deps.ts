@@ -18,11 +18,9 @@ import type { EventBus } from "./event-bus.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The workspace name of the langwatch app, as declared in
- * apps/api/package.json. Used to filter the install down to the apps and their
- * dependencies. It was plain `langwatch` until ADR-076 — the same name the
- * published TypeScript SDK uses, which is exactly why it had to change before
- * the two could live in one workspace.
+ * Workspace names of the four deployables, used to filter the install.
+ * Renamed off plain `langwatch` per ADR-076 to avoid colliding with the
+ * published SDK's package name.
  */
 export const APP_PACKAGE_NAMES = [
   "@langwatch/platform-api",
@@ -48,12 +46,9 @@ export function workspaceInstallArgs(rootDir: string, { prod }: { prod: boolean 
 }
 
 /**
- * Ensure the applications' node_modules exist and `start:prepare:files` has
- * run, both of which are prerequisites for the migration tasks and for
- * `pnpm run start` in apps/api and apps/worker.
- *
- * Runs INSIDE the relocated tree (LANGWATCH_HOME/app/) — see
- * services/app-dir.ts for why we relocate out of node_modules.
+ * Ensures node_modules and `start:prepare:files` exist for the migration
+ * tasks and `pnpm run start`. Runs INSIDE the relocated tree
+ * (LANGWATCH_HOME/app/) — see services/app-dir.ts for why.
  */
 export async function ensureLangwatchDeps(
   ctx: { paths: LangwatchPaths },
@@ -76,24 +71,16 @@ export async function ensureLangwatchDeps(
   const workspacePath = join(rootDir, "pnpm-workspace.yaml");
   const hashFile = join(nodeModulesPath, ".install-hash");
 
-  // One artifact, not five. The two Node processes are no longer bundled —
-  // apps/api and apps/worker run their entry point from source through Node's
-  // own type stripping, and the ClickHouse migrations are read
-  // from the task's own directory rather than a copy under dist/server. What a
-  // build still has to produce is the browser bundle the API process serves,
-  // and index.html is the file that proves it landed whole: an interrupted
-  // vite build leaves assets without a shell.
+  // Only the browser bundle still needs a build step — apps/api and
+  // apps/worker run from source. index.html proves it landed whole: an
+  // interrupted vite build leaves assets without one.
   const distAlreadyBuilt = existsSync(join(distPath, "client", "index.html"));
   // Install key from lockfile + workspace + package.json; seq5 forces re-run on old tree layouts.
   const installKey = `${computeInstallKey(lockfilePath, workspacePath, join(apiDir, "package.json"))}|seq5-three-applications`;
 
-  // Top-level symlinks are the strongest "install completed" signal:
-  // pnpm creates `.bin/` and direct package entries LAST after populating
-  // `.pnpm/`. If a previous install was interrupted between those two
-  // phases (CTRL-C, OOM, fs flush mid-write), `.pnpm/` looks fine but
-  // `.bin/prisma` is missing — and `pnpm prisma migrate deploy` then
-  // dies with `Command "prisma" not found`. Including this in the
-  // skip-gate keeps that whole class of bug from re-armoring.
+  // Top-level symlinks are the strongest "install complete" signal: pnpm
+  // populates `.pnpm/` before `.bin/`, so an interrupted install leaves
+  // `.bin/prisma` missing and `prisma migrate deploy` failing later.
   const topLevelLinksOk = existsSync(join(nodeModulesPath, ".bin", "prisma"));
   const cachedHash = existsSync(hashFile) ? readFileSync(hashFile, "utf8").trim() : null;
   const installFresh = topLevelLinksOk && cachedHash === installKey;
@@ -132,12 +119,9 @@ export async function ensureLangwatchDeps(
     ]);
   }
 
-  // Skip the build step entirely when apps/ui/dist/client/ is already present.
   // Published npm tarballs ship dist/ pre-built (see
-  // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
-  // + `prisma generate` and nothing else. The build only runs for
-  // `pnpm pack`-driven local dogfood and dev checkouts where dist/
-  // doesn't exist yet.
+  // .github/workflows/npx-server-publish.yml); the build only runs for
+  // local dogfood/dev checkouts where dist/ doesn't exist yet.
   if (!distAlreadyBuilt) {
     // Full prod build, in the three steps the image runs: start:prepare:files
     // (Prisma client, langevals evaluator types, the langy skill catalogue),
@@ -276,10 +260,9 @@ function lstatSafely(path: string): boolean {
 }
 
 /**
- * Every @langwatch/* entry in node_modules must resolve to a real directory.
- * A dangling link means the app tree is missing a workspace package the
- * lockfile promised — a packaging bug in the published artifact, not
- * something a retry can fix. Exported for tests.
+ * Every @langwatch/* entry must resolve to a real directory; a dangling
+ * link means the app tree is missing a workspace package the lockfile
+ * promised. Exported for tests.
  */
 export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
   const scopeDir = join(nodeModulesPath, "@langwatch");

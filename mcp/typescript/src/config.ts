@@ -37,13 +37,10 @@ function getGlobalState(): McpGlobalState {
   };
 }
 
+/** Trim surrounding whitespace and drop any trailing slashes. */
 /**
- * Trim surrounding whitespace and drop any trailing slashes.
- *
- * Request URLs are built as `${endpoint}/api/...`, so an endpoint written as
- * `https://app.langwatch.ai/` would produce a double slash the router does not
- * match, and the caller gets an opaque 404 with nothing pointing at the
- * endpoint as the cause.
+ * Request URLs are built as `${endpoint}/api/...`; a trailing slash would
+ * double up and 404 with nothing pointing at the endpoint as the cause.
  */
 function normalizeEndpoint(endpoint: string): string {
   const trimmed = endpoint.trim();
@@ -71,12 +68,10 @@ export function tryGetConfig(): McpConfig | undefined {
   return state.configStorage.getStore() ?? state.globalConfig;
 }
 
+/** The current config: per-request scoped inside runWithConfig(), else global. */
 /**
- * Returns the current config: the per-request scoped config if inside
- * a `runWithConfig()` callback, otherwise the global config.
- *
- * Throws when there is none, because every caller of this one needs it to
- * proceed. A caller that can carry on without it asks `tryGetConfig()`.
+ * Throws when there is none — every caller here needs it to proceed. A
+ * caller that can carry on without it asks `tryGetConfig()` instead.
  */
 export function getConfig(): McpConfig {
   const config = tryGetConfig();

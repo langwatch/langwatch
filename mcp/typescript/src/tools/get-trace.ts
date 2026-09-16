@@ -2,10 +2,8 @@ import { getTraceById as apiGetTraceById } from "../langwatch-api.js";
 import { formatEvaluationLines } from "../utils/format-evaluations.js";
 
 /**
- * Handles the get_trace MCP tool invocation.
- *
- * Retrieves a single trace by ID. In digest mode (default), returns the
- * AI-readable formatted digest. In json mode, returns the full raw JSON.
+ * Handles the get_trace MCP tool: retrieves a trace by ID as an
+ * AI-readable digest (default) or full raw JSON.
  */
 export async function handleGetTrace(params: {
   traceId: string;

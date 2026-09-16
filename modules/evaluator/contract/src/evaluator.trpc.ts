@@ -1,7 +1,6 @@
 /**
- * Every `evaluators.*` procedure, declared once: name, kind, request and answer.
- * The server binds a permission and a handler to a name declared here.
- * Specs: specs/evaluators/evaluator-management.feature,
+ * Every `evaluators.*` procedure, declared once: name, kind, request and
+ * answer. Specs: specs/evaluators/evaluator-management.feature,
  * specs/monitors/replicate-monitor-to-project.feature.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";

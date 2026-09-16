@@ -1,8 +1,6 @@
 /**
- * Digests of the test suite tools, and the test suite fields the scenario
- * tools carry so an agent can file a scenario in a suite and read a suite
- * back.
- *
+ * Digests of the test suite tools and the suite fields scenario tools
+ * carry, so an agent can file a scenario in a suite and read one back.
  * @see specs/mcp-server/test-suite-tools.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -19,10 +19,9 @@ export function langwatchEndpointEnv(
 }
 
 /**
- * The base URL a cURL example posts to.
- *
- * Falls back to the SaaS address, which is what a snippet rendered on a hosted
- * instance — or before the document exists — should say.
+ * The base URL a cURL example posts to. Falls back to the SaaS address
+ * — what a snippet on a hosted instance, or before `document` exists,
+ * should say.
  */
 export function langwatchEndpoint(
   location: { protocol: string; hostname: string; port: string } | null = typeof window ===

@@ -5,11 +5,8 @@ import type {
 } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
 
 /**
- * Formats evaluator schema information for the discover_schema tool.
- *
- * Two levels of detail:
- * - Overview (no evaluatorType): compact list of all evaluator types
- * - Detail (with evaluatorType): full schema for one evaluator type
+ * Formats evaluator schema for discover_schema: an overview (all types,
+ * compact) when no evaluatorType is given, else the full schema for one.
  */
 export function formatEvaluatorSchema(evaluatorType?: string): string {
   if (evaluatorType) {

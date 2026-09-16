@@ -2,11 +2,8 @@ import { listDatasets as apiListDatasets, type DatasetSummary } from "../langwat
 import { escapeMarkdown } from "../utils/escape-markdown.js";
 
 /**
- * Fetches all datasets by paginating through the API until every page
- * has been retrieved.
- *
- * Returns the accumulated dataset summaries along with the total count
- * reported by the server.
+ * Fetches all datasets by paginating until every page is retrieved.
+ * Returns the accumulated summaries plus the total count from the server.
  */
 async function fetchAllDatasets(): Promise<{
   datasets: DatasetSummary[];
@@ -33,9 +30,7 @@ async function fetchAllDatasets(): Promise<{
 }
 
 /**
- * Handles the platform_list_datasets MCP tool invocation.
- *
- * Lists all datasets in the LangWatch project, formatted as an
+ * Handles the platform_list_datasets MCP tool: lists datasets as an
  * AI-readable digest or raw JSON.
  */
 export async function handleListDatasets(
