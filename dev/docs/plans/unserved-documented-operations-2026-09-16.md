@@ -218,9 +218,9 @@ Classes as defined in the Sep-14 document.
 | governance | 7 | B | `governance.server.ts` exists but exports worker factories, not a `defineServerModule` installer, so the generator skips it at every tier. Its package also carries 3 unresolved imports (`@ee/event-sourcing/…` ×2, `~/generated/prisma/client`). Module conversion. |
 | dataset direct-upload | 5 | D | recipe at `b383462d96^`. The branch adds `/api/stored-objects/storedObjects.*`; confirm whether the upload flow moved there deliberately before porting. |
 | langy control | 4 | B/C | needs `withTransportFacts` bindings the process refuses to boot without; the branch adds `/api/langy/conversations`, so confirm this is not a deliberate redesign before porting. |
-| scenario-events | 3 | C | Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/server/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
+| scenario-events | 3 | C | **Blocked on the same decision as `/api/simulation-runs`** — see the section above. `createScenarioEventsRest` is a factory taking `simulations`, `scenarioTabs` and `broadcast`, the same infrastructure-bag members no process can supply, so `extractInlineMedia` is not the only thing holding it. Original note: Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/server/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
 | gateway providers | 4 | — | **closed** (`60708e784f`). Main's four were tombstones: 410 `gateway_provider_bindings_gone` naming the model-provider address that replaced them. The code and its customer copy were already ported and thrown by nobody; the branch now declares the four routes and throws it. |
-| `/api/track_event` | 1 | C | blocked on blocker 1. |
+| `/api/track_event` | 1 | — | **closed** (`f0aa34828c`). Not blocked after all: the alias was shaped to forward through a member nobody implemented, but the monolith shared a service between the two addresses rather than forwarding. Both routes now declare over one handler body. |
 | teams | — | C | listed Sep 14 (9 operations); **not** among today's probed-and-absent set. Re-measure before acting. |
 
 ## Checks
@@ -320,3 +320,24 @@ consumer imports it from the entry point that owns it. The fix that honours
 that is to give `build()`'s return a published name and annotate the six
 exports with it. `packages/api` is being rewritten by another session, so it is
 left for whoever holds that file.
+
+## Where the document gate actually reads from
+
+`pnpm --filter @langwatch/platform-api run task openapi-check` compares the
+declarations against **`apps/api/src/features/discovery/openapi-document.json`**,
+not `docs/api-reference/openapiLangWatch.json`. It fails only on `removed` —
+an operation the frozen document lists that no declaration publishes — and
+reports `added` without failing.
+
+As of `f0aa34828c` it is green: **285 declared, 280 documented, removed 0,
+changed 0, added 5**. The five are the four gateway provider addresses restored
+here plus `POST /api/v1/events/track`, which was already declared and
+undocumented. `/api/track_event` is correctly absent: it is declared
+`hide: true`, the way the alias has always been.
+
+The docs-site document already carried `/api/gateway/v1/providers` and
+`/api/gateway/v1/providers/{id}` from main, so the served surface and the
+published reference agree again. The frozen discovery document is left as it
+is: it is frozen deliberately, the gate does not fail on additions, and
+regenerating it would sweep in the other served-but-undocumented operations as
+a side effect of an unrelated change.
