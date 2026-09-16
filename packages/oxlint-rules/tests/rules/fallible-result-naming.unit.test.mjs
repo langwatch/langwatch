@@ -334,3 +334,60 @@ describe("given a file outside the repository path gate", () => {
     });
   });
 });
+
+describe("given a nullable function named for a conversion rather than a lookup", () => {
+  describe("when the conversion declares a nullable result", () => {
+    /** @scenario "A conversion that answers with absence is left alone" */
+    it("leaves parse, extract, build, stringify, decode and as prefixed conversions alone", () => {
+      for (const name of [
+        "parseKsuidCreatedAtMs",
+        "extractMessageText",
+        "buildDisplayInput",
+        "stringifySpanIO",
+        "decodeCursor",
+        "asChatMessages",
+      ]) {
+        const found = report(
+          `export function ${name}(raw: unknown): string | undefined { return undefined; }`,
+          SERVICE,
+        );
+
+        expect(found.map((entry) => entry.messageId)).not.toContain("nullableWithoutFind");
+      }
+    });
+
+    /** @scenario "A conversion that answers with absence is left alone" */
+    it("still reports a lookup-named nullable function in the same file", () => {
+      const found = report(
+        "export function lookupWidget(id: string): string | undefined { return undefined; }",
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+    });
+
+    /** @scenario "A conversion that answers with absence is left alone" */
+    it("still reports a try-prefixed conversion whose catch swallows, because the try prefix is a separate fault", () => {
+      const found = report(
+        "export class CursorService { tryParseCursor(raw: string): string | null {"
+          + " try { return this.decode(raw); } catch { return null; } } }",
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["tryPrefix"]);
+      expect(found[0].data).toEqual({ name: "tryParseCursor", plain: "parseCursor" });
+    });
+  });
+
+  describe("when the conversion declares no result type at all", () => {
+    /** @scenario "A conversion with no declared result type is still reported" */
+    it("still reports noResultType for an undeclared conversion", () => {
+      const found = report(
+        "export function parseCursor(raw: string) { return raw ? raw : undefined; }",
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toContain("noResultType");
+    });
+  });
+});

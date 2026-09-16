@@ -116,3 +116,25 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it does not report repositoryServiceVocabulary
     But nullableWithoutFind still applies to it as before
+
+  # A conversion is handed the thing it converts. When it answers with absence it
+  # is saying "the input carried none", not "no such record exists", and the two
+  # are different facts. The rule's only remedy for a nullable result is a
+  # find-prefixed rename, and since the naming decision of 2026-09-16 `find`
+  # states cardinality: it returns an array. So a conversion cannot take the name
+  # the rule prescribes without lying about what it gives back, which leaves the
+  # rule firing where it has no fix to offer.
+  @unit
+  Scenario: A conversion that answers with absence is left alone
+    Given a nullable-returning function whose name begins with a conversion verb such as parse, extract, build, stringify, serialize, decode, format or as
+    When the fallible-result-naming rule runs over it
+    Then it does not report nullableWithoutFind for that function
+    But a lookup-named nullable function in the same file is still reported
+    And a try-prefixed conversion whose catch swallows the failure is still reported, because the try prefix is a separate fault
+
+  @unit
+  Scenario: A conversion with no declared result type is still reported
+    Given a function whose name begins with a conversion verb and which declares no return type
+    When the fallible-result-naming rule runs over it
+    Then it still reports noResultType
+    Because the exemption answers what absence means, and an undeclared result states nothing at all

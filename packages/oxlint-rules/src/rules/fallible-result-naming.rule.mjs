@@ -21,6 +21,14 @@ const REPOSITORY_METHOD_FILE = /\/repositories\/(?:prisma\/|memory\/)?[^/]*\.rep
 const REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/;
 const GET_VOCABULARY = /^get([A-Z]|$)/;
 
+// A conversion is handed the value it converts; absence from one means "the
+// input carried none", not "no such record". The only fix this rule offers a
+// nullable result is a `find*` rename, and since 2026-09-16 `find` states
+// cardinality - it answers an array - so a conversion cannot take that name
+// without lying about what it returns. Reporting it prescribes nothing.
+const CONVERSION_VOCABULARY =
+  /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to)([A-Z]|$)/;
+
 /** Shared with `no-try-prefix` so the two rules cannot drift apart on what counts as hedged. */
 export function isTryPrefixedName(name) {
   return TRY_PREFIX.test(name);
@@ -188,6 +196,7 @@ function shouldReportNullableWithoutFind(name, returnType, isRepositoryVocabular
   if (isFindPrefixed(name)) return false;
   if (isTryPrefixedName(name)) return false;
   if (isRepositoryVocabularyName) return false;
+  if (CONVERSION_VOCABULARY.test(name)) return false;
   return true;
 }
 
