@@ -4,7 +4,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { TraceAttributeAccumulationService } from "../../projections/services/trace-attribute-accumulation.service";
-import type { TraceOriginService } from "../../projections/services/trace-origin.service";
+import { TraceOriginService } from "../../projections/services/trace-origin.service";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 import {
@@ -375,11 +375,12 @@ describe("evaluationTrigger subscriber", () => {
      * subscriber, with nothing hand-written in between.
      */
     it("carries the depth from the span through accumulation into the guard", async () => {
-      const accumulation = new TraceAttributeAccumulationService({
-        stripLegacyMarkers: () => void 0,
-        hoistOrigin: () => void 0,
-        hoistSource: () => void 0,
-      } as unknown as TraceOriginService);
+      // The real TraceOriginService, not a stub: hoistOrigin is what decides
+      // whether this trace ever reaches the deferred path, so stubbing it out
+      // would remove the very code the assertion depends on.
+      const accumulation = new TraceAttributeAccumulationService(
+        new TraceOriginService(),
+      );
 
       const accumulated = accumulation.accumulateAttributes({
         state: { attributes: {} } as unknown as TraceSummaryData,
