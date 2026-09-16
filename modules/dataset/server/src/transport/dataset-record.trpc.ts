@@ -1,7 +1,6 @@
 /**
  * The server half of `datasetRecord.*`: a permission and a handler per
  * procedure the contract already named.
- *
  * Spec: modules/dataset/specs/dataset-service.feature.
  */
 
@@ -13,10 +12,9 @@ import {
 } from "@langwatch/dataset-contract";
 
 /**
- * The editor loads into the browser, so it asks for a wider window than the
- * 5 MB default (~3 rows of base64 images). A byte budget is what THIS door
- * asks for, not a fact about the dataset, which is why it stays here rather
- * than on the application both doors share.
+ * The editor asks for a wider window than the 5 MB default (~3 rows of
+ * base64 images) because it loads into the browser. This is what THIS
+ * door asks for, not a dataset fact, so it stays here, not on the shared app.
  */
 const DATASET_EDITOR_READ_LIMIT_MB = 13;
 

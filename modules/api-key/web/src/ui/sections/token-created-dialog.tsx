@@ -39,9 +39,8 @@ export interface CodeAssistant {
   label: string;
   /**
    * Present only where the assistant ships a one-line installer. Cursor,
-   * Copilot, Windsurf and Claude Desktop are configured by editing a file, so
-   * inventing a `cursor mcp add` for symmetry would hand out a command that
-   * does not exist.
+   * Copilot, Windsurf and Claude Desktop edit a file instead, so inventing
+   * a `cursor mcp add` for symmetry would hand out a command that doesn't exist.
    */
   buildCommand?: (context: CommandContext) => string;
   /** The file this assistant reads its MCP servers from. */

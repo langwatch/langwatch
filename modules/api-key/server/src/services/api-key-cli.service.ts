@@ -147,12 +147,9 @@ export class ApiKeyCliService {
     deviceLabel: string;
     selection: CliKeySelection;
     /**
-     * When the device session began, carried across every refresh. Together
-     * with `maxSessionDurationDays` and `refreshWindowMs`, drives the key's
-     * `expiresAt` (see {@link loginKeyExpiresAt}) so a session nothing
-     * refreshes again is retired by the hourly sweep, and the ingest keys
-     * under it with it. Omitted, the key mints with no expiry — the prior
-     * behaviour, for a caller that has not adopted session timing yet.
+     * When the device session began, carried across every refresh. With
+     * `maxSessionDurationDays`/`refreshWindowMs`, drives `expiresAt` (see
+     * {@link loginKeyExpiresAt}); omitted, the key mints with no expiry.
      */
     sessionStartedAtMs?: number;
     maxSessionDurationDays?: number;
@@ -269,10 +266,8 @@ export class ApiKeyCliService {
 
   /**
    * Moves a live login key's expiry with its session, on a successful
-   * refresh. Silently a no-op for a key that is not a live CLI login key
-   * owned by this user in this organization (see
-   * `ApiKeyRepository.extendLoginKeyExpiry`), so a refresh racing a revoke
-   * never brings a dead key back into the hourly sweep's live set.
+   * refresh. Silently a no-op unless it is a live CLI login key owned by
+   * this user/org (see `extendLoginKeyExpiry`) — a refresh can't resurrect a revoked key.
    */
   async extendCliLoginKeyExpiry(input: {
     apiKeyId: string;

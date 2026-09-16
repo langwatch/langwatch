@@ -98,9 +98,8 @@ export interface DatasetApi {
   }): Promise<BatchEvaluationRecord[]>;
   /**
    * The platform's own address for one dataset resource, built from the
-   * project's slug and the path the caller already resolved. The REST
-   * declaration is a static object with no request-scoped builder to
-   * receive, so the app composes the link itself.
+   * project's slug and a caller-resolved path. The REST declaration is
+   * static with no request-scoped builder, so the app composes this link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
 }

@@ -1,8 +1,7 @@
 /**
- * Revoking a key retires the keys minted under it, from every entry point:
- * the API-keys page, the REST route, the tRPC mutation and `langwatch
- * logout`. A cascade that lived in one caller was one the other three
- * skipped, leaving a live ingestion credential under a dead login.
+ * Revoking a key retires the keys minted under it, from every entry
+ * point: the API-keys page, REST, tRPC, and `langwatch logout`. A cascade
+ * in only one caller left a live ingestion credential under a dead login.
  */
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";

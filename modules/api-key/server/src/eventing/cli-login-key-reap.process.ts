@@ -4,12 +4,9 @@ import { z } from "zod";
 export const CLI_LOGIN_KEY_REAP_PROCESS_NAME = "cliLoginKeyReap";
 
 /**
- * Hourly. A login key carries its session's `expiresAt` and
- * `ApiKeyTokenResolutionService.findVerifiedToken` already refuses an
- * elapsed one, so the sweep is not closing an authentication hole. It is
- * what retires the ingest keys under a session that stopped refreshing:
- * those carry no expiry of their own and keep authorizing until their
- * parent is revoked.
+ * Hourly. A login key's session `expiresAt` and `findVerifiedToken` already
+ * refuse an elapsed one — not an auth hole. This retires the ingest keys
+ * under a stalled session: those carry no expiry and authorize until revoked.
  */
 export const CLI_LOGIN_KEY_REAP_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -30,10 +27,9 @@ export type CliLoginKeyReapIntents = {
 };
 
 /**
- * Wake handlers must be pure and synchronous, with no I/O and no clock read,
- * because the commit that persists this evolution is what fences racing
- * workers. The revoke itself is an intent, so it runs behind the outbox
- * lease.
+ * Wake handlers must be pure and synchronous, no I/O, no clock read —
+ * the commit that persists this evolution is what fences racing workers.
+ * The revoke itself is an intent, run behind the outbox lease.
  */
 export const cliLoginKeyReapWake: WakeHandler<CliLoginKeyReapState, CliLoginKeyReapIntents> = (
   _state,

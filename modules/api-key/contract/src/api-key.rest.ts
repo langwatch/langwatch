@@ -1,8 +1,7 @@
 /**
- * The wire shapes the `/api/api-keys` REST family publishes. Narrower than the
- * stored key on purpose: neither the hashed secret nor the lookup id ever
- * leaves this door. `bindings` is the write shape of what `roleBindings`
- * reads back, so a write followed by a read is a comparison, not a translation.
+ * The wire shapes the `/api/api-keys` REST family publishes — narrower
+ * than the stored key: neither the hashed secret nor the lookup id ever
+ * leaves this door. `bindings` is the write shape `roleBindings` reads back.
  */
 import { z } from "zod";
 

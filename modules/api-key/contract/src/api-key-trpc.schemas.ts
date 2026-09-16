@@ -8,11 +8,9 @@ import { apiKeyPermissionSchema, apiKeyRoleSchema, apiKeyScopeTypeSchema } from 
 import { API_KEY_PERMISSION_MODES, refineRestrictedPermissions } from "./api-key.permissions.ts";
 
 /**
- * The binding shape the drawers post. Deliberately narrower than the
- * contract's `apiKeyScopeSchema`: it is not `.strict()`, so a stray field is
- * stripped rather than refused, and it carries no `customRoleId` — a
- * restricted key's custom role is minted by the service, never named by the
- * client.
+ * The binding shape the drawers post — narrower than the contract's
+ * `apiKeyScopeSchema`: not `.strict()`, so a stray field is stripped, and
+ * no `customRoleId` — a restricted key's role is minted by the service.
  */
 const roleBindingSchema = z.object({
   role: apiKeyRoleSchema,

@@ -1,8 +1,7 @@
 /**
- * Every `apiKey.*` procedure, declared once: name, kind, input, output. The
- * server binds a permission and a handler to a name declared here; the browser
- * reads the same names and schemas as types. The namespace is the React Query
- * cache key's first segment, so it is the mounted name and never respelled.
+ * Every `apiKey.*` procedure, declared once: name, kind, input, output.
+ * The server binds a permission and handler to a name here; the browser
+ * reads the same names as types — the mounted namespace, never respelled.
  */
 
 // `create` is the ONLY procedure that ever returns the plaintext token — once,

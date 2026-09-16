@@ -5,12 +5,9 @@ import { z } from "zod";
 import { datasetRecordSchema, datasetSchema } from "./dataset.ts";
 
 /**
- * `datasetRecord.getAll` / `datasetRecord.download`: the stored dataset's own
- * fields, flattened, plus its records under `datasetRecords` and whether the
- * read was truncated by the caller's byte budget. This is the editor's
- * historical wire shape — flattened rather than `{ dataset, records }` — kept
- * as its own schema so a future field on `Dataset` cannot silently drift the
- * two apart.
+ * `datasetRecord.getAll`/`download`: the dataset's fields, flattened,
+ * plus `datasetRecords` and whether the read was truncated. Kept as its
+ * own schema (historical, flattened) so a Dataset field can't drift the two apart.
  */
 export const datasetRecordEditorReadSchema = datasetSchema.extend({
   datasetRecords: z.array(datasetRecordSchema),

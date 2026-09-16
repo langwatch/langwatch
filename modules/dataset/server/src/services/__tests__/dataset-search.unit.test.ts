@@ -82,11 +82,9 @@ describe("matchesDatasetSearch()", () => {
 
   it("survives an entry that is not an object", () => {
     // `adaptS3JsonlRecord` assigns `entry` straight from a JSONL line with no
-    // shape check (datasetRecord.utils.ts:248), so a line of `null` — or a bare
-    // scalar — reaches this predicate. Ordinary paging tolerates such a row and
-    // renders it blank; a search must not be the one path that throws on data
-    // the rest of the editor survives, because it fails the WHOLE search, not
-    // the one row.
+    // shape check, so a line of `null` or a bare scalar reaches this
+    // predicate. Ordinary paging tolerates such a row and renders it blank;
+    // a search must not fail the WHOLE search over the one row it can't survive.
     expect(() =>
       matchesDatasetSearch({ entry: null as never, search: "escalation" }),
     ).not.toThrow();

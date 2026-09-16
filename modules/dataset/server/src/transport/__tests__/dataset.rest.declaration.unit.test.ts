@@ -1,8 +1,7 @@
 /**
- * `/api/dataset`, pinned: every method, path, operation id and permission the
- * family publishes, and the handler behaviour each door owns. The operation
- * ids are the ones the published document already carries, so a rename here
- * renames an integrator's generated client.
+ * `/api/dataset`, pinned: every method, path, operation id and
+ * permission the family publishes. Operation ids are what the published
+ * document already carries, so a rename here renames an integrator's client.
  */
 
 import { BadRequestError, NotFoundError } from "@langwatch/api/rest";

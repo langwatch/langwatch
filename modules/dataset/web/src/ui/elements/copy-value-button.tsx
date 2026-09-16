@@ -1,9 +1,7 @@
 /**
- * Copies one short value — a dataset slug — and says so for two seconds.
- *
- * A family-local copy of `platform/app/src/components/CopyButton`, narrowed to
- * the one shape the slug display uses. The Design System owns the clipboard
- * write (`use-copy-to-clipboard`), so what is local here is only the affordance.
+ * Copies one short value (a dataset slug) and says so for two seconds. A
+ * family-local copy of `platform/app/.../CopyButton`, narrowed to one
+ * shape; the Design System owns the clipboard write, this is just the affordance.
  */
 
 import { IconButton } from "@chakra-ui/react";

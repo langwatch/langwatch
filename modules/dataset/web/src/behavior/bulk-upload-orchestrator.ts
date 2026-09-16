@@ -58,12 +58,9 @@ export type UploadSingleFileResult = {
 };
 
 /**
- * Upload one file end to end. On a slug conflict (the within-batch / concurrent
- * name race) it bumps the name via `nextName` and retries the CREATE — no row
- * exists yet on a conflict (the server rejects the name BEFORE minting one), so
- * the retry is clean. After the row IS created, any PUT/finalize failure OR a
- * caller cancel (AbortError) reaps the `uploading` row before rethrowing, so a
- * failed/cancelled file never leaves a half-created dataset behind.
+ * Upload one file end to end. On a slug conflict it bumps the name via
+ * `nextName` and retries — no row exists yet (the server rejects the name
+ * before minting one). Once created, any failure or cancel reaps the row first.
  */
 export async function uploadSingleFile(
   params: {

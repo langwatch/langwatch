@@ -1,9 +1,7 @@
 /**
- * What a corrected trace becomes once it is mapped into a dataset row. This is
- * the point of the whole feature and it is deliberate: a dataset holds the
- * trace as it should have been, so a corrected output is the output the dataset
- * gets, whether the correction came from the drawer or from a suggested
- * expected output. The captured trace is untouched and still identifies the row.
+ * What a corrected trace becomes once mapped into a dataset row: the
+ * dataset holds the trace as it should have been, so the corrected output
+ * is what it gets — from the drawer or a suggestion. The captured trace stays untouched.
  */
 import { describe, expect, it } from "vitest";
 import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping.ts";

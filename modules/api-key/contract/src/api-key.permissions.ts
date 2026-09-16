@@ -53,10 +53,9 @@ export interface PermissionCategory {
 }
 
 /**
- * Every registry permission of the given resources. The write level of a
- * category grants its resources wholesale, derived from the registry so a
- * new action can never be stranded outside the UI: the coverage test in
- * permission-categories.unit.test.ts pins categories to ALL_PERMISSIONS.
+ * Every registry permission of the given resources, wholesale — derived
+ * from the registry so a new action is never stranded outside the UI. See
+ * permission-categories.unit.test.ts's coverage test.
  */
 function allActionsOf(...resources: AuthzResource[]): AuthzPermission[] {
   return resources.flatMap((resource) =>
@@ -68,11 +67,7 @@ function viewsOf(...resources: AuthzResource[]): AuthzPermission[] {
   return resources.map((resource) => `${resource}:view` as AuthzPermission);
 }
 
-/**
- * The resources the Gateway category grants as one unit: virtual keys,
- * budgets, providers, routing, guardrails, caching, usage/log/spend
- * reporting, and webhook endpoints.
- */
+/** The resources the Gateway category grants as one unit. */
 const GATEWAY_RESOURCES: AuthzResource[] = [
   "virtualKeys",
   "gatewayBudgets",
@@ -87,10 +82,9 @@ const GATEWAY_RESOURCES: AuthzResource[] = [
 ];
 
 /**
- * The resources the Governance category grants as one unit. All of them are
- * org-exclusive at enforcement time (registry scopes: ["organization"]);
- * the category needs no special casing for that — a grant a binding cannot
- * carry simply never takes effect.
+ * The resources the Governance category grants as one unit. All are
+ * org-exclusive at enforcement (registry scopes: ["organization"]); a grant
+ * a binding cannot carry simply never takes effect.
  */
 const GOVERNANCE_RESOURCES: AuthzResource[] = [
   "governance",
@@ -227,11 +221,10 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
   },
   {
     // One category, because the role model gives no way to split it:
-    // `project:manage` is the umbrella grant for the project resource, and
-    // `hasPermissionWithHierarchy` answers a `project:create` or
-    // `project:delete` check with it. A category that offered project
-    // settings without project creation would describe a separation the
-    // request path does not make.
+    // `project:manage` is the umbrella grant, and `hasPermissionWithHierarchy`
+    // answers `project:create`/`project:delete` checks with it — splitting
+    // settings from creation would describe a separation the request path
+    // does not make.
     key: "project",
     label: "Project",
     accessLevels: ["read", "write"],
@@ -260,13 +253,11 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: allActionsOf(...GOVERNANCE_RESOURCES),
   },
   {
-    // Write only, because the resource has one action and it is a write:
-    // `featureFlags:manageExperiments` sets a project's or organization's
-    // experiment enrolment policy, and the registry declares no
-    // `featureFlags:view` for a read level to grant. Its own category rather
-    // than a line in Governance: the governance resources are org-exclusive
-    // at enforcement time, and this one is grantable at the project tier too.
-    // Distinct from "Experiments", which is the evaluation product.
+    // Write only: the registry declares no `featureFlags:view`, and
+    // `featureFlags:manageExperiments` sets the experiment enrolment policy.
+    // Its own category, not a line in Governance, because it is grantable at
+    // the project tier too, unlike governance's org-exclusive resources.
+    // Distinct from "Experiments", the evaluation product.
     key: "featureFlags",
     label: "Feature Flags",
     accessLevels: ["write"],
@@ -276,12 +267,9 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
 ] as const;
 
 /**
- * The registry permissions the categories deliberately do NOT cover: the
- * platform tier (`scopes: ["platform"]`), which is grantable only to
- * platform staff and can never ride on an API key. Everything else in
- * ALL_PERMISSIONS belongs to at least one category — enforced by
- * permission-categories.unit.test.ts so the registry cannot drift out of
- * the UI again.
+ * What the categories deliberately do NOT cover: the platform tier
+ * (`scopes: ["platform"]`), grantable only to platform staff, never on an
+ * API key. Enforced by permission-categories.unit.test.ts.
  */
 export function categorizablePermissions(): AuthzPermission[] {
   return [...ALL_PERMISSIONS].filter((permission) => {

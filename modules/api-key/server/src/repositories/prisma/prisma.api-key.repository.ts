@@ -153,12 +153,9 @@ export class PrismaApiKeyRepository
     });
   }
   /**
-   * One bounded UPDATE over the (name, revokedAt, expiresAt) shape.
-   *
-   * `expiresAt: { not: null }` is carried explicitly rather than left to
-   * `lte`: a key created without an expiry must never be swept, and a NULL
-   * that a later Prisma or Postgres comparison treated as "before now" would
-   * revoke every key of this name in the product at once.
+   * One bounded UPDATE over (name, revokedAt, expiresAt). `expiresAt: {
+   * not: null }` is explicit, not left to `lte`: a NULL treated as "before
+   * now" would revoke every key of this name in the product at once.
    */
   async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     const now = toDate(input.now);

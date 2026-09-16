@@ -1,8 +1,7 @@
 /**
- * The procedures this package calls. The `apiKey` namespace is derived from
- * the contract; the borrowed three belong to features that have not split yet.
- * The segment names are load-bearing (tRPC hashes the path into the React
- * Query cache key), and no read below carries key material — see ADR-001.
+ * The procedures this package calls, `apiKey` derived from the contract
+ * (the borrowed three await their own). Segment names are load-bearing
+ * (cache key); no read below carries key material — see ADR-001.
  */
 
 import type { apiKeyTrpc } from "@langwatch/api-key-contract";
@@ -35,10 +34,9 @@ type BorrowedProcedures = {
 
   organization: {
     /**
-     * The organization graph, asked with the same input the application shell
-     * asks with — under tRPC's path-plus-input cache key that is the same
-     * entry, so the graph is fetched once per document. Read for the CLI
-     * project picker; invalidated after a legacy project key rotation.
+     * The organization graph, asked with the shell's own input — same
+     * tRPC path-plus-input cache key, so it's fetched once per document.
+     * Read for the CLI picker; invalidated after a key rotation.
      */
     getAll: { query: { input: { isDemo?: boolean }; output: unknown } };
   };
@@ -48,11 +46,8 @@ type BorrowedProcedures = {
 export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> & BorrowedProcedures;
 
 /**
- * The API Key family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createModuleApi` for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: the screens call it, and the process
- * shell mounts `apiKeyApi.Provider`.
+ * The API Key family's typed tRPC hooks, sharing machinery, transport and
+ * cache with the application's `api` proxy (see `createModuleApi` for why).
+ * INTERNAL by convention: screens call it; the shell mounts the Provider.
  */
 export const apiKeyApi = createModuleApi<ApiKeyApiMap>();

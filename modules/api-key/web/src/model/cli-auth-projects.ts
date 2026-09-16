@@ -35,10 +35,9 @@ interface TeamLike {
 export const PERSONAL_GROUP_NAME = "Personal";
 
 /**
- * The CALLER's own personal workspace, matched on the PROJECT's ownerUserId:
- * the exact field the approve endpoint authorizes against, so the picker can
- * never offer an entry the server would refuse. An admin's payload can carry
- * other members' personal workspaces too; those never match.
+ * The CALLER's own personal workspace, matched on the PROJECT's
+ * `ownerUserId` — the field the approve endpoint authorizes against, so
+ * the picker can't offer what the server would refuse. Others never match.
  */
 function findOwnPersonalProject(
   teams: TeamLike[],
@@ -62,10 +61,9 @@ function findOwnPersonalProject(
 }
 
 /**
- * The project the picker starts on: the last project the user worked in when
- * it is one of the offered ones, then the sole shared project, then, where the
- * org has no shared projects at all, the personal one, so a fresh solo user is
- * never dead-ended on an empty picker.
+ * The project the picker starts on: the last project worked in when
+ * offered, else the sole shared project, else — with no shared projects —
+ * the personal one, so a fresh solo user is never dead-ended.
  */
 function pickDefaultProjectId(args: {
   projects: CliAuthProjectOption[];

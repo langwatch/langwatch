@@ -31,10 +31,8 @@ export function sanitizeDeviceLabel(raw: string | null | undefined): string | nu
 
 /**
  * The label for a device session: the user-chosen label wins over the
- * machine hostname, both normalized, and a session that sent neither is
- * `unknown-device`. The value names the key AND matches the previous login
- * key for replacement on re-login, so an unnormalized value would leave the
- * old key alive on a hostname or formatting change.
+ * machine hostname, both normalized, else `unknown-device`. It also
+ * matches the previous login key on re-login, so it must stay normalized.
  */
 export function deviceLabelForSession(clientInfo: DeviceLabelSource | undefined | null): string {
   return (

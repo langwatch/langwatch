@@ -63,12 +63,10 @@ describe("given the token-created-snippets feature is implemented", () => {
   });
 
   describe("when checking what each assistant entry builds", () => {
-    // Full expected strings, not substrings. The assistants deliberately
-    // differ in where each flag goes — Claude Code puts the project id before
-    // the `--` and its key after, Codex puts everything before — and a
-    // substring check passes happily while those are wrong. A Gemini entry
-    // whose flags sat on the wrong side of the server name shipped and was
-    // pulled for exactly that reason (#6654).
+    // Full expected strings, not substrings: the assistants differ in flag
+    // order (Claude Code: project id before `--`, key after; Codex: all
+    // before) and a substring check would pass while wrong. A Gemini entry
+    // shipped with flags reversed and was pulled for it (#6654).
     const API_KEY = "sk-lw-real";
     const PROJECT_ID = "project-abc";
     const CLOUD = "https://app.langwatch.ai";

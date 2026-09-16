@@ -1,9 +1,7 @@
 /**
- * Narrow contract between a dataset spreadsheet table and whatever owns its
- * state. The editor cells (EditableCell, TableCell, VirtualizedTableBody) are
- * shared across surfaces (the evaluations workbench backs this with its
- * zustand store, the standalone dataset editor backs it with its own store)
- * and only ever talk to this interface.
+ * Narrow contract between a dataset spreadsheet table and whatever owns
+ * its state. The editor cells are shared across surfaces (the workbench's
+ * zustand store, the standalone editor's own) and only ever talk to this.
  */
 import { createContext, type ReactNode, type RefObject, useContext } from "react";
 

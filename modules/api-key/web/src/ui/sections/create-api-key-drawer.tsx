@@ -1,8 +1,7 @@
 /**
- * "Create new secret key": the form that decides what a key will be able to do.
- * Every level offered is bounded by what the caller holds at the selected
- * scope, because the mint refuses a wider selection (`api_key_scope_violation`)
- * rather than quietly dropping one permission.
+ * "Create new secret key": decides what a key will be able to do. Every
+ * level offered is bounded by what the caller holds at the selected
+ * scope — the mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
 
 import {

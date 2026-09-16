@@ -5,11 +5,9 @@
 import type { DatasetColumns, DatasetConfirmColumns } from "@langwatch/dataset-contract";
 
 /**
- * Sentinel error for "no browser-reachable object storage" (the backend's
- * 409 `DirectUploadUnavailable`). The caller branches on this to fall back to
- * the in-browser-parse + backend multipart upload path, so small/self-hosted
- * installs with no S3 keep working. Kept client-side and distinct from the
- * server's same-named error so the modal can `instanceof`-check it.
+ * Sentinel for "no browser-reachable object storage" (backend's 409
+ * `DirectUploadUnavailable`) — caller falls back to in-browser-parse +
+ * multipart. Client-side and distinct from the server's, for `instanceof`.
  */
 export class DirectUploadUnavailableError extends Error {
   constructor(message = "Direct upload is unavailable; use the backend upload path") {

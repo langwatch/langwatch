@@ -7,10 +7,8 @@ const logger = createLogger("langwatch:api-key:cli-login-key-reaper");
 
 /**
  * A session the CLI stops refreshing leaves Redis by TTL, which runs no
- * code, so this sweep is what retires its login key and, through the
- * ordinary revoke cascade, its parented ingest keys. Each elapsed key is
- * revoked one at a time through the module's own `revoke`, so the only
- * thing crossing organizations here is the read of which keys elapsed.
+ * code — this sweep retires its login key and, via the revoke cascade,
+ * its ingest keys. Each is revoked one at a time; only the read crosses orgs.
  */
 export class CliLoginKeyReapService {
   static create(options: {
@@ -38,8 +36,7 @@ export class CliLoginKeyReapService {
   /**
    * Revokes every elapsed, unrevoked CLI login key and answers how many. A
    * row with no `userId` is skipped: a login key is always minted for a
-   * user, so its absence means the row cannot be revoked as this user's,
-   * and the row would only pile up as a repeated warning otherwise.
+   * user, so it can't be revoked as one — it would only repeat as a warning.
    */
   async reap(): Promise<number> {
     const now = this.now();

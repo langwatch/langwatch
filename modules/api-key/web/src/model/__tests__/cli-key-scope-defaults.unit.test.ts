@@ -90,13 +90,10 @@ describe("defaultCliKeyScopes()", () => {
     });
 
     it("skips a personal project whose team binding is missing and offers the organization instead", () => {
-      // The personal-workspace owner grant is appended to the grants ledger
-      // asynchronously and is skipped outright on a ledger outage, so the
-      // personal project can be visible while its TEAM binding row is not.
-      // A PROJECT chip whose ceiling resolves to the org-member bag can
-      // never mint (both permissions are org-exclusive and the mint strips
-      // them from selections with no ORGANIZATION binding) — the org chip
-      // mints a view-only key instead of dead-ending the login.
+      // The owner grant is appended to the ledger asynchronously and skipped
+      // on a ledger outage, so a personal project can be visible with no TEAM
+      // binding row — a PROJECT chip resolving to the org-member bag (both
+      // org-exclusive) can never mint, so the org chip mints view-only instead.
       const scopes = defaultCliKeyScopes({
         organizationId,
         bindings: [
@@ -184,13 +181,10 @@ describe("defaultCliKeyScopes()", () => {
   });
 
   describe("when the organization-chip fallback is offered", () => {
-    // The cross-layer pin for the fallback: the screen's permission list is
-    // `defaultCliKeyPermissions()` intersected with the chip's ceiling, and
-    // the mint (`filterToGrantable`) keeps org-exclusive permissions only
-    // when an ORGANIZATION binding is selected. If either fact drifts, the
-    // fallback chip renders an approve button that can never be enabled, or
-    // the approval 422s server-side — both are the dead end this exists to
-    // prevent.
+    // Cross-layer pin: the screen's list is `defaultCliKeyPermissions()`
+    // intersected with the chip's ceiling; the mint (`filterToGrantable`)
+    // keeps org-exclusive permissions only with an ORGANIZATION binding. If
+    // either drifts: a dead approve button, or a server-side 422.
     it("keeps the org-member bag inside the CLI defaults, so the chip's approval carries permissions", () => {
       const defaults = new Set<string>(defaultCliKeyPermissions());
       const bag = [...builtinRolePermissions("org-member")];

@@ -1,10 +1,8 @@
 import type { WireOf } from "@langwatch/api/web";
 /**
- * "Edit API key": the same ceiling as create, applied to a key that already
- * exists. Selections are clamped TWICE: a level stored on the key, or picked
- * before another scope was added, can sit above what the caller now holds
- * everywhere the key binds, and save would else come back
- * `api_key_scope_violation` for a row that still looked granted.
+ * "Edit API key": the same ceiling as create, on a key that already
+ * exists. Selections are clamped TWICE — a stored or pre-existing level
+ * can sit above what the caller now holds, else save fails `api_key_scope_violation`.
  */
 
 import {
@@ -125,12 +123,9 @@ export function EditApiKeyDrawer({
   );
   const primaryScope = ceilingScopes[0]!;
 
-  // Same ceiling the create drawer shows: the team-role bags carry no
-  // organization, gateway, governance or playground permissions, so reading
-  // them directly would lock rows a service key or an organization admin can
-  // in fact grant. Across every selected scope, not only the first: one
-  // permission list serves every binding, so a row the second scope refuses
-  // would fail the save with a scope violation.
+  // Same ceiling as the create drawer: team-role bags carry no org, gateway,
+  // governance or playground permissions, so reading them directly would
+  // lock rows a service/admin key can grant. Checked across every scope.
   const userPermissions = useMemo(() => {
     return getUserPermissionsAcrossScopes({
       myBindings: myBindings.data,

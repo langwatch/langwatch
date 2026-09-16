@@ -9,11 +9,9 @@ import { retryDatasetNormalize } from "../../behavior/direct-upload.ts";
 import { DatasetEditorTable } from "./dataset-editor-table.tsx";
 
 /**
- * The grant that offers the workbench hand-off.
- *
- * Read from the host rather than declared by the frontend feature, because it
- * gates a BUTTON rather than the page: a reader without it still opens the
- * dataset, they are just not offered the experiment.
+ * The grant that offers the workbench hand-off. Read from the host, not
+ * declared by the feature, because it gates a BUTTON, not the page — a
+ * reader without it still opens the dataset, just isn't offered the experiment.
  */
 const EXPERIMENT_PERMISSION = "evaluations:manage";
 
@@ -46,12 +44,10 @@ export default function DatasetEditorScreen() {
   // throwing: surface that explicitly rather than treating the absent row as
   // "ready" via the legacy-null branch below.
   const datasetGone = datasetQuery.isSuccess && datasetQuery.data == null;
-  // Gate on `isSuccess` AND a present row: before the query resolves `status` is
+  // Gate on `isSuccess` AND a present row: before resolving, `status` is
   // `undefined`, and `undefined == null` is `true` — which would mount the
-  // editor and read records from a still-`processing` (or missing) dataset (the
-  // server refuses, and the refusal cascades into a retry toast) before the
-  // status is known. Once the query settles on a real row, a genuinely-null
-  // status (legacy rows born before the column) still reads as ready.
+  // editor against a still-processing dataset before status is known. Once
+  // settled, a genuinely-null status (legacy rows) still reads as ready.
   const isReady =
     datasetQuery.isSuccess && datasetQuery.data != null && (status === "ready" || status == null);
 

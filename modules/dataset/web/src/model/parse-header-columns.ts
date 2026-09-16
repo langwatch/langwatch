@@ -46,10 +46,9 @@ const firstNonEmptyLine = (text: string): string | null => {
 };
 
 /**
- * Extract the first complete top-level `{…}` object from a `.json` array slice
- * by brace-matching (the slice usually truncates the array, so `JSON.parse` of
- * the whole slice fails). String-literal aware so braces inside values don't
- * miscount. Returns null if no complete object fits the slice.
+ * Extract the first complete top-level `{…}` object from a `.json` array
+ * slice by brace-matching (the slice usually truncates the array, so
+ * `JSON.parse` fails whole). String-literal aware; null if none fits.
  */
 const firstJsonObject = (text: string): string | null => {
   const start = text.indexOf("{");

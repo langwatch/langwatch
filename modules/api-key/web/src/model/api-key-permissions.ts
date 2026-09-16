@@ -1,8 +1,7 @@
 /**
- * What an API key may be granted, and what the CALLER may grant it. The
- * hierarchy rule and built-in role bags come from `@langwatch/authz-contract`;
- * the contract's `admin` bag lists `langy:create/update/delete` explicitly
- * where the legacy bag implied them — see `cli-key-defaults.unit.test.ts`.
+ * What an API key may be granted, and what the CALLER may grant it, per
+ * `@langwatch/authz-contract` — its `admin` bag lists `langy:create/update/delete`
+ * explicitly where the legacy bag implied them; see `cli-key-defaults.unit.test.ts`.
  */
 
 import {
@@ -397,10 +396,9 @@ export function getUserPermissionsAtScope({
 }
 
 /**
- * The ceiling for a key bound to several scopes at once: the intersection of
- * what the caller holds at each of them. One permission list serves every
- * binding on a key — `assertSelectionWithinCeiling` refuses the whole
- * selection at save time otherwise.
+ * The ceiling for a key bound to several scopes: the intersection of what
+ * the caller holds at each. One list serves every binding on a key —
+ * `assertSelectionWithinCeiling` refuses the whole selection otherwise.
  */
 export function getUserPermissionsAcrossScopes({
   myBindings,
@@ -438,10 +436,9 @@ export function getUserPermissionsAcrossScopes({
 }
 
 /**
- * Narrows category selections to what the ceiling still allows. The ceiling
- * moves while the form is open; write falls back to read where read survives,
- * and to none where neither does. A category the ceiling no longer covers
- * renders locked, the same `categoryAccessAvailability` answer the rows use.
+ * Narrows category selections to what the moving ceiling still allows:
+ * write falls back to read where read survives, else to none. A category
+ * no longer covered renders locked, per `categoryAccessAvailability`.
  */
 export function clampSelectionsToAvailability({
   selections,

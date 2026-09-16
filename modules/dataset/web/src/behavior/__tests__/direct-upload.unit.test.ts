@@ -235,12 +235,10 @@ describe("directUpload service", () => {
 
     describe("when a same-origin (local-FS) PUT fails", () => {
       it("surfaces the server's own refusal and does NOT signal a fallback", async () => {
-        // The local streaming route reports a real, fixable reason as the
-        // handled `storage_not_writable` code. It must reach the user as the
-        // server sent it, NOT as a PresignedUploadFailedError, which would make
-        // the modal fall back to the in-browser parse and show the misleading
-        // "requires object storage" cap. The environment variables that fix it
-        // are in the error's tips and the server log, never in this message.
+        // The local streaming route reports a real, fixable reason as
+        // `storage_not_writable`. It must reach the user as sent, NOT as
+        // `PresignedUploadFailedError` (which shows the misleading "requires
+        // object storage" cap) — the fix lives in the error's tips, not this message.
         const serverMessage = "Dataset storage is not writable, so nothing was saved";
         mockFetch().mockResolvedValue({
           ok: false,

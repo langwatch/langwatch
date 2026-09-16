@@ -14,9 +14,8 @@ const handleDatasetError = createDatasetErrorHandler({
 
 /**
  * A minimal fake Hono Context: the handler only reads path/method/param
- * for logging and calls `c.json(body, status)`. We capture the status + parsed
- * body the handler chose so we can assert the domain→HTTP mapping directly,
- * without spinning up the whole route app.
+ * for logging and calls `c.json(body, status)`. Captures status + body so
+ * domain→HTTP mapping can be asserted without a full route app.
  */
 const fakeContext = (): {
   c: Context;

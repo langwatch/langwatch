@@ -5,10 +5,9 @@
  */
 
 /**
- * Fixed `en-US` separator (1,640) for record counts. Pinned rather than
- * `toLocaleString()` (runtime locale) so the copy is deterministic — the tooltip
- * text and visible count stay identical across browsers/CI, and the pinned-copy
- * test doesn't break under a non-en locale (`1.640` / `1 640`).
+ * Fixed `en-US` separator (1,640), not `toLocaleString()` (runtime
+ * locale), so the copy is deterministic across browsers/CI and the
+ * pinned-copy test doesn't break under a non-en locale (`1.640` / `1 640`).
  */
 const recordCountFormatter = new Intl.NumberFormat("en-US");
 
@@ -32,19 +31,19 @@ export const formatSearchRecordCount = ({
     : `${formatRecordCount(matched)} of ${formatRecordCount(total)} records`;
 
 /**
- * Shown in place of the grid when a search matched nothing. Repeats the text
- * that was searched for: with a debounce between typing and results, the user
- * needs to see which search this empty result belongs to.
+ * Shown in place of the grid when a search matched nothing, repeating the
+ * searched text — with a debounce between typing and results, the user
+ * needs to see which search this belongs to.
  */
+
 /** The count chip with no search in effect: "679 records", "1 record". */
 export const plainRecordCount = (count: number): string =>
   `${formatRecordCount(count)} ${count === 1 ? "record" : "records"}`;
 
 /**
- * Shown in the grid when the server refused or failed the search.
- *
- * The toast carries the reason and then dismisses; this stays, so the screen
- * never settles into looking like a search that returned something.
+ * Shown in the grid when the server refused or failed the search. The toast
+ * carries the reason and dismisses; this stays, so the screen never settles
+ * into looking like a search that returned something.
  */
 export const searchFailedMessage = (search: string): string =>
   `Couldn’t run the search for “${search}”.`;
@@ -53,10 +52,9 @@ export const noSearchMatchesMessage = (search: string): string =>
   `No records match “${search}”.`;
 
 /**
- * Tooltip shown on the truncated-read count chip. A large dataset is loaded into
- * the editor up to a byte budget, so only the first rows are shown; this
- * explains that nothing is lost, that editing a visible row is safe, and how to
- * get the complete data.
+ * Tooltip on the truncated-read count chip: a large dataset loads up to a
+ * byte budget, so only the first rows show. Explains nothing is lost,
+ * editing a visible row is safe, and how to get the complete data.
  */
 export const truncatedReadTooltip = ({ shown, total }: { shown: number; total: number }): string =>
   `This dataset is too large to display in full here — showing ${formatRecordCount(shown)} out of ${formatRecordCount(total)} rows. Editing a visible row saves just that row; use Download as CSV for the complete dataset.`;

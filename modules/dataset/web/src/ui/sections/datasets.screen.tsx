@@ -1,8 +1,7 @@
 /**
  * Every dataset in the project: find, open, manage, via `DatasetHostApi`.
- * Row type is `DatasetSummary`, not a router inference a screen closure may
- * not name. Its overlays are local state, not the shared drawer registry.
- * Spec: specs/datasets/datasets-list-page.feature, specs/rbac/lite-member-restrictions.feature.
+ * Row type is `DatasetSummary`, not a router inference a screen closure
+ * can't name. Specs: datasets-list-page, rbac/lite-member-restrictions.feature.
  */
 
 import {
@@ -54,10 +53,9 @@ import { readableDate } from "../../model/readable-date.ts";
 const DELETE_NOTICE_MS = 10_000;
 
 /**
- * Single entry point for getting data into datasets: a dropdown that splits the
- * two flows — uploading file(s) (one dataset per file, bulk drawer) and creating
- * an empty dataset by defining its columns. The caller supplies the trigger so
- * the same menu backs both the header button and the empty-state CTA.
+ * Single entry point for getting data into datasets: a dropdown split
+ * between uploading file(s) (bulk drawer, one dataset per file) and
+ * creating an empty one. The caller supplies the trigger for both header/empty-state use.
  */
 function UploadOrCreateDatasetMenu({
   children,

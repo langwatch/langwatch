@@ -1,7 +1,6 @@
 /**
- * When a CLI login key's session runs out: the sooner of the refresh window
- * from now and the organization's max session duration from the session
- * start.
+ * When a CLI login key's session runs out: the sooner of the refresh
+ * window from now and the org's max session duration from session start.
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { describe, expect, it } from "vitest";

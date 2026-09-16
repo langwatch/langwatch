@@ -2,12 +2,9 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The HMAC key an API key is hashed with, verbatim.
- *
- * A separate leaf from the stored-secret cipher key even though the two share
- * a fallback chain, so the pepper can rotate without re-encrypting every
- * stored credential. Blank is not a refusal: a key hashed with no pepper still
- * authenticates, and the shape is the hasher's own rule to enforce.
+ * The HMAC key an API key is hashed with, verbatim — a separate leaf from
+ * the stored-secret cipher key so the pepper can rotate without
+ * re-encrypting every credential. Blank still authenticates; not a refusal.
  */
 export const apiKeyServerConfigDefinition = RuntimeConfig.define({
   pepper: Config.value(z.string().optional(), { env: "API_KEY_PEPPER" }),

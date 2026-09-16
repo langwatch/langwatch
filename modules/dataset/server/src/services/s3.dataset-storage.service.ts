@@ -39,9 +39,8 @@ import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.
 
 /**
  * The app's KSUID resource for a staged upload's tracking id
- * (`KSUID_RESOURCES.PRESIGNED_UPLOAD`). The literal, not the constant table:
- * the value is only ever a staging-key path segment, but the kind still
- * says what it is for.
+ * (`KSUID_RESOURCES.PRESIGNED_UPLOAD`) — the literal, not the constant
+ * table: only ever a staging-key path segment, but the kind still names it.
  */
 const PRESIGNED_UPLOAD_KSUID_RESOURCE = "presignedupload";
 

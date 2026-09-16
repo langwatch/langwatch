@@ -1,8 +1,7 @@
 /**
- * Shared dropzone visuals for the dataset upload flows (single-file
- * `UploadCSVDrawer` and `BulkUploadDrawer`) so both look identical: the
- * dotted-grid dashed surface, the cloud illustration that grows on hover/drag,
- * and the rainbow "loading" text sheen used while a file prepares.
+ * Shared dropzone visuals for the dataset upload flows (`UploadCSVDrawer`
+ * and `BulkUploadDrawer`): the dashed dotted-grid surface, the cloud
+ * illustration that grows on hover/drag, and the rainbow "loading" sheen.
  */
 import { Box, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";

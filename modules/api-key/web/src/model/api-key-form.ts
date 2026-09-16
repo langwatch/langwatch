@@ -16,11 +16,9 @@ export const EXPIRATION_OPTIONS = [
 ];
 
 /**
- * The date an expiration choice means, resolved against now.
- *
- * Extracted from the create drawer's `handleCreate` so the one branch that has
- * ever been wrong — a custom date parsed out of a date input, versus a preset
- * counted forward in days — is testable without rendering a drawer.
+ * The date an expiration choice means, resolved against now. Extracted
+ * from the create drawer's `handleCreate` so the one branch that has ever
+ * been wrong — custom vs preset — is testable without rendering a drawer.
  */
 export function resolveExpiresAt({
   preset,

@@ -49,11 +49,9 @@ export const datasetImageUrl = (value: unknown): string | null => {
 };
 
 /**
- * The URL to actually request.
- *
- * A remote image goes through the application's proxy so a third-party host
- * never sees the reader's referrer, and so a mixed-content or CORS-hostile host
- * still renders. Data URLs and same-origin paths are already fetchable.
+ * The URL to actually request. A remote image goes through the app's
+ * proxy so a third-party host never sees the reader's referrer, and a
+ * mixed-content or CORS-hostile host still renders. Others are already fetchable.
  */
 export const proxiedDatasetImageUrl = (url: string): string => {
   if (!url) return url;

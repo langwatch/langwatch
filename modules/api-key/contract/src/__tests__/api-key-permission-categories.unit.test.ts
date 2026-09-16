@@ -21,13 +21,11 @@ const CustomRolePermissionsSchema = z.array(z.enum(ALL_PERMISSIONS));
 describe("PERMISSION_CATEGORIES", () => {
   /** @scenario Every registry permission belongs to a category */
   it("covers every registry permission except the platform tier", () => {
-    // Which categories claim each permission, rather than whether any does:
-    // the categories partition the registry, so a permission owned by two of
-    // them is as wrong as one owned by none. A flat Set hides that, and the
-    // second owner is what silently widens a key — granting one category
-    // would hand over another category's resources. Read and write of the
-    // SAME category both naming a permission is the intended shape, since a
-    // write level always carries its own reads.
+    // Which categories claim each permission, not whether any does: the
+    // categories partition the registry, so a permission owned by two is as
+    // wrong as one owned by none — the second owner is what silently widens
+    // a key. Read and write of the SAME category both naming it is
+    // intended: a write level always carries its own reads.
     const owners = new Map<string, string[]>();
     for (const category of PERMISSION_CATEGORIES) {
       for (const permission of new Set([

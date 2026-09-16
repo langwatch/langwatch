@@ -15,12 +15,10 @@ const DOMAIN_ERROR_HTTP: Record<string, { status: ContentfulStatusCode; code: st
   DatasetConflictError: { status: 409, code: "Conflict" },
   UploadNotPendingError: { status: 409, code: "Conflict" },
   DatasetNotRetryableError: { status: 409, code: "Conflict" },
-  // Reading/appending a still-preparing dataset (I-READY): 425 Too Early,
-  // matching the tRPC layer's PRECONDITION_FAILED and the explicit
-  // `mapDatasetNotReadyError` the read routes use. This is the global safety
-  // net so a route that lets the error propagate (e.g. POST /:slugOrId/upload
-  // racing an in-flight normalize) returns 425, not a 500 that pages on-call
-  // for a normal user-induced race.
+  // I-READY: a still-preparing dataset is 425 Too Early, matching tRPC's
+  // PRECONDITION_FAILED and `mapDatasetNotReadyError`. This is the global
+  // safety net so a propagated error (e.g. an upload racing an in-flight
+  // normalize) returns 425, not a 500 that pages on-call for a normal race.
   DatasetNotReadyError: { status: 425, code: "DatasetNotReady" },
   DirectUploadUnavailableError: {
     status: 409,
@@ -102,12 +100,10 @@ export function createDatasetErrorHandler(options: {
       return c.json(errorSchema.parse(error), error.status);
     }
 
-    // Default to 500 for unexpected errors
-    // A handled error already knows its own status, code, meta, reasons and
-    // remediation — collapsing it to a 500 here would throw all of that away and
-    // report the caller's mistake as our outage. This handler exists to add the
-    // family's domain mapping on top of the shared boundary, not to replace it,
-    // so anything it has not specifically claimed goes to the boundary handler.
+    // Default to 500: a handled error already knows its status, code, meta
+    // and remediation, so collapsing here would report the caller's mistake
+    // as our outage. This adds domain mapping on the shared boundary;
+    // anything not claimed here falls through to it.
     if (HandledError.isHandled(error)) {
       return (await boundaryErrorHandler(error, c)) as Response;
     }

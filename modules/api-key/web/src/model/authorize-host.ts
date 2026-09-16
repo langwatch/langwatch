@@ -36,10 +36,9 @@ export type McpAuthorizeRequest = {
 
 export type AuthorizeFailureNotice = {
   /**
-   * The failure itself, which the composition's presentation registry turns
-   * into the sentence a customer reads. Required rather than optional, and the
-   * shape `UiFeedback` takes: a notice with no error degrades to the generic
-   * line for a failure we could have named.
+   * The failure itself, which the presentation registry turns into the
+   * sentence a customer reads. Required, not optional: a notice with no
+   * error degrades to the generic line for a failure we could have named.
    */
   readonly error: unknown;
   /** What the reader was doing, for a code the registry does not list. */
@@ -66,12 +65,9 @@ export abstract class AuthorizeHostApi {
   abstract replace(to: string): void;
 
   /**
-   * Leaves for an address this application does not own.
-   *
-   * Separate from `navigate` on purpose: the MCP flow ends by handing the reader
-   * to the client's own callback, which is a third-party address and never a
-   * route. The screen checks the scheme before calling this; the host performs
-   * the navigation because a feature may not touch `window.location`.
+   * Leaves for an address this application does not own — separate from
+   * `navigate` because the MCP flow ends at the client's own callback. The
+   * screen checks the scheme; the host navigates so features stay off `window.location`.
    */
   abstract handOffTo(url: string): void;
 
@@ -82,10 +78,9 @@ export abstract class AuthorizeHostApi {
   abstract revealProjectApiKey(): string | undefined;
 
   /**
-   * The control that chooses what is being authorized.
-   *
-   * `null` only if a composition has no workspace graph to switch within, which
-   * for these two addresses would be a composition fault rather than a state.
+   * The control that chooses what is being authorized. `null` only if a
+   * composition has no workspace graph to switch within — for these two
+   * addresses that is a composition fault, not a state.
    */
   abstract projectSwitcher(): ReactNode;
 
@@ -109,12 +104,9 @@ const AuthorizeHostContext = createContext<AuthorizeHostApi | undefined>(void 0)
 export const AuthorizeHostProvider = AuthorizeHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means a screen was rendered outside the frontend feature that owns it,
- * which is a composition fault rather than something a consent screen can
- * degrade around — and degrading around it would mean granting access without
- * being able to name what is being granted.
+ * The host these screens are mounted in. Missing means a screen rendered
+ * outside the frontend feature that owns it — a composition fault;
+ * degrading around it would mean granting access without naming what is granted.
  */
 export function useAuthorizeHost(): AuthorizeHostApi {
   const host = useContext(AuthorizeHostContext);

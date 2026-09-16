@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Row search in the dataset editor. The transport is mocked, so what these
- * tests pin is the editor's half of the contract: what it asks the server for,
- * and what it does to the grid around a search that is in effect.
+ * Row search in the dataset editor, transport mocked: pins the editor's
+ * half of the contract — what it asks the server for, and what it does to
+ * the grid while a search is in effect.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -334,12 +333,10 @@ describe("given a saved dataset", () => {
 
       await typeSearch(user, "zzzznope");
 
-      // Waited for by its full text, not asserted on the first appearance of
-      // the message. `typeSearch` enters one character at a time and the search
-      // waits 300ms after each, so an early prefix — "z", "zz" — can settle
-      // mid-typing and put up its own "no records match" first. Asserting on
-      // whichever message appeared first is a race, and it is the one that
-      // failed this file on CI.
+      // Waited for by full text, not the first appearance: `typeSearch` enters
+      // one character at a time and search waits 300ms after each, so an early
+      // prefix ("z", "zz") can show its own "no records match" first —
+      // asserting on whichever appeared first is the race that failed CI.
       const empty = await waitFor(() => {
         const message = screen.getByTestId("dataset-search-empty");
         expect(message).toHaveTextContent("zzzznope");
@@ -526,11 +523,9 @@ describe("given the dataset's own total is not known yet", () => {
     /** @scenario The record count reports the matches, not the whole dataset */
     it("does not pass the match count off as the dataset's total", async () => {
       // The two-number chip remembers the total from the last UNSEARCHED read. If
-      // no unsearched read has settled — a slow whole-dataset read, or a remount
-      // while a search is active — there is no total to report, and reusing the
-      // match count for both halves would state "1 of 1 records" for a dataset of
-      // 120: precisely the "the dataset has shrunk" misreading the two numbers
-      // exist to prevent. Saying less is the only honest option.
+      // none has settled yet, reusing the match count for both halves would state
+      // "1 of 1 records" for a dataset of 120 — the exact "dataset has shrunk"
+      // misreading the two numbers exist to prevent. Saying less is honest.
       const user = userEvent.setup();
       // Stable refs per branch — a fresh object each render feeds the editor's
       // data-keyed effects a new value every time and spins it into an update
@@ -575,13 +570,10 @@ describe("given the search's own read has not come back yet", () => {
   describe("when the count chip is rendered", () => {
     /** @scenario The record count reports the matches, not the whole dataset */
     it("does not report the held-over rows as the matches", async () => {
-      // While the search's read is in flight, `keepPreviousData` keeps serving
-      // the last unsearched page, and the `count` that comes with it is the
-      // DATASET's size, not a number of matches. Rendered through the two-number
-      // chip that becomes "120 of 120 records" — every row matched — over rows
-      // that were never searched at all. On a large dataset that read takes
-      // seconds, and a refused one used to hold this state for the whole retry
-      // backoff.
+      // In flight, `keepPreviousData` serves the last unsearched page, whose
+      // `count` is the DATASET's size, not matches — rendering "120 of 120
+      // records" over rows never searched. That read can take seconds on a
+      // large dataset, and a refusal used to hold this state for the whole backoff.
       const user = userEvent.setup();
       const unsearched = {
         data: {
@@ -723,12 +715,11 @@ describe("given the server refuses the search", () => {
   describe("when the refusal comes back", () => {
     /** @scenario A refused search does not leave unsearched rows on screen as if they matched */
     it("stops presenting the pre-search rows as the result", async () => {
-      // The rows on screen were read before the search and never matched against
-      // it. The store is only written from a settled `data`, so on error it keeps
-      // them — and the chip, fed by the same stale count, labels them as the
-      // matches. "50 of 60,000 records" under a search box containing
-      // "escalation" is a complete, confident, false answer; the toast that
-      // explains it dismisses after 12s and leaves only the falsehood.
+      // The rows on screen predate the search and were never matched against it.
+      // The store only updates from settled `data`, so on error it keeps them —
+      // and the chip, fed the same stale count, labels them as matches: "50 of
+      // 60,000 records" under a search for "escalation" is a confident, false
+      // answer that outlives the 12s toast explaining it.
       const user = userEvent.setup();
       const loaded = {
         data: {

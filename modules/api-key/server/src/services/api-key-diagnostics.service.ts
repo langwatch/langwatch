@@ -6,12 +6,9 @@ export interface ApiKeyDiagnostics {
 }
 
 /**
- * Where an API-key grant warning goes.
- *
- * The legacy grant service warns rather than throws when a grant it expected
- * to revoke is already gone, so this is the only record that the fail-safe
- * path ran. The composing process supplies a named logger; nothing about which
- * name belongs to the feature.
+ * Where an API-key grant warning goes. The legacy grant service warns
+ * rather than throws when an expected revoke is already gone, so this is
+ * the only record the fail-safe path ran; the process supplies a named logger.
  */
 export class ApiKeyDiagnosticsAdapter implements ApiKeyDiagnostics {
   static create(logger: Pick<Logger, "warn">): ApiKeyDiagnosticsAdapter {

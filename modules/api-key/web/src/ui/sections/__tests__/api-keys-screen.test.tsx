@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Consolidates three platform suites onto the host harness. Core cases: lookup
- * prefix never shows secrets; minted token appears once then vanishes.
+ * Consolidates three platform suites onto the host harness. Core cases:
+ * lookup prefix never shows secrets; minted token appears once then vanishes.
  * Specs: specs/api-keys/{unified-api-keys,scope-filter,project-key-rotation}.feature
  */
 

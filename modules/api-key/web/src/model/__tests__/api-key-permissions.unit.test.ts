@@ -656,11 +656,9 @@ describe("getUserPermissionsAtScope()", () => {
         getTeamRolePermissions: mockGetPerms,
       });
       // The org-member bag (organization:view, aiTools:view) targets
-      // org-tier-only resources, and the mint strips org-exclusive
-      // permissions from any selection with no ORGANIZATION binding
-      // (`filterToGrantable`). Offering them on a PROJECT chip made the
-      // approve request carry only permissions the server then dropped,
-      // failing with "Select at least one permission".
+      // org-tier-only resources; the mint strips them from any selection with
+      // no ORGANIZATION binding (`filterToGrantable`). On a PROJECT chip this
+      // dropped every permission, failing with "Select at least one permission".
       expect(result).toEqual([]);
     });
   });

@@ -2,12 +2,10 @@
  * @vitest-environment node
  */
 
-// The `apiKey.*` declared transport, exercised through the real runtime with
-// permissive ports: what reaches the application, what the caller is answered,
-// what the audit trail records, and which refusals cross the boundary
-// unchanged. The authorization DECISIONS themselves (membership first,
-// admin-only paths) belong to `ApiKeyApp`; here the app is a stub and the
-// transport is the unit under test.
+// The `apiKey.*` declared transport, exercised through the real runtime
+// with permissive ports: what reaches the app, what the caller is
+// answered, and which refusals cross unchanged. Authorization DECISIONS
+// belong to `ApiKeyApp`; here the app is a stub and transport is the unit under test.
 
 import {
   ApiKeyAdminRequiredError,

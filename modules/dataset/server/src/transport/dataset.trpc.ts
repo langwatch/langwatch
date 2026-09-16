@@ -1,8 +1,7 @@
 /**
- * The server half of `dataset.*`: a permission and a handler per procedure the
- * contract already named. Names, kinds and schemas are not repeated here.
- *
- * Spec: modules/dataset/specs/dataset-service.feature.
+ * The server half of `dataset.*`: a permission and a handler per
+ * procedure the contract already named. Names, kinds and schemas are
+ * not repeated here. Spec: modules/dataset/specs/dataset-service.feature.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

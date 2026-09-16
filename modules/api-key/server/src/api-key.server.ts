@@ -49,8 +49,7 @@ export function buildAgentSandboxMaintenancePipeline(
 /**
  * The whole module, declared. Every call answers something already
  * installable, so there is no build step to forget. What the process must
- * hand it is read off `ApiKeyApp.create` and off the repository registry —
- * its repositories, its three peers and its own config slice.
+ * hand it is read off `ApiKeyApp.create` and the repository registry.
  */
 export const apiKeyServer = defineServerModule("api-key")
   .withRepositories(apiKeyRepositories)

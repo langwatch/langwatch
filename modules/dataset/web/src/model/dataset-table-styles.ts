@@ -1,12 +1,9 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
 
 /**
- * Cell and row styling shared by every dataset table surface (the standalone
- * dataset editor and the evaluations workbench), applied via the `css` prop on
- * the table's scroll container. The cells render bare `<td>`/`<th>` elements so
- * this is the single source of truth for their borders, padding, typography,
- * hover, and selected-row treatment. Hosts layer their own column-width,
- * sticky-header, and resize-handle rules on top.
+ * Cell/row styling shared by every dataset table surface, applied via
+ * `css` on the scroll container — the source of truth for bare `<td>`/`<th>`
+ * borders, padding and hover. Hosts layer column-width, sticky-header on top.
  */
 export const datasetTableCss: SystemStyleObject = {
   "& th": {

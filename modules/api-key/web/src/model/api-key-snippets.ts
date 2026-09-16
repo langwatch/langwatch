@@ -12,10 +12,9 @@ export function maskSecret(v: string): string {
 }
 
 /**
- * Masks an API key for display, showing the first 6 and last 4 characters
- * with bullet characters in between.
- *
- * Returns an empty string when the key is empty/falsy.
+ * Masks an API key for display: the first 6 and last 4 characters, with
+ * bullet characters between them. Returns an empty string when the key
+ * is empty/falsy.
  */
 export function maskApiKey(key: string): string {
   if (!key) return "";
@@ -35,11 +34,9 @@ interface BuildMcpInput {
   apiKey: string;
   endpoint: string | undefined;
   /**
-   * Project id to surface as `LANGWATCH_PROJECT_ID`. Required for API keys (the
-   * unified auth middleware needs it to resolve scope), harmless for legacy
-   * `sk-lw-*` keys (the SDK + MCP server simply prefer it when set). We
-   * always emit it when supplied so users see one consistent env block
-   * regardless of token type.
+   * Project id to surface as `LANGWATCH_PROJECT_ID`: required for API keys
+   * (scope resolution), harmless for legacy `sk-lw-*` keys. Always emitted
+   * when supplied, for one consistent env block regardless of token type.
    */
   projectId?: string;
 }

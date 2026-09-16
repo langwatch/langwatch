@@ -1,9 +1,7 @@
 /**
- * One dataset resource's platform address: the app's `publicBaseUrl`, the
- * project's slug, and the path the caller already resolved. Mirrors
- * `suite-platform-url.rules.ts` / `agent-platform-url.rules.ts` — the REST
- * declaration is a static object with no request-scoped builder, so the app
- * composes the link itself.
+ * One dataset resource's platform address: the app's `publicBaseUrl`,
+ * project slug, and caller-resolved path. Mirrors `suite-platform-url.rules.ts`
+ * / `agent-platform-url.rules.ts`; the app composes this link itself.
  */
 export function datasetPlatformUrl({
   publicBaseUrl,

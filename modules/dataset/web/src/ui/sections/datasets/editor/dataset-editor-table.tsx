@@ -211,12 +211,10 @@ export function DatasetEditorTable({
 
   // Row search via paged read; saved datasets only (in-memory selection by position).
   const [searchInput, setSearchInput] = useState("");
-  // The term is debounced TOGETHER with the dataset it was typed against. A
-  // bare-string debounce leaves the previous dataset's term in the debounced
-  // value for 300ms after the user moves to another dataset without leaving the
-  // editor — long enough to fetch the new dataset narrowed by a word that was
-  // never typed against it. Pairing them lets the term be discarded the instant
-  // it stops belonging to what is on screen, without waiting for the debounce.
+  // The term is debounced TOGETHER with the dataset it was typed against — a
+  // bare-string debounce would leave the previous dataset's term live for
+  // 300ms after switching, long enough to fetch the new dataset narrowed by
+  // a word never typed against it.
   const searchScope = useMemo(
     () => ({ datasetId, text: searchInput }),
     [datasetId, searchInput],
@@ -227,13 +225,10 @@ export function DatasetEditorTable({
       ? debouncedSearch.text.trim() || undefined
       : undefined;
   const isSearching = !!activeSearch;
-  // Whether a search OWNS the grid — the settled one, or the one the user has
-  // already typed and the debounce has not run yet. `isSearching` alone is the
-  // wrong gate for withdrawing the ways of adding a row: it trails the box by
-  // 300ms, so for that long the editor still offers a row that the search
-  // landing a moment later removes from the grid. Presentation of search
-  // RESULTS stays on `isSearching`, which is the right gate for it: there is
-  // nothing to say about matches until the search has actually run.
+  // Whether a search OWNS the grid: settled, or typed but not yet debounced.
+  // `isSearching` alone is the wrong gate for withdrawing ways to add a row —
+  // it trails the box by 300ms, long enough to offer a row search is about to
+  // remove. RESULTS still gate on `isSearching`: nothing to say until it runs.
   const hasSearchTakenTheGrid =
     !!datasetId && (!!searchInput.trim() || isSearching);
 
@@ -484,12 +479,10 @@ export function DatasetEditorTable({
       : undefined,
   });
 
-  // A search withdraws the CSV import (see its render gate at the bottom), but
-  // the gate only unmounts the dialog — the disclosure goes on believing it is
-  // open. Left that way the flag outlives the dialog, and clearing the search
-  // reopens it on its own: a dialog the user last touched a search ago, back on
-  // screen without being asked for and empty of whatever they had chosen in it.
-  // Tell the disclosure it closed, so "withdrawn" and "closed" cannot disagree.
+  // A search withdraws the CSV import dialog, but only unmounts it — the
+  // disclosure still believes it's open, so clearing the search would reopen
+  // it, stale and empty, without being asked. Tell the disclosure it closed,
+  // so "withdrawn" and "closed" cannot disagree.
   const isCsvModalOpen = addRowsFromCSVModal.open;
   const closeCsvModal = addRowsFromCSVModal.onClose;
   useEffect(() => {
@@ -883,14 +876,11 @@ export function DatasetEditorTable({
             </tbody>
           </table>
 
-          {/* A search with no matches leaves the grid empty: the phantom
-              add-row is withdrawn during a search, so `displayRowCount` is 0
-              and the body renders nothing. An empty grid alone is unreadable —
-              it looks the same as a dataset that has no rows, and does not say
-              which search produced it. Sits INSIDE the grid's border, where the
-              missing rows would have been: below it, the reader gets a blank
-              box with an unattached sentence under it. Held until the read
-              settles so the message does not flash between keystrokes. */}
+          {/* A search with no matches leaves the grid empty (the phantom add-row
+              is withdrawn, so `displayRowCount` is 0) — unreadable alone, since
+              it looks like a dataset with no rows. Sits INSIDE the grid's
+              border, held until the read settles so the message doesn't flash
+              between keystrokes. */}
           {hasSearchFailed && (
             <Text
               fontSize="13px"

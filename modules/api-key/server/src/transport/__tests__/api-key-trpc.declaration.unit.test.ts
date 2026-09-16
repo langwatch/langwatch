@@ -1,8 +1,6 @@
 /**
- * The `apiKey.*` tRPC wire, pinned: every procedure name, its kind, and the
- * access declaration the server binds to it. A rename here is a cache-key
- * change in every browser that calls it.
- *
+ * The `apiKey.*` tRPC wire, pinned: name, kind, and access declaration
+ * per procedure. A rename here is a cache-key change in every browser.
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 import { existsSync, readFileSync } from "node:fs";
@@ -29,10 +27,9 @@ function valueImports(relative: string): string[] {
 }
 
 /**
- * One shared reason: no `apiKey:*` permission exists, because a personal key
- * belongs to its owner and the application proves membership and ownership
- * itself. Every procedure states that opt-out with the organization id
- * explicitly allowed.
+ * One shared reason: no `apiKey:*` permission exists — a personal key
+ * belongs to its owner, and the application proves membership and
+ * ownership itself. Every procedure states the opt-out with organization id allowed.
  */
 const OWN_KEYS = {
   kind: "no-permission",

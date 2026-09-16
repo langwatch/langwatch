@@ -54,10 +54,9 @@ describe("PrismaApiKeyRepository", () => {
   });
 
   /**
-   * The sweep runs cross-tenant, so every clause below is load-bearing: the
-   * name is what keeps it off customer keys, `revokedAt: null` is what stops it
-   * rewriting rows it already retired, and `expiresAt: { not: null }` is what
-   * keeps a key created without an expiry out of a `lte` comparison.
+   * The sweep runs cross-tenant, so every clause is load-bearing: the name
+   * keeps it off customer keys, `revokedAt: null` stops rewriting retired
+   * rows, and `expiresAt: { not: null }` keeps a no-expiry key out of `lte`.
    */
   describe("when sweeping expired keys of one reserved name", () => {
     /** @scenario "The sandbox sweep revokes only elapsed sandbox keys" */
@@ -107,9 +106,8 @@ describe("PrismaApiKeyRepository", () => {
   });
 
   /**
-   * ensureForProject -> ApiKeyRepository.findIngestKey once queried ApiKey
-   * WITHOUT organizationId, so the org-tenancy guard
-   * (dbOrganizationIdProtection) rejected every mint/rotate at runtime.
+   * `ensureForProject` -> `findIngestKey` once queried ApiKey WITHOUT
+   * `organizationId`, so the org-tenancy guard rejected every mint/rotate.
    * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
    */
   describe("when looking up an organization's ingestion key", () => {

@@ -226,14 +226,10 @@ describe("dataset search (s3_jsonl)", () => {
 
       /** @scenario A dataset within the row limit but over the byte limit refuses the search */
       it("refuses a dataset whose rows occupy more bytes than one search will read", async () => {
-        // Well inside the row cap, and the most expensive scan the search could be
-        // asked to run: rows are as wide as the columns they were given, so a row
-        // count says nothing about how much has to be fetched and parsed to produce
-        // them.
-        //
-        // `sizeBytes` is a bigint here because it is a bigint on the row. Passing a
-        // number would typecheck against this fixture and exercise a comparison the
-        // service never performs.
+        // Worst-case scan: rows are as wide as their columns, so row count alone
+        // says nothing about bytes fetched. `sizeBytes` is a bigint here because
+        // it is a bigint on the row — a `number` would typecheck but skip the
+        // comparison the service actually performs.
         mockChunks();
         const service = makeService({});
 
@@ -339,12 +335,11 @@ describe("dataset search (s3_jsonl)", () => {
       });
 
       it("keeps counting bytes across a chunk whose size was never recorded", async () => {
-        // `readValidChunkOffsets` checks the row bounds and not `byteSize`, so a
-        // valid offsets array can carry an entry without one. Added to a running
-        // total that value poisons it — every later comparison against `NaN` is
-        // false — and the backstop silently stops existing for the whole dataset,
-        // with every other test in this file still green. An unrecorded size is one
-        // chunk this cannot measure, not permission to stop measuring.
+        // `readValidChunkOffsets` checks row bounds, not `byteSize`, so a valid
+        // offsets entry can lack one — added to a running total, `NaN` poisons
+        // every later comparison and silently kills the backstop for the whole
+        // dataset. An unrecorded size is one chunk this cannot measure, not
+        // permission to stop measuring.
         const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
         mockChunks();
         const service = makeService({});
@@ -378,12 +373,11 @@ describe("dataset search (s3_jsonl)", () => {
       });
 
       it("does not let a negative recorded size buy room for the chunks after it", async () => {
-        // A size below zero is not a small chunk, it is a broken record — and
-        // subtracted from a running total it does not merely fail to bound its own
-        // chunk, it hands back allowance for every chunk that follows. One entry
-        // reading -100 MB is enough to carry the whole scan past the limit while
-        // the total still looks well inside it. Normalised the same way a missing
-        // size is: one chunk this cannot measure, contributing nothing.
+        // A negative size doesn't just fail to bound its own chunk — subtracted
+        // from the running total it hands back allowance for every chunk after
+        // it, letting one bad entry carry the whole scan past the limit while
+        // the total still looks safe. Treated the same as a missing size:
+        // unmeasurable, contributing nothing.
         const halfTheLimitEach = Math.ceil(DATASET_SEARCH_MAX_BYTES / 2) + 1;
         const { readChunk } = mockChunks();
         const service = makeService({});
@@ -519,13 +513,11 @@ describe("dataset search (s3_jsonl)", () => {
       });
 
       it("scans every chunk when the offsets index is only partly written", async () => {
-        // A half-written offsets array (an interrupted migration) has entries that
-        // pass a per-entry check and entries that do not. Trusting the survivors
-        // silently drops the chunks the broken entries described — here chunk 2,
-        // where every match lives, so the search would answer "no matches" for rows
-        // ordinary paging still displays. Ordinary paging already rejects the whole
-        // array on one bad entry and falls back to `chunkCount`; the search has to
-        // agree with it, or the same dataset answers two ways.
+        // A half-written offsets array (interrupted migration) mixes entries that
+        // pass a per-entry check with ones that don't. Trusting the survivors would
+        // silently drop the chunks the bad entries describe and answer "no matches"
+        // for rows paging still shows — paging already falls back to `chunkCount`
+        // on one bad entry, and the search has to agree with it.
         const { readChunk } = mockChunks();
         const service = makeService({});
 
@@ -548,11 +540,10 @@ describe("dataset search (s3_jsonl)", () => {
 
       it("refuses a dataset whose offsets are malformed and whose chunkCount has gone null", async () => {
         // The other end of the fallback above: rejecting the offsets leaves
-        // `chunkCount` to say how many chunks there are, and on a dataset where
-        // that has gone null too there is nothing left to ask. Reading it as zero
-        // would scan no chunks and answer "no matches" for a dataset that has them
-        // — a wrong answer the user cannot tell from a right one, which is why this
-        // throws instead.
+        // `chunkCount` to say how many chunks exist, and here that has gone null
+        // too. Reading it as zero would scan nothing and answer "no matches" for
+        // a dataset that has rows — indistinguishable from a right answer — so
+        // this throws instead.
         const { readChunk } = mockChunks();
         const service = makeService({});
 
@@ -704,13 +695,11 @@ describe("dataset search (postgres-backed)", () => {
             count: DATASET_SEARCH_MAX_ROWS - 1,
             maxUpdatedAt: null,
           }),
-          // A full batch every time the walk asks, for twice as many rows as the
-          // cap allows, and then a short one. Handing back full batches forever
-          // would be the truer fake, but a walk with no backstop never asks for the
-          // last one — it spins until the heap gives out and takes the whole runner
-          // with it, which reads as an infrastructure failure rather than as this
-          // assertion. Bounded, the same missing backstop shows up as this test
-          // failing and nothing else.
+          // A full batch each time, for twice the cap's rows, then a short one.
+          // Returning full batches forever would be the truer fake, but a walk
+          // with no backstop then never stops — it spins until the heap gives
+          // out, which reads as an infrastructure failure rather than this
+          // assertion. Bounded, the same missing backstop just fails this test.
           findDatasetRecordsPage: vi.fn(({ take }: { take: number }) => {
             batchesServed += 1;
             const exhausted = batchesServed > MAX_BATCHES_BEFORE_GIVING_UP;

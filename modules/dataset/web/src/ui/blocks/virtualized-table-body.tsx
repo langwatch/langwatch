@@ -1,8 +1,7 @@
 /**
- * VirtualizedTableBody - Memoized table body component for virtualized rows.
- *
- * This component is extracted to prevent the entire EvaluationsV3Table from
- * re-rendering on every scroll event. The virtualizer state is contained here.
+ * Memoized table body for virtualized rows, extracted to prevent the
+ * entire EvaluationsV3Table re-rendering on every scroll event — the
+ * virtualizer state is contained here.
  */
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -23,12 +22,9 @@ type VirtualizedTableBodyProps<TData extends DatasetTableRowData> = {
   shouldVirtualize: boolean;
   disableVirtualization: boolean;
   displayRowCount: number;
-  /** Width of a trailing spacer column, e.g. to leave room for a side
-   *  drawer overlaying the table (the evaluations workbench passes its
-   *  drawer width). When set, each row also gets a filler cell absorbing
-   *  the remaining width, and the host must declare the matching filler +
-   *  spacer entries in its colgroup and thead. Omit to let the data
-   *  columns share the full row width. */
+  /** Width of a trailing spacer column (e.g. room for an overlaying side
+   *  drawer). When set, each row gets a filler cell too, and the host must
+   *  declare matching filler + spacer entries in its colgroup/thead. */
   trailingSpacerWidth?: number;
 };
 

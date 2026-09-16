@@ -31,9 +31,8 @@ export function resolveFirstTracePolling({
 
 /**
  * Pure transition policy for a first-trace read landing: confirm the
- * never-synced state, mark prior traces (which keeps the current behavior),
- * or start the redirect. A response that lands after the watch timed out
- * must not start a redirect, however late the network was.
+ * never-synced state, mark prior traces, or start the redirect. A
+ * response landing after the watch timed out must never start a redirect.
  */
 export function resolveFirstTraceTransition({
   firstMessage,

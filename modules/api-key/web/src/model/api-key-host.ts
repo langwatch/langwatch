@@ -190,11 +190,9 @@ const ApiKeyHostContext = createContext<ApiKeyHostApi | undefined>(void 0);
 export const ApiKeyHostProvider = ApiKeyHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means a screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host these screens are mounted in. Missing means a screen rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useApiKeyHost(): ApiKeyHostApi {
   const host = useContext(ApiKeyHostContext);

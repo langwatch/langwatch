@@ -1,7 +1,6 @@
 /**
- * What the CLI login-key sweep may touch: a fleet-wide predicate bounded by
- * the reserved name prefix and the clock, and a revoke funnelled through the
- * caller's own `revoke` so bindings cleanup and the parent cascade both run.
+ * What the CLI login-key sweep may touch: bounded by the reserved name
+ * prefix and the clock; revoked through the caller's own `revoke` for cleanup.
  * Spec: modules/api-key/specs/api-key.feature
  */
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";

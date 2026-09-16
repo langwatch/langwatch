@@ -49,11 +49,9 @@ export abstract class ApiKeyRepository {
   abstract listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]>;
   abstract update(input: ApiKeyUpdateRecord): Promise<StoredApiKey>;
   /**
-   * Marks a key revoked, recording why, and never overwrites a cause already
-   * on the row. The fence on `revokedAt` makes the cause the FIRST
-   * revocation's: a person revoking a key and the personal ingest-key cap
-   * retiring it can both read a live row, and a `"cap"` written over a
-   * `"user"` would let the CLI re-mint a key a person meant to kill.
+   * Marks a key revoked, keeping the FIRST cause ever recorded: the fence
+   * on `revokedAt` stops a `"cap"` retirement from overwriting a `"user"`
+   * revoke that already landed.
    */
   abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
@@ -68,51 +66,40 @@ export abstract class ApiKeyRepository {
     projectId: string;
   }): Promise<StoredApiKey[]>;
   /**
-   * Revokes every unrevoked key of one reserved name whose expiry has elapsed.
-   *
-   * Cross-tenant by design: the caller is a fleet-wide sweep, not a request, so
-   * there is no organization to scope to. The name is a parameter rather than a
-   * constant here because deciding WHICH reserved name may be swept is policy,
-   * and policy belongs above persistence.
+   * Revokes every unrevoked key of one reserved name past expiry.
+   * Cross-tenant by design (a fleet-wide sweep, not a request); the name is
+   * a parameter because choosing which reserved name to sweep is policy.
    */
   abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
   /**
-   * The live keys minted under one key, inside its organization.
-   *
-   * Bounded by `organizationId` so the cascade goes through the ordinary
-   * tenancy guard rather than a cross-tenant hatch: a cascade always knows
-   * whose organization it is retiring keys in.
+   * The live keys minted under one key, inside its organization. Bounded
+   * by `organizationId` so the cascade goes through the ordinary tenancy
+   * guard rather than a cross-tenant hatch.
    */
   abstract findLiveChildren(input: {
     parentApiKeyId: string;
     organizationId: string;
   }): Promise<{ id: string }[]>;
   /**
-   * Whether one key is still usable, by id, without its bindings.
-   *
-   * The auth path asks this about a key's parent on every request that
-   * presents a session-minted key, so it reads only the two columns that
-   * decide it.
+   * Whether one key is still usable, by id, without its bindings. The auth
+   * path asks this about a key's parent on every request presenting a
+   * session-minted key, so it reads only the two columns that decide it.
    */
   abstract findLivenessById(input: {
     id: string;
   }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
   /**
-   * Every unrevoked CLI login key (name carries {@link CLI_LOGIN_KEY_NAME_PREFIX})
-   * whose session has run out. Cross-tenant by design, like
+   * Every unrevoked CLI login key past its session. Cross-tenant, like
    * {@link revokeExpiredByName}: the caller is the hourly sweep, not a
-   * request. `expiresAt: { not: null }` is explicit so a login key minted
-   * before device metadata (and therefore no expiry) is never swept.
+   * request. `expiresAt: { not: null }` excludes a key minted before device metadata.
    */
   abstract findElapsedLoginKeys(input: {
     now: Instant;
   }): Promise<{ id: string; userId: string | null; organizationId: string }[]>;
   /**
-   * Moves a live CLI login key's expiry with its session, so a session
-   * nothing keeps refreshing is still retired by the hourly sweep rather
-   * than sliding forward forever. Scoped by name prefix as well as
-   * id/organization/user, and a key already revoked is left alone, so a
-   * refresh racing a revoke never brings a dead key back into the sweep.
+   * Moves a live CLI login key's expiry with its session, so an inactive
+   * session is still retired by the hourly sweep. A key already revoked is
+   * left alone, so a refresh racing a revoke can't resurrect it.
    */
   abstract extendLoginKeyExpiry(input: {
     id: string;

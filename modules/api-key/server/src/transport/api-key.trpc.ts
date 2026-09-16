@@ -4,12 +4,10 @@
  * repeated here.
  */
 
-// No procedure declares a permission: an `apiKey:*` permission does not exist,
-// because a personal key belongs to its owner. The application proves
-// organization membership before it reads anything, and asks `isOrgAdmin` on
-// the admin-only paths — so every procedure states the opt-out WITH the
-// organization id explicitly allowed, which is what keeps the declaration
-// sweep honest.
+// No procedure declares a permission: `apiKey:*` doesn't exist, because
+// a personal key belongs to its owner. The app proves org membership
+// first and asks `isOrgAdmin` on admin-only paths — every procedure states
+// the opt-out WITH the organization id, keeping the declaration sweep honest.
 
 import { ApiKeyApi, apiKeyTrpc } from "@langwatch/api-key-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";

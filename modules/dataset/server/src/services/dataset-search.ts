@@ -3,11 +3,9 @@
  */
 
 /**
- * How many rows one search will read.
- *
- * Rows because every dataset has a count of them: legacy postgres-backed
- * datasets carry a null `sizeBytes` (only the s3_jsonl chunking paths write
- * it), so this is the only limit that can hold on that path at all.
+ * How many rows one search will read. Legacy postgres-backed datasets carry
+ * a null `sizeBytes` (only s3_jsonl chunking writes it), so this row limit
+ * is the only one that can hold on that path at all.
  */
 export const DATASET_SEARCH_MAX_ROWS = 50_000;
 
@@ -17,11 +15,9 @@ export const DATASET_SEARCH_MAX_ROWS = 50_000;
 export const DATASET_SEARCH_MAX_BYTES = 100 * 1024 * 1024;
 
 /**
- * How many postgres-backed rows are read per round of a scan.
- *
- * The s3_jsonl scan is naturally batched by chunk; the postgres scan has no
- * such unit, so it reads in slices to keep the same property — heap holds one
- * batch plus the matches kept for the page, not the whole dataset.
+ * How many postgres-backed rows are read per scan round. s3_jsonl is
+ * naturally batched by chunk; postgres has no such unit, so it slices to
+ * keep the same property — heap holds one batch plus the page's matches.
  */
 export const DATASET_SEARCH_SCAN_BATCH = 1_000;
 
@@ -82,10 +78,9 @@ export const matchesDatasetSearch = ({
 };
 
 /**
- * Objects and arrays are searched by their JSON text, which is what the editor
- * renders in the cell. A value that cannot be serialised (a cycle, a BigInt)
- * falls back to `String(...)` rather than throwing mid-scan and failing the
- * whole search over one bad cell.
+ * Objects and arrays are searched by their JSON text — what the editor
+ * renders in the cell. A value that can't serialise (a cycle, a BigInt)
+ * falls back to `String(...)` rather than failing the whole search.
  */
 const safeStringifyValue = (value: unknown): string => {
   if (typeof value === "object") {

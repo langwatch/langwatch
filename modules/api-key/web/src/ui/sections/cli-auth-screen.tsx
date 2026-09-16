@@ -60,12 +60,9 @@ type ActionState =
   | { kind: "denied" };
 
 /**
- * The `user_code` the address carries.
- *
- * A query key can legitimately arrive repeated, and the route port answers a
- * single value per key (last write wins), so nothing has to be normalised here
- * any more - the platform page's array guard was for the framework router that
- * parsed repeats into arrays.
+ * The `user_code` the address carries. A repeated query key is fine: the
+ * route port already answers one value per key (last write wins), so
+ * nothing needs normalising here.
  */
 function userCodeOf(reading: ApiKeyRouteReading): string {
   return reading.query.user_code ?? "";
@@ -98,12 +95,10 @@ export default function CliAuthScreen() {
   const [permissionSelections, setPermissionSelections] = useState<
     Record<string, PermissionSelection>
   >({});
-  // Step one of the screen: the code check. The organization picker, the
-  // access selection and the approve action only appear once the user
-  // confirms the code matches their terminal, so the phishing check is not
-  // one card among many but the gate to the rest of the page. Confirmed as a
-  // value rather than a flag: step two only opens when the confirmed code is
-  // still the code being looked at.
+  // Step one: the code check gates the rest of the page (org picker, access
+  // selection, approve) rather than being one card among many — it's the
+  // phishing check. Confirmed as a value, not a flag: step two only opens
+  // while the confirmed code still matches what's being looked at.
   const [confirmedUserCode, setConfirmedUserCode] = useState<string | null>(null);
 
   // A second login opened in this tab replaces the whole flow: any finished
@@ -122,12 +117,10 @@ export default function CliAuthScreen() {
     }
   }, [organizations, selectedOrgId]);
 
-  // First-touch acquisition source: a browser opened by `langwatch login`
-  // carries no utm/ref params, so stamp the CLI as lead source here. The
-  // round-trip through onboarding then lands it in signupData and the
-  // Customer.io lead_source trait. First-touch semantics: a user who
-  // originally arrived via a campaign keeps their real source, which is the
-  // host method's whole contract.
+  // First-touch acquisition: a browser opened by `langwatch login` carries no
+  // utm/ref params, so stamp the CLI as lead source here — it lands in
+  // signupData and the Customer.io lead_source trait via onboarding.
+  // First-touch: a user who arrived via a campaign keeps that real source.
   useEffect(() => {
     host.recordLeadSourceIfAbsent(CLI_LEAD_SOURCE);
   }, [host]);
@@ -143,14 +136,11 @@ export default function CliAuthScreen() {
     }
   }, [sessionStatus, organizations, userCode, host]);
 
-  // Projects offered in the project-login picker (project_api_key mode).
-  // resolveCliAuthProjects offers the shared projects grouped by team plus
-  // the caller's own personal project as an explicit "Personal" entry
-  // (silent auto-selection of personal was the historical hazard; explicit
-  // choice is honoured server-side, and it is preselected only when the org
-  // has no shared projects at all). The hidden internal_governance tenancy
-  // project is never offered. The default is the last project the user
-  // worked in when offered, else the sole shared project, else personal.
+  // Projects for the project-login picker: `resolveCliAuthProjects` groups
+  // shared projects by team plus the caller's personal project as
+  // "Personal" (preselected only when the org has none shared). The hidden
+  // internal_governance tenancy project is never offered. Default: last
+  // project worked in, else the sole shared project, else personal.
   const lastProjectSlug = scope.projectSlug ?? null;
   const {
     projects: projectsForOrg,

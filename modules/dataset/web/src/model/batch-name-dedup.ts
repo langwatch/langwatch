@@ -14,10 +14,9 @@ export const baseNameFromFilename = (filename: string): string => {
 };
 
 /**
- * Increment a name's `" (k)"` suffix (or add `" (1)"`). Used by the orchestrator
- * to pick the next candidate after a server slug 409 (a DB collision that the
- * within-batch dedupe couldn't see — e.g. a name already taken by an existing
- * dataset, or a concurrent create in another tab).
+ * Increment a name's `" (k)"` suffix (or add `" (1)"`), for the next
+ * candidate after a server slug 409 — a DB collision the within-batch
+ * dedupe couldn't see (an existing dataset, or a concurrent create elsewhere).
  */
 export const bumpName = (name: string): string => {
   const match = name.match(/^(.*) \((\d+)\)$/);
@@ -37,10 +36,9 @@ const nextSuffixed = (name: string, taken: Set<string>): string => {
 };
 
 /**
- * Return one distinct name per input, preserving order. The first occurrence
- * keeps its name; later collisions get `"<name> (1)"`, `"<name> (2)"`, … A
- * literal input that equals an already-emitted suffix keeps bumping, so
- * `["a","a","a (1)"]` → `["a","a (1)","a (1) (1)"]` — never a duplicate.
+ * One distinct name per input, preserving order: collisions get
+ * `"<name> (1)"`, `"<name> (2)"`, … A literal matching an emitted suffix
+ * keeps bumping: `["a","a","a (1)"]` → `["a","a (1)","a (1) (1)"]`.
  */
 export const batchDedupeNames = (names: string[]): string[] => {
   const taken = new Set<string>();

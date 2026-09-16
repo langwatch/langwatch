@@ -208,11 +208,9 @@ export class DatasetChunkMaintenanceService {
 }
 
 /**
- * Two gates the column rewrite passes under the lock. The source schema is revalidated
- * because `oldColumnTypes` was captured before it: a concurrent edit that already rewrote the
- * chunks would make the remap read those rows with the stale schema and shift or drop values.
- * And the rewrite buffers every row while holding the lock, so above the byte cap it refuses
- * rather than risk exhausting the shared worker's heap. Both bail before any write.
+ * Two gates under the lock: the source schema is revalidated because a
+ * concurrent rewrite could have changed it (stale schema would shift or
+ * drop values), and the byte cap bails before buffering risks the heap.
  */
 function assertColumnEditAllowed({
   current,

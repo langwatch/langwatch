@@ -1,10 +1,7 @@
 /**
- * One API key row, as the Settings > API Keys table reads it. See ADR-001
- * (../adrs/001-api-key-service.md) for why the shape lives in the contract.
- *
- * NO KEY MATERIAL is on this shape: `lookupIdPrefix` is five characters of the
- * key's public lookup id, never part of the secret. The plaintext token leaves
- * the server exactly once, in `apiKey.create` at the moment of minting.
+ * One API key row (ADR-001). NO KEY MATERIAL here: `lookupIdPrefix` is five
+ * characters of the public lookup id, never the secret — the plaintext
+ * token leaves the server exactly once, in `apiKey.create` at minting.
  */
 
 import { z } from "zod";
@@ -44,11 +41,9 @@ export const apiKeyListRoleBindingSchema = z
 export type ApiKeyListRoleBinding = z.infer<typeof apiKeyListRoleBindingSchema>;
 
 /**
- * One API key, as every read of the feature answers it.
- *
- * The four timestamps are `z.date()` because this is the shape tRPC serialises:
- * the browser receives them as ISO strings through `WireOf<ApiKeyListEntry>`,
- * and the server still constructs real dates at the Prisma seam.
+ * One API key, as every read of the feature answers it. Timestamps are
+ * `z.date()` because tRPC serialises this shape: the browser gets ISO
+ * strings via `WireOf<ApiKeyListEntry>`, built as real dates at the Prisma seam.
  */
 export const apiKeyListEntrySchema = z
   .object({
@@ -68,10 +63,9 @@ export const apiKeyListEntrySchema = z
     lastUsedAt: z.date().nullable(),
     revokedAt: z.date().nullable(),
     /**
-     * Non-null marks this as an ingestion key: a project-scoped, ingest-only
-     * write credential the `langwatch <tool>` CLI mints. `null` is a regular
-     * personal or service key. The API Keys page renders the two in separate
-     * sections on this field alone.
+     * Non-null marks an ingestion key: a project-scoped, ingest-only write
+     * credential the `langwatch <tool>` CLI mints (`null` for a regular
+     * key). The API Keys page renders the two sections on this field alone.
      */
     ingestSourceType: z.string().nullable(),
     ingestionTemplateId: z.string().nullable(),

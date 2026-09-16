@@ -43,12 +43,9 @@ export default function McpAuthorize() {
   if (status !== "authenticated") return null;
 
   /**
-   * The `error` is deliberately `undefined` here.
-   *
-   * Every sentence this screen shows is written at the point it is produced  - 
-   * RFC 6749 §4.1.2.1 wire fields from our own authorize endpoint, or a refusal
-   * this screen made about an unusable redirect - so there is no code for a
-   * presentation registry to look up, and `description` is the whole message.
+   * The `error` is deliberately `undefined` here: every sentence is written
+   * at the point it's produced — RFC 6749 §4.1.2.1 fields, or a refusal this
+   * screen made — so there's no code to look up; `description` is the whole message.
    */
   const showError = (message: string) => {
     host.failed({

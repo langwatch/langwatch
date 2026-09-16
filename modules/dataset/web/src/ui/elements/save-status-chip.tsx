@@ -1,9 +1,7 @@
 /**
- * Compact autosave indicator: nothing while idle, a spinner while saving, a
- * check on success, and a loud error with the message when a save fails.
- *
- * A blocked save must never look like a successful one, which is why the error
- * state is a state of its own rather than a silent return to idle.
+ * Compact autosave indicator: nothing while idle, a spinner while saving,
+ * a check on success, a loud error with the message on failure. A blocked
+ * save must never look successful, so error is its own state, not a silent idle.
  */
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";

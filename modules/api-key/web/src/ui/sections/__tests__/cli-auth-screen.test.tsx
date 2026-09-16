@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Consolidates three platform suites onto the host harness. Key structural
- * change: host methods instead of fetch mocking. Specs: login-user-scoped-key,
+ * Consolidates three platform suites onto the host harness. Key change:
+ * host methods instead of fetch mocking. Specs: login-user-scoped-key,
  * authorize-project-picker, post-login-first-trace-redirect.feature
  */
 

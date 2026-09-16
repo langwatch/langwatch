@@ -14,11 +14,9 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 type BorrowedProcedures = {
   limits: {
     /**
-     * Declared for its INVALIDATION rather than its answer.
-     *
-     * Archiving a dataset frees usage against the plan, and the surfaces that
-     * render the allowance ask this procedure. Nothing in this package renders
-     * it; the list screen invalidates the entry so those surfaces re-ask.
+     * Declared for its INVALIDATION, not its answer: archiving frees usage
+     * against the plan, and surfaces that render the allowance ask this
+     * procedure. Nothing here renders it; the list screen just invalidates it.
      */
     getUsage: {
       query: {

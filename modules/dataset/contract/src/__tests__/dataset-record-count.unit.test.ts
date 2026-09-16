@@ -1,7 +1,6 @@
 /**
- * The display count, over each of the three storage layouts and both names the
- * entries-table count travels under.
- *
+ * The display count, over each of the three storage layouts and both
+ * names the entries-table count travels under.
  * Spec: specs/datasets/datasets-list-page.feature.
  */
 import { describe, expect, it } from "vitest";

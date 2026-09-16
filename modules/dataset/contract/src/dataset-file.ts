@@ -29,14 +29,10 @@ export const MAX_ROWS_LIMIT = resolveRequestBound("datasetRowsMax", "FREE");
  */
 export const MAX_FILE_SIZE_BYTES = resolveRequestBound("datasetFileBytes", "FREE");
 
-// JSON.parse rejects U+0000 null bytes inside string literals as a
-// "Bad control character" syntax error, even though Postgres-bound
-// payloads only break later. Scrub null bytes from raw file content
-// before any parser sees them so user-supplied uploads with stray
-// null bytes (PDF copy-paste, broken CSV exports) no longer crash
-// the upload pipeline. The dataset-record sanitiser below catches
-// any null bytes that survive parsing (e.g. `\u0000` JSON escapes
-// resolved to a real null after JSON.parse).
+// JSON.parse rejects U+0000 null bytes in string literals ("Bad control
+// character"), even though Postgres-bound payloads only break later. Scrub
+// them from raw content first (PDF copy-paste, broken CSV exports) so
+// uploads don't crash; the record sanitiser below catches any that survive.
 function stripRawNullBytes(content: string): string {
   return content.includes("\u0000") ? content.replaceAll("\u0000", "") : content;
 }
@@ -201,11 +197,9 @@ export function convertValueToColumnType(
 }
 
 /**
- * Converts row values to match declared column types.
- * Ported from frontend tryToConvertRowsToAppropriateType.
- *
- * Converts string values to numbers, booleans, dates, or parsed JSON
- * based on the declared column types.
+ * Converts row values to match declared column types — strings to
+ * numbers, booleans, dates, or parsed JSON. Ported from the frontend's
+ * `tryToConvertRowsToAppropriateType`.
  */
 export function convertRowsToColumnTypes(
   rows: Record<string, unknown>[],

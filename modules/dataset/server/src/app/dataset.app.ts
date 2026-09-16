@@ -101,10 +101,9 @@ type DatasetSetup = FeatureSetup<
 >;
 
 /**
- * A create-or-replace, as a door has it: possibly naming the dataset by slug
- * rather than id, possibly naming an experiment instead of a name, and
- * possibly naming neither a name nor the columns because it is patching what
- * already exists. {@link DatasetApp.upsertDataset} completes it.
+ * A create-or-replace: possibly named by slug rather than id, possibly
+ * naming an experiment instead of a name, and possibly missing name and
+ * columns when only patching what already exists.
  */
 export interface DatasetUpsertInput {
   projectId: string;
@@ -309,12 +308,9 @@ export class DatasetApp implements DatasetApi {
   }
 
   /**
-   * The same copy, on behalf of a person.
-   *
-   * A copy reads a SECOND project — the source — that a door's declared check
-   * never covers, so the person's reach into it is probed here, where the read
-   * is made. Holding create on a project implies being able to read its
-   * datasets, which is what a copy does.
+   * The same copy, for a person: it also reads a SECOND project — the
+   * source — that the door's check never covers, so reach into it is probed
+   * here. Holding create on a project implies read on its datasets.
    */
   async copyDatasetForActor(input: CopyDatasetInput & { actorId: string }): Promise<Dataset> {
     const permitted = await this.#permissions.hasPermission({
@@ -341,10 +337,9 @@ export class DatasetApp implements DatasetApi {
   // ── Records ──────────────────────────────────────────────────────────────
 
   /**
-   * A dataset and its records, up to the byte budget the CALLER named, and in
-   * the slice the caller asked for. Both stay arguments: the editor, an export
-   * and an evaluation run all want a different budget, and a run reads the
-   * first, the last, a random or every entry depending on how it was set up.
+   * A dataset and its records, up to the byte budget the CALLER named, in
+   * the slice it asked for. Both stay arguments: the editor, an export and
+   * an evaluation run all want a different budget and a different slice.
    */
   getDatasetWithRecords(
     input: DatasetLookupInput & {
@@ -438,11 +433,9 @@ export class DatasetApp implements DatasetApi {
   }
 
   /**
-   * Every batch-evaluation record of the experiment a URL slug names.
-   *
-   * The slug-to-id read is the only thing this feature asks of Experiment, and
-   * it is made here so no door reaches a second feature to answer a dataset
-   * question.
+   * Every batch-evaluation record of the experiment a URL slug names. The
+   * slug-to-id read is the only thing this feature asks of Experiment, done
+   * here so no door reaches a second feature to answer a dataset question.
    */
   async listBatchEvaluations(input: {
     projectId: string;
@@ -612,11 +605,9 @@ export interface DatasetStorage {
 }
 
 /**
- * Runtime-selected storage. The app supplies this once during composition.
- *
- * An `abstract class` rather than a plain `interface` — see
- * {@link DatasetInfrastructure}'s own doc for why. A concrete resolver still
- * `implements DatasetStorageResolver`, never `extends` it.
+ * Runtime-selected storage, supplied once during composition. See
+ * {@link DatasetInfrastructure}'s doc for why this is an `abstract class`
+ * rather than an `interface` — a resolver `implements`, never `extends`, it.
  */
 export abstract class DatasetStorageResolver {
   abstract forProject(projectId: string): Promise<DatasetStorage>;

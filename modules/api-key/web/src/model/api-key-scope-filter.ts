@@ -13,19 +13,16 @@ import {
 } from "@langwatch/authz-web/surfaces/scope-picker";
 
 /**
- * The `?scope=` address contract, passed through for the one screen that reads
- * and writes it. ONE import statement in the whole module, because
- * `ui-screen-closure` counts import LINES and a separate `export … from` would
- * be a second finding for the same decision.
+ * The `?scope=` address contract, passed through for the one screen that
+ * reads and writes it. ONE import statement in the module: `ui-screen-closure`
+ * counts import LINES, and a second `export … from` would double-count it.
  */
 export { scopeFilterAddressWrite, scopeFilterFromAddress, scopeHierarchyOf };
 
 /**
  * The two shared types, re-exported for this package's own modules.
- *
- * `ui-screen-closure` counts import LINES, so everything in the package that
- * merely needs the TYPES reads them from here, and only the modules that render
- * the surface's components name it again.
+ * `ui-screen-closure` counts import LINES, so anything needing only the
+ * types reads them from here; only modules rendering the surface name it again.
  */
 export type { ScopeFilterValue, ScopeHierarchy };
 
@@ -47,10 +44,9 @@ export function resolveRowFilter(
 }
 
 /**
- * Rows whose scopes sit on the same branch of the org tree as the filter.
- *
- * A row with no scopes at all is dropped by a specific filter and kept by
- * "all", which is what the platform util did: `[].some(...)` is `false`.
+ * Rows whose scopes sit on the same branch of the org tree as the filter. A
+ * row with no scopes is dropped by a specific filter, kept by "all" —
+ * `[].some(...)` is `false`, matching the platform util's behavior.
  */
 export function filterRowsByScope<T extends RowWithScopes>(
   rows: readonly T[],

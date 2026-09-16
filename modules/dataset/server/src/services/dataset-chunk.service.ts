@@ -1,8 +1,7 @@
 /**
- * ADR-032 rung 6b — the write side of a dataset stored as `contentLayout='s3_jsonl'`.
- * Every operation mutates S3 chunks AND Postgres counters under the per-dataset
- * advisory lock (Decision 9 / I-COUNT). Deleting and whole-dataset re-derivation are
- * their own collaborators; this class keeps the append and edit paths and the locate scan.
+ * ADR-032 rung 6b — the write side of `contentLayout='s3_jsonl'`. Every
+ * operation mutates S3 chunks AND Postgres counters under the per-dataset
+ * advisory lock (Decision 9 / I-COUNT); this class keeps append, edit and locate.
  */
 
 import { createLogger } from "@langwatch/observability";

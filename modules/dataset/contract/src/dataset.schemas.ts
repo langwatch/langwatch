@@ -143,11 +143,9 @@ export type DatasetApiFindNextNameInput = z.infer<typeof datasetApiFindNextNameI
 export type DatasetApiCopyInput = z.infer<typeof datasetApiCopyInputSchema>;
 
 /**
- * The whole `upsert` payload, as one type.
- *
- * The router chains the two parsers above, so what a client sends is their
- * intersection; the split exists for the authorization sweep's benefit and a
- * caller should not have to know that.
+ * The whole `upsert` payload, as one type: the router chains the two
+ * parsers above, so a client's send is their intersection. The split
+ * exists for the authorization sweep's benefit; callers needn't know it.
  */
 export type DatasetApiUpsertInput = DatasetApiUpsertBaseInput & DatasetApiUpsertTargetInput;
 

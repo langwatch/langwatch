@@ -35,10 +35,9 @@ export const apiKeySchema = z
     createdByUserId: z.string().nullable(),
     createdByDeviceLabel: z.string().nullable(),
     /**
-     * The CLI login key of the device session that minted this ingestion
-     * key. Set by the CLI's personal mint, null for every other key.
-     * Revoking the parent (logout, the devices tab, a re-login from the
-     * same device, session expiry) revokes the children with it.
+     * The CLI login key of the device session that minted this key. Set by
+     * the CLI's personal mint, null otherwise. Revoking the parent (logout,
+     * devices tab, re-login, session expiry) revokes the children with it.
      */
     parentApiKeyId: z.string().nullable().optional(),
     lookupId: z.string().min(1),
@@ -46,10 +45,9 @@ export const apiKeySchema = z
     expiresAt: z.date().nullable(),
     revokedAt: z.date().nullable(),
     /**
-     * Why the key was revoked; nothing while it is live or for a row revoked
-     * before the cause was recorded. A plain string, because the stored value
-     * is whatever the build that wrote it knew: readers narrow it with
-     * {@link isApiKeyRevocationCause} rather than trusting it.
+     * Why the key was revoked; empty while live, or for a row revoked before
+     * the cause was recorded. A plain string — the stored value is whatever
+     * the build that wrote it knew; narrow with {@link isApiKeyRevocationCause}.
      */
     revocationCause: z.string().nullable().optional(),
     lastUsedAt: z.date().nullable(),
@@ -107,17 +105,15 @@ export const revokeApiKeyInputSchema = z
     callerIsAdmin: z.boolean(),
     awaitProjection: z.boolean().optional(),
     /**
-     * Why the key dies, recorded on the row. Defaults to a person's decision,
-     * which every user-facing path is; the platform's own revocations name
-     * themselves so the CLI can tell a key it may re-mint from one it must
-     * leave dead.
+     * Why the key dies, recorded on the row. Defaults to a person's
+     * decision (every user-facing path); the platform's own revocations
+     * name themselves so the CLI can tell a re-mintable key from a dead one.
      */
     cause: z.enum(API_KEY_REVOCATION_CAUSES).optional(),
     /**
-     * Whether to retire the keys minted under this one. On by default, so
-     * every entry point cascades; the cascade itself turns it off for the
-     * children it revokes, since a child has no children of its own and
-     * nothing should recurse further.
+     * Whether to retire the keys minted under this one. On by default so
+     * every entry point cascades; the cascade turns it off for the children
+     * it revokes, since nothing should recurse past one level.
      */
     cascadeToChildren: z.boolean().optional(),
   })

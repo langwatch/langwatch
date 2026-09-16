@@ -10,10 +10,9 @@ import type {
 } from "@langwatch/annotation-contract";
 
 /**
- * Only what the mapping reads off a project score: its id, to match a rating
- * against, and its label, to name the column. Naming the whole row here would
- * force every caller to hold one — including the browser, which holds the
- * serialised shape, not the stored one.
+ * Only what the mapping reads off a project score: its id, to match a
+ * rating against, and its label, to name the column. Naming the whole
+ * row would force every caller — including the browser — to hold one.
  */
 type AnnotationScore = Pick<StoredAnnotationScore, "id" | "name">;
 import {

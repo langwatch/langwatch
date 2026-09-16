@@ -1,8 +1,7 @@
 /**
  * Every `batchRecord.*` procedure, declared once: the two rollups an
- * experiment's batch-evaluation runs are summarised by. The rows are
- * `BatchEvaluation`, which this feature owns beside the datasets they ran
- * against.
+ * experiment's batch-evaluation runs are summarised by. Rows are
+ * `BatchEvaluation`, owned beside the datasets they ran against.
  */
 
 import { defineTrpcContract } from "@langwatch/api/contract";

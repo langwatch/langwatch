@@ -253,10 +253,9 @@ export class DatasetNotReadyError extends HandledError {
 }
 
 /**
- * Thrown when a manual normalize retry is requested on a dataset that can't
- * be re-run: not in a recoverable state, or no staging key to re-read. Maps to 409 Conflict.
- * ADR-032 I-RECOVER: a stuck dataset is recoverable only when there's
- * something to recover from.
+ * Thrown when a normalize retry is requested on a dataset that can't be
+ * re-run: not recoverable, or no staging key to re-read. Maps to 409.
+ * ADR-032 I-RECOVER: recoverable only when there's something to recover from.
  */
 export class DatasetNotRetryableError extends Error {
   constructor(message = "Dataset cannot be retried") {

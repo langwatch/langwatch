@@ -1,8 +1,7 @@
 /**
- * Searchable list of the project's datasets: the picker experience shared
- * by the Choose Dataset drawer (evaluations workbench) and the workflow
- * dataset node. Renders search, loading, empty states, and one card per
- * dataset with entry/column counts and last-edit date.
+ * Searchable list of the project's datasets: shared by the Choose Dataset
+ * drawer (evaluations workbench) and the workflow dataset node. Renders
+ * search, loading and empty states, one card per dataset with counts and date.
  */
 import { Box, chakra, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "@langwatch/time";
