@@ -30,9 +30,8 @@ function floorBucket(timeUnixMs: number): number {
 
 /**
  * The fields sequence decisions actually read. Successor seeks fetch only
- * these — never the megabyte-scale payload columns — so the type names the
- * contract: anything with these fields can participate in ordering and
- * predecessor-dependency checks.
+ * these — never the megabyte-scale payload columns — so this type names the
+ * contract for ordering and predecessor-dependency checks.
  */
 export interface MetricSequencePoint {
   seriesId: CanonicalMetricDataPoint["seriesId"];
@@ -103,10 +102,9 @@ function startsNewSequence(
 }
 
 /**
- * Whether a point's rolled-up value is derived from its predecessor, which is
- * what makes a late insert able to change the *next* bucket. OTLP summaries
- * carry no temporality field yet are always cumulative, so temporality alone
- * cannot answer this.
+ * Whether a point's rolled-up value is derived from its predecessor — what
+ * lets a late insert change the *next* bucket. OTLP summaries carry no
+ * temporality field yet are always cumulative, so temporality alone can't answer this.
  */
 function usesPredecessor(point: MetricSequencePoint): boolean {
   return point.metricKind === "summary" || point.aggregationTemporality === "cumulative";

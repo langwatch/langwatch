@@ -8,12 +8,9 @@ import {
 } from "../otel.evaluation-execution-metrics.service.ts";
 
 /**
- * Spec: modules/evaluation/specs/evaluation-service.feature
- *
- * The names and the label are pinned as literals because they are read by name
- * from outside this repository — `docs/langwatch-dashboard.json` charts both —
- * and because every way they can go wrong is silent: a panel naming a series
- * nobody writes renders empty, which reads as "no evaluations ran".
+ * Spec: modules/evaluation/specs/evaluation-service.feature. Names and label
+ * are pinned as literals, read by name outside this repo
+ * (`docs/langwatch-dashboard.json`) — an unmatched series renders an empty panel.
  */
 describe("given the evaluator process series pushed over OTLP", () => {
   const metrics = createRecordingMeterProvider();

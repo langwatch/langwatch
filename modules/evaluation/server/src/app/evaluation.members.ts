@@ -48,12 +48,9 @@ export type EvaluationTraceProtections = Readonly<{
 }>;
 
 /**
- * The three legacy trace reads an online evaluation makes.
- *
- * The whole `TraceService` is not named because these are the only calls the
- * execution path makes, and it is a ClickHouse read stack in another feature's
- * server package. The signatures are positional because the implementation the
- * process binds is the packaged one, whose shape this must satisfy exactly.
+ * The three legacy trace reads an online evaluation makes, narrowed from
+ * `TraceService` (a ClickHouse read stack in another feature's server
+ * package). Positional signatures match the packaged implementation's shape exactly.
  */
 export interface EvaluationTraceRead {
   getTracesWithSpans(
@@ -80,10 +77,8 @@ export interface EvaluationTraceRead {
 
 /**
  * Renders a trace's spans as the digest an evaluator reads for the
- * `formatted_trace` / `formatted_traces` mapping sources.
- *
- * A port rather than a call because the renderer walks the trace read model and
- * lives with it, in `@langwatch/trace-server`.
+ * `formatted_trace` / `formatted_traces` mapping sources. A port rather than
+ * a call, since the renderer walks the trace read model in `@langwatch/trace-server`.
  */
 export interface EvaluationSpanDigest {
   format(spans: Span[]): Promise<string>;
@@ -140,11 +135,9 @@ export interface EvaluationExecutionTelemetry {
 }
 
 /**
- * The one monitor read an execution makes: which evaluator this command names.
- *
- * Narrowed from `MonitorService`, which a worker would otherwise have to
- * compose whole — create, replicate, toggle and the evaluator graph behind
- * them — to answer a lookup by id. `MonitorService` satisfies this.
+ * The one monitor read an execution makes: which evaluator this command
+ * names. Narrowed from `MonitorService`, which a worker would otherwise
+ * compose whole — create, replicate, toggle and the evaluator graph — for a lookup by id.
  */
 export interface EvaluationMonitorLookup {
   tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null>;

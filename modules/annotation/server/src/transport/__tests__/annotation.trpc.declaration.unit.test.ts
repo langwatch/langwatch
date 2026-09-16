@@ -1,9 +1,7 @@
 /**
- * The annotation tRPC wire, pinned: every procedure name, its kind, the schema
- * pair the contract declares for it and the permission the server binds to it.
- * A rename here is a cache-key change in every browser that calls it.
- *
- * Spec: packages/api/specs/transport-declaration-split.feature.
+ * The annotation tRPC wire, pinned: every procedure name, its kind, the
+ * schema pair, and the permission the server binds to it — a rename here is
+ * a cache-key change in every browser that calls it (transport-declaration-split.feature).
  */
 
 import { existsSync, readFileSync } from "node:fs";

@@ -21,10 +21,9 @@ import { MemoryDataRetentionRepository } from "../memory/memory.data-retention.r
 import { PrismaDataRetentionRepository } from "../prisma/prisma.data-retention.repository.ts";
 
 /**
- * One backend under test. The namespace keeps a run's organization and scope
- * ids off every other row in a shared database: the stored unique key is
- * (scopeType, scopeId, category) across all organizations, so a fixed scope id
- * would collide with whatever else is in there.
+ * One backend under test. The namespace keeps a run's rows apart in a shared
+ * database: the stored unique key is (scopeType, scopeId, category) across
+ * organizations, so a fixed scope id would collide with existing rows.
  */
 type Backend = Readonly<{ repository: () => DataRetentionRepository; namespace: () => string }>;
 

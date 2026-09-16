@@ -28,10 +28,9 @@ const REPO_ROOT = (() => {
 const RESTING_MIB = 543;
 
 /**
- * One worker with every local model resident: 2571 MiB measured. This is the
- * figure a ceiling has to clear, and it only stays the relevant figure because
- * the chart pins the pool size — left alone the service scales it with the
- * node's core count and the footprint becomes a multiple of this.
+ * One worker with every local model resident: 2571 MiB measured. This stays
+ * the relevant figure only because the chart pins the pool size — left alone,
+ * the service scales it with the node's core count, multiplying the footprint.
  */
 const SINGLE_WORKER_LOADED_MIB = 2571;
 
@@ -52,11 +51,9 @@ const MEBIBYTES: Record<string, number> = { Mi: 1, Gi: 1024, M: 1, G: 1024 };
 const SIZING_DOC = "docs/self-hosting/configuration/sizing-and-scaling.mdx";
 
 /**
- * The sizing page quotes each profile's figures so someone can decide how much
- * cluster to buy without reading YAML. A quote is a copy, and copies rot: these
- * numbers had drifted far enough that the page understated a dev install by
- * more than a gigabyte. Each entry pairs a heading on that page with the file
- * it claims to describe.
+ * The sizing page quotes each profile's figures so someone can decide how
+ * much cluster to buy without reading YAML — a copy that can drift from the
+ * chart. Each entry pairs a heading on that page with the file it describes.
  */
 const DOCUMENTED_PROFILES = [
   {

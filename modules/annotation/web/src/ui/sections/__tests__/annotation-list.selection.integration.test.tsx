@@ -573,8 +573,7 @@ describe("given rows on a queue page are selected", () => {
     /**
      * `platform/app` mounted the create-queue drawer from inside the dialog.
      * Here the dialog writes this family's own address and the screen above
-     * mounts the editor, so the dialog does not have to know a queue can be
-     * created at all.
+     * mounts the editor — it never has to know a queue can be created at all.
      */
     it("writes the queue editor address rather than mounting a drawer", () => {
       const { host } = renderQueuePage();

@@ -12,9 +12,7 @@ import {
 /**
  * Durable metric processing, composed from nothing but a tenant-keyed
  * ClickHouse client — the whole seam a background worker needs. The redaction
- * policy and the organization-keyed read client an HTTP door needs stay off
- * this path, because demanding them is what kept the pipeline unbuildable
- * outside the App.
+ * policy and org-keyed read client an HTTP door needs stay off this path.
  */
 export class ClickhouseMetricProcessingRepository {
   private constructor(

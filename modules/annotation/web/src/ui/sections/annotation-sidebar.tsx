@@ -23,10 +23,9 @@ function PendingCount({ count }: { count: number | undefined }) {
 }
 
 /**
- * One queue in the sidebar list. The queue's own actions live here rather than
- * on the page it opens, so they are reachable from wherever the reviewer is.
- * The trigger takes the trailing slot the pending count sits in, and only on
- * hover, so a resting sidebar still reads as counts.
+ * One queue in the sidebar list. Actions live here rather than on the page
+ * it opens, reachable from wherever the reviewer is. The trigger takes the
+ * pending count's trailing slot on hover only, so a resting sidebar reads counts.
  */
 function QueueSidebarEntry({
   queue,

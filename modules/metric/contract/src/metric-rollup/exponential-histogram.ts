@@ -186,10 +186,9 @@ function collectContributors({
 }
 
 /**
- * Rolls up exponential histograms onto one scale and one zero threshold. Both
- * are chosen across every contributing point — including the predecessors that
- * cumulative points are differenced against — so the stored row is a valid
- * exponential histogram rather than a union of incompatible layouts.
+ * Rolls up exponential histograms onto one scale and one zero threshold,
+ * chosen across every contributing point — including differenced-against
+ * predecessors — so the stored row is a valid histogram, not a layout union.
  */
 function buildExponentialHistogramRow({
   row,

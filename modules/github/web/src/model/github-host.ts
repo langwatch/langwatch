@@ -34,11 +34,9 @@ export abstract class GithubHostApi {
   abstract route(): GithubRouteReading;
 
   /**
-   * Rewrites the query string in place.
-   *
-   * The install round-trip lands back here with `?githubError=…` when GitHub
-   * refused; the screen reports it once and then drops the parameter, so a
-   * reload does not report it again.
+   * Rewrites the query string in place. The install round-trip lands back
+   * here with `?githubError=…` when GitHub refused; the screen reports it
+   * once then drops the parameter, so a reload does not report it again.
    */
   abstract setQuery(
     next: Readonly<Record<string, string | undefined>>,
@@ -47,10 +45,8 @@ export abstract class GithubHostApi {
 
   /**
    * Leaves this application for an address it does not serve, in this tab.
-   *
-   * The install entry point is built by the SERVER and handed back on the
-   * connection status, so the App slug and the shape of the flow stay off the
-   * client; the screen only appends the mode and the return address.
+   * The install entry point is SERVER-built and handed back on the connection
+   * status, keeping the App slug and the flow's shape off the client.
    */
   abstract leaveTo(url: string): void;
 
@@ -66,11 +62,9 @@ const GithubHostContext = createContext<GithubHostApi | undefined>(void 0);
 export const GithubHostProvider = GithubHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means the screen was rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useGithubHost(): GithubHostApi {
   const host = useContext(GithubHostContext);

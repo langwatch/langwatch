@@ -49,10 +49,9 @@ export interface EvaluationAnalyticsRollupRow {
   /** Count of finite scores for processed evaluations; divisor for average. */
   scoreCount: number;
   /**
-   * Evaluation wall-clock duration in ms. Always 0 from this projection —
-   * the event payload doesn't carry started/completed timestamps; the slim
-   * fold computes duration from its accumulated state. Kept on the row so
-   * the column shape matches the DDL.
+   * Evaluation wall-clock duration in ms. Always 0 here — the event payload
+   * carries no timestamps; the slim fold computes it from accumulated state.
+   * Kept on the row so the column shape matches the DDL.
    */
   durationSum: number;
   /** Always 0 from this projection — eval cost lives in the Postgres `cost` table by FK. */
@@ -72,11 +71,9 @@ function toStartOfMinute(unixMs: number): ClickHouseMoment {
 }
 
 /**
- * A verdict (passed/score) is only real when the evaluation ran to
- * completion — producers can attach `passed: false` alongside
- * `status: "error"` (#6833). Without the status guard such an event
- * increments FailCount AND ErrorCount, so the counters double-count and
- * pass-rate reads an members error as a real fail.
+ * A verdict (passed/score) is real only when the evaluation completed —
+ * producers can attach `passed: false` alongside `status: "error"` (#6833).
+ * The status guard stops such an event double-counting FailCount and ErrorCount.
  */
 function scoreOf({ status, score }: { status: string; score: number | null | undefined }): {
   scoreSum: number;

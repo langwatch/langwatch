@@ -99,10 +99,9 @@ export class GithubInstallationNotFromFlowError extends Error {
 }
 
 /**
- * A setup callback claimed an installation on a GitHub account other than the one its flow
- * named, or other than the installation the flow was pinned to. The App's own JWT reads any
- * installation of this App, so the account GitHub reports is the only ownership evidence the
- * callback has; a mismatch is refused rather than bound.
+ * A setup callback claimed a different GitHub account or installation than
+ * its flow named. The App's JWT reads any installation of the App, so the
+ * reported account is the only ownership evidence; a mismatch is refused.
  */
 export class GithubInstallationAccountMismatchError extends HandledError {
   declare readonly code: "github_installation_account_mismatch";

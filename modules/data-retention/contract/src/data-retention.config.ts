@@ -31,11 +31,8 @@ const NON_PRODUCTION_NODE_ENVS = ["development", "test"] as const;
 
 /**
  * Resolves the retention stamped when no override exists in a tenant's scope
- * cascade. `LANGWATCH_DEFAULT_RETENTION_DAYS` lowers it for a local stack, in
- * whole weeks, and only under a recognised non-production environment.
- *
- * Both processes stamp rows in one ClickHouse, so both read this one way: a
- * process that resolved a different default would expire the other's rows.
+ * cascade, in whole weeks, under a recognised non-production environment only.
+ * Both processes stamp one ClickHouse, so a mismatched default expires rows.
  */
 export function resolvePlatformDefaultRetentionDays(
   source: Readonly<{ LANGWATCH_DEFAULT_RETENTION_DAYS?: string; NODE_ENV?: string }>,

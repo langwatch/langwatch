@@ -166,18 +166,16 @@ export abstract class GithubPullRequestsRepository {
     leaseMs: number;
     /**
      * Whether this claim is demand for the branch, and so refreshes
-     * `lastRequestedAt`. The sweep passes false: the branch is on its due list
-     * because of demand already recorded, and renewing it here would keep the
-     * branch on that list for good.
+     * `lastRequestedAt`. The sweep passes false — the branch is already on
+     * its due list from recorded demand, and renewing it here would keep it there for good.
      */
     shouldRecordDemand: boolean;
   }): Promise<boolean>;
 
   /**
-   * Record demand for a branch whose lookup another caller is already holding,
-   * so losing the claim still keeps the branch inside the sweep's activity
-   * window, but only for a row whose `lastRequestedAt` is at or before
-   * `staleBefore`, so a burst of folds on one branch writes once.
+   * Record demand for a branch whose lookup another caller already holds, so
+   * losing the claim still keeps it in the sweep's activity window — but only
+   * when `lastRequestedAt` is at or before `staleBefore`, so a burst writes once.
    */
   abstract touchBranchCheckRequestedAt(params: {
     organizationId: string;

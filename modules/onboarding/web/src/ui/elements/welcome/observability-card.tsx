@@ -87,11 +87,9 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
 );
 
 /**
- * `trackEvent("integration_guide_click")` did NOT travel, and the `event` field
- * on each guide is kept so the reinstatement is one line rather than a rewrite.
- * Product analytics is the application's and a port method the host could only
- * answer with nothing is worse than its absence — the line the navigation family
- * drew for `trackEvent("navigation_product_switch")`.
+ * `trackEvent("integration_guide_click")` did NOT travel; the `event` field
+ * on each guide stays so reinstating it is one line, not a rewrite — the
+ * same line the navigation family drew for `trackEvent("navigation_product_switch")`.
  */
 const ObservabilityCard: React.FC = () => {
   return (

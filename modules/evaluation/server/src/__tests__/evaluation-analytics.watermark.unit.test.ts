@@ -13,10 +13,9 @@ import type {
 import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.store.ts";
 
 /**
- * The write path for the evaluation fold. Two claims the executor's dedup and
- * `trustAbsentMiss` both rest on: the applied-event-id watermark is persisted
- * beside the row, and no state is ever refused — a state with no identity of
- * its own is stamped from the aggregate id rather than gated out.
+ * The write path for the evaluation fold. Two claims `trustAbsentMiss` rests
+ * on: the applied-event-id watermark persists beside the row, and no state
+ * is ever refused — one with no identity is stamped from the aggregate id.
  */
 
 const TENANT = "proj-eval-watermark";

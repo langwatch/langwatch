@@ -88,12 +88,9 @@ export const evaluateResponseSchema = z.union([
 ]);
 
 /**
- * A refusal from the evaluate family.
- *
- * `error` is the sentence, which is this endpoint's long-standing wire shape.
- * A missing required field additionally carries `kind` — the stable
- * `HandledError` code, named `kind` for back-compat — and `meta` naming the
- * field, so a client can say which input was missing without matching prose.
+ * A refusal from the evaluate family. `error` is the sentence (long-standing
+ * wire shape). A missing field also carries `kind` — the stable
+ * `HandledError` code, kept as `kind` for back-compat — and `meta` naming the field.
  */
 export const evaluateErrorSchema = z.object({
   error: z.string().describe("The failure, as a sentence"),
@@ -127,11 +124,9 @@ export const evaluatorCatalogueResponseSchema = z.object({
 });
 
 /**
- * The body `POST /api/dataset/evaluate` parses.
- *
- * Written here rather than reused from the handler's own schema because that
- * one is declared below the route it serves; documenting it at the route means
- * naming it where a reader of the reference will look for it.
+ * The body `POST /api/dataset/evaluate` parses. Written here rather than
+ * reused from the handler's own schema, which is declared below the route it
+ * serves — documenting it here is where a reference reader will look for it.
  */
 export const datasetEvaluateRequestSchema = z.object({
   evaluation: z
@@ -194,12 +189,9 @@ type RequestBodySchema = NonNullable<
 >;
 
 /**
- * A zod schema as a `requestBody` schema object.
- *
- * `resolver()` is the normal way to put a zod schema into `describeRoute`, but
- * it only types against `responses`; hono-openapi wants a plain schema object
- * under `requestBody`. Every route in this family parses its body by hand, so
- * there is no `zValidator` for the generator to read one off either.
+ * A zod schema as a `requestBody` schema object. `resolver()` only types
+ * against `responses`; hono-openapi wants a plain schema under `requestBody`,
+ * and this family parses its body by hand, with no `zValidator` to read one off.
  */
 export const requestBodySchema = (schema: z.ZodType): RequestBodySchema =>
   z.toJSONSchema(schema, {

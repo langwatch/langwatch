@@ -1,8 +1,7 @@
 /**
- * The Integrations screen's tRPC hooks. The `github` segment is load-bearing: tRPC
- * hashes it into the React Query cache key. This module is the package's one
- * governed-closure exception to ADR-004: its `@langwatch/api/web` import is the
- * only one in the package.
+ * The Integrations screen's tRPC hooks. The `github` segment is load-bearing —
+ * tRPC hashes it into the cache key. Package's one ADR-004 exception: its
+ * `@langwatch/api/web` import is the only one in the package.
  */
 
 import type { githubTrpc } from "@langwatch/github-contract";

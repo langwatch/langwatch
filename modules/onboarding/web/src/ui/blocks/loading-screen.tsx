@@ -82,13 +82,11 @@ export const LoadingScreen = () => {
     <motion.div
       ref={rootRef}
       style={{ width: "100%", height: "100%", minHeight: "100vh" }}
-      // No entry fade on a re-mount: once the logo has been seen, flashing the
-      // whole page back up from zero on every subsequent wait is a wink, not a
-      // transition.
-      //
-      // There is deliberately no `exit` here — it would never run. The way out
-      // is the ghost in the layout-effect cleanup above, which is the only
-      // thing that survives an early-returned unmount.
+      // No entry fade on a re-mount: once the logo has been seen, flashing
+      // back up from zero on every subsequent wait is a wink, not a transition.
+      // Deliberately no `exit` either — it would never run; the way out is the
+      // ghost in the layout-effect cleanup above, the only thing that survives
+      // an early-returned unmount.
       initial={reduceMotion || logoVisibleOnce ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}

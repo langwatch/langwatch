@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
  * The pinned-trace contract, stated once and run against both backends: the
- * memory twin always, and the Postgres one when a test database is named at
- * `LANGWATCH_TEST_DATABASE_URL`. The datastore lane
- * (`vitest.integration.config.ts`) is where both halves run together.
+ * memory twin always, and Postgres when `LANGWATCH_TEST_DATABASE_URL` names a
+ * test database. Both halves run together in the datastore lane.
  * @see specs/data-retention-service.feature
  */
 import {

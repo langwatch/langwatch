@@ -51,11 +51,9 @@ describe("given one of the four annotation views", () => {
   });
 
   /**
-   * THE QUEUE-MEMBERSHIP PREDICATE. `showQueueAndUser` widens the read from the
-   * reviewer's own items to every queue they are a member of, and exactly one
-   * view wants that. Widening the reviewer's own queue would put a teammate's
-   * work on a page titled "My Queue"; narrowing the Inbox would empty it for
-   * anybody whose work arrives through a shared queue.
+   * THE QUEUE-MEMBERSHIP PREDICATE. `showQueueAndUser` widens the read to
+   * every queue the reviewer is a member of; exactly one view wants that —
+   * widening "My Queue" leaks a teammate's work in; narrowing Inbox empties it.
    */
   describe("when the list asks whose work to read", () => {
     it("reads every queue the reviewer is on for the Inbox and nowhere else", () => {

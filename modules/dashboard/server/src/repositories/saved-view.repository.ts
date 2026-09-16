@@ -14,9 +14,8 @@ export type CreateSavedViewInput = {
   order: number;
   /**
    * Storage shape discriminator. Omit to keep the SavedView default
-   * ("v1-traces-filter"), which is what the v1 filter bar writes. The traces v2
-   * lens system sends "v2-traces-lens" so the two clients can share this table
-   * without seeing each other's rows.
+   * ("v1-traces-filter"), what the v1 filter bar writes; traces v2 sends
+   * "v2-traces-lens" so the two clients share this table without collision.
    */
   kind?: string;
 };

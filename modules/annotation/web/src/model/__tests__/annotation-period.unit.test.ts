@@ -159,11 +159,9 @@ describe("given a window on screen", () => {
     });
 
     /**
-     * INHERITED, and said out loud rather than asserted away: the day-span
-     * match is tried first, every sub-day preset also spans one calendar day,
-     * and `today` is the one-day preset — so a fifteen-minute window reads
-     * "Today". That is what `platform/app` has always shown, and which of two
-     * presets wins is a behaviour change a page move does not own.
+     * INHERITED, said out loud rather than asserted away: the day-span match
+     * tries first and `today` is the one-day preset, so a fifteen-minute
+     * window reads "Today", matching `platform/app` — not this move's call to change.
      */
     it("labels a sub-day window Today, the way the platform control did", () => {
       expect(matchingPreset({ period: computeRelativeWindow("15m", NOW), now: NOW })?.key).toBe(

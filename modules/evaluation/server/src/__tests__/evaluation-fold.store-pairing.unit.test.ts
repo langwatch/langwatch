@@ -4,9 +4,8 @@ import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.stor
 
 /**
  * The evaluation half of the `trustAbsentMiss` store pairing. A `get()`-only
- * store can never answer `undecodable` — the executor stamps its nulls
- * `absent` — so a trusted fold that keeps `refoldOnStoreMiss` alongside one
- * would carry dead config that reads like a safety net.
+ * store can never answer `undecodable` (nulls stamp `absent`), so a trusted
+ * fold keeping `refoldOnStoreMiss` alongside one carries dead config.
  */
 describe("evaluationAnalytics fold projection", () => {
   const fold = EvaluationAnalyticsFoldProjection.create({

@@ -10,10 +10,9 @@ export const GITHUB_INSTALL_RETURN = "/settings/integrations#github";
 export const GITHUB_ERROR_QUERY_KEY = "githubError";
 
 /**
- * The full install address, or null when the instance cannot start one.
- *
- * The same endpoint serves the in-chat popup flow; this is the redirect-mode
- * variant, so a full-page round-trip lands back on this page.
+ * The full install address, or null when the instance cannot start one. The
+ * same endpoint serves the in-chat popup flow; this is the redirect-mode
+ * variant, landing a full-page round-trip back on this page.
  */
 export function githubInstallAddress(installUrl: string | null | undefined): string | null {
   if (!installUrl) return null;

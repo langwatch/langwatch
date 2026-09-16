@@ -1,8 +1,7 @@
 /**
  * The dashboard feature's application: what its doors call. It holds the
- * services, peers and ports the feature reaches, and it makes here the
- * decisions each transport used to make for itself — the alert a graph
- * carries and its redaction, who is asking, and where a dashboard opens.
+ * services, peers and ports the feature reaches, making here the decisions
+ * each transport used to make itself: alert redaction, who's asking, dashboard address.
  */
 import {
   AnalyticsApi,
@@ -46,9 +45,8 @@ import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.se
 
 /**
  * `BASE_HOST`, this deployment's public origin, for the address a saved
- * dashboard opens at. Defaults to none rather than refusing at boot, exactly
- * as the deleted `createPlatformUrlBuilder` answered an absent origin: with a
- * relative link, never a refusal.
+ * dashboard opens at. Defaults to none rather than refusing at boot — the
+ * deleted `createPlatformUrlBuilder` answered an absent origin the same way.
  */
 const dashboardAppZodSchema = z.object({
   baseHost: z.string().default(""),
@@ -56,10 +54,9 @@ const dashboardAppZodSchema = z.object({
 export type DashboardAppConfig = z.infer<typeof dashboardAppZodSchema>;
 
 /**
- * A process that opened no dashboard-specific config slice hands this
- * module `undefined` rather than `{}` — guarded here the same way
- * `featureFlagAppConfigSchema` guards it, so an absent slice still resolves
- * to every field's own default instead of refusing to parse at all.
+ * A process with no dashboard-specific config slice hands this module
+ * `undefined`, not `{}` — guarded the same way `featureFlagAppConfigSchema`
+ * does, so an absent slice resolves to defaults instead of refusing to parse.
  */
 const dashboardAppConfigSchema: FeatureConfigSchema<DashboardAppConfig> = {
   parse: (value: unknown): DashboardAppConfig =>
@@ -572,11 +569,9 @@ export class DashboardApp implements DashboardApi {
   }
 
   /**
-   * One trigger with its action parameters stripped. Empty, exactly as
-   * every real deployment's redaction answered before the composition that
-   * wired it was deleted: this process composes no per-provider redaction
-   * for a card's alert parameters, so none of a provider's stored secrets
-   * leaves the server.
+   * One trigger with its action parameters stripped, always empty since the
+   * per-provider redaction composition was deleted — this process composes
+   * none, so no provider's stored secret ever leaves the server.
    */
   #redacted(trigger: Trigger): Trigger {
     return {

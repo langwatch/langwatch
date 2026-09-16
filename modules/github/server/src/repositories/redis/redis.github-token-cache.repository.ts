@@ -10,10 +10,9 @@ const LOCK_RETRY_MS = 100;
 const LOCK_MAX_WAIT_MS = 3_000;
 
 /**
- * The Redis tier. The connection is nullable because this module's Redis is
- * optional members: a process that opened none keeps every row absent,
- * which is the same answer a cold cache gives, so the App degrades to asking
- * GitHub every time rather than refusing to boot.
+ * The Redis tier. The connection is nullable because this module's Redis
+ * member is optional — a process with none keeps every row absent, the same
+ * answer a cold cache gives, so the App degrades to asking GitHub, not refusing to boot.
  */
 export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository {
   static create(parts: {

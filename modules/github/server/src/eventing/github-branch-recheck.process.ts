@@ -11,11 +11,8 @@ export const GITHUB_BRANCH_RECHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 /**
  * How often the branch bookkeeping is pruned. Retention is a daily concern and
- * the sweep is a ten-minute one, so the prune rides the same schedule and fires
- * on the first wake past its own interval rather than carrying a second
- * singleton. This mirrors the automations pipeline, which hangs its
- * trigger-settlement retention off the webhook prune's daily wake for the same
- * reason.
+ * the sweep a ten-minute one, so the prune rides the same schedule, firing on
+ * the first wake past its own interval rather than a second singleton.
  */
 export const GITHUB_RETENTION_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 

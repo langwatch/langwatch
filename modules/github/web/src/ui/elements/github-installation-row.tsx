@@ -11,11 +11,9 @@ export type GithubInstallationRowProps = {
   /** Whether this row's disconnect is in flight. */
   disconnecting: boolean;
   /**
-   * Whether GitHub has been opened to finish this uninstall.
-   *
-   * Disconnecting drops the local record and hands back a deep link; the row
-   * keeps saying "Installed" until GitHub's webhook confirms, which without a
-   * hint reads as the button doing nothing.
+   * Whether GitHub has been opened to finish this uninstall. Disconnecting
+   * drops the local record and hands back a deep link, but the row keeps
+   * saying "Installed" until GitHub's webhook confirms — else it reads as inert.
    */
   uninstallStarted: boolean;
   onDisconnect: (installationId: string) => void;

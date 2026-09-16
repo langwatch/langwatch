@@ -225,11 +225,9 @@ function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
 }
 
 /**
- * One row per trace, carrying everything said about it.
- *
- * The list is of annotations rather than of traces, so a comment left on one
- * span is one of the trace's annotations rather than a row of its own — which is
- * what makes the grouping the page's job and not the server's.
+ * One row per trace, carrying everything said about it. The list is of
+ * annotations rather than of traces, so a comment on one span is one of the
+ * trace's annotations, not a row of its own — the page groups them, not the server.
  */
 function groupByTrace(
   annotations: readonly AnnotationWithUser[],

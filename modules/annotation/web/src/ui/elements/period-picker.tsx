@@ -1,9 +1,7 @@
 /**
- * The range control at the head of every annotation list. The rendering half
- * of the family-local period copy (`model/annotation-period.ts` holds the
- * presets and address writes) — a copy of the old `PeriodSelector`, whose
- * other thirty callers a deletes-only migration forbids repointing.
- * Narrowed: no size/variant/placement props, since every list looks the same.
+ * The range control at the head of every annotation list — rendering half of
+ * the family-local period copy (`model/annotation-period.ts` holds presets
+ * and address writes), copied from `PeriodSelector` since a migration forbids reuse.
  */
 
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";

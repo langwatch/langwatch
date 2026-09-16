@@ -35,9 +35,7 @@ function downscaleBuckets({
 /**
  * Densification never allocates more than this many buckets. Bucket offsets
  * are sender-controlled int32s, so a merged map can span the whole int32
- * range — allocating an array proportional to that span is an OOM waiting for
- * one hostile OTLP batch. Layout selection downscales to fit this cap first;
- * the fold below only fires for spans no legal scale can absorb.
+ * range — an OOM waiting for one hostile OTLP batch without this cap.
  */
 export const MAX_DENSE_BUCKET_SPAN = 512;
 
@@ -100,9 +98,8 @@ function bucketBounds({ index, scale }: { index: number; scale: number }): {
 
 /**
  * The zero threshold a merged exponential histogram must adopt. OpenTelemetry
- * requires the largest threshold among the inputs, widened to a bucket's upper
- * boundary whenever it would otherwise bisect a populated bucket — a threshold
- * inside a bucket has no well-defined count to split.
+ * requires the largest threshold among the inputs, widened to a bucket's
+ * upper boundary when it would otherwise bisect a populated bucket (undefined to split).
  */
 function commonZeroThreshold({
   thresholds,

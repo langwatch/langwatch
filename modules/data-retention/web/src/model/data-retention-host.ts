@@ -37,12 +37,9 @@ export type RetentionSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it. The raw `error` travels rather than a
+ * screen-composed sentence — the wire message of a handled error is its code
+ * slug, and `fallbackTitle` names the action that failed for an unrecognised code.
  */
 export type RetentionFailureNotice = {
   error: unknown;
@@ -62,11 +59,9 @@ export abstract class DataRetentionHostApi {
   abstract availableScopes(): RetentionAvailableScopes;
 
   /**
-   * Whether the reader administers the PLATFORM, not an organization.
-   *
-   * Decides only whether the drawer offers "no retention (keep forever)". The
-   * mutation authorizes the capability itself, so a stale `true` here can widen
-   * the menu and not the outcome.
+   * Whether the reader administers the PLATFORM, not an organization. Decides
+   * only whether the drawer offers "no retention (keep forever)" — the mutation
+   * authorizes the capability, so a stale `true` here only widens the menu.
    */
   abstract isPlatformAdmin(): boolean;
 
@@ -92,11 +87,9 @@ const DataRetentionHostContext = createContext<DataRetentionHostApi | undefined>
 export const DataRetentionHostProvider = DataRetentionHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means the screen was rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useDataRetentionHost(): DataRetentionHostApi {
   const host = useContext(DataRetentionHostContext);

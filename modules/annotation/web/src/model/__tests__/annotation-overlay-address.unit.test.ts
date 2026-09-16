@@ -118,10 +118,9 @@ describe("given the queue editor, which is this family's own overlay", () => {
 describe("given a queue item that is still waiting", () => {
   describe("when the reviewer opens it", () => {
     /**
-     * The walker is still served by `platform/app`, so this is a plain address
-     * across the seam rather than anything this package renders. The shape is
-     * the one `AnnotationsTable` wrote, unchanged, because a link minted before
-     * the move has to keep working.
+     * The walker is still served by `platform/app`, so this is a plain
+     * address across the seam. The shape is the one `AnnotationsTable`
+     * wrote, unchanged — a link minted before the move has to keep working.
      */
     it("goes to the queue walker naming the item and its trace", () => {
       expect(

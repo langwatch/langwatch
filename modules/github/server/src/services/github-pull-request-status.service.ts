@@ -46,9 +46,8 @@ export interface GithubPullRequestStatusServiceDeps {
 }
 
 /**
- * The status a pull request's own fields imply. Merge time wins over state
- * because GitHub reports a merged pull request as closed, and "closed" for
- * something that shipped would read as abandoned.
+ * The status a pull request's own fields imply: merge time wins over state,
+ * since GitHub reports a merged PR as closed, which would else read as abandoned.
  */
 /** A timestamp as GitHub's REST answer spells it, read through the same lenient parse. */
 function instantOf(value: string): Instant {

@@ -554,13 +554,11 @@ function DataRetentionPage({
                   ),
                 );
                 if (succeededCategories.length > 0) {
-                  // The server uses the cascade-aware resolver
-                  // (PROJECT > TEAM > ORGANIZATION > platform default), so
-                  // saving an org/team rule when the project already has a
-                  // closer override applies the project's value, NOT the
-                  // saved value. The server returns the value it actually
-                  // used; we surface that in the notice so the user sees the
-                  // truth (not the form value they typed).
+                  // The server resolves the cascade (PROJECT > TEAM >
+                  // ORGANIZATION > platform default), so saving an org/team
+                  // rule may not change what a project with a closer override
+                  // actually uses. The notice shows the value the server
+                  // actually applied, not the form value typed.
                   const triggerResults = await Promise.all(
                     succeededCategories.map((category) =>
                       triggerUpdate.mutateAsync({ projectId, category }).then(

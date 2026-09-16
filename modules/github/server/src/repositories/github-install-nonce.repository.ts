@@ -1,8 +1,7 @@
 /**
- * The one-shot nonces the GitHub App installation flow mints. A nonce is a row
- * with a lifetime, written when the popup opens and consumed exactly once when
- * GitHub redirects back, so a replayed Setup URL cannot record an installation
- * twice.
+ * The one-shot nonces the GitHub App installation flow mints. A nonce is a
+ * row with a lifetime, written when the popup opens and consumed exactly once
+ * on GitHub's redirect, so a replayed Setup URL cannot record an install twice.
  */
 export abstract class GithubInstallNonceRepository {
   /**

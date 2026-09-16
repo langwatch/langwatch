@@ -105,13 +105,11 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
-    // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer as for "no row"
-    // — the watermark is dropped too, because a watermark without the state it
-    // belongs to would suppress the very events the re-fold needs — but report
-    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
-    // executor must not answer with an unwindowed re-read that can only find
-    // the same row again.
+    // Stale schema snapshot: the read-back columns didn't exist when this row
+    // was written, so decoding would fabricate state. Answer as "no row" (drop
+    // the watermark too, or it would suppress the events the re-fold needs) but
+    // report `undecodable`, not `absent` — the row was found, so the executor
+    // must not retry with an unwindowed re-read that only finds it again.
     if (found.row.version !== EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }

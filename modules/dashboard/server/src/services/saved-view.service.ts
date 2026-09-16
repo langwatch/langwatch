@@ -135,10 +135,9 @@ export class SavedViewService {
   }
 
   /**
-   * Reorders views. A personal view is only the owner's to move: another
-   * member's reads as one this caller does not have, the same absence `delete`
-   * and `rename` answer with, so an ordering cannot be probed for whose views
-   * exist.
+   * Reorders views. A personal view is only the owner's to move — another
+   * member's reads as absent, the same answer `delete`/`rename` give, so
+   * ordering can't probe for whose views exist.
    */
   async reorder({
     projectId,

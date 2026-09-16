@@ -4,10 +4,8 @@ import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup
 
 /**
  * Thin AppendStore adapter for the `evaluation_analytics_rollup` map
- * projection (ADR-034 Phase 6 — eval mirror of
- * `TraceAnalyticsRollupAppendStore`). Pulls per-tenant retention off the
- * context and stamps it onto the row's `_retention_days` column, then
- * delegates to the repository.
+ * projection (ADR-034 Phase 6, mirroring `TraceAnalyticsRollupAppendStore`).
+ * Stamps per-tenant retention onto the row's `_retention_days` column.
  */
 export class EvaluationAnalyticsRollupStore implements AppendStore<EvaluationAnalyticsRollupRow> {
   static create(input: {

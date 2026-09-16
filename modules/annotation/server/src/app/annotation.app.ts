@@ -53,12 +53,9 @@ import { AnnotationQueueService } from "#services/annotation-queue.service";
 import { AnnotationScoreService } from "#services/annotation-score.service";
 
 /**
- * Everything the process hands this module, named one member per key: the
- * repositories the registry built and the peer applications the module reads
- * through their own tokens. There is nothing else — annotation keeps no state
- * outside its own tables and reaches nothing the process owns — so this list
- * IS the module's member set, and a member added here that the process cannot
- * supply is a compile error at the call that installs it.
+ * Everything the process hands this module, one member per key: repositories
+ * the registry built, and peer applications read through their own tokens.
+ * This list IS the member set; an unsuppliable member fails at the install call.
  */
 type AnnotationSetup = Readonly<{
   repositories: AnnotationRepositories;

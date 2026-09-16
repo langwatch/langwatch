@@ -1,10 +1,7 @@
 /**
- * What a list shows when it holds nothing.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/NoDataInfoBlock`, which
- * keeps six callers across the application and so did not travel; the datasets
- * family took the same copy for the same reason, and both are promotion
- * candidates for the Design System that a page move is not the place to promote.
+ * What a list shows when it holds nothing. A FAMILY-LOCAL COPY of
+ * `platform/app/src/components/NoDataInfoBlock` (kept six callers, so it
+ * didn't travel) — a Design System promotion candidate, not for this move.
  */
 
 import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";

@@ -1,8 +1,6 @@
 /**
  * The project's dashboards and the graphs placed on them, over the memory
- * repository the Prisma one is the twin of.
- *
- * Spec: modules/dashboard/specs/dashboard-service.feature.
+ * repository the Prisma one is the twin of. Spec: dashboard-service.feature.
  */
 import {
   DashboardNotFoundError,

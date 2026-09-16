@@ -47,9 +47,8 @@ interface AnnotationCardProps {
 
 /**
  * One annotation as it reads beside its turn: who wrote it, when, what they
- * said, how they rated it, and the correction they suggested. Everything is
- * display only. Editing happens in the composer that docks in the card's
- * place, and only the author gets there.
+ * said, how they rated it, and the correction they suggested. Display only —
+ * editing happens in the composer that docks in the card's place, author-only.
  */
 export function AnnotationCard({
   annotation,

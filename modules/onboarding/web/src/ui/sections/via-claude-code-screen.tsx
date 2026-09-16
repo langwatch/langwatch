@@ -101,9 +101,8 @@ export const TRACING_SKILL_ID = "tracing";
 
 /**
  * Returns SKILLS with `primarySkillId` moved to the front, preserving the
- * relative order of the rest. The traces empty state uses this to lead with
- * tracing without reordering the shared onboarding list (every other
- * surface keeps the default order). Unknown / absent ids are a no-op.
+ * relative order of the rest — lets the traces empty state lead with tracing
+ * without reordering the shared list. Unknown/absent ids are a no-op.
  */
 function orderSkills(primarySkillId?: string): SkillItem[] {
   if (!primarySkillId) return SKILLS;
@@ -129,13 +128,10 @@ const EDITOR_PATHS: EditorPath[] = [
 ];
 
 function glassCard(): Record<string, unknown> {
-  // No `backdropFilter` here: these cards sit on the same surface as
-  // their parent (the integration content area is `bg.surface`, the
-  // cards are `bg.panel` over it — same colour family). A backdrop
-  // blur over identical content is invisible work, and these cards
-  // render N-per-grid, so the blur cost multiplies for no visual gain.
-  // Brand blur stays where it actually has something to filter
-  // through — drawers, dialogs, the top toolbar.
+  // No `backdropFilter` here: these cards sit on the same surface as their
+  // parent (`bg.surface` under `bg.panel`, same colour family) — a blur over
+  // identical content is invisible work, multiplied N-per-grid. Blur stays
+  // where it has something to filter through: drawers, dialogs, toolbar.
   return {
     borderRadius: "xl",
     border: "1px solid",

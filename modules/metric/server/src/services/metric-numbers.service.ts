@@ -17,12 +17,9 @@ export const MAX_INT64 = (1n << 63n) - 1n;
 const MAX_DATE_MS = 8_640_000_000_000_000;
 
 /**
- * OTLP numbers, checked against the range the column can actually hold.
- *
- * Every reader here answers null rather than throwing or clamping. A metric
- * point carrying a value outside its declared type is a broken point, and the
- * caller's job is to drop it — silently clamping would store a number nobody
- * measured, and throwing would lose the whole batch for one bad point.
+ * OTLP numbers, checked against the range the column can hold. Every reader
+ * answers null rather than throwing or clamping — clamping would store a
+ * number nobody measured, and throwing would lose the whole batch for one bad point.
  */
 export class MetricNumbersAdapter {
   private constructor() {}
@@ -110,10 +107,9 @@ export class MetricNumbersAdapter {
   }
 
   /**
-   * Returns the canonical form of an optional OTLP double, or throws when one is
-   * present but unrepresentable. Storing NaN or ±Infinity as NULL while still
-   * reporting the point as accepted loses the measurement silently, so the point
-   * is rejected instead and OTLP partial-success reports it.
+   * Returns the canonical form of an optional OTLP double, or throws when
+   * present but unrepresentable, so OTLP partial-success reports it rather
+   * than storing NaN/±Infinity as a silently-accepted NULL.
    */
   static checkedOptionalDouble({ value, label }: { value: unknown; label: string }): number | null {
     if (value === undefined || value === null) return null;

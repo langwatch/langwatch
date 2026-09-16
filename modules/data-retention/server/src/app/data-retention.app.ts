@@ -113,11 +113,9 @@ export type DataRetentionAppConfig = Readonly<{
 }>;
 
 /**
- * Both ClickHouse paths this feature has - the retention rewrite and the
- * storage meter - run on the process's one `clickhouse` member. A deployment
- * that named no ClickHouse refuses at boot naming this module and that member,
- * rather than metering every project at zero bytes and rewriting nothing while
- * reporting success.
+ * Both ClickHouse paths this feature has — the retention rewrite and the
+ * storage meter — run on the process's one `clickhouse` member. A deployment
+ * with no ClickHouse refuses at boot rather than silently metering at zero.
  */
 type DataRetentionSetup = FeatureSetup<
   typeof DataRetentionApp.dependencies,

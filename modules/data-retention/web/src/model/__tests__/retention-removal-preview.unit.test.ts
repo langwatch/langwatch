@@ -1,8 +1,5 @@
 /**
  * The remove-confirmation preview asks only when a scope is actually pending.
- *
- * These cases were `platform/app/src/pages/settings/__tests__/data-retention-preview.unit.test.ts`,
- * on the helper that moved into this package with the page.
  */
 
 import { describe, expect, it } from "vitest";

@@ -15,8 +15,7 @@ export type OnboardingApiMap = {
     /**
      * Mints the reader's first organization, its team and — on the LLM Ops
      * track — its first project. The governance track answers a null
-     * `projectSlug`, which is what sends that reader through the home resolver
-     * instead of to a project.
+     * `projectSlug`, sending that reader through the home resolver instead.
      */
     initializeOrganization: {
       mutation: {
@@ -78,8 +77,7 @@ export type OnboardingApiMap = {
     /**
      * Polled by the "waiting for traces" chip. Only the GROUP COUNT is read —
      * the chip turns green on the first non-empty answer — so the payload is
-     * declared as narrowly as it is used rather than restating the explorer's
-     * row type, which is `@langwatch/trace-contract`'s.
+     * declared as narrowly as used, not restating `@langwatch/trace-contract`'s row type.
      */
     getAllForProject: {
       query: {
@@ -92,11 +90,9 @@ export type OnboardingApiMap = {
           pageSize: number;
         };
         /**
-         * Grouped trace rows. The chip reads the COUNT and, on the first
-         * arrival, one `trace_id` so it can link straight to the trace that
-         * proved the integration works — nothing else off the row, which is why
-         * the explorer's full type (`@langwatch/trace-contract`'s) is not
-         * restated here.
+         * Grouped trace rows. The chip reads the COUNT and, on first arrival,
+         * one `trace_id` to link straight to the trace proving the
+         * integration works — nothing else, so the explorer's full type isn't restated.
          */
         output: { groups?: { trace_id?: string }[][] };
       };
@@ -152,12 +148,9 @@ export type OnboardingApiMap = {
 };
 
 /**
- * The onboarding family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy — see
- * `createModuleApi` for why separate instances still share cache entries.
- *
- * Exported as `api` as well, which is what let the moved call sites keep their
- * `api.onboarding.initializeOrganization.useMutation()` spelling unchanged.
+ * The onboarding family's typed tRPC hooks — same machinery, transport and
+ * cache as the application's `api` proxy (see `createModuleApi`). Also
+ * exported as `api`, so moved call sites keep their `api.onboarding.*` spelling.
  */
 export const onboardingApi = createModuleApi<OnboardingApiMap>();
 

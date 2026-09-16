@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Rating a turn on the project's score keys. The chip opens a small form: what
- * the reviewer picks and types stays in it until they confirm, so a rating and
- * the reason behind it land together and leaving the form any other way costs
- * them nothing. See specs/traces-v2/annotations.feature.
+ * Rating a turn on the project's score keys. The chip opens a small form:
+ * picks and types stay local until confirmed, so the rating and reason land
+ * together; leaving any other way costs nothing. See specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

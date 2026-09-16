@@ -1,20 +1,16 @@
 import type { RetentionCategory } from "./data-retention.ts";
 
 /**
- * `event_log` cannot be classified table-wide the way every other
- * retention-managed ClickHouse table is: one row is a trace event, the next
- * is a scenario run, the next is a durable identity/authorization record that
- * must never expire. Every row is classified on its own terms instead, by the
- * aggregate it belongs to (falling back to the matching event-type prefix for
- * a row whose aggregate is missing or unrecognised) — never by the table.
+ * `event_log` mixes rows with different retention needs — a trace event next
+ * to a durable identity record that must never expire — so classification is
+ * per-row by aggregate type, falling back to event-type prefix, never table-wide.
  */
 export type EventLogRetentionClass = RetentionCategory | "indefinite";
 
 /**
  * Security event-type prefixes that must remain durable even if an old or
- * malformed row carries an unexpected aggregate type. Aggregate
- * classification remains the normal path; these prefixes are the safety net
- * for identity and authorisation history.
+ * malformed row carries an unexpected aggregate type — the safety net behind
+ * normal aggregate classification for identity and authorisation history.
  */
 export const INDEFINITE_EVENT_TYPE_PREFIXES = ["lw.identity.", "lw.authz."] as const;
 
@@ -23,10 +19,8 @@ export const INDEFINITE_EVENT_TYPES = ["lw.governance.vk_lifecycle"] as const;
 
 /**
  * Every aggregate type this deployment's event-sourcing runtime registers,
- * assigned to its retention class deliberately. An aggregate not listed here
- * falls back to `"traces"` at runtime in {@link classifyEventLogRowRetention}
- * — the conservative choice for a row whose contents have not been inspected,
- * never `"indefinite"` by omission.
+ * assigned to its retention class. An unlisted aggregate falls back to
+ * `"traces"` — the conservative choice, never `"indefinite"` by omission.
  */
 export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetentionClass> = {
   authz_grant: "indefinite",
@@ -55,11 +49,9 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
 };
 
 /**
- * Classifies one `event_log` row for retention. Checked in order: the
- * event-type prefix safety net, the exact virtual-key-lifecycle exception,
- * then the aggregate map — an unrecognised aggregate is `"traces"`, never
- * `"indefinite"`, because indefinite retention is opted into by name, not
- * assumed for the unknown.
+ * Classifies one `event_log` row for retention, checked in order: event-type
+ * prefix, virtual-key-lifecycle exception, then the aggregate map. An
+ * unrecognised aggregate is `"traces"`, never `"indefinite"` by default.
  */
 export function classifyEventLogRowRetention(row: {
   AggregateType: string;

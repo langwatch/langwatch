@@ -39,11 +39,9 @@ function tenantFilterParams(projectId: string): Record<string, string> {
 }
 
 /**
- * Retention rewrites, over the process's one ClickHouse client.
- *
- * The client routes each statement to the server its tenant belongs on, so
- * this repository holds no per-tenant client and cannot obtain an unscoped
- * one: every call below names the project it acts for.
+ * Retention rewrites, over the process's one ClickHouse client. It routes
+ * each statement to the tenant's own server, so this repository holds no
+ * per-tenant client — every call below names the project it acts for.
  */
 export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRetentionRepository {
   static create(options: {
@@ -78,12 +76,11 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     }
 
     for (const table of tables) {
-      // event_log carries rows from every category and a durable, never-expiring
-      // security slice. The extra predicate keeps this mutation to the rows this
-      // category actually owns, and the marker records which category ran it so
-      // a concurrent mutation for a different category is not mistaken for a
-      // conflict (`getActiveMutations`) and progress reports the right category
-      // (`parseRows`).
+      // event_log carries rows from every category plus a durable,
+      // never-expiring security slice. The extra predicate keeps this mutation
+      // to the rows this category owns; the marker records which category ran
+      // it so a concurrent mutation for another category is not mistaken for a
+      // conflict.
       const eventLogCategoryFilter =
         table === EVENT_LOG_TABLE
           ? ` AND (${eventLogRetentionCategorySqlPredicate(input.category)})` +
@@ -220,11 +217,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
   }
 
   /**
-   * event_log's category is read off the marker its own mutation stamped
-   * (`eventLogRetentionCategoryMutationMarkerSql`), because the table maps to
-   * "traces" flatly while its rows do not. A mutation predating the marker
-   * falls back to that flat mapping, which is conservative: it reports
-   * "traces" and blocks every category rather than none.
+   * event_log's category is read off the marker its own mutation stamped,
+   * since the table maps to "traces" flatly while its rows do not. A mutation
+   * predating the marker falls back to "traces", blocking every category.
    */
   private categoryForRow(table: string, command: string | undefined): RetentionCategory | null {
     if (table === EVENT_LOG_TABLE) {

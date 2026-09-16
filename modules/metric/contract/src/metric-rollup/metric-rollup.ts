@@ -56,9 +56,8 @@ function buildMetricRollups({
 
 /**
  * Buckets a late point can change: its own, plus the next sample's when that
- * sample derives its value by differencing this one. Sequence dependency — not
- * temporality — decides, because summaries difference their predecessor while
- * reporting no temporality at all.
+ * sample derives its value by differencing this one. Sequence dependency, not
+ * temporality, decides — summaries difference their predecessor while reporting none at all.
  */
 function affectedRollupBuckets({
   points,

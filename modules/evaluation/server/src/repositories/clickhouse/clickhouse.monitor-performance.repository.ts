@@ -3,11 +3,9 @@ import { ClickHouseMonitorPerformanceRepository } from "./monitor-performance.re
 import { MonitorPerformanceService } from "../../services/monitor-performance.service.ts";
 
 /**
- * Composes the trend read alone, over a routed ClickHouse.
- *
- * The counterpart to {@link EvaluationAdapter} for a process that reads the
- * monitors page and executes nothing: the repository stays private to this
- * package, and what a caller receives is the service that folds its buckets.
+ * Composes the trend read alone, over a routed ClickHouse. The counterpart
+ * to {@link EvaluationAdapter} for a process that reads the monitors page and
+ * executes nothing — the repository stays private; callers get the folding service.
  */
 export class ClickhouseMonitorPerformanceRepository {
   static create(options: {

@@ -9,12 +9,9 @@ export interface ActiveProjectContextValue {
   project?: MinimalProject;
   organization?: MinimalOrganization;
   /**
-   * The raw API token that was freshly minted in this session (returned
-   * once by the create mutation). Undefined when no token has been minted
-   * yet, or after a page refresh. Consumers that need to display the raw
-   * key (e.g. MCP config JSON) use this instead of `project.apiKey` so
-   * they can detect "no fresh token" and show a mint-a-key CTA rather
-   * than silently falling back to a stale / DB key.
+   * The raw API token freshly minted this session (once, by the create
+   * mutation); undefined after a refresh. Consumers needing the raw key
+   * use this over `project.apiKey`, to show a mint CTA instead of a stale key.
    */
   freshToken?: string;
   /**

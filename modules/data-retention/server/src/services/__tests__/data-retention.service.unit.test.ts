@@ -73,9 +73,8 @@ describe("DataRetentionService", () => {
   describe("given a rewrite was asked for", () => {
     /**
      * The store is never absent: a deployment with no ClickHouse refuses at
-     * boot naming this module and the member. So a rewrite that was asked for
-     * is reported as in progress until it is killed, rather than a read
-     * answering "nothing is running" because there was nowhere to look.
+     * boot naming this module. So a rewrite asked for reports as in progress
+     * until killed, rather than "nothing is running" for lack of a store.
      */
     it("reports it as in progress until it is killed", async () => {
       const service = createService();

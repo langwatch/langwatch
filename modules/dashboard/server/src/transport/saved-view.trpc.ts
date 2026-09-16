@@ -1,9 +1,7 @@
 /**
- * The server half of `savedViews.*`: a permission and a handler per procedure
- * the contract already named.
- *
- * Every procedure takes `traces:view`: a saved view is a stored trace filter,
- * so being able to read traces is exactly the right to keep one.
+ * The server half of `savedViews.*`: a permission and a handler per
+ * procedure the contract already named. Every procedure takes `traces:view`
+ * — a saved view is a stored trace filter, so reading traces is the right to keep one.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { DashboardApi, savedViewTrpc } from "@langwatch/dashboard-contract";

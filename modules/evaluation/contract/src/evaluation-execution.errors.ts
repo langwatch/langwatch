@@ -82,10 +82,8 @@ export class EvaluatorExecutionError extends HandledError {
 
 /**
  * Thrown when the request data is missing a field the evaluator's definition
- * marks as required (e.g. Pairwise Compare's candidate_a_id/candidate_b_id,
- * which come from Variant A/Variant B not being configured yet). `meta`
- * carries the raw field name so the client can translate it into
- * user-facing language ("Variant A") instead of showing the wire identifier.
+ * marks as required (e.g. Pairwise Compare's candidate_a_id/candidate_b_id).
+ * `meta` names the raw field so the client can show user-facing text, not the wire id.
  */
 export class EvaluatorMissingFieldError extends HandledError {
   declare readonly code: "evaluator_missing_field";

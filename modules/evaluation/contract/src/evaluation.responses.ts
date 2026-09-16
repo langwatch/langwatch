@@ -1,10 +1,7 @@
 /**
- * What the evaluation tRPC surface answers with.
- *
- * The catalogue entry is an evaluator's own definition plus the two facts this
- * install adds to it: which of its environment variables are unset here, and
- * why it cannot run at all. Both live with the answer rather than with the
- * definition, because both are about THIS deployment.
+ * What the evaluation tRPC surface answers with: an evaluator's own
+ * definition plus two per-deployment facts — which env vars are unset here,
+ * and why it cannot run — kept with the answer, not the definition.
  */
 import { singleEvaluationResultSchema } from "@langwatch/evaluator-contract";
 import { z } from "zod";

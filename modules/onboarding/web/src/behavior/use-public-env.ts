@@ -51,10 +51,8 @@ export function readOnboardingPublicEnvironment(): OnboardingPublicEnvironment {
 
 /**
  * The RETURN SHAPE is the platform hook's — `{ data, isLoading }` with
- * SCREAMING_SNAKE keys — because that is what the seven call sites destructure.
- * `isLoading` is always false: the tag is in the document before any screen
- * renders, so the welcome flow's "hold the last screen until the environment
- * answers" branch still compiles and simply never holds.
+ * SCREAMING_SNAKE keys, matching what the seven call sites destructure.
+ * `isLoading` is always false since the tag is in the document pre-render.
  */
 export function usePublicEnv(): OnboardingPublicEnv {
   return useMemo(() => {

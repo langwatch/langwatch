@@ -2,12 +2,9 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The GitHub App a deployment mints installation tokens through.
- *
- * All five leaves are optional and are read together: none set is an ordinary
- * install with no GitHub connection, which the feature reports through its
- * `configured` flag rather than by failing a call. `host` is absent for
- * github.com and names the Enterprise Server otherwise.
+ * The GitHub App a deployment mints installation tokens through. All five
+ * leaves are read together: none set means no connection (`configured` flag,
+ * not a failing call); `host` is absent for github.com, set for Enterprise Server.
  */
 export const githubServerConfigDefinition = RuntimeConfig.define({
   appId: Config.value(z.string().optional(), { env: "GITHUB_LANGY_APP_ID" }),

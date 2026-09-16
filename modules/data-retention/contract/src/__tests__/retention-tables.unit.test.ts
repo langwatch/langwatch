@@ -34,10 +34,8 @@ describe("SECURITY_RETENTION_EXEMPT_TABLES", () => {
 
   /**
    * The module throws at load time when a reserved name collides with the
-   * customer registry (see the guard beside RETENTION_TABLE_CATEGORY_MAP) —
-   * this module having loaded at all is that guard passing. This assertion
-   * pins the invariant the guard enforces so a future edit to either list
-   * fails loudly here first, rather than only via the module-load throw.
+   * customer registry (see the guard beside RETENTION_TABLE_CATEGORY_MAP). This
+   * assertion pins that invariant so a future edit to either list fails here first.
    */
   it("shares no name with the customer retention registry", () => {
     const exempt = new Set<string>(SECURITY_RETENTION_EXEMPT_TABLES);

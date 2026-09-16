@@ -51,10 +51,9 @@ export const FRAMEWORKS_BY_PLATFORM = deriveFrameworksByPlatform() as Record<
 >;
 
 /**
- * Returns the platform list trimmed to platforms that actually have at least
- * one entry in the category, paired with that category's frameworks-by-platform
- * map. Used by the traces-v2 empty-state onboarding to swap framework lists
- * when the user toggles between Agents and Traditional.
+ * Returns the platform list trimmed to platforms with at least one entry in
+ * the category, paired with that category's frameworks-by-platform map. Used
+ * to swap framework lists when the user toggles Agents vs Traditional.
  */
 export function getCategoryOptions(category: IntegrationCategory): {
   platforms: PlatformOption[];

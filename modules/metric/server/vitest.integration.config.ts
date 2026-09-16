@@ -2,9 +2,8 @@ import { defineConfig } from "vitest/config";
 
 /**
  * Integration lane: `*.integration.test.ts` under `src/`, excluded from the
- * unit lane. Needs ClickHouse — the canonical metric repository's fold runs
- * its real INSERT/SELECT SQL against the migrated `metric_data_points`,
- * `metric_usage_estimates` and `metric_time_rollups` tables.
+ * unit lane. Needs ClickHouse — the fold runs real INSERT/SELECT against the
+ * migrated `metric_data_points`, `metric_usage_estimates` and `metric_time_rollups` tables.
  */
 export default defineConfig({
   test: {

@@ -118,11 +118,9 @@ export type RollupSourceRow = Pick<
 >;
 
 /**
- * The columns a successor seek needs: just enough to order points
- * (TimeUnixNano, PointId), locate their buckets (TimeUnixMs) and decide
- * predecessor dependency (MetricKind, AggregationTemporality). Everything else
- * — attributes, values, buckets, payload — is dead weight the seek used to
- * materialise through `FINAL` for every one of its folded branches.
+ * The columns a successor seek needs: order (TimeUnixNano, PointId), bucket
+ * (TimeUnixMs), predecessor dependency (MetricKind, AggregationTemporality).
+ * Everything else used to materialise through `FINAL` per folded branch.
  */
 export const SEEK_SELECT = `
   SeriesId, PointId,
@@ -141,11 +139,8 @@ export interface SeekMetricRow {
 
 /**
  * Metric data points between their canonical shape and the ClickHouse rows
- * that store them.
- *
- * Both directions in one class for the same reason as the trace full-record
- * mapper: the write shape and the read shape have to agree, and they only stay
- * comparable while they sit together.
+ * that store them. Both directions in one class, as with the trace
+ * full-record mapper — write and read shapes stay comparable only together.
  */
 export class MetricDataPointMapper {
   /**

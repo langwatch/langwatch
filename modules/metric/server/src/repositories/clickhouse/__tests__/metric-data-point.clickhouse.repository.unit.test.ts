@@ -394,11 +394,9 @@ describe("MetricDataPointClickHouseRepository", () => {
     });
 
     // FINAL materialises every selected column for every row a granule
-    // covers, not for the rows returned, and this read returns on the order
-    // of a hundred rows out of millions scanned. Each column here was being
-    // decompressed millions of times and discarded; the server ran out of
-    // memory inside one of them by name (`while reading column
-    // PointAttributesJson`).
+    // covers, not the rows returned — this read returns ~100 rows out of
+    // millions scanned. Each column was decompressed millions of times and
+    // discarded; the server OOMed inside one by name (`PointAttributesJson`).
     for (const column of [
       "CanonicalPayload",
       "PointAttributesJson",

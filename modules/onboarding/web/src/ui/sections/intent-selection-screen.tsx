@@ -20,9 +20,8 @@ interface IntentOption {
 
 /**
  * Card copy is load-bearing (ADR-038 S1): someone BUILDING a coding agent
- * as their product wants LLMOps, so the governance card speaks of the
- * tools your team uses, and the LLMOps card explicitly claims coding
- * agents you are building. Pinned by test.
+ * as their product wants LLMOps, so governance speaks of tools your team
+ * uses, and LLMOps explicitly claims coding agents you're building. Pinned by test.
  */
 const intentOptions: IntentOption[] = [
   {

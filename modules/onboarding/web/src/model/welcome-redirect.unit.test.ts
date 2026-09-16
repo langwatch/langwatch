@@ -3,10 +3,8 @@ import { resolveWelcomeRedirect } from "./welcome-redirect.ts";
 
 /**
  * ADR-038 v6: the welcome screen's redirect decision. Belonging to an
- * organization means onboarded, period — re-showing the create-org form would
- * mint a duplicate organization. Personal workspaces never count as projects.
- *
- * Spec: specs/features/onboarding/intent-fork.feature
+ * organization means onboarded — re-showing the create-org form would mint a
+ * duplicate. Personal workspaces never count as projects. Spec: intent-fork.feature.
  */
 describe("resolveWelcomeRedirect", () => {
   const org = (

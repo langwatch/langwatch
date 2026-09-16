@@ -1,10 +1,7 @@
 /**
- * The organization's view of its GitHub connection: what a settings surface
- * renders, and what a disconnect hands back.
- *
- * Deliberately narrower than `GithubInstallation`: a member who can see that a
- * connection exists is not shown the repository names it reaches, only how
- * many of them a "selected" install covers.
+ * The organization's view of its GitHub connection — narrower than
+ * `GithubInstallation`: a member sees a connection exists and how many
+ * repositories a "selected" install covers, never the repository names.
  */
 import { z } from "zod";
 import { githubPullRequestLiveStatusSchema } from "./github.ts";

@@ -44,12 +44,9 @@ type BranchCheckRecord = {
 };
 
 /**
- * The client this repository reads through, named by the delegates it uses.
- *
- * The composition root already holds a typed `PrismaClient`; this states which
- * part of it pull-request linkage touches, so a caller that hands over
- * something else is a type error at the composition rather than a `TypeError`
- * on the first query.
+ * The client this repository reads through, named by the delegates it uses —
+ * states which part of the typed `PrismaClient` linkage touches, so a wrong
+ * caller is a type error at composition, not a `TypeError` on first query.
  */
 export type PrismaGithubPullRequestsDatabase = Pick<
   PrismaClient,
@@ -423,11 +420,9 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
   }
 
   /**
-   * The cross-organization sweep read. The three predicates below are matched
-   * LITERALLY by the org-tenancy guard's bound for this model, so a change here
-   * has to be a deliberate change there too. See `dbOrganizationIdProtection`
-   * and the interface docblock for why this one read is allowed to span
-   * tenants at all.
+   * The cross-organization sweep read — deliberately allowed to span tenants
+   * (see the interface docblock). Its three predicates are matched LITERALLY
+   * by the org-tenancy guard (`dbOrganizationIdProtection`); change both together.
    */
   async findRecheckDue({
     now,
@@ -472,9 +467,8 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
 
   /**
    * Repositories are stored lowercased so a lookup matches whatever casing the
-   * session reported. Applied on both the read and the write side here, which is
-   * what makes it an invariant of the table rather than a convention callers have
-   * to remember.
+   * session reported — applied on both read and write here, which makes it an
+   * invariant of the table rather than a convention callers must remember.
    */
   private static normalizeFullName(repositoryFullName: string): string {
     return repositoryFullName.toLowerCase();

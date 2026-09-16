@@ -1,8 +1,7 @@
 /**
- * Every saved LangWatchQL workbench chart procedure, declared once. The
- * process mounts them under `analytics.savedWorkbenchCharts`, the namespace a
- * member reaches them through, while the subject belongs to Dashboard.
- * Spec: specs/analytics/lwql-saved-charts.feature.
+ * Every saved LangWatchQL workbench chart procedure, declared once. Mounted
+ * under `analytics.savedWorkbenchCharts` — the reachable namespace — while
+ * the subject belongs to Dashboard. Spec: lwql-saved-charts.feature.
  */
 import {
   langWatchQLQueryResultSchema,

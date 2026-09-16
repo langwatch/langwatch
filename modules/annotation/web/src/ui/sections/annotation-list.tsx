@@ -51,9 +51,8 @@ import { downloadCsv } from "@langwatch/csv/download";
 
 /**
  * The list this page IS, named the way the queue reads name participants
- * (`queue-<id>` for a named queue, `user-<id>` for a reviewer's own inbox).
- * A page that is a queue MOVES its selection to another queue rather than only
- * adding it to one.
+ * (`queue-<id>` for a named queue, `user-<id>` for a reviewer's inbox). A
+ * queue page MOVES its selection to another queue, rather than only adding it.
  */
 export type PageQueue = { annotatorId: string; name: string };
 
@@ -452,10 +451,8 @@ export function AnnotationList({
 
 /**
  * What the reviewer can do with the rows they picked: hand them to a dataset,
- * queue them for another pass, and take them out of the queue they are on.
- *
- * On a queue page the queue action MOVES rather than adds: the picker opens on
- * this queue, and leaving it out of the send is what takes the rows off it.
+ * queue them for another pass, or take them off the queue they are on. On a
+ * queue page the action MOVES: leaving this queue out of the send removes them.
  */
 function SelectionActions({
   host,

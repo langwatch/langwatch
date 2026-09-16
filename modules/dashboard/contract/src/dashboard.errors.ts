@@ -1,10 +1,7 @@
 /**
- * Every refusal this feature names, with the code a client renders copy from.
- *
- * Each one replaces a branch a door used to own: a `TRPCError` built by hand,
- * an `error.name === "…"` string comparison, or a plain `Error` a transport
- * had to recognise. The status each carries is the status those branches
- * already answered with.
+ * Every refusal this feature names, with the code a client renders copy
+ * from. Each replaces a branch a door used to own — a hand-built `TRPCError`,
+ * an `error.name` check, or a recognised `Error` — keeping that branch's status.
  */
 import { HandledError, remediation, ValidationError } from "@langwatch/handled-error";
 
@@ -40,12 +37,9 @@ export class GraphNotFoundError extends HandledError {
 }
 
 /**
- * A reorder naming dashboards the project does not have.
- *
- * 404 rather than 400 because that is what the tRPC surface has always
- * answered. The REST family answers 400 for the same refusal and keeps doing
- * so — that disagreement predates this contract, and reconciling it would
- * change a published status.
+ * A reorder naming dashboards the project does not have. 404, not 400: what
+ * the tRPC surface has always answered. REST answers 400 for the same
+ * refusal — predates this contract; reconciling would change a published status.
  */
 export class DashboardReorderUnknownIdsError extends HandledError {
   declare readonly code: "dashboard_reorder_unknown_ids";

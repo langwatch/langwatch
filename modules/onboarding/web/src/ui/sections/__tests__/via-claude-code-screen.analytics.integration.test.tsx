@@ -77,10 +77,9 @@ function findCopyButton(pattern: RegExp): HTMLElement | undefined {
 }
 
 /**
- * Switches tab and waits for its content to mount. The tab panels live in an
- * `AnimatePresence mode="wait"`, so the incoming panel only mounts once the
- * outgoing one has finished exiting; querying straight after the click finds
- * the previous tab. Clears the `selected` event the switch itself emits.
+ * Switches tab and waits for its content to mount. Panels live in an
+ * `AnimatePresence mode="wait"`, so the incoming one mounts only once the
+ * outgoing one exits — querying right after the click finds the previous tab.
  */
 async function goToTab(name: keyof typeof TAB_MARKER | string): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name }));

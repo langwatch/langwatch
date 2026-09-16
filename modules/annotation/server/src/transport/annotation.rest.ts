@@ -107,9 +107,8 @@ export const annotationRest = defineRestRouter(AnnotationApi)
 
 /**
  * Every refusal these routes raise, in the bodies this family has always
- * answered. It travels with the declaration rather than with the process that
- * mounts it: `{ status, message }` is not the house shape, and a published
- * family cannot change what it answers because its installer moved.
+ * answered. It travels with the declaration, not the mounting process —
+ * `{ status, message }` isn't the house shape; a moved installer can't change the answer.
  */
 export const annotationRestErrors: RestErrorHandler = (error, context) => {
   if (error instanceof AnnotationNotFoundError) {

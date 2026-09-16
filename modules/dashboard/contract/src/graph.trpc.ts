@@ -1,8 +1,7 @@
 /**
- * Every `graphs.*` procedure, declared once: its name, its kind, what it takes
- * and what it answers. The inputs live here so the wire shape a client is
- * typed against is stated once, in the package both sides may import.
- * Spec: modules/dashboard/specs/dashboard-service.feature.
+ * Every `graphs.*` procedure, declared once: its name, its kind, what it
+ * takes and what it answers, stated once in the package both sides import.
+ * Spec: dashboard-service.feature.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { triggerSchema } from "@langwatch/automation-contract";

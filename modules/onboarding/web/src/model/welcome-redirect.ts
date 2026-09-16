@@ -28,13 +28,11 @@ export function resolveWelcomeRedirect({
   const hasAnyProject =
     organizations?.some((org) => sharedTeams(org).some((t) => t.projects.length > 0)) ?? false;
 
-  // Membership is the test, not `primaryIntent`. That field is null for every
-  // organization created before ADR-038 and for every one created outside
-  // onboarding, so a member invited into such an organization was shown "let's
-  // kick off by creating your organization" with no way past it except making a
-  // second organization nobody wanted. An organization with no shared project
-  // yet is still an organization they belong to; where they land from here is
-  // the home resolver's job.
+  // Membership is the test, not `primaryIntent` — that field is null for
+  // organizations created before ADR-038 or outside onboarding, which showed
+  // an invited member "let's kick off" with no way past it but a second,
+  // unwanted organization. Belonging with no shared project yet still counts;
+  // where they land from here is the home resolver's job.
   const belongsToAnOrganization = (organizations?.length ?? 0) > 0;
 
   if (!hasAnyProject) {

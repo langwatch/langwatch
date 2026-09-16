@@ -1,9 +1,7 @@
 /**
- * The alert a graph card renders, and what never leaves with it. The
- * application asks Automation for the trigger and strips every action
- * parameter before any door sees the row — this process composes no
- * per-provider redaction, so none of a provider's stored secrets leaves
- * the server.
+ * The alert a graph card renders, and what never leaves with it. Dashboard
+ * asks Automation for the trigger and strips every action parameter before
+ * any door sees the row — no per-provider redaction, so no secret leaves the server.
  */
 import type { Trigger } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";

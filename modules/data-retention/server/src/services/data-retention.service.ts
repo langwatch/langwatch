@@ -39,12 +39,10 @@ export type DataRetentionServiceOptions = Readonly<{
   projects: ProjectApi;
   organizations: OrganizationApi;
   defaultRetentionDays: number;
-  /** Null on a deployment that composed no ClickHouse. */
   /**
    * The rewrite path. Not nullable: a deployment with no ClickHouse refuses at
-   * boot naming the module and the member, so by the time this service exists
-   * there is a store behind it. Answering `[]` for "no backend" is what let a
-   * project's in-flight retention rewrite read as finished.
+   * boot, so by the time this service exists there is a store behind it —
+   * answering `[]` for "no backend" let an in-flight rewrite read as finished.
    */
   retroactive: RetroactiveRetentionRepository;
   cache: DataRetentionCacheStore;

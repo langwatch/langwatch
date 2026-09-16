@@ -29,11 +29,9 @@ export type OnboardingOrganization = {
 };
 
 /**
- * What page this is about, and what is still arriving.
- *
- * `isLoading` is the graph's, not the session's: every redirect decision in this
- * family is wrong if it runs before the organizations have answered, which is
- * the bug `resolveWelcomeRedirect`'s docblock is about.
+ * What page this is about, and what is still arriving. `isLoading` is the
+ * graph's, not the session's — every redirect decision here is wrong if it
+ * runs before organizations answer (see `resolveWelcomeRedirect`'s docblock).
  */
 export type OnboardingScope = {
   readonly organization: OnboardingOrganization | undefined;
@@ -66,9 +64,8 @@ export type OnboardingSuccessNotice = {
 export type OnboardingFailureNotice = {
   /**
    * The failure itself, which the composition's presentation registry turns
-   * into the sentence a customer reads. Required rather than optional, and the
-   * shape `UiFeedback` takes: a notice with no error degrades to the generic
-   * line for a failure we could have named.
+   * into the sentence a customer reads. Required, not optional — a notice
+   * with no error degrades to the generic line for a failure we could have named.
    */
   readonly error: unknown;
   /** What the reader was doing, for a code the registry does not list. */
@@ -93,12 +90,9 @@ export abstract class OnboardingHostApi {
   abstract replace(to: string): void;
 
   /**
-   * A whole new document.
-   *
-   * The welcome flow uses it after minting an organization: everything the
-   * browser holds — the graph, the permissions, the flags — was read before that
-   * organization existed, and a client transition would carry all of it into the
-   * first page of the product.
+   * A whole new document. The welcome flow uses it after minting an
+   * organization: everything the browser holds (graph, permissions, flags)
+   * was read before it existed, and a client transition would carry that in.
    */
   abstract hardRedirect(to: string): void;
 
@@ -143,11 +137,9 @@ const OnboardingHostContext = createContext<OnboardingHostApi | undefined>(void 
 export const OnboardingHostProvider = OnboardingHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means a screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host these screens are mounted in. Missing means a screen was rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useOnboardingHost(): OnboardingHostApi {
   const host = useContext(OnboardingHostContext);

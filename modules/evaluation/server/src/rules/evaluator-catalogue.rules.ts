@@ -22,11 +22,9 @@ function isPublishedEvaluator(key: string): boolean {
 }
 
 /**
- * One evaluator's settings schema, as JSON Schema.
- *
- * `io: "input"` is what a settings FORM needs: a setting with a default is
- * optional to supply, not required. `unrepresentable: "any"` keeps one exotic
- * setting from emptying the whole catalogue.
+ * One evaluator's settings schema, as JSON Schema. `io: "input"` marks a
+ * setting with a default as optional rather than required for a settings
+ * FORM; `unrepresentable: "any"` keeps one exotic setting from emptying the catalogue.
  */
 export function evaluatorSettingsJsonSchema(key: string): Record<string, unknown> {
   const settings =
@@ -40,11 +38,9 @@ export function evaluatorSettingsJsonSchema(key: string): Record<string, unknown
 }
 
 /**
- * Rewrites `anyOf` of single-value schemas back into `enum`.
- *
- * A zod union of literals is one setting with a fixed list of choices, and
- * `enum` is how this endpoint has always published it — a renderer that only
- * understands `enum` draws a select box where it would otherwise draw nothing.
+ * Rewrites `anyOf` of single-value schemas back into `enum` — a zod union of
+ * literals is one setting with fixed choices, and `enum` is how this endpoint
+ * has always published it, so an `enum`-only renderer still draws a select box.
  */
 function withEnumerations(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(withEnumerations);

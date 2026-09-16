@@ -20,12 +20,9 @@ export type SavedWorkbenchChartRecord = Omit<SavedWorkbenchChart, "definition"> 
 };
 
 /**
- * The dashboards, their builder graphs and their saved workbench charts: three
- * shapes over the two tables Dashboard owns.
- *
- * A write that names a row the project does not have raises the feature's own
- * absence rather than answering with nothing, so every backend refuses it the
- * same way.
+ * The dashboards, their builder graphs and their saved workbench charts:
+ * three shapes over the two tables Dashboard owns. A write naming a row the
+ * project lacks raises the feature's own absence — every backend refuses alike.
  */
 export interface DashboardRepository {
   findAllDashboards(input: {

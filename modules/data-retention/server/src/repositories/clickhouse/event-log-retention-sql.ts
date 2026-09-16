@@ -1,9 +1,7 @@
 /**
- * ClickHouse SQL for the `event_log` table's per-row retention classification
- * (`@langwatch/data-retention-contract/event-log-retention-policy`). Generated
+ * ClickHouse SQL for `event_log`'s per-row retention classification. Derived
  * from the same exhaustive aggregate map ingestion stamps rows with, so a
- * retroactive category change can never overwrite an indefinite security row
- * or apply the wrong category's retention to a scenario/experiment event.
+ * retroactive category change can never overwrite an indefinite security row.
  */
 import {
   INDEFINITE_EVENT_TYPE_PREFIXES,
@@ -43,10 +41,9 @@ export const EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE =
   `AggregateType IN (${indefiniteAggregateTypesSql}))`;
 
 /**
- * ClickHouse predicate selecting the finite-policy rows for one customer
- * retention category. It is generated from the same exhaustive map used by
- * ingestion, so retroactive updates cannot overwrite indefinite rows or move
- * scenario and experiment events onto the traces policy.
+ * Finite-policy predicate for one retention category, generated from the same
+ * map as ingestion — traces excludes scenario/experiment aggregate types so
+ * neither can silently inherit the traces retention window.
  */
 export function eventLogRetentionCategorySqlPredicate(category: RetentionCategory): string {
   const finiteGuard = `NOT ${EVENT_LOG_INDEFINITE_RETENTION_SQL_PREDICATE}`;
@@ -70,10 +67,9 @@ export function eventLogRetentionCategorySqlPredicate(category: RetentionCategor
 const EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
 
 /**
- * A no-op predicate fragment that stamps which category triggered an
- * `event_log` mutation, so a concurrent mutation for a different category can
- * be told apart from a real conflict and a resumed process can report
- * progress against the category that started it.
+ * No-op predicate fragment stamping which category triggered a mutation, so a
+ * concurrent mutation for a different category is distinguishable from a real
+ * conflict.
  */
 export function eventLogRetentionCategoryMutationMarkerSql(category: RetentionCategory): string {
   const marker = `${EVENT_LOG_MUTATION_CATEGORY_MARKER_PREFIX}${category}`;

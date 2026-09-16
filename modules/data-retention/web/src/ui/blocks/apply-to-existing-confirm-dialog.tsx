@@ -37,13 +37,10 @@ export function ApplyToExistingConfirmDialog({
                   already-stored data.
                 </Text>
               ) : (
-                // We don't name a specific day count here because the server
-                // applies the project's RESOLVED effective retention
-                // (PROJECT > TEAM > ORGANIZATION > platform default), which
-                // may differ from the value the user just selected (e.g. when
-                // saving an org-wide rule but the project has a closer
-                // override). The toast that fires after the apply shows the
-                // value that was actually used.
+                // No day count named here: the server applies the project's
+                // RESOLVED effective retention (PROJECT > TEAM > ORGANIZATION >
+                // platform default), which may differ from what was just
+                // selected. The toast after apply shows the value actually used.
                 <Text>
                   We will rewrite <strong>this project's</strong> existing data to use its currently
                   resolved retention policy. Rows older than the resolved retention become eligible

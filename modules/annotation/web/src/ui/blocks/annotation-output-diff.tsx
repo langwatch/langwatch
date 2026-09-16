@@ -3,12 +3,9 @@ import { type Change, diffWordsWithSpace } from "diff";
 import { useDeferredValue, useMemo } from "react";
 
 /**
- * The word-level difference between the captured output and the reviewer's
- * correction, computed once for everything that reads it. The diff is the
- * expensive call in the suggest form and the field it reads is a whole trace
- * output, so the counts and the panel share one pass.
- *
- * `useDeferredValue` keeps typing snappy by recomputing at idle.
+ * The word-level diff between captured output and the reviewer's correction,
+ * computed once for everything that reads it — an expensive call over a
+ * whole trace output. `useDeferredValue` recomputes at idle to keep typing snappy.
  */
 export function useOutputDiff({
   original,

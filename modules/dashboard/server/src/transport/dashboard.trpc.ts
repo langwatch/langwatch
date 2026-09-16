@@ -1,9 +1,7 @@
 /**
  * The server half of `dashboards.*`: a permission and a handler per procedure
- * the contract already named.
- *
- * Reading takes `analytics:view`; creating takes `analytics:create`, editing
- * `analytics:update`, and removing `analytics:delete`.
+ * the contract already named. Reading takes `analytics:view`; creating takes
+ * `analytics:create`, editing `analytics:update`, removing `analytics:delete`.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { DashboardApi, dashboardTrpc } from "@langwatch/dashboard-contract";

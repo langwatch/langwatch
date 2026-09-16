@@ -187,8 +187,7 @@ export type GithubBranchDemandComposition = Readonly<{
 /**
  * The demand service under the two names its cross-feature consumers know.
  * `GithubService` answers the host question from the same `GithubHostApi`
- * this composition resolved, and routes the request into the same demand
- * service, so a consumer holding either object gets the same two answers.
+ * this composition resolved and routes into the same demand service.
  */
 class ComposedGithubBranchDemand implements GithubBranchDemand {
   static create(parts: {
@@ -298,10 +297,9 @@ export class GithubApp implements GithubApiContract {
   }
 
   /**
-   * The fleet-wide branch sweep alone: the pull-request rows, the installation
-   * reads, an App token minter and the host. A process that wants only the
-   * sweep gets it without composing the organization or project services
-   * {@link GithubApp.composeApi} also needs.
+   * The fleet-wide branch sweep alone: the pull-request rows, the
+   * installation reads, an App token minter and the host — without composing
+   * the organization or project services {@link GithubApp.composeApi} needs.
    */
   static composeBranchMaintenance(
     parts: GithubBranchMaintenanceComposition,
@@ -328,9 +326,8 @@ export class GithubApp implements GithubApiContract {
 
   /**
    * The demand half of pull-request linkage alone. Composes the same four
-   * objects as the sweep, deliberately: the two halves take different inputs - 
-   * demand needs a project seam and the sweep must be composable without one - 
-   * and either, both, or neither may be mounted.
+   * objects as the sweep, deliberately — demand needs a project seam, the
+   * sweep must be composable without one, and either may be mounted alone.
    */
   static composeBranchDemand(
     parts: GithubBranchDemandComposition,

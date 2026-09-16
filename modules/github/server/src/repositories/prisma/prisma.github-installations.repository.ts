@@ -64,10 +64,9 @@ function reposToJson(
 }
 
 /**
- * The client this repository reads through, named by the one delegate it uses.
- *
- * The composition root already holds a typed `PrismaClient`; naming the model
- * here is what lets it hand that client straight down with no cast at the seam.
+ * The client this repository reads through, named by the one delegate it
+ * uses — states which model of the composition root's typed `PrismaClient`
+ * this repository touches, with no cast at the seam.
  */
 export type PrismaGithubInstallationsDatabase = Pick<PrismaClient, "githubInstallation">;
 

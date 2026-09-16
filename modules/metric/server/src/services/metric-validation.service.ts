@@ -13,11 +13,9 @@ import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
 const { isRecord } = MetricSerializationAdapter;
 
 /**
- * Whether a metric point's shape matches the kind it claims to be.
- *
- * A histogram with mismatched bucket and bound counts, or a summary with
- * quantiles out of order, is not a point that can be stored and read back as
- * what it says it is. Checked once here, on the way in.
+ * Whether a metric point's shape matches the kind it claims to be. A
+ * histogram with mismatched bucket/bound counts, or an out-of-order summary,
+ * cannot round-trip as what it claims — checked once here, on the way in.
  */
 export class MetricValidationAdapter {
   private constructor() {}

@@ -788,3 +788,26 @@ the budget rather than evading it.
     precisely the condition this whole web-boundaries migration is changing.
     Worth re-checking after that migration lands — it may become genuinely
     redundant, and nothing in the file will say so.
+
+39. **A JSDoc left behind by a move, documenting a method that is not in the
+    file.** `modules/evaluation/server/src/services/evaluation-execution.service.ts`.
+    The block "Server-only mapping sources need data this service alone can
+    produce (e.g. a formatted transcript from the span digest) — fills those
+    fields into `mappedData` in place" documented `fillServerOnlyTraceSources`,
+    which now lives at `modules/evaluation/server/src/services/evaluation-data.service.ts:46`
+    and is **undocumented there**. The comment stayed behind between two section
+    dividers, attached to nothing; the stale `dist/.d.ts` shows it had re-attached
+    to `runEvaluation`, so the build output documented that method with a
+    description of a different one.
+
+    The lane met it as an over-budget block and cleared the finding by inserting
+    a blank line to split the JSDoc from the divider beneath it. That is lesson 8
+    in substance — dividing rather than shortening — and it escaped the orphan
+    regex, which only matches a *single-line* `/** … */` before the blank. The
+    coordinator deleted the block and the by-then-empty "Data building" divider
+    instead.
+
+    **The follow-up is one comment-only edit, deliberately not taken here**
+    because `evaluation-data.service.ts` is outside this slice and taking it
+    would have broken the scope check that catches peer contamination: give
+    `fillServerOnlyTraceSources` that sentence, shortened to five lines.

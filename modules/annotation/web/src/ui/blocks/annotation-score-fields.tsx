@@ -18,12 +18,9 @@ const scoreOptionSchema = z.object({
 const scoreOptionsSchema = z.array(scoreOptionSchema);
 
 /**
- * The project's active score keys, as chips the reviewer rates on.
- *
- * Every comment is offered them, whichever part of the trace it is about. A
- * score is a project-wide key with no notion of a target and reads as a
- * judgement about the trace, so what the reviewer was pointing at when they
- * gave it changes nothing about where it lands.
+ * The project's active score keys, as chips the reviewer rates on. Every
+ * comment is offered them: a score is a project-wide key with no notion of a
+ * target, so what the reviewer pointed at changes nothing about where it lands.
  */
 export function ScoreFields({ state }: { state: AnnotationFormState }) {
   const scores = state.scores.data;
@@ -95,12 +92,9 @@ function toSelection(value: string | string[] | undefined): string[] {
 }
 
 /**
- * One score key as a chip with an editor behind it. The editor buffers: picking
- * an option, ticking several, and typing a reason all stay local until the
- * reviewer confirms with OK, which commits the rating and the reason together
- * and closes. Clear commits an empty rating, returning the key to unrated.
- * Leaving any other way (Escape, a click outside, opening another chip) keeps
- * what was already committed, so the chip only ever reads what was confirmed.
+ * One score key as a chip with an editor behind it. The editor buffers:
+ * picking, ticking, or typing a reason stays local until OK commits it, or
+ * Clear commits empty — leaving any other way keeps what was last confirmed.
  */
 export function ScoreChip({
   name,

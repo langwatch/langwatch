@@ -9,12 +9,9 @@ export type DataRetentionPlan = Readonly<{
    */
   free: boolean;
   /**
-   * Whether the plan may persist any whole-week value at or above the
-   * enterprise custom floor, rather than only the fixed paid presets.
-   *
-   * Enterprise tiers and self-hosted installs are uncapped; every other
-   * non-free plan is not. An unrecognised tier must resolve to `false`, which
-   * fails CLOSED to the restrictive menu — the data-loss-safe direction.
+   * Whether the plan may persist a whole-week value at or above the enterprise
+   * custom floor. An unrecognised tier must resolve to `false` — fails CLOSED
+   * to the restrictive menu, the data-loss-safe direction.
    */
   uncapped: boolean;
 }>;

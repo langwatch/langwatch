@@ -230,15 +230,6 @@ export class EvaluationExecutionService {
   }
 
   // ---------------------------------------------------------------------------
-  // Data building (reuses existing mapping functions)
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Server-only mapping sources need data this service alone can produce
-   * (e.g. a formatted transcript from the span digest) — fills those fields
-   * into `mappedData` in place.
-   */
-  // ---------------------------------------------------------------------------
   // Evaluation execution (built-in vs custom/workflow)
   // ---------------------------------------------------------------------------
 

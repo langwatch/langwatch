@@ -5,9 +5,7 @@ import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
 /**
  * ADR-038 I3/I7: the flow config IS the fork. Governance track is exactly
  * two screens; LLMOps keeps today's screens after the intent; self-hosted
- * gets the intent screen too.
- *
- * Spec: specs/features/onboarding/intent-fork.feature
+ * gets the intent screen too. Spec: intent-fork.feature.
  */
 describe("getOnboardingFlowConfig", () => {
   describe("when on SaaS with no intent selected yet", () => {

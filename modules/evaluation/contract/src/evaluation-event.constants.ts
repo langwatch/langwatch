@@ -78,11 +78,8 @@ export const EVALUATION_PROCESSING_COMMAND_TYPES = [
 export type EvaluationProcessingCommandType = (typeof EVALUATION_PROCESSING_COMMAND_TYPES)[number];
 
 /**
- * Projection schema versions using calendar versioning (YYYY-MM-DD).
- *
- * These versions indicate the schema version of the projection data structure.
- * When the projection schema changes, projections may need to be rebuilt from
- * events to apply the new schema.
+ * Projection schema versions, calendar-versioned (YYYY-MM-DD). A change here
+ * may require rebuilding projections from events to apply the new schema.
  */
 export const EVALUATION_PROJECTION_VERSIONS = {
   /** Initial projection schema version */

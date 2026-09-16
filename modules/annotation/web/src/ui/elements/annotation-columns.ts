@@ -98,10 +98,9 @@ export function annotationColumnOptions({
 }
 
 /**
- * Whether a column shows: what the reviewer chose for it, and its own default
- * where they have chosen nothing. Reading the default per column rather than
- * storing the visible set is what lets a column added later — a new score type
- * among them — arrive as its author intended instead of silently hidden.
+ * Whether a column shows: what the reviewer chose, and its own default where
+ * they've chosen nothing. Reading the default per column, not storing the
+ * visible set, lets a column added later arrive as intended, not silently hidden.
  */
 export function isColumnVisible({
   column,

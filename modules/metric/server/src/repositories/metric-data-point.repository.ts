@@ -17,12 +17,9 @@ export abstract class MetricDataPointRepository extends MetricDataPointAppendRep
   abstract queryUsageEstimates(query: MetricUsageEstimateQuery): Promise<MetricUsageEstimate[]>;
 
   /**
-   * Totals for every series whose point-attribute set carries
-   * `attributeKey = attributeValue`, summed from the 30-second rollups
-   * (delta-converged, so the sum IS the total regardless of the source
-   * temporality). This is the session-keyed read coding agents need: their
-   * metrics carry no exemplars, so they can never correlate to a trace, but
-   * `session.id` rides the datapoint attributes.
+   * Totals for series matching `attributeKey = attributeValue`, summed from
+   * delta-converged 30s rollups (sum IS the total regardless of temporality)
+   * — the session-keyed read coding agents need, given no trace-correlating exemplars.
    */
   abstract getSeriesTotalsByPointAttribute(args: {
     tenantId: string;

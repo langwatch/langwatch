@@ -53,21 +53,15 @@ interface CodePreviewProps {
   onToggleVisibility?: () => void;
   llmPrompt?: string;
   /**
-   * When set, the copy button always writes THIS value to the clipboard,
-   * regardless of reveal state. The default CodeBlock copy trigger copies
-   * the rendered string — the masked form while the snippet is hidden —
-   * which hands the user a broken credential they only discover when their
-   * SDK rejects it. Surfaces whose snippet carries a secret pass the real
-   * text here.
+   * When set, the copy button always writes THIS value, regardless of
+   * reveal state — the default trigger copies the rendered (masked) string,
+   * handing the user a broken credential their SDK later rejects.
    */
   copyText?: string;
   /**
-   * When true, the header action buttons (copy / eye / llm-prompt) are
-   * suppressed. Used by empty-state surfaces where the rendered code
-   * still includes a placeholder value (e.g. `sk-lw-xxxxx...`) and
-   * letting the user copy it would just create a broken curl that
-   * silently fails. The canonical mint CTA lives in the surrounding
-   * surface (banner / panel) instead.
+   * When true, the header action buttons are suppressed — for empty-state
+   * surfaces whose placeholder (`sk-lw-xxxxx...`) would copy into a
+   * silently-failing curl. The mint CTA lives in the surrounding surface instead.
    */
   disableActions?: boolean;
   /** Caps tall snippets while keeping the code header and actions visible. */

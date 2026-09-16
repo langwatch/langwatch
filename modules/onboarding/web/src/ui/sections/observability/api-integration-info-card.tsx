@@ -52,13 +52,10 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
       />
 
       {/*
-       * Mirror the rule used by the empty-state API key card and
-       * `buildMcpConfig`: only surface `LANGWATCH_ENDPOINT` when the
-       * deployment differs from the public cloud default. Cloud users
-       * never need this in their .env (it's the SDK's default), and
-       * shipping it here would make a no-op line look like a required
-       * value. Routed through the shared `CLOUD_ENDPOINT` constant so
-       * the cloud comparison can never drift between surfaces.
+       * Mirrors the rule in the empty-state API key card and
+       * `buildMcpConfig`: only surface `LANGWATCH_ENDPOINT` when it differs
+       * from the public cloud default, via the shared `CLOUD_ENDPOINT`
+       * constant so the comparison can't drift between surfaces.
        */}
       {effectiveEndpoint && effectiveEndpoint !== CLOUD_ENDPOINT && (
         <CopyableInputWithPrefix

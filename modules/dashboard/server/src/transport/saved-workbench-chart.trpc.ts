@@ -1,8 +1,7 @@
 /**
  * The server half of the saved-workbench-chart namespace: a permission and a
- * handler per procedure the contract already named. Thin by design — the
- * application resolves who is asking, applies the rollout gate and admits the
- * definition against that member's own protections.
+ * handler per procedure the contract already named. Thin by design — the app
+ * resolves who's asking, applies the rollout gate, admits against protections.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { DashboardApi, savedWorkbenchChartTrpc } from "@langwatch/dashboard-contract";

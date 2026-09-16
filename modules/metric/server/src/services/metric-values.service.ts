@@ -7,10 +7,9 @@ import {
 const { isRecord } = MetricSerializationAdapter;
 
 /**
- * The canonical view of every value-carrying OTLP field, in the exact form the
- * queryable columns store. The canonical payload that produces PointId is
- * rendered from this same view, so a point's identity can never disagree with
- * its own persisted content.
+ * The canonical view of every value-carrying OTLP field, in the exact form
+ * the queryable columns store. PointId is rendered from this same view, so
+ * a point's identity can never disagree with its own persisted content.
  */
 export interface CanonicalPointValues {
   valueType: "none" | "int" | "double";

@@ -28,13 +28,11 @@ const parametersSchema = z
       });
     }
 
-    // Checked here rather than as `z.string().max(…)` on the key. A key
-    // schema's refusal is reported as zod's `invalid_key`, wrapping the real
-    // `too_big` one level down — so `flatten()`, which is what the boundary
-    // sends a caller, produced the field error "Invalid key in record": it
-    // names neither the parameter nor the ceiling, and "record" is our
-    // storage, not the member's vocabulary. An issue raised here carries the
-    // offending name in its own path and the limit in its own field.
+    // Checked here rather than as `z.string().max(…)` on the key: a key
+    // schema's refusal reports as zod's `invalid_key`, wrapping the real
+    // `too_big` one level down, so `flatten()` produced "Invalid key in
+    // record" — naming neither the parameter nor the ceiling. This way
+    // carries the offending name in its own path and the limit in its own field.
     for (const name of names) {
       if (name.length > MAX_PARAMETER_NAME_LENGTH) {
         context.addIssue({

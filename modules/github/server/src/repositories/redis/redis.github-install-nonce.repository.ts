@@ -2,10 +2,9 @@ import type { GithubRedis } from "./github-redis.connection.ts";
 import { GithubInstallNonceRepository } from "../github-install-nonce.repository.ts";
 
 /**
- * The Redis tier. The connection is nullable because this module's Redis is
- * optional members: a process that opened none answers null, and the
- * installation flow reads that as "replay cannot be judged here" rather than
- * refusing every install.
+ * The Redis tier. The connection is nullable because this module's Redis
+ * member is optional: a process with none answers null, and the installation
+ * flow reads that as "replay cannot be judged here" rather than refusing every install.
  */
 export class GithubInstallNonceRedisRepository extends GithubInstallNonceRepository {
   static create(parts: {

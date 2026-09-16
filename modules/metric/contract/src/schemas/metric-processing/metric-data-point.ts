@@ -15,10 +15,8 @@ export type AggregationTemporality = z.infer<typeof aggregationTemporalitySchema
 
 /**
  * Event payload and projection record for one canonical OTLP data point.
- *
- * Integer and UInt64 values are decimal strings. This is deliberate: JS
- * numbers cannot represent every OTLP int64/fixed64 value, while ClickHouse
- * accepts decimal strings for its Int64/UInt64 columns.
+ * Integer and UInt64 values are decimal strings — JS cannot represent every
+ * OTLP int64/fixed64 value, while ClickHouse accepts decimal strings for those columns.
  */
 export const canonicalMetricDataPointSchema = z.object({
   tenantId: z.string(),

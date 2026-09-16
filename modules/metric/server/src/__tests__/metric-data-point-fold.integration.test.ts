@@ -406,11 +406,9 @@ describe("given a series whose chunk points have stored points between them", ()
       points: folded.map((index) => sample({ seriesId: foldedSeriesId, index })),
     });
     // The reference series never touches the folded entry point, for either
-    // half. Seeding its pre-stored half with a chunk would have let a
-    // folded-read defect affecting those points cancel out of the comparison,
-    // since both sides would carry it. Reverse order on purpose: every sample
-    // is late relative to the one before it, which is the arrival pattern a
-    // chunk collapses.
+    // half — seeding its pre-stored half with a chunk would let a folded-read
+    // defect cancel out of the comparison. Reverse order is deliberate: every
+    // sample is late relative to the one before it, the pattern a chunk collapses.
     for (const index of [...preStored].reverse()) {
       await repo.recomputeAffectedRollups({
         point: sample({ seriesId: perPointSeriesId, index }),

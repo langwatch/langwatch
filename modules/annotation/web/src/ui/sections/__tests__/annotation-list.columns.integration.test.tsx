@@ -11,9 +11,8 @@ import {
 
 /**
  * Every spy is created once, at hoist time, never inside a mock factory's
- * return value: a hook called on every render would otherwise build a fresh
- * `vi.fn()` per render, and nothing in the test can then assert on the one the
- * component actually held.
+ * return value — a hook called every render would build a fresh `vi.fn()`,
+ * leaving nothing for the test to assert against the one the component held.
  */
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
