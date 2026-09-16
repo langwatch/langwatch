@@ -3,6 +3,7 @@ import { carryLangyConversation } from "~/features/langy/logic/langyConversation
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { belongsToNoOrganization } from "./logic/belongsToNoOrganization";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
 import type { ProductId } from "./products";
@@ -46,6 +47,18 @@ function toResolvedHome(query: {
     isReady: query.data !== undefined,
     hasError: query.isError,
   };
+}
+
+/**
+ * What `/` has to draw, for the one case where it cannot redirect.
+ *
+ * Every other outcome is a destination, and a destination that has not been
+ * decided yet is a loading screen. A refused graph is neither: it will never
+ * decide, so a page that keeps waiting for it waits forever.
+ */
+export interface LandingRedirect {
+  /** The refusal the workspace read came back with. Absent until one does. */
+  workspaceError: unknown;
 }
 
 interface LandingInput {
@@ -147,8 +160,8 @@ function useReplaceOnce(): (destination: string | null) => void {
  * Specs: specs/ai-gateway/governance/persona-home-resolver.feature
  *        specs/navigation/navigation-v2-landing.feature
  */
-export function useLandingRedirect(): void {
-  const { project, organization, organizations, isLoading } =
+export function useLandingRedirect(): LandingRedirect {
+  const { project, organization, organizations, isLoading, workspaceError } =
     useOrganizationTeamProject({ redirectToOnboarding: false });
   const resolved = api.governance.resolveHome.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -175,8 +188,11 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless:
-            !isLoading && !organization && (organizations?.length ?? 0) === 0,
+          isOrgless: belongsToNoOrganization({
+            isWorkspaceResolving: isLoading,
+            organization,
+            organizations,
+          }),
         }),
         search: window.location.search,
       }),
@@ -193,4 +209,6 @@ export function useLandingRedirect(): void {
     reachableProducts,
     llmOpsProjectSlug,
   ]);
+
+  return { workspaceError };
 }
