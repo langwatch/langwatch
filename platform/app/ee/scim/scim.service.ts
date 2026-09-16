@@ -33,6 +33,7 @@ import { ScimDirectoryIdentityService } from "./scim-directory-identity.service"
 import { parseScimFilter, type ScimFilterTerm } from "./scim-filter";
 import { reconcileScimGrants } from "./scim-grants.reconciler";
 import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
+import { mergeNameParts, namePartsIn } from "./scim-name";
 import { resolveHighestRole } from "./scim-role-resolver";
 import { scimSyncLifecycle } from "./scim-sync.runtime";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
@@ -1002,44 +1003,38 @@ export class ScimService {
         continue;
       }
 
-      if (operation.value == null || typeof operation.value !== "object")
-        continue;
-
-      const value = operation.value as Record<string, unknown>;
       const updates: { name?: string; email?: string } = {};
 
-      if ("active" in value) {
-        if (value.active === false) {
-          await this.deactivate({ id, organizationId, connectionId });
-          op = "deactivate";
-        } else {
-          await this.reactivate({ id });
-        }
+      // A NAME ARRIVES IN THREE SPELLINGS AND ONLY ONE OF THEM IS AN OBJECT.
+      // `{path: "name.familyName", value: "Smith"}` is what Okta and Entra
+      // actually send, and the object guard below is why it used to be
+      // dropped: 200, record unchanged, request log filing it "Accepted".
+      const nameParts = namePartsIn({
+        path: operation.path,
+        value: operation.value,
+      });
+      if (nameParts) {
+        // Merged against the stored name, never rebuilt from the half we were
+        // handed — patching a surname must not throw the forename away.
+        const stored = await this.userService.findById({ id });
+        const merged = mergeNameParts({ current: stored?.name, ...nameParts });
+        if (merged !== undefined) updates.name = merged;
       }
 
-      if ("userName" in value && typeof value.userName === "string") {
-        updates.email = value.userName;
-      }
+      if (operation.value != null && typeof operation.value === "object") {
+        const value = operation.value as Record<string, unknown>;
 
-      if ("name" in value && typeof value.name === "object") {
-        const nameObj = value.name as Record<string, string>;
-        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
-        if (parts.length > 0) {
-          updates.name = parts.join(" ");
+        if ("active" in value) {
+          if (value.active === false) {
+            await this.deactivate({ id, organizationId, connectionId });
+            op = "deactivate";
+          } else {
+            await this.reactivate({ id });
+          }
         }
-      } else if ("name.givenName" in value || "name.familyName" in value) {
-        // Dot-notation attribute paths in value object (RFC 7644 §3.5.2)
-        const given =
-          typeof value["name.givenName"] === "string"
-            ? value["name.givenName"]
-            : null;
-        const family =
-          typeof value["name.familyName"] === "string"
-            ? value["name.familyName"]
-            : null;
-        const parts = [given, family].filter(Boolean);
-        if (parts.length > 0) {
-          updates.name = parts.join(" ");
+
+        if ("userName" in value && typeof value.userName === "string") {
+          updates.email = value.userName;
         }
       }
 

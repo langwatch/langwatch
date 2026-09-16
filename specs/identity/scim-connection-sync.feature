@@ -434,3 +434,22 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Given a connection whose token was revoked
     When a straggling push arrives on the old token
     Then the connection stays revoked
+
+  # A name reaches us as two halves and is stored as one string, so a directory
+  # that patches one half is asking us to change that half and leave the other.
+  # Okta and Entra both patch one part at a time, over a dotted path carrying a
+  # plain string — the one spelling the handler used to skip entirely, answering
+  # 200 with the record untouched and filing it in the request log as accepted.
+
+  @unit
+  Scenario: A directory patches one half of a name with a dotted path
+    Given a person the directory provisioned as "Ada Lovelace"
+    When the directory patches only their surname to "Smith"
+    Then they are stored as "Ada Smith"
+    And the change is reported as applied rather than merely accepted
+
+  @unit
+  Scenario: A directory replaces both halves of a name at once
+    Given a person the directory provisioned as "Ada Lovelace"
+    When the directory sends both halves of a new name
+    Then they are stored as exactly the name that was sent
