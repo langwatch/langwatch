@@ -6,16 +6,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { featureFlagService } from "~/server/featureFlag";
 
 /**
- * The gate over the custom-chart-playground surface: the page, its REST
- * routes, and the Langy skill that drives them all read the same flag, so
- * "can I use this feature" answers identically everywhere.
- *
- * Mirrors `~/server/analytics/lwql/access.ts`'s `LWQL_FLAG`/`lwqlEnabled`
- * pattern exactly, for the same reasons: one flag read in one place, keyed
- * on the project (a REST caller is an API key with no member behind it, so
- * the project is the only identity that can be distinct here), with the
- * project's organization resolved so an org-scoped targeting rule actually
- * matches.
+ * The gate over the custom-chart-playground surface — page, REST routes and
+ * the Langy skill all read this one flag, keyed on the project (a REST
+ * caller is an API key with no member), mirroring `lwql/access.ts`'s pattern.
  */
 export const CUSTOM_CHART_PLAYGROUND_FLAG = "release_custom_chart_playground";
 

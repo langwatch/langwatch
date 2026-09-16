@@ -1,15 +1,7 @@
 /**
- * Which filter fields are meaningless without a key, or without a subkey.
- *
- * Kept on the server side because it is what the `dataForFilter` procedure
- * refuses on: a picker asking for `metadata.value` without naming the metadata
- * key is asking a question with no answer, and the refusal has to happen before
- * the query is built. The rest of a filter's catalogue entry — its display
- * name, its URL key, whether the picker is single-select — is presentation and
- * lives with the browser surface that renders it.
- *
- * Both sets are exhaustive over {@link FilterField} by construction: they are
- * `FilterField[]`, so a field removed from the enum stops compiling here.
+ * Which filter fields are meaningless without a key, or a subkey — kept
+ * server-side because `dataForFilter` refuses on it before the query is
+ * built. Both sets are `FilterField[]`, exhaustive over {@link FilterField}.
  */
 import type { FilterField } from "@langwatch/analytics-contract";
 

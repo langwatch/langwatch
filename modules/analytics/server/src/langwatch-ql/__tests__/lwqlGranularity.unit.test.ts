@@ -1,6 +1,7 @@
 /**
- * The granularity contract on its own: what declaring `{dashboard_context_granularity_seconds:UInt32}`
- * means for one run, and the three ways a surface can get it wrong.
+ * The granularity contract on its own: what declaring
+ * `{dashboard_context_granularity_seconds:UInt32}` means for one run, and
+ * the three ways a surface can get it wrong.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

@@ -1,14 +1,7 @@
 /**
- * The settings profile, as SQL text.
- *
- * The integration suites prove the shipped profile is *accepted* by ClickHouse
- * and that a caller cannot override it. What they cannot show cheaply is which
- * ceilings the statement carries at all: a limit dropped from the emitted text
- * leaves every one of those suites green, because nothing they run comes near
- * the bound that went missing. This file is the inventory check — it fails when
- * a ceiling stops being pinned, which is the change that would otherwise ship
- * silently.
- *
+ * The settings profile, as SQL text. Integration suites prove it's accepted
+ * and not overridable, but not which ceilings it carries — a dropped limit
+ * would leave every suite green. This is the inventory check for that.
  * @see ../../services/langwatch-ql-access-model.service.ts — the statements under test
  * @see specs/analytics/lwql-api.feature
  */
@@ -151,15 +144,9 @@ describe("given the LangWatchQL row policy", () => {
 });
 
 /**
- * The administrative user's access-management config, as XML text.
- *
- * The `lwql_postgres` named collection holds a plaintext PostgreSQL password,
- * so `show_named_collections_secrets` would expose it through
- * `SHOW CREATE NAMED COLLECTION`. It must never be granted — parity with the
- * chart-managed renderer (`infra/clickhouse-serverless`, commit ec0005aadf) —
- * and this asserts the *absence*, which no integration suite would catch: a
- * suite that never runs `SHOW CREATE NAMED COLLECTION` stays green whether the
- * secret is exposed or not.
+ * The admin access-management config, as XML text. `lwql_postgres` holds a
+ * plaintext PostgreSQL password, so `show_named_collections_secrets` must
+ * never be granted — this asserts that *absence*, which no suite would catch.
  */
 describe("given the LangWatchQL access-management config", () => {
   describe("when it is rendered for the administrative user", () => {

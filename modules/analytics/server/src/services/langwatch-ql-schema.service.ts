@@ -1,7 +1,7 @@
 /**
- * The endpoint's projection of the catalog, not a second schema. Columns stay visible with gate kinds
- * and `available: false`, so a caller can see the permission needed. Datasets with no readable column
- * are absent. Shared catalog derivations keep publication and validator eligibility identical.
+ * The endpoint's projection of the catalog, not a second schema. Columns
+ * stay visible with gate kinds and `available: false`, so a caller can see
+ * the permission needed; datasets with no readable column are absent.
  */
 
 import type { LangWatchQLProtections, LangWatchQLSchema } from "@langwatch/analytics-contract";

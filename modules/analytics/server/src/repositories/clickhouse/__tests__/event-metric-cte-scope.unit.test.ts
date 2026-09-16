@@ -1,22 +1,7 @@
 /**
  * @regression
- *
- * Event-based metrics (sentiment.thumbs_up_down, events.event_type) produce
- * selectExpressions that reference `ss."Events.Name"` (the stored_spans alias).
- * When these metrics are used alongside a groupBy that triggers the CTE dedup
- * path (buildArrayJoinTimeseriesQuery), the metric expression ends up in the
- * outer SELECT — but the `ss` alias only exists inside the CTE. This caused
- * ClickHouse to reject the query with:
- *
- *   "Unknown expression or function identifier 'ss.Events.Name' in scope"
- *
- * The fix in transformMetricForDedup() detects count-like expressions containing
- * ss."Events.Name" or ss."Events.Attributes" and rewrites them to
- * uniqExact(trace_id), since in the CTE context the group_key already
- * filters to matching events.
- *
- * Value-based aggregations (avgArray, sumArray, etc.) are NOT rewritten,
- * because doing so would silently change "average score" to "count of traces".
+ * CTE-dedup count-like expressions on `ss.Events.*` columns rewrite to
+ * `uniqExact(trace_id)`; value-based aggregations are NOT rewritten.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";

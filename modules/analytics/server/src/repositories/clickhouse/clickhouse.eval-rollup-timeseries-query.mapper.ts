@@ -1,19 +1,7 @@
 /**
  * Rollup SQL builder for `evaluation_analytics_rollup` — ADR-034 Phase 6
- * (eval mirror of `rollup-timeseries-query.ts`).
- *
- * The eval rollup carries (ScoreSum, ScoreCount), (PassCount, FailCount),
- * (EvalCount, ErrorCount, SkippedCount), and DurationSum/CostSum/
- * NonBilledCostSum. Aggregations:
- *
- *   - `evaluation_score / avg`  → sum(ScoreSum) / nullIf(sum(ScoreCount), 0)
- *   - `evaluation_score / sum`  → sum(ScoreSum)
- *   - `evaluation_pass_rate / avg` → sum(PassCount) / nullIf(sum(PassCount) + sum(FailCount), 0)
- *   - `evaluation_runs / cardinality` → sum(EvalCount)
- *
- * The builder owns these compositions; routing only decides whether to
- * call it. Anything unsupported throws (programmer error — routing should
- * have selected the slim or legacy table).
+ * (eval mirror of `rollup-timeseries-query.ts`). The builder owns these
+ * aggregation compositions; anything unsupported throws (programmer error).
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
@@ -32,17 +20,9 @@ const ROLLUP_TABLE = "evaluation_analytics_rollup" as const;
 const ra = "ra";
 
 /**
- * Aggregations the eval rollup can compute CORRECTLY from its
- * `SimpleAggregateFunction(sum, …)` columns — exactly mirroring the router's
- * `ROLLUP_EVAL_AGGREGATIONS`.
- *
- * `min`/`max` are DELIBERATELY absent. The rollup stores per-bucket sums, so
- * the best it could do is `min/max(ScoreSum / ScoreCount)` — the extremum of
- * per-bucket AVERAGES, which shifts as background merges combine parts and is
- * never the true worst/best score. Those route to the eval slim table (one row
- * per evaluation), where `min/max(Score)` is the real per-eval extremum.
- * Narrowing the type here makes the exhaustive switches below reject them at
- * compile time rather than silently returning merge-state noise.
+ * `min`/`max` are DELIBERATELY absent: the rollup only stores per-bucket
+ * sums, so `min/max(ScoreSum/ScoreCount)` would be the extremum of
+ * per-bucket AVERAGES, not the true per-eval extremum (route to slim for that).
  */
 export type EvalRollupAggregation = Extract<AnalyticsAggregation, "sum" | "avg" | "cardinality">;
 

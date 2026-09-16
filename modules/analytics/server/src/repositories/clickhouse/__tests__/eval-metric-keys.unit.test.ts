@@ -1,15 +1,7 @@
 /**
- * Which evaluation metrics the timeseries builders will serve.
- *
- * This one list is now the source for three things that used to be written
- * separately: the `EvalMetricKey` type, the runtime check both builders guard
- * with, and the route table's rollup-rollable set. Adding a fourth evaluation
- * metric should be one edit.
- *
- * The check is not cosmetic. Both builders THROW when a series names a metric
- * they cannot serve, so a key that routes but fails the check reaches the
- * builder and is refused there — a metric that looks supported right up to the
- * point somebody charts it.
+ * Which evaluation metrics the timeseries builders serve — one list feeding
+ * the `EvalMetricKey` type, the runtime check, and the route table, so
+ * adding a metric is one edit. Both builders THROW on an unserved metric.
  */
 
 import { describe, expect, it } from "vitest";

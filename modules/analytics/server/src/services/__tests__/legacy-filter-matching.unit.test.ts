@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Recovered with the matcher itself. These scenarios were written against
- * `platform/app/src/server/filters/triggerFilter.matcher.ts` and deleted with
- * it; the subject moved, the contract did not. The #4805 fail-closed cases and
- * the `events.metrics.value` boundary parity table are the reason this file
- * exists — they are what a rewrite would silently drop.
+ * Recovered with the matcher itself: the subject moved but the contract
+ * (#4805 fail-closed cases, metric-boundary parity) did not — don't drop them.
  */
 import { describe, expect, it } from "vitest";
 import type { FilterField, PreconditionTraceData } from "@langwatch/analytics-contract";

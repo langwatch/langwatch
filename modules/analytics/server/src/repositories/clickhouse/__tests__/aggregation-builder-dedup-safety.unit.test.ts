@@ -1,21 +1,6 @@
 /**
- * Structural regression tests for LIMIT 1 BY deduplication in analytics queries.
- *
- * ClickHouse LIMIT 1 BY reads all selected columns (including heavy Maps
- * like Attributes and Arrays like Models) for every row in a granule before
- * deduplicating. Combined with missing date filters in the inner subquery,
- * this causes 800x data over-reads (2.5GB vs 3MB expected).
- *
- * The safe alternative is an IN-tuple subquery:
- *   WHERE (TenantId, TraceId, UpdatedAt) IN (
- *     SELECT TenantId, TraceId, max(UpdatedAt) ... GROUP BY TenantId, TraceId
- *   )
- * which resolves dedup using only lightweight key columns and enables
- * partition pruning when date filters are pushed into the inner subquery.
- *
- * These tests verify that dedupedTraceSummaries no longer uses LIMIT 1 BY
- * and instead uses the max(UpdatedAt) GROUP BY pattern.
- *
+ * Structural regression: `dedupedTraceSummaries` must use `max(UpdatedAt)
+ * GROUP BY` for dedup, never bare `LIMIT 1 BY` (reads every heavy column/row).
  * @see dev/docs/best_practices/clickhouse-queries.md
  * @regression issue #3158
  */

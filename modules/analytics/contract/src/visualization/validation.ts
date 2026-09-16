@@ -1,9 +1,7 @@
 /**
- * Server-side admission path for saved chart definitions.
- *
- * It is deliberately a separate export from the browser visualization entry:
- * loading the generated validator is valid while a chart is saved, but must
- * not make an ordinary browser import of theme/policy helpers eager.
+ * Server-side admission path for saved chart definitions. Deliberately
+ * separate from the browser visualization entry, so loading the generated
+ * validator never makes an ordinary browser import eager.
  */
 export * from "./lwql-dataset-names.ts";
 export * from "./validate-vega-lite-spec.ts";

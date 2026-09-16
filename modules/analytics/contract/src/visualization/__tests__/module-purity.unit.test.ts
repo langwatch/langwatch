@@ -41,11 +41,8 @@ const BROWSER_RUNTIME_MODULE =
   /from\s+["'](react|react-dom|react-vega|vega|vega-embed|vega-view|@chakra-ui\/[^"']+)["']/;
 
 /**
- * Whether a module *evaluates* a browser runtime.
- *
- * Type-only imports are stripped first because they are erased before anything
- * runs — which is what lets `noNetworkVegaLoader.ts` check its shape against
- * vega's own `Loader` at compile time without importing vega.
+ * Whether a module *evaluates* a browser runtime. Type-only imports are
+ * stripped first, since they are erased before anything runs.
  */
 function importsBrowserRuntime(source: string): boolean {
   return BROWSER_RUNTIME_MODULE.test(source.replace(TYPE_ONLY_STATEMENT, ""));
@@ -83,12 +80,9 @@ describe("the Vega-Lite validator and policy modules", () => {
           expect(source.includes("import("), `${name} uses a lazy import`).toBe(false);
         }
 
-        // The schema module reaches the bundled schema only through the
-        // ahead-of-time generated validator: it names no `vega-lite` module at
-        // all, and compiles nothing at runtime. `new Function` is what a
-        // Content-Security-Policy without `unsafe-eval` refuses, so a runtime
-        // `ajv.compile` here would be the chart layer's validation quietly
-        // dying in exactly the environment it is hardened for.
+        // The schema module never calls `ajv.compile` at runtime; it uses the
+        // ahead-of-time generated validator, since `new Function` is what a
+        // CSP without `unsafe-eval` refuses.
         const schemaSource = files.find(({ name }) => name === "vega-lite-schema.ts")?.source ?? "";
         expect(schemaSource).toContain('from "./vega-lite-schema-validator.generated.js"');
         expect(schemaSource).not.toMatch(/from\s+["']vega-lite[^"']*["']/);

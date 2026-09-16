@@ -1,10 +1,7 @@
 /**
  * The contract between the LangWatchQL workbench and its Vega-Lite chart
- * layer: what a renderer is handed, and what validation hands back.
- *
- * This module imports nothing. Every other module under `visualization/`
- * depends on it, so keeping it import-free keeps the dependency graph acyclic
- * and keeps a server-side import of the validator from evaluating anything.
+ * layer. This module imports nothing — every other `visualization/` module
+ * depends on it, which keeps the dependency graph acyclic.
  */
 
 /** One dataset the renderer registers with Vega by name. */
@@ -34,11 +31,9 @@ export interface LangWatchQLVegaLiteChartProps {
 }
 
 /**
- * Stable presentation keys. These are what the client presentation registry is
- * keyed by; the specific rule that fired travels alongside as `rule`.
- *
- * These are validation *results*, not `HandledError`s: nothing here is thrown
- * across a boundary, so nothing here needs a wire contract.
+ * Stable presentation keys the client presentation registry is keyed by; the
+ * rule that fired travels alongside as `rule`. These are validation
+ * *results*, not `HandledError`s — nothing here is thrown across a boundary.
  */
 export type VegaValidationErrorCode =
   | "invalid-json"

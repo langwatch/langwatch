@@ -162,10 +162,8 @@ describe("reading which columns a specification encodes", () => {
     ];
 
     /**
-     * Vega-Lite writes such a column as `usage\.total_tokens`, while the
-     * response carries the unescaped name. Matching only the raw spelling
-     * dropped the column from the scan set, and a dropped column is silently
-     * never checked for non-finite or wide-integer values.
+     * Vega-Lite escapes this as `usage\.total_tokens`; matching only the raw
+     * spelling silently dropped it from the scan, skipping its validation.
      */
     it("recognises the escaped spelling as that column", () => {
       expect(

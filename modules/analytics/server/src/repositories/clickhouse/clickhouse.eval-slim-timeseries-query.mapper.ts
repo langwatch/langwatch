@@ -1,26 +1,7 @@
 /**
  * Slim SQL builder for `evaluation_analytics` — ADR-034 Phase 6 (eval mirror
- * of `slim-timeseries-query.ts`).
- *
- * Deliberately separate from the trace slim builder because the column set
- * differs: the eval slim has typed columns for Score / Passed / EvaluatorType
- * / Status / Label rather than the trace slim's TraceName / Models / cost-
- * and-token bag. Parameterising one builder across both would devolve into a
- * pile of source-conditional column picks; two builders read straight-line
- * better and let each one's exhaustiveness assertion guard its own column
- * set.
- *
- * Routing decides whether to call this builder (`pickAnalyticsTable` returns
- * `"evaluation_analytics"`); the builder only handles what the eval slim
- * supports — any unsupported shape is a programmer error and throws.
- *
- * All queries:
- *   * include `WHERE TenantId = {tenantId:String}` as the FIRST predicate
- *     (multi-tenancy contract);
- *   * filter on the partition column `OccurredAt` so ClickHouse prunes
- *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table via the IN-tuple pattern — eval slim is
- *     `ReplacingMergeTree(UpdatedAt)`.
+ * of `slim-timeseries-query.ts`), kept separate from the trace slim builder
+ * since their column sets differ too much to share one parameterised builder.
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
@@ -52,17 +33,9 @@ export type EvalSlimGroupByKey =
 /** Eval-slim eligible metric keys (must match SLIM_ELIGIBLE_EVAL_METRIC_KEYS). */
 
 /**
- * Map an eval metric to its slim column expression.
- *
- * Pass-rate is special: `Passed` is `Nullable(Bool)`, and the registry's
- * `avg` over a boolean treats it as 0/1. We coerce with `toUInt8` so the
- * avg comes out as the pass rate.
- *
- * Verdict metrics (score, pass-rate) null themselves out on rows whose
- * evaluation did not run to completion — an errored run's stray verdict must
- * not shift the chart (#6833). Matches the legacy per-evaluator path's
- * `Status = 'processed'` condition, and covers slim rows written before the
- * fold gated Passed/Score at write time.
+ * Maps an eval metric to its slim column. `Passed` is `Nullable(Bool)`; we
+ * coerce with `toUInt8` so `avg` reads as a pass rate. Verdict metrics null
+ * themselves on incomplete runs so a stray verdict can't shift the chart (#6833).
  */
 function evalSlimColumnFor(metric: EvalMetricKey): string {
   switch (metric) {
@@ -222,12 +195,9 @@ function buildEvalSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["fi
 }
 
 /**
- * Build a slim query for `evaluation_analytics`.
- *
- * Serves UNKEYED eval series only. `evaluation_analytics` hoists
- * `EvaluatorType`, not `EvaluatorId`, so a per-evaluator predicate cannot be
- * expressed against this table; the router sends keyed series to
- * `evaluation_runs`.
+ * Builds a slim query for `evaluation_analytics`, UNKEYED series only —
+ * it hoists `EvaluatorType`, not `EvaluatorId`, so keyed series route to
+ * `evaluation_runs` instead.
  */
 export function buildEvalSlimTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,

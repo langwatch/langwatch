@@ -1,9 +1,6 @@
 /**
- * Tests for ClickHouse analytics column pruning.
- *
- * Validates that analytics queries select only the columns they need,
- * avoiding expensive reads of wide columns like ComputedInput/ComputedOutput.
- *
+ * Tests for ClickHouse analytics column pruning: queries select only the
+ * columns they need, avoiding wide reads like ComputedInput/ComputedOutput.
  * @see specs/analytics/clickhouse-column-pruning.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
@@ -13,19 +10,9 @@ import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../clickhouse.field-mappi
 import { resetParamCounter } from "../clickhouse.filter-translator.mapper.ts";
 
 /**
- * Splits a SELECT list into its items. Commas inside a call cannot split an
- * item, so parenthesised groups are emptied first, innermost outwards, until
- * none are left: a plain `split(",")` would otherwise tear
- * `map('k', SpanAttributes['k']) AS SpanAttributes` in half at its inner comma
- * and make the whole-map assertion below meaningless.
- *
- * Emptying rather than removing keeps each item's shape, so
- * `map(...) AS SpanAttributes` stays distinguishable from a bare
- * `SpanAttributes`, which is the whole point of the assertion.
- *
- * Quoted strings are emptied first: an attribute key is arbitrary text, so a
- * key like `'tool(args)'` would otherwise contribute an unbalanced parenthesis
- * and leave its enclosing call un-emptied.
+ * Splits a SELECT list into items; parenthesised groups and quoted strings
+ * are emptied first (innermost-out) so `split(",")` can't tear a call in
+ * half, while emptying — not removing — keeps `AS SpanAttributes` distinct.
  */
 function selectListItems(selectList: string): string[] {
   let flattened = selectList.replace(/'[^']*'/g, "''");

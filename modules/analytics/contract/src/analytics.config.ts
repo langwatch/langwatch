@@ -29,12 +29,9 @@ export const LANGWATCH_QL_ENV_NAMES = {
 export const analyticsServerConfigSchema = compileRuntimeConfig(analyticsServerConfigDefinition);
 
 /**
- * Refuses a SQL workbench identity that is half configured, naming the
- * variables the operator still has to set. Variable names only: one of these
- * five is a password.
- *
- * Applied to the RESOLVED value rather than declared as a refinement on the
- * schema, so the rule reads the same shape every process holds.
+ * Refuses a SQL workbench identity that is half configured, naming only the
+ * missing variables (one of the five is a password). Checked against the
+ * resolved config, not a schema refinement.
  */
 export function assertAnalyticsServerConfig(config: AnalyticsServerConfig): void {
   const absent = Object.entries(LANGWATCH_QL_ENV_NAMES)

@@ -1,24 +1,6 @@
 /**
- * The monitor-card pass-rate read path: the ClickHouse analytics repository →
- * `buildTimeseriesQuery` (trace_summaries ⋈ evaluation_runs) → the shared row
- * parser, against a ClickHouse carrying the shipped migrations.
- *
- * Reproduces the customer-reported divergence: an evaluator with 6/6 passed
- * runs on a single day showed a 25% pass rate on the Evaluations page while
- * the analytics donut said 100%. Day buckets exist for every day ANY evaluator
- * ran; the parser used to default the pass-rate to 0 in buckets where THIS
- * evaluator had no processed runs, and the card averaged the four daily
- * values: (0 + 0 + 0 + 1) / 4 = 25%.
- *
- * Asserts the two contracts the fix relies on:
- *   (a) daily buckets carry NO pass-rate value for days without processed runs
- *       (absent, not 0);
- *   (b) a `timeScale: "full"` read returns the run-weighted rate over the whole
- *       period — the number the card now headlines, and the same number the
- *       donut derives by counting runs.
- *
+ * Pass-rate buckets omit unprocessed days (never 0); `full` returns run-weighted rate.
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
- *
  * @integration
  * @vitest-environment node
  */

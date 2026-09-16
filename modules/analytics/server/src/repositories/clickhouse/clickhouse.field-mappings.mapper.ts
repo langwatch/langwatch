@@ -91,9 +91,9 @@ export const SPAN_ANALYTICS_COLUMNS = [
 export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 /**
- * Field mapping configuration for the legacy `trace_summaries` SQL builder previously carried here has moved to
- * `../routing/field-availability.ts` where the router + slim/rollup builders consume it directly.
- * (`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)
+ * Field mapping configuration for the legacy `trace_summaries` SQL builder
+ * (`aggregation-builder.ts`). ADR-034 routing metadata (`availableOn`) has
+ * moved to `../routing/field-availability.ts`, consumed there directly.
  */
 export interface FieldMapping {
   /** The ClickHouse table containing this field */
@@ -469,8 +469,10 @@ export function getTableAlias(table: CHTable): string {
 
 /**
  * Build JOIN clause for a table, selecting only the columns needed.
- * @param table the table to JOIN; @param requiredColumns optional column subset (defaults to all analytics columns).
- * @param spanTimeFilter / @param evalTimeFilter optional partition-column bounds for `stored_spans` / `evaluation_runs` — without one the subquery cold-scans every partition; ignored for other tables.
+ * @param table the table to JOIN.
+ * @param requiredColumns optional column subset (defaults to all analytics columns).
+ * @param spanTimeFilter `stored_spans` partition bound; omitted, it cold-scans every partition.
+ * @param evalTimeFilter `evaluation_runs` partition bound; omitted, it cold-scans every partition.
  */
 export function buildJoinClause({
   table,

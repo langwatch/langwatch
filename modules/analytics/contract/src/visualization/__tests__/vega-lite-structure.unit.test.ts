@@ -48,10 +48,9 @@ describe("visitJsonObjects", () => {
 
   describe("given sibling objects in one array", () => {
     /**
-     * Characterisation, not a promise: the walk pops a LIFO stack, so siblings
-     * come back last-first. No rule depends on the order — each reads the
-     * pointer — but the descent was rewritten from recursion to a worklist and
-     * a reordering there would be silent, so it is pinned.
+     * Characterisation, not a promise: siblings come back last-first because
+     * the walk pops a LIFO stack. No rule depends on order, but a silent
+     * reordering here is pinned by this test.
      */
     it("reports them in the stack's order, unchanged by the worklist descent", () => {
       const found = visitJsonObjects({

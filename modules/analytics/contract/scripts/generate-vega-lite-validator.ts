@@ -55,10 +55,8 @@ export function readBundledVegaLiteSchema(): Record<string, unknown> {
 }
 
 /**
- * Compiles the schema and returns the standalone module source, imports and
- * header included. Deterministic: the same schema and the same Ajv version
- * produce byte-identical output, which is what lets the drift guard compare
- * bytes rather than behaviour alone.
+ * Deterministic: the same schema and Ajv version produce byte-identical
+ * output, which is what lets the drift guard compare bytes, not behaviour.
  */
 export function generateVegaLiteValidatorSource(schema: Record<string, unknown>): string {
   const ajv = new Ajv({

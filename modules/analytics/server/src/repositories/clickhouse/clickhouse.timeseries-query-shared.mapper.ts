@@ -1,9 +1,7 @@
 /**
  * Internal helpers shared by the slim + rollup timeseries SQL builders
- * (ADR-034 Phase 3 app-layer module). Both builders need the same
- * `toStartOf…` bucket function over different time columns; centralising
- * keeps bucket boundaries identical between the two destination tables
- * (and identical to the legacy `trace_summaries` builder for parity).
+ * (ADR-034 Phase 3). Centralising the `toStartOf…` bucket function keeps
+ * boundaries identical across both tables and the legacy builder.
  */
 
 const MINUTES_PER_HOUR = 60;
@@ -91,12 +89,9 @@ export function isPercentile(agg: "median" | "p90" | "p95" | "p99" | (string & {
 }
 
 /**
- * Timeseries safety-net: when the (endDate - startDate) / timeScale bucket
- * count would exceed MAX_TIMESERIES_BUCKETS, or when `timeScale` is
- * undefined, coerce the query to a daily bucket so the response stays
- * bounded. Extracted from the analytics service + both legacy shims
- * (simp5012-003 — they were triplicated verbatim; drift would surface as
- * a false tripwire alarm).
+ * Timeseries safety-net: when the bucket count from (endDate - startDate) /
+ * timeScale would exceed `MAX_TIMESERIES_BUCKETS`, or `timeScale` is
+ * undefined, coerce to a daily bucket so the response stays bounded.
  */
 export const MAX_TIMESERIES_BUCKETS = 1000;
 const MS_PER_MINUTE = 1000 * 60;
@@ -138,15 +133,9 @@ export function percentileFor(agg: string): number {
 }
 
 /**
- * The evaluation metrics both timeseries builders can answer.
- *
- * One list, and the type and the check both derive from it. It used to be
- * three: a const list in the route table with `EvalRollupMetricKey` derived
- * from it, and a hand-written union of the same three members in EACH query
- * builder — one of them under the same type name — with a hand-written
- * predicate beside it. Adding a fourth evaluation metric meant remembering
- * five places, and forgetting one of the predicates would route the metric and
- * then refuse it.
+ * The evaluation metrics both timeseries builders can answer — one list,
+ * with the type and runtime check both derived from it. It used to be three
+ * hand-written copies; forgetting one meant a metric that routed but refused.
  */
 export const EVAL_METRIC_KEYS = [
   "evaluations.evaluation_score",

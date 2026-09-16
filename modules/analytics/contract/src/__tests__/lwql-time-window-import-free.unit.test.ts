@@ -15,12 +15,9 @@ const MODULE_DIR = fileURLToPath(new URL("../", import.meta.url));
 const read = (name: string): string => readFileSync(path.join(MODULE_DIR, name), "utf8");
 
 /**
- * Every way a module can name another, in the order they are reported.
- *
- * The two static forms are anchored to the start of a line, because the guarded
- * module's docblock has to be able to use the words "import" and "importing" in
- * prose to explain the rule — a bare substring search would fail on the very
- * sentence that states it.
+ * Every way a module can name another, in the order they are reported. The
+ * static forms anchor to a line start, since the guarded module's own
+ * docblock uses the words "import"/"importing" in prose.
  */
 const IMPORT_FORMS: readonly [form: string, pattern: RegExp][] = [
   ["a static import", /^\s*import\s/m],

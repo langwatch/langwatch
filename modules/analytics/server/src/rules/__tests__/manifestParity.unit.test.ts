@@ -1,25 +1,10 @@
 /**
- * The Go renderer's LWQL manifest must agree with this repo's catalog.
- *
- * `infra/clickhouse-serverless/internal/render/lwql_catalog.json` is the single
- * source of truth for the Go side of the LangWatchQL access model: it lists the
- * source tables the restricted identity is granted a filtered read of, and the
- * caller-facing views it is granted SELECT on. The Go binary embeds it, so what
- * Go renders is exactly this file — but nothing in the Go repo can tell whether
- * the file still matches the application's catalog, which is what actually
- * defines those tables and views. That gap is what let `batch_evaluations`
- * drift: it was in the Go lists and the SaaS renderer but absent from the
- * catalog.
- *
- * This test closes it. It derives both sets from the catalog and asserts the
- * manifest equals them, so a catalog change without a matching manifest edit
- * fails here. The langwatch-saas `render-config.sh` is a third list in another
- * repo and cannot be reached from single-repo CI — a real boundary, left to the
- * PR thread.
- *
+ * The Go renderer's LWQL manifest must agree with this repo's catalog — Go
+ * embeds a static JSON copy nothing in that repo can validate. This test
+ * derives both sets from the catalog so a drift (`batch_evaluations` did) fails here.
  * @see ../../../../../../../../infra/clickhouse-serverless/internal/render/lwql.go
  * @see ../lwql-view-catalog.rules.ts — the catalog the manifest mirrors
- * @see ../../services/langwatch-ql-view-provisioning.service.ts — sourceTables, the canonical source-table derivation
+ * @see ../../services/langwatch-ql-view-provisioning.service.ts — source-table derivation
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -57,11 +42,9 @@ function catalogViewNames(): string[] {
 }
 
 /**
- * The catalog's distinct source tables in order, via the same helper the
- * provisioner uses — a single deployment database, so its qualified-name
- * dedup collapses to the bare names the Go manifest lists. The order is
- * load-bearing: the Go renderer iterates the array to generate GRANT
- * statements, and their order affects the rendered output.
+ * The catalog's distinct source tables, in order — via the same helper the
+ * provisioner uses. Order is load-bearing: the Go renderer iterates this
+ * array to generate GRANT statements, and their order affects the output.
  */
 function catalogSourceTables(): string[] {
   return viewProvisioning.sourceTables({ names: NAMES, sourceDatabase: NAMES.database }).map(

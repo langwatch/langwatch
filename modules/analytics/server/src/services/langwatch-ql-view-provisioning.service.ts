@@ -1,5 +1,6 @@
 /**
- * What provisioning LangWatchQL views involves beyond the view statements: grants, row policies, and run order.
+ * What provisioning LangWatchQL views involves beyond the view statements:
+ * grants, row policies, and run order.
  * @see ./langwatch-ql-view-statements.service.ts — the views
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
@@ -83,19 +84,11 @@ export class LangWatchQLViewProvisioningService {
   }): string[] {
     return [
       ...views.map((view) => viewStatements.viewStatement({ names, sourceDatabase, view, dedup })),
-      // Row policies BEFORE the grants they constrain, and this order is load-bearing rather
-      // than cosmetic. In ClickHouse a table carrying a `SELECT` grant and no row policy
-      // returns every row, so grants-first leaves a window in which the restricted identity
-      // reads across every tenant — and provisioning is not atomic. A caller that dies midway
-      // (a dropped connection, a refused statement) can leave that window standing
-      // indefinitely, and the caller that drives this deliberately swallows the error and
-      // continues booting, so nothing downstream would close it.
-      //
-      // Emitting policies first inverts the failure: a partial run leaves the identity
-      // policed but not yet granted, which refuses reads rather than widening them. Safe to
-      // hoist because every table named here already exists by this point — fact tables come
-      // from migrations, and the PostgreSQL-engine tables are created earlier in the same
-      // batch.
+      // Row policies BEFORE grants — load-bearing, not cosmetic. A `SELECT`
+      // grant with no row policy returns every row, so grants-first leaves a
+      // window where the restricted identity reads across every tenant if a
+      // caller dies midway. Policies-first fails closed instead: unpoliced-but-
+      // ungranted refuses reads. Safe to hoist — these tables already exist.
       ...this.sourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
         accessModel.rowPolicyStatement({ names, lwqlTable }),
       ),

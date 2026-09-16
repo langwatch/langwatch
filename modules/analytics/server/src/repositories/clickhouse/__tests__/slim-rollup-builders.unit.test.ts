@@ -1,15 +1,7 @@
 /**
- * Unit tests for the slim + rollup SQL builders (ADR-034 Phase 3,
- * app-layer module).
- *
- * Asserts the SQL shape per destination — table name in FROM, presence of
- * tenant + partition-key predicates, absence of `*Merge` (the rollup uses
- * SimpleAggregateFunction(sum, …) so `sum(col)` is the right read).
- *
- * The legacy code path (`trace_summaries`) is no longer dispatched from
- * inside the legacy `buildTimeseriesQuery`; that's owned by the new
- * AnalyticsService + the legacy shim. These tests therefore call the new
- * builders directly.
+ * Unit tests for the slim + rollup SQL builders (ADR-034 Phase 3). Asserts
+ * SQL shape per destination — table, tenant/partition predicates, and no
+ * `*Merge` (the rollup uses `SimpleAggregateFunction(sum, …)`).
  */
 
 import { describe, expect, it } from "vitest";

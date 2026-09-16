@@ -2,18 +2,9 @@ import type { PreconditionTraceData } from "@langwatch/analytics-contract";
 import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
 
 /**
- * The fold state a match was settled on, read as the trace a filter matches.
- *
- * Filters are written against a trace's own vocabulary — a user id, a label, a
- * span model, an event metric — and a fold state carries most of that flattened
- * into one attribute map. This is the projection back: one place that knows
- * which attribute key each field is spelled with, so a background process
- * confirming a match sees the same trace the interactive filter saw.
- *
- * The trace-level events list is NOT on the fold state. A caller that matches
- * event filters derives it from stored spans and passes it in; omitting it
- * leaves event fields unresolved, which the matcher then fails closed on rather
- * than skipping to pass.
+ * The fold state a match was settled on, read as the trace a filter
+ * matches, so a background match sees what the interactive filter saw.
+ * The events list is NOT included; omitting it fails closed, not open.
  */
 export class PreconditionTraceDataService {
   static create(): PreconditionTraceDataService {
@@ -183,11 +174,9 @@ function resolveCustomMetadataKey(key: string): {
 }
 
 /**
- * Extracts custom metadata from fold state attributes.
- * Matches all three legacy key formats consistent with ClickHouse filter generation:
- * - metadata.{key} (canonical, priority 3)
- * - langwatch.metadata.{key} (legacy REST, priority 2)
- * - {key} (bare OTEL attribute, priority 1)
+ * Extracts custom metadata from fold state attributes, matching all three
+ * legacy key formats (priority in parens): `metadata.{key}` (3, canonical),
+ * `langwatch.metadata.{key}` (2, legacy REST), `{key}` (1, bare OTEL).
  */
 function extractCustomMetadata(attrs: Record<string, string>): Record<string, string> | null {
   const result: Record<string, string> = {};

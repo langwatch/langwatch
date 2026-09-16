@@ -1,8 +1,7 @@
 /**
- * Vega-Lite's `as` can be one name (writes val, val_end) or two names (both
- * already named, nothing appended). The distinction matters because incorrect
- * names in `produces` cause fail-open errors. Node environment — see
- * `validateVegaLiteSpec.unit.test.ts`.
+ * Vega-Lite's `as` can be one name (writes val, val_end) or two (nothing
+ * appended); wrong names in `produces` cause fail-open errors. Node
+ * environment — see `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 

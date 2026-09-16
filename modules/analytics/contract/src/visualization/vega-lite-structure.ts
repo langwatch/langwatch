@@ -1,10 +1,7 @@
 /**
- * Pure structural measurement and traversal of a candidate Vega-Lite spec.
- *
- * Everything here treats the spec as untrusted JSON: nothing is assumed about
- * its shape, the traversals are iterative so a pathologically nested document
- * cannot exhaust the stack, and no value is read for meaning — only for size,
- * depth, and composition.
+ * Pure structural measurement and traversal of a candidate Vega-Lite spec,
+ * treated as untrusted JSON. Traversals are iterative so a pathologically
+ * nested document cannot exhaust the stack.
  */
 
 /** JSON Pointer for the document root. Never `""`, so a path is always shown. */
@@ -127,13 +124,9 @@ function pushDescendants({
   key: string;
   value: unknown;
 }): void {
-  // Iterative rather than recursive: array nesting is caller-authored, so a
-  // spec nested deeply enough — `[[[[…]]]]` — would overflow the call stack
-  // and crash the screen instead of being refused. A worklist descends to any
-  // depth at heap cost.
-  //
-  // Items are pushed in reverse so popping yields index order, which is the
-  // order the previous recursive descent produced.
+  // Iterative rather than recursive: a spec nested deeply enough would
+  // overflow the call stack and crash instead of being refused. Items are
+  // pushed in reverse so popping yields index order.
   const pending: { path: string; value: unknown }[] = [{ path, value }];
 
   while (pending.length > 0) {
@@ -218,12 +211,9 @@ export interface VegaViewNode {
 }
 
 /**
- * Flattens the composition tree, carrying data and `repeat` scope down to each
- * node. Data inheritance is Vega-Lite's own: a node without `data` reads the
- * nearest ancestor that has one.
- *
- * Safe to recurse because the pipeline refuses anything past the nesting
- * ceiling before this runs.
+ * Flattens the composition tree, carrying data and `repeat` scope down to
+ * each node. Safe to recurse because the pipeline refuses anything past the
+ * nesting ceiling before this runs.
  */
 export function collectViewNodes(spec: unknown): VegaViewNode[] {
   const collected: VegaViewNode[] = [];

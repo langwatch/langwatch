@@ -154,12 +154,9 @@ export interface VegaExpressionScreening {
 }
 
 /**
- * Screens one expression string. An empty result on both lists means the
- * expression uses nothing but allowlisted identifiers, arithmetic, comparison,
- * ternaries, and access to its own datum.
- *
- * Field names reached through `datum.` are NOT screened here: they are data,
- * and the dataset that feeds the branch decides whether they exist.
+ * Screens one expression string; an empty result on both lists means it uses
+ * only allowlisted identifiers, arithmetic, comparison, ternaries and its own
+ * datum. Fields reached through `datum.` are NOT screened — they are data.
  */
 export function screenVegaExpression(expression: string): VegaExpressionScreening {
   const withoutStrings = expression.replace(STRING_LITERAL, "0");

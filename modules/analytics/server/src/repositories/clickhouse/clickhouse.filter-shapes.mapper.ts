@@ -71,9 +71,8 @@ export type FilterConditionBuilder = (
  */
 export type FilterConditionOptions = {
   /**
-   * Pre-built SQL fragment bounding `sp.StartTime` to the dashboard time window,
-   * injected into `stored_spans` EXISTS subqueries so they prune partitions
-   * instead of cold-scanning every weekly partition (including S3-tiered ones).
+   * Pre-built SQL fragment bounding `sp.StartTime` to the dashboard window,
+   * injected into `stored_spans` EXISTS subqueries to prune partitions.
    * Empty string when no time window is available.
    */
   spanTimeBound?: string;

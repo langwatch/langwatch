@@ -118,10 +118,9 @@ describe("the starting chart specification", () => {
       });
 
       /**
-       * The server pins every result to one tenant, so `TenantId` is constant
-       * and a chart over it is a single bar of everything. The starter reaches
-       * past it when the result offers any other category — and still uses it
-       * when it is the only category there is, because an axis beats none.
+       * `TenantId` is constant per result, so a chart over it is one bar.
+       * The starter skips past it when another category exists, but falls
+       * back to it when it's the only one — an axis beats none.
        */
       it("prefers a category the result can distinguish over the tenant scope column", () => {
         const spec = starterVegaLiteSpec({

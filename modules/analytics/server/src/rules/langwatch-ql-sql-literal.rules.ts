@@ -12,10 +12,9 @@
 export const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
- * Returns `value` if it is a safe identifier, throws otherwise.
- *
- * `role` names what the identifier is for, so a provisioning failure says which
- * configured name was rejected rather than only that one was.
+ * Returns `value` if it's a safe identifier, throws otherwise. `role` names
+ * what it's for, so a provisioning failure says which configured name was
+ * rejected, not just that one was.
  */
 export function assertIdentifier(value: string, role: string): string {
   if (!SAFE_IDENTIFIER.test(value)) {
@@ -37,15 +36,9 @@ export function postgresLiteral(value: string): string {
 }
 
 /**
- * A PostgreSQL identifier as SQL: always double-quoted.
- *
- * Not optional the way it is on the ClickHouse side. Prisma names its tables
- * and columns in the case the model declares (`Annotation`, `projectId`), and
- * PostgreSQL folds an unquoted identifier to lower case, so an unquoted
- * `Annotation` resolves to a relation that does not exist. Every PostgreSQL
- * identifier this package emits goes through here — quoting some of them and
- * not others is the same bug, deferred until a deployment names a schema in
- * mixed case.
+ * A PostgreSQL identifier as SQL: always double-quoted, since PostgreSQL
+ * folds an unquoted identifier to lower case (`Annotation` -> a relation
+ * that doesn't exist). Quoting some identifiers and not others is the same bug.
  */
 export function postgresQuoted(value: string): string {
   return `"${assertIdentifier(value, "PostgreSQL identifier")}"`;

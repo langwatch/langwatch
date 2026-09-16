@@ -1,10 +1,7 @@
 /**
- * The two refusals the chart layer raises that validation cannot.
- *
- * Neither is a property of a specification, so neither can be decided before
- * the chart runs: whether Vega compiles what it was given, and whether the rows
- * it was given hold anything to draw. They are shaped like every other refusal
- * so the chart has exactly one way of telling a member what happened.
+ * The two refusals the chart layer raises that validation cannot: whether
+ * Vega compiles what it was given, and whether the rows hold anything to
+ * draw. Shaped like every other refusal, so there is one way to report it.
  */
 
 import { lwqlVegaError } from "./vega-lite-policy.ts";
@@ -26,11 +23,9 @@ function isVegaValidationError(value: unknown): value is VegaValidationError {
 }
 
 /**
- * A failure from inside Vega, once a specification has already been accepted.
- *
- * A refusal from the repository-owned loader keeps its own detail — it already
- * names the resource it blocked, redacted — because "this chart tried to load
- * something" and "this chart did not compile" call for different next steps.
+ * A failure from inside Vega, once a specification is already accepted. A
+ * loader refusal keeps its own (redacted) detail, since "tried to load
+ * something" and "did not compile" call for different next steps.
  */
 export function lwqlRenderFailure(error: unknown): VegaValidationError {
   const detail = isRecord(error) && isVegaValidationError(error.detail) ? error.detail : void 0;

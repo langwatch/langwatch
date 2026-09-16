@@ -1,10 +1,7 @@
 /**
- * Specifications refused for being wrong rather than for being hostile: a
- * mistyped encoding, the wrong Vega-Lite version, a column that does not exist,
- * a dataset that was never registered.
- *
- * Text that is not JSON at all has no fixture — it cannot be a `.json` file, so
- * `parseVegaLiteSpecText` is exercised from the test instead.
+ * Specifications refused for being wrong rather than hostile: a mistyped
+ * encoding, an unregistered dataset, a bad version. Text that isn't JSON has
+ * no fixture — `parseVegaLiteSpecText` is exercised from the test instead.
  */
 
 import type { LangWatchQLVegaRuleId } from "../../../visualization-types.ts";

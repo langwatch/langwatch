@@ -1,8 +1,7 @@
 /**
- * Field references, resolved against the dataset feeding the branch they sit in
- * rather than against whatever dataset happens to be at the top of the spec.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Field references resolve against the dataset feeding their own branch, not
+ * whatever dataset sits at the top of the spec. Node environment on purpose
+ * — see `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 

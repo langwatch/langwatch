@@ -12,11 +12,8 @@ export interface TransformEffect {
 
 /**
  * Per-transform reads and writes, keyed by the signature key a step declares.
- *
- * Deliberately shorter than Vega-Lite's own set: `density`, `regression`,
- * `loess`, `quantile`, `impute`, `sample`, `extent` and the generators are
- * absent — and so refused — because nothing here bounds what they cost or what
- * they emit.
+ * Deliberately shorter than Vega-Lite's own set — `density`, `regression`,
+ * `loess` and the generators are absent because nothing here bounds their cost.
  */
 export const TRANSFORM_ANALYZERS: Record<
   string,
@@ -85,12 +82,9 @@ export const TRANSFORM_ANALYZERS: Record<
 };
 
 /**
- * Reads the effect of one transform step, off the first signature key the table
- * carries.
- *
- * A step the table does not recognise consumes and produces nothing, which is
- * the conservative reading — and unreachable through the validator, whose
- * allowlist is this table's own keys.
+ * Reads the effect of one transform step, off the first signature key it
+ * carries. An unrecognised step consumes/produces nothing — unreachable,
+ * since the validator's allowlist is this table's own keys.
  */
 export function analyzeTransform(step: Record<string, unknown>): TransformEffect {
   for (const [name, analyze] of Object.entries(TRANSFORM_ANALYZERS)) {
@@ -117,12 +111,9 @@ function opOutputs(value: unknown): string[] {
 }
 
 /**
- * What an explicit `as` names.
- *
- * Two names name both outputs and nothing is appended. One name names only the
- * start, and Vega-Lite derives the end as `<name>_end`. Appending to a two-name
- * tuple would publish fields the step never writes, which the field-existence
- * check would then accept.
+ * What an explicit `as` names: two names name both outputs; one name names
+ * only the start, and Vega-Lite derives the end as `<name>_end`. Appending to
+ * a two-name tuple would publish fields the step never writes.
  */
 function namedTransformOutputs(named: string[]): string[] {
   const [only] = named;

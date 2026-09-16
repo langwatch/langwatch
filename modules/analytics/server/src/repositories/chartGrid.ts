@@ -1,20 +1,7 @@
 /**
- * The chart grid's own unit — shared by the server-side layout validation
- * (`graphs.ts`, `dashboardWidgets.ts` and the saved-workbench-chart placement
- * schema) and the frontend grid that renders it (`ChartGrid.tsx`). Both sides
- * must agree on these numbers or a layout a client considers valid would be
- * rejected by the server, or vice versa.
- *
- * A column is a fraction of the grid's own width — {@link CHART_GRID_COLUMNS}
- * of them span the full row — and a row is a fixed
- * {@link CHART_GRID_ROW_HEIGHT_PX} regardless of container width, the same
- * fluid-column/fixed-row model `react-grid-layout` (and most dashboard grids
- * modelled on it, e.g. Grafana's) default to.
- *
- * Existing rows were converted to this unit once, by the
- * `chart_grid_eight_columns` Prisma migration; nothing here converts at read
- * time.
- *
+ * The chart grid's own unit, shared by server-side layout validation and the
+ * frontend `ChartGrid.tsx` that renders it — both sides must agree on these
+ * numbers, or a client-valid layout is rejected by the server, or vice versa.
  * @see specs/analytics/chart-grid-resize.feature
  */
 
@@ -91,10 +78,9 @@ export const chartGridCardHeightPx = (rowSpan: number): number =>
   rowSpan * CHART_GRID_ROW_HEIGHT_PX + (rowSpan - 1) * CHART_GRID_MARGIN_PX;
 
 /**
- * The first row below every card listed — where a new card goes so it sits
- * under the existing ones rather than on top of the tallest. A card ends at
- * `gridRow + rowSpan`, so the bottom is the largest of those, or row 0 when
- * the grid is empty.
+ * The first row below every card listed, so a new card sits under the
+ * existing ones. A card ends at `gridRow + rowSpan`; the bottom is the
+ * largest of those, or row 0 when the grid is empty.
  */
 export const chartGridBottomRow = (
   cards: readonly { gridRow: number; rowSpan: number }[],

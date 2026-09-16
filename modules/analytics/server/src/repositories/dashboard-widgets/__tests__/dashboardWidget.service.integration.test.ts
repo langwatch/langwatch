@@ -1,12 +1,7 @@
 /**
- * Dashboard widget service against a real Postgres.
- *
- * The claims that only a real database can make: that a widget's grid row is
- * allocated from the placement target alone (not every widget in the project),
- * that a `dashboardId` from another project is refused before it is persisted
- * (the IDOR the schema does not enforce), and that a partial definition update
- * keeps the half the caller did not send.
- *
+ * Dashboard widget service against real Postgres: grid rows allocate from
+ * the placement target alone, cross-project `dashboardId` writes are
+ * refused pre-persist (an IDOR the schema doesn't enforce).
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 

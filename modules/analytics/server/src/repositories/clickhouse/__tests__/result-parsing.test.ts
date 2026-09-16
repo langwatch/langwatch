@@ -4,15 +4,9 @@ import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.t
 import { buildMetricAlias } from "../clickhouse.metric-translator.mapper.ts";
 
 /**
- * These tests verify that the column aliases generated in SQL match
- * the aliases we look up when parsing results.
- *
- * The key insight is:
- * - SQL uses: `... AS \`0__metric_name\`` (backticks in SQL)
- * - ClickHouse JSONEachRow returns: `{"0__metric_name": value}` (no backticks)
- * - We look up: `row["0__metric_name"]` (no backticks)
- *
- * So the backticks should be stripped by ClickHouse when returning JSON.
+ * Column aliases generated in SQL must match what we look up when parsing.
+ * SQL emits a backticked alias; ClickHouse's JSONEachRow strips backticks,
+ * so the lookup key is the bare alias name.
  */
 describe("result-parsing", () => {
   describe("alias consistency", () => {

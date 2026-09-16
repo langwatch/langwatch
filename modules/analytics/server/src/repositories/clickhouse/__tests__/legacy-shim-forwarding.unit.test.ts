@@ -1,14 +1,7 @@
 /**
- * Unit tests for the Analytics ClickHouse repository's timeseries forwarding
- * (`clickhouse.analytics.repository.ts`, successor to the legacy analytics
- * shim).
- *
- * The repository is pure forwarding: builder -> CH client -> parser. These
- * tests pin the forwarding contract for the input fields the SQL builder
- * implements — in particular `negateFilters` (the toolbar's Negate Filters
- * toggle) and `traceIds` (trace-scoped graphs), which the shim used to
- * silently drop.
- * See specs/analytics/negate-filters-and-trace-scope.feature.
+ * Pins the forwarding contract (builder -> CH client -> parser) for
+ * `negateFilters` and `traceIds`, which the legacy shim used to silently
+ * drop. See specs/analytics/negate-filters-and-trace-scope.feature.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

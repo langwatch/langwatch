@@ -1,23 +1,7 @@
 /**
- * Executed-SQL coverage for the `evaluation_runs` JOIN's partition bounds.
- *
- * The JOIN subquery and its IN-tuple dedup inner are both bounded below on
- * `ScheduledAt` and `evaluation_runs.UpdatedAt`, so the weekly partitions
- * prune instead of the tenant's whole evaluation history being walked on every
- * graph. The bounds are lower-only, and that is the whole correctness
- * argument: an evaluation is inserted at or after the trace it scores, but it
- * can be scheduled arbitrarily later than the window the graph asks about, and
- * a re-evaluation writes a newer row version later still.
- *
- * Every other analytics fixture schedules the evaluation at the same instant
- * as its trace, so none of them can tell a lower bound from an upper one.
- * These cases pin the shapes that can: an evaluation scheduled months after
- * the queried window on a trace inside it, row versions spread across weekly
- * partitions and inserted out of order, and two versions tied on `UpdatedAt`.
- *
+ * Lower-only bounds by design: evaluations can be scheduled long after the trace they score.
  * @see specs/analytics/evaluation-runs-join-time-bounds.feature
  * @see https://github.com/langwatch/langwatch/issues/6392
- *
  * @integration
  * @vitest-environment node
  */
@@ -38,10 +22,9 @@ const TENANT_ID = "test-eval-join-bounds-6392";
 const SEEDED_TABLES = ["trace_summaries", "evaluation_runs"] as const;
 
 /**
- * June 2025, with May as the comparison period. The generated bound sits 7
- * days below the previous period's start (2025-04-24), so anything the
- * fixtures schedule after that date is inside the bound and anything before it
- * is not.
+ * June 2025, with May as comparison. The generated bound sits 7 days below
+ * the previous period's start (2025-04-24); fixtures scheduled after that
+ * date are inside the bound, before it are not.
  */
 const baseInput = {
   projectId: TENANT_ID,

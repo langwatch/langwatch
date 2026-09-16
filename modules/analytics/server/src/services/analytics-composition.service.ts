@@ -13,12 +13,8 @@ import type { AnalyticsTripwire } from "@langwatch/analytics-contract";
 
 /**
  * Process composition binds the one Analytics repository to the service.
- *
- * `resolveClient` answers the SAME narrow session shape
- * ({@link EvaluationAnalyticsClickHouseClient}) both the timeseries repository
- * and the evaluation repository call — one tenant-bound session, not a raw
- * `@clickhouse/client` handle, so whatever builds it (today, a thin wrapper
- * over the process's routing `clickhouse` member) has one shape to satisfy.
+ * `resolveClient` answers the same narrow session shape both the timeseries
+ * and evaluation repositories call — one tenant-bound session, not a raw client.
  */
 export class AnalyticsAdapter {
   static create(options: {

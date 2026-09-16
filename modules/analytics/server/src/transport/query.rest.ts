@@ -26,25 +26,18 @@ import {
 } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 
 /**
- * What the query door reaches. The project identity is the process's: the tenant
- * capability is hashed from a secret the request deliberately does not carry.
- *
- * The catalogue and the execution are taken straight off {@link AnalyticsApi},
- * so this door cannot ask for a spelling the contract does not have — it asked
- * for `describeSchema` and `execute` until now, which the application has
- * never served under those names, and every request answered 500. `AnalyticsApp`
- * declares `implements AnalyticsQueryApi` for the third.
+ * What the query door reaches — project identity is the process's; the
+ * tenant capability is hashed from a secret the request never carries.
+ * Typed straight off {@link AnalyticsApi}, so it can't name a spelling the app doesn't implement.
  */
 export interface AnalyticsQueryApi extends Pick<
   AnalyticsApi,
   "describeLangWatchQLSchema" | "executeLangWatchQL"
 > {
   /**
-   * The project identity one execution runs under, resolved for a CREDENTIAL
-   * rather than for a member — this door carries no session, and its caller's
-   * protections arrive as a fact rather than being resolved here. The
-   * LangWatchQL secret it carries is read server-side and must never leave the
-   * handler: no field of it may appear in a response.
+   * The project identity one execution runs under, for a CREDENTIAL rather
+   * than a member — this door has no session, so caller protections arrive
+   * as a fact. The LangWatchQL secret must never leave the handler.
    */
   resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
 }
@@ -129,13 +122,10 @@ export const lwqlSchemaSchema = z.object({
               name: z.string(),
               type: z.string(),
               description: z.string(),
-              // Nullable rather than optional: the response answers the unit
-              // question for every column, and `null` is the answer for one that is
-              // not measured in anything. A bare string, matching
-              // `LangWatchQLSchemaColumn` (`@langwatch/analytics-contract`) —
-              // the App's declared return type, not the narrower
-              // `LWQL_COLUMN_UNITS`/gate-name sets this door's own catalog
-              // happens to draw from today.
+              // Nullable rather than optional: `null` answers the unit
+              // question for a column not measured in anything. A bare
+              // string, matching `LangWatchQLSchemaColumn`'s declared type —
+              // not the narrower set this door's catalog happens to draw from.
               unit: z.string().nullable(),
               gates: z.array(z.string()).readonly(),
               available: z.boolean(),

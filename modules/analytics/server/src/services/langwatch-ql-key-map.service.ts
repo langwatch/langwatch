@@ -36,9 +36,9 @@ export class LwqlKeyMapService {
   ) {}
 
   /**
-   * `sourceDatabase` is the ClickHouse database the approved views read, which a process knows from its own
-   * connection string. Taken as an argument rather than parsed here, because a package that parsed the deployment's
-   * connection string would be reading configuration that belongs to whoever composed it.
+   * `sourceDatabase` is the ClickHouse database the approved views read,
+   * known to a process from its own connection string — taken as an
+   * argument rather than parsed here, since that config belongs to the composer.
    */
   static create(options: {
     repository: LwqlKeyMapRepository;

@@ -1,9 +1,7 @@
 /**
- * The LangWatchQL policy: where data may come from, which resource-loading paths
- * exist, who controls the chart runtime, and what a transform or an expression
- * is allowed to do.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * The LangWatchQL policy: where data may come from, which resource-loading
+ * paths exist, and what a transform or expression may do. Node environment
+ * on purpose — see `validateVegaLiteSpec.unit.test.ts`.
  */
 import { describe, expect, it } from "vitest";
 
@@ -367,10 +365,9 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given the same forbidden expression in every slot that carries one", () => {
     describe("when it is validated", () => {
       /**
-       * Screening is per-key, so a slot missing from the key list is not
-       * screened *less* — it is not screened at all, and the expression reaches
-       * the same evaluator having been read by nothing. `condition.test` was
-       * exactly that slot: refused as a `filter`, accepted verbatim here.
+       * Screening is per-key: a slot missing from the key list isn't
+       * screened less, it's not screened at all. `condition.test` was
+       * exactly that slot — refused as a `filter`, accepted here.
        */
       it("refuses it in a conditional encoding, as it does in a filter", () => {
         const forbidden = "window.parent.document.cookie";

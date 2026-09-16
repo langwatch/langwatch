@@ -20,10 +20,8 @@ import {
 const TEST_DIR = fileURLToPath(new URL("./", import.meta.url));
 
 /**
- * Rules whose refusal has no fixture, because the thing they refuse cannot be
- * a checked-in `.json` file: text that is not JSON, a value that is not an
- * object, a specification too large to be worth committing, a row count, or a
- * runtime load. Each names the test that exercises it.
+ * Rules whose refusal has no fixture because the thing refused cannot be a
+ * checked-in `.json` file. Each entry names the test that exercises it.
  */
 const RULES_COVERED_BY_NAMED_TESTS: Partial<Record<LangWatchQLVegaRuleId, string>> = {
   "spec.not-json": "validate-vega-lite-spec.unit.test.ts",

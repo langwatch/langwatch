@@ -1,9 +1,7 @@
 /**
- * Memory-safety invariant for builder-generated analytics SQL: SpanAttributes is
- * a Map column, and selecting it whole in an outer SELECT materialises every key
- * of every row. Production OOMs came from exactly that, so the builder may only
- * touch it through key access.
- *
+ * Memory-safety invariant: `SpanAttributes` is a Map column, so selecting it
+ * whole materialises every key of every row (this OOMed in production) — the
+ * builder may only touch it through key access.
  * @see specs/analytics/clickhouse-memory-safety.feature (Layer 1: @unit scenarios)
  */
 
@@ -27,11 +25,8 @@ describe("memory-safety", () => {
 
   describe("SpanAttributes access in builder-generated queries", () => {
     /**
-     * Regex that matches bare "SpanAttributes" NOT followed by ['key'] access.
-     * We check the outermost SELECT by splitting on subquery boundaries.
-     *
-     * A bare SpanAttributes reference means the full Map column is being read,
-     * which can be gigabytes for wide attribute sets.
+     * Regex matching bare "SpanAttributes" not followed by `['key']` access
+     * — i.e. the full Map column being read, which can be gigabytes wide.
      */
     const bareSpanAttributesPattern = /SpanAttributes(?!\s*\[)/;
 

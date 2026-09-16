@@ -1,7 +1,6 @@
 /**
- * clickHouseFilterConditions builders that translate a filter field's selected
- * values into raw ClickHouse SQL fragments, and generateClickHouseFilterConditions
- * that composes them for a whole filter set.
+ * `clickHouseFilterConditions` builders translate a filter field's selected
+ * values into raw SQL; `generateClickHouseFilterConditions` composes them.
  * Spec: specs/traces/saved-views.feature, modules/analytics/specs/filter-sql-generation.feature
  */
 import { describe, expect, it } from "vitest";

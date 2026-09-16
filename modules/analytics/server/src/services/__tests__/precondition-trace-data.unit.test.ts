@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Recovered with the projection. A fold state carries the trace flattened into
- * one attribute map, and these pin which key each field is spelled with —
- * including the three legacy custom-metadata spellings and their priority
- * order, which is where a rewrite would quietly disagree with ClickHouse.
+ * Recovered with the projection: these pin which attribute key each field
+ * is spelled with, including the three legacy metadata spellings and order.
  */
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";

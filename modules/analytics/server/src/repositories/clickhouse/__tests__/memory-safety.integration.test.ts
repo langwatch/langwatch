@@ -1,19 +1,6 @@
 /**
- * Memory-budgeted execution of the generated analytics queries.
- *
- * Every case runs the SQL the builder emits against ClickHouse carrying the
- * *shipped* migrations, so a query that names a column the schema does not
- * have fails here rather than in production. Three properties are asserted
- * separately because they fail separately: the SQL is valid, it stays inside a
- * hard memory ceiling on deliberately wide rows, and it returns the number the
- * seed implies.
- *
- * The wide-attribute tenant is the whole memory argument. A metric that reads
- * `SpanAttributes` when it only needs `trace_summaries` columns is invisible
- * against narrow rows and an out-of-memory failure against real ones.
- *
+ * Runs generated SQL against shipped migrations, under a hard memory ceiling.
  * @see specs/analytics/clickhouse-memory-safety.feature
- *
  * @integration
  * @vitest-environment node
  */
@@ -37,12 +24,9 @@ const SEEDED_TABLES = ["trace_summaries", "stored_spans"] as const;
 /** 50 MB. The ceiling a wide-attribute read blows through. */
 const MEMORY_BUDGET = "50000000";
 /**
- * The wide tenants hold 80 KB of `SpanAttributes` per span, so a thousand of
- * them is 80 MB and two thousand is 160 MB — several times the budget above,
- * which is what makes an unpruned read fail here. The width is spread over
- * more spans rather than more bytes per span because the test server runs
- * under its own 1 GiB ceiling and refuses the seed long before the assertion
- * if one insert block is wide enough to matter.
+ * Wide tenants hold 80 KB of `SpanAttributes` per span — a thousand of them
+ * is well over the budget above. Width is spread across spans, not bytes per
+ * span, because the test server's own 1 GiB ceiling would refuse the seed.
  */
 const TIME_BUDGET_MS = 5_000;
 

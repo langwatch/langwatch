@@ -45,9 +45,8 @@ export class LangWatchQLVegaLoadBlockedError extends Error {
 
 /**
  * Strips credentials, query and fragment before a blocked reference is ever
- * shown or logged. The spec is caller-authored, so its URLs are caller-authored
- * too, and a refusal message must not become the thing that copies a token
- * somewhere it is kept.
+ * shown or logged — the spec is caller-authored, so a refusal message must
+ * not itself leak a token.
  */
 export function redactResourceReference(reference: string): string {
   try {

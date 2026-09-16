@@ -1,9 +1,7 @@
 /**
- * The dataset registry every fixture is validated against.
- *
- * `query_result` is the dataset the first workbench actually supplies;
- * `model_catalog` exists so the multi-dataset renderer contract and the lookup
- * rules have a second registered name to resolve against.
+ * The dataset registry every fixture validates against. `query_result` is
+ * what the workbench actually supplies; `model_catalog` gives the
+ * multi-dataset lookup rules a second registered name to resolve against.
  */
 
 import type {

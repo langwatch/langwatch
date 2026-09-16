@@ -141,3 +141,76 @@ coordinator confirmed the repair independently — the comment-stripped
 comparison reported 0 of 200 files with changed non-comment text. But the trap
 is generic: **never replace by reported line count; re-read the range, and
 re-derive line numbers after every edit to the same file.**
+
+---
+
+## modules/analytics — lanes `comments-analytics` and `comments-analytics-2a`
+
+### ADR candidates from `comments-analytics-2a` (five)
+
+Three of these were forced by a rule defect, not by the budget — see the
+rule-mechanics note below.
+
+1. **`server/src/repositories/clickhouse/__tests__/evaluation-runs-join-time-bounds.integration.test.ts`**
+   — lost the pinned-shape enumeration the fixture exists to exercise: an
+   evaluation scheduled months after the queried window; row versions spread
+   across weekly partitions inserted out of order; two versions tied on
+   `UpdatedAt`. Also lost: **every other analytics fixture schedules at the
+   same instant, so none of them can tell a lower bound from an upper one.**
+   That sentence is the reason this fixture is not redundant.
+2. **`.../__tests__/memory-safety.integration.test.ts`** — lost "the
+   wide-attribute tenant is the whole memory argument": why the fixture uses
+   wide `SpanAttributes` rather than narrow rows to make the OOM path
+   observable at all.
+3. **`.../__tests__/monitor-pass-rate.integration.test.ts`** — the two
+   contracts the fix rests on were compressed to one line: daily buckets carry
+   **no** pass-rate value (not `0`) for unprocessed days, and a
+   `timeScale: "full"` read returns the run-weighted rate. The
+   customer-reported divergence narrative (6/6 passed reading 25% vs 100%) was
+   dropped, which is fine — incident history belongs in git.
+4. **`server/src/rules/__tests__/manifestParity.unit.test.ts`** — dropped a
+   disclosed **known gap in the test's own coverage**: the langwatch-saas
+   `render-config.sh` is a third list in another repository and cannot be
+   reached from single-repo CI. That is a live limitation, not incident
+   history, and the lane found it recorded nowhere else.
+5. **`server/src/repositories/chartGrid.ts`** — dropped the column/row unit
+   definitions and the comparison with `react-grid-layout`'s fluid-column,
+   fixed-row model, plus the `chart_grid_eight_columns` migration provenance.
+   Lowest priority: the units are still documented at each constant.
+
+### RULE DEFECT: three tags are counted that should be discounted
+
+`comment-block-size` discounts structural JSDoc tags (`@param`, `@returns`,
+`@see`, …) because, in the rule's own words, "their count comes from the
+signature or the annotation, so counting them would report a length the author
+cannot cut". **`@integration`, `@vitest-environment` and `@regression` are not
+in that list, so they count as full content lines.**
+
+Consequence: an integration-test file header carrying `@see` (free) plus
+`@integration` and `@vitest-environment` (both counted) has budget for exactly
+**one** line of prose. That is what squeezed candidates 1-3 above, and it will
+squeeze every integration test in every remaining lane — ops, automation,
+identity and model-provider all have them.
+
+These three read as directives and markers, not narrative, and an author cannot
+delete them: `@vitest-environment` *is* the test's environment selection. They
+belong in `STRUCTURAL_TAG_LINE` in
+`packages/oxlint-rules/grammar/comment-block-policy.mjs` alongside `@see`.
+
+Fixing this lowers the finding count, but it does so by correcting a
+mis-measurement rather than by lowering the bar — exactly the reason `@param`
+is already discounted. **Not done yet:** it is a change to the shared
+`packages/oxlint-rules` package, which cannot be touched while sweep lanes are
+running (see the plugin-crash incident in `.claude/coordinator/LANES.md`).
+
+### One comment whose meaning was reconstructed, not just shortened
+
+`server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts:94` —
+the original three-line block had its sentences physically interleaved and did
+not parse as English ("…SQL builder previously carried here has moved to … .
+(`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)"). The
+lane reconstructed the intended reading rather than asking. The coordinator
+reviewed it: both facts survive — the interface documents the legacy builder's
+configuration, and ADR-034's `availableOn` metadata moved to
+`../routing/field-availability.ts`. Recorded because it is the one place in the
+sweep so far where a lane changed meaning rather than length.

@@ -1,9 +1,7 @@
 /**
- * The entry point: what counts as a specification at all, which schema decides
- * validity, and what the renderer contract is allowed to carry.
- *
- * Node environment on purpose — no jsdom docblock. These modules passing under
- * plain node IS the server-import-safety commitment, not an accident of setup.
+ * The entry point: what counts as a specification, which schema decides
+ * validity, and what the renderer contract may carry. Node environment on
+ * purpose — passing under plain node IS the server-import-safety commitment.
  */
 import { describe, expect, it, vi } from "vitest";
 import { schemaInvalidEncodingType, unknownSchemaVersion } from "./fixtures/invalid/index.ts";

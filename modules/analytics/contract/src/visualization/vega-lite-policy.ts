@@ -1,9 +1,7 @@
 /**
- * The LangWatchQL Vega-Lite policy: the ceilings, the allowlists, the rule
- * catalogue, and the fail-closed walk that applies them.
- *
- * Every ceiling is named here and nowhere else, so a refusal can say which one
- * it hit and a reviewer can see the whole envelope in one place.
+ * The LangWatchQL Vega-Lite policy: the ceilings, allowlists, rule catalogue
+ * and fail-closed walk. Every ceiling is named here and nowhere else, so a
+ * refusal can say which one it hit.
  */
 
 import { EXPRESSION_BEARING_KEYS, screenVegaExpression } from "./vega-lite-expressions.ts";
@@ -73,11 +71,9 @@ export const LWQL_VEGA_LIMITS: LangWatchQLVegaLimits = {
 export type LangWatchQLVegaLimitName = keyof typeof LWQL_VEGA_LIMITS;
 
 /**
- * Transforms whose behaviour and produced columns have been reviewed.
- *
- * Read off the analyzer table rather than restated, because a transform this
- * list permitted without an analyzer behind it would contribute no columns and
- * refuse a working chart for the wrong reason.
+ * Transforms whose behaviour and produced columns have been reviewed. Read
+ * off the analyzer table rather than restated, so a permitted transform with
+ * no analyzer behind it can't silently contribute zero columns.
  */
 export const ALLOWED_VEGA_LITE_TRANSFORMS: readonly string[] = Object.keys(TRANSFORM_ANALYZERS);
 
@@ -400,10 +396,9 @@ function refuseCallerDatasets(spec: unknown): VegaValidationError[] {
 }
 
 /**
- * Any property named `url`, anywhere. The Vega-Lite v6 schema puts one on
- * `UrlData`, on the `url` encoding channel, on `MarkDef`, and on six different
- * mark config definitions, so position-by-position rules would leak; the blanket
- * rule cannot, and no LangWatchQL chart has a legitimate URL in it.
+ * Any property named `url`, anywhere. The Vega-Lite v6 schema puts one in
+ * enough places that position-by-position rules would leak; a blanket rule
+ * cannot, and no LangWatchQL chart has a legitimate URL.
  */
 function refuseUrlProperties(objects: readonly JsonObjectNode[]): VegaValidationError[] {
   return objects
