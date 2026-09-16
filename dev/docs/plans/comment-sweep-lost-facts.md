@@ -728,3 +728,33 @@ The fix is not to delete the citations but to move what they point at into
 committed documentation — a `dev/docs/adr/` entry or a `dev/docs/` page — and
 repoint them. Until then, treat any `.claude/` reference in shipped source as a
 broken link.
+
+## Wave 6 — `apps/ui` and `modules/navigation`
+
+Three cuts, and the second is the one that matters — it is an edge-case
+behaviour note, not incident narration, which is the class the brief says to
+keep.
+
+33. **A save refused mid-action still refuses that action.**
+    `apps/ui/e2e/langy/fake-tab-document.ts`, `catchUpIfBehind`. Gone: "a save
+    refused DURING an action still refuses that action, because the tab is
+    holding an unsaved edit right then." That is a real rule about when the
+    refusal applies, not a story about how it was found, and nothing else in
+    the file states it. Someone reading the fake tab now sees that saves can be
+    refused but not that an in-flight action is not exempt.
+
+34. **Which settings address redirects, and which are sections of the rail.**
+    `modules/navigation/web/src/model/settings-menu.ts`, the Event Sourcing
+    `alsoActiveAt` entry. The general reason survives ("these addresses have an
+    owner"); the mapping does not — the scheduler address redirects onto the
+    schedules section, while the payload store and Deja View are pages of the
+    workspace reached from its own rail and projection replay is the drawer.
+    Whoever next adds an `alsoActiveAt` entry has the rule but no worked
+    example of it.
+
+35. **Why the legacy pill opens on hover, focus and click.**
+    `modules/navigation/web/src/ui/elements/legacy-pill.tsx`. Kept: why it is a
+    popover rather than a tooltip. Cut: that the open-on-hover/focus/click
+    behaviour is what keeps it reachable by pointer *and* keyboard. That is an
+    accessibility requirement, and an accessibility requirement with no
+    surviving statement is one that gets "simplified" away.
