@@ -276,6 +276,31 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And the resolved endpoint for both flows is `https://lw.acme.internal`
     And the persisted config (and/or .env) records the endpoint after success
 
+  # `~/.langwatch/config.json` is one file for the whole machine. A login
+  # against a local dev instance repoints it for every other shell, so the next
+  # `langwatch ingest context` and every wrapped tool follow a port that is only
+  # up while that dev server runs. The CLI says so once and continues; a shell
+  # that already exports LANGWATCH_CLI_CONFIG has its own config file and hears
+  # nothing.
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: Logging in against a local instance says the machine's global config now points there
+    When the user logs in with `--endpoint http://localhost:5580`
+    Then the CLI warns that the machine's global config now points at a local instance
+    And the warning names LANGWATCH_CLI_CONFIG, CLAUDE_CONFIG_DIR and CODEX_HOME as the way to isolate a QA shell
+    And the login continues
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: A login shell that already relocated the CLI config hears nothing
+    Given LANGWATCH_CLI_CONFIG points at a scratch config file
+    When the user logs in with `--endpoint http://localhost:5580`
+    Then the CLI says nothing about the machine's global config
+
+  @unit @cli @login @endpoint @local-instance
+  Scenario: A self-hosted endpoint on another host is not a local instance
+    When the user logs in with `--endpoint https://lw.acme.internal`
+    Then the CLI says nothing about the machine's global config
+
   @bdd @cli @login @device-skip
   Scenario: `langwatch login --device` skips both prompts (existing behavior preserved)
     Given the user is in an interactive terminal
