@@ -53,10 +53,9 @@ export abstract class CodingAgentSessionRepository {
   }): Promise<CodingAgentSessionBranchRecord[]>;
 
   /**
-   * The same rows as `listByRepositoryBranch`, fetched by session id instead
-   * of by repository: the read behind fact-stamp discovery, where a session's
-   * stamped rows name a repository its own row has since moved away from.
-   * `startedAtFromMs` is required for the same partition-pruning reason.
+   * The same rows as `listByRepositoryBranch`, fetched by session id: the
+   * read behind fact-stamp discovery, where a session's stamped rows name a
+   * repository its own row has since moved away from.
    */
   abstract listBySessionIds(input: {
     tenantIds: string[];

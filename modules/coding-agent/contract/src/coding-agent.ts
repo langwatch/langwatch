@@ -168,12 +168,9 @@ export const codingAgentSessionEventSchema = z
     promptChars: z.number(),
     totalTokens: z.number(),
     /**
-     * The working context active when the event happened, stamped onto the
-     * event by the contribute command from the session's last `session_context`
-     * declaration. '' on rows from before a declaration (or before the stamp
-     * existed), which the usage read prices under the legacy whole-session
-     * rule. This is what lets one session's cost split across every pull
-     * request it drove.
+     * The working context active when the event happened, stamped from the
+     * session's last `session_context` declaration. '' on pre-declaration rows;
+     * this is what lets one session's cost split across every pull request it drove.
      */
     repositoryHost: z.string(),
     repositoryOwner: z.string(),

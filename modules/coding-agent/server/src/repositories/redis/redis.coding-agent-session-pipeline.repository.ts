@@ -66,10 +66,8 @@ export interface CodingAgentProcessingPipelineDeps {
 
 /**
  * The session-keyed coding-agent pipeline from ADR-056. Source subscribers
- * contribute bounded span, log, and metric facts; projections persist the
- * session fold, trace map, converged metric series, and ordered session events.
- * GitHub mapping is the only post-fold effect. Session-seen stamping remains
- * an inline, throttled store concern.
+ * contribute bounded span/log/metric facts; projections persist the fold,
+ * trace map, metric series and events. GitHub mapping is the only post-fold effect.
  */
 export class EventingCodingAgentProcessingAdapter {
   private constructor(private readonly deps: CodingAgentProcessingPipelineDeps) {}

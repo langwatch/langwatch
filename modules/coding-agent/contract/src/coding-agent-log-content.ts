@@ -21,10 +21,9 @@ export interface LogContentKey {
 const BODY_ATTR = "body";
 
 /**
- * Free text an agent writes ABOUT the session (an error it hit, the task it
- * handed a sub-agent, the commit message it wrote). It routinely quotes the
- * prompt and the reply together, so it survives only for a viewer allowed
- * BOTH, mirroring how evaluator `details` are gated in `trace-view-gates.api.ts`.
+ * Free text an agent writes ABOUT the session (an error, a sub-agent's task,
+ * a commit message). It routinely quotes prompt and reply together, so it
+ * survives only for a viewer allowed BOTH, like evaluator `details`.
  */
 const SESSION_FREE_TEXT: LogContentCategory = "both";
 
@@ -106,11 +105,9 @@ const ALL_CONTENT_KEYS: readonly string[] = [
 ];
 
 /**
- * The gate's fallback for an event in neither table. It withholds EVERY key
- * the table knows, not just `body`: a new agent adapter, or a new event on an
- * existing one, would otherwise carry `prompt` or `response_text` straight
- * through the gate untouched — the same bypass shape a namespaced event had.
- * The side is unknown, so every one of them needs BOTH categories.
+ * The gate's fallback for an event in neither table: it withholds EVERY key,
+ * not just `body`, since a new adapter could otherwise leak `prompt` or
+ * `response_text` straight through untouched. Unknown side, so BOTH gate.
  */
 const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] = ALL_CONTENT_KEYS.map((key) => ({
   key,
@@ -128,20 +125,17 @@ function knownContentKeys(eventName: string): readonly LogContentKey[] | undefin
 
 /**
  * What the API's log redaction withholds: every content key present on the
- * record, each behind its own category, and for an unrecognised event every
- * key the table knows. Always a superset of {@link contentAttrKeys}, which is
- * what makes the gate impossible to walk past.
+ * record, each behind its own category, or (for an unrecognised event) every
+ * key the table knows — always a superset of `contentAttrKeys`.
  */
 export function logContentKeys(eventName: string): readonly LogContentKey[] {
   return knownContentKeys(eventName) ?? UNKNOWN_EVENT_CONTENT_KEYS;
 }
 
 /**
- * What the read-path enrichment probes to find an event's content payload, in
- * order: it reads the FIRST key present. An unrecognised event keeps the plain
- * `body` convention here rather than the gate's wide fallback, because guessing
- * a content key for an event we do not know would surface the wrong attribute
- * as span content. Hiding too much is safe; showing the wrong thing is not.
+ * What read-path enrichment probes for an event's content payload: the FIRST
+ * key present. An unrecognised event keeps the plain `body` fallback rather
+ * than the gate's wide one — hiding too much is safe, showing the wrong thing isn't.
  */
 export function contentAttrKeys(eventName: string): readonly string[] {
   return knownContentKeys(eventName)?.map((entry) => entry.key) ?? [BODY_ATTR];

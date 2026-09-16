@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
  * The Opened column's date: short inside the current year, carrying the year
  * outside it.
  */

@@ -47,10 +47,9 @@ export interface TurnDivider {
 export interface MergedSession {
   entries: TranscriptEntry[];
   /**
-   * A stable identity per row, parallel to `entries`. React keys have to
-   * survive a prepend: keyed by position, every row inherits the state of a
-   * different row when earlier turns arrive above it, and an expanded system
-   * context would silently migrate onto someone else's line.
+   * A stable identity per row, parallel to `entries`. Keyed by position, a
+   * prepend would make every row inherit a different row's state — an
+   * expanded system context would silently migrate onto someone else's line.
    */
   rowKeys: string[];
   toolSpans: ReadonlyMap<string, TerminalToolSpan>;

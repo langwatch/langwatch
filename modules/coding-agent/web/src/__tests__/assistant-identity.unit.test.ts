@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
  * The bridge from a stored session's agent slug to the assistant kind whose
  * name and mark a reader recognises.
  */

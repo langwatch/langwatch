@@ -100,11 +100,9 @@ export function signalSays(signal: CodingAgentSignal, needle: string): boolean {
 }
 
 /**
- * One agent, declaratively. Pure data and pure predicates — a definition
- * never reads state, never writes, and is exercised only through the engine.
- *
- * Registration is ordered (see `CODING_AGENT_REGISTRY`): the first definition
- * whose `matches` returns true names the record.
+ * One agent, declaratively. Pure data and pure predicates — never reads or
+ * writes state, exercised only through the engine. Registration is ordered
+ * (`CODING_AGENT_REGISTRY`): the first definition whose `matches` returns true wins.
  */
 export interface CodingAgentDefinition {
   id: Exclude<CodingAgent, "unknown">;
@@ -134,30 +132,23 @@ export interface CodingAgentDefinition {
   toolNameFromSpanName?(spanName: string): string | null;
 
   /**
-   * Span names this agent's session facts fold from, joined into the span
-   * dispatcher's gate. Names here need not carry the agent's namespace
-   * (codex's turn span is a bare `session_task.turn`), so the gate demands
-   * agent DETECTION on top of membership for them — a foreign span that
-   * happens to reuse the name is declined, where Claude's self-namespaced
-   * names are admitted on the name alone.
+   * Span names this agent's session facts fold from. Names need not carry the
+   * agent's namespace (codex's turn span is bare `session_task.turn`), so the
+   * gate demands agent DETECTION too — Claude's self-namespaced names alone suffice.
    */
   sessionSpanNames?: readonly string[];
 
   /**
-   * The session key off one of this agent's spans, when the SHARED candidate
-   * order reads the wrong attribute for it. Codex is the reason this exists:
-   * its turn span carries the per-turn id under `gen_ai.conversation.id` and
-   * the SESSION's id under `thread.id`, so the shared order would split every
-   * turn into its own session. Return null to fall back to the shared
-   * resolution; never return a value that is not this agent's session id.
+   * The session key off this agent's spans, for when the SHARED candidate
+   * order reads the wrong attribute. Codex needs it: its turn span carries
+   * the per-turn id under `gen_ai.conversation.id`, the session's under `thread.id`.
    */
   sessionKeyFromSpan?(params: { name: string; attrs: Record<string, unknown> }): string | null;
 
   /**
-   * True when the agent's tool runs are reported only on its LOG events
-   * (there is no tool span to fold from), so the session fold counts them
-   * from `tool_result`. Implied by `logsOnly`. Codex is the non-logsOnly
-   * case: its spans carry the turn and token story, its events the tools.
+   * True when tool runs are reported only on LOG events (no tool span to fold
+   * from), so the session fold counts them from `tool_result`. Codex is the
+   * non-logsOnly case: its spans carry turn/token, its events the tools.
    */
   foldsToolRunsFromEvents?: boolean;
 

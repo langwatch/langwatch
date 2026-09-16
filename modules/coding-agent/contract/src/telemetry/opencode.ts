@@ -3,12 +3,9 @@ import { type CodingAgentDefinition, signalSays } from "./coding-agent-definitio
 const OPENCODE_TOOL_SPAN = "opencode.tool.";
 
 /**
- * opencode. Scope `com.opencode`; sends BARE event names (`tool_result`,
- * not `opencode.tool_result`) and dots its session events
- * (`session.created`) — both handled by the engine's strip/flatten, not
- * aliases here. Its `lines_of_code.total` cumulative gauge is deliberately
- * NOT mapped (it sits alongside the `.count` delta; adding both would
- * double every line).
+ * opencode: scope `com.opencode`, sends BARE event names (`tool_result`, not
+ * `opencode.tool_result`) and dots session events (`session.created`).
+ * `lines_of_code.total` is unmapped since it duplicates the `.count` delta.
  */
 export const opencodeAgent: CodingAgentDefinition = {
   id: "opencode",

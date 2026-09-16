@@ -1,12 +1,9 @@
 import type { ContributionFacts } from "../coding-agent-processing.ts";
 
 /**
- * The LangWatch session-context vocabulary: the companion event a `langwatch
- * ingest context` declaration arrives as, and the keys its git identity rides
- * on. Agent-generic by construction — every agent that installs the hook sends
- * these exact spellings. Shared by the session fold (which keeps the session
- * row's present-tense identity) and the contribute command (which stamps each
- * fact row with the context active when it happened).
+ * The LangWatch session-context vocabulary: the event a `langwatch ingest
+ * context` declaration arrives as, and the keys its git identity rides on.
+ * Agent-generic — every agent installing the hook sends these exact spellings.
  */
 export const SESSION_CONTEXT_EVENT = "session_context";
 
@@ -19,10 +16,9 @@ export const SESSION_CONTEXT_ATTR = {
 } as const;
 
 /**
- * The working context a declaration names: which repository and branch the
- * session is on right now. The worktree is deliberately absent — attribution
- * matches pull requests on repository and branch, and the worktree names a
- * checkout, not a destination.
+ * The working context a declaration names: repository and branch. Worktree
+ * is deliberately absent — attribution matches on repository/branch, and
+ * worktree names a checkout, not a destination.
  */
 export interface SessionWorkingContext {
   repositoryHost: string;
@@ -32,10 +28,9 @@ export interface SessionWorkingContext {
 }
 
 /**
- * The declared context off a `session_context` contribution's facts, or null
- * when the declaration names no repository. A partial answer (repository
- * without a branch, as on a detached HEAD) still returns, with the missing
- * field empty; the stamper decides whether that is enough to stamp with.
+ * The declared context off a `session_context` contribution, or null when it
+ * names no repository. A partial answer (repository without branch, as on a
+ * detached HEAD) still returns, empty field and all — the stamper decides.
  */
 export function workingContextOfFacts(facts: ContributionFacts): SessionWorkingContext | null {
   const context = {

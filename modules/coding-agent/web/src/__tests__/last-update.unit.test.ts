@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
  * @unit
- *
  * The Last update column: a distance while the row is still warm, a date once
  * it is not.
  */

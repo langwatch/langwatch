@@ -114,10 +114,8 @@ function childOutput({
 
 /**
  * Parse Edit's `diff` attribute into hunks. Claude serializes a structured
- * patch (jsdiff's shape: hunks of `+`/`-`/context lines), which is the real
- * change rather than the `old_string` → `new_string` diff we'd otherwise have
- * to synthesize. Returns null on anything unexpected — a diff we can't read is
- * shown as raw text rather than mangled.
+ * jsdiff-shaped patch — the real change, not a synthesized `old_string` →
+ * `new_string` diff. Returns null on anything unexpected, shown as raw text.
  */
 export function parsePatchHunks(diff: string | null): PatchHunk[] | null {
   if (diff === null) return null;

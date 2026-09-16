@@ -150,21 +150,17 @@ export class CodingAgentSessionLogProjection {
         });
 
       case LANGWATCH.EVENT.SESSION_CONTEXT: {
-        // Everything here is present tense, last write wins: a resumed session
-        // moves between branches, worktrees and even repositories, and the row
-        // answers where it is NOW. Per-branch history lives on the fact rows
-        // (the contribute command stamps each one with the context active when
-        // it happened), so nothing is lost by letting the scalars move. Every
-        // branch the session passed through also joins the set, because a
-        // session that moves on has still driven the branch it left, and the
-        // pull request it opened there.
+        // Everything here is present tense, last write wins: the row answers
+        // where a resumed session is NOW, even across branches, worktrees and
+        // repositories. Per-branch history lives on the fact rows instead, so
+        // every branch the session passed through also joins the set — it
+        // still drove the branch it left, and the pull request opened there.
         const branch = this.stateProjection.string(attrs[LANGWATCH.ATTR.BRANCH]);
-        // Two titles can ride the record. The context title is the codex
-        // harvest's prompt-derived name (codex withholds prompt text from its
-        // own events), so it fills an empty row only. The session NAME is the
-        // one the harness itself holds — claude's --name and /rename, codex's
-        // thread name — mirrored by the capture seams: the newest name
-        // replaces the title in place and neither derived tier may clobber it.
+        // Two titles can ride the record. The context title is codex's
+        // prompt-derived name (codex withholds prompt text from its own
+        // events), filling an empty row only. The session NAME is what the
+        // harness itself holds — claude's --name/rename, codex's thread name —
+        // and the newest name always replaces the title, never the reverse.
         const named = this.stateProjection.withTitle({
           state: this.stateProjection.withTitle({
             state: base,

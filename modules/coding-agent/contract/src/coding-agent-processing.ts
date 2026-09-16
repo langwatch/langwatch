@@ -1,31 +1,26 @@
 import { z } from "zod";
 
 /**
- * Contribution payloads (ADR-056 §2).
- *
- * Each source pipeline lifts the coding-agent facts off its own signal and
- * dispatches them here, keyed by the SESSION. Content never rides in a
- * contribution: prompts, replies and tool output stay in the canonical
- * span/log rows; these carry lengths, ids, names and counters only.
+ * Contribution payloads (ADR-056 §2): lifted off each source signal, keyed
+ * by SESSION. Content never rides here — prompts, replies and output stay
+ * in the span/log rows; only lengths, ids, names and counters travel.
  */
 
 /** A lifted scalar fact. Anything structured stays in the source row. */
 const scalarFactSchema = z.union([z.string(), z.number(), z.boolean()]);
 
 /**
- * The lifted scalar vocabulary — raw wire keys, values scalar-only. The keys
- * are the ones `CODING_AGENT_CONTRIBUTION_KEYS` enumerates for logs and the
- * session derivation reads for spans; preserving the raw names keeps the
- * fold's derivation identical across signals.
+ * The lifted scalar vocabulary — raw wire keys, scalar values only, matching
+ * `CODING_AGENT_CONTRIBUTION_KEYS`. Preserving the raw names keeps the fold's
+ * derivation identical across signals.
  */
 export const contributionFactsSchema = z.record(z.string(), scalarFactSchema);
 export type ContributionFacts = z.infer<typeof contributionFactsSchema>;
 
 /**
  * How the session key was established. `provider` is the agent's own key
- * (`session.id` / `gen_ai.conversation.id` — identical values, different
- * spellings). `trace_fallback` means the telemetry carried no session key, so
- * the trace id stands in and the session is a one-trace session (ADR-056 §1).
+ * (`session.id` / `gen_ai.conversation.id`); `trace_fallback` means the
+ * telemetry carried none, so the trace id stands in (ADR-056 §1).
  */
 export const sessionKeySourceSchema = z.enum(["provider", "trace_fallback"]);
 export type SessionKeySource = z.infer<typeof sessionKeySourceSchema>;
@@ -56,10 +51,9 @@ export const spanFactsContributionSchema = contributionBaseSchema.extend({
   startTimeUnixMs: z.number(),
   endTimeUnixMs: z.number(),
   /**
-   * The OTLP numeric status enum (0 unset / 1 ok / 2 error) — NEVER a string.
-   * PR #5708 shipped a `=== "error"` comparison that could not be true, so
-   * every failed tool folded as successful; the type here makes that
-   * unrepresentable.
+   * OTLP numeric status enum (0 unset / 1 ok / 2 error) — never a string. PR
+   * #5708's `=== "error"` string check could never match, folding every failed
+   * tool as successful; this type makes that unrepresentable.
    */
   statusCode: z.number().int().min(0).max(2),
   /** Lifted scalar span attributes (raw wire keys). */
@@ -85,12 +79,9 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
   /** The lifted scalar vocabulary (`CODING_AGENT_CONTRIBUTION_KEYS`). */
   facts: contributionFactsSchema,
   /**
-   * The working context active when the record happened, stamped onto the
-   * EVENT by the contribute command from the session's last `session_context`
-   * declaration (see `services/session-context-memo.ts`). Absent on the
-   * contribution the dispatcher enqueues and on events from before the stamp
-   * existed; the fact table stores absence as '' and the usage read prices
-   * those rows under the legacy whole-session rule.
+   * The working context active when the record happened, stamped from the
+   * session's last `session_context` declaration. Absent on pre-stamp events,
+   * where the fact table stores '' and prices under the legacy whole-session rule.
    */
   repositoryHost: z.string().optional(),
   repositoryOwner: z.string().optional(),
@@ -100,11 +91,9 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
 export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 
 /**
- * Converged totals for one metric SERIES of a session (ADR-056 §5).
- *
- * The value is the series' converged total as of `asOfUnixMs` — never a
- * delta. Re-delivery replaces (last-write-wins per series); it never adds.
- * That single rule is what makes metric replay safe.
+ * Converged totals for one metric SERIES of a session (ADR-056 §5). The value
+ * is the series' total as of `asOfUnixMs`, never a delta; re-delivery
+ * replaces (last-write-wins), never adds — the rule that makes replay safe.
  */
 export const metricFactsContributionSchema = contributionBaseSchema.extend({
   /** The canonical metric pipeline's series identity hash. */

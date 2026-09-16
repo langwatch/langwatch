@@ -18,11 +18,9 @@ const persistence = {
 } satisfies CodingAgentProjectionPersistence;
 
 /**
- * A backed-up group without coalescing pays one append per queued event —
- * the O(n²) drain pattern this pipeline's maps showed during the 2026-07-31
- * backlog (one-event-per-job at ~90 busy slots). These tests pin the batch
- * ceiling so a refactor cannot silently drop the option back to the
- * framework default of 1.
+ * A backed-up group without coalescing pays one append per queued event — the
+ * O(n²) drain pattern this pipeline showed during the 2026-07-31 backlog
+ * (~90 busy slots). Pins the batch ceiling so a refactor can't drop it to 1.
  */
 describe("coding-agent map coalescing", () => {
   describe("when the trace-sessions map projection is constructed", () => {

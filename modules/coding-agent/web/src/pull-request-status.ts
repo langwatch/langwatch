@@ -1,10 +1,7 @@
 /**
- * Where a pull request stands, and how the stored snapshot reads it.
- *
- * This is the snapshot-side derivation, matching what the live status service
- * derives from GitHub's own fields. The module exists so the table, the drawer
- * and the sorting all tell one story instead of each re-deciding what "merged"
- * means.
+ * Where a pull request stands, and how the stored snapshot reads it: the
+ * snapshot-side derivation, matching the live status service's read of
+ * GitHub's fields — one story, not each caller re-deciding what "merged" means.
  */
 
 export type PullRequestStatus = "open" | "draft" | "merged" | "closed";

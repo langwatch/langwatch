@@ -56,12 +56,9 @@ import type {
 } from "./coding-agent.members.ts";
 
 /**
- * The caller's permission cut over an organization: which of its projects they
- * may read, which of those they may also price, and how each is named to them.
- *
- * Derived from the service's own input rather than restated, so this and the
- * service cannot drift into disagreement about what a scope is. One
- * declaration, because two doors used to carry one each.
+ * The caller's permission cut over an organization: which projects they may
+ * read, which of those they may also price, and how each is named. Derived
+ * from the service's own input rather than restated, so the two cannot drift.
  */
 export type CodingAgentCallerScope = Pick<
   CodingAgentPersonalPullRequestUsageInput,
@@ -91,10 +88,8 @@ export interface CodingAgentScopeMembers {
   findOrganizationForProject(projectId: string): Promise<string | undefined>;
   /**
    * The organization's projects split by what one caller may do with each.
-   *
-   * Enumerated from the organization rather than taken from the request: a
-   * caller that could name the projects to count could count one it may not
-   * read.
+   * Enumerated from the organization rather than the request, so a caller
+   * cannot count a project by naming one it may not read.
    */
   resolveCallerProjectScope(input: {
     caller: CodingAgentScopeCaller;
@@ -186,10 +181,9 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 
   /**
-   * `codingAgents.*` on a process that composed no session store. The namespace still
-   * mounts and every call refuses by name: a process either installs this feature or
-   * does not, so the refusal lives here rather than as a second hand-rolled
-   * implementation in each composing process.
+   * `codingAgents.*` on a process with no session store composed: the namespace
+   * still mounts and every call refuses by name, rather than each composing
+   * process hand-rolling its own refusal.
    */
   static refusing(): CodingAgentApi {
     const refuse = (): never => {
@@ -377,9 +371,8 @@ export class CodingAgentApp implements CodingAgentApi {
 
   /**
    * One pull request in full: totals, contributors, models and sessions. Each
-   * session's title is resolved against the project it ran in, because the
-   * detail spans an organization and a reader can be trusted with one
-   * project's conversations and not another's.
+   * session's title resolves against the project it ran in, since a reader
+   * trusted with one project's conversations may not be trusted with another's.
    */
   async getPullRequestDetail(
     pullRequest: CodingAgentPullRequestRef,

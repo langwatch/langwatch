@@ -57,12 +57,9 @@ export interface CodingAgentSessionEventRecord {
   promptChars: number;
   totalTokens: number;
   /**
-   * The working context active when the event happened, stamped onto the
-   * event by the contribute command from the session's last `session_context`
-   * declaration. '' on rows from before a declaration (or before the stamp
-   * existed), which the usage read prices under the legacy whole-session
-   * rule. This is what lets one session's cost split across every pull
-   * request it drove.
+   * The working context active when the event happened, stamped from the
+   * session's last `session_context` declaration. '' on pre-declaration rows;
+   * this is what lets one session's cost split across every pull request it drove.
    */
   repositoryHost: string;
   repositoryOwner: string;
@@ -197,12 +194,9 @@ export class CodingAgentSessionEventsMapProjection
   }
 
   /**
-   * The raw wire event name off a contribution, read totally.
-   *
-   * Shared by `map()` and the enqueue filter so the two read the same field the
-   * same way. Structural rather than schema-parsed on purpose: the filter runs on
-   * the dispatch hot path with no retry behind it, and a body shape it cannot
-   * read is an event with no name, which is already the "no row" answer.
+   * The raw wire event name off a contribution, read totally. Shared by
+   * `map()` and the enqueue filter so both read the same field the same way.
+   * Structural, not schema-parsed, since the hot-path filter has no retry.
    */
   private static rawEventName(event: { data?: unknown }): string {
     const parsed = contributionEventDataSchema.safeParse(event.data);

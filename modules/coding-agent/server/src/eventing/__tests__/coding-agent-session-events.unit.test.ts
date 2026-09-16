@@ -270,10 +270,9 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
   describe("its enqueue-time gate", () => {
     /**
-     * The wire vocabulary as it actually arrives, taken from a measured
-     * dogfooding corpus (34 sessions, 5641 coding-agent log records): every
-     * name the projection maps, in both the bare and namespaced spellings, plus
-     * every name it does not.
+     * The wire vocabulary as it actually arrives, from a measured dogfooding
+     * corpus (34 sessions, 5641 log records): every name the projection maps,
+     * bare and namespaced, plus every name it declines.
      */
     const DECLINED_WIRE_NAMES = [
       "hook_execution_start",
@@ -359,9 +358,8 @@ describe("CodingAgentSessionEventsMapProjection", () => {
 
     /**
      * The gate runs on the dispatch hot path, where a throw is a dispatch
-     * failure rather than a retry. A payload it cannot read at all must
-     * therefore answer, not raise — and it answers the same "no row" `map()`
-     * would.
+     * failure, not a retry — so an unreadable payload must answer, not raise,
+     * the same "no row" `map()` would.
      */
     it("answers for a payload with no readable facts instead of throwing", () => {
       for (const data of [undefined, null, {}, { facts: null }, "nonsense"]) {

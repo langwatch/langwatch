@@ -18,9 +18,8 @@ import { readableDate, type ReadableDate } from "./short-date.ts";
 
 /**
  * The date-range control the activity tables narrow by. A copy of the old
- * `PeriodSelector`, controlled-only: both tables hold the range in their own
- * state rather than the query string, which a feature-web package may not
- * touch. `Period`/`PeriodMode` are `session-filters`' own.
+ * `PeriodSelector`, controlled-only: tables hold the range in their own
+ * state, not the query string, which a feature-web package may not touch.
  */
 
 /**

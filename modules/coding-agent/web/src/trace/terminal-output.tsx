@@ -10,9 +10,8 @@ const COLLAPSE_AT_LINES = 6;
 
 /**
  * Collapse on size too, not just line count: common Bash stdout (minified
- * JSON, base64) is one multi-megabyte LINE, which a line-count predicate never
- * folds — and it would render in full, synchronously, through the ANSI parser
- * on first paint.
+ * JSON, base64) is one multi-megabyte LINE that a line-count predicate never
+ * folds, rendering in full through the ANSI parser on first paint.
  */
 const COLLAPSE_AT_CHARS = 10_000;
 

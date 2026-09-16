@@ -5,11 +5,8 @@ import { ASSISTANT_PRESETS } from "./assistant-presets.ts";
 
 /**
  * Which agent did the work, read as its product name next to its own mark.
- *
- * The glyph is bare rather than sitting in a tile: this reads inside a table
- * cell, alongside text, where a boxed icon would carry more weight than the
- * fact deserves. An agent this build does not know keeps its raw slug, which
- * is the honest answer.
+ * The glyph is bare, not boxed — inside a table cell a boxed icon would
+ * carry more weight than it deserves. An unknown agent keeps its raw slug.
  */
 export function AgentLabel({ agent }: { agent: string }) {
   const kind = assistantKindOfAgent(agent);

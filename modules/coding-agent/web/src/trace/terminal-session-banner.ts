@@ -2,12 +2,9 @@ import type { SpanDetail } from "@langwatch/trace-contract";
 import { isModelCallSpan, readString } from "@langwatch/coding-agent-contract";
 
 /**
- * The handful of facts a coding agent itself prints above the prompt when a
- * session starts: which agent it is, its version, the model, and where it's
- * running. Sourced straight from the OTel resource/span attributes rather
- * than the `coding_agent_sessions` fold — the fold is a bounded aggregate
- * (ADR-041) and deliberately doesn't carry identity strings the drawer
- * already has spans for.
+ * The handful of facts a coding agent prints above the prompt at session
+ * start: agent, version, model, where it's running. Sourced from OTel
+ * resource/span attributes, not the bounded `coding_agent_sessions` fold (ADR-041).
  */
 
 /** Which agent's mark and name the banner draws. */
@@ -61,10 +58,9 @@ function detectBannerAgent({
 }
 
 /**
- * `resourceAttributes` comes from the `resourceInfo` read (root span only —
- * these are the same across a session). `spans` supplies the model, which is
- * per-call rather than per-resource: the LAST model call's model is what the
- * session ended on.
+ * `resourceAttributes` comes from the root-span `resourceInfo` read (same
+ * across a session). `spans` supplies the model, per-call not per-resource —
+ * the LAST model call's model is what the session ended on.
  */
 export function deriveSessionBanner({
   resourceAttributes,

@@ -4,11 +4,9 @@ import { type AnsiSegment, type AnsiStyle, parseAnsi } from "./terminal-ansi-par
 import { ansiColorToken, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 
 /**
- * Render a raw string that may contain ANSI escape codes as selectable,
- * theme-aware coloured monospace text. The escape codes never reach the DOM —
- * `parseAnsi` turns them into styled segments, so the visible (and therefore
- * copyable) text is clean. Newlines are preserved as real text nodes between
- * segments so a click-drag selection copies exactly what's on screen.
+ * Render a raw string with ANSI escape codes as selectable, theme-aware
+ * monospace text. `parseAnsi` turns codes into styled segments so the
+ * copyable text stays clean, and newlines stay real text nodes for click-drag.
  */
 export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
   const lines = useMemo(() => parseAnsi(text), [text]);
@@ -50,10 +48,9 @@ function AnsiSpan({ segment }: { segment: AnsiSegment }) {
 }
 
 /**
- * Translate a parsed {@link AnsiStyle} into Chakra style props. Returns null
- * when the run carries no styling (so the caller can skip the wrapper). Inverse
- * video swaps foreground/background, falling back to the screen tokens when a
- * side is unset — matching how a real terminal renders `\x1b[7m`.
+ * Translate a parsed `AnsiStyle` into Chakra style props, or null when the
+ * run carries no styling. Inverse video swaps foreground/background, falling
+ * back to screen tokens when a side is unset — matching `\x1b[7m`.
  */
 function styleToChakraProps(style: AnsiStyle): Record<string, unknown> | null {
   const hasAny =

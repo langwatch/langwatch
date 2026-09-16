@@ -16,10 +16,9 @@ export interface CallerProjectDisplay {
   /** Whether the project is one person's workspace rather than a shared one. */
   isPersonal: boolean;
   /**
-   * Who work in this project is attributed to. A personal workspace is one
-   * person, so it is named by that person; a shared project is named by
-   * itself, because the work inside it belongs to the project rather than to
-   * anyone the platform can identify.
+   * Who work in this project is attributed to: a personal workspace is named
+   * by its one person; a shared project is named by itself, since the work
+   * belongs to the project, not to anyone the platform can identify.
    */
   contributorLabel: string;
   /**

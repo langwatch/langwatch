@@ -19,10 +19,9 @@ interface TerminalReplayInput {
 }
 
 /**
- * The whole of what a replay needs to know about a session: which session it
- * is. The turns are read from the session id, so any surface that lists
- * sessions can open one without first shaping its rows like the sessions
- * table's, and this hook works the same on all of them.
+ * The whole of what a replay needs to know: which session it is. Turns are
+ * read from the session id, so any surface listing sessions can open one
+ * without shaping its rows like the sessions table's.
  */
 export interface ReplayableSession {
   sessionId: string;

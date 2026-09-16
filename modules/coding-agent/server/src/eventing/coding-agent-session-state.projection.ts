@@ -13,12 +13,9 @@ export interface SessionStep {
 }
 
 /**
- * Who set the session's `title`, in rank order: the harness's own session
- * name beats the generated conversation title beats the prompt-derived name.
- *
- * A schema rather than a bare union because the value is also decoded back
- * from a row column, so the names have to exist at runtime. One declaration
- * serves both, and the two cannot drift apart.
+ * Who set the session's `title`, in rank order: harness session name beats
+ * generated conversation title beats prompt-derived name. A schema, not a
+ * bare union, since the value also decodes back from a row column at runtime.
  */
 export const sessionTitleSourceSchema = z.enum(["prompt", "generated", "name"]);
 export type SessionTitleSource = z.infer<typeof sessionTitleSourceSchema>;
@@ -390,25 +387,20 @@ export class CodingAgentSessionStateProjection {
         this.string(attrs["service.version"]),
       terminalType: state.terminalType ?? this.string(attrs["terminal.type"]),
       entrypoint: state.entrypoint ?? this.string(attrs["app.entrypoint"]),
-      // Claude stamps user identity on log events, not spans; other agents send
-      // none at all, so a session they produce honestly keeps null here.
-      // Opaque provider ids only — Claude Code's `user.id` hash, or Cowork's
-      // account UUID / tagged account id. `user.email` also rides those events
-      // but is raw human identity, and this value lands verbatim in a durable
-      // row, so it is deliberately never read.
+      // Claude stamps user identity on log events, not spans; other agents keep
+      // this null. Opaque provider ids only — Claude Code's `user.id` hash, or
+      // Cowork's account UUID/tagged id. `user.email` also rides those events
+      // but is raw human identity and deliberately never read into this durable row.
       userId:
         state.userId ??
         this.string(attrs["user.id"]) ??
         this.string(attrs["user.account_uuid"]) ??
         this.string(attrs["user.account_id"]),
-      // Spawn lineage, for agents that stamp it. Once-set like the rest of the
-      // identity: a session has ONE parent, and a fork stays a fork.
-      //
-      // Nothing observed so far stamps it. A session that spawned a sub-agent
-      // with every enhanced-telemetry knob on carried neither key, while that
-      // sub-agent's own `agent_id` does arrive and is counted by `seenSubAgent`.
-      // So empty reads as "no lineage was reported", never as "this is a root
-      // session": the two are indistinguishable from here.
+      // Spawn lineage, for agents that stamp it — a session has ONE parent, and
+      // a fork stays a fork. Nothing observed so far stamps it: a sub-agent spawn
+      // with every enhanced-telemetry knob on carried neither key, though the
+      // sub-agent's own `agent_id` arrives and is counted by `seenSubAgent`. So
+      // empty reads as "no lineage reported", never as "this is a root session".
       parentSessionId: state.parentSessionId ?? this.string(attrs.parent_session_id),
       isFork: state.isFork || this.scalarString(attrs.is_fork) === "true",
     };
@@ -500,12 +492,10 @@ export class CodingAgentSessionStateProjection {
       withTool.toolDurationMs = this.incrementCounter(next.toolDurationMs, toolName, toolMs);
     }
 
-    // A sub-agent runs its OWN conversation and can do twenty reads of its own.
-    // Splicing those into the session's steps would read as though the main thread
-    // did them, flattening away the hierarchy. The sub-agent is already
-    // represented by the step that SPAWNED it. `agent_id` is absent on the main
-    // thread and present on every sub-agent span, so it is exactly the
-    // discriminator. The work still counts toward the totals — it happened.
+    // A sub-agent runs its OWN conversation; splicing its reads into the
+    // session's steps would flatten the hierarchy — it's already represented
+    // by the step that SPAWNED it. `agent_id` is absent on the main thread and
+    // present on every sub-agent span, so it's exactly the discriminator.
     const toolAgentId = this.string(attrs.agent_id);
     if (toolAgentId !== null) {
       Object.assign(withTool, this.recordSubAgent(withTool, toolAgentId));
@@ -531,12 +521,11 @@ export class CodingAgentSessionStateProjection {
       withTool.skills = this.addToBoundedSet(next.skills, skillName);
     }
 
-    // An MCP call announces itself in its NAME — `mcp__<server>__<tool>` — and that
-    // is the signal that actually arrives. Reading only the `mcp_server.name` /
-    // `mcp_tool.name` attributes found nothing on real sessions: a session that had
-    // plainly called an MCP server reported using none, because the agent doesn't
-    // emit those attributes on the tool span. So parse the name first and treat the
-    // attributes as a bonus for agents that DO send them.
+    // An MCP call announces itself in its NAME — `mcp__<server>__<tool>`.
+    // Reading only `mcp_server.name`/`mcp_tool.name` found nothing on real
+    // sessions: a session that plainly called an MCP server reported none,
+    // because the agent never emits those attributes on the tool span. Parse
+    // the name first; treat the attributes as a bonus for agents that do send them.
     const fromName = parseMcpToolName(toolName);
     // Codex spells the server as a bare `mcp_server` on its tool_result events
     // (empty string for a builtin tool, which this.string() already reads as absent).

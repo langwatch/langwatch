@@ -37,10 +37,8 @@ import type { Period, PeriodMode } from "./session-filters.ts";
 import type { PullRequestSortColumn, PullRequestSortState } from "./pull-request-sort.ts";
 
 /**
- * What each pull request cost in assistant usage, over its whole lifetime
- * (pre-open sessions count too) and across every project the viewer may
- * read. Opens on all time since the page prices whole lifetimes; every
- * numeric column shows a comparison bar, never color, for bundled-plan cost.
+ * What a pull request cost in assistant usage over its whole lifetime, across
+ * every project the viewer may read. Uses comparison bars rather than color.
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 
@@ -384,9 +382,8 @@ const OnePageOfPullRequests: React.FC<{
 
 /**
  * The two ways the list narrows: a word, and a stretch of time. Both are the
- * table's own state rather than the address bar's, because the page is one
- * table rather than a whole surface, and a period the reader never asked for
- * would hide the long-lived pull requests this page exists to price.
+ * table's own state, not the address bar's — a period the reader never asked
+ * for would hide the long-lived pull requests this page exists to price.
  */
 const PullRequestsToolbar: React.FC<{
   search: string;
@@ -423,10 +420,9 @@ const PullRequestsToolbar: React.FC<{
 );
 
 /**
- * Whether a row survives the search box. A query that is a number, with or
- * without GitHub's leading hash, also matches the pull request number, so
- * "#4218" and "4218" both find it; a query carrying anything else is not a
- * number and never matches one.
+ * Whether a row survives the search box. A numeric query, with or without
+ * GitHub's leading hash, also matches the pull request number, so "#4218"
+ * and "4218" both find it.
  */
 function matchesPullRequestSearch({
   row,
@@ -467,10 +463,9 @@ function isWithinPeriod({
 }
 
 /**
- * Where each numeric column's values sit, measured against the page the reader
- * is looking at, and each column against its own values: a pull request can be
- * heavy on tokens and cheap in money, or the reverse, so one shared scale
- * would misread both.
+ * Where each numeric column's values sit, measured per-column rather than on
+ * one shared scale — a pull request can be heavy on tokens and cheap in
+ * money, or the reverse, so a shared scale would misread both.
  */
 function usePageStats(rows: PullRequestListRow[]) {
   const tokenStats = useMemo(() => percentileStats(rows.map((row) => row.totalTokens)), [rows]);
@@ -716,11 +711,9 @@ const StatusCell: React.FC<{
 };
 
 /**
- * The leading model, and how many others rode along.
- *
- * An entry whose totals are not known carries its name alone. Which models a
- * row ran, and how much can be said about each, is the read's question and it
- * has already answered it; this cell only draws the answer.
+ * The leading model, and how many others rode along. An entry whose totals
+ * are not known carries its name alone — this cell only draws the answer the
+ * read already computed.
  */
 const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
   if (models.length === 0) {
@@ -756,10 +749,9 @@ const ModelsCell: React.FC<{ models: ModelUsage[] }> = ({ models }) => {
 };
 
 /**
- * The list-price cost of the row, read exactly like every other number here:
- * one value, one comparison bar. Money a bundled plan already covered is still
- * that same list price, so it is explained on hover rather than set apart by a
- * color the reader would have to learn.
+ * The list-price cost of the row: one value, one comparison bar. Money a
+ * bundled plan already covered is still that same list price, so it's
+ * explained on hover rather than set apart by a color to learn.
  */
 const TokenCostCell: React.FC<{
   row: PullRequestListRow;

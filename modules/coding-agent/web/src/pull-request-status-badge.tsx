@@ -13,11 +13,9 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PULL_REQUEST_STATUS_LABELS, type PullRequestStatus } from "./pull-request-status.ts";
 
 /**
- * A pull request's state, drawn the way GitHub draws it: a solid badge in the
- * state's own color, carrying the same mark GitHub uses for it.
- *
- * A snapshot answer is the exception. It is drawn back so it never passes for
- * a live one, and says in its tooltip how old it is.
+ * A pull request's state, drawn the way GitHub draws it: a solid badge in
+ * the state's own color, with GitHub's own mark. A snapshot answer is drawn
+ * back so it never passes for a live one, and its tooltip says how old it is.
  */
 
 /** GitHub's own colors for the four states. */

@@ -332,10 +332,9 @@ describe("EventingCodingAgentSessionStoreAdapter durable dedup", () => {
 });
 
 /**
- * The read-back gate (ADR-066). The columns of migrations 00053/00054 are only
- * trustworthy on a row written after 00053 applied; on an older row each decodes
- * as a ClickHouse default indistinguishable from a real value, so the store
- * reports a miss and the fold's `refoldOnStoreMiss` rebuilds it once.
+ * The read-back gate (ADR-066): migrations 00053/00054's columns are only
+ * trustworthy after 00053; an older row decodes them as an indistinguishable
+ * ClickHouse default, so the store reports a miss and rebuilds once.
  */
 describe("EventingCodingAgentSessionStoreAdapter read-back gate", () => {
   /** A session with every read-back column carrying real, non-default values. */

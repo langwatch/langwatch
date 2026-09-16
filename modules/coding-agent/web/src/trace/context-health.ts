@@ -17,10 +17,9 @@ const EXTENDED_CONTEXT_WINDOW_TOKENS = 1_000_000;
 const EXTENDED_CONTEXT_MARKER = /\[1m\]/i;
 
 /**
- * The context-window ceiling to measure `peakContextTokens` against. Uses
- * the widest window among the session's models — if any call ran in the 1M
- * beta, that's the ceiling the peak should be judged against, even if
- * earlier calls used the standard window.
+ * The context-window ceiling to measure `peakContextTokens` against: the
+ * widest window among the session's models — if any call ran in the 1M beta,
+ * that's the ceiling, even if earlier calls used the standard window.
  */
 export function contextWindowCeiling(models: string[]): number {
   return models.some((model) => EXTENDED_CONTEXT_MARKER.test(model))

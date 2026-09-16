@@ -19,11 +19,9 @@ export const pullRequestMappingStateSchema = z.object({
 type PullRequestMappingState = z.infer<typeof pullRequestMappingStateSchema>;
 
 /**
- * Pure hot-path guard. Most sessions carry no git context at all (only agents
- * with a companion emitter report it), so this rejects the majority before any
- * job is staged. A repository on another host is rejected here too: no GitHub
- * call can answer for it, and enqueueing a job that would immediately return is
- * pure queue traffic.
+ * Pure hot-path guard: most sessions carry no git context (only agents with a
+ * companion emitter report it), so this rejects the majority before any job
+ * is staged. A repository on another host is rejected too — no GitHub call can answer for it.
  */
 export function shouldMapPullRequests(
   input: {

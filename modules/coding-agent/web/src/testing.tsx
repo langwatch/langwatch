@@ -124,11 +124,9 @@ export function fakeCodingAgentActivityHost(
 }
 
 /**
- * The address, held where React can see it change.
- *
- * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one the tables rely on to drop
- * `?pullRequest=` when the drawer closes.
+ * The address, held where React can see it change. `setQuery` replaces the
+ * whole query string — a key left out is a key removed — the contract the
+ * tables rely on to drop `?pullRequest=` when the drawer closes.
  */
 function CodingAgentHostHarness({
   host,
@@ -146,11 +144,9 @@ function CodingAgentHostHarness({
 }
 
 /**
- * The tree an activity table is mounted inside, as a Testing Library wrapper.
- *
- * A wrapper rather than a wrapped element, so `rerender` keeps the host and the
- * query state: Testing Library re-applies the wrapper on every re-render, and a
- * test that re-renders to prove a shrinking list is doing exactly that.
+ * The tree an activity table is mounted inside, as a Testing Library wrapper
+ * rather than a wrapped element — so `rerender` keeps the host and query
+ * state, since Testing Library re-applies the wrapper on every re-render.
  */
 export function codingAgentHostWrapper(host: FakeCodingAgentActivityHost) {
   return ({ children }: { children: ReactNode }) => (

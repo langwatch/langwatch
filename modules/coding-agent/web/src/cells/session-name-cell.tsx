@@ -44,10 +44,9 @@ export const SessionNameCell: React.FC<{
 };
 
 /**
- * The name as the control that opens the replay, drawn as plain text because
- * the whole row already reads as clickable. It stops the click from reaching
- * the row underneath so the replay is asked for once rather than twice, and
- * a row with nothing to open renders the name and no control at all.
+ * The name as the control that opens the replay, drawn as plain text since
+ * the whole row already reads as clickable. Stops the click reaching the row
+ * underneath so replay is asked for once, not twice; nothing to open renders no control.
  */
 const SessionNameButton: React.FC<{
   onOpenReplay: (() => void) | undefined;

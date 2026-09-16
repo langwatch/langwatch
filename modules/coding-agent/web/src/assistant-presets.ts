@@ -17,10 +17,9 @@ interface AssistantPreset {
   label: string;
   iconUrl: string | null;
   /**
-   * When true, apply CSS `filter: invert(1) hue-rotate(180deg)` in dark
-   * mode — for monochrome black-on-transparent icons that vanish on
-   * dark backgrounds. Brand-colored icons (orange/gradient) leave this
-   * false; their colors are visible in both modes.
+   * When true, apply CSS `filter: invert(1) hue-rotate(180deg)` in dark mode
+   * — for monochrome black-on-transparent icons that vanish on dark
+   * backgrounds. Brand-colored icons leave this false; visible in both modes.
    */
   darkModeInvert: boolean;
 }

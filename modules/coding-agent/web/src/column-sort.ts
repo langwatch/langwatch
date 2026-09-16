@@ -10,10 +10,9 @@ export interface ColumnSortState<Column extends string> {
 }
 
 /**
- * What a column sorts a row by. `null` means the column does not apply to this
- * row at all, which is a different thing from a small value: a branch has no
- * pull request number, a session may have driven no pull request, and a project
- * the reader may not price has no cost.
+ * What a column sorts a row by. `null` means it doesn't apply to this row at
+ * all, unlike a small value — a branch has no pull request number, a session
+ * may have driven none, and an unpriced project has no cost.
  */
 export type SortKey = number | string | null;
 

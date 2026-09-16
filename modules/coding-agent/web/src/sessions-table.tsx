@@ -148,10 +148,9 @@ const ListedSessions: React.FC<{
 };
 
 /**
- * The page the reader is looking at. The comparison bars are scaled against
- * this page alone, and each column against its own values: a session can carry
- * a huge context and cost very little, or the reverse, so one shared scale
- * would misread both.
+ * The page the reader is looking at. Comparison bars are scaled per-column
+ * against this page alone — a session can carry huge context and cost very
+ * little, or the reverse, so a shared scale would misread both.
  */
 const OnePageOfSessions: React.FC<{
   projectId: string;

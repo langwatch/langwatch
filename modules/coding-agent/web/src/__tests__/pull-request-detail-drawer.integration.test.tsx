@@ -149,10 +149,9 @@ function sessionFact(over: Record<string, unknown> = {}) {
 }
 
 /**
- * Every property that could set one cost cell apart from another, read off the
- * element as the browser resolved it. Compared whole rather than property by
- * property, so a color branch reintroduced under any name is caught rather
- * than only the one property a test happened to name.
+ * Every rendering property read off the element, compared as one whole
+ * rather than property by property, so a color branch reintroduced under
+ * any name gets caught even if a test never named that property.
  */
 function renderedStyleOf(element: HTMLElement) {
   const style = window.getComputedStyle(element);
@@ -603,11 +602,10 @@ describe("the pull request detail drawer", () => {
             conversationId: "session-a",
           }),
         );
-        // The drawer the replay opens is somebody else's component, and it
-        // opens from the address, so what this one owes is the address. The
-        // project travels with the trace here too: these rows are read from
-        // the caller's own workspace, so a drawer left to resolve the
-        // project itself would query whichever one the chrome was sitting
+        // The drawer the replay opens is somebody else's component, reached by
+        // address, so what this one owes is the address — project included,
+        // since these rows come from the caller's own workspace. A drawer left
+        // to resolve the project itself would query whatever the chrome sat
         // in and report the trace missing.
         expect(host.recording.queries.map((write) => write.next)).toEqual([
           {
@@ -661,12 +659,11 @@ describe("the pull request detail drawer", () => {
     });
 
     describe("when the reader has no pointer", () => {
-      // A click handler on the row alone cannot be reached from a keyboard: a
-      // table row takes no focus and has no activation behaviour. The replay
-      // is therefore carried by a real button with its own accessible name,
-      // which is what makes it focusable and what gives Enter and Space their
-      // meaning for free. Asserting the role is what pins that: a row that
-      // went back to being only clickable has no button to find.
+      // A click handler on the row alone cannot be reached from a keyboard —
+      // a table row takes no focus. The replay is carried by a real button
+      // with its own accessible name, which is what makes it focusable and
+      // gives Enter/Space meaning for free; a row that went back to only
+      // being clickable has no button to find.
       it("exposes the replay as a focusable control, not just a clickable row", async () => {
         utils.tracesV2.conversationContext.fetch.mockResolvedValue({
           turns: [{ traceId: "trace-last", timestamp: 2_000 }],

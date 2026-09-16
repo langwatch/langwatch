@@ -1,10 +1,9 @@
 import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
- * GitHub Copilot CLI. Namespaces under the ORG, not the product
- * (`github.copilot.`). Emits its lifecycle events as SPAN EVENTS rather
- * than log records; the aliases below map them so they fold the same way
- * if they ever arrive as logs.
+ * GitHub Copilot CLI: namespaces under the ORG, not the product
+ * (`github.copilot.`). Emits lifecycle events as SPAN EVENTS, not log
+ * records; the aliases below fold them the same way if they ever arrive as logs.
  */
 export const copilotAgent: CodingAgentDefinition = {
   id: "copilot",

@@ -7,11 +7,9 @@ import {
 } from "@langwatch/coding-agent-contract";
 
 /**
- * One row per converged metric unit of a session (ADR-056 §5): the LWW
- * projection behind `session_metric_series`. A re-observed cumulative total
- * writes a newer version of its series row; a delta point is its own row.
- * The per-session read is `SUM(...) GROUP BY` across the deduplicated units
- * — never an increment on insert.
+ * One row per converged metric unit of a session (ADR-056 §5), the LWW
+ * projection behind `session_metric_series`: a cumulative total writes a
+ * newer row version, a delta point its own row — summed via `GROUP BY`, never incremented.
  */
 export interface SessionMetricSeriesRecord {
   tenantId: string;
@@ -28,11 +26,9 @@ export interface SessionMetricSeriesRecord {
 }
 
 /**
- * The attribute keys the session read actually consumes (the overlay's
- * `type` / `decision` / `language` dimensions). Series identity is already
- * fixed upstream in `seriesId`, so persisting anything beyond these would
- * only copy provider-supplied attributes — which can carry identity like
- * `user.id` / `user.email` — verbatim into a durable table.
+ * The attribute keys the session read actually consumes (`type`/`decision`/
+ * `language`). Series identity is already fixed in `seriesId`, so persisting
+ * more would copy provider attributes — including identity like `user.id` — verbatim.
  */
 const PERSISTED_ATTRIBUTE_KEYS = new Set(["type", "decision", "language"]);
 

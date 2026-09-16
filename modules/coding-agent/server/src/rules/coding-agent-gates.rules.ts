@@ -15,11 +15,9 @@ export function gateSessionListTitles<T extends { title: string | null }>({
 }
 
 /**
- * Strip session spend for a viewer without cost:view.
- *
- * Nulled rather than zeroed: the row's own cost is nullable already, because a
- * session in a project the reader may not price reports its tokens with no
- * cost, and a zero here would read as "this session was free".
+ * Strip session spend for a viewer without cost:view. Nulled rather than
+ * zeroed: cost is nullable already, since a session in a project the reader
+ * may not price reports tokens with no cost — zero would read as "free".
  */
 export function gateSessionListCost<T extends { costUsd: number | null }>({
   rows,

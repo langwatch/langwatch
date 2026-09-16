@@ -52,12 +52,10 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         attributes["event.name"] = record.eventName;
       }
 
-      // Two-phase detection, so an ordinary application log costs one cheap
-      // name/scope check and never a resource-attributes parse. Cowork's
-      // events reuse Claude Code's runtime (anthropic scope, claude_code
-      // event names), so they PASS this gate as claude_code; the resource
-      // parse below then supplies the service.name that relabels them
-      // claude_cowork at the contribution.
+      // Two-phase detection, so an ordinary log costs one cheap name/scope
+      // check, never a resource-attributes parse. Cowork reuses Claude Code's
+      // runtime (anthropic scope, claude_code names), so it PASSES this gate
+      // as claude_code; the resource parse below relabels it claude_cowork.
       const facts = liftCodingAgentLogFacts({
         scopeName: record.scopeName,
         attributes,
@@ -130,9 +128,8 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
 
 /**
  * Stamp the conversation title Claude generates for the session. It rides
- * inside the body of one utility model call, so it cannot be lifted by the
- * vocabulary; the body itself stays in the canonical row and only the title
- * becomes a fact, which the fold then reads like any other.
+ * inside one utility model call's body, so it can't be lifted by the
+ * vocabulary — only the extracted title becomes a fact, the body stays canonical.
  */
 function stampSessionTitle({
   facts,
@@ -157,12 +154,9 @@ function stampSessionTitle({
 }
 
 /**
- * Stamp a prompt-derived name candidate on every prompt event that carries
- * the user's words. The fold fills an empty title from it and otherwise
- * ignores it, so the session ends up named by the FIRST thing the user asked
- * unless the agent generated a real title. The vocabulary lifts prompt
- * lengths, never text, so like the generated title this is derived here,
- * where the full attributes are still in hand.
+ * Stamp a prompt-derived name candidate on every prompt event carrying the
+ * user's words: the fold fills an empty title from it, else names the session
+ * by the FIRST prompt. Derived here since the vocabulary lifts lengths, not text.
  */
 function stampPromptTitleFallback({
   facts,

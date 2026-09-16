@@ -78,8 +78,7 @@ export function isDiffTool(name: string): boolean {
 /**
  * Pull the before/after text for a diff-style tool call out of its input.
  * Handles Edit (`old_string`/`new_string`), Write (`content`, all additions),
- * and the common `file_path` carrier. Returns null when the shape doesn't
- * carry a diffable pair.
+ * and `file_path`; returns null when the shape carries no diffable pair.
  */
 export function extractDiffFromToolInput(input: unknown): {
   oldText: string;

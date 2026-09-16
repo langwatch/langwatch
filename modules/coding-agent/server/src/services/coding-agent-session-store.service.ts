@@ -10,11 +10,9 @@ import {
 } from "../eventing/coding-agent-session.projection.ts";
 
 /**
- * Whether a committed row's read-back columns can be trusted.
- *
- * See `EventingCodingAgentSessionStoreAdapter.getWithApplied` for why the projection version is
- * not sufficient on its own, and why `lastEventOccurredAt` is a sound second
- * half of the discriminator.
+ * Whether a committed row's read-back columns can be trusted. Projection
+ * version alone is not sufficient (see `getWithApplied`); `lastEventOccurredAt`
+ * is the sound second half of the discriminator.
  */
 function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
   if (row.version === CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST) {
@@ -33,10 +31,8 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
       defaultRetentionDays: number;
       /**
        * Called after a commit with the distinct tenants whose sessions were
-       * stored — the seam the project's Sessions-destination stamp rides
-       * (`createCodingAgentSessionSeenTouch`). Fire-and-forget: the callback
-       * owns its own errors and throttling, and the committed row must never
-       * wait on it.
+       * stored — the seam `createCodingAgentSessionSeenTouch` rides. Fire-and-forget:
+       * the callback owns its own errors, never blocking the committed row.
        */
       onSessionsStored?: (tenantIds: string[]) => Promise<void>;
     },
@@ -76,10 +72,9 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 
   /**
-   * Fire-and-forget by contract: the callback logs and swallows its own
-   * failures (`createCodingAgentSessionSeenTouch`), and the committed row must
-   * never wait on it — but a hook that rejects anyway must surface as nothing
-   * worse than a dropped stamp, not as an unhandled rejection in the worker.
+   * Fire-and-forget by contract: the callback swallows its own failures, and
+   * a hook that rejects anyway must surface as nothing worse than a dropped
+   * stamp, never an unhandled rejection in the worker.
    */
   private reportSessionsStored(tenantIds: string[]): void {
     void this.hooks.onSessionsStored?.(tenantIds).catch(() => undefined);
@@ -108,12 +103,9 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 
   /**
-   * Cold-cache reads carry the state and delivery watermark together. Rows from
-   * before migration 00053 lack essential read-back columns and must be an
-   * `undecodable` miss so one refold rebuilds them; an absent windowed row is
-   * the only miss the executor retries without the window. The pre-bump stamp
-   * is accepted only with positive `LastEventOccurredAt`, whose UTC-decoded
-   * default distinguishes old rows from a populated checkpoint.
+   * Rows from before migration 00053 lack read-back columns, so they must
+   * report `undecodable` — not `absent` — so a refold rebuilds them instead
+   * of the executor retrying with an unwindowed re-read.
    */
   async getWithApplied(
     aggregateId: string,
@@ -129,13 +121,11 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
-    // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer as for "no row"
-    // — the watermark is dropped too, because a watermark without the state it
-    // belongs to would suppress the very events the re-fold needs — but report
-    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
-    // executor must not answer with an unwindowed re-read that can only find
-    // the same row again.
+    // Stale schema snapshot: read-back columns didn't exist when this row was
+    // written, so decoding it would fabricate state. The watermark is dropped
+    // too — one without its state would suppress events the re-fold needs —
+    // and reported as `undecodable`, not `absent`, so the executor doesn't
+    // retry with an unwindowed re-read that finds the same row again.
     if (!carriesReadBackColumns(found.row)) {
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }

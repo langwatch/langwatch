@@ -37,10 +37,8 @@ export type CodingAgentScopeProject = Readonly<{
 
 /**
  * The organization's projects, and the person behind each personal workspace.
- *
- * The project list is enumerated from the ORGANIZATION and never taken from a
- * request: a caller that could name the projects to count could count one it
- * may not read.
+ * The project list is enumerated from the ORGANIZATION, never from a request,
+ * so a caller cannot count a project by naming one it may not read.
  */
 export interface CodingAgentCallerScopeDirectory {
   /** Every live project of one organization. */
@@ -49,11 +47,9 @@ export interface CodingAgentCallerScopeDirectory {
   }): Promise<readonly CodingAgentScopeProject[]>;
 
   /**
-   * Who each personal workspace belongs to, keyed by team id.
-   *
-   * Asked only for personal teams, and never for a shared one: a shared team's
-   * members are not an answer to "who worked here", so reading them would cost
-   * a query nothing displays.
+   * Who each personal workspace belongs to, keyed by team id. Asked only for
+   * personal teams, never a shared one — a shared team's members answer
+   * nothing displays, so reading them would cost a query for nothing.
    */
   listPersonalTeamOwnerNames(input: {
     teamIds: readonly string[];
@@ -107,10 +103,8 @@ export interface CodingAgentCostMetrics {
 export interface CodingAgentProjectActivity {
   /**
    * Records that this project has just seen coding-agent session activity.
-   *
-   * The staleness window the write is throttled by belongs to the
-   * implementation, not the caller: both graphs must skip the same writes, and
-   * a caller that named its own would make that a coincidence.
+   * The staleness window it's throttled by belongs to the implementation, not
+   * the caller — both graphs must skip the same writes, not merely agree by chance.
    */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
 }

@@ -62,9 +62,8 @@ export const TerminalPatch = memo(function TerminalPatch({
 
 /**
  * The new-file line number for every line of a hunk: counting starts at
- * `newStart`, and removed lines get null without advancing it (they don't
- * exist in the new file). One linear pass per hunk, memoised because the
- * render maps over the same hunk once per line.
+ * `newStart`, removed lines get null without advancing it. One linear pass
+ * per hunk, memoised since the render maps over it once per line.
  */
 const newLineNumberCache = new WeakMap<PatchHunk, (number | null)[]>();
 function newLineNumbers(hunk: PatchHunk): (number | null)[] {

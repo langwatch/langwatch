@@ -1,10 +1,7 @@
 /**
- * One vocabulary for every coding agent.
- *
- * Every string in this file is a REAL wire value — taken from each agent's source
- * or from our own live telemetry. Inventing plausible-looking identifiers here
- * would defeat the entire purpose of the module, which exists precisely because
- * the agents do not spell things the way you would guess.
+ * One vocabulary for every coding agent. Every string here is a REAL wire
+ * value, taken from each agent's source or our own live telemetry — inventing
+ * plausible-looking identifiers would defeat the module's whole purpose.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -60,10 +57,9 @@ describe("detectCodingAgent", () => {
 
   describe("given a Cowork record", () => {
     /**
-     * Cowork is the Claude desktop runtime working in a VM: its events reuse
-     * Claude Code's vocabulary and scope, and only the resource-level
-     * `service.name: cowork` (its docs' Service information table) names it.
-     * The service signal must beat the anthropic-scope fallback.
+     * Cowork reuses Claude Code's vocabulary and scope; only the resource-level
+     * `service.name: cowork` (per its docs' Service information table) names it,
+     * so the service signal must beat the anthropic-scope fallback.
      */
     it("is named by its service, not its runtime's scope", () => {
       expect(
@@ -105,10 +101,9 @@ describe("detectCodingAgent", () => {
 
 describe("resolveConversationKey", () => {
   /**
-   * The one key every agent agrees on — under four different names. Claude Code
-   * puts `session.id` on its LOGS but `gen_ai.conversation.id` on its SPANS, and
-   * they carry the identical UUID (verified against live data). If this function
-   * only knew one of them, a session's spans and logs would never join.
+   * The one key every agent agrees on, under four names. Claude Code puts
+   * `session.id` on LOGS but `gen_ai.conversation.id` on SPANS, carrying the
+   * identical UUID (verified against live data) — else spans and logs never join.
    */
   it("finds the session however the agent spelled it", () => {
     expect(resolveConversationKey({ "session.id": "s-1" })).toBe("s-1");
@@ -125,10 +120,9 @@ describe("resolveConversationKey", () => {
 
 describe("resolveSpanConversationKey", () => {
   /**
-   * Live-verified on codex 0.147: the turn span's `gen_ai.conversation.id`
-   * is the id of the TURN, and the session rides `thread.id` — the exact
-   * value every codex log event carries as `conversation.id`. Reading the
-   * shared candidate order here split each turn into its own session.
+   * Live-verified on codex 0.147: the turn span's `gen_ai.conversation.id` is
+   * the TURN id; the session rides `thread.id`, matching every codex log
+   * event's `conversation.id`. The shared candidate order would split turns.
    */
   it("keys a codex turn span on its thread id, not the per-turn id", () => {
     expect(

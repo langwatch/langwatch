@@ -29,10 +29,9 @@ const codingAgentSessionEvents = [
 ] as const;
 
 /**
- * Schema-snapshot version. Bump when replay must rebuild persisted state.
- * This version moves reported cost to `AgentReportedCostUsd` and recomputes
- * `CostUsd` from stored span contributions (migration 00085). Older schema
- * transitions live with migrations 00053, 00054, 00074, 00075, and 00077.
+ * Schema-snapshot version; bump when replay must rebuild persisted state.
+ * This version moves reported cost to `AgentReportedCostUsd`, recomputed from
+ * stored span contributions (migration 00085; earlier: 00053/54/74/75/77).
  */
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-08-23";
 
@@ -89,9 +88,7 @@ export class CodingAgentSessionFoldProjection
   /**
    * Read back committed state per ADR-066. A schema-gated miss refolds once;
    * steady-state delivery never reads `event_log`. Out-of-order refolds stay
-   * off because accumulators commute and steps order by their own time. The
-   * window prunes StartedAt partitions, with an unbounded retry on a miss.
-   * See `EventingCodingAgentSessionStoreAdapter.getWithApplied` for the legacy checkpoint.
+   * off since accumulators commute, and the window retries unbounded on a miss.
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,
@@ -241,10 +238,9 @@ export class CodingAgentSessionFoldProjection
 }
 
 /**
- * One converged metric unit, as it rides in the row's `MetricSeries` column
- * (migration 00053). Mirrors {@link MetricSeriesFact} but with the nullable
- * attribute fields flattened to empty strings for the ClickHouse tuple; they
- * map back to null on read-back.
+ * One converged metric unit in the row's `MetricSeries` column (migration
+ * 00053). Mirrors `MetricSeriesFact`, with nullable attributes flattened to
+ * empty strings for the ClickHouse tuple and mapped back to null on read.
  */
 export interface CodingAgentSessionMetricSeriesRow {
   seriesId: string;
@@ -387,10 +383,9 @@ export interface CodingAgentSessionRow {
 }
 
 /**
- * Project the fold state into the row. Every heavy thing stays out: the row
- * carries counters, bounded sets, and the IDS that reach the spans, the logs and
- * the response body — never their contents. The read-back columns (ADR-066)
- * carry the fold's working-state bookkeeping so `store.get()` round-trips.
+ * Project the fold state into the row. Every heavy thing stays out — the row
+ * carries counters, bounded sets and IDs, never span/log/response contents.
+ * The read-back columns (ADR-066) let `store.get()` round-trip.
  */
 export class CodingAgentSessionRowMapper {
   private constructor() {}
@@ -519,10 +514,9 @@ export class CodingAgentSessionRowMapper {
 }
 
 /**
- * The git identity and title columns (migrations 00075 and 00077). The empty
- * string is the honest unset for the six scalars: an agent with no companion
- * emitter reports none of them, and `nullIfEmpty` maps them straight back on
- * read. `gitBranches` is an empty array for the same reason.
+ * The git identity and title columns (migrations 00075/00077). Empty string
+ * is the honest unset here — an agent with no companion emitter reports
+ * none — mapped back by `nullIfEmpty`; `gitBranches` uses an empty array.
  */
 function gitContextColumns(state: CodingAgentSessionState): {
   repositoryHost: string;

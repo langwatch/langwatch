@@ -11,11 +11,9 @@ export interface PeriodSelection {
 }
 
 /**
- * What the reader has to type to keep a row. Everything named on the row is
- * matchable, plus the branches and models that are not: a session is often
- * remembered by the branch it ran on rather than by the title an agent gave
- * it. A query that is a number, with or without GitHub's leading hash, also
- * matches a pull request number.
+ * What the reader has to type to keep a row: everything named on the row,
+ * plus branches and models that aren't — a session is often remembered by
+ * its branch rather than its title. A numeric query also matches a pull request number.
  */
 export function matchesSessionSearch({
   row,

@@ -46,11 +46,8 @@ type ClickHouseRequest = { url: string; body: string };
 
 /**
  * A typed local ClickHouse wire fixture for package runtime-adapter tests.
- *
- * It stands in for the process's ONE client rather than for a resolver: the
- * repositories are handed {@link TestClickHouseEndpoint.clickhouse}, name their
- * tenant on every statement, and the guard below refuses one that cannot. What
- * reaches this endpoint is what a real server would have received.
+ * Stands in for the process's ONE client, not a resolver: repositories name
+ * their tenant on every statement, and the guard below refuses one that cannot.
  */
 export class TestClickHouseEndpoint {
   /** The process's one client, pointed at this endpoint. */

@@ -1,9 +1,7 @@
 /**
- * Type identifiers for the coding-agent pipeline (ADR-056).
- *
- * Taxonomy: `<provenance>.<domain>.<aggregate-type>.<identifier>` — the
- * aggregate is the SESSION, not the trace. Every event here is a contribution
- * INTO a session from one of the three OTLP signals.
+ * Type identifiers for the coding-agent pipeline (ADR-056). Taxonomy:
+ * `<provenance>.<domain>.<aggregate-type>.<identifier>` — the aggregate is
+ * the SESSION, not the trace; every event is a contribution into one.
  */
 
 export const SPAN_FACTS_CONTRIBUTED_EVENT_TYPE =
@@ -50,9 +48,8 @@ export const CODING_AGENT_PROCESSING_COMMAND_TYPES = [
 export const CODING_AGENT_MAP_COALESCE_MAX_BATCH = 256;
 
 /**
- * Contribution append bound from ADR-066. It matches sibling log, metric, and
- * map commands because all carry bounded scalar facts. The session key is not
- * sharded: model-call order determines cache rebuilds, finalRequestId,
- * stopReason, and truncation. Coalescing changes insert size, never that order.
+ * Contribution append bound from ADR-066, matching sibling log/metric/map
+ * commands since all carry bounded scalar facts. Not sharded by session key:
+ * model-call order determines cache rebuilds, stopReason and truncation.
  */
 export const CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH = 256;

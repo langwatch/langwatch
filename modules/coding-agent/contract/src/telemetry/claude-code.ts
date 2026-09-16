@@ -1,12 +1,9 @@
 import { type CodingAgentDefinition, signalSays } from "./coding-agent-definition.ts";
 
 /**
- * Claude Code (CLI). Namespaces its event and metric names under
- * `claude_code.`, with scope `com.anthropic.claude_code.events` — the bare
- * `anthropic` scope match catches records whose names arrive un-namespaced.
- *
- * Registered AFTER claude_cowork: Cowork runs this same runtime, so the
- * anthropic scope alone must not claim a record whose service says cowork.
+ * Claude Code (CLI): namespaces under `claude_code.`, scope
+ * `com.anthropic.claude_code.events` — the bare `anthropic` match catches
+ * un-namespaced records. Registered AFTER claude_cowork, since cowork shares this runtime.
  */
 export const claudeCodeAgent: CodingAgentDefinition = {
   id: "claude_code",

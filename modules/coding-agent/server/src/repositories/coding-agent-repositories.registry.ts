@@ -4,9 +4,8 @@ import { MemoryCodingAgentRepositories } from "./memory/memory.coding-agent.repo
 
 /**
  * The two tiers a process selects between: `live` reaches the real stores,
- * `memory` stands them in. Neither is named after a database — every row this
- * module owns is a projection in ClickHouse, which the live tier's folder and
- * the member it requires already say.
+ * `memory` stands them in. Neither is named after a database — the live
+ * tier's folder and required member already say it's ClickHouse.
  */
 export const codingAgentRepositories = defineRepositories({
   live: ClickHouseCodingAgentRepositories,

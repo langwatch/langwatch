@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
  * @unit
- * Two vocabularies meet at bundled-plan policy: agent id vs tile assistantKind;
- * mapper renames when they disagree; Cowork must not fold into claude_code or
- * unticking bundled subscription would rebill Cowork.
+ * Two vocabularies meet at bundled-plan policy: agent id vs tile assistantKind,
+ * renamed when they disagree — Cowork must not fold into claude_code and rebill.
  */
 import { describe, expect, it } from "vitest";
 

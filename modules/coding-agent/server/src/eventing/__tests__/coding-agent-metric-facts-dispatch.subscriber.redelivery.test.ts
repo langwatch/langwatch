@@ -2,7 +2,6 @@
  * The metric→session dispatcher, driven with canonical datapoints — the
  * shape metric-processing actually stores. Temporality decides the converged
  * unit: cumulative → the series (replace), delta → the point (sum once).
- *
  * @see specs/coding-agent/session-aggregate.feature
  * @see specs/coding-agent/personal-usage.feature
  */
@@ -21,10 +20,9 @@ const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);
 
 /**
- * Encode attributes exactly the way build-point does — through
- * canonicalAttributes + stableStringify — so this suite drives the dispatcher
- * with the canonical KeyValue-array shape the pipeline actually stores, not a
- * hand-rolled flat object.
+ * Encode attributes exactly like build-point does — canonicalAttributes +
+ * stableStringify — so this suite drives the dispatcher with the pipeline's
+ * actual canonical KeyValue-array shape, not a hand-rolled flat object.
  */
 function encodeAttributes(attributes: Record<string, unknown>): string {
   return stableStringify(

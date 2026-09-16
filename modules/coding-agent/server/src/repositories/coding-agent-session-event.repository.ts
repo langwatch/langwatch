@@ -27,10 +27,9 @@ export abstract class CodingAgentSessionEventRepository {
   }): Promise<SessionModelTotalsRow[]>;
 
   /**
-   * The sessions whose stamped fact rows name one repository's branches: the
-   * discovery read that finds a session for a pull request even after the
-   * session's own row moved on to another repository. Returns distinct
-   * (tenantId, sessionId) pairs only; the caller fetches the session rows.
+   * The sessions whose stamped fact rows name one repository's branches: finds
+   * a session for a pull request even after its own row moved to another
+   * repository. Returns distinct (tenantId, sessionId) pairs; caller fetches rows.
    */
   abstract listSessionsByStampedBranch(input: {
     tenantIds: string[];
@@ -43,10 +42,9 @@ export abstract class CodingAgentSessionEventRepository {
 }
 
 /**
- * One (session, model, working context) group's totals. The context fields are
- * '' for rows written before the session declared where it was working (or
- * before the stamp existed); those unstamped totals are priced under the
- * legacy whole-session rule.
+ * One (session, model, working context) group's totals. Context fields are
+ * '' for rows written before a declaration (or before the stamp existed);
+ * those unstamped totals price under the legacy whole-session rule.
  */
 export interface SessionModelTotalsRow {
   tenantId: string;

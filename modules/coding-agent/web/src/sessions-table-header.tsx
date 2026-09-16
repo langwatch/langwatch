@@ -5,10 +5,9 @@ import { SortableColumnHeader } from "./sortable-column-header.tsx";
 import type { SessionsSortColumn, SessionsSortState } from "./session-sort.ts";
 
 /**
- * The columns, in the order a reader scans them: what the session was and when
- * it last moved, then what it cost, then what it shipped. Every one of them
- * sorts, and the trailing column carries the row's overflow menu rather than a
- * value, so it has no label.
+ * The columns, in the order a reader scans them: what the session was and
+ * when it last moved, then cost, then what it shipped. Every one sorts; the
+ * trailing column carries the row's overflow menu, not a value, so it has no label.
  */
 export const SessionsTableHeader: React.FC<{
   sort: SessionsSortState;

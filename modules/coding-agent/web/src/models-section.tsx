@@ -10,11 +10,8 @@ type ModelUsage = DetailPayload["modelBreakdown"][number];
 
 /**
  * One model's line: what it consumed, and a bar scaled against the heaviest
- * model on the pull request.
- *
- * An entry whose totals are not known is named and nothing more. There is no
- * figure to print and nothing to scale a bar against, and drawing either would
- * be a claim the read did not make.
+ * model on the pull request. An entry with unknown totals is named and
+ * nothing more — drawing a figure or bar would claim what the read didn't.
  */
 const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }) => (
   <VStack align="stretch" gap={1}>

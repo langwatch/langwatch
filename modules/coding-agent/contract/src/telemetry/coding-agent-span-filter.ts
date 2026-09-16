@@ -3,10 +3,9 @@
 
 export const CODEX_SCOPE = "codex_cli_rs";
 /**
- * codex names its instrumentation scope after the originator, so `codex exec`
- * sessions arrive under `codex_exec` while the interactive TUI stays
- * `codex_cli_rs`. Same emitter, same noise (auth, rollout persistence, plugin
- * enumeration, 500+ spans for one exec turn), same filter.
+ * codex names its instrumentation scope after the originator: `codex exec`
+ * sessions arrive under `codex_exec`, the interactive TUI under
+ * `codex_cli_rs` — same emitter, same noise (500+ spans per exec turn), same filter.
  */
 export const CODEX_EXEC_SCOPE = "codex_exec";
 export const OPENCODE_SCOPE = "opencode";
@@ -15,10 +14,9 @@ export const OPENCODE_SCOPE = "opencode";
 const CODEX_TURN_SPAN = "session_task.turn";
 
 /**
- * The app-server request span that starts a codex helper thread's turn, kept
- * only once ingestion has stamped the helper's thread id on it. The stamp is
- * the admission: the same span for a user-driven turn carries no stamp and
- * stays noise.
+ * The app-server request span starting a codex helper thread's turn, kept
+ * only once ingestion stamps the helper's thread id — that stamp is the
+ * admission; the same span for a user-driven turn carries none and stays noise.
  */
 const CODEX_TURN_REQUEST_SPAN = "turn/start";
 const CODEX_HELPER_THREAD_STAMP = "langwatch.thread.id";

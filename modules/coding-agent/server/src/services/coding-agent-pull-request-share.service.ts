@@ -241,10 +241,9 @@ export class CodingAgentPullRequestShareService {
   }
 
   /**
-   * Buckets the rows by a key that depends on the SESSION alone, never on which pull request
-   * is being asked about. That is what makes the integer allocation the same answer in every
-   * read: each pull request takes a disjoint set of whole buckets, so their counters cannot
-   * sum past the session's own however many reads ask.
+   * Buckets rows by a key depending on the SESSION alone, never the pull
+   * request asked about — each pull request takes a disjoint set of whole
+   * buckets, so counters can't sum past the session's own reads.
    */
   private static bucketWeights({
     rows,

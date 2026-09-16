@@ -14,12 +14,10 @@ export const codexAgent: CodingAgentDefinition = {
   logsRequireSessionKey: true,
 
   // The turn span carries TWO ids, live-verified on 0.147: `thread.id` is
-  // the session (equal to the `conversation.id` every codex log event
-  // carries), while `gen_ai.conversation.id` is the id of the TURN — the
-  // shared candidate order would read the latter and split each turn into
-  // its own session. Guarded to UUID-shaped values because codex's OTHER
-  // spans stamp the tokio worker id ("10") under the same key; those spans
-  // are not gated in, but the guard keeps this hook safe if one ever is.
+  // the session (same as every log event's `conversation.id`), while
+  // `gen_ai.conversation.id` is the TURN's — reading the latter via the
+  // shared order would split turns into their own sessions. Guarded to
+  // UUID shape since codex's OTHER spans stamp tokio worker id "10" here too.
   sessionKeyFromSpan: ({ name, attrs }) => {
     if (name !== "session_task.turn") return null;
     const threadId = attrs["thread.id"];

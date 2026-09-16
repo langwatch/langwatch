@@ -1255,11 +1255,9 @@ describe("CodingAgentSessionFoldProjection", () => {
 describe("read-back losslessness (ADR-066)", () => {
   describe("when a folded session is projected to a row and rebuilt", () => {
     /**
-     * The outage fix depends on this exactly: store.get() reads working state
-     * back by decoding the row, instead of replaying event_log. If any field the
-     * fold needs fails to round-trip, a cache miss would silently fold onto
-     * partial state — so this asserts the WHOLE state survives, and calls out the
-     * previously-lossy bookkeeping fields by name.
+     * The outage fix depends on this: `store.get()` decodes working state from
+     * the row instead of replaying event_log, so a field that fails to round-trip
+     * would silently fold onto partial state. Asserts the WHOLE state survives.
      */
     it("recovers the identical working state, including the bookkeeping the old row dropped", () => {
       const projection = makeProjection();
@@ -1330,12 +1328,9 @@ describe("read-back losslessness (ADR-066)", () => {
   });
 
   /**
-   * The round-trip above proves the bookkeeping survives the row. These prove
-   * why that matters: each one folds a further contribution onto the recovered
-   * state, and contrasts it with the same contribution folded onto a state
-   * whose bookkeeping did NOT survive — which is exactly the shape a row
-   * written before these columns existed decodes to, and exactly why the store
-   * refuses such a row instead of reading it back.
+   * The round-trip above proves bookkeeping survives the row. These prove why
+   * it matters: folding onto recovered state differs from folding onto a
+   * pre-column row's lossy shape — exactly why the store refuses such a row.
    */
   describe("when a further contribution folds onto the recovered state", () => {
     /** Round-trips a state through the row the fold would have committed. */
@@ -1686,10 +1681,9 @@ describe("coding-agent session fold, per-agent gating", () => {
 
 describe("coding-agent session fold, codex", () => {
   /**
-   * A live turn span from codex-rs 0.147, as the fold receives it: after
-   * canonicalisation, where the input has already been made the disjoint
-   * non-cached bucket (2936 of the 13944 codex reported, the other 11008
-   * being the cache read).
+   * A live turn span from codex-rs 0.147, post-canonicalisation: the input is
+   * already the disjoint non-cached bucket (2936 of the 13944 codex reported,
+   * the other 11008 being the cache read).
    */
   const codexTurnFacts = {
     "gen_ai.request.model": "gpt-5.6-sol",

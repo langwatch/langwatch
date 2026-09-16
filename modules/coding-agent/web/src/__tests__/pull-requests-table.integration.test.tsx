@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The personal Pull Requests table. The tRPC surface is a proxy that
- * answers every query empty unless a test pins it, so the table's two
- * reads (usage rollup, live status) are the only wiring under test.
+ * The tRPC surface is a proxy answering every query empty unless a test pins
+ * it, so the table's two reads (rollup, live status) are the wiring under test.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -87,10 +85,9 @@ function pinStatusesPending() {
 }
 
 /**
- * Every property that could set one cell's value apart from another's, read
- * off the element as the browser resolved it. Compared whole rather than
- * property by property, so a color branch reintroduced under any name is
- * caught rather than only the one property a test happened to name.
+ * Every rendering property read off the element, compared as one whole
+ * rather than property by property, so a color branch reintroduced under
+ * any name gets caught even if a test never named that property.
  */
 function renderedStyleOf(element: HTMLElement) {
   const style = window.getComputedStyle(element);
@@ -111,10 +108,9 @@ function renderedStyleOf(element: HTMLElement) {
 const tableElement = () => <PullRequestsTable projectId="proj-personal" />;
 
 /**
- * The host the table is mounted in, rebuilt per render so a test that drops a
- * grant mid-way gets a viewer who really lacks it. `renderWithCodingAgentHost`
- * is not used directly here because these tests re-render, and the wrapper is
- * what carries the host across a re-render.
+ * The host the table is mounted in, rebuilt per render so a test dropping a
+ * grant mid-way gets a viewer who really lacks it. Not `renderWithCodingAgentHost`
+ * because these tests re-render, and this carries the host across it.
  */
 let host: FakeCodingAgentActivityHost;
 
@@ -126,11 +122,9 @@ function renderTable() {
 }
 
 /**
- * Tab until the element holds focus, the way a keyboard reader reaches it, or
- * give up once the whole order has been walked. Walking the real focus order is
- * the point: calling `focus()` would prove the element accepts focus without
- * proving anything can get to it. The budget covers the toolbar and every
- * sortable heading, which all come before the first row.
+ * Tab until the element holds focus, or give up once the whole order has
+ * been walked — walking the real order proves reachability, not just that
+ * the element accepts focus. Budget covers the toolbar and sortable headings.
  */
 async function tabTo({
   user,
@@ -171,10 +165,9 @@ type CostOverrides = {
 };
 
 /**
- * The three cost numbers a row carries, resolved so they always add up: billed
- * is what the total leaves once the bundled part is taken out, unless a case
- * pins it. A case that pins only the total therefore cannot state a billed
- * figure larger than what was spent.
+ * The three cost numbers a row carries, resolved so they always add up:
+ * billed is the total minus the bundled part, unless a case pins it, so a
+ * pinned total alone can never yield a billed figure larger than what was spent.
  */
 function costSplit({ over, defaultCostUsd }: { over: CostOverrides; defaultCostUsd: number }) {
   const costUsd = over.costUsd ?? defaultCostUsd;

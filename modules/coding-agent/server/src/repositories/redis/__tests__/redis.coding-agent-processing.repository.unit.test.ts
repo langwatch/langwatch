@@ -10,10 +10,8 @@ import type { CodingAgentProjectActivity, CodingAgentPullRequestMapping } from "
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
- *
- * Restated here rather than imported because the point of the case below is
- * that a process which configures nothing still gets a bounded, correct TTL —
- * an import would assert the constant against itself.
+ * Restated here, not imported, since importing would assert the constant
+ * against itself rather than prove an unconfigured process still gets a bounded TTL.
  */
 const FOLD_CACHE_FLOOR_SECONDS = 300;
 

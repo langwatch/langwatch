@@ -4,12 +4,9 @@ import type React from "react";
 import { Link } from "./activity-link.tsx";
 
 /**
- * The width a contributor's name is allowed to take.
- *
- * A shared project can be named at any length, and left alone one long name
- * sizes the whole table past the drawer and pushes the numbers out of sight,
- * so the column is bounded and anything longer is cut with the whole name on
- * hover.
+ * The width a contributor's name is allowed to take. A shared project can be
+ * named at any length, and one long name would size the whole table past the
+ * drawer — so the column is bounded and anything longer is cut, full name on hover.
  */
 const CONTRIBUTOR_COLUMN_WIDTH = "220px";
 

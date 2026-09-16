@@ -50,9 +50,8 @@ export interface CacheRebuildEvent {
 
 /**
  * A cache write costs MORE than a read, so a call whose `cacheCreationTokens`
- * is close to the size of the context the PREVIOUS call had cached is the
- * session paying twice for the same tokens. The first call is never flagged —
- * there is nothing to reuse yet, so a cold cache isn't a rebuild.
+ * nears the previous call's cached context size is paying twice for the same
+ * tokens. The first call is never flagged — a cold cache isn't a rebuild.
  */
 const REBUILD_RATIO_THRESHOLD = 0.5;
 const REBUILD_MIN_TOKENS = 1_000;

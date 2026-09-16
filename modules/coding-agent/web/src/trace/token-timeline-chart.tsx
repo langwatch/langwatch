@@ -8,12 +8,9 @@ const CHART_HEIGHT_PX = 56;
 const NUMBER_EVERY_BAR_MAX = 24;
 
 /**
- * One column per model call, in call order, on a shared baseline. Column
- * height is the call's total token volume; the light segment is what was
- * served from cache, the solid segment is what was paid fresh, and a red
- * segment is a call that re-created the cache instead of reading it. The
- * session fold only ever carries the SUM across the whole run — this is the
- * "where", built from the per-call points the drawer already has.
+ * One column per model call, in call order, on a shared baseline: height is
+ * total token volume, light is cache-served, solid is paid fresh, red is a
+ * cache re-creation. The fold only carries the SUM; this is the "where".
  */
 export function TokenTimelineChart({
   points,

@@ -24,12 +24,9 @@ const NAMED_HEX: Record<AnsiColorName, string> = {
 };
 
 /**
- * Resolve an ANSI colour to a value for Chakra's `color`/`bg` props.
- *
- * Named colours resolve to the fixed terminal palette above. 256-colour and
- * truecolor codes carry an absolute rgb that no palette entry represents, so
- * they pass through as hex too — the source pinned an exact colour, and nothing
- * here should override it.
+ * Resolve an ANSI colour for Chakra's `color`/`bg` props. Named colours use
+ * the fixed palette above; 256-colour and truecolor codes carry an absolute
+ * rgb no palette entry represents, so they pass through as hex unchanged.
  */
 export function ansiColorToken(color: AnsiColor): string {
   if (color.kind === "named") return NAMED_HEX[color.name];
@@ -37,10 +34,9 @@ export function ansiColorToken(color: AnsiColor): string {
 }
 
 /**
- * The terminal "screen" — fixed dark chrome, not the drawer's own
- * light/dark tokens. A code editor's console pane stays dark inside an
- * otherwise light IDE theme for the same reason: it's recreating a specific
- * real-world surface, not part of the app's own themeable UI.
+ * The terminal "screen" — fixed dark chrome, not the drawer's own light/dark
+ * tokens, the same way a code editor's console pane stays dark inside a
+ * light IDE: it recreates a real-world surface, not themeable app UI.
  */
 export const TERMINAL_TOKENS = {
   screenBg: "#0A0A0A",
@@ -71,11 +67,8 @@ export const TERMINAL_FONT_STACK =
 
 /**
  * The startup mark's shading, left to right — a warm terracotta gradient, not
- * one flat colour. This is the same kind of narrow, deliberate exception as
- * `ansiColorToken`'s truecolor passthrough above: Chakra's palette has no
- * multi-stop gradient token, and the mark is a fixed piece of brand art, not
- * themeable UI chrome, so it is pinned here rather than left to a token that
- * doesn't exist.
+ * one flat colour. Like `ansiColorToken`'s truecolor passthrough: Chakra has
+ * no multi-stop gradient token, and this is fixed brand art, not themeable UI.
  */
 export const CLAUDE_MARK_GRADIENT = [
   "#F2C4AA",

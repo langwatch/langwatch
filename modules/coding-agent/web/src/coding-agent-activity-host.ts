@@ -50,11 +50,9 @@ const CodingAgentActivityHostContext = createContext<CodingAgentActivityHost | u
 export const CodingAgentActivityHostProvider = CodingAgentActivityHostContext.Provider;
 
 /**
- * The surface this table is running in.
- *
- * Missing means the table was mounted outside a screen that answers for it,
- * which is a composition fault rather than something the table can degrade
- * around.
+ * The surface this table is running in. Missing means the table was mounted
+ * outside a screen that answers for it — a composition fault, not something
+ * the table can degrade around.
  */
 export function useCodingAgentActivityHost(): CodingAgentActivityHost {
   const host = useContext(CodingAgentActivityHostContext);

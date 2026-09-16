@@ -23,10 +23,8 @@ import { deriveTokenTimeline, findCacheRebuilds } from "./token-timeline.ts";
 interface SessionViewProps {
   session: CodingAgentSessionDisplay;
   /**
-   * The session's transcript entries, for the per-call token timeline. The
-   * fold above is a bounded aggregate (ADR-056) — it has the SUM of cache
-   * reused/rebuilt but not the "where". Optional: without it the timeline
-   * section is simply omitted rather than the whole tab failing.
+   * Per-call token timeline. The fold above sums cache reused/rebuilt but not
+   * where; optional so its absence doesn't fail the tab.
    */
   entries?: TranscriptEntry[];
 }
@@ -87,11 +85,8 @@ export function SessionView({ session, entries }: SessionViewProps) {
 }
 
 /**
- * The fold keeps its dedup sets bounded at 50 entries (MAX_SET in
- * coding-agent-session.derivation.ts), so a set-derived figure that reads
- * exactly 50 is a floor, not a count — a long session shows "50+" rather
- * than presenting the cap as the total. Counter-derived figures (model
- * calls, tools run) are exact and never pass through this.
+ * Dedup sets cap at 50 (MAX_SET in coding-agent-session.derivation.ts); a
+ * figure reading exactly 50 is a floor, not a count, so it renders "50+".
  */
 const FOLD_SET_CAP = 50;
 
@@ -100,14 +95,10 @@ function boundedCount(n: number): string {
 }
 
 function Headline({ session }: { session: CodingAgentSessionDisplay }) {
-  // No agent / version / model chips here: the drawer header directly above
-  // already carries Service and Models, and the agent version opens the
-  // Terminal tab's banner. Only the multi-trace note earns a spot — most
-  // sessions are one trace (Claude Code's own tracer groups a whole run
-  // under one traceId), and when one isn't (a context compaction, a
-  // `/clear`, or the session outliving its own limit and continuing) the
-  // reader must know they are looking at a merged view rather than silently
-  // seeing only the trace that happened to be open.
+  // No agent/version/model chips: the drawer header already shows Service and
+  // Models, and the agent version is in the Terminal tab's banner. Only the
+  // multi-trace note earns a spot, since a compaction, `/clear`, or a session
+  // outliving its limit can merge more than one trace into this view.
   return (
     <VStack align="stretch" gap={3}>
       {session.traceIds.length > 1 && (
@@ -183,11 +174,9 @@ function Signals({ signals }: { signals: SessionSignal[] }) {
 }
 
 /**
- * The order things happened, batched.
- *
- * Counts alone ("Bash 9, Edit 9, Read 2") lose the story. The sequence keeps it:
- * it read the files, ran the tests, fixed one, ran them again. A failed step is
- * marked where it failed rather than hoisted out of order.
+ * Batched order of what happened. Counts alone lose the story; the sequence
+ * shows it read the files, ran the tests, fixed one, ran them again, with a
+ * failed step marked where it failed rather than hoisted out of order.
  */
 function Steps({ steps }: { steps: [string, number, boolean][] }) {
   if (steps.length === 0) {
@@ -335,12 +324,9 @@ function ToolTable({
 }
 
 /**
- * How the context held up — promoted out of the headline grid because a raw
- * "context rebuilt: 318k" number means nothing without what it's measured
- * against. Peak context is banded against the same reliability curve
- * currently discussed for long-context coding-agent sessions (see
- * contextHealth.ts); cache misses and the single worst rebuild turn "it
- * rebuilt the cache" into "it happened N times, worst case M tokens".
+ * Promoted out of the headline grid: peak context is banded against the
+ * reliability curve in contextHealth.ts, and cache misses plus the worst
+ * rebuild turn a raw "context rebuilt" number into a concrete story.
  */
 function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
   const ceiling = contextWindowCeiling(session.models);
@@ -392,11 +378,8 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
 }
 
 /**
- * Claude Code's own signal that the context got noisy enough to act on — a
- * compaction is the CLI deciding older detail had to be summarised away to
- * keep going. A more concrete "how noisy was this" proxy than an invented
- * ratio: it's the agent's own judgement call, not ours. Renders nothing for
- * the common case of a session that never needed one.
+ * Compaction count is Claude Code's own signal of context noise — its
+ * judgement call, not an invented ratio. Renders nothing when zero.
  */
 function ContextNoise({ session }: { session: CodingAgentSessionDisplay }) {
   if (session.compactions === 0) return null;
@@ -418,10 +401,8 @@ function ContextNoise({ session }: { session: CodingAgentSessionDisplay }) {
 }
 
 /**
- * What the session reached for beyond its built-in tools. Empty for most
- * sessions, and when it isn't, this is usually the interesting part: an MCP
- * server that got used once, a skill that fired, a sub-agent type nobody knew
- * was running.
+ * What the session reached for beyond its built-in tools — an MCP server used
+ * once, a skill that fired, a sub-agent type nobody knew was running.
  */
 function Extensions({ session }: { session: CodingAgentSessionDisplay }) {
   // Skills lead — "which skills did you use" is the first thing anyone asks

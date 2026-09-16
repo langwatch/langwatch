@@ -31,12 +31,9 @@ function SortIndicator({ direction }: { direction: "asc" | "desc" | null }) {
 }
 
 /**
- * What `aria-sort` has to say for a reader who cannot see the chevron.
- *
- * Every sortable heading carries the attribute, including the ones not in
- * force: `"none"` is what marks a column as sortable-but-unsorted, and
- * dropping it would leave those headings indistinguishable from the columns
- * that do not sort at all.
+ * What `aria-sort` says for a reader who can't see the chevron. Every
+ * sortable heading carries it, even unsorted ones: `"none"` marks a column
+ * sortable-but-unsorted, distinguishing it from columns that don't sort at all.
  */
 function ariaSortFor(direction: "asc" | "desc" | null) {
   if (direction === null) return "none" as const;

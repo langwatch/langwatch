@@ -19,10 +19,9 @@ export type ClickHouseCodingAgentInfrastructure = Readonly<{
 }>;
 
 /**
- * The live tier. Every coding-agent row is a projection in one tenant-keyed
- * ClickHouse, reached through the process's single client: this tier resolves
- * no endpoint and holds no per-tenant client, because every statement its
- * repositories issue names the tenant it belongs to and the client places it.
+ * The live tier: every coding-agent row is a projection in one tenant-keyed
+ * ClickHouse, reached through the process's single client. No endpoint or
+ * per-tenant client here — every statement names its own tenant.
  */
 export class ClickHouseCodingAgentRepositories {
   static readonly requires = ["clickhouse"] as const;
@@ -32,10 +31,9 @@ export class ClickHouseCodingAgentRepositories {
   }
 
   /**
-   * The same tier with the retention default, the read metrics and the clock
-   * named. The provider entry above takes members alone, because a boot
-   * selection carries only what the process declared; a test that has to
-   * control time or the retention horizon says so here.
+   * The same tier with retention default, read metrics and clock named. The
+   * provider entry above takes members alone — a boot selection carries only
+   * what the process declared; a test controlling time or retention says so here.
    */
   static createWith(
     options: ClickHouseCodingAgentInfrastructure &

@@ -7,10 +7,9 @@ import { Menu } from "@langwatch/design-system/menu";
 import type { SessionListRow } from "./session-list-row.ts";
 
 /**
- * Everything a reader can do with a row other than choose it. Choosing the row
- * already opens the replay over the table, so the menu repeats that and adds
- * the one destination the row itself cannot reach: the same replay on the
- * full trace explorer page.
+ * Everything a reader can do with a row other than choose it — choosing
+ * already opens the replay over the table, so the menu repeats that plus the
+ * one destination the row can't reach: the full trace explorer page.
  */
 export const SessionRowActions: React.FC<{
   row: SessionListRow;

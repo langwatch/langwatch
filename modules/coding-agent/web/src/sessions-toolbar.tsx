@@ -15,9 +15,8 @@ const PLACEHOLDER_PERIOD_PRESET = "30d";
 
 /**
  * The two ways the list narrows: a word, and a stretch of time. Both are the
- * table's own state rather than the address bar's, because the page is one
- * table rather than a whole surface, and a period the reader never asked for
- * would hide the sessions that ran before this week.
+ * table's own state, not the address bar's — a period the reader never asked
+ * for would hide sessions that ran before this week.
  */
 export const SessionsToolbar: React.FC<{
   search: string;

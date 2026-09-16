@@ -10,9 +10,8 @@ import {
 
 /**
  * One row per (trace, session) pair — the seam the trace drawer resolves its
- * session through (ADR-056 §4): TraceId → SessionId is a keyed seek here,
- * then SessionId → row is a keyed seek on `coding_agent_sessions`, instead
- * of scanning the session table's TraceIds arrays.
+ * session through (ADR-056 §4): TraceId→SessionId is a keyed seek here, then
+ * SessionId→row a keyed seek on `coding_agent_sessions`, not a table scan.
  */
 export interface CodingAgentTraceSessionRecord {
   tenantId: string;

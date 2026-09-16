@@ -17,11 +17,9 @@ export interface SessionSignal {
 }
 
 /**
- * A cache read costs a fraction of fresh input; re-CREATING the cache costs more
- * than fresh input. So cache-creation tokens are the ones that quietly cost
- * money, and the ratio against reads is what says whether the session was
- * re-warming the cache repeatedly or just once at the start (which is normal and
- * unavoidable — every session pays for the first write).
+ * A cache read costs a fraction of fresh input; re-CREATING it costs more,
+ * so creation tokens are what quietly cost money. Their ratio against reads
+ * says whether the session re-warmed repeatedly, or paid once at the start.
  */
 const CACHE_CHURN_RATIO = 0.25;
 

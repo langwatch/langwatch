@@ -2,11 +2,9 @@ import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 /**
- * The empty state a list shows when it has nothing to list.
- *
- * The package's own copy of `platform/app`'s `NoDataInfoBlock`, taken rather
- * than imported: a feature-web package may not reach into the application, and
- * the block is thirty lines of Chakra's own `EmptyState` parts.
+ * The empty state a list shows when it has nothing to list. The package's
+ * own copy of `platform/app`'s `NoDataInfoBlock`, taken not imported: a
+ * feature-web package may not reach into the application.
  */
 export const NoDataInfoBlock = ({
   title,
