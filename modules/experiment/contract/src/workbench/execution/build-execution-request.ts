@@ -11,11 +11,9 @@ import { type CellId, computeExecutionCells } from "../execution-scope.ts";
 import { toComparisonConfig } from "../normalize-comparison.ts";
 
 /**
- * The request one workbench run sends, built from state alone.
- *
- * Pure and node-safe: the browser hook and the server-side saved-state runner
- * both go through here, so a run started from an open page and a run started
- * with no page attached cover the same cells and carry the same seeds.
+ * The request one workbench run sends, built from state alone. Pure and
+ * node-safe: the browser hook and the server-side saved-state runner both go
+ * through here, so an open-page run and a no-page run cover the same cells.
  */
 
 /** Outputs a run reuses instead of producing, keyed `${rowIndex}:${targetId}`. */
@@ -46,10 +44,9 @@ export type ExecutionRequestState = {
 };
 
 /**
- * The rows a scope covers, as indexes into the dataset.
- *
- * Mirrors the orchestrator's `resolveScopedRowIndices`: the two must agree, or
- * a run seeds rows it does not cover and leaves the rows it does bare.
+ * The rows a scope covers, as indexes into the dataset. Mirrors the
+ * orchestrator's `resolveScopedRowIndices`: the two must agree, or a run
+ * seeds rows it does not cover and leaves the rows it does bare.
  */
 const rowsInScope = ({
   scope,
@@ -113,12 +110,9 @@ export const comparisonDependencies = ({
 };
 
 /**
- * What a scoped run does about the columns its comparisons depend on.
- *
- * Row by row: a dependency that already has a saved output is SEEDED, so the
- * judge reads it without paying to produce it again; a dependency with nothing
- * saved is added to the run, so Phase 1 produces what Phase 2 needs. A full run
- * needs neither, because it runs every column anyway.
+ * What a scoped run does about the columns its comparisons depend on. A
+ * dependency already saved is SEEDED so the judge reads it for free; one
+ * with nothing saved is added for Phase 1 to produce; a full run needs neither.
  */
 export const planComparisonSeeding = ({
   targets,
@@ -185,11 +179,8 @@ const seedOneDependency = ({
 
 /**
  * The cells a run covers itself, as `${rowIndex}:${targetId}` keys.
- *
- * `computeExecutionCells` answers this for every scope that names rows and
- * columns. The single-cell `evaluator` scope names neither, so its one cell is
- * added here; without it the run would carry that cell's old verdict in
- * alongside the new one it is about to produce.
+ * `computeExecutionCells` covers scopes naming rows/columns; the single-cell
+ * `evaluator` scope names neither, so its cell is added here to avoid a stale verdict.
  */
 const cellsCoveredByRun = ({
   scope,
@@ -280,12 +271,9 @@ const targetOnTheWire = (target: TargetConfig): ExecutionRequest["targets"][numb
 });
 
 /**
- * One evaluator as the server reads it.
- *
- * The comparison config must survive the wire. The orchestrator keys its whole
- * Phase-1/Phase-2 split off this field: without it every comparison evaluator
- * looks like a plain per-row evaluator, gets attached to each target cell in
- * Phase 1, and dispatches an empty input payload (nlpgo: "Data required").
+ * One evaluator as the server reads it. The comparison config must survive
+ * the wire: without it, the orchestrator's Phase-1/Phase-2 split breaks and
+ * a comparison evaluator dispatches nlpgo an empty payload.
  */
 const evaluatorOnTheWire = (
   evaluator: EvaluatorConfig,

@@ -48,12 +48,9 @@ function pythonConditionTemplate(inputs: Field[]): string {
 }
 
 /**
- * Drawer for the if/else gate. The condition is either a Liquid boolean
- * expression (same language as prompt templates) or, with the Code
- * toggle on, a python function that receives the inputs and returns
- * True/False. The engine routes execution down the true or false branch
- * handle and skips the not-taken side; the branch outputs are the
- * gating contract, so they render read-only.
+ * Drawer for the if/else gate: a Liquid boolean expression, or with Code on,
+ * a python function returning True/False. The engine routes down the true
+ * or false handle, skips the other; branch outputs render read-only.
  */
 export function IfElsePropertiesPanel({
   node,

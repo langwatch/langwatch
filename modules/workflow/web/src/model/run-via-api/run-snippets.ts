@@ -271,11 +271,9 @@ function goRequestBody({
 }
 
 /**
- * The Go snippet: start the run, poll it to a terminal status, then read the
- * per-row results back. Authenticated with `Authorization: Bearer`, never the
- * legacy X-Auth-Token header. The body is marshalled from a map literal rather
- * than pasted in as a raw string, so a field identifier can never break out of
- * the generated source.
+ * The Go snippet: start the run, poll to a terminal status, then read the
+ * per-row results. Authenticated with `Authorization: Bearer`, never the
+ * legacy X-Auth-Token. Body is a marshalled map literal, never a raw string.
  */
 function buildGoSnippet(input: BuildRunSnippetInput): string {
   const { baseUrl, dataSource, datasetName } = input;

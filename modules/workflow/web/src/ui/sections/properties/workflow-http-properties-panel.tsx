@@ -76,10 +76,9 @@ function parseHeadersFromParams(parameters: DslField[] | undefined): HttpHeader[
 }
 
 /**
- * Properties panel for HTTP Call nodes in the optimization studio.
- *
- * Uses the shared HttpConfigEditor for the endpoint + tabs UI,
- * plus studio-specific input mappings and outputs.
+ * Properties panel for HTTP Call nodes in the optimization studio. Uses the
+ * shared HttpConfigEditor for the endpoint/tabs UI, plus studio-specific
+ * input mappings and outputs.
  */
 export function HttpPropertiesPanel({
   node,

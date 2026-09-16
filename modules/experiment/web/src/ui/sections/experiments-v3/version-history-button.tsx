@@ -34,14 +34,11 @@ export function VersionHistoryButton({ disabled = false }: VersionHistoryButtonP
       onOpenChange={({ open }) => setIsOpen(open)}
       positioning={{ placement: "bottom-end" }}
     >
-      {/*
-        No Tooltip around this trigger. Both Tooltip and Popover.Trigger clone
-        their props onto the same child, the Tooltip's win, and the popover is
-        left with no anchor registered: floating-ui then computes no position
-        and the panel renders at the window origin instead of under the button.
-        The button says "History" in plain text anyway, so a tooltip repeating
-        it bought nothing. The name a screen reader reads stays on the button.
-      */}
+      {/* No Tooltip around this trigger: Tooltip and Popover.Trigger both
+        clone props onto the same child, the Tooltip's win, and the popover
+        loses its anchor — floating-ui then renders the panel at the window
+        origin. The button already says "History" in plain text, so a
+        screen-reader name lives on the button, not a redundant tooltip. */}
       <Popover.Trigger asChild>
         <Button
           size="sm"

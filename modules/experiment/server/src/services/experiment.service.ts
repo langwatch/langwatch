@@ -127,11 +127,8 @@ export type ExperimentServiceOptions = {
 
 /**
  * The experiment feature's persistence-and-orchestration service: the full
- * surface `ExperimentApp` forwards from and a handful of peer compositions
- * (dataset find-or-create, evaluation reporting) still call directly. Folded
- * out of the contract package per ADR-133 (was the `experiment.service.ts`
- * abstract class under `contract/src`, the flagged "contract-service"
- * shape) - this class is now the sole definition of the surface, server-side.
+ * surface `ExperimentApp` forwards from, plus peer compositions calling it
+ * directly. Folded out of contract per ADR-133 (the flagged "contract-service" shape).
  */
 export class ExperimentService {
   static create(options: ExperimentServiceOptions): ExperimentService {

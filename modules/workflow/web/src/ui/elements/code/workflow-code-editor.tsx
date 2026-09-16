@@ -251,13 +251,10 @@ const onSaveAndClose = {
 
 const EMPTY_FIELDS: readonly PythonField[] = [];
 
-// React Flow's `panActivationKeyCode` defaults to `Space`, so it registers a
-// document-level keydown handler that preventDefaults every Space — which
-// swallows the keystroke before the browser turns it into a `beforeinput` for
-// Monaco. Shield ONLY Space (and not the other ~dozen keys React Flow
-// watches) so editor shortcuts that legitimately bubble (Cmd+A select-all,
-// Cmd+Z undo, etc.) still reach Monaco's standalone keybinding service above
-// the editor root.
+// React Flow's `panActivationKeyCode` defaults to `Space`, so it swallows
+// every Space keystroke before Monaco sees it. Shield ONLY Space (not the
+// other ~dozen keys React Flow watches) so shortcuts that legitimately
+// bubble (Cmd+A, Cmd+Z) still reach Monaco's keybinding service.
 function shieldSpaceFromReactFlow(editor: MonacoEditorInstance) {
   const editorRoot = editor.getDomNode?.();
   if (!editorRoot) return;
@@ -346,11 +343,9 @@ function persistViewStateOnDispose({
 
 function wireEditorSaveShortcuts(editor: MonacoEditorInstance) {
   editor.onKeyDown((e) => {
-    // Escape is INTENTIONALLY not handled here — Monaco itself uses it to
-    // dismiss the suggest widget, hover, parameter-hint, etc. If none of
-    // those are open, Monaco won't stop propagation and the surrounding
-    // Dialog will close on its own. That gives Escape the expected
-    // contextual feel: first press closes the open widget, a *second* press
+    // Escape is INTENTIONALLY not handled here — Monaco uses it to dismiss its
+    // own widgets; if none are open, propagation continues and the Dialog
+    // closes. So a first press closes an open widget, a *second* press
     // dismisses the modal.
 
     // Cmd/Ctrl+S → Save (keep modal open). Bound here too so the shortcut
@@ -491,12 +486,9 @@ export function WorkflowCodeEditor({
           }
 
           // React Flow's `panActivationKeyCode` defaults to `Space`, so it
-          // registers a document-level keydown handler that preventDefaults
-          // every Space — which swallows the keystroke before the browser
-          // turns it into a `beforeinput` for Monaco. Shield ONLY Space (and
-          // not the other ~dozen keys React Flow watches) so editor shortcuts
-          // that legitimately bubble (Cmd+A select-all, Cmd+Z undo, etc.) still
-          // reach Monaco's standalone keybinding service above the editor root.
+          // swallows every Space keystroke before Monaco sees it. Shield ONLY
+          // Space (not the other ~dozen keys React Flow watches) so shortcuts
+          // that legitimately bubble (Cmd+A, Cmd+Z) still reach Monaco.
           shieldSpaceFromReactFlow(editor);
           wireSecretDragAndDrop(editor);
           persistViewStateOnDispose({ editor, viewStateKey });

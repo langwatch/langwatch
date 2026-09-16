@@ -1,9 +1,7 @@
 /**
- * A project's stored run environment, in memory.
- *
- * A project with no row answers with an empty environment rather than a throw:
- * the Prisma tier's `findUniqueOrThrow` is a schema guarantee, and a process
- * composed without Postgres has no project table to guarantee it against.
+ * A project's stored run environment, in memory. A project with no row
+ * answers with an empty environment, not a throw — `findUniqueOrThrow` is a
+ * Prisma-tier guarantee a Postgres-less process has no table to make.
  */
 import {
   WorkflowProjectEnvironmentRepository,

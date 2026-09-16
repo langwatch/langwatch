@@ -1,9 +1,7 @@
 /**
  * One workflow resource's platform address: the app's `publicBaseUrl`, the
- * project's slug, and the path the caller already resolved. Mirrors
- * `suite-platform-url.rules.ts` / `agent-platform-url.rules.ts` — the REST
- * declaration is a static object with no request-scoped builder, so the app
- * composes the link itself.
+ * project's slug, and an already-resolved path. Mirrors
+ * `suite-platform-url.rules.ts`/`agent-platform-url.rules.ts` since REST is static.
  */
 export function workflowPlatformUrl({
   publicBaseUrl,

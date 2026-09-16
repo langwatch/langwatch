@@ -533,10 +533,9 @@ export const buildSignatureNodeFromPrompt = ({
 };
 
 /**
- * Builds the prompt-identity fields (configId / handle / versionMetadata) that nlpgo reads to emit
- * PromptApiService.get + Prompt.compile spans. Mirrors signatureComponentSchema in
- * @langwatch/workflow-contract and the Go-side dsl.Component (PromptConfigID / PromptHandle /
- * VersionMetadata).
+ * Builds the prompt-identity fields (configId/handle/versionMetadata) nlpgo
+ * reads to emit its spans. Mirrors `signatureComponentSchema` and the Go
+ * side's `dsl.Component` (PromptConfigID/PromptHandle/VersionMetadata).
  */
 const buildPromptIdentity = (identity: {
   configId?: string | null;

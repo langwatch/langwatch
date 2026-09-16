@@ -8,12 +8,9 @@ type EvaluatorNodeDraggableProps = {
 };
 
 /**
- * Single "Evaluator" draggable in the sidebar.
- *
- * Uses the first evaluator from MODULES.evaluators as the node template but
- * overrides the name and description to be generic. On drag-end the caller
- * (via useEvaluatorPickerFlow) opens the evaluator list drawer so the user
- * can choose an existing evaluator or create a new one.
+ * Single "Evaluator" draggable in the sidebar. Uses the first evaluator from
+ * MODULES.evaluators as the template, with a generic name/description. On
+ * drag-end, useEvaluatorPickerFlow opens the drawer to pick or create one.
  */
 export function EvaluatorNodeDraggable({ onDragEnd }: EvaluatorNodeDraggableProps) {
   const defaultEvaluator = MODULES.evaluators[0];

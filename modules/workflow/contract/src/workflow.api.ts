@@ -312,17 +312,15 @@ export interface WorkflowApi {
   // -- the deployment's own housekeeping ------------------------------------
 
   /**
-   * Deletes the studio's quiet per-project NLP Lambda functions and their log
-   * groups. It belongs here rather than to a process: the Lambdas are the
-   * studio's own engines and the policy deciding which are quiet is this
-   * module's service. The deployment's cron bearer is what invokes it.
+   * Deletes the studio's quiet per-project NLP Lambda functions and their
+   * log groups. Belongs here, not a process: the Lambdas are the studio's
+   * own engines; the deployment's cron bearer is what invokes it.
    */
   cleanupOldLambdas(): Promise<void>;
   /**
-   * The platform's own address for one workflow resource, built from the
-   * project's slug and the path the caller already resolved. The REST
-   * declaration is a static object with no request-scoped builder to
-   * receive, so the app composes the link itself.
+   * The platform's own address for one workflow resource, from the
+   * project's slug and an already-resolved path. Built by the app itself
+   * since the REST declaration is static, with no request-scoped builder.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
 }

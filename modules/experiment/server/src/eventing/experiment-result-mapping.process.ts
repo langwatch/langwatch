@@ -33,11 +33,8 @@ export type ResultMapperConfig = {
 };
 
 /**
- * Parses a composite node ID to extract targetId and optional evaluatorId.
- *
- * Node ID patterns:
- * - "target-1" -> { targetId: "target-1", evaluatorId: undefined }
- * - "target-1.eval-1" -> { targetId: "target-1", evaluatorId: "eval-1" }
+ * Parses a composite node ID into `targetId` and an optional `evaluatorId`,
+ * e.g. `"target-1.eval-1"` -> `{ targetId: "target-1", evaluatorId: "eval-1" }`.
  */
 export const parseNodeId = (nodeId: string): { targetId: string; evaluatorId?: string } => {
   const dotIndex = nodeId.indexOf(".");
@@ -241,11 +238,9 @@ export const mapEvaluatorResult = (
   options?: {
     stripScore?: boolean;
     /**
-     * The evaluator's own request payload (e.g. a Comparison evaluator's
-     * ordered `candidates` list). Persisted alongside the result so
-     * downstream aggregation (Bradley-Terry leaderboard) can recover which
-     * variants the judge actually compared on this row — the response alone
-     * only names the winner, not the full candidate set.
+     * The evaluator's own request payload (e.g. Comparison's ordered
+     * `candidates`). Persisted so the Bradley-Terry leaderboard can recover
+     * which variants were compared — the response alone only names the winner.
      */
     inputs?: Record<string, unknown>;
   },
@@ -445,12 +440,9 @@ export const mapWorkflowEvaluatorResult = (
     cost?: number;
     error?: string;
     /**
-     * The engine's stable code for the failure (`NodeError.Type`).
-     *
-     * Named apart from the result's own `error_type` below, which is a
-     * free-text display label ("EvaluatorError") on `SingleEvaluationResult`.
-     * One identifier meaning both a stable code and a display string, twelve
-     * lines apart, is how a code ends up rendered as a label.
+     * The engine's stable code for the failure (`NodeError.Type`). Named apart
+     * from the result's own `error_type`, a free-text display label
+     * ("EvaluatorError") — conflating the two renders a code as a label.
      */
     nodeErrorCode?: string;
     upstream_status?: number;

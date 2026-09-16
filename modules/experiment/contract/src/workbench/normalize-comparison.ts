@@ -88,10 +88,9 @@ const stripInvalidComparison = <T extends EvaluatorCarrier>(evaluator: T): T => 
 };
 
 /**
- * Generic over the evaluator shape so the browser store (which holds the
- * narrowed `EvaluatorConfig`) and the server read path (which holds the
- * persisted shape, whose `evaluatorType` is a plain string) run the same
- * function rather than two copies that can drift.
+ * Generic over the evaluator shape so the browser store (narrowed
+ * `EvaluatorConfig`) and the server read path (persisted shape, plain-string
+ * `evaluatorType`) run the same function rather than two copies that drift.
  */
 export const normalizeEvaluators = <T extends EvaluatorCarrier>(evaluators: T[]): T[] =>
   evaluators.map((evaluator) => stripInvalidComparison(normalizeCarrier(evaluator)));

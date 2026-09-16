@@ -44,10 +44,9 @@ export function nodeHasGateInput(node: Node | undefined): boolean {
 }
 
 /**
- * Whether a node should grow a temporary gate input while a branch is dragged:
- * any node that takes inputs and does not already have a gate. The drag's own
- * source node, the entry (source-only) node, and prompting_technique (which
- * attaches to a node and has no inputs) are excluded.
+ * Whether a node should grow a temporary gate input while a branch is
+ * dragged: any node that takes inputs and has no gate yet, excluding the
+ * drag's own source, the entry node, and prompting_technique (no inputs).
  */
 export function showsTemporaryGate({
   node,
@@ -64,10 +63,9 @@ export function showsTemporaryGate({
 }
 
 /**
- * Whether a pending connection is allowed (React Flow isValidConnection).
- * A branch carries a boolean, so it may only land on a bool input (an existing
- * bool input or the gate). Self-connections are rejected. Every non-branch
- * connection keeps its own rules in onConnect.
+ * Whether a pending connection is allowed (React Flow isValidConnection). A
+ * branch may only land on a bool input or the gate; self-connections are
+ * rejected. Every other connection keeps its own rules in onConnect.
  */
 export function isConnectionAllowed({
   nodes,

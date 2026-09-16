@@ -1,10 +1,7 @@
 /**
- * Tests to ensure the execution request schema matches what the frontend sends.
- *
- * IMPORTANT: These tests prevent type duplication issues where the frontend
- * and backend schemas diverge. The executionRequestSchema MUST use shared
- * schemas from experiment-workbench.ts (evaluatorConfigSchema, targetConfigSchema)
- * rather than defining inline duplicates.
+ * Tests that the execution request schema matches what the frontend sends.
+ * IMPORTANT: `executionRequestSchema` MUST use the shared schemas from
+ * experiment-workbench.ts, not inline duplicates.
  */
 import { describe, expect, it } from "vitest";
 import { executionRequestSchema } from "../types.ts";

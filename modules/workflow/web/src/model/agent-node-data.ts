@@ -8,11 +8,9 @@ import type {
 } from "@langwatch/workflow-contract";
 
 /**
- * Translation layer between an agent library record and the workflow
- * DSL node that executes it. The node's parameters are what the
- * backend parser reads, so every place that writes an agent into a
- * node (drag-drop pick, create-new, drawer Save, library refresh) must
- * produce the same shape - keep them all on these builders.
+ * Translation layer between an agent library record and the workflow DSL
+ * node that executes it. Every place that writes an agent into a node must
+ * produce the same shape the backend parser reads — keep them on these builders.
  */
 
 export function mapAgentInputs(agent: TypedAgent): Field[] {

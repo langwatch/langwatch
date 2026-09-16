@@ -8,10 +8,9 @@ import type { WorkflowField } from "@langwatch/workflow-contract";
 export const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
 
 /**
- * Example scalar value for an entry field type, or undefined when the type is
- * not a scalar. The evaluate endpoint only accepts string, number or boolean
- * parameter values, so structured inputs (lists, dicts, json schemas, chat
- * messages) come from the dataset and are not offered as constant parameters.
+ * Example scalar value for an entry field type, or undefined when not a
+ * scalar. The evaluate endpoint only accepts string/number/boolean params,
+ * so structured inputs (lists, dicts, chat messages) come from the dataset.
  */
 export function exampleParameterValue(type: string): string | number | boolean | undefined {
   switch (type) {
@@ -31,11 +30,9 @@ export function exampleParameterValue(type: string): string | number | boolean |
 }
 
 /**
- * Build the example "parameters" object: the entry fields the dataset does not
- * already provide, each with an example value of its type. Fields that match a
- * dataset column by name are omitted - the dataset feeds those per row, and
- * naming one as a parameter would override every row with a single constant.
- * Non-scalar fields are skipped (see exampleParameterValue).
+ * Build the example "parameters" object: entry fields the dataset doesn't
+ * already provide, each with an example value (non-scalar fields skipped,
+ * see `exampleParameterValue`). Fields matching a dataset column are omitted.
  */
 export function buildEvaluateParameters({
   entryFields,

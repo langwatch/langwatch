@@ -36,12 +36,9 @@ export class HttpWorkflowStudioStreamAdapter implements WorkflowStudioStream {
 }
 
 /**
- * The engine this deployment did not configure.
- *
- * Refuses by name rather than answering: a studio run dispatched at no address
- * is not a slower run, it is one whose result nobody will ever see, and a
- * `fetch` at `undefined/go/...` reports a URL parse failure instead of the
- * configuration gap that caused it.
+ * The engine this deployment did not configure. Refuses by name: a run
+ * dispatched at no address is one whose result nobody will ever see, not a
+ * `fetch` at `undefined/go/...` reporting an opaque URL parse failure.
  */
 export class UnconfiguredWorkflowStudioStreamAdapter implements WorkflowStudioStream {
   static create(): UnconfiguredWorkflowStudioStreamAdapter {

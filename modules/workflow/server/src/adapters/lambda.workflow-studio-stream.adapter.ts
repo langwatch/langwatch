@@ -29,10 +29,9 @@ export type LambdaWorkflowStudioStreamOptions = Readonly<{
   functions: NlpLambdaFunctionReader;
   invoke: NlpLambdaStreamInvoke;
   /**
-   * Where an oversized body is parked. Absent is a supported composition — a
-   * deployment with no object storage runs every studio graph that fits under
-   * the cap — and an oversized run then refuses by name instead of posting
-   * over the cap and reporting AWS's byte count.
+   * Where an oversized body is parked. Absent is a supported composition; an
+   * oversized run then refuses by name instead of posting past AWS's byte
+   * cap.
    */
   staging?: NlpPayloadStaging | undefined;
   stagingThresholdBytes: number;
@@ -122,12 +121,9 @@ export class LambdaWorkflowStudioStreamAdapter implements WorkflowStudioStream {
 }
 
 /**
- * The invocation's frames as the bytes Studio reads.
- *
- * The prelude is stripped before anything is enqueued: AWS commonly delivers
- * it in the same chunk as the first SSE frame, and forwarded raw it puts a
- * bare `{` where the parser expects `data: `, which drops the engine's first
- * event — the heartbeat Studio waits on before it says it is connected.
+ * The invocation's frames as the bytes Studio reads. The prelude is stripped
+ * first: AWS often ships it in the same chunk as the first SSE frame, and
+ * forwarded raw it drops the engine's first event — the connect heartbeat.
  */
 function readStudioFrames(input: {
   frames: AsyncIterable<NlpLambdaStreamChunk>;

@@ -34,11 +34,8 @@ export const handledErrorEnvelopeSchema = z
 
 /**
  * The 409 a workbench write answers with when someone else saved first.
- *
- * `StaleWorkbenchStateError` carries `currentVersion` in `meta`, and the REST
- * boundary spreads `meta` flat, so the number arrives as a sibling of `error`.
- * It is declared here because reloading is the whole remedy: a client that
- * reads it can go straight to the current version instead of guessing.
+ * `StaleWorkbenchStateError`'s `currentVersion` arrives as a sibling of
+ * `error` (the REST boundary spreads `meta` flat) — reloading is the remedy.
  */
 export const staleWorkbenchStateErrorSchema = handledErrorEnvelopeSchema.extend({
   currentVersion: z
@@ -126,9 +123,8 @@ export const listRunsResponseSchema = z.object({
 
 /**
  * What a completed run tallied, as the poll endpoint reports it: the engine's
- * `ExecutionSummary` plus the per-target and per-evaluator breakdown a CI job
- * prints. This is the run-state object held in Redis, NOT the ClickHouse
- * aggregate of the same name in {@link runAggregateSummarySchema}.
+ * `ExecutionSummary` plus the per-target/evaluator breakdown a CI job prints.
+ * The Redis run-state object, NOT the ClickHouse aggregate in {@link runAggregateSummarySchema}.
  */
 const executionSummarySchema = z.object({
   runId: z.string(),
@@ -177,10 +173,9 @@ const executionSummarySchema = z.object({
 });
 
 /**
- * The poll response. Which fields are present depends on `status`: a run still
- * going carries progress only, a finished one adds `finishedAt` and either a
- * `summary` or the failure's stable `error` code. Optionality here reflects
- * that, rather than four separate documented shapes for one endpoint.
+ * The poll response. Which fields are present depends on `status`: a run
+ * still going carries progress only; a finished one adds `finishedAt` and
+ * either a `summary` or the failure's stable `error` code.
  */
 export const runStatusResponseSchema = z.object({
   runId: z.string(),
@@ -388,12 +383,9 @@ export const experimentInitResponseSchema = z.object({
 });
 
 /**
- * The two 400s the create call answers with.
- *
- * They are hand-rolled in the handler rather than raised as handled errors,
- * and they share no field: a body that is not JSON at all answers `message`, a
- * body that parses but fails the schema answers `error` carrying the
- * validation sentence. Documented as sent, so a caller reads the right field.
+ * The two 400s the create call answers with, hand-rolled rather than raised
+ * as handled errors: a body that is not JSON answers `message`, one that
+ * parses but fails the schema answers `error` with the validation sentence.
  */
 export const experimentInitBadRequestSchema = z.union([
   z.object({

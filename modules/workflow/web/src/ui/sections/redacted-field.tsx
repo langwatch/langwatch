@@ -11,11 +11,9 @@ interface RedactedFieldProps {
   children: React.ReactNode;
   loadingComponent?: React.ReactNode;
   /**
-   * When provided, drives the redaction state directly instead of the per-field
-   * query: the traces-v2 drawer passes the DTO's own redaction info so the
-   * marker can never disagree with the content the server already nulled.
-   * `visibleTo` is the human audience label ("Admins, Security group" or "no
-   * one"), or null for the generic copy.
+   * When provided, drives the redaction state directly (traces-v2 passes the
+   * DTO's own info) instead of the per-field query, so the marker can't
+   * disagree with server-nulled content. `visibleTo` is the audience label.
    */
   redacted?: boolean;
   visibleTo?: string | null;

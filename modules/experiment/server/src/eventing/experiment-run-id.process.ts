@@ -4,11 +4,9 @@ import { createHash } from "node:crypto";
 const EXPERIMENT_RUN_RESULT_KSUID_RESOURCE = "exprunresult";
 
 /**
- * The deterministic identity of one experiment run result.
- *
- * Derived from the run's coordinates for the same reason span ids are: a
- * retried result must overwrite its earlier self rather than appear twice in
- * the run.
+ * The deterministic identity of one experiment run result. Derived from the
+ * run's coordinates for the same reason span ids are: a retried result must
+ * overwrite its earlier self rather than appear twice in the run.
  */
 export class ExperimentRunIds {
   static generateDeterministicResultId({

@@ -7,10 +7,8 @@ import type { ExperimentRunStateData } from "../../eventing/experiment-run-state
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
- *
- * Restated here rather than imported because the point of the case below is
- * that a process which configures nothing still gets a bounded, correct TTL —
- * an import would assert the constant against itself.
+ * Restated here, not imported: the case below proves an unconfigured process
+ * still gets a bounded TTL — importing would assert the constant against itself.
  */
 const FOLD_CACHE_FLOOR_SECONDS = 300;
 

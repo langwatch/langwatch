@@ -39,9 +39,8 @@ export type ExperimentV3RunLoop = Readonly<{
 
 /**
  * Whether the signed-in person behind a browser door holds one permission on
- * one project. The same question the process's managed-session port answered,
- * resolved through the same authorization service every other door asks, so
- * two doors cannot decide differently about a person.
+ * one project — resolved through the same authorization service every other
+ * door asks, so two doors cannot decide differently about a person.
  */
 export type ExperimentWorkbenchPermissions = Readonly<{
   permitted(

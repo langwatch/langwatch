@@ -142,9 +142,8 @@ export type ExecutionState = {
   /** Raw engineer-facing failure message; customer sees generic "unknown" instead. */
   error?: string;
   /**
-   * Stable code for the failure — the nlpgo engine's `NodeError.Type`
-   * (`http_error`, `upstream_http_error`, `llm_error`, …). Generated into
-   * `nodeErrorCodes` and mapped to customer copy by the presentation
+   * Stable code for the failure — the nlpgo engine's `NodeError.Type`, listed
+   * in `nodeErrorCodes` and mapped to customer copy by the presentation
    * registry. Absent on older engines and on non-error states.
    */
   error_type?: string;
@@ -165,12 +164,9 @@ export type ExecutionState = {
     model?: string;
   };
   /**
-   * What an HTTP node saw on the wire. Diagnostics for whoever is configuring
-   * the endpoint, not workflow data: nothing downstream binds to it. Present
-   * on a non-2xx as well as a success, since the failure is the case worth
-   * reading. `rendered_body` is the request body after templating, which is
-   * safe to show because the body template is the one field the engine
-   * deliberately does not resolve secrets into.
+   * What an HTTP node saw on the wire — diagnostics only, nothing downstream
+   * binds to it. `rendered_body` (the post-template request body) is safe to
+   * show since templating is the one place secrets are never resolved into.
    */
   http?: {
     status_code?: number;
@@ -462,10 +458,9 @@ const studioEdgeSchema = z.looseObject({
 });
 
 /**
- * `WorkflowDsl` is the canonical open wire envelope owned by Workflow
- * contract. Studio needs a typed editor refinement for its known node data;
- * this schema keeps the same permissive node/edge payload while requiring the
- * fields the canvas materialises. It is not a second persisted wire format.
+ * `WorkflowDsl` is the canonical open wire envelope; this schema is Studio's
+ * typed refinement, keeping the same permissive node/edge payload while
+ * requiring the fields the canvas materialises. Not a second wire format.
  */
 export const studioWorkflowWireSchema = workflowDslSchema
   .extend({

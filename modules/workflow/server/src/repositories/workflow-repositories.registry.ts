@@ -7,9 +7,8 @@ import type { WorkflowRepository } from "./workflow.repository.ts";
 
 /**
  * The rows the workflow module owns, chosen once at boot: the graph and its
- * versions, the bare row a Studio copy lands in, and the project environment a
- * run executes with. Postgres holds every one of them in a deployment that has
- * Postgres; the memory tier holds them in a process that does not.
+ * versions, the bare row a Studio copy lands in, and the run environment.
+ * Postgres holds all of them when composed; the memory tier holds them otherwise.
  */
 export interface WorkflowRepositories {
   readonly workflows: WorkflowRepository;

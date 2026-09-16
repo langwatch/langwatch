@@ -282,16 +282,11 @@ function ScoreBars({
           />
         </Box>
       ))}
-      {/*
-        This used to read "where two bands overlap, this run did not separate
-        those variants". That was the rule when separation compared these two
-        bands; it is now decided on the interval of the DIFFERENCE between two
-        scores, which is tighter than either band because both move together
-        across resamples. Overlapping bands are therefore routinely separated
-        — on a four-variant run this caption sat a few lines above a count
-        that contradicted it. The bands still show how well each score is
-        pinned down, which is what they are for; they just are not the test.
-      */}
+      {/* This used to read "where two bands overlap, this run did not
+        separate those variants" — separation is now decided on the interval
+        of the DIFFERENCE between two scores, tighter than either band since
+        both move together. Bands still show how pinned-down each score is,
+        which is what they're for, not the test. */}
       <Text fontSize="2xs" color="fg.muted">
         Bar marks the score, the shaded band the range it could plausibly be. Two bands overlapping
         does not by itself mean the run failed to separate them — that is judged on the gap between

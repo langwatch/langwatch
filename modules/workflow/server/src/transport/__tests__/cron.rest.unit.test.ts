@@ -1,10 +1,10 @@
 /**
+ * @vitest-environment node
  * @see specs/studio/nlp-lambda-cleanup.feature
- * The deployment's own housekeeping door, on a runtime that stands in for the
- * process: one shared-secret door, and the two literal addresses the running
- * CronJob already curls.
+ * The deployment's own housekeeping door, on a runtime that stands in for
+ * the process: one shared-secret door, and the two literal addresses the
+ * running CronJob already curls.
  */
-// @vitest-environment node
 import {
   createRestRuntime,
   type RestErrorHandler,

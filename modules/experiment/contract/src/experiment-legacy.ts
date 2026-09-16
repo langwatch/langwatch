@@ -119,11 +119,9 @@ export const dSPyStepSummarySchema = z.object({
 export type DSPyStepSummary = z.infer<typeof dSPyStepSummarySchema>;
 
 /**
- * Valid target types for batch evaluations.
- * - prompt: LLM prompt target from Evaluations V3
- * - agent: Agent target from Evaluations V3
- * - evaluator: Evaluator used as a target (for testing evaluators)
- * - custom: External target from API (Python SDK, etc.)
+ * Batch evaluation target types: `prompt`/`agent` from Evaluations V3,
+ * `evaluator` (an evaluator run as a target, for testing evaluators), and
+ * `custom` (an external target from the API, e.g. the Python SDK).
  */
 export const eSBatchEvaluationTargetTypeSchema = z.union([
   z.literal("prompt"),

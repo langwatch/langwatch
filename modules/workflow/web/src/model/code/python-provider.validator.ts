@@ -15,10 +15,8 @@ import {
 
 /**
  * Lightweight client-side validator — flags mismatched brackets, unterminated
- * strings, tabs-after-spaces indentation, and (when the node has declared
- * outputs) any output keys missing from the user's `return {...}` dict. Not a
- * full Python parser; it catches the structural mistakes users hit most
- * without a server round-trip.
+ * strings, tabs-after-spaces indentation, and missing declared output keys.
+ * Not a full Python parser; catches the mistakes users hit most, no round-trip.
  */
 export interface ValidatorHandle extends IDisposable {
   revalidate: () => void;
@@ -196,12 +194,10 @@ export function registerValidator(monaco: Monaco, contractRef: ContractRef): Val
         }
       }
 
-      // Cheap literal-type-mismatch lint. Walk the last `return {…}` dict on
-      // the source and, for each declared output that has an obviously-typed
-      // literal value (string, number, bool, list, dict), warn when the
-      // literal kind doesn't match the declared type. Variable references and
-      // function calls fall through unchecked — too many false positives
-      // without a real Python parser.
+      // Cheap literal-type-mismatch lint: walk the last `return {…}` dict and
+      // warn when an obviously-typed literal (string, number, bool, list,
+      // dict) doesn't match its declared output type. Variable references and
+      // calls fall through unchecked — too many false positives otherwise.
       const lastReturn = findLastReturnDict(source);
       if (lastReturn) {
         const entries = parseSimpleDictEntries(lastReturn.body);

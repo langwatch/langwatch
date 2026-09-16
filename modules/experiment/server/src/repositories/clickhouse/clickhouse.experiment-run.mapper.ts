@@ -1,9 +1,7 @@
 /**
  * Query helpers shared by the Experiment run-history ClickHouse repository.
- *
- * The item tables are partitioned by week. Keep the lifecycle-derived
- * OccurredAt bounds and exact experiment/run pairs in every multi-run read so
- * ClickHouse can prune partitions without treating reused run ids as matches.
+ * Item tables are partitioned by week: keep OccurredAt bounds and exact
+ * experiment/run pairs in every read so ClickHouse can prune without matching reused run ids.
  */
 
 import { Temporal, toEpochMs } from "@langwatch/time";

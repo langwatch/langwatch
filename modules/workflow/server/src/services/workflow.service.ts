@@ -41,9 +41,8 @@ import { WorkflowDslService } from "./workflow-dsl.service.ts";
 
 /**
  * The app's KSUID resources for a workflow row and a version row
- * (`KSUID_RESOURCES.WORKFLOW`, `KSUID_RESOURCES.WORKFLOW_VERSION`). The
- * literals rather than the app's constant table: the prefix is part of the
- * id format already written to the database, so it belongs with the writer.
+ * (`KSUID_RESOURCES.WORKFLOW`/`WORKFLOW_VERSION`). Literals, not the app's
+ * constant table: the prefix is part of the id format already on the database.
  */
 const WORKFLOW_KSUID_RESOURCE = "workflow";
 const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";

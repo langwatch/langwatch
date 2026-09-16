@@ -675,13 +675,11 @@ describe("buildEvaluatorTargetNode", () => {
   });
 });
 
-// Prompt-identity forwarding is what lets nlpgo emit the
-// PromptApiService.get + Prompt.compile spans (the engine emits them only
-// when the signature node carries data.configId — see
+// Prompt-identity forwarding lets nlpgo emit the PromptApiService.get +
+// Prompt.compile spans, gated on `data.configId` (see
 // services/nlpgo/app/engine/prompt_spans_emit_test.go and
-// specs/nlp-go/prompt-spans-eval-v3.feature). Without these fields the
-// eval-v3 target prompt has no prompt ancestry in the trace and the
-// drawer's "Open in Prompts" resume is hidden.
+// specs/nlp-go/prompt-spans-eval-v3.feature). Without it there is no prompt
+// ancestry, and the drawer's "Open in Prompts" resume is hidden.
 describe("buildSignatureNodeFromPrompt", () => {
   const createVersionedPrompt = (): VersionedPrompt => ({
     id: "prompt_supportrouter_xyz",
@@ -900,14 +898,11 @@ describe("buildSignatureNodeFromLocalConfig", () => {
 describe("buildCellWorkflow", () => {
   describe("given an agent target whose agent wraps a Studio workflow", () => {
     it("throws instead of silently building an empty code node", () => {
-      // A workflow-type agent (created via Agent -> New Agent -> Workflow)
-      // has no code/parameters of its own — just a pointer to a Studio
-      // workflow. The orchestrator must resolve and run that linked workflow
-      // via executeWorkflowCell *before* ever reaching buildCellWorkflow. If
-      // it isn't resolved, buildCellWorkflow must fail loudly rather than
-      // silently build an empty "code" node (the empty-code node is what
-      // produced the confusing downstream DSPy "user code must define one
-      // of..." error for every row).
+      // A workflow-type agent has no code of its own — just a pointer to a
+      // Studio workflow. The orchestrator must resolve and run it via
+      // executeWorkflowCell *before* ever reaching buildCellWorkflow; if it
+      // isn't resolved, buildCellWorkflow must fail loudly rather than
+      // silently build an empty "code" node.
       const workflowAgent: TypedAgent = {
         id: "workflow-agent-1",
         projectId: "project-1",

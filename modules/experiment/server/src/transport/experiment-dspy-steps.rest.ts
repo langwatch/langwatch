@@ -1,10 +1,7 @@
 /**
- * `POST /api/dspy/log_steps` - the DSPy optimizer's own progress log.
- *
- * Like the create-or-take door beside it, this one answers its own bodies: an
- * SDK optimizer parses `{ message }` and `{ error }`, so the route declares a
- * raw answer rather than a schema that would reshape every refusal on the way
- * out. Spec: modules/experiment/specs/experiment-service.feature.
+ * `POST /api/dspy/log_steps` - the DSPy optimizer's own progress log. Like
+ * the create-or-take door beside it, this one answers its own bodies: an SDK
+ * optimizer parses `{ message }`/`{ error }`, not a reshaping schema.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

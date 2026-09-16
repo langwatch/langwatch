@@ -522,13 +522,10 @@ describe("workflowStoreCore", () => {
   });
 
   describe("updateInputFields entry-point preservation", () => {
-    // The hook fires when a user adds/removes input fields on a code
-    // node. It rewrites the entrypoint method's signature in-place.
-    // The owner directive on PR #3483 (nlp-go-migration): the new
-    // default template uses Python's idiomatic `__call__` instead of
-    // torch/dspy's `forward`, but legacy customer code with `forward`
-    // must keep working — silently rewriting `forward` to `__call__`
-    // on field-add would surprise users and pollute their diffs.
+    // The hook rewrites the entrypoint signature in-place when a user
+    // adds/removes input fields on a code node. New templates use Python's
+    // `__call__` over torch/dspy's `forward`, but legacy `forward` code must
+    // keep working — silently rewriting it on field-add would surprise users.
     const codeParam = (value: string) => [{ identifier: "code", type: "code" as const, value }];
 
     it("rewrites __call__ signature when the new default is in use", () => {

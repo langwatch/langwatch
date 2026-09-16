@@ -1,10 +1,7 @@
 /**
- * The stored rows a Studio run's environment is built from: the project's API
- * key and its project-scoped secrets, as they are stored.
- *
- * The secrets come back encrypted. Decryption is a process capability rather
- * than a stored row, so the cipher belongs to the service above this seam and
- * a repository never carries one.
+ * The stored rows a Studio run's environment is built from: the project's
+ * API key and its project-scoped secrets, still encrypted. Decryption is a
+ * process capability, not a stored row — never the repository's to hold.
  */
 
 /** One project-scoped secret, as the row holds it. */

@@ -1,8 +1,8 @@
 /**
  * Regression coverage for mapping-inference side-locking: "output"-like
- * evaluator fields never fall back to same-named dataset columns, and
- * "expected_output"/"input"-like fields never fall back to same-named target
- * outputs. @see specs/experiments-v3/mapping-auto-inference.feature
+ * fields never fall back to dataset columns; "expected_output"/"input"-like
+ * fields never fall back to target outputs.
+ * @see specs/experiments-v3/mapping-auto-inference.feature
  */
 import type { Field } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";

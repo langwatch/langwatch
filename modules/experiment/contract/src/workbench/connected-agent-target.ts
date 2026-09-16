@@ -12,12 +12,9 @@ export const CONNECTED_INPUT_FIELD = "input";
 export const CONNECTED_OUTPUT_FIELD = "output";
 
 /**
- * The parameters the agent declared, as a column reads them.
- *
- * Secrets are left out: a column mapping is stored in the experiment and read
- * back by everyone who opens it, which is not where a credential goes. A run
- * that needs one is a simulation, where secret values are supplied per run
- * and encrypted.
+ * The parameters the agent declared, as a column reads them. Secrets are left
+ * out of the stored mapping (read by everyone who opens it); a run needing
+ * one is a simulation, where secrets are supplied per run and encrypted.
  */
 export const connectedParameterDefinitions = (source: unknown): ScenarioParameterDefinition[] => {
   const declared = (source as { parameters?: ScenarioParameterDefinition[] } | undefined)
@@ -39,12 +36,9 @@ const fieldTypeOf = (definition: ScenarioParameterDefinition): Field["type"] => 
 };
 
 /**
- * The inputs and outputs of a connected agent column.
- *
- * Every parameter is optional, whatever the function declares: a column that
- * maps none of them still runs, and the function applies its own defaults. A
- * parameter the function requires is refused by the SDK with the name in the
- * message, which is a clearer answer than a mapping the workbench invented.
+ * The inputs and outputs of a connected agent column. Every parameter is
+ * optional: an unmapped one runs on the function's own default. A required
+ * parameter left unmapped is refused by the SDK, by name, not silently.
  */
 export const connectedTargetFields = (source: unknown): { inputs: Field[]; outputs: Field[] } => ({
   inputs: [

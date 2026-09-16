@@ -1,10 +1,7 @@
 /**
- * Shared state + tab assembly for the Run via API dialog.
- *
- * Owns the selected data source and turns a snippet builder into the ordered
- * language tabs the dialog renders (Python first, then TypeScript, Go, Shell).
- * Returns state and callbacks only, never JSX, so both the workflow and the
- * experiment buttons can reuse it.
+ * Shared state + tab assembly for the Run via API dialog. Turns a snippet
+ * builder into ordered language tabs; returns state and callbacks only,
+ * never JSX, so both the workflow and experiment buttons can reuse it.
  */
 import type { PrismLanguage } from "../../../model/prism-language.ts";
 import { useMemo, useState } from "react";

@@ -1,8 +1,7 @@
 /**
  * The three published operations of `/api/experiments`, as the document
- * describes them. Prose only: the framework derives the operation id, the
- * security scheme, the path parameters and the request body from the
- * declaration itself.
+ * describes them. Prose only: the framework derives the operation id,
+ * security scheme, path params and body from the declaration itself.
  */
 
 import type { RestTransportDocs } from "@langwatch/api/rest";

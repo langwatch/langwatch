@@ -11,10 +11,9 @@ import type { CallOutput, ProtocolMessage } from "@langwatch/agent-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 
 /**
- * How long a row keeps waiting for a busy agent before it fails.
- *
- * The same budget a simulation turn gives it, so a customer whose agent takes
- * one call at a time reads one behavior on both screens.
+ * How long a row keeps waiting for a busy agent before it fails — the same
+ * budget a simulation turn gives it, so an agent taking one call at a time
+ * reads the same behavior on both screens.
  */
 export const CONNECTED_BUSY_RETRY_BUDGET_MS = 60_000;
 
@@ -28,10 +27,8 @@ export type ConnectedTargetCall = {
 };
 
 /**
- * The conversation for one row.
- *
- * A string input is the customer's own question and becomes one user message.
- * A dataset column of chat messages is already a conversation and travels as
+ * The conversation for one row. A string input becomes one user message; a
+ * dataset column of chat messages is already a conversation and travels as
  * it is, so a multi-turn dataset can be replayed against the agent.
  */
 const messagesOf = (value: unknown): ProtocolMessage[] => {
@@ -64,12 +61,9 @@ const booleanValueOf = (value: unknown): boolean | undefined => {
 };
 
 /**
- * A value read as the type the parameter declares, or nothing.
- *
- * A cell that holds nothing, and a value the declared type cannot read, both
- * read as nothing: the parameter is left out of the call and the function
- * applies its own default, rather than the agent receiving `NaN` or the text
- * "undefined".
+ * A value read as the type the parameter declares, or nothing — both an
+ * empty cell and one the declared type can't read. Left out of the call so
+ * the function's own default applies, not the agent seeing `NaN` or "undefined".
  */
 const parameterValueOf = ({
   value,
@@ -85,12 +79,9 @@ const parameterValueOf = ({
 };
 
 /**
- * The turn for one row: the conversation, and the parameter values the agent
- * declared.
- *
- * Only declared names are sent. A column input that names nothing the agent
- * declares is dropped rather than passed through, because the SDK refuses a
- * parameter the function has no argument for.
+ * The turn for one row: the conversation and the agent's declared parameter
+ * values. Only declared names are sent; an input naming nothing the agent
+ * declares is dropped, because the SDK refuses a parameter with no argument.
  */
 export const buildConnectedCall = ({
   inputs,
@@ -131,12 +122,9 @@ const contentText = (message: ProtocolMessage): string => {
 };
 
 /**
- * What the cell shows.
- *
- * The function may answer with text, one message or a list of them (the
- * relay's output contract), and an evaluator mapped to the column reads one
- * text either way. A list is read as its last message, which is the agent's
- * answer to this turn.
+ * What the cell shows. The function may answer with text, one message or a
+ * list of them (the relay's output contract); an evaluator mapped to the
+ * column reads one text either way — a list as its last message.
  */
 export const connectedOutputText = (output: CallOutput): string => {
   if (typeof output === "string") return output;
@@ -148,12 +136,9 @@ export const connectedOutputText = (output: CallOutput): string => {
 };
 
 /**
- * A failed call as the cell records it.
- *
- * A handled error travels by its code, so the cell renders the copy that code
- * is registered with (ADR-045): "no process of this agent is connected", not
- * a stack message. Anything else is unnamed and reads as the generic failure,
- * which is what an unanticipated fault should look like.
+ * A failed call as the cell records it. A handled error travels by its code,
+ * so the cell renders the registered copy (ADR-045) rather than a stack
+ * message; anything else is unnamed and reads as the generic failure.
  */
 export const connectedCallFailure = (
   error: unknown,

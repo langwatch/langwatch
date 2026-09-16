@@ -1,9 +1,7 @@
 /**
- * The setup a create call gets when it sends none.
- *
- * A caller that posts nothing still gets a workbench they can open, so the
- * create endpoint is usable on its own rather than only as step one of a
- * create-then-save pair.
+ * The setup a create call gets when it sends none. A caller posting nothing
+ * still gets a workbench they can open, so create is usable on its own, not
+ * only as step one of a create-then-save pair.
  */
 import type { PersistedEvaluationsV3State } from "@langwatch/experiment-contract";
 

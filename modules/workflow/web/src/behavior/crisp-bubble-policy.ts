@@ -71,10 +71,9 @@ function isCrispContainer(node: Node): boolean {
 }
 
 /**
- * Installs the policy: seeds the `$crisp` queue so the hide command and the
- * event bindings are drained the moment Crisp boots, and wires the re-assert
- * triggers. Returns a teardown that restores the default (suppressed) state.
- * Single owner: mounted once, from ExtraFooterComponents.
+ * Installs the policy: seeds the `$crisp` queue so the hide command and
+ * event bindings drain the moment Crisp boots, and wires the re-assert
+ * triggers. Returns a teardown restoring the default (suppressed) state.
  */
 export function installCrispBubblePolicy(): () => void {
   if (teardown) return teardown;

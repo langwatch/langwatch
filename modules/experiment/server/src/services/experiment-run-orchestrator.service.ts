@@ -48,12 +48,9 @@ import type {
 import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
 
 /**
- * What a cell's tokens cost, in the deployment's own rate table.
- *
- * The rates live with the tracer's cost catalogue, which is neither the
- * Experiment feature's data nor portable: a self-hosted deployment prices the
- * same model differently from the cloud one. The run asks for a number and
- * takes `undefined` for "no known rate", which is what it already did.
+ * What a cell's tokens cost, in the deployment's own rate table. Lives with
+ * the tracer's cost catalogue — neither Experiment's data nor portable, since
+ * self-hosting prices the same model differently. `undefined` means no known rate.
  */
 export abstract class ExperimentModelCost {
   abstract findTokenPrice(input: {

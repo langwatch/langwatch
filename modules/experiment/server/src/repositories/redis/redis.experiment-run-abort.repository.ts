@@ -45,10 +45,8 @@ export class RedisExperimentRunAbortRepository extends ExperimentRunAbortReposit
   }
 
   /**
-   * Marks a run as running and records its owning project.
-   *
-   * Stored as JSON so the start timestamp stays available for listing the
-   * executions currently in flight.
+   * Marks a run as running and records its owning project. Stored as JSON
+   * so the start timestamp stays available for listing in-flight executions.
    */
   async setRunning({ runId, projectId }: { runId: string; projectId: string }): Promise<void> {
     await this.redis.set(

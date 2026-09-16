@@ -1,9 +1,7 @@
 /**
- * The bare workflow row a Studio copy lands in, in memory.
- *
- * It writes into the same store the memory lifecycle repository reads, so a
- * copy row created here is a workflow the lifecycle then commits a version
- * against, exactly as the two Prisma writes behave.
+ * The bare workflow row a Studio copy lands in, in memory. Writes into the
+ * same store the lifecycle repository reads, so a copy row here is a
+ * workflow the lifecycle can commit a version against, like the Prisma pair.
  */
 import type { Workflow } from "@langwatch/workflow-contract";
 import {

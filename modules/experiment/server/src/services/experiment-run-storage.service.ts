@@ -24,10 +24,8 @@ import { nowInstant } from "@langwatch/time";
 
 /**
  * Where a workbench cell's evaluator result is reported as an evaluation.
- *
- * The Evaluation feature owns the command and its pipeline; a core feature
- * server may not import another feature's server, so the run reports through
- * this declaration and the process binds it to the Evaluation application.
+ * The Evaluation feature owns the command; a core feature server may not
+ * import another's, so the run reports through here, bound by the process.
  */
 export abstract class ExperimentEvaluationReporting {
   abstract reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown>;

@@ -7,11 +7,9 @@ import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 import { ComponentNode, NodeSectionTitle } from "./workflow-nodes.tsx";
 
 /**
- * The workflow's entry point on the canvas. Renders the entry fields
- * under an "Inputs" title and, when a dataset is attached, a compact
- * marker with the dataset name and row count instead of an embedded
- * grid. The attach/seed semantics live in the store's
- * attachEntryDataset; viewing and editing happen in the entry drawer.
+ * The workflow's entry point on the canvas: entry fields under "Inputs", or
+ * a compact dataset marker when one is attached. Attach/seed semantics live
+ * in the store's `attachEntryDataset`; the entry drawer views and edits.
  */
 export const EntryNode = forwardRef(function EntryNode(
   props: NodeProps<Node<Component>>,

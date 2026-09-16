@@ -98,11 +98,9 @@ export class RedisExperimentRunProgressRepository extends ExperimentRunProgressR
   }
 
   /**
-   * Marks a run as failed.
-   *
-   * Takes the CODE, not the thrown message — the caller maps the failure
-   * through the result mapper first, so what is stored (and later served by the
-   * run API) is what the customer is allowed to read.
+   * Marks a run as failed. Takes the CODE, not the thrown message — the
+   * caller maps the failure through the result mapper first, so what is
+   * stored (and later served by the run API) is what the customer may read.
    */
   async failRun(runId: string, failure: ExperimentRunProgressFailure): Promise<void> {
     const state = await this.findRunState(runId);

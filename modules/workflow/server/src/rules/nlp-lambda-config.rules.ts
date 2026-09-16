@@ -52,12 +52,9 @@ export type StudioLambdaFleetFields = Omit<
 >;
 
 /**
- * The code-block ceiling a per-project function is given.
- *
- * Two deadlines enclose a code block and the ceiling has to sit under both, or
- * the block is killed by something that cannot say why: Lambda's own
- * invocation timeout, and the engine's stream idle timeout, which a running
- * block spends emitting nothing.
+ * The code-block ceiling a per-project function is given. Two deadlines
+ * enclose a code block, and the ceiling must sit under both or it dies
+ * unexplained: Lambda's own timeout, and the engine's stream idle timeout.
  */
 export function clampCodeBlockTimeoutSeconds(rawValue: string | undefined): number {
   const maxSeconds =

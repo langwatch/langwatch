@@ -27,9 +27,8 @@ export const recordTargetResultCommandDataSchema = z.object({
   error: z.string().nullable().optional(),
   /**
    * The failure's stable code, as the serialised handled error the SSE frame
-   * carries. Without it the row keeps only `error` — the engine's raw string —
-   * and the grid prints that to the customer on the next page load. See
-   * `targetResultEventDataSchema`, which this envelope mirrors.
+   * carries. Without it the row keeps only `error` — the engine's raw string,
+   * printed to the customer. Mirrors `targetResultEventDataSchema`.
    */
   domainError: z
     .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)

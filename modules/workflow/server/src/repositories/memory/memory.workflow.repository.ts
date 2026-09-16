@@ -1,9 +1,7 @@
 /**
- * The workflow graph rows a process without Postgres keeps, in memory.
- *
- * The same contract the Prisma tier answers: a missing row is null rather than
- * a throw, an archived workflow is invisible unless asked for, and a version
- * read without its DSL still answers with an empty graph rather than nothing.
+ * The workflow graph rows a process without Postgres keeps, in memory. The
+ * same contract the Prisma tier answers: a missing row is null, an archived
+ * workflow is invisible unless asked for, and a DSL-less version reads as an empty graph.
  */
 import {
   workflowDslSchema,

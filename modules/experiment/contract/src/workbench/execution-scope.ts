@@ -1,10 +1,7 @@
 /**
- * Utilities for determining which cells will be executed based on execution scope.
- * This is the single source of truth for execution cell calculation on the frontend.
- *
- * The run loop (`@langwatch/experiment-server`'s
- * `services/experiment-run-orchestrator.service.ts`) computes the same cells,
- * and the two must stay in sync.
+ * The single source of truth on the frontend for which cells an execution
+ * scope covers. The server's run orchestrator computes the same cells, and
+ * the two must stay in sync.
  */
 
 import type { ExecutionScope } from "./execution/types.ts";
@@ -31,12 +28,9 @@ export type ComputeExecutionCellsParams = {
 };
 
 /**
- * Computes exactly which cells will be executed based on the scope.
- * This accounts for:
- * - The execution scope type (full, rows, target, cell)
- * - Empty row filtering (empty rows are always skipped)
- *
- * Returns an array of cell identifiers that will be executed.
+ * Computes exactly which cells will be executed for a scope: the scope type
+ * (full, rows, target, cell) and empty-row filtering (always skipped).
+ * Returns the array of cell identifiers to execute.
  */
 export const computeExecutionCells = ({
   scope,

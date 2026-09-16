@@ -12,11 +12,9 @@ import { useRunViaApiTabs } from "../run-via-api/use-run-via-api-tabs.ts";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
 /**
- * Shows how to trigger this workflow's evaluation from CI or scripts: the same
- * run the Evaluate button starts, through the unified evaluations-v3 backend.
- * Offers a language picker (Python, TypeScript, Go, Shell) and a data-source picker
- * (attached dataset, inline data, dataset id), and always shows how to read the
- * per-row results back. The example mirrors the entry point's own fields.
+ * Shows how to trigger this workflow's evaluation from CI or scripts, via the
+ * same evaluations-v3 backend the Evaluate button uses. Offers a language
+ * picker and a data-source picker, and always shows reading results back.
  */
 export function RunViaApiButton({
   workflowId,

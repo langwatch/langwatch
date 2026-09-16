@@ -190,10 +190,8 @@ export type RestoreWorkbenchVersionInput = z.infer<typeof restoreWorkbenchVersio
 
 /**
  * Writes the cells produced by one completed run into the current workbench.
- *
- * The runner computes the scoped merge from its execution plan, while the
- * service owns the read-version-write compare-and-set that makes that merge a
- * durable workbench change.
+ * The runner computes the scoped merge from its execution plan; the service
+ * owns the read-version-write compare-and-set that makes it a durable change.
  */
 export const recordWorkbenchRunResultsInputSchema = z.object({
   projectId: z.string(),

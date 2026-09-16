@@ -4,10 +4,9 @@ import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "./python-stdlib.ts";
 import { scanImports } from "./python-provider.shared.ts";
 
 /**
- * Pop the parameter-hint widget when the user opens a call expression. Resolves
- * the callee against the same catalogue the hover provider uses (builtins
- * + stdlib + imported modules). Re-triggers on commas so multi-arg calls keep
- * the hint visible.
+ * Pop the parameter-hint widget when the user opens a call expression.
+ * Resolves the callee against the hover provider's catalogue (builtins +
+ * stdlib + imported modules); re-triggers on commas for multi-arg calls.
  */
 export function registerSignatureHelp(monaco: Monaco): IDisposable {
   const CALLEE_BEFORE_PAREN = /([A-Za-z_][\w.]*)\s*\($/;

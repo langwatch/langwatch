@@ -103,10 +103,9 @@ export type ExecutionRequest = {
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
   /**
-   * Pre-existing target outputs the client already has for targets NOT
-   * being re-run this dispatch. Used by Phase 2 pairwise so it can read
-   * variantA / variantB outputs from a prior run without forcing them to
-   * re-execute. Keyed by `${rowIndex}:${targetId}`.
+   * Pre-existing target outputs the client already has for targets NOT being
+   * re-run this dispatch, keyed by `${rowIndex}:${targetId}`. Used by Phase 2
+   * pairwise to read prior variantA/variantB outputs without re-executing.
    */
   seedTargetOutputs?: Record<string, { output: unknown; cost?: number; duration?: number }>;
   /**
@@ -209,9 +208,8 @@ export const executionRequestSchema = z
 
 /**
  * Optional run inputs accepted as a JSON body by the run API and the workflow
- * evaluate endpoint: inline data, a saved dataset id, constant parameters that
- * override every row, and a row-index subset. data and dataset_id are mutually
- * exclusive.
+ * evaluate endpoint: inline data, a dataset id, override parameters, and a
+ * row-index subset. `data` and `dataset_id` are mutually exclusive.
  */
 export const runInputsBodySchema = z
   .object({
@@ -287,10 +285,9 @@ export type EvaluationV3Event =
        */
       error?: string;
       /**
-       * The coded failure, mirroring the evaluator side
-       * (`EvaluationV3EvaluatorResult.domainError`). Built from the engine's
-       * `NodeError.Type`; the client renders customer copy from the
-       * presentation registry rather than the raw `error` string.
+       * The coded failure, mirroring the evaluator side's `domainError`. Built
+       * from the engine's `NodeError.Type`; the client renders customer copy
+       * from the presentation registry rather than the raw `error` string.
        */
       domainError?: SerializedHandledError;
     }
@@ -306,9 +303,8 @@ export type EvaluationV3Event =
       duration?: number;
       /**
        * The request payload sent to the evaluator (e.g. a Comparison
-       * evaluator's ordered `candidates` list). Persisted so downstream
-       * aggregation can recover which variants were actually compared on
-       * this row, independent of which one won.
+       * evaluator's ordered `candidates`). Persisted so downstream
+       * aggregation can recover which variants were compared on this row.
        */
       inputs?: Record<string, unknown>;
     }
@@ -325,11 +321,9 @@ export type EvaluationV3Event =
        */
       domainError?: SerializedHandledError;
       /**
-       * The trace to hand support. An unhandled failure deliberately tells the
-       * client nothing about what went wrong, which leaves the id as the only
-       * thing that ties "it broke" to the log line — the same reasoning as
-       * `data.traceId` on the tRPC boundary. A handled failure also carries it
-       * inside `domainError`; this is the field a caller can read either way.
+       * The trace to hand support, present whether the failure was handled or
+       * not — an unhandled one tells the client nothing else, so this id is
+       * what ties "it broke" to the log line (same reasoning as `data.traceId`).
        */
       traceId?: string;
       rowIndex?: number;

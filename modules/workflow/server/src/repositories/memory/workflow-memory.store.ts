@@ -1,10 +1,7 @@
 /**
  * The one in-memory store every memory-tier workflow repository writes into.
- *
- * One store behind every row, the way one Prisma client serves them: a
- * workflow written through the lifecycle is the workflow a copy row reads
- * back, and a secret written for a project is the secret an environment read
- * answers with.
+ * One store behind every row, like one Prisma client: a workflow written
+ * through the lifecycle is the workflow a copy row reads back.
  */
 import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
 

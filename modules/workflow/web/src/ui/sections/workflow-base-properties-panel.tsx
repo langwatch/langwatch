@@ -226,13 +226,10 @@ export function FieldsDefinition({
     onSubmit(data);
   };
 
-  // Re-sync the form when the node's fields change from OUTSIDE the form:
-  // attaching a dataset merges its columns into the entry node, and the
-  // evaluator toggle swaps the end node's results. Keyed on a content
-  // signature, not the array reference, so a fresh reference each render
-  // can't loop; guarded against the form already matching so the user's own
-  // edits - which round-trip through setNode and return identical - never
-  // trigger a replace mid-typing.
+  // Re-sync the form when the node's fields change from OUTSIDE the form (a
+  // dataset attach, or the evaluator toggle). Keyed on a content signature, not
+  // the array reference, so a fresh reference each render can't loop; guarded
+  // against an already-matching form so the user's own edits never replace mid-typing.
   const currentFields = node.data[field] ?? [];
   const fieldsSignature = JSON.stringify(
     currentFields.map((f) => [f.identifier, f.type, f.optional ?? false]),
@@ -427,12 +424,7 @@ export function FieldsForm({
     void handleSubmit(onSubmit)();
   }, [handleSubmit, onSubmit]);
 
-  /**
-   * Debounced submit handler
-   * - leading: true - Submit immediately on first change (responsive)
-   * - trailing: false - Don't submit again after debounce period
-   * - 100ms delay - Balances responsiveness with update frequency
-   */
+  /** Debounced submit: fires immediately, not again until 100ms of quiet. */
   const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {
     leading: true,
     trailing: false,

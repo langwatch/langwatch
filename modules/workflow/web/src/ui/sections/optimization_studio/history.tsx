@@ -238,14 +238,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                       image={version.author?.image}
                     />
                     {version.author?.name}
-                    {/* {" · "}
-                    <Tooltip
-                      // content={new Date(version.updatedAt).toLocaleString()}
-                      content="what"
-                      positioning={{ placement: "top" }}
-                    >
-                      {formatTimeAgo(version.updatedAt.getTime())}
-                    </Tooltip> */}
                   </HStack>
                 </VStack>
                 {!version.isCurrentVersion && (

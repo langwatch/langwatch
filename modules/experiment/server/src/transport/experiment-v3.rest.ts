@@ -1,8 +1,7 @@
 /**
- * `/api/experiments/*` - the workbench's project-keyed doors: the CI/CD run,
- * the run reads and the saved setup. Every route names the permission its key
- * is measured against, so the door resolves the project and the handler is
- * handed the scope rather than authenticating the caller itself.
+ * `/api/experiments/*` - the workbench's project-keyed doors for the CI/CD
+ * run, run reads and saved setup. Each route names its required permission,
+ * so the handler receives an already-resolved scope, not a raw caller.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -56,10 +55,8 @@ const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPR
 
 /**
  * Everything the workbench's ten doors reach that `ExperimentApi` does not
- * name: the session, the api-key credential, the run loop, and the
- * experiment application both read and write through. Composed by the
- * process (`apps/api/src/features/experiment/experiment-v3-rest.mount.ts`)
- * because none of it is installed as a module.
+ * name: the session, api-key credential, run loop, and experiment application.
+ * Composed by the process's `experiment-v3-rest.mount.ts` (not a module).
  */
 export interface ExperimentV3RestApi {
   /** Whether the signed-in person holds one permission on one project. */
@@ -71,10 +68,9 @@ export interface ExperimentV3RestApi {
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
   /**
-   * The run loop, as this process composed it. A call rather than a field
-   * because a module's API answers through a reference that exposes
-   * operations only (`LocalFeatureApi`), and a field-valued collaborator read
-   * off one throws.
+   * The run loop, as this process composed it. A call rather than a field:
+   * a module's API exposes operations only (`LocalFeatureApi`), and a
+   * field-valued collaborator read off one throws.
    */
   run(): ExperimentV3RunLoop;
   /**
@@ -116,11 +112,8 @@ export class ExperimentRunLoopUnavailableError extends HandledError {
 }
 
 /**
- * A route that answers its own statuses writes them through rather than
- * validating them against one success schema; each states its 200 body in its
- * own words.
- *
- * A JSON answer this door writes itself.
+ * A JSON answer this door writes itself, rather than validating against one
+ * success schema — each route states its 200 body in its own words.
  */
 export const jsonAnswer = (body: unknown, status: number): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });

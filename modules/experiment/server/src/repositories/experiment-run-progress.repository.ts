@@ -45,8 +45,7 @@ export type ExperimentRunProgressState = {
   /**
    * The failure's stable code — a handled error's own, or the unnamed-failure
    * marker. Never the thrown error's message: `GET /runs/:runId` hands this
-   * straight to any API consumer, and a raw message there is the same leak the
-   * live stream stopped shipping (ADR-045).
+   * straight to any consumer, the same leak the live stream stopped shipping.
    */
   error?: string;
   /** The serialised handled error, when the failure had one. */

@@ -9,11 +9,9 @@ import type {
 } from "./workflow.ts";
 
 /**
- * The transport inputs the workflow surface publishes.
- *
- * They live in the contract rather than beside the router because two
- * different clients are typed against them: the application's tRPC transport,
- * and the standalone workflow client the studio pages use.
+ * The transport inputs the workflow surface publishes. They live in the
+ * contract, not beside the router, because two different clients are typed
+ * against them: the application's tRPC transport and the studio's own client.
  */
 
 /** One project. Every project-scoped procedure on the surface takes it. */

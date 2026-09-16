@@ -146,9 +146,8 @@ function useModifierKeyLabel(): string {
 
 /**
  * Tiny dimmed shortcut hint next to a button label. Avoids Chakra's `Kbd`
- * (too chunky at small button sizes — thick border, shadow, big padding).
- * Inherits the button's own text colour so it adapts to both outline and
- * solid backgrounds without colour drift.
+ * (too chunky at small sizes). Inherits the button's own text colour so it
+ * adapts to both outline and solid backgrounds.
  */
 function ShortcutHint({ children }: { children: React.ReactNode }) {
   return (

@@ -684,10 +684,9 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /**
-   * The application the workbench's four setup doors answer from. They hold it
-   * whole rather than calling through the module's reference, because a
-   * reference publishes operations and several of those doors read the
-   * service behind one.
+   * The application the workbench's four setup doors answer from. Held whole
+   * rather than called through the module's reference, because several of
+   * those doors read the service the reference only publishes operations on.
    */
   experiments(): ExperimentApp {
     return this;

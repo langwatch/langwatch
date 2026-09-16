@@ -16,11 +16,8 @@ import { ExperimentTargetLoadingService } from "./experiment-target-loading.serv
 
 /**
  * The committed studio workflow a workflow target runs, once per dataset row.
- *
- * Two narrow reads rather than one "load the workflow" call: the run
- * distinguishes a workflow that does not exist from one that exists with no
- * committed version, and says so differently. Both live in Postgres beside the
- * Workflow feature, which this package may not reach into.
+ * Two narrow reads, not one "load the workflow" call, so a missing workflow
+ * and one with no committed version say so differently (Postgres, off-limits).
  */
 export abstract class ExperimentWorkflowDsl {
   /** The workflow, or null when the project has none by that id. */

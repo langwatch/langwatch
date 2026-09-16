@@ -40,12 +40,9 @@ export class WorkflowProjectEnvironmentService implements WorkflowProjectEnviron
 }
 
 /**
- * A deployment with no stored-secret cipher.
- *
- * Refuses rather than passing the ciphertext through: an encrypted provider
- * key handed to a running graph as its own value is a credential the graph
- * would send to a provider verbatim, and the failure that produces is a
- * mystery at the provider rather than a missing key here.
+ * A deployment with no stored-secret cipher. Refuses rather than passing the
+ * ciphertext through: a graph sending an encrypted provider key verbatim
+ * fails as a mystery at the provider, not a missing key here.
  */
 export class UnavailableWorkflowEnvironmentDecryptor implements WorkflowEnvironmentDecryptor {
   static create(): UnavailableWorkflowEnvironmentDecryptor {

@@ -19,9 +19,8 @@ let endpoint: MigratedClickHouse | undefined;
 
 /**
  * Starts (or reuses) the migrated endpoint and returns a client bound to it.
- *
- * `CLICKHOUSE_CLUSTER` is unset for the migration: it switches every engine to
- * its `Replicated` form, which needs a Keeper no test server has.
+ * `CLICKHOUSE_CLUSTER` is unset for the migration: it switches every engine
+ * to its `Replicated` form, which needs a Keeper no test server has.
  */
 export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
   if (endpoint) return endpoint;
@@ -69,10 +68,9 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
 }
 
 /**
- * Deletes one tenant's rows from the migrated tables.
- *
- * Mutations rather than a dropped database: the endpoint is shared, and the
- * suites key their rows on ids unique per run.
+ * Deletes one tenant's rows from the migrated tables. Mutations rather than
+ * a dropped database: the endpoint is shared, and suites key their rows on
+ * ids unique per run.
  */
 export async function deleteMigratedTenantRows({
   client,

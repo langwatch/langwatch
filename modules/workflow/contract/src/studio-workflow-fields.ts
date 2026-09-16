@@ -92,10 +92,8 @@ export function canAutoMapAllFields(fields: WorkflowField[]): boolean {
 }
 
 /**
- * Extract end node inputs from a workflow DSL.
- * These represent the outputs that the workflow produces when used as an evaluator.
- * The End node's inputs are what becomes the evaluator's outputs.
- *
+ * Extracts a workflow's end-node inputs — what it produces when used as an
+ * evaluator, since the End node's inputs become the evaluator's outputs.
  * @param workflow - The workflow DSL object
  * @returns Array of field definitions from the end node inputs
  */

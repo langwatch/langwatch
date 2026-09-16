@@ -1,8 +1,7 @@
 /**
- * What one reported DSPy step becomes before it is stored: its examples
- * hashed, its LLM calls priced against the project's own cost rules, and the
- * largest of them truncated so storing a step never costs more than reading it
- * is worth.
+ * What one reported DSPy step becomes before storage: examples hashed, LLM
+ * calls priced against the project's own cost rules, and the largest ones
+ * truncated so storing a step never costs more than reading it is worth.
  */
 import {
   type DSPyLLMCall,

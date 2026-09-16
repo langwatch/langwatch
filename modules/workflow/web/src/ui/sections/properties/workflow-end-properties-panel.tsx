@@ -70,19 +70,15 @@ export function EndPropertiesPanel({
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Treat the end node as an evaluator from EITHER signal: the node's own
-  // behave_as flag OR the workflow being an evaluator. Older evaluator
-  // workflows (and any where the two drifted) carry workflow_type without
-  // the node flag, and those were the ones still showing free-form fields
-  // where users hand-created "score"/"passed" - the exact confusion this
-  // contract removes.
+  // behave_as flag OR the workflow being an evaluator. Older workflows (where
+  // the two drifted) carry workflow_type without the node flag — exactly the
+  // case that used to show free-form "score"/"passed" fields.
   const isEvaluator = node.data.behave_as === "evaluator" || workflowType === "evaluator";
 
   // Pin the evaluator end node to the fixed result vocabulary. Existing
-  // connections survive (identifiers keep their handles); free-form fields
-  // users created by hand are replaced by the contract. The check also
-  // reconciles optionality and order, so older nodes that pinned passed/score
-  // as required (or kept the fields in the wrong spot) normalize to the
-  // all-optional, details-first vocabulary.
+  // connections survive (identifiers keep their handles); hand-created
+  // free-form fields are replaced. Older nodes with passed/score required or
+  // out of order normalize to the all-optional, details-first vocabulary.
   useEffect(() => {
     if (!isEvaluator) return;
     if (matchesEvaluatorContract(node.data)) return;

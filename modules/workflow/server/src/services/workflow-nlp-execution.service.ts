@@ -31,9 +31,8 @@ const logger = createLogger("langwatch:workflows:execution");
 
 /**
  * The app's KSUID resource for a synthesized trace id
- * (`KSUID_RESOURCES.WORKFLOW_TRACE`). The literal rather than the app's
- * constant table: the prefix is part of the id format already written to
- * storage, so it belongs with the writer.
+ * (`KSUID_RESOURCES.WORKFLOW_TRACE`). The literal, not the app's constant
+ * table: the prefix is part of the id format already on storage.
  */
 const WORKFLOW_TRACE_KSUID_RESOURCE = "workflowtrace";
 

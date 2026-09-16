@@ -6,10 +6,9 @@ import type { Connection, Edge, Node } from "@xyflow/react";
  */
 
 /**
- * A constraint that must hold for a node to execute: an If/Else gate node
- * id and the branch side it must take, e.g. `"gate-1:true"`. A node's
- * guard set is the conjunction of constraints that hold on EVERY execution
- * path reaching it - its necessary conditions.
+ * A constraint that must hold for a node to execute: an If/Else gate node id
+ * and the branch side it must take, e.g. `"gate-1:true"`. A node's guard set
+ * is the conjunction of constraints holding on EVERY path reaching it.
  */
 type Guard = string;
 
@@ -120,9 +119,8 @@ export function guardsAreMutuallyExclusive(a: Set<Guard>, b: Set<Guard>): boolea
 
 /**
  * Whether a new connection may join an input that already has source(s).
- * Allowed only when the new source is mutually exclusive with EVERY
- * existing source on that input, so at runtime at most one of them ever
- * produces a value. A first source (no existing edge) is always allowed.
+ * Allowed only when the new source is mutually exclusive with EVERY existing
+ * source on that input; a first source (no existing edge) is always allowed.
  */
 export function canConvergeOnInput({
   nodes,

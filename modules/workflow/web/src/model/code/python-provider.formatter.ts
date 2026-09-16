@@ -3,10 +3,9 @@ import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable } from "monaco-editor";
 
 /**
- * Heuristic Python formatter — re-indents to multiples of 4 spaces, trims
- * trailing whitespace, and collapses runs of 3+ blank lines into 2. We do not
- * try to match Black; the goal is consistent in-editor hygiene without
- * depending on a server round-trip.
+ * Heuristic Python formatter — re-indents to 4-space multiples, trims
+ * trailing whitespace, collapses 3+ blank lines to 2. Not trying to match
+ * Black; the goal is in-editor hygiene without a server round-trip.
  */
 export function registerFormatter(monaco: Monaco): IDisposable {
   return monaco.languages.registerDocumentFormattingEditProvider("python", {

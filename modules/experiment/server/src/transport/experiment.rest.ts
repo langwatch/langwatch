@@ -1,10 +1,7 @@
 /**
- * `/api/experiments` - the project's experiments over a standard project key:
- * the list, one row of it, and the create that starts a workbench.
- *
- * Everything a handler reaches is an operation on the api. The one thing the
- * request itself carries is the credential a create is attributed to, and that
- * arrives as a bound fact rather than as a reach into the framework's context.
+ * `/api/experiments` - the list, one row, and the create that starts a
+ * workbench, over a standard project key. The create's attributed credential
+ * is a bound fact, not a reach into the framework's context.
  */
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {

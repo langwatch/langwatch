@@ -255,10 +255,9 @@ export interface ExperimentApi {
   // ── The project's live-update channel ──────────────────────────────
 
   /**
-   * The freshness signals a workbench save lands on, for as long as the caller
-   * listens. A stream rather than the fan-out itself: pairing the subscribe
-   * with the release is the application's, and a door that held the emitter
-   * could forget the release and leak one per abandoned tab.
+   * The freshness signals a workbench save lands on, for as long as the
+   * caller listens. A stream, not the fan-out itself: pairing subscribe with
+   * release is the application's — a door holding the emitter could leak one.
    */
   watchUpdates(
     input: Readonly<{ projectId: string; signal?: AbortSignal | undefined }>,

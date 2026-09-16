@@ -47,10 +47,9 @@ const answer = (status: 200 | 400 | 403, body: object) => ({
 });
 
 /**
- * The plan refusal, flattened. Matched on the CODE rather than on the licence
- * layer's own class: that class lives in an enterprise package this one may not
- * reach, and a code comparison is what the repo asks for anywhere an error may
- * have crossed a serialisation boundary.
+ * The plan refusal, flattened. Matched on the CODE, not the licence layer's
+ * own class: that class lives in an enterprise package this one may not
+ * reach, and a code comparison is what a crossed serialisation boundary asks for.
  */
 const limitRefusal = (error: HandledError) =>
   answer(403, {

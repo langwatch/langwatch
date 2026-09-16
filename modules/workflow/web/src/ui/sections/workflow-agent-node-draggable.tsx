@@ -8,11 +8,9 @@ type AgentNodeDraggableProps = {
 };
 
 /**
- * Single "Agent" draggable in the sidebar.
- *
- * Uses MODULES.agent as the node template. On drag-end the caller
- * (via useAgentPickerFlow) opens the agent list drawer so the user
- * can choose an existing agent or create a new one.
+ * Single "Agent" draggable in the sidebar. Uses MODULES.agent as the
+ * template. On drag-end, useAgentPickerFlow opens the drawer to pick or
+ * create one.
  */
 export function AgentNodeDraggable({ onDragEnd }: AgentNodeDraggableProps) {
   return (

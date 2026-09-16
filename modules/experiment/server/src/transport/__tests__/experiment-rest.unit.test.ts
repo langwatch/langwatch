@@ -1,9 +1,7 @@
 /**
  * `/api/experiments` - the behaviours the family answered before it was
- * rewritten against the declaration builder, ported by behaviour from the
- * transport test that stood beside the deleted imperative one.
- *
- * Spec: modules/experiment/specs/experiment-service.feature.
+ * rewritten against the declaration builder, ported from the deleted
+ * imperative transport test. Spec: modules/experiment/specs/experiment-service.feature.
  * @vitest-environment node
  */
 import type { Experiment } from "@langwatch/experiment-contract";

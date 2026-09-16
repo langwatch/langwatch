@@ -1,8 +1,7 @@
 /**
- * Writes the bare workflow row a Studio copy lands in.
- *
- * Moved from the platform app's `runtime/app/features/workflow.ts` unchanged:
- * one create against the workflow table, with the draft as the row.
+ * Writes the bare workflow row a Studio copy lands in. Moved unchanged from
+ * the platform app's `runtime/app/features/workflow.ts`: one create against
+ * the workflow table, with the draft as the row.
  */
 import {
   WorkflowRowRepository,

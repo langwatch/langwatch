@@ -31,6 +31,7 @@ export type WorkflowCopyTarget = {
 /**
  * A failure, as a screen knows it. `fallbackTitle` names the action that failed.
  */
+
 /**
  * The one way out a failure offers; rendered as a button on the notice.
  */
@@ -56,12 +57,9 @@ export type WorkflowSuccessNotice = {
 };
 
 /**
- * The path parameters and query string the screen was opened with.
- *
- * `pathname` was added for the studio: its drawer navigation composes an
- * address out of the current one, and ninety-odd of its call sites read
- * `router.pathname` or `router.asPath` off the compat shim that no longer
- * travels with them.
+ * The path parameters and query string the screen was opened with. `pathname`
+ * was added for the studio, whose call sites still read `router.pathname` or
+ * `router.asPath` off the compat shim that no longer travels with them.
  */
 export type WorkflowRouteReading = {
   params: Readonly<Record<string, string | undefined>>;
@@ -93,11 +91,9 @@ export abstract class WorkflowHostPort {
   abstract navigate(to: string): void;
 
   /**
-   * Steps back one entry in the reader's own history.
-   *
-   * Added for the studio, which offers a way out of a dead end and out of a
-   * drawer it opened. A host with no history to step back through may make this
-   * a no-op; nothing in the family treats it as a navigation that must land.
+   * Steps back one entry in the reader's own history. Added for the studio; a
+   * host with no history to step back through may make this a no-op — nothing
+   * in the family treats it as a navigation that must land.
    */
   abstract back(): void;
 

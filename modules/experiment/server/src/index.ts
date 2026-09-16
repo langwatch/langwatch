@@ -1,8 +1,7 @@
 /**
  * The persistence-and-orchestration service, folded out of the contract
  * package (ADR-133: no standalone contract-service class). Peer compositions
- * that still call the full surface directly (dataset find-or-create,
- * evaluation reporting) import the type from here now.
+ * still import the full surface's type from here.
  */
 export type { ExperimentServiceOptions } from "./services/experiment.service.ts";
 export { ExperimentDspyRetentionRepository } from "./repositories/experiment-dspy-retention.repository.ts";

@@ -1,9 +1,7 @@
 /**
  * `/api/experiments/execute` and `/api/experiments/abort` - the two workbench
- * doors a BROWSER opens. They answer behind the session door, so the framework
- * authenticates the person before the handler runs; the project a run names
- * lives in the request body, which is why the scope is deferred and the
- * handler asks `evaluations:manage` about it.
+ * doors a BROWSER opens, behind the session door. The project a run names
+ * lives in the body, so the scope is deferred to `evaluations:manage`.
  */
 import { deferredScope } from "@langwatch/api/access";
 import {

@@ -276,10 +276,9 @@ export interface WorkflowInfrastructure {
   signals: WorkflowSignals;
   nlpLambdaArnResolver: NlpLambdaArnResolver;
   /**
-   * The account the studio's engines are deployed into, for the sweep the
-   * deployment's cron bearer invokes. Absent where the deployment fronts the
-   * engine with no Lambdas at all, and the sweep then refuses by name rather
-   * than reporting a clean run over nothing.
+   * The account the studio's engines are deployed into, for the cron sweep.
+   * Absent where the deployment fronts the engine with no Lambdas at all,
+   * and the sweep then refuses by name rather than reporting a clean run.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
   nlpLambdaFunction: NlpLambdaFunctionReader;
@@ -309,8 +308,7 @@ export type WorkflowHostMembers = Omit<
 /**
  * `nlpServiceUrl` resolves the module's own NLP runtime, the way
  * `WorkerEvaluationWorkflowCompositionInput.nlpServiceUrl` did for
- * `apps/worker`: absent, a run refuses by name rather than dispatching
- * nowhere (`UnconfiguredWorkflowNlpRuntimeAdapter`).
+ * `apps/worker`: absent, a run refuses by name (`UnconfiguredWorkflowNlpRuntimeAdapter`).
  */
 const workflowAppConfigSchema = z.object({
   nlpServiceUrl: z.string().optional(),
@@ -926,10 +924,9 @@ export class WorkflowApp implements WorkflowApi {
   // -- the deployment's own housekeeping ------------------------------------
 
   /**
-   * Sweeps the studio's quiet per-project NLP Lambda functions and their log
-   * groups. It refuses rather than reporting an empty sweep when the
-   * deployment composed no fleet: "nothing to delete" and "nothing was looked
-   * at" read identically to a scheduler, and only one of them is healthy.
+   * Sweeps the studio's quiet per-project NLP Lambda functions and log
+   * groups. Refuses rather than reporting an empty sweep when no fleet was
+   * composed — "nothing to delete" and "nothing was looked at" read alike.
    */
   async cleanupOldLambdas(): Promise<void> {
     const fleet = this.#members.nlpLambdaFleet;
@@ -1165,11 +1162,9 @@ export interface WorkflowStudioDsl {
 }
 
 /**
- * The agent-mapping recompute a saved Studio graph triggers.
- *
- * Best effort and outside the save: the agents whose scenario mappings this
- * refreshes are the host's rows, and a failure to refresh them must never fail
- * the version that was already written.
+ * The agent-mapping recompute a saved Studio graph triggers. Best effort and
+ * outside the save: a failure to refresh the host's scenario mappings must
+ * never fail the version that was already written.
  */
 export interface WorkflowAgentMapping {
   recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void>;
