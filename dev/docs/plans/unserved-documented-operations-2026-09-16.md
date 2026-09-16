@@ -219,7 +219,7 @@ Classes as defined in the Sep-14 document.
 | dataset direct-upload | 5 | D | recipe at `b383462d96^`. The branch adds `/api/stored-objects/storedObjects.*`; confirm whether the upload flow moved there deliberately before porting. |
 | langy control | 4 | B/C | needs `withTransportFacts` bindings the process refuses to boot without; the branch adds `/api/langy/conversations`, so confirm this is not a deliberate redesign before porting. |
 | scenario-events | 3 | C | Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/server/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
-| gateway providers | 4 | D | `gateway-platform.rest.ts` serves `virtual-keys`, `budgets`, `cache-rules` but not `providers`; the sub-route was dropped in conversion. File is lane-owned at the time of writing. |
+| gateway providers | 4 | — | **closed** (`60708e784f`). Main's four were tombstones: 410 `gateway_provider_bindings_gone` naming the model-provider address that replaced them. The code and its customer copy were already ported and thrown by nobody; the branch now declares the four routes and throws it. |
 | `/api/track_event` | 1 | C | blocked on blocker 1. |
 | teams | — | C | listed Sep 14 (9 operations); **not** among today's probed-and-absent set. Re-measure before acting. |
 
