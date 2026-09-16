@@ -5,6 +5,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import {
+  SimulationRunNotFoundError,
   DEFAULT_SET_ID,
   encodeContent,
   encodeEnd,
@@ -22,7 +23,6 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ErrorHandler } from "hono";
 import {
   type AppRestBroadcast,
   baseResponses,
@@ -48,20 +48,6 @@ export type InlineMediaExtraction = (input: {
   purpose: string;
 }) => Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
 
-/**
- * A run this project does not hold. The family answers it in the bare
- * `{ error }` body it has always had.
- */
-export class ScenarioRunNotThereError extends Error {}
-
-export const scenarioEventErrorHandler =
-  (boundary: ErrorHandler): ErrorHandler =>
-  (error, c) => {
-    if (error instanceof ScenarioRunNotThereError) {
-      return c.json({ error: error.message }, 404);
-    }
-    return boundary(error, c);
-  };
 
 /**
  * REST for the events an SDK reports while a scenario runs.
@@ -258,7 +244,7 @@ export function createScenarioEventsRest(options: {
             projectId: scope.id,
             scenarioRunId,
           });
-          if (archivedRun === null) throw new ScenarioRunNotThereError("Scenario run not found");
+          if (archivedRun === null) throw new SimulationRunNotFoundError(scenarioRunId);
           return archivedRun;
         }
 

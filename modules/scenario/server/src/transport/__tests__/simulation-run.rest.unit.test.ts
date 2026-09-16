@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSimulationRunsRest, simulationRunErrorHandler } from "../simulation-run.rest.ts";
+import { createSimulationRunsRest } from "../simulation-run.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
@@ -23,7 +23,7 @@ function buildSimulationRunsFamily(
   const declaration = createSimulationRunsRest();
   const mounted = runtime.mount(declaration.router(), {
     app: () => world.app,
-    onError: simulationRunErrorHandler(scenarioRestTestErrors),
+    onError: scenarioRestTestErrors,
     facts: [projectFacts],
   });
 
@@ -106,12 +106,14 @@ describe("the simulation-runs REST declaration", () => {
     });
 
     /** @scenario "An unknown batch run id answers 404" */
-    it("answers the legacy 404 body", async () => {
+    it("names the miss with the code the caller can act on", async () => {
       const family = buildSimulationRunsFamily();
 
       const response = await family.request("/api/simulation-runs/batches/missing");
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({ error: "Batch run not found" });
+      // The code, not the sentence: the sentence is copy and the registry owns
+      // what a customer reads for `batch_run_not_found`.
+      await expect(response.json()).resolves.toMatchObject({ error: "batch_run_not_found" });
     });
   });
 

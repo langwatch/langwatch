@@ -28,3 +28,10 @@ Feature: Scenario service boundary
     Given an agent input mapping is used by authoring and execution
     When either surface resolves it
     Then both use the scenario contract's mapping rules
+
+  @unit
+  Scenario: A scenario this project does not hold is refused as a named miss
+    Given a scenario id no scenario in this project carries
+    When the REST surface is asked to read it
+    Then the response status is 404
+    And it carries the code scenario_not_found, not an unknown error

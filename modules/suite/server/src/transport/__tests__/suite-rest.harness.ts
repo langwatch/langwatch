@@ -35,7 +35,7 @@ import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.re
 import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 import { createRunPlansRest } from "../run-plans.rest.ts";
-import { createSuitesAliasRest, suitesAliasErrorHandler } from "../suites-alias.rest.ts";
+import { createSuitesAliasRest } from "../suites-alias.rest.ts";
 import { createTestSuitesRest } from "../test-suites.rest.ts";
 
 /** The project every request in these suites is authenticated for. */
@@ -459,7 +459,7 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
     "/",
     runtime.mount(
       createSuitesAliasRest().router(),
-      mount(suitesAliasErrorHandler(renderHandled)),
+      mount(renderHandled),
     ),
   );
 

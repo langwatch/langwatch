@@ -2,11 +2,7 @@ import { bindRestHeader } from "@langwatch/api/rest";
 import { scenarioRestResponseWithPlatformUrlSchema } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  createScenarioRest,
-  scenarioRestErrorHandler,
-  scenarioRestSurface,
-} from "../scenario.rest.ts";
+import { createScenarioRest, scenarioRestSurface } from "../scenario.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
@@ -23,7 +19,7 @@ function buildScenarioFamily(
     createScenarioRest().router(),
     {
       app: () => app,
-      onError: scenarioRestErrorHandler(scenarioRestTestErrors),
+      onError: scenarioRestTestErrors,
       facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
     },
   );
@@ -159,5 +155,25 @@ describe("the scenarios REST declaration", () => {
         situation: "Original situation",
       });
     });
+  });
+});
+
+describe("given an id no scenario in this project carries", () => {
+  /**
+   * The transport used to catch `ScenarioNotFoundError` and rethrow it as a
+   * plain Error so a family handler could word the miss, which left the
+   * boundary nothing to render but "An unknown error occurred" — apidiff run
+   * 20260916-r6 read main answering 404 and this branch answering 500.
+   *
+   * @scenario "A scenario this project does not hold is refused as a named miss"
+   */
+  it("answers 404 with the code the caller can act on", async () => {
+    const family = buildScenarioFamily();
+
+    const response = await family.request("/api/scenarios/scenario-nobody-holds");
+
+    expect(response.status).toBe(404);
+    // The code, not the sentence: the sentence is copy the registry owns.
+    await expect(response.json()).resolves.toMatchObject({ error: "scenario_not_found" });
   });
 });

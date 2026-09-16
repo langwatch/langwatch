@@ -32,13 +32,6 @@ import {
 const logger = createLogger("langwatch:api:scenarios");
 
 /**
- * A scenario or version this project does not hold. The family answers it in
- * the bare `{ error }` body it has always had, so the miss is raised as the
- * family's own error and rendered by the family's own handler.
- */
-export class ScenarioRestNotThereError extends Error {}
-
-/**
  * The surface a write declares itself through, off the X-LangWatch-Surface
  * header. Only "cli" is honoured; every other value, absent included, reads
  * as "api", so a caller cannot claim an in-process surface over the wire.
@@ -52,16 +45,6 @@ export const scenarioRestSurface = defineRestMiddleware(
 function scenarioAuthorLabel(surface: string | null): "cli" | "api" {
   return surface?.toLowerCase() === "cli" ? "cli" : "api";
 }
-
-/** The family's 404s, in the body they have always had. */
-export const scenarioRestErrorHandler =
-  (boundary: ErrorHandler): ErrorHandler =>
-  (error, c) => {
-    if (error instanceof ScenarioRestNotThereError) {
-      return c.json({ error: error.message }, 404);
-    }
-    return boundary(error, c);
-  };
 
 /**
  * The fields the caller named. The schema marks every field optional, and a
@@ -144,7 +127,7 @@ export function createScenarioRest() {
     .handle(async ({ app, input, scope }, project) => {
       logger.info({ projectId: scope.id, scenarioId: input.id }, "Getting scenario");
       const scenario = await app.tryGetById({ id: input.id, projectId: scope.id });
-      if (!scenario) throw new ScenarioRestNotThereError("Scenario not found");
+      if (!scenario) throw new ScenarioNotFoundError(input.id);
       return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
@@ -205,7 +188,7 @@ export function createScenarioRest() {
       logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
       const existing = await app.tryGetById({ id, projectId: scope.id });
-      if (!existing) throw new ScenarioRestNotThereError("Scenario not found");
+      if (!existing) throw new ScenarioNotFoundError(id);
 
       const scenario = await app.update(
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
@@ -226,7 +209,7 @@ export function createScenarioRest() {
       logger.info({ projectId: scope.id, scenarioId: id }, "Updating scenario");
 
       const existing = await app.tryGetById({ id, projectId: scope.id });
-      if (!existing) throw new ScenarioRestNotThereError("Scenario not found");
+      if (!existing) throw new ScenarioNotFoundError(id);
 
       const scenario = await app.update(
         { id, projectId: scope.id, ...scenarioUpdateData(body) },
@@ -249,15 +232,8 @@ export function createScenarioRest() {
     .handle(async ({ app, input, scope }) => {
       const { id } = input;
       logger.info({ projectId: scope.id, scenarioId: id }, "Archiving scenario");
-      try {
-        await app.archive({ id, projectId: scope.id });
-        return { id, archived: true };
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          throw new ScenarioRestNotThereError("Scenario not found");
-        }
-        throw error;
-      }
+      await app.archive({ id, projectId: scope.id });
+      return { id, archived: true };
     })
 
     /** The version history of a scenario, newest first. */
@@ -274,31 +250,24 @@ export function createScenarioRest() {
     .handle(async ({ app, input, scope }) => {
       const { id, limit, cursor } = input;
       logger.info({ projectId: scope.id, scenarioId: id }, "Listing scenario versions");
-      try {
-        const page = await app.listVersions({
-          projectId: scope.id,
-          scenarioId: id,
-          ...(limit !== undefined && { limit }),
-          ...(cursor !== undefined && { cursor }),
-        });
-        return {
-          versions: page.versions.map((version) => ({
-            version: version.version,
-            authorLabel: version.authorLabel,
-            authorId: version.authorId,
-            changeDescription: version.changeDescription,
-            changedFields: version.changedFields,
-            createdAt: version.createdAt.toISOString(),
-            isSynthesized: version.isSynthesized,
-          })),
-          nextCursor: page.nextCursor,
-        };
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          throw new ScenarioRestNotThereError("Scenario not found");
-        }
-        throw error;
-      }
+      const page = await app.listVersions({
+        projectId: scope.id,
+        scenarioId: id,
+        ...(limit !== undefined && { limit }),
+        ...(cursor !== undefined && { cursor }),
+      });
+      return {
+        versions: page.versions.map((version) => ({
+          version: version.version,
+          authorLabel: version.authorLabel,
+          authorId: version.authorId,
+          changeDescription: version.changeDescription,
+          changedFields: version.changedFields,
+          createdAt: version.createdAt.toISOString(),
+          isSynthesized: version.isSynthesized,
+        })),
+        nextCursor: page.nextCursor,
+      };
     })
 
     /**
@@ -323,35 +292,28 @@ export function createScenarioRest() {
     .handle(async ({ app, input, scope }) => {
       const { id, version } = input;
       logger.info({ projectId: scope.id, scenarioId: id, version }, "Getting scenario version");
-      try {
-        const detail = await app.getVersion({ projectId: scope.id, scenarioId: id, version });
-        return {
-          version: detail.version,
-          authorLabel: detail.authorLabel,
-          authorId: detail.authorId,
-          changeDescription: detail.changeDescription,
-          changedFields: detail.changedFields,
-          createdAt: detail.createdAt.toISOString(),
-          isSynthesized: detail.isSynthesized,
-          schemaVersion: detail.schemaVersion,
-          snapshot: {
-            name: detail.fields.name,
-            situation: detail.fields.situation,
-            criteria: detail.fields.criteria,
-            labels: detail.fields.labels,
-            parameters: parseScenarioParameterDefinitions(detail.fields.parameters),
-            simulatorModel: detail.fields.simulatorModel,
-            judgeModel: detail.fields.judgeModel,
-            maxTurns: detail.fields.maxTurns,
-            minTurns: detail.fields.minTurns,
-          },
-        };
-      } catch (error) {
-        if (error instanceof ScenarioNotFoundError) {
-          throw new ScenarioRestNotThereError("Scenario not found");
-        }
-        throw error;
-      }
+      const detail = await app.getVersion({ projectId: scope.id, scenarioId: id, version });
+      return {
+        version: detail.version,
+        authorLabel: detail.authorLabel,
+        authorId: detail.authorId,
+        changeDescription: detail.changeDescription,
+        changedFields: detail.changedFields,
+        createdAt: detail.createdAt.toISOString(),
+        isSynthesized: detail.isSynthesized,
+        schemaVersion: detail.schemaVersion,
+        snapshot: {
+          name: detail.fields.name,
+          situation: detail.fields.situation,
+          criteria: detail.fields.criteria,
+          labels: detail.fields.labels,
+          parameters: parseScenarioParameterDefinitions(detail.fields.parameters),
+          simulatorModel: detail.fields.simulatorModel,
+          judgeModel: detail.fields.judgeModel,
+          maxTurns: detail.fields.maxTurns,
+          minTurns: detail.fields.minTurns,
+        },
+      };
     })
 
     .build();

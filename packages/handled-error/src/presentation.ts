@@ -345,6 +345,12 @@ const presentations = {
     describe: () =>
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
+  lwql_rate_limited: {
+    // The project answered too often, not the person: the invoice a query
+    // loop runs up is the project's, so the budget is too.
+    title: "Too many queries just now",
+    describe: () => "Wait a minute, then run the query again.",
+  },
   lwql_reserved_parameter_supplied: {
     // One code covers three reserved names, so both halves of the copy are
     // built from the ones actually supplied (`meta.parameters`, the same list
@@ -894,6 +900,17 @@ const presentations = {
     title: "Choose which copies to update",
     describe: () =>
       "None of the prompts you picked is a copy of this one. Reload to see its current copies, then pick again.",
+  },
+  prompt_execute_rate_limited: {
+    // One run spends provider credit the project pays for, so the counter is
+    // the project's and the remedy is the window, not another click.
+    title: "Too many playground runs just now",
+    describe: () => "Wait a minute, then run the prompt again.",
+  },
+  prompt_messages_too_many: {
+    title: "Too many messages in one run",
+    describe: () =>
+      "Shorten the conversation — or split it into smaller runs — and try again. Your plan's limit is in the error details.",
   },
   prompt_playground_chat_unavailable: {
     // Not a failure the reader caused, and not one that will pass: this
@@ -2134,6 +2151,12 @@ const presentations = {
     title: "That test suite name isn't available",
     describe: () => "Choose a different name and try again.",
   },
+  scenario_generate_rate_limited: {
+    // The author-assist spends a model call per click; the counter is the
+    // project's because the invoice is.
+    title: "Too many generations just now",
+    describe: () => "Wait a minute, then ask the author-assist again.",
+  },
   scenario_not_found: {
     title: "That test case isn't available",
     describe: () => "It may have been archived or removed. Reload and try again.",
@@ -2202,6 +2225,18 @@ const presentations = {
     title: "This run cannot start as asked",
     describe: () =>
       "Check the scenario, its parameters and the target the run points at, then try again.",
+  },
+  // A simulation run and the batch it belongs to are addressed by id from the
+  // REST surface and from the run drawer, and both go the same way: archived,
+  // or filed under a project this caller is not reading. Naming which would
+  // confirm whose ids exist, and the caller acts on either the same way.
+  simulation_run_not_found: {
+    title: "That simulation run isn't available",
+    describe: () => "It may have been archived or removed. Reload and try again.",
+  },
+  batch_run_not_found: {
+    title: "That batch isn't available",
+    describe: () => "It may have been archived or removed. Reload to see the current runs.",
   },
   // ---- secret run parameters ----
   // Only names reach these strings. The value is the thing the whole feature
@@ -3346,6 +3381,13 @@ const presentations = {
     title: "That took too long",
     describe: () =>
       "Langy didn't finish in time. Try again, or ask for a narrower slice: a shorter time range, or a single trace.",
+  },
+  langy_turns_rate_limited: {
+    // Per project, not per person: a turn loop spends against the project's
+    // provider invoice whoever sends it. Distinct from `langy_rate_limited`,
+    // the composer's per-user slow-down.
+    title: "Too many Langy turns just now",
+    describe: () => "That one wasn't sent. Wait a minute, then send it again.",
   },
   langy_ui_turn_inactive: {
     title: "Langy isn't replying right now",

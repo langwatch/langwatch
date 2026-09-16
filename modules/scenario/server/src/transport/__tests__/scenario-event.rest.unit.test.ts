@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-import { createScenarioEventsRest, scenarioEventErrorHandler } from "../scenario-event.rest.ts";
+import { createScenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
@@ -57,7 +57,7 @@ function buildEventFamily(
   });
   const mounted = runtime.mount(declaration.router(), {
     app: () => world.app,
-    onError: scenarioEventErrorHandler(scenarioRestTestErrors),
+    onError: scenarioRestTestErrors,
     facts: [projectFacts],
   });
 

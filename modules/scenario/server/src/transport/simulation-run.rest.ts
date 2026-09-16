@@ -3,6 +3,8 @@
  */
 import { createLogger } from "@langwatch/observability";
 import {
+  BatchRunNotFoundError,
+  SimulationRunNotFoundError,
   ScenarioApi,
   type BatchSummary,
   type ScenarioRunData,
@@ -16,7 +18,6 @@ import {
   simulationRunListResponseSchema,
   simulationBatchListResponseSchema,
 } from "@langwatch/scenario-contract";
-import type { ErrorHandler } from "hono";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
@@ -79,22 +80,6 @@ function toRunResponse(run: ScenarioRunData) {
   };
 }
 
-/**
- * A run or a batch this project does not hold. The family answers it in the
- * bare `{ error }` body it has always had, so the miss is raised as the
- * family's own error and rendered by the family's own handler.
- */
-export class SimulationRunNotThereError extends Error {}
-
-/** The family's 404s, in the body they have always had. */
-export const simulationRunErrorHandler =
-  (boundary: ErrorHandler): ErrorHandler =>
-  (error, c) => {
-    if (error instanceof SimulationRunNotThereError) {
-      return c.json({ error: error.message }, 404);
-    }
-    return boundary(error, c);
-  };
 
 const notFoundResponse = {
   404: {
@@ -187,7 +172,7 @@ export function createSimulationRunsRest() {
         projectId,
         scenarioRunId: input.scenarioRunId,
       });
-      if (!run) throw new SimulationRunNotThereError("Simulation run not found");
+      if (!run) throw new SimulationRunNotFoundError(input.scenarioRunId);
 
       return withPlatformUrl(app, run, project.projectSlug);
     })
@@ -231,7 +216,7 @@ export function createSimulationRunsRest() {
       logger.info({ projectId, batchRunId: input.batchRunId }, "Getting batch summary");
 
       const batch = await app.findBatchSummary({ projectId, batchRunId: input.batchRunId });
-      if (!batch) throw new SimulationRunNotThereError("Batch run not found");
+      if (!batch) throw new BatchRunNotFoundError(input.batchRunId);
 
       return toBatchSummaryResponse(batch);
     })

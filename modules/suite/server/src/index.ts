@@ -81,6 +81,6 @@ export type { SuiteRepositories } from "./repositories/suite.repositories.ts";
  */
 export { createRunPlansRest } from "./transport/run-plans.rest.ts";
 export { createTestSuitesRest } from "./transport/test-suites.rest.ts";
-export { createSuitesAliasRest, suitesAliasErrorHandler } from "./transport/suites-alias.rest.ts";
+export { createSuitesAliasRest } from "./transport/suites-alias.rest.ts";
 /** The header every suite family records the surface of a run from. */
 export { suiteSurfaceFact } from "./rules/suite-wire-v1.rules.ts";

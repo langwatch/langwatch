@@ -57,24 +57,6 @@ class SuiteAliasRunRefusedError extends HandledError {
   }
 }
 
-/**
- * A row this family could not address, carrying the sentence it answers with.
- * The body has always been the bare `{ error }` the family writes itself, and
- * the wording differs by route, so the message travels with the refusal.
- */
-class SuiteAliasNotFoundError extends Error {}
-
-/** The family's 404s, in the bare `{ error }` body they have always had. */
-export const suitesAliasErrorHandler =
-  (boundary: RestErrorHandler): RestErrorHandler =>
-  (error, c) => {
-    if (error instanceof SuiteAliasNotFoundError) {
-      return c.json({ error: error.message }, 404);
-    }
-
-    return boundary(error, c);
-  };
-
 /** The refusal for a body that names targets the addressed row does not take. */
 function storedTargetsRefusal(operation: "run" | "update"): ValidationError {
   const message =
@@ -362,12 +344,6 @@ function withPlatformUrl(params: {
   };
 }
 
-/** A missing row, in the sentence this family answers it with. */
-function refuseAsMissing(error: unknown, message: string): never {
-  if (error instanceof SuiteNotFoundError) throw new SuiteAliasNotFoundError(message);
-  throw error;
-}
-
 async function listSuites(params: {
   app: SuiteApi;
   kind: "custom" | "folder";
@@ -407,8 +383,7 @@ async function getSuite(params: {
   // The "try the run plan, fall back to the test suite" order is the
   // application's; this door only decides how it words the miss.
   const found = await params.app
-    .getByIdOrTestSuite({ id: params.id, projectId: params.projectId })
-    .catch((error: unknown) => refuseAsMissing(error, "Suite not found"));
+    .getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
 
   return withPlatformUrl({
     row: eitherResponse(found),
@@ -466,8 +441,7 @@ async function updateSuite(params: {
   if (fields.targets !== undefined) await refuseTargetsOnTestSuite({ app, id, projectId });
 
   const updated = await app
-    .update({ id, projectId, ...fields, ...(scope ? { scope: toDomainScope(scope) } : {}) })
-    .catch((error: unknown) => refuseAsMissing(error, "Suite not found"));
+    .update({ id, projectId, ...fields, ...(scope ? { scope: toDomainScope(scope) } : {}) });
 
   return withPlatformUrl({
     row: eitherResponse(updated),
@@ -485,19 +459,13 @@ async function duplicateSuite(params: {
   logger.info({ projectId: params.projectId, suiteId: params.id }, "Duplicating suite");
 
   const suite = await params.app
-    .duplicate({ id: params.id, projectId: params.projectId })
-    .catch((error: unknown) => refuseAsMissing(error, missingSuiteMessage(error)));
+    .duplicate({ id: params.id, projectId: params.projectId });
 
   return withPlatformUrl({
     row: toSuiteResponse(suite),
     projectSlug: params.projectSlug,
     app: params.app,
   });
-}
-
-/** The domain's own wording for a miss, kept as this family always answered it. */
-function missingSuiteMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Suite not found";
 }
 
 /**
@@ -571,16 +539,17 @@ async function scheduleRun(params: {
   return { ...result, scheduled: true, items: toRunItemsWire(result.items) };
 }
 
-/** Every refusal this family renders itself, at the status it publishes it. */
+/**
+ * The one refusal this family re-words: a rejected execution carries the
+ * plan's own reasons and is published at 400. Everything else the application
+ * raises is already a handled error - `SuiteNotFoundError` and
+ * `OrganizationNotFoundForProjectError` both name their cause, their 404 and
+ * their remediation - so it travels to the boundary untouched.
+ */
 function refuseRun(error: unknown): never {
-  if (error instanceof OrganizationNotFoundForProjectError) {
-    throw new SuiteAliasNotFoundError("Organization not found for project");
-  }
-  // The domain's own refusal, at the status this family publishes: the code,
-  // the fault and the remediation are the boundary's to render.
   if (error instanceof SuiteExecutionError) throw new SuiteAliasRunRefusedError(error);
 
-  return refuseAsMissing(error, missingSuiteMessage(error));
+  throw error;
 }
 
 /**
@@ -605,8 +574,7 @@ async function archiveSuite(params: {
   if (archivedTestSuite) return { id, archived: true };
 
   await app
-    .archive({ id, projectId })
-    .catch((error: unknown) => refuseAsMissing(error, "Suite not found"));
+    .archive({ id, projectId });
 
   return { id, archived: true };
 }

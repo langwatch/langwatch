@@ -1,5 +1,30 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
+/**
+ * The author-assist answered this project one generation too many inside the
+ * window. `fault` stays customer: it is their generation rate, and the
+ * retry-after is theirs to wait out.
+ */
+export class ScenarioGenerateRateLimitedError extends HandledError {
+  declare readonly code: "scenario_generate_rate_limited";
+
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super(
+      "scenario_generate_rate_limited",
+      "Too many scenario generations for this project",
+      {
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        ...(input.retryAfterSeconds !== undefined
+          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+          : {}),
+      },
+    );
+    this.name = "ScenarioGenerateRateLimitedError";
+  }
+}
+
 export class ScenarioNotFoundError extends HandledError {
   declare readonly code: "scenario_not_found";
 
@@ -65,6 +90,33 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
 
 // Refuses runs to internal platform-owned sets to avoid corrupting plan aggregates.
 // See specs/scenarios/reserved-set-write-guard.feature
+/**
+ * A simulation run this project does not hold. The REST surface used to raise
+ * a plain Error for this and let a family handler word it, which meant the
+ * boundary could only answer "An unknown error occurred" for a miss it knew
+ * the cause of (apidiff run 20260916-r6: main answered 404, the branch 500).
+ */
+export class SimulationRunNotFoundError extends NotFoundError {
+  declare readonly code: "simulation_run_not_found";
+
+  constructor(scenarioRunId: string) {
+    super("simulation_run_not_found", "Simulation run", scenarioRunId, {
+      meta: { scenarioRunId },
+    });
+    this.name = "SimulationRunNotFoundError";
+  }
+}
+
+/** The batch a set of simulation runs was started as, which this project does not hold. */
+export class BatchRunNotFoundError extends NotFoundError {
+  declare readonly code: "batch_run_not_found";
+
+  constructor(batchRunId: string) {
+    super("batch_run_not_found", "Batch run", batchRunId, { meta: { batchRunId } });
+    this.name = "BatchRunNotFoundError";
+  }
+}
+
 export class ScenarioReservedSetIdError extends HandledError {
   declare readonly code: "scenario_reserved_set_id";
 

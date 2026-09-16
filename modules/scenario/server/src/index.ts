@@ -126,6 +126,7 @@ export * from "./services/scenario-execution-pool.service.ts";
 export * from "./services/scenario-execution-prefetcher.service.ts";
 export * from "./services/scenario-execution.service.ts";
 export * from "./services/scenario-failure-handler.service.ts";
+export { ScenarioGenerateBoundsService } from "./services/scenario-generate-bounds.service.ts";
 export * from "./services/scenario-processor.service.ts";
 export * from "./services/scenario-tab-registry.service.ts";
 export * from "./services/scenario-workflow-mapping.service.ts";
@@ -152,11 +153,9 @@ export {
 } from "./services/run-configurations.service.ts";
 export { ScenarioService, type ScenarioServiceOptions } from "./services/scenario.service.ts";
 export {
-    ScenarioRunNotThereError,
     archiveScenarioRun,
     archiveScenarioSetRuns,
     createScenarioEventsRest,
-    scenarioEventErrorHandler,
     type InlineMediaExtraction
 } from "./transport/scenario-event.rest.ts";
 export {
@@ -173,16 +172,12 @@ export {
     type ScenarioRunExportRestPorts
 } from "./transport/scenario-run-export.rest.ts";
 export {
-    ScenarioRestNotThereError,
     createScenarioRest,
-    scenarioRestErrorHandler,
     scenarioRestSurface
 } from "./transport/scenario.rest.ts";
 export { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 export {
-    SimulationRunNotThereError,
     createSimulationRunsRest,
-    simulationRunErrorHandler,
     type ScenarioRunPlatformUrlBuilder
 } from "./transport/simulation-run.rest.ts";
 

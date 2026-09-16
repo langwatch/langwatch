@@ -15,7 +15,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
-import { createSuitesAliasRest, suitesAliasErrorHandler } from "../suites-alias.rest.ts";
+import { createSuitesAliasRest } from "../suites-alias.rest.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
   constructor() {
@@ -73,7 +73,7 @@ function buildApi(run: (...args: never[]) => unknown) {
   const app = runtime.mount(createSuitesAliasRest().router(), {
     app: () => suites,
     credential: "project",
-    onError: suitesAliasErrorHandler(boundaryErrorHandler),
+    onError: boundaryErrorHandler,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
