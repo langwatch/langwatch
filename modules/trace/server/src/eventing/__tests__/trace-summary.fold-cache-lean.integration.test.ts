@@ -15,7 +15,7 @@ import {
 } from "@langwatch/eventing";
 import type { SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   IO_PREVIEW_BYTES,
   TraceProjectionLeanService,

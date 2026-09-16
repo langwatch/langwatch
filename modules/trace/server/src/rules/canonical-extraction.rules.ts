@@ -7,7 +7,7 @@ import {
   normalizeToMessages,
   stripSystemMessages,
 } from "./canonical-message.rules.ts";
-import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
+import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 
 export type MessageSource =
   | { type: "attr"; keys: readonly string[] }

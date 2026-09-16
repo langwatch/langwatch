@@ -1,7 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceEvaluationMappingService } from "../../services/support/trace-evaluation-mapping.service.ts";
-import { TraceEventAttributeMappingService } from "../../services/attribute/trace-event-attribute-mapping.service.ts";
-import { TraceLlmSpanMessagesService } from "../../services/content/trace-llm-span-messages.service.ts";
+import { TraceEvaluationMappingService } from "../../services/trace-evaluation-mapping.service.ts";
+import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service.ts";
+import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
-import { TraceRetentionFloorService } from "../../services/support/trace-retention-floor.service.ts";
+import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
@@ -19,7 +19,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   type ClickHouseEvaluationRunRow,
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../services/support/trace-evaluation-mapping.service.ts";
+} from "../../services/trace-evaluation-mapping.service.ts";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
@@ -29,17 +29,17 @@ import type {
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
 
 import { findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
-import { TraceReadRedactionService } from "../../services/read/trace-read-redaction.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/read/trace-legacy-span-mapping.service.ts";
-import { TraceLegacySummaryMappingService } from "../../services/read/trace-legacy-summary-mapping.service.ts";
-import { type EventSpanRow } from "../../services/attribute/trace-event-attribute-mapping.service.ts";
+import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
+import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
+import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service.ts";
+import { type EventSpanRow } from "../../services/trace-event-attribute-mapping.service.ts";
 import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-contract";
 import {
   TraceOffloadResolutionService,
   type ResolvedTraceSpans,
 } from "../../services/offload/trace-offload-resolution.service.ts";
 import { TraceOffloadResolutionBatchService } from "../../services/offload/trace-offload-resolution-batch.service.ts";
-import type { BlobResolutionDeps } from "../../services/read/trace-legacy-read.service.ts";
+import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
 import type {
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,

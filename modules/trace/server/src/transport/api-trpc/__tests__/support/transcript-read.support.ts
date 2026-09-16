@@ -1,6 +1,6 @@
 // Real implementations everywhere; only the two stores are mocked.
 
-import { TraceReadRedactionService } from "../../../../services/read/trace-read-redaction.service.ts";
+import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
 import { vi } from "vitest";
 import {
   CONTENT_KEY_CATALOG,
@@ -14,7 +14,7 @@ import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../services/log/trace-log-content-derivation.service.ts";
-import type { TracesV2ReadMembers } from "../../../../services/read/trace-transcript-read.service.ts";
+import type { TracesV2ReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 
 /** One of the two stores the read is driven from. */
 export type TranscriptStoreMock = ReturnType<

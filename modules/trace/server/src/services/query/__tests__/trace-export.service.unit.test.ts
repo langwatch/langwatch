@@ -3,7 +3,7 @@ import type { Protections } from "@langwatch/trace-contract";
  * blobs to prevent truncation data loss. */
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyReadService } from "../../read/trace-legacy-read.service.ts";
+import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import type { GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
 import { TraceExportService } from "../trace-export.service.ts";

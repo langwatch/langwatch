@@ -27,7 +27,7 @@ import type {
 } from "../app/trace.members.ts";
 import type { TraceSpanSpool } from "../app/trace.members.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
-import { TraceAttributeCapService } from "./attribute/trace-attribute-cap.service.ts";
+import { TraceAttributeCapService } from "./trace-attribute-cap.service.ts";
 
 const traceAttributeCapService = TraceAttributeCapService.create();
 

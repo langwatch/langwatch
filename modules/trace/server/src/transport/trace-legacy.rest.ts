@@ -3,8 +3,8 @@
  * Declared public, resolves own credential, checks permissions in handler. Literal
  * paths (no versioning) that released SDKs dial.
  */
-import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
-import { TraceFormattingService } from "#services/support/trace-formatting.service";
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
+import { TraceFormattingService } from "#services/trace-formatting.service";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import { publicRoute } from "@langwatch/api/access";
 import {

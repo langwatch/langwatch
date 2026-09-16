@@ -10,7 +10,7 @@ import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
-import { TraceIOExtractionService } from "../../content/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,

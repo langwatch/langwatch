@@ -1,6 +1,6 @@
-import { ClickHouseEvaluatorFacetAdapter } from "../trace-facet-evaluator.clickhouse.adapter.ts";
+import { ClickHouseEvaluatorFacetAdapter } from "../clickhouse.trace-facet-evaluator.repository.ts";
 import { describe, expect, it } from "vitest";
-import type { FacetQueryContext } from "../trace-facet-registry.clickhouse.adapter.ts";
+import type { FacetQueryContext } from "../clickhouse.trace-facet-registry.repository.ts";
 
 function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   return {

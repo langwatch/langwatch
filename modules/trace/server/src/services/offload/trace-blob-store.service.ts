@@ -1,4 +1,4 @@
-import { TraceStreamBufferService } from "../ingestion/trace-stream-buffer.service.ts";
+import { TraceStreamBufferService } from "../trace-stream-buffer.service.ts";
 import type { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { Logger } from "@langwatch/observability";

@@ -6,7 +6,7 @@ import {
   type RecordCapturedSpanInput,
 } from "@langwatch/trace-contract";
 import type { TraceSpanIngest } from "./trace.members.ts";
-import { TraceCollectorSpanService } from "../services/span/trace-collector-span.service.ts";
+import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
@@ -72,14 +72,14 @@ import type {
 import type { TraceLegacyRead } from "./trace.members.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
-import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
+import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import {
   TraceExportBoundsService,
   type TraceExportBounds,
 } from "../services/trace-export-bounds.service.ts";
-import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";
-import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
+import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
+import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
@@ -93,9 +93,9 @@ import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
 } from "../rules/trace-legacy-search-body.rules.ts";
-import type { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
-import type { TraceIngestCredentialService } from "../services/support/trace-ingest-credential.service.ts";
-import type { TraceIngestionService } from "../services/ingestion/trace-ingestion.service.ts";
+import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
+import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import type {
   CollectorApp,
   CollectorCredential,
@@ -120,7 +120,7 @@ import {
   type TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
 import { generate } from "@langwatch/ksuid";
-import { TrackedEventSpanService } from "../services/ingestion/tracked-event-span.service.ts";
+import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
 
 /**
  * The app's KSUID resource for a tracked event (`KSUID_RESOURCES.TRACKED_EVENT`).

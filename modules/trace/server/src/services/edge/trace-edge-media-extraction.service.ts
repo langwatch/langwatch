@@ -4,14 +4,14 @@
  * fail-open, and skipped for projects whose data-privacy policy drops span content.
  */
 
-import { TraceValueMediaExtractionService } from "../content/trace-value-media-extraction.service.ts";
+import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { containsMediaMarkers, type OtlpKeyValue, type OtlpSpan } from "@langwatch/trace-contract";
 import type { TraceEdgeMediaTelemetry } from "../../app/trace.members.ts";
 import type { TraceMediaStore } from "../../app/trace.members.ts";
 import type { ExtractedRef } from "../../rules/content-part-extraction.rules.ts";
-import { type ExtractionBudget } from "../content/trace-value-media-extraction.service.ts";
+import { type ExtractionBudget } from "../trace-value-media-extraction.service.ts";
 
 /** Purpose tag for stored objects extracted from trace span content. */
 export const TRACE_MEDIA_PURPOSE = "trace_content";

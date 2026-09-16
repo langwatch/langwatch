@@ -18,7 +18,7 @@ import {
   type TracesV2SessionGroupsReader,
   type TracesV2SpanReader,
 } from "../trace.app.ts";
-import type { TraceService as TraceTreeService } from "../../services/support/trace.service.ts";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 
 const PROTECTIONS = { canSeeCosts: true };
 const QUERY = { projectId: "project-1", startDate: 1_000, endDate: 2_000 };

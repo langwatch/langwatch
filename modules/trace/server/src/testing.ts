@@ -9,11 +9,11 @@ import { TraceRecordRepository } from "./repositories/read/trace-record.reposito
 import { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
 import { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 
-export { TraceCanonicalisationService } from "./services/canonicalisers/trace-canonicalisation.service.ts";
-export { SpanNormalizationPipelineService } from "./services/span/span-normalization.service.ts";
+export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
+export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
 export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";
-export { TraceSpanCostMatchingService } from "./services/span/trace-span-cost-matching.service.ts";
-export { ClickHouseTraceQuerySubqueryAdapter } from "./repositories/clickhouse/trace-query-subquery.clickhouse.adapter.ts";
+export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
+export { ClickHouseTraceQuerySubqueryAdapter } from "./repositories/clickhouse/clickhouse.trace-query-subquery.repository.ts";
 
 export class MissingTraceRecordRepository extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {

@@ -10,7 +10,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
 import type { ProjectableTrace, ProjectionFrom } from "@langwatch/trace-contract";
 import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";

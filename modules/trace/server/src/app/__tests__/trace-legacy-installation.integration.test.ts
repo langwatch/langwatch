@@ -14,8 +14,8 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceService as TraceTreeService } from "../../services/support/trace.service.ts";
-import { TraceLegacyCredentialService } from "../../services/support/trace-legacy-credential.service.ts";
+import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
+import { TraceLegacyCredentialService } from "../../services/trace-legacy-credential.service.ts";
 import type { TraceViewerProtectionService } from "../../services/viewer/trace-viewer-protection.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";

@@ -19,7 +19,7 @@ import { type TraceEventDerivation } from "./trace.members.ts";
 import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
 import { type TraceFullIo } from "./trace.members.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
-import { TraceService } from "../services/support/trace.service.ts";
+import { TraceService } from "../services/trace.service.ts";
 
 export type TraceTreeCompositionOptions = {
   resolveClient: TraceClickHouseResolver;

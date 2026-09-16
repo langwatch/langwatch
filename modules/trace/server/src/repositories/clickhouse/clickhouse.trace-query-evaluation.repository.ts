@@ -13,9 +13,9 @@ import {
   UNSUPPORTED,
   type Unsupported,
 } from "@langwatch/trace-contract";
-import { MAX_NODE_COUNT, TraceQueryClickHouseAdapter } from "./trace-query.clickhouse.adapter.ts";
-import { FIELD_DEF_BY_NAME } from "./trace-query-fields.clickhouse.adapter.ts";
-import { TraceQueryMetaFieldsAdapter } from "./trace-query-meta-fields.clickhouse.adapter.ts";
+import { MAX_NODE_COUNT, TraceQueryClickHouseAdapter } from "./clickhouse.trace-query.repository.ts";
+import { FIELD_DEF_BY_NAME } from "./clickhouse.trace-query-fields.repository.ts";
+import { TraceQueryMetaFieldsAdapter } from "./clickhouse.trace-query-meta-fields.repository.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -23,7 +23,7 @@ import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   TraceQueryValuesAdapter,
-} from "./trace-query-values.clickhouse.adapter.ts";
+} from "./clickhouse.trace-query-values.repository.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
 

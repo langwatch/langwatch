@@ -2,11 +2,11 @@
  * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
  * Route order load-bearing: register :traceId sub-resources before bare :traceId.
  */
-import { TraceFormattingService } from "#services/support/trace-formatting.service";
-import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
+import { TraceFormattingService } from "#services/trace-formatting.service";
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
-import { AmbiguousTraceIdPrefixError } from "#services/read/trace-legacy-read.service";
-import { traceMetadataUpdateSchema } from "#services/support/trace-metadata-write.service";
+import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
+import { traceMetadataUpdateSchema } from "#services/trace-metadata-write.service";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
   badRequestSchema,

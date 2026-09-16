@@ -12,7 +12,7 @@ import {
   traceEventReferenceKey,
 } from "@langwatch/trace-contract";
 import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import { TraceAttributeCapService } from "../attribute/trace-attribute-cap.service.ts";
+import { TraceAttributeCapService } from "../trace-attribute-cap.service.ts";
 import { clonePayload } from "../../rules/payload-clone.rules.ts";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules.ts";
 

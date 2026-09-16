@@ -15,7 +15,7 @@ import {
   tracesTrpc,
 } from "@langwatch/trace-contract";
 
-import { TraceReadableSpanService } from "../services/read/trace-readable-span.service.ts";
+import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
 
 export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("getAllForProject")

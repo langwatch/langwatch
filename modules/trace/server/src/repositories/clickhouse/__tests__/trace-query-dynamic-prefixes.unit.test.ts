@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter.ts";
+import { TraceQueryClickHouseAdapter } from "../clickhouse.trace-query.repository.ts";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };

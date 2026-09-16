@@ -6,7 +6,7 @@ import type {
   TraceCanonicalisationService,
 } from "@langwatch/trace-contract";
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
-import { SpanNormalizationPipelineService } from "./span/span-normalization.service.ts";
+import { SpanNormalizationPipelineService } from "./span-normalization.service.ts";
 
 /**
  * Span normalization for the projections, over this package's own pipeline service. Frozen twin

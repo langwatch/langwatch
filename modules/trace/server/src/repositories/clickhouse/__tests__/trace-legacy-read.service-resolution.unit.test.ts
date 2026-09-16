@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceBlobStoreService } from "../../../services/offload/trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../../../services/offload/trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../../../services/content/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary

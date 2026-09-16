@@ -7,7 +7,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import { describe, expect, it } from "vitest";
-import type { TraceSpanDedupConnection } from "../../services/ingestion/trace-span-dedup.service.ts";
+import type { TraceSpanDedupConnection } from "../../services/trace-span-dedup.service.ts";
 import {
   buildTraceCollaborators,
   buildTraceProcessRegistrationCommands,

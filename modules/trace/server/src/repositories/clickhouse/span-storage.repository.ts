@@ -1,5 +1,5 @@
-import { TraceSpanCostMatchingService } from "../../services/span/trace-span-cost-matching.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/read/trace-legacy-span-mapping.service.ts";
+import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
+import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {

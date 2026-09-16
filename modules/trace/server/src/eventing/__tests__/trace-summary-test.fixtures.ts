@@ -1,4 +1,4 @@
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceIoExtractionAdapter } from "../../services/trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceAdapter } from "../../services/trace-media-reference.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";

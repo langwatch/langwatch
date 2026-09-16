@@ -4,7 +4,7 @@ import {
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { createTenantId } from "@langwatch/eventing";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,

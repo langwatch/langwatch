@@ -27,9 +27,9 @@ import { TraceApp } from "../../app/trace.app.ts";
 import { composeTraceAppDependencies } from "../../app/trace-read.composition.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { NullTraceSpanDedupAdapter } from "../../services/ingestion/trace-span-dedup.service.ts";
+import { NullTraceSpanDedupAdapter } from "../../services/trace-span-dedup.service.ts";
 import { TraceBlobStoreService } from "../../services/offload/trace-blob-store.service.ts";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { traceServer } from "../../trace.server.ts";
 import { CollectorApi, collectorRest } from "../collector.rest.ts";
 

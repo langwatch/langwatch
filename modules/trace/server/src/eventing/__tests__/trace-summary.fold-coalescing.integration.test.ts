@@ -8,7 +8,7 @@ import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
 } from "../../repositories/projection/trace-summary-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceSummaryStore } from "../trace-summary.store.ts";
 import type { TraceSummaryData } from "../trace-summary.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";

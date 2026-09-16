@@ -3,11 +3,11 @@
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter.ts";
+import { TraceQueryClickHouseAdapter } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
   startMigratedTraceClickHouse,

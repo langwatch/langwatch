@@ -2,7 +2,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { type TraceSpanTokenEstimation } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../app/trace.members.ts";
-import { OtlpSpanTokenEstimationService } from "./span/span-token-estimation.service.ts";
+import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
 
 /**
  * Renames the estimator onto the narrow port `EventingRecordSpanAdapter`

@@ -12,7 +12,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
 } from "../../repositories/projection/trace-analytics-projection.repository.ts";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,

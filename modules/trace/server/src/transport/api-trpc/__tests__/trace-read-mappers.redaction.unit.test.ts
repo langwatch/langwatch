@@ -19,7 +19,7 @@ import {
   stripRolesFromChatArrayJson,
 } from "@langwatch/data-privacy-contract";
 
-import { TestCodingAgentService } from "../../../services/ingestion/__tests__/support/coding-agent.service.fake.ts";
+import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 
 /**
  * The data-privacy vocabulary the mappers take as a port, wired to the REAL

@@ -13,15 +13,15 @@ import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../repositories/trace-clickhouse-client.repository.ts";
-import { TraceCanonicalisationService } from "../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
-import type { TraceSpanDedup } from "../services/ingestion/trace-ingestion.service.ts";
+import type { TraceSpanDedup } from "../services/trace-ingestion.service.ts";
 import {
   RedisTraceSpanDedupAdapter,
   type TraceSpanDedupConnection,
-} from "../services/ingestion/trace-span-dedup.service.ts";
+} from "../services/trace-span-dedup.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
 import type { TraceProcessingCommands } from "./trace.members.ts";
 

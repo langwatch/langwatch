@@ -31,7 +31,7 @@ import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { SpanStorageService } from "../trace-span-storage-read.service.ts";
-import { TraceIOExtractionService } from "../../content/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,

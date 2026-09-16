@@ -1,10 +1,10 @@
-import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 import { describe, expect, it } from "vitest";
 import {
   type DynamicKeysDef,
   type FacetDefinition,
   type QueryBuilderCategoricalDef,
-} from "../trace-facet-registry.clickhouse.adapter.ts";
+} from "../clickhouse.trace-facet-registry.repository.ts";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 const baseCtx = {

@@ -6,7 +6,7 @@ import {
   MAX_ATTRIBUTE_KEY_LENGTH,
   MAX_VALUE_LENGTH,
   TraceQueryValuesAdapter,
-} from "../trace-query-values.clickhouse.adapter.ts";
+} from "../clickhouse.trace-query-values.repository.ts";
 
 describe("TraceQueryValuesAdapter.validateAttributeKey", () => {
   describe("given a key that reads like an identifier", () => {

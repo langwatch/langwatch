@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
 import { TraceSummaryStore } from "../trace-summary.store.ts";
 import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";

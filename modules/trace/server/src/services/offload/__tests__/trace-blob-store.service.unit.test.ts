@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
-import { StreamTooLargeError } from "../../ingestion/trace-stream-buffer.service.ts";
+import { StreamTooLargeError } from "../../trace-stream-buffer.service.ts";
 import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,

@@ -54,7 +54,7 @@ import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
 import { type WarnLogger } from "../trace-offload-resolution.service.ts";
-import { TraceIOExtractionService } from "../../content/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Constants and helpers

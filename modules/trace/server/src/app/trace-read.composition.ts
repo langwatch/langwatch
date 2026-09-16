@@ -4,14 +4,14 @@ import {
   TraceIngressCommand,
   type CodingAgentIngestFilter,
   type TraceSpanDedup,
-} from "../services/ingestion/trace-ingestion.service.ts";
-import { TraceIngestCredentialService } from "../services/support/trace-ingest-credential.service.ts";
+} from "../services/trace-ingestion.service.ts";
+import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
+import { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import type { LogApi } from "@langwatch/log-contract";
@@ -27,24 +27,24 @@ import {
 } from "@langwatch/trace-contract";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
 import { traceRefusalProxy } from "./trace-composition.build.ts";
-import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
+import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
 import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
-import { TraceEventDerivationService } from "../services/ingestion/trace-event-derivation.service.ts";
+import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import { type TraceFullIo } from "./trace.members.ts";
-import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
-import { TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
-import { TraceListService } from "../services/read/trace-list-read.service.ts";
+import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
+import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
+import { TraceListService } from "../services/trace-list-read.service.ts";
 import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../repositories/read/query-field-values.repository.ts";
-import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
+import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,

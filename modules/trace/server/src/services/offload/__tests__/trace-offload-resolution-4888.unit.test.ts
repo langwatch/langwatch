@@ -26,7 +26,7 @@ vi.mock("langwatch", () => ({
 import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { TraceIOExtractionService } from "../../content/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,

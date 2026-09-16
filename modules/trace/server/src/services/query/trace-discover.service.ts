@@ -18,7 +18,7 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "@langwatch/trace-server";
-import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts";
+import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
 import {
   discoverCacheKey,
@@ -26,8 +26,8 @@ import {
   type DiscoverParams,
 } from "../../rules/trace-list-cache-key.rules.ts";
 import { isExpressionCategorical } from "../../rules/trace-facet-classification.rules.ts";
-import { TtlCache } from "../support/trace-ttl-cache.service.ts";
-import type { TraceTopicNamingService } from "../support/trace-topic-naming.service.ts";
+import { TtlCache } from "../trace-ttl-cache.service.ts";
+import type { TraceTopicNamingService } from "../trace-topic-naming.service.ts";
 import { TraceFacetDescriptorService } from "../facet/trace-facet-descriptor.service.ts";
 import { nowInstant } from "@langwatch/time";
 
