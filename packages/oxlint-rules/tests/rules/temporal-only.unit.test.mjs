@@ -115,6 +115,42 @@ describe("given a file outside the governed source", () => {
     });
   });
 
+  describe("when it is the ClickHouse repository seam", () => {
+    /** @scenario "The ClickHouse seam keeps its Date" */
+    it("reports nothing, because the client binds a Date for DateTime64", () => {
+      expect(
+        ids(
+          "const at = new Date();",
+          "modules/agent/server/src/repositories/clickhouse/clickhouse.agent.repository.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the Postgres adapter is a directory rather than a filename", () => {
+    /** @scenario "The Postgres adapter keeps its Date under either spelling" */
+    it("reports nothing", () => {
+      expect(
+        ids(
+          "const at = new Date();",
+          "packages/eventing/src/server/adapters/postgres/prisma-scheduled-job-store.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a path merely contains the word clickhouse outside a repository folder", () => {
+    /** @scenario "The seam is the folder, not the word" */
+    it("still reports, so the exemption cannot be claimed by a filename", () => {
+      expect(
+        ids(
+          "const at = new Date();",
+          "modules/agent/server/src/services/clickhouse-health.service.ts",
+        ),
+      ).toEqual(["mintNow"]);
+    });
+  });
+
   describe("when it is a test", () => {
     /** @scenario "Test files keep their Date fixtures" */
     it("reports nothing", () => {

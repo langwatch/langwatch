@@ -69,6 +69,24 @@ Feature: The linter keeps one clock
       Then it reports nothing
 
     @unit
+    Scenario: The ClickHouse seam keeps its Date
+      Given a repository under the ClickHouse seam that holds a Date
+      When the rule runs
+      Then it reports nothing
+
+    @unit
+    Scenario: The Postgres adapter keeps its Date under either spelling
+      Given a Postgres adapter written as a directory rather than a filename
+      When the rule runs
+      Then it reports nothing
+
+    @unit
+    Scenario: The seam is the folder, not the word
+      Given a service whose filename merely contains the word clickhouse
+      When the rule runs
+      Then it reports the Date it holds
+
+    @unit
     Scenario: Test files keep their Date fixtures
       Given a test file that builds a Date fixture
       When the rule runs
@@ -83,13 +101,5 @@ Feature: The linter keeps one clock
     @unit
     Scenario: A member call on another object is left alone
       Given production source that calls now on an injected clock
-      When the rule runs
-      Then it reports nothing
-
-  Rule: Existing debt is held on the register rather than switched off
-
-    @unit
-    Scenario: A file on the debt register is left alone
-      Given a file carrying a temporal-only entry in the shared oxlint baseline
       When the rule runs
       Then it reports nothing

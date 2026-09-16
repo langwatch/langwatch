@@ -1,13 +1,27 @@
 import { defineRule } from "../define-rule.mjs";
 
-// One clock. `Date` survives only where a boundary refuses anything else: the
-// Prisma seam, and the two named helpers in @langwatch/time that convert for
-// an SDK. Everywhere else a moment is a `Temporal.Instant`.
+// One clock. `Date` survives only where a boundary refuses anything else: a
+// persistence seam, and the two named helpers in @langwatch/time that convert
+// for an SDK. Everywhere else a moment is a `Temporal.Instant`.
 
 const GOVERNED =
   /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/|sdks\/typescript\/src\/|mcp\/typescript\/src\/)/;
 const TIME_PACKAGE = /^packages\/time\//;
-const PRISMA_SEAM = /(?:^|\/)(?:repositories\/prisma\/|adapters\/postgres\.)/;
+// The seams where a driver binds a real `Date` and will not take an `Instant`.
+//
+// `adapters/postgres.` is the flat spelling (`adapters/postgres.foo.adapter.ts`)
+// and `adapters/postgres/` the directory one -- the second was missing, which
+// is why packages/eventing's own Prisma store was being asked to hold an
+// `Instant` for a column Prisma binds as a `Date`.
+//
+// ClickHouse is here for exactly the reason Prisma is, and was simply never
+// added: the client binds a `Date` for a `DateTime64` parameter. The
+// repositories under it already convert at the write boundary -- scenario's
+// simulation-run store maps its own date columns to `Date | null` through a
+// `WithDateWrites` type and imports `toDate` to fill them -- so the rule was
+// reporting, 81 times, the one shape those files are required to have.
+const PERSISTENCE_SEAM =
+  /(?:^|\/)(?:repositories\/(?:prisma|clickhouse)\/|adapters\/postgres[./])/;
 const DECLARATION = /\.d\.[cm]?ts$/;
 const BOUNDARY_HELPER = new Set(["fromDate", "toDate"]);
 const FUNCTION_NODE = new Set([
@@ -22,7 +36,7 @@ function isTemporalOnlySource(file) {
   const path = file.workspacePath;
   if (!GOVERNED.test(path)) return false;
   if (TIME_PACKAGE.test(path)) return false;
-  if (PRISMA_SEAM.test(path)) return false;
+  if (PERSISTENCE_SEAM.test(path)) return false;
   if (DECLARATION.test(path)) return false;
 
   return file.isProduction;
