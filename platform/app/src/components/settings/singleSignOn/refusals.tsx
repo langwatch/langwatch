@@ -107,16 +107,29 @@ export function InlineRefusal({
   what,
 }: {
   error: unknown;
-  /** The act that was refused, named for the title's fallback. */
+  /**
+   * The act that was refused, for the title to fall back to when the failure
+   * has no registered copy of its own — "Registering that connection didn't
+   * work" says more than "Something went wrong" does.
+   *
+   * It is ONLY the fallback. A registered code's title is the one sentence
+   * written for that exact failure, and naming the act instead throws it
+   * away: `sso_issuer_unreachable` says "That address did not answer as an
+   * identity provider", which tells the reader which of the boxes in front of
+   * them is wrong. This used to render the act whenever it was passed, so
+   * every caller that named one got the generic title over the specific
+   * description — the two halves of the alert describing different failures.
+   */
   what?: string;
 }) {
   if (!error) return null;
   const copy = explainAnyError(error);
+  const title = copy.isRegistered || !what ? copy.title : `${what} didn't work`;
   return (
     <Alert.Root status="error" data-testid="sso-inline-refusal">
       <Alert.Indicator />
       <Alert.Content>
-        <Alert.Title>{what ? `${what} didn't work` : copy.title}</Alert.Title>
+        <Alert.Title>{title}</Alert.Title>
         <Alert.Description>{copy.description}</Alert.Description>
       </Alert.Content>
     </Alert.Root>
