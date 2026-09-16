@@ -96,8 +96,8 @@ function lintContract(
 
     if (existsSync(api)) {
       for (const statement of sourceFile({ file: api }).statements) {
-        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
-          continue;
+        if (!ts.isImportDeclaration(statement)) continue;
+        if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
         if (statement.moduleSpecifier.text !== "@langwatch/runtime-composition") continue;
 
@@ -317,7 +317,15 @@ function packageEntrypoints(pkg: ClassifiedPackage): string[] {
     const isDeclaration = target.endsWith(".d.ts");
     if (isDeclaration) continue;
 
-    if (SOURCE_FILE_EXTENSIONS.some((extension) => target.endsWith(extension))) {
+    let matchesSourceExtension = false;
+    for (const extension of SOURCE_FILE_EXTENSIONS) {
+      if (target.endsWith(extension)) {
+        matchesSourceExtension = true;
+        break;
+      }
+    }
+
+    if (matchesSourceExtension) {
       targets.add(target.replace(/^\.\//, ""));
     }
   }
@@ -392,7 +400,10 @@ function resolveSpecifier(
     ...SOURCE_FILE_EXTENSIONS.map((ext) => `${base}${ext}`),
     join(base, "index.ts"),
   ]) {
-    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    if (!existsSync(candidate)) continue;
+
+    const stat = statSync(candidate);
+    if (stat.isFile()) return candidate;
   }
 
   return void 0;
@@ -431,16 +442,7 @@ function declaresValue(statement: ts.Statement, name: string): boolean {
   return false;
 }
 
-function isExportedValueDeclaration(statement: ts.Statement): boolean {
-  if (
-    !ts.isClassDeclaration(statement) &&
-    !ts.isFunctionDeclaration(statement) &&
-    !ts.isVariableStatement(statement) &&
-    !ts.isEnumDeclaration(statement)
-  ) {
-    return false;
-  }
-
+function hasExportModifier(statement: ts.Statement): boolean {
   return (
     ts.canHaveModifiers(statement) &&
     (ts
@@ -448,6 +450,15 @@ function isExportedValueDeclaration(statement: ts.Statement): boolean {
       ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
       false)
   );
+}
+
+function isExportedValueDeclaration(statement: ts.Statement): boolean {
+  if (ts.isClassDeclaration(statement)) return hasExportModifier(statement);
+  if (ts.isFunctionDeclaration(statement)) return hasExportModifier(statement);
+  if (ts.isVariableStatement(statement)) return hasExportModifier(statement);
+  if (ts.isEnumDeclaration(statement)) return hasExportModifier(statement);
+
+  return false;
 }
 
 function parseModule(file: string): ts.SourceFile {
@@ -522,7 +533,8 @@ function resolveBindingOrigin(
       for (const element of statement.exportClause.elements) {
         if (element.isTypeOnly || element.name.text !== name) continue;
 
-        if (resolveBindingOrigin(target, exportName(element), pkg, visited, allowTestingDoubles))
+        const boundName = exportName(element);
+        if (resolveBindingOrigin(target, boundName, pkg, visited, allowTestingDoubles))
           return true;
       }
       // `export * from "./elsewhere"` may forward the name; best-effort probe.
@@ -661,12 +673,15 @@ function lintPrivateServerExportsForEntry(
       // private directory is still caught.
       const originPath = target ? workspacePath(`${pkg.root}/src`, target) : specifierText;
 
-      if (
-        PRIVATE_SERVER_EXPORT.test(originPath) &&
-        !(allowTestingDoubles && TESTING_ENTRY_DOUBLE.test(originPath))
-      ) {
-        add(statement, specifierText);
-        continue;
+      if (PRIVATE_SERVER_EXPORT.test(originPath)) {
+        if (!allowTestingDoubles) {
+          add(statement, specifierText);
+          continue;
+        }
+        if (!TESTING_ENTRY_DOUBLE.test(originPath)) {
+          add(statement, specifierText);
+          continue;
+        }
       }
 
       if (!target) continue;

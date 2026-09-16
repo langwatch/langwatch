@@ -404,16 +404,19 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
         },
       };
     case "local_write":
-      if (!isString(params.path) || !isString(params.content)) return null;
+      if (!isString(params.path)) return null;
+      if (!isString(params.content)) return null;
       return {
         tool: "local_write",
         params: { path: params.path, content: params.content },
       };
     case "local_edit": {
-      if (!isString(params.path) || !Array.isArray(params.edits)) return null;
+      if (!isString(params.path)) return null;
+      if (!Array.isArray(params.edits)) return null;
       const edits: LocalEditReplace[] = [];
       for (const entry of params.edits) {
-        if (!isRecord(entry) || !isString(entry.oldText)) return null;
+        if (!isRecord(entry)) return null;
+        if (!isString(entry.oldText)) return null;
         edits.push({
           oldText: entry.oldText,
           newText: readString(entry.newText, ""),
@@ -501,7 +504,8 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !isString(parsed.type)) return null;
+  if (!isRecord(parsed)) return null;
+  if (!isString(parsed.type)) return null;
   switch (parsed.type) {
     case "registered":
       return readRegistered(parsed);
@@ -519,14 +523,17 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
         ? { type: "cancel", protocol: protocolOf(parsed), callId: parsed.callId }
         : null;
     case "permission":
-      return isString(parsed.callId) && isDecision(parsed.decision)
-        ? {
+      if (isString(parsed.callId)) {
+        if (isDecision(parsed.decision)) {
+          return {
             type: "permission",
             protocol: protocolOf(parsed),
             callId: parsed.callId,
             decision: parsed.decision,
-          }
-        : null;
+          };
+        }
+      }
+      return null;
     case "policy":
       return {
         type: "policy",

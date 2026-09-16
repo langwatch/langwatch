@@ -45,7 +45,14 @@ const nonEmptyTrimmed = (text: string | undefined): string | undefined => {
 /** Best-effort detection of the coding agent driving this terminal. */
 export const detectAgent = (env: NodeJS.ProcessEnv = process.env): string | undefined => {
   if (env.CLAUDECODE ?? env.CLAUDE_CODE_ENTRYPOINT) return "claude-code";
-  if (Object.keys(env).some((name) => name.startsWith("CODEX_"))) return "codex";
+  let hasCodexEnv = false;
+  for (const name of Object.keys(env)) {
+    if (name.startsWith("CODEX_")) {
+      hasCodexEnv = true;
+      break;
+    }
+  }
+  if (hasCodexEnv) return "codex";
   if (env.CURSOR_TRACE_ID ?? env.CURSOR_AGENT) return "cursor";
   if (env.GEMINI_CLI) return "gemini-cli";
   return undefined;
@@ -106,16 +113,18 @@ export const reportCommand = async (
     rawSession = readFileSync(options.session, "utf8");
   }
 
-  if (!summary?.trim() && !rawSession?.trim()) {
-    throw new Error(
-      [
-        "Nothing to report: pass --summary/--summary-file, --session <transcript.jsonl>, or both.",
-        "",
-        "A good report includes what you were trying to do, what went wrong (verbatim",
-        "errors), and what you had to figure out the hard way. The full session",
-        "transcript is the most useful thing you can send.",
-      ].join("\n"),
-    );
+  if (!summary?.trim()) {
+    if (!rawSession?.trim()) {
+      throw new Error(
+        [
+          "Nothing to report: pass --summary/--summary-file, --session <transcript.jsonl>, or both.",
+          "",
+          "A good report includes what you were trying to do, what went wrong (verbatim",
+          "errors), and what you had to figure out the hard way. The full session",
+          "transcript is the most useful thing you can send.",
+        ].join("\n"),
+      );
+    }
   }
 
   const events = createCommandEvents({ resource: "report", verb: "send" });

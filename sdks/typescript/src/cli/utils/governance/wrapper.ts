@@ -611,18 +611,21 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // the full transcript with a per-turn trace_id. Poll it while codex runs
   // to stream each turn as it completes rather than one burst on exit; the
   // poll and a final sweep are idempotent (span id is trace_id-derived).
-  const codexStreamer =
-    tool === "codex" &&
-    modeResult.mode === "ingestion" &&
-    modeResult.endpoint &&
-    modeResult.ingestionToken
-      ? createCodexIOStreamer({
-          sinceMs: sessionStartMs,
-          endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
-          logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
-          token: modeResult.ingestionToken,
-        })
-      : null;
+  let codexStreamer: ReturnType<typeof createCodexIOStreamer> | null = null;
+  if (tool === "codex") {
+    if (modeResult.mode === "ingestion") {
+      if (modeResult.endpoint) {
+        if (modeResult.ingestionToken) {
+          codexStreamer = createCodexIOStreamer({
+            sinceMs: sessionStartMs,
+            endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
+            logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
+            token: modeResult.ingestionToken,
+          });
+        }
+      }
+    }
+  }
   let codexPoll: ReturnType<typeof setInterval> | null = null;
   if (codexStreamer) {
     let inFlight = false;

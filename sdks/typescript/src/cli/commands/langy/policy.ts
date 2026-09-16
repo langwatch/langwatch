@@ -287,9 +287,14 @@ export function isSecretPath(target: string): boolean {
   const name = parts[parts.length - 1] ?? "";
   if (isSecretFileName(name)) return true;
   const written = parts.join("/");
-  if (
-    SECRET_RELATIVE_PATHS.some((secret) => written === secret || written.endsWith(`/${secret}`))
-  ) {
+  let isSecretRelativePath = false;
+  for (const secret of SECRET_RELATIVE_PATHS) {
+    if (written === secret || written.endsWith(`/${secret}`)) {
+      isSecretRelativePath = true;
+      break;
+    }
+  }
+  if (isSecretRelativePath) {
     return true;
   }
   return parts.slice(0, -1).some((segment) => SECRET_DIRECTORIES.includes(segment));
@@ -540,9 +545,13 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === undefined || name === "") return false;
   if (isEnvironmentAssignment(name)) return false;
   if (part.hasRedirect) return false;
-  if (args.some((argument) => WRITE_FLAGS.has(argument))) return false;
+  for (const argument of args) {
+    if (WRITE_FLAGS.has(argument)) return false;
+  }
   if (namesAPath(name)) return false;
-  if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
+  for (const argument of args) {
+    if (DIRECTORY_FLAGS.has(argument)) return false;
+  }
 
   if (name === "git") return isReadOnlyGit(args);
 
@@ -563,11 +572,11 @@ function isReadOnlyPart(part: CommandPart): boolean {
 
   const rule = READ_ONLY_COMMAND_RULES.get(name);
   if (rule !== undefined) {
-    if (
-      rule.writeOptions !== undefined &&
-      args.some((argument) => carriesOption(argument, rule.writeOptions!))
-    ) {
-      return false;
+    if (rule.writeOptions !== undefined) {
+      const writeOptions = rule.writeOptions;
+      for (const argument of args) {
+        if (carriesOption(argument, writeOptions)) return false;
+      }
     }
     const operands = args.filter((argument) => !argument.startsWith("-"));
     if (rule.maxOperands !== undefined && operands.length > rule.maxOperands) {
@@ -591,7 +600,8 @@ export function carriesOption(argument: string, options: ReadonlySet<string>): b
   const letters = argument.slice(1);
   for (const option of options) {
     if (option.startsWith("--") || option.length !== 2) continue;
-    if (letters.includes(option.slice(1))) return true;
+    const suffix = option.slice(1);
+    if (letters.includes(suffix)) return true;
   }
   return false;
 }
@@ -601,17 +611,19 @@ export function carriesOption(argument: string, options: ReadonlySet<string>): b
  * with a write operand still writes.
  */
 export function isReadOnlyGit(args: string[]): boolean {
-  if (args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument))) return false;
+  for (const argument of args) {
+    if (GIT_WRITE_ARGUMENTS.has(argument)) return false;
+  }
   const words = args.filter((argument) => !argument.startsWith("-"));
   const [subcommand, ...operands] = words;
   if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
   const rule = GIT_OPERAND_RULES.get(subcommand);
   if (rule !== undefined) {
-    if (
-      rule.lists === true &&
-      args.some((argument) => GIT_LIST_OPTIONS.has(argument.split("=")[0]!))
-    ) {
-      return true;
+    if (rule.lists === true) {
+      for (const argument of args) {
+        const flagName = argument.split("=")[0]!;
+        if (GIT_LIST_OPTIONS.has(flagName)) return true;
+      }
     }
     if (operands.length === 0) return rule.bare;
     return operands.length <= 2 && rule.verbs.has(operands[0]!);
@@ -786,7 +798,9 @@ export function effectOf(part: CommandPart): CommandEffect {
   const [name, ...args] = part.tokens;
   if (name === undefined || name === "") return "runs_program";
   if (part.hasRedirect) return "writes_files";
-  if (args.some((argument) => WRITE_FLAGS.has(argument))) return "writes_files";
+  for (const argument of args) {
+    if (WRITE_FLAGS.has(argument)) return "writes_files";
+  }
 
   const verb = args.find((argument) => !argument.startsWith("-"));
 
@@ -801,10 +815,16 @@ export function effectOf(part: CommandPart): CommandEffect {
     }
     return "changes_repository";
   }
-  if (PACKAGE_MANAGERS.has(name) && verb !== undefined && INSTALL_VERBS.has(verb)) {
-    return "installs_packages";
+  if (PACKAGE_MANAGERS.has(name)) {
+    if (verb !== undefined) {
+      if (INSTALL_VERBS.has(verb)) {
+        return "installs_packages";
+      }
+    }
   }
-  if (args.some((argument) => CHECK_TOKENS.has(argument))) return "runs_checks";
+  for (const argument of args) {
+    if (CHECK_TOKENS.has(argument)) return "runs_checks";
+  }
   if (CHECK_TOKENS.has(name)) return "runs_checks";
   if (NETWORK_COMMANDS.has(name)) return "reaches_network";
   if (FILE_WRITE_COMMANDS.has(name)) return "writes_files";
@@ -1013,7 +1033,16 @@ function decideFileTool({
     const name = path.basename(check.resolved);
     // Both spellings are read: the path as it was written, and the path it
     // really points at, so a link into `.ssh` is judged as `.ssh`.
-    if (isSecretPath(target) || isSecretPath(check.resolved)) {
+    if (isSecretPath(target)) {
+      const verb = TOOL_VERBS[call.tool];
+      return {
+        kind: "ask",
+        summary: `${verb} ${target}`,
+        pattern: `${call.tool} ${target}`,
+        patterns: [`${call.tool} ${target}`],
+        reason: `${name} may hold secrets, so it is not read for you without an answer.`,
+      };
+    } else if (isSecretPath(check.resolved)) {
       const verb = TOOL_VERBS[call.tool];
       return {
         kind: "ask",
@@ -1145,7 +1174,9 @@ export function pathTokensOf(part: CommandPart): string[] {
     if (equals) {
       const flag = equals[1]!;
       const value = equals[2]!;
-      if (DIRECTORY_FLAGS.has(flag) || isPathCandidate({ name, token: value, afterEndOfOptions })) {
+      if (DIRECTORY_FLAGS.has(flag)) {
+        named.add(value);
+      } else if (isPathCandidate({ name, token: value, afterEndOfOptions })) {
         named.add(value);
       }
       continue;
@@ -1220,8 +1251,11 @@ export function secretFileRead(part: CommandPart): string | null {
     : pathTokensOf(part);
   for (const token of candidates) {
     if (isSecretPath(token)) return path.basename(token);
-    if (!ownVocabulary && globCouldMatchSecret(path.basename(token))) {
-      return path.basename(token);
+    if (!ownVocabulary) {
+      const baseName = path.basename(token);
+      if (globCouldMatchSecret(baseName)) {
+        return baseName;
+      }
     }
   }
   return null;

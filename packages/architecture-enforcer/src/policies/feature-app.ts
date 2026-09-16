@@ -172,7 +172,8 @@ export function hasCanonicalAppFactory(
 }
 /** A file with no `class` token declares no class, and is never parsed to find that out. */
 function classDeclarations(file: string): ts.ClassDeclaration[] {
-  if (!/\bclass\b/.test(sourceText({ file }))) return [];
+  const text = sourceText({ file });
+  if (!/\bclass\b/.test(text)) return [];
 
   return source(file).statements.filter((item) => ts.isClassDeclaration(item));
 }
@@ -1347,7 +1348,8 @@ function installers(snapshot: WorkspaceSnapshot, serverRoot: string): Installer[
   const result: Installer[] = [];
 
   for (const file of productionFiles(snapshot, serverRoot)) {
-    if (!sourceText({ file }).includes("@langwatch/runtime-composition")) continue;
+    const text = sourceText({ file });
+    if (!text.includes("@langwatch/runtime-composition")) continue;
 
     const parsed = source(file);
     const imports = installerImports(parsed);
@@ -1544,7 +1546,9 @@ function validDefinedStages(stages: string[]): boolean {
   const tail =
     stages.at(-1) === "build" ? stages.slice(appIndex + 1, -1) : stages.slice(appIndex + 1);
 
-  if (tail.some((stage) => !DECLARED_MODULE_STAGES.has(stage))) return false;
+  for (const stage of tail) {
+    if (!DECLARED_MODULE_STAGES.has(stage)) return false;
+  }
 
   return new Set(tail).size === tail.length;
 }

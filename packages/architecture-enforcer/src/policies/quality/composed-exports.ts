@@ -67,7 +67,9 @@ function isTestingModule(file: string): boolean {
 }
 
 function isSubjectName(name: string): boolean {
-  if (EXCLUDED_SUFFIXES.some((suffix) => name.endsWith(suffix))) return false;
+  for (const suffix of EXCLUDED_SUFFIXES) {
+    if (name.endsWith(suffix)) return false;
+  }
 
   if (TRANSPORT_FACTORY.test(name)) return true;
 
@@ -79,12 +81,14 @@ function parseFile(file: string): ts.SourceFile {
 }
 
 function subdirectories(path: string): string[] {
-  return existsSync(path) && statSync(path).isDirectory()
-    ? readdirSync(path, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name)
-        .sort()
-    : [];
+  if (!existsSync(path)) return [];
+  const stat = statSync(path);
+  if (!stat.isDirectory()) return [];
+
+  return readdirSync(path, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 }
 
 /**
@@ -106,9 +110,17 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
   }
 
   for (const name of subdirectories(join(root, "packages"))) {
-    if (EXCLUDED_PACKAGE_SUFFIXES.some((suffix) => name.endsWith(suffix))) continue;
+    let isExcludedPackage = false;
+    for (const suffix of EXCLUDED_PACKAGE_SUFFIXES) {
+      if (name.endsWith(suffix)) {
+        isExcludedPackage = true;
+        break;
+      }
+    }
+    if (isExcludedPackage) continue;
 
-    if (!existsSync(join(root, "packages", name, "src", "server"))) continue;
+    const serverDir = join(root, "packages", name, "src", "server");
+    if (!existsSync(serverDir)) continue;
 
     push(join(root, "packages", name, "src", "index.ts"));
   }
@@ -172,7 +184,10 @@ function exportedNames({
 
     if (exported !== true) continue;
 
-    if (ts.isClassDeclaration(statement) || ts.isFunctionDeclaration(statement)) {
+    if (ts.isClassDeclaration(statement)) {
+      if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
+    }
+    if (ts.isFunctionDeclaration(statement)) {
       if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
     }
   }
@@ -321,21 +336,19 @@ function valueReferences({
       return;
     }
 
-    if (
-      ts.isImportDeclaration(node) ||
-      ts.isExportDeclaration(node) ||
-      ts.isImportEqualsDeclaration(node) ||
-      ts.isTypeAliasDeclaration(node) ||
-      ts.isInterfaceDeclaration(node) ||
-      ts.isTypeNode(node)
-    ) {
-      return;
-    }
+    if (ts.isImportDeclaration(node)) return;
+    if (ts.isExportDeclaration(node)) return;
+    if (ts.isImportEqualsDeclaration(node)) return;
+    if (ts.isTypeAliasDeclaration(node)) return;
+    if (ts.isInterfaceDeclaration(node)) return;
+    if (ts.isTypeNode(node)) return;
 
     if (ts.isIdentifier(node)) {
-      if (wanted.has(node.text) && !declaredHere.has(node.text) && !isDeclarationName(node)) {
-        found.push(node.text);
-      }
+      if (!wanted.has(node.text)) return;
+      if (declaredHere.has(node.text)) return;
+      if (isDeclarationName(node)) return;
+
+      found.push(node.text);
 
       return;
     }
@@ -364,13 +377,17 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
   const composed = new Set<string>();
 
   for (const file of reachableFiles({ root, resolver })) {
-    if (!/\.[cm]?tsx?$/.test(file) || file.endsWith(".d.ts")) continue;
+    if (!/\.[cm]?tsx?$/.test(file)) continue;
+    if (file.endsWith(".d.ts")) continue;
 
     const words = mentionedWords({ file });
     let candidate = false;
 
     for (const word of words) {
-      if (wanted.has(word) && !composed.has(word)) candidate = true;
+      if (!wanted.has(word)) continue;
+      if (composed.has(word)) continue;
+
+      candidate = true;
     }
 
     if (!candidate) continue;

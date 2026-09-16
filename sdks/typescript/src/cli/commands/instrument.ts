@@ -105,12 +105,20 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
     process.stdout.write(
       `${lwTag()} minted a project ingest key for ${tool} (project ${pinned.label}).\n`,
     );
-  } else if (!options.personal && cfg.tool_project_keys?.[tool]?.secret) {
-    // Bare re-run on a pinned tool refreshes the wiring for the pin.
-  } else if (!isLoggedIn(cfg)) {
-    fail(
-      `not logged in. Run \`langwatch login --device\` for the personal scope, or pass --key <ingest-key> (or set ${KEY_ENV_VAR}) for a project key.`,
-    );
+  } else {
+    let alreadyPinned = false;
+    if (!options.personal) {
+      if (cfg.tool_project_keys?.[tool]?.secret) {
+        alreadyPinned = true; // Bare re-run on a pinned tool refreshes the wiring for the pin.
+      }
+    }
+    if (!alreadyPinned) {
+      if (!isLoggedIn(cfg)) {
+        fail(
+          `not logged in. Run \`langwatch login --device\` for the personal scope, or pass --key <ingest-key> (or set ${KEY_ENV_VAR}) for a project key.`,
+        );
+      }
+    }
   }
 
   const credential = await resolveIngestionCredential({

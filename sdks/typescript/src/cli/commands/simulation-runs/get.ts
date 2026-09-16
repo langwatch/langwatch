@@ -20,7 +20,14 @@ function renderContent(raw: unknown): string {
     // Try one round of JSON parse so single Anthropic blocks (`{"type":"thinking",...}`)
     // and array-stringified content render as readable text instead of raw JSON.
     const trimmed = raw.trim();
-    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    if (trimmed.startsWith("{")) {
+      try {
+        return renderContent(JSON.parse(trimmed));
+      } catch {
+        return raw;
+      }
+    }
+    if (trimmed.startsWith("[")) {
       try {
         return renderContent(JSON.parse(trimmed));
       } catch {
@@ -197,14 +204,16 @@ export const getSimulationRunCommand = async (
           if (run.results.reasoning) {
             console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
           }
-          if (run.results.metCriteria && run.results.metCriteria.length > 0) {
+          const metCriteria = run.results.metCriteria;
+          if (metCriteria && metCriteria.length > 0) {
             console.log(
-              `    ${chalk.gray("Met:")}        ${chalk.green(run.results.metCriteria.join(", "))}`,
+              `    ${chalk.gray("Met:")}        ${chalk.green(metCriteria.join(", "))}`,
             );
           }
-          if (run.results.unmetCriteria && run.results.unmetCriteria.length > 0) {
+          const unmetCriteria = run.results.unmetCriteria;
+          if (unmetCriteria && unmetCriteria.length > 0) {
             console.log(
-              `    ${chalk.gray("Unmet:")}      ${chalk.red(run.results.unmetCriteria.join(", "))}`,
+              `    ${chalk.gray("Unmet:")}      ${chalk.red(unmetCriteria.join(", "))}`,
             );
           }
           if (run.results.error) {

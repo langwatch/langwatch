@@ -286,7 +286,11 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // healthy. Absent spend is unreadable, not zero spend.
         const spent = budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
         // Neither "at risk" nor "fine" - we cannot say which, so say that.
-        if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
+        if (!Number.isFinite(limit)) {
+          unreadable.push(budget.name);
+          return [];
+        }
+        if (!Number.isFinite(spent)) {
           unreadable.push(budget.name);
           return [];
         }

@@ -82,9 +82,18 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     if (shouldCaptureInput() && args.input !== void 0) {
       const i: any = args.input as any;
-      if (i && typeof i === "object" && "type" in i && "value" in i) {
-        span.setInput(i.type, i.value);
-      } else {
+      let handledTypedInput = false;
+      if (i) {
+        if (typeof i === "object") {
+          if ("type" in i) {
+            if ("value" in i) {
+              span.setInput(i.type, i.value);
+              handledTypedInput = true;
+            }
+          }
+        }
+      }
+      if (!handledTypedInput) {
         span.setInput(i);
       }
     }

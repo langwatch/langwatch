@@ -52,7 +52,11 @@ export class DatasetsFacade {
    * @returns The created dataset metadata
    */
   create = (options: CreateDatasetOptions): Promise<DatasetMetadata> => {
-    if (!options.name || options.name.trim().length === 0) {
+    if (!options.name) {
+      throw new DatasetValidationError("Dataset name must not be empty");
+    }
+    const trimmedName = options.name.trim();
+    if (trimmedName.length === 0) {
       throw new DatasetValidationError("Dataset name must not be empty");
     }
     return this.#datasetService.createDataset(options);

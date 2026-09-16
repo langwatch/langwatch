@@ -17,10 +17,13 @@ const EXCLUDED_DIRECTORIES = new Set([
 ]);
 
 function isSourceFile(path: string): boolean {
-  if (!SOURCE_EXTENSIONS.has(extname(path))) return false;
+  const extension = extname(path);
+  if (!SOURCE_EXTENSIONS.has(extension)) return false;
 
   const segments = path.split(sep);
-  if (segments.some((segment) => EXCLUDED_DIRECTORIES.has(segment))) return false;
+  for (const segment of segments) {
+    if (EXCLUDED_DIRECTORIES.has(segment)) return false;
+  }
 
   return !/\.(?:generated|gen)\.[cm]?[jt]sx?$/.test(path);
 }

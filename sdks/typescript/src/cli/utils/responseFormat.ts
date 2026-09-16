@@ -86,7 +86,9 @@ export const asFlatFields = (
   if (!isPlainObject(schema.properties)) return null;
 
   const allowedSchemaKeys = new Set(["type", "properties", "required", "additionalProperties"]);
-  if (Object.keys(schema).some((k) => !allowedSchemaKeys.has(k))) return null;
+  for (const k of Object.keys(schema)) {
+    if (!allowedSchemaKeys.has(k)) return null;
+  }
 
   if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
     return null;
@@ -104,7 +106,9 @@ export const asFlatFields = (
   for (const name of propertyNames) {
     const prop = properties[name];
     if (!isPlainObject(prop)) return null;
-    if (Object.keys(prop).some((k) => k !== "type")) return null;
+    for (const k of Object.keys(prop)) {
+      if (k !== "type") return null;
+    }
     const jsonType = prop.type;
     if (typeof jsonType !== "string") return null;
     const scalar = JSON_TYPE_TO_SCALAR_OUTPUT[jsonType];

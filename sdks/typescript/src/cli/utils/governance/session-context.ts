@@ -206,7 +206,8 @@ export function parseTraceparent(raw: string | undefined): TraceContext | null {
   if (!match) return null;
   const traceId = match[1]!;
   const spanId = match[2]!;
-  if (ALL_ZERO.test(traceId) || ALL_ZERO.test(spanId)) return null;
+  if (ALL_ZERO.test(traceId)) return null;
+  if (ALL_ZERO.test(spanId)) return null;
   return { traceId, spanId };
 }
 

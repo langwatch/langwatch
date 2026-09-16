@@ -36,38 +36,40 @@ export function createTracingProxy<
       }
 
       // Only trace public methods
-      if (
-        typeof prop === "string" &&
-        !prop.startsWith("_") && // Skip private methods
-        !isGetterOrSetter(target, prop) && // Skip actual getters/setters
-        !isBuiltInMethod(prop) // Skip built-in methods
-      ) {
-        return (...args: any[]) => {
-          const spanName = `${target.constructor.name}.${prop}`;
+      if (typeof prop === "string" && !prop.startsWith("_")) {
+        // Skip private methods
+        if (!isGetterOrSetter(target, prop)) {
+          // Skip actual getters/setters
+          if (!isBuiltInMethod(prop)) {
+            // Skip built-in methods
+            return (...args: any[]) => {
+              const spanName = `${target.constructor.name}.${prop}`;
 
-          return tracer.withActiveSpan(
-            spanName,
-            {
-              kind: SpanKind.CLIENT,
-              attributes: {
-                "code.function": prop,
-                "code.namespace": target.constructor.name,
-              },
-            },
-            (span) => {
-              // If decorator has this method, call it with span as first parameter
-              if (decorator && prop in decorator) {
-                const decoratorMethod = decorator[prop as keyof typeof decorator];
-                if (typeof decoratorMethod === "function") {
-                  return decoratorMethod.apply(decorator, [span, ...args]);
-                }
-              }
+              return tracer.withActiveSpan(
+                spanName,
+                {
+                  kind: SpanKind.CLIENT,
+                  attributes: {
+                    "code.function": prop,
+                    "code.namespace": target.constructor.name,
+                  },
+                },
+                (span) => {
+                  // If decorator has this method, call it with span as first parameter
+                  if (decorator && prop in decorator) {
+                    const decoratorMethod = decorator[prop as keyof typeof decorator];
+                    if (typeof decoratorMethod === "function") {
+                      return decoratorMethod.apply(decorator, [span, ...args]);
+                    }
+                  }
 
-              // Default: just call the original method
-              return value.apply(target, args);
-            },
-          );
-        };
+                  // Default: just call the original method
+                  return value.apply(target, args);
+                },
+              );
+            };
+          }
+        }
       }
 
       return typeof value === "function" ? value.bind(target) : value;

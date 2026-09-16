@@ -214,8 +214,12 @@ function mergeHookEntries({
   const ours = entries.filter(isLangwatchHookEntry);
   const desired = sessionContextHookEntry(tool, event);
 
-  if (ours.length === 1 && JSON.stringify(ours[0]) === JSON.stringify(desired)) {
-    return entries;
+  if (ours.length === 1) {
+    const oursJson = JSON.stringify(ours[0]);
+    const desiredJson = JSON.stringify(desired);
+    if (oursJson === desiredJson) {
+      return entries;
+    }
   }
   return [...entries.filter((entry) => !isLangwatchHookEntry(entry)), desired];
 }
@@ -243,7 +247,8 @@ function sessionContextHookEntry(
 }
 
 function isLangwatchHookEntry(entry: unknown): boolean {
-  if (!isPlainObject(entry) || !Array.isArray(entry.hooks)) return false;
+  if (!isPlainObject(entry)) return false;
+  if (!Array.isArray(entry.hooks)) return false;
   return entry.hooks.some((hook) => {
     if (!isPlainObject(hook)) return false;
     const command = hook.command;

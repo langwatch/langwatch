@@ -190,12 +190,8 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
 function isWellFormedCliKeyScope(scope: GovernanceConfig["cli_api_key_scope"]): boolean {
   if (!scope) return false;
   if (scope.kind !== "organization" && scope.kind !== "projects") return false;
-  if (
-    !Array.isArray(scope.project_ids) ||
-    !scope.project_ids.every((id) => typeof id === "string")
-  ) {
-    return false;
-  }
+  if (!Array.isArray(scope.project_ids)) return false;
+  if (!scope.project_ids.every((id) => typeof id === "string")) return false;
   // An organization scope carries no project ids by definition. A scope
   // holding both would have `whoami` report "whole organization" while the
   // list says otherwise, so refuse it as malformed.

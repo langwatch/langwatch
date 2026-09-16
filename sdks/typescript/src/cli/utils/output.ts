@@ -540,12 +540,14 @@ export const assertFormatIsSupported = async (
   // passes through. Narrowly, though: `-o yaml` and `--jq` are still beyond
   // it, so those stay refusable (owning `--json` proves ITS json, not every
   // format).
-  if (
-    ownsOwnJsonFlag(actionCommand) &&
-    actionCommand.optsWithGlobals().output === undefined &&
-    actionCommand.optsWithGlobals().jq === undefined
-  ) {
-    return resolved;
+  if (ownsOwnJsonFlag(actionCommand)) {
+    const globalOpts = actionCommand.optsWithGlobals();
+
+    if (globalOpts.output === undefined) {
+      if (globalOpts.jq === undefined) {
+        return resolved;
+      }
+    }
   }
 
   const raw: RawOutputFlags = actionCommand.optsWithGlobals();

@@ -59,25 +59,32 @@ export const updateWebhookCommand = async (
         }
       : {}),
   };
-  if (
-    options.url === undefined &&
-    Object.keys(sqsFields).length === 0 &&
-    options.events === undefined &&
-    options.maxBatchSize === undefined &&
-    options.maxBatchDelay === undefined &&
-    options.maxInFlight === undefined
-  ) {
-    console.error(
-      "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
-    );
-    process.exit(1);
+  if (options.url === undefined) {
+    if (Object.keys(sqsFields).length === 0) {
+      if (options.events === undefined) {
+        if (options.maxBatchSize === undefined) {
+          if (options.maxBatchDelay === undefined) {
+            if (options.maxInFlight === undefined) {
+              console.error(
+                "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+              );
+              process.exit(1);
+            }
+          }
+        }
+      }
+    }
   }
   // Number("abc") is NaN and JSON.stringify turns NaN into null, so loose
   // parsing here would ship a null patch the server cannot bound-check.
   const parseIntOption = (value: string | undefined, flag: string): number | undefined => {
     if (value === undefined) return undefined;
     const parsed = Number(value);
-    if (!Number.isInteger(parsed) || value.trim() === "") {
+    if (!Number.isInteger(parsed)) {
+      console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
+      process.exit(1);
+    }
+    if (value.trim() === "") {
       console.error(`Invalid ${flag} value: ${value} (expected an integer)`);
       process.exit(1);
     }

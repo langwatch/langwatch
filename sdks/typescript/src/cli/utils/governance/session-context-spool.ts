@@ -127,15 +127,11 @@ function parseEntry(file: string): SpooledDeclaration | null {
     const sessionId = record.session_id;
     const fingerprint = record.fingerprint;
     const queuedAtMs = record.queued_at_ms;
-    if (
-      typeof agent !== "string" ||
-      typeof sessionId !== "string" ||
-      typeof fingerprint !== "string" ||
-      typeof queuedAtMs !== "number" ||
-      record.payload === undefined
-    ) {
-      return null;
-    }
+    if (typeof agent !== "string") return null;
+    if (typeof sessionId !== "string") return null;
+    if (typeof fingerprint !== "string") return null;
+    if (typeof queuedAtMs !== "number") return null;
+    if (record.payload === undefined) return null;
     return {
       agent,
       sessionId,

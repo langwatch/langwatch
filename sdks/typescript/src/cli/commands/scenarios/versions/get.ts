@@ -20,7 +20,19 @@ export const getScenarioVersionCommand = async (
   // so the command would silently read a version nobody asked for. The REST
   // layer answers 422 for the same input, and the CLI refuses it the same way.
   const versionNumber = Number(version.trim());
-  if (version.trim() === "" || !Number.isInteger(versionNumber) || versionNumber < 1) {
+  if (version.trim() === "") {
+    console.error(
+      chalk.red(`Error: "${version}" is not a version number. Use a whole number, e.g. 2.`),
+    );
+    process.exit(1);
+  }
+  if (!Number.isInteger(versionNumber)) {
+    console.error(
+      chalk.red(`Error: "${version}" is not a version number. Use a whole number, e.g. 2.`),
+    );
+    process.exit(1);
+  }
+  if (versionNumber < 1) {
     console.error(
       chalk.red(`Error: "${version}" is not a version number. Use a whole number, e.g. 2.`),
     );

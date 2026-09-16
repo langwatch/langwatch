@@ -45,7 +45,22 @@ const MANAGED_MARKER_RE = /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\
  * interface a future caller could construct wrong. A violation throws.
  */
 const assertPathSafeSlug = (slug: string): void => {
-  if (slug === "" || slug.includes("/") || slug.includes("\\") || slug.includes("..")) {
+  if (slug === "") {
+    throw new Error(
+      `Refusing to build a skill path from slug ${JSON.stringify(slug)}: slugs must be a single path segment with no "/" or "..".`,
+    );
+  }
+  if (slug.includes("/")) {
+    throw new Error(
+      `Refusing to build a skill path from slug ${JSON.stringify(slug)}: slugs must be a single path segment with no "/" or "..".`,
+    );
+  }
+  if (slug.includes("\\")) {
+    throw new Error(
+      `Refusing to build a skill path from slug ${JSON.stringify(slug)}: slugs must be a single path segment with no "/" or "..".`,
+    );
+  }
+  if (slug.includes("..")) {
     throw new Error(
       `Refusing to build a skill path from slug ${JSON.stringify(slug)}: slugs must be a single path segment with no "/" or "..".`,
     );
@@ -153,8 +168,10 @@ const sweepOrphanedTemps = (dir: string, fileName: string): void => {
   const prefix = `.${fileName}.${process.pid}-`;
   try {
     for (const entry of fs.readdirSync(dir)) {
-      if (entry.startsWith(prefix) && entry.endsWith(".tmp")) {
-        fs.rmSync(path.join(dir, entry), { force: true });
+      if (entry.startsWith(prefix)) {
+        if (entry.endsWith(".tmp")) {
+          fs.rmSync(path.join(dir, entry), { force: true });
+        }
       }
     }
   } catch {

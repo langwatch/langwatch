@@ -91,15 +91,19 @@ function dynamicCompositionImports(source: ts.SourceFile): ts.CallExpression[] {
   const imports: ts.CallExpression[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      node.arguments[0] !== undefined &&
-      ts.isStringLiteral(node.arguments[0]) &&
-      node.arguments[0].text === "@langwatch/api/composition"
-    ) {
-      imports.push(node);
+    if (ts.isCallExpression(node)) {
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        if (node.arguments.length === 1) {
+          const firstArgument = node.arguments[0];
+          if (firstArgument !== undefined) {
+            if (ts.isStringLiteral(firstArgument)) {
+              if (firstArgument.text === "@langwatch/api/composition") {
+                imports.push(node);
+              }
+            }
+          }
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -133,7 +137,9 @@ function featureBindingAnalysis(
   const rawTrpcNames = new Set<string>();
 
   for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) continue;
+    if (!ts.isImportDeclaration(statement)) {
+      if (!ts.isExportDeclaration(statement)) continue;
+    }
 
     const moduleSpecifier = statement.moduleSpecifier;
     if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) continue;
@@ -178,17 +184,21 @@ function featureBindingAnalysis(
       }
     }
 
-    if (bindings && ts.isNamespaceImport(bindings) && isApiModuleSpecifier(specifier)) {
-      apiNamespaceNames.add(bindings.name.text);
-      bindingNames.add(`${bindings.name.text}.createTrpcHandlerBinding`);
+    if (bindings) {
+      if (ts.isNamespaceImport(bindings)) {
+        if (isApiModuleSpecifier(specifier)) {
+          apiNamespaceNames.add(bindings.name.text);
+          bindingNames.add(`${bindings.name.text}.createTrpcHandlerBinding`);
 
-      for (const builder of [
-        "createRestService",
-        "createTrpcService",
-        "createRestRouter",
-        "createTrpcRouter",
-      ]) {
-        apiBuilderNames.add(`${bindings.name.text}.${builder}`);
+          for (const builder of [
+            "createRestService",
+            "createTrpcService",
+            "createRestRouter",
+            "createTrpcRouter",
+          ]) {
+            apiBuilderNames.add(`${bindings.name.text}.${builder}`);
+          }
+        }
       }
     }
   }
@@ -297,7 +307,13 @@ export function featureServerTransportFindings(file: string, contents: string): 
           ? `${callee.expression.getText(source)}.${callee.name.text}`
           : "";
 
-      if (bindingNames.has(calleeText) || calleeText.endsWith(".createTrpcHandlerBinding")) {
+      if (bindingNames.has(calleeText)) {
+        report(
+          node,
+          "Feature server calls createTrpcHandlerBinding (ADR-133).",
+          "Create the process/framework handler binding in the application composition root; feature transports expose router declarations.",
+        );
+      } else if (calleeText.endsWith(".createTrpcHandlerBinding")) {
         report(
           node,
           "Feature server calls createTrpcHandlerBinding (ADR-133).",
@@ -305,25 +321,28 @@ export function featureServerTransportFindings(file: string, contents: string): 
         );
       }
 
-      if (ts.isIdentifier(callee) && rawTrpcNames.has(callee.text)) {
-        report(
-          node,
-          "Feature server calls initTRPC outside the process/framework root (ADR-133).",
-          "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
-        );
+      if (ts.isIdentifier(callee)) {
+        if (rawTrpcNames.has(callee.text)) {
+          report(
+            node,
+            "Feature server calls initTRPC outside the process/framework root (ADR-133).",
+            "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
+          );
+        }
       }
 
-      if (
-        ts.isPropertyAccessExpression(callee) &&
-        callee.name.text === "context" &&
-        ts.isIdentifier(callee.expression) &&
-        rawTrpcNames.has(callee.expression.text)
-      ) {
-        report(
-          node,
-          "Feature server calls initTRPC.context() outside the process/framework root (ADR-133).",
-          "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
-        );
+      if (ts.isPropertyAccessExpression(callee)) {
+        if (callee.name.text === "context") {
+          if (ts.isIdentifier(callee.expression)) {
+            if (rawTrpcNames.has(callee.expression.text)) {
+              report(
+                node,
+                "Feature server calls initTRPC.context() outside the process/framework root (ADR-133).",
+                "Create the tRPC root in the process/framework composition root and provide the configured procedures to the feature transport.",
+              );
+            }
+          }
+        }
       }
 
       if (isOutputBypass(node, isApiTransport)) {
@@ -351,17 +370,18 @@ export function featureServerTransportFindings(file: string, contents: string): 
       );
     }
 
-    if (
-      isApiTransport &&
-      ts.isPropertyAssignment(node) &&
-      node.name.getText(source) === "validateOutput" &&
-      node.initializer.kind === ts.SyntaxKind.FalseKeyword
-    ) {
-      report(
-        node,
-        "Feature transport disables output validation with validateOutput: false (ADR-133).",
-        "Declare the mandatory output schema and keep runtime validation enabled through @langwatch/api.",
-      );
+    if (isApiTransport) {
+      if (ts.isPropertyAssignment(node)) {
+        if (node.name.getText(source) === "validateOutput") {
+          if (node.initializer.kind === ts.SyntaxKind.FalseKeyword) {
+            report(
+              node,
+              "Feature transport disables output validation with validateOutput: false (ADR-133).",
+              "Declare the mandatory output schema and keep runtime validation enabled through @langwatch/api.",
+            );
+          }
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -408,13 +428,16 @@ function inspectHandler(
         )?.initializer
       : resolved;
 
-  if (
-    !resolvedHandler ||
-    (!ts.isArrowFunction(resolvedHandler) &&
-      !ts.isFunctionExpression(resolvedHandler) &&
-      !ts.isFunctionDeclaration(resolvedHandler))
-  )
+  if (!resolvedHandler) return;
+  if (ts.isArrowFunction(resolvedHandler)) {
+    // handled below
+  } else if (ts.isFunctionExpression(resolvedHandler)) {
+    // handled below
+  } else if (ts.isFunctionDeclaration(resolvedHandler)) {
+    // handled below
+  } else {
     return;
+  }
 
   const first = resolvedHandler.parameters[0];
   if (!first) return;
@@ -435,14 +458,16 @@ function inspectHandler(
 
       const property = element.propertyName ?? element.name;
 
-      if (ts.isIdentifier(property) && !ALLOWED_HANDLER_FIELDS.has(property.text)) {
-        report(
-          first,
-          `Handler receives raw context field "${property.text}" (ADR-133).`,
-          "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
-        );
+      if (ts.isIdentifier(property)) {
+        if (!ALLOWED_HANDLER_FIELDS.has(property.text)) {
+          report(
+            first,
+            `Handler receives raw context field "${property.text}" (ADR-133).`,
+            "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+          );
 
-        if (ts.isIdentifier(element.name)) rawNames.add(element.name.text);
+          if (ts.isIdentifier(element.name)) rawNames.add(element.name.text);
+        }
       }
     }
 
@@ -470,30 +495,31 @@ function handlerAliases(
   const names = new Set([root]);
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      node.initializer &&
-      ts.isIdentifier(node.initializer) &&
-      names.has(node.initializer.text)
-    ) {
-      if (ts.isIdentifier(node.name)) names.add(node.name.text);
+    if (ts.isVariableDeclaration(node)) {
+      if (node.initializer) {
+        if (ts.isIdentifier(node.initializer)) {
+          if (names.has(node.initializer.text)) {
+            if (ts.isIdentifier(node.name)) names.add(node.name.text);
 
-      if (ts.isObjectBindingPattern(node.name)) {
-        for (const element of node.name.elements) {
-          const property = element.propertyName ?? element.name;
+            if (ts.isObjectBindingPattern(node.name)) {
+              for (const element of node.name.elements) {
+                const property = element.propertyName ?? element.name;
 
-          if (
-            ts.isIdentifier(property) &&
-            !ALLOWED_HANDLER_FIELDS.has(property.text) &&
-            ts.isIdentifier(element.name)
-          ) {
-            report(
-              element,
-              `Handler receives raw context field "${property.text}" (ADR-133).`,
-              "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
-            );
+                if (ts.isIdentifier(property)) {
+                  if (!ALLOWED_HANDLER_FIELDS.has(property.text)) {
+                    if (ts.isIdentifier(element.name)) {
+                      report(
+                        element,
+                        `Handler receives raw context field "${property.text}" (ADR-133).`,
+                        "Handlers receive only { input, app, actor, scope, signal } from the API framework.",
+                      );
 
-            names.add(element.name.text);
+                      names.add(element.name.text);
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -513,19 +539,25 @@ function inspectRawContextBody(
   report: (node: ts.Node, message: string, allowed: string) => void,
 ): void {
   const visit = (node: ts.Node): void => {
-    const property = ts.isPropertyAccessExpression(node)
-      ? node.name.text
-      : ts.isElementAccessExpression(node) &&
-          node.argumentExpression &&
-          ts.isStringLiteral(node.argumentExpression)
-        ? node.argumentExpression.text
-        : undefined;
+    let property: string | undefined;
+    if (ts.isPropertyAccessExpression(node)) {
+      property = node.name.text;
+    } else if (ts.isElementAccessExpression(node)) {
+      if (node.argumentExpression && ts.isStringLiteral(node.argumentExpression)) {
+        property = node.argumentExpression.text;
+      }
+    }
 
-    const receiver =
-      (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
-      ts.isIdentifier(node.expression)
-        ? node.expression.text
-        : undefined;
+    let receiver: string | undefined;
+    if (ts.isPropertyAccessExpression(node)) {
+      if (ts.isIdentifier(node.expression)) {
+        receiver = node.expression.text;
+      }
+    } else if (ts.isElementAccessExpression(node)) {
+      if (ts.isIdentifier(node.expression)) {
+        receiver = node.expression.text;
+      }
+    }
 
     if (receiver === name && property && RAW_CONTEXT_FIELDS.has(property)) {
       report(
@@ -566,15 +598,15 @@ function importFindings(
   report: (finding: Omit<Finding, "file">) => void,
 ): void {
   for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) {
-      continue;
-    }
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
     const specifier = statement.moduleSpecifier.text;
     const line = source.getLineAndCharacterOfPosition(statement.getStart(source)).line + 1;
     const names = importedBindings(statement);
 
-    if (specifier.split("/").includes("rbac")) {
+    const specifierSegments = specifier.split("/");
+    if (specifierSegments.includes("rbac")) {
       report({
         line,
         message: `Transport file imports the legacy RBAC module "${specifier}".`,
@@ -606,12 +638,16 @@ function importFindings(
       }
     }
 
-    if (surface === "trpc" && specifier.startsWith("@trpc/server") && names.includes("initTRPC")) {
-      report({
-        line,
-        message: "tRPC transport calls initTRPC; a feature must not create a second root.",
-        allowed: "Build on the process's root and procedure, which the mount hands over.",
-      });
+    if (surface === "trpc") {
+      if (specifier.startsWith("@trpc/server")) {
+        if (names.includes("initTRPC")) {
+          report({
+            line,
+            message: "tRPC transport calls initTRPC; a feature must not create a second root.",
+            allowed: "Build on the process's root and procedure, which the mount hands over.",
+          });
+        }
+      }
     }
   }
 }
@@ -625,18 +661,19 @@ function nodeFindings(
     source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isIdentifier(node) &&
-      LEGACY_RBAC_IDENTIFIERS.has(node.text) &&
-      !ts.isImportSpecifier(node.parent) &&
-      !ts.isPropertyAssignment(node.parent)
-    ) {
-      report({
-        line: lineOf(node),
-        message: `Transport file names the legacy RBAC identifier ${node.text}.`,
-        allowed:
-          "Ask AuthZ for the permission the procedure declares; a role enum is not an access declaration.",
-      });
+    if (ts.isIdentifier(node)) {
+      if (LEGACY_RBAC_IDENTIFIERS.has(node.text)) {
+        if (!ts.isImportSpecifier(node.parent)) {
+          if (!ts.isPropertyAssignment(node.parent)) {
+            report({
+              line: lineOf(node),
+              message: `Transport file names the legacy RBAC identifier ${node.text}.`,
+              allowed:
+                "Ask AuthZ for the permission the procedure declares; a role enum is not an access declaration.",
+            });
+          }
+        }
+      }
     }
 
     const constructsRawApp =
@@ -645,13 +682,17 @@ function nodeFindings(
       ts.isIdentifier(node.expression) &&
       RAW_APP_CONSTRUCTORS.has(node.expression.text);
 
-    if (constructsRawApp && ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
-      report({
-        line: lineOf(node),
-        message: `REST transport constructs ${node.expression.text} of its own.`,
-        allowed:
-          "Build the family with createRestService; mounting the Hono app is the process's job.",
-      });
+    if (constructsRawApp) {
+      if (ts.isNewExpression(node)) {
+        if (ts.isIdentifier(node.expression)) {
+          report({
+            line: lineOf(node),
+            message: `REST transport constructs ${node.expression.text} of its own.`,
+            allowed:
+              "Build the family with createRestService; mounting the Hono app is the process's job.",
+          });
+        }
+      }
     }
 
     if (surface === "trpc" && ts.isCallExpression(node)) {
@@ -793,7 +834,8 @@ function scriptKind(file: string): ts.ScriptKind {
 
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
 
-  if (file.endsWith(".mjs") || file.endsWith(".cjs")) return ts.ScriptKind.JS;
+  if (file.endsWith(".mjs")) return ts.ScriptKind.JS;
+  if (file.endsWith(".cjs")) return ts.ScriptKind.JS;
 
   return ts.ScriptKind.TS;
 }
@@ -860,39 +902,42 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
   const references: ImportReference[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      references.push({
-        node,
-        specifier: node.moduleSpecifier.text,
-        importedNames: importedNames(node),
-      });
+    if (ts.isImportDeclaration(node)) {
+      if (ts.isStringLiteral(node.moduleSpecifier)) {
+        references.push({
+          node,
+          specifier: node.moduleSpecifier.text,
+          importedNames: importedNames(node),
+        });
 
-      return;
+        return;
+      }
     }
 
-    if (
-      ts.isExportDeclaration(node) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      references.push({ node, specifier: node.moduleSpecifier.text, importedNames: [] });
+    if (ts.isExportDeclaration(node)) {
+      if (node.moduleSpecifier) {
+        if (ts.isStringLiteral(node.moduleSpecifier)) {
+          references.push({ node, specifier: node.moduleSpecifier.text, importedNames: [] });
 
-      return;
+          return;
+        }
+      }
     }
 
-    if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference) &&
-      node.moduleReference.expression &&
-      ts.isStringLiteral(node.moduleReference.expression)
-    ) {
-      references.push({
-        node,
-        specifier: node.moduleReference.expression.text,
-        importedNames: [node.name.text],
-      });
+    if (ts.isImportEqualsDeclaration(node)) {
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        if (node.moduleReference.expression) {
+          if (ts.isStringLiteral(node.moduleReference.expression)) {
+            references.push({
+              node,
+              specifier: node.moduleReference.expression.text,
+              importedNames: [node.name.text],
+            });
 
-      return;
+            return;
+          }
+        }
+      }
     }
 
     if (ts.isCallExpression(node)) {
@@ -900,8 +945,12 @@ function importReferences(source: ts.SourceFile): ImportReference[] {
       const requireCall = ts.isIdentifier(node.expression) && node.expression.text === "require";
       const firstArgument = node.arguments[0];
 
-      if ((dynamicImport || requireCall) && firstArgument && ts.isStringLiteral(firstArgument)) {
-        references.push({ node, specifier: firstArgument.text, importedNames: [] });
+      if (dynamicImport || requireCall) {
+        if (firstArgument) {
+          if (ts.isStringLiteral(firstArgument)) {
+            references.push({ node, specifier: firstArgument.text, importedNames: [] });
+          }
+        }
       }
     }
 
@@ -928,18 +977,16 @@ function forbiddenImportReason(
 
   if (importsRepository) return "repository";
 
-  if (
-    specifier === "@prisma/client" ||
-    specifier.startsWith("@prisma/") ||
-    specifier === "@langwatch/prisma-client" ||
-    specifier.startsWith("@langwatch/prisma-client/")
-  ) {
+  if (specifier === "@prisma/client") return "Prisma or a generated database client";
+  if (specifier.startsWith("@prisma/")) return "Prisma or a generated database client";
+  if (specifier === "@langwatch/prisma-client") return "Prisma or a generated database client";
+  if (specifier.startsWith("@langwatch/prisma-client/")) {
     return "Prisma or a generated database client";
   }
 
-  if (basename === "env" || segments.includes("env") || /(?:^|[.-])env$/.test(basename)) {
-    return "environment module";
-  }
+  if (basename === "env") return "environment module";
+  if (segments.includes("env")) return "environment module";
+  if (/(?:^|[.-])env$/.test(basename)) return "environment module";
 
   const appImplementation =
     specifier.startsWith("~/server/") ||
@@ -955,8 +1002,11 @@ function forbiddenImportReason(
 
 function declarationName(node: ts.NamedDeclaration): string | null {
   const name = node.name;
+  if (!name) return null;
+  if (ts.isIdentifier(name)) return name.text;
+  if (ts.isStringLiteral(name)) return name.text;
 
-  return name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : null;
+  return null;
 }
 
 function typeName(node: ts.TypeNode | undefined): string | null {
@@ -997,13 +1047,14 @@ function localFunctions(source: ts.SourceFile): ReadonlyMap<string, ts.FunctionL
 
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (
-          ts.isIdentifier(declaration.name) &&
-          declaration.initializer &&
-          (ts.isArrowFunction(declaration.initializer) ||
-            ts.isFunctionExpression(declaration.initializer))
-        ) {
-          add(declaration.name.text, declaration.initializer);
+        if (ts.isIdentifier(declaration.name)) {
+          if (declaration.initializer) {
+            if (ts.isArrowFunction(declaration.initializer)) {
+              add(declaration.name.text, declaration.initializer);
+            } else if (ts.isFunctionExpression(declaration.initializer)) {
+              add(declaration.name.text, declaration.initializer);
+            }
+          }
         }
       }
 
@@ -1027,22 +1078,21 @@ function handlerForEndpoint(
   call: ts.CallExpression,
   functions: ReadonlyMap<string, ts.FunctionLikeDeclaration>,
 ): ts.FunctionLikeDeclaration | null {
-  if (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "handle") {
-    return resolveHandler(call.arguments[0], functions);
+  if (ts.isPropertyAccessExpression(call.expression)) {
+    const methodName = call.expression.name.text;
+
+    if (methodName === "handle") {
+      return resolveHandler(call.arguments[0], functions);
+    }
+    if (methodName === "registerRoute") {
+      return resolveHandler(call.arguments[3], functions);
+    }
+    if (methodName === "register") {
+      return resolveHandler(call.arguments[2], functions);
+    }
   }
 
-  if (
-    ts.isPropertyAccessExpression(call.expression) &&
-    call.expression.name.text === "registerRoute"
-  ) {
-    return resolveHandler(call.arguments[3], functions);
-  }
-
-  if (!ts.isPropertyAccessExpression(call.expression) || call.expression.name.text !== "register") {
-    return null;
-  }
-
-  return resolveHandler(call.arguments[2], functions);
+  return null;
 }
 
 function handlerRegistration(
@@ -1050,11 +1100,13 @@ function handlerRegistration(
 ): { candidate: ts.Expression; fluent: boolean } | null {
   if (!ts.isPropertyAccessExpression(call.expression)) return null;
 
-  if (call.expression.name.text === "handle" && call.arguments[0] && isFluentEndpointHandle(call)) {
+  const methodName = call.expression.name.text;
+
+  if (methodName === "handle" && call.arguments[0] && isFluentEndpointHandle(call)) {
     return { candidate: call.arguments[0], fluent: true };
   }
 
-  if (call.expression.name.text === "registerRoute" && call.arguments[3]) {
+  if (methodName === "registerRoute" && call.arguments[3]) {
     return { candidate: call.arguments[3], fluent: false };
   }
 
@@ -1080,8 +1132,12 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 
   let receiver: ts.Expression = call.expression.expression;
 
-  while (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)) {
-    if (FLUENT_ENDPOINT_METHODS.has(receiver.expression.name.text)) return true;
+  while (true) {
+    if (!ts.isCallExpression(receiver)) break;
+    if (!ts.isPropertyAccessExpression(receiver.expression)) break;
+
+    const methodName = receiver.expression.name.text;
+    if (FLUENT_ENDPOINT_METHODS.has(methodName)) return true;
 
     receiver = receiver.expression.expression;
   }
@@ -1090,19 +1146,22 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 
   while (current.parent) {
     current = current.parent;
-    if (!ts.isArrowFunction(current) && !ts.isFunctionExpression(current)) continue;
+    if (!ts.isArrowFunction(current)) {
+      if (!ts.isFunctionExpression(current)) continue;
+    }
 
     const parent = current.parent;
 
-    if (
-      ts.isCallExpression(parent) &&
-      ts.isPropertyAccessExpression(parent.expression) &&
-      new Set(["delete", "get", "patch", "post", "put", "register"]).has(
-        parent.expression.name.text,
-      ) &&
-      parent.arguments.includes(current)
-    ) {
-      return true;
+    if (ts.isCallExpression(parent)) {
+      if (ts.isPropertyAccessExpression(parent.expression)) {
+        const methodName = parent.expression.name.text;
+
+        if (new Set(["delete", "get", "patch", "post", "put", "register"]).has(methodName)) {
+          if (parent.arguments.includes(current)) {
+            return true;
+          }
+        }
+      }
     }
   }
 
@@ -1112,13 +1171,25 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 function unwrapHandlerExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
 
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isTypeAssertionExpression(current) ||
-    ts.isSatisfiesExpression(current)
-  ) {
-    current = current.expression;
+  while (true) {
+    if (ts.isParenthesizedExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    if (ts.isAsExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    if (ts.isTypeAssertionExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    if (ts.isSatisfiesExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+
+    break;
   }
 
   return current;
@@ -1166,12 +1237,14 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       for (const element of first.name.elements) {
         const key = element.propertyName ?? element.name;
 
-        if (ts.isIdentifier(key) && !allowedContextFields.has(key.text)) {
-          report(
-            element,
-            `Handler receives raw context field "${key.text}" (ADR-133).`,
-            "Handlers receive only { input, app, actor, scope, signal }; request authentication and response shaping belong to framework middleware.",
-          );
+        if (ts.isIdentifier(key)) {
+          if (!allowedContextFields.has(key.text)) {
+            report(
+              element,
+              `Handler receives raw context field "${key.text}" (ADR-133).`,
+              "Handlers receive only { input, app, actor, scope, signal }; request authentication and response shaping belong to framework middleware.",
+            );
+          }
         }
       }
     }
@@ -1188,114 +1261,144 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       const path = propertyPath(expression);
       if (path && path.length === 1 && aliases.has(path[0]!)) return true;
 
-      if (
-        ts.isElementAccessExpression(expression) &&
-        expression.argumentExpression &&
-        ts.isStringLiteral(expression.argumentExpression)
-      ) {
-        const parent = propertyPath(expression.expression);
+      if (ts.isElementAccessExpression(expression)) {
+        if (expression.argumentExpression) {
+          if (ts.isStringLiteral(expression.argumentExpression)) {
+            const parent = propertyPath(expression.expression);
 
-        return Boolean(parent && parent.length === 1 && aliases.has(parent[0]!));
+            return Boolean(parent && parent.length === 1 && aliases.has(parent[0]!));
+          }
+        }
       }
 
       return false;
     };
 
     const directContextMemberName = (expression: ts.Expression): string | null => {
-      if (
-        ts.isPropertyAccessExpression(expression) &&
-        pathIsDirectContextMember(expression.expression)
-      ) {
-        return expression.name.text;
+      if (ts.isPropertyAccessExpression(expression)) {
+        if (pathIsDirectContextMember(expression.expression)) {
+          return expression.name.text;
+        }
       }
 
-      if (
-        ts.isElementAccessExpression(expression) &&
-        expression.argumentExpression &&
-        ts.isStringLiteral(expression.argumentExpression) &&
-        pathIsDirectContextMember(expression.expression)
-      ) {
-        return expression.argumentExpression.text;
+      if (ts.isElementAccessExpression(expression)) {
+        if (expression.argumentExpression) {
+          if (ts.isStringLiteral(expression.argumentExpression)) {
+            if (pathIsDirectContextMember(expression.expression)) {
+              return expression.argumentExpression.text;
+            }
+          }
+        }
       }
 
       return null;
     };
 
-    const visit = (node: ts.Node): void => {
-      if (ts.isVariableDeclaration(node) && node.initializer && ts.isIdentifier(node.name)) {
-        if (pathStartsAtContext(node.initializer)) aliases.add(node.name.text);
+    const inspectContextMemberAccess = (
+      node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+    ): void => {
+      const member = directContextMemberName(node);
+
+      let propertyName: string | null;
+      if (ts.isPropertyAccessExpression(node)) {
+        propertyName = node.name.text;
+      } else if (ts.isStringLiteral(node.argumentExpression)) {
+        propertyName = node.argumentExpression.text;
+      } else {
+        propertyName = null;
       }
 
-      if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-        const member = directContextMemberName(node);
-
-        const propertyName = ts.isPropertyAccessExpression(node)
-          ? node.name.text
-          : ts.isStringLiteral(node.argumentExpression)
-            ? node.argumentExpression.text
-            : null;
-
-        if ((member && rawFields.has(member)) || propertyName === "headers") {
-          report(
-            node,
-            propertyName === "headers"
-              ? `Handler accesses transport headers through ${node.getText(source)} (ADR-133).`
-              : `Handler reaches raw request context through ${node.getText(source)} (ADR-133).`,
-            "Handlers receive parsed domain input only; authentication, request headers and response shaping belong to framework middleware.",
-          );
-        }
-      }
-
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
-        const member = directContextMemberName(node.expression);
-        const methodName = node.expression.name.text;
-
-        if (transportMethods.has(methodName)) {
-          report(
-            node,
-            `Handler calls transport response method ${methodName}() (ADR-133).`,
-            "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
-          );
-        }
-      }
-
-      if (
-        ts.isNewExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        node.expression.text === "Response"
-      ) {
+      if ((member && rawFields.has(member)) || propertyName === "headers") {
         report(
           node,
-          "Handler constructs a raw Response (ADR-133).",
-          "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
+          propertyName === "headers"
+            ? `Handler accesses transport headers through ${node.getText(source)} (ADR-133).`
+            : `Handler reaches raw request context through ${node.getText(source)} (ADR-133).`,
+          "Handlers receive parsed domain input only; authentication, request headers and response shaping belong to framework middleware.",
         );
+      }
+    };
+
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node)) {
+        if (node.initializer) {
+          if (ts.isIdentifier(node.name)) {
+            if (pathStartsAtContext(node.initializer)) aliases.add(node.name.text);
+          }
+        }
+      }
+
+      if (ts.isPropertyAccessExpression(node)) {
+        inspectContextMemberAccess(node);
+      } else if (ts.isElementAccessExpression(node)) {
+        inspectContextMemberAccess(node);
+      }
+
+      if (ts.isCallExpression(node)) {
+        if (ts.isPropertyAccessExpression(node.expression)) {
+          const methodName = node.expression.name.text;
+
+          if (transportMethods.has(methodName)) {
+            report(
+              node,
+              `Handler calls transport response method ${methodName}() (ADR-133).`,
+              "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
+            );
+          }
+        }
+      }
+
+      if (ts.isNewExpression(node)) {
+        if (ts.isIdentifier(node.expression)) {
+          if (node.expression.text === "Response") {
+            report(
+              node,
+              "Handler constructs a raw Response (ADR-133).",
+              "Return a declared JSON object/array or void; text, SSE and other response shapes require an explicit custom framework integration outside the handler.",
+            );
+          }
+        }
       }
 
       if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-        if (
-          (ts.isPropertyAccessExpression(node.left) || ts.isElementAccessExpression(node.left)) &&
-          directContextMemberName(node.left)
-        ) {
-          report(
-            node,
-            `Handler mutates transport response state through ${node.left.getText(source)} (ADR-133).`,
-            "Declare status and headers on the fluent endpoint or middleware.",
-          );
+        if (ts.isPropertyAccessExpression(node.left)) {
+          if (directContextMemberName(node.left)) {
+            report(
+              node,
+              `Handler mutates transport response state through ${node.left.getText(source)} (ADR-133).`,
+              "Declare status and headers on the fluent endpoint or middleware.",
+            );
+          }
+        } else if (ts.isElementAccessExpression(node.left)) {
+          if (directContextMemberName(node.left)) {
+            report(
+              node,
+              `Handler mutates transport response state through ${node.left.getText(source)} (ADR-133).`,
+              "Declare status and headers on the fluent endpoint or middleware.",
+            );
+          }
         }
       }
 
       if (ts.isReturnStatement(node) && node.expression) {
         const expression = node.expression;
 
-        if (
-          (ts.isIdentifier(expression) && expression.text === "NO_CONTENT") ||
-          (ts.isPropertyAccessExpression(expression) && expression.name.text === "NO_CONTENT")
-        ) {
-          report(
-            expression,
-            "Handler returns the NO_CONTENT sentinel (ADR-133).",
-            "Return void (or await a void service method) for an empty response; NO_CONTENT is not a transport value.",
-          );
+        if (ts.isIdentifier(expression)) {
+          if (expression.text === "NO_CONTENT") {
+            report(
+              expression,
+              "Handler returns the NO_CONTENT sentinel (ADR-133).",
+              "Return void (or await a void service method) for an empty response; NO_CONTENT is not a transport value.",
+            );
+          }
+        } else if (ts.isPropertyAccessExpression(expression)) {
+          if (expression.name.text === "NO_CONTENT") {
+            report(
+              expression,
+              "Handler returns the NO_CONTENT sentinel (ADR-133).",
+              "Return void (or await a void service method) for an empty response; NO_CONTENT is not a transport value.",
+            );
+          }
         }
       }
 
@@ -1318,12 +1421,14 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
             "Legacy registerRoute handler bypasses the fluent endpoint boundary.",
             "Declare the endpoint with the fluent API so verb, input, output, permissions and the inline handler form one typed chain.",
           );
-        } else if (!ts.isArrowFunction(inline) && !ts.isFunctionExpression(inline)) {
-          report(
-            registration.candidate,
-            "Fluent endpoint handler must be an inline function.",
-            "Keep the handler next to its endpoint verb, input, output and permission declarations so the complete boundary is reviewable.",
-          );
+        } else if (!ts.isArrowFunction(inline)) {
+          if (!ts.isFunctionExpression(inline)) {
+            report(
+              registration.candidate,
+              "Fluent endpoint handler must be an inline function.",
+              "Keep the handler next to its endpoint verb, input, output and permission declarations so the complete boundary is reviewable.",
+            );
+          }
         }
 
         const handler = resolveHandler(registration.candidate, functions);
@@ -1347,7 +1452,8 @@ function resolveHandler(
 
   candidate = unwrapHandlerExpression(candidate);
 
-  if (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate)) return candidate;
+  if (ts.isArrowFunction(candidate)) return candidate;
+  if (ts.isFunctionExpression(candidate)) return candidate;
 
   if (ts.isIdentifier(candidate)) return functions.get(candidate.text) ?? null;
 
@@ -1355,13 +1461,16 @@ function resolveHandler(
     return functions.get(candidate.name.text) ?? null;
   }
 
-  if (
-    ts.isCallExpression(candidate) &&
-    ts.isPropertyAccessExpression(candidate.expression) &&
-    candidate.expression.name.text === "bind" &&
-    ts.isPropertyAccessExpression(candidate.expression.expression)
-  ) {
-    return functions.get(candidate.expression.expression.name.text) ?? null;
+  if (ts.isCallExpression(candidate)) {
+    if (ts.isPropertyAccessExpression(candidate.expression)) {
+      const methodName = candidate.expression.name.text;
+
+      if (methodName === "bind") {
+        if (ts.isPropertyAccessExpression(candidate.expression.expression)) {
+          return functions.get(candidate.expression.expression.name.text) ?? null;
+        }
+      }
+    }
   }
 
   return null;
@@ -1386,9 +1495,10 @@ function serviceOrRepositoryConstruction(
     return SERVICE_OR_REPOSITORY_FACTORY.test(canonicalName) ? canonicalName : null;
   }
 
-  if (!ts.isPropertyAccessExpression(node.expression) || node.expression.name.text !== "create") {
-    return null;
-  }
+  if (!ts.isPropertyAccessExpression(node.expression)) return null;
+
+  const methodName = node.expression.name.text;
+  if (methodName !== "create") return null;
 
   const localName = expressionName(node.expression.expression);
   const canonicalName = localName ? (importedCanonicalNames.get(localName) ?? localName) : null;
@@ -1498,7 +1608,9 @@ function serviceAliases(handler: ts.FunctionLikeDeclaration): ReadonlySet<string
 
       const key = element.propertyName ?? element.name;
 
-      if (ts.isIdentifier(key) || ts.isStringLiteral(key)) {
+      if (ts.isIdentifier(key)) {
+        bind(element.name, [...path, key.text]);
+      } else if (ts.isStringLiteral(key)) {
         bind(element.name, [...path, key.text]);
       }
     }
@@ -1571,9 +1683,11 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
       const nested = nestedFunction || entersNestedFunction;
       if (!nested && isDomainControlFlow(node)) controlFlow.push(node);
 
-      if (ts.isCallExpression(node) && isCanonicalServiceCall(node, contextNames, aliases)) {
-        serviceCalls.push(node);
-        if (nested) nestedServiceCalls.push(node);
+      if (ts.isCallExpression(node)) {
+        if (isCanonicalServiceCall(node, contextNames, aliases)) {
+          serviceCalls.push(node);
+          if (nested) nestedServiceCalls.push(node);
+        }
       }
 
       ts.forEachChild(node, (child) => visit(child, nested));
@@ -1620,15 +1734,19 @@ function handlerShapeViolations(file: string, source: ts.SourceFile): Architectu
       });
     }
 
-    if (ts.isBlock(handler.body) && handler.body.statements.length > HANDLER_STATEMENT_LIMIT) {
-      violations.push({
-        policy: "api-transport-handler-shape",
-        file,
-        line: source.getLineAndCharacterOfPosition(handler.body.getStart(source)).line + 1,
-        message: `Endpoint handler has ${handler.body.statements.length} top-level statements; the transport ceiling is ${HANDLER_STATEMENT_LIMIT}.`,
-        allowed:
-          "Keep the handler to authorization, one service call and optional pure response mapping. Declare rate/resource limits through the transport builder or middleware.",
-      });
+    if (ts.isBlock(handler.body)) {
+      const statementCount = handler.body.statements.length;
+
+      if (statementCount > HANDLER_STATEMENT_LIMIT) {
+        violations.push({
+          policy: "api-transport-handler-shape",
+          file,
+          line: source.getLineAndCharacterOfPosition(handler.body.getStart(source)).line + 1,
+          message: `Endpoint handler has ${statementCount} top-level statements; the transport ceiling is ${HANDLER_STATEMENT_LIMIT}.`,
+          allowed:
+            "Keep the handler to authorization, one service call and optional pure response mapping. Declare rate/resource limits through the transport builder or middleware.",
+        });
+      }
     }
   };
 
@@ -1650,13 +1768,9 @@ function honoBindings(source: ts.SourceFile): ReadonlySet<string> {
   const bindings = new Set<string>();
 
   for (const statement of source.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier) ||
-      statement.moduleSpecifier.text !== "hono"
-    ) {
-      continue;
-    }
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    if (statement.moduleSpecifier.text !== "hono") continue;
 
     const clause = statement.importClause;
     if (clause?.name) bindings.add(clause.name.text);
@@ -1681,23 +1795,30 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
   const receivers = new Set<string>();
 
   const collect = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      ts.isNewExpression(node.initializer) &&
-      ts.isIdentifier(node.initializer.expression) &&
-      honoTypes.has(node.initializer.expression.text)
-    ) {
-      receivers.add(node.name.text);
+    if (ts.isVariableDeclaration(node)) {
+      if (ts.isIdentifier(node.name)) {
+        if (node.initializer) {
+          if (ts.isNewExpression(node.initializer)) {
+            if (ts.isIdentifier(node.initializer.expression)) {
+              const constructorName = node.initializer.expression.text;
+
+              if (honoTypes.has(constructorName)) {
+                receivers.add(node.name.text);
+              }
+            }
+          }
+        }
+      }
     }
 
-    if (
-      ts.isParameter(node) &&
-      ts.isIdentifier(node.name) &&
-      honoTypes.has(typeName(node.type) ?? "")
-    ) {
-      receivers.add(node.name.text);
+    if (ts.isParameter(node)) {
+      if (ts.isIdentifier(node.name)) {
+        const parameterTypeName = typeName(node.type) ?? "";
+
+        if (honoTypes.has(parameterTypeName)) {
+          receivers.add(node.name.text);
+        }
+      }
     }
 
     ts.forEachChild(node, collect);
@@ -1708,21 +1829,27 @@ function rawHonoViolations(file: string, source: ts.SourceFile): ArchitectureVio
   const violations: ArchitectureViolation[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      RAW_HONO_METHODS.has(node.expression.name.text) &&
-      ts.isIdentifier(node.expression.expression) &&
-      receivers.has(node.expression.expression.text)
-    ) {
-      violations.push({
-        policy: "api-transport-builder",
-        file,
-        line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
-        message: `Strict feature API registers raw Hono route ${node.expression.name.text}().`,
-        allowed:
-          "Define the endpoint with @langwatch/api and leave Hono mounting to application composition.",
-      });
+    if (ts.isCallExpression(node)) {
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        const methodName = node.expression.name.text;
+
+        if (RAW_HONO_METHODS.has(methodName)) {
+          if (ts.isIdentifier(node.expression.expression)) {
+            const receiverName = node.expression.expression.text;
+
+            if (receivers.has(receiverName)) {
+              violations.push({
+                policy: "api-transport-builder",
+                file,
+                line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+                message: `Strict feature API registers raw Hono route ${methodName}().`,
+                allowed:
+                  "Define the endpoint with @langwatch/api and leave Hono mounting to application composition.",
+              });
+            }
+          }
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -1757,13 +1884,14 @@ function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
     return node.name.text === "query" || node.name.text === "mutate" ? node.name.text : null;
   }
 
-  if (
-    ts.isElementAccessExpression(node) &&
-    node.argumentExpression &&
-    ts.isStringLiteral(node.argumentExpression) &&
-    (node.argumentExpression.text === "query" || node.argumentExpression.text === "mutate")
-  ) {
-    return node.argumentExpression.text;
+  if (ts.isElementAccessExpression(node)) {
+    if (node.argumentExpression) {
+      if (ts.isStringLiteral(node.argumentExpression)) {
+        const key = node.argumentExpression.text;
+
+        if (key === "query" || key === "mutate") return key;
+      }
+    }
   }
 
   return null;
@@ -1772,54 +1900,73 @@ function stringDispatchMember(node: ts.Expression): "query" | "mutate" | null {
 function stringLocatorViolations(file: string, source: ts.SourceFile): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
 
+  const inspectMethodDispatch = (node: ts.MethodDeclaration | ts.MethodSignature): void => {
+    const methodName = declarationName(node);
+    if (methodName !== "query" && methodName !== "mutate") return;
+    if (!parameterIsString(node.parameters[0])) return;
+    if (!returnsPromise(node.type)) return;
+
+    violations.push({
+      policy: "api-transport-service-locator",
+      file,
+      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      message: `API transport exposes generic ${methodName}(path: string, ...) dispatch.`,
+      allowed:
+        "Expose semantic service methods or a typed generated transport client; procedure paths must be compiler-checked.",
+    });
+  };
+
+  const inspectFunctionPropertyDispatch = (
+    node: ts.PropertyDeclaration | ts.PropertySignature,
+  ): void => {
+    const propertyName = declarationName(node);
+    if (propertyName !== "query" && propertyName !== "mutate") return;
+    if (node.type === void 0) return;
+    if (!ts.isFunctionTypeNode(node.type)) return;
+    const dispatchType = node.type;
+    if (!parameterIsString(dispatchType.parameters[0])) return;
+    if (!returnsPromise(dispatchType.type)) return;
+
+    violations.push({
+      policy: "api-transport-service-locator",
+      file,
+      line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      message: `API transport exposes generic ${propertyName}(path: string, ...) dispatch.`,
+      allowed:
+        "Expose semantic service methods or a typed generated transport client; procedure paths must be compiler-checked.",
+    });
+  };
+
   const visit = (node: ts.Node): void => {
-    const isMethod = ts.isMethodDeclaration(node) || ts.isMethodSignature(node);
-    const methodName = isMethod ? declarationName(node) : null;
-
-    const isFunctionProperty =
-      (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) &&
-      (declarationName(node) === "query" || declarationName(node) === "mutate") &&
-      node.type !== void 0 &&
-      ts.isFunctionTypeNode(node.type);
-
-    const functionPropertyName = isFunctionProperty ? declarationName(node) : null;
-
-    if (
-      (isMethod &&
-        (methodName === "query" || methodName === "mutate") &&
-        parameterIsString(node.parameters[0]) &&
-        returnsPromise(node.type)) ||
-      (isFunctionProperty &&
-        parameterIsString(node.type.parameters[0]) &&
-        returnsPromise(node.type.type))
-    ) {
-      const dispatchName = methodName ?? functionPropertyName;
-
-      violations.push({
-        policy: "api-transport-service-locator",
-        file,
-        line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
-        message: `API transport exposes generic ${dispatchName}(path: string, ...) dispatch.`,
-        allowed:
-          "Expose semantic service methods or a typed generated transport client; procedure paths must be compiler-checked.",
-      });
+    if (ts.isMethodDeclaration(node)) {
+      inspectMethodDispatch(node);
+    } else if (ts.isMethodSignature(node)) {
+      inspectMethodDispatch(node);
+    } else if (ts.isPropertyDeclaration(node)) {
+      inspectFunctionPropertyDispatch(node);
+    } else if (ts.isPropertySignature(node)) {
+      inspectFunctionPropertyDispatch(node);
     }
 
-    if (
-      ts.isCallExpression(node) &&
-      stringDispatchMember(node.expression) !== null &&
-      node.arguments[0] &&
-      ts.isStringLiteral(node.arguments[0]) &&
-      /[./]/.test(node.arguments[0].text)
-    ) {
-      violations.push({
-        policy: "api-transport-service-locator",
-        file,
-        line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
-        message: `API transport dispatches through string path ${JSON.stringify(node.arguments[0].text)}.`,
-        allowed:
-          "Call a semantic service method or a typed generated transport procedure directly.",
-      });
+    if (ts.isCallExpression(node)) {
+      if (stringDispatchMember(node.expression) !== null) {
+        const firstArgument = node.arguments[0];
+
+        if (firstArgument) {
+          if (ts.isStringLiteral(firstArgument)) {
+            if (/[./]/.test(firstArgument.text)) {
+              violations.push({
+                policy: "api-transport-service-locator",
+                file,
+                line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+                message: `API transport dispatches through string path ${JSON.stringify(firstArgument.text)}.`,
+                allowed:
+                  "Call a semantic service method or a typed generated transport procedure directly.",
+              });
+            }
+          }
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -1848,25 +1995,33 @@ function credentialContextViolations(file: string, source: ts.SourceFile): Archi
   const violations: ArchitectureViolation[] = [];
 
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === "get" &&
-      node.arguments.length === 1 &&
-      node.arguments[0] !== void 0 &&
-      ts.isStringLiteral(node.arguments[0]) &&
-      CREDENTIAL_CONTEXT_KEYS.has(node.arguments[0].text)
-    ) {
-      violations.push({
-        policy: "api-transport-credential-context",
-        file,
-        line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
-        message: `API transport reads the credential off the request context (${JSON.stringify(
-          (node.arguments[0] as ts.StringLiteral).text,
-        )}).`,
-        allowed:
-          "Take the caller as typed input: `credentialPrincipalOf(c)` from @langwatch/api/rest answers with the whole resolved credential, including its class. The context bag is the application's, not the handler's input.",
-      });
+    if (ts.isCallExpression(node)) {
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        const methodName = node.expression.name.text;
+
+        if (methodName === "get") {
+          if (node.arguments.length === 1) {
+            const firstArgument = node.arguments[0];
+
+            if (firstArgument !== void 0) {
+              if (ts.isStringLiteral(firstArgument)) {
+                if (CREDENTIAL_CONTEXT_KEYS.has(firstArgument.text)) {
+                  violations.push({
+                    policy: "api-transport-credential-context",
+                    file,
+                    line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+                    message: `API transport reads the credential off the request context (${JSON.stringify(
+                      firstArgument.text,
+                    )}).`,
+                    allowed:
+                      "Take the caller as typed input: `credentialPrincipalOf(c)` from @langwatch/api/rest answers with the whole resolved credential, including its class. The context bag is the application's, not the handler's input.",
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     ts.forEachChild(node, visit);

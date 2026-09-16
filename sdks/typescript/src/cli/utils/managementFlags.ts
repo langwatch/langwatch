@@ -33,7 +33,10 @@ export const oneOf = (values: readonly string[]): string => values.join(", ");
 export const parseCount = ({ value, flag }: { value: string; flag: string }): number => {
   const trimmed = value.trim();
   const count = Number(trimmed);
-  if (!/^\d+$/.test(trimmed) || !Number.isSafeInteger(count)) {
+  if (!/^\d+$/.test(trimmed)) {
+    throw new ManagementFlagError(`Invalid ${flag} "${value}". Expected a whole number.`);
+  }
+  if (!Number.isSafeInteger(count)) {
     throw new ManagementFlagError(`Invalid ${flag} "${value}". Expected a whole number.`);
   }
   return count;
@@ -48,7 +51,17 @@ export const parsePermissionFlags = (values: string[] = []): string[] => {
   const permissions: string[] = [];
   for (const value of values) {
     const parts = value.split(":");
-    if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+    if (parts.length !== 2) {
+      throw new ManagementFlagError(
+        `Invalid permission "${value}". Expected resource:action, for example project:view.`,
+      );
+    }
+    if (!parts[0]?.trim()) {
+      throw new ManagementFlagError(
+        `Invalid permission "${value}". Expected resource:action, for example project:view.`,
+      );
+    }
+    if (!parts[1]?.trim()) {
       throw new ManagementFlagError(
         `Invalid permission "${value}". Expected resource:action, for example project:view.`,
       );
@@ -121,7 +134,19 @@ export const parseScopeType = (value: string): ManagementScopeType =>
 export const parseBindingFlags = (values: string[] = []): ManagementBindingInput[] =>
   values.map((value) => {
     const parts = value.split(":");
-    if (parts.length !== 3 || parts.some((part) => !part.trim())) {
+    if (parts.length !== 3) {
+      throw new ManagementFlagError(
+        `Invalid binding "${value}". Expected role:scopeType:scopeId, for example ADMIN:PROJECT:project_abc.`,
+      );
+    }
+    let hasEmptyPart = false;
+    for (const part of parts) {
+      if (!part.trim()) {
+        hasEmptyPart = true;
+        break;
+      }
+    }
+    if (hasEmptyPart) {
       throw new ManagementFlagError(
         `Invalid binding "${value}". Expected role:scopeType:scopeId, for example ADMIN:PROJECT:project_abc.`,
       );

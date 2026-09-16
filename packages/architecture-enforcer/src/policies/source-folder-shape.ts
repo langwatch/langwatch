@@ -262,7 +262,8 @@ export function lintSourceFolderShape(snapshot: WorkspaceSnapshot): Architecture
   const found = new Set(findings.map(entryKey));
 
   for (const finding of findings) {
-    if (baselined.has(entryKey(finding))) continue;
+    const key = entryKey(finding);
+    if (baselined.has(key)) continue;
 
     violations.push({
       policy: "source-folder-shape",

@@ -294,13 +294,12 @@ export class ExperimentsFacade {
       throw new ExperimentsApiError("Unauthorized - check your API key", 401);
     }
 
-    const errorMessage =
-      typeof error === "object" &&
-      error !== null &&
-      "error" in error &&
-      typeof error.error === "string"
-        ? error.error
-        : `Failed to start experiment: ${slug}`;
+    let errorMessage = `Failed to start experiment: ${slug}`;
+    if (typeof error === "object" && error !== null && "error" in error) {
+      if (typeof error.error === "string") {
+        errorMessage = error.error;
+      }
+    }
     throw new ExperimentsApiError(errorMessage, status);
   }
 
@@ -313,13 +312,12 @@ export class ExperimentsFacade {
       throw new ExperimentsApiError("Unauthorized - check your API key", 401);
     }
 
-    const errorMessage =
-      typeof error === "object" &&
-      error !== null &&
-      "error" in error &&
-      typeof error.error === "string"
-        ? error.error
-        : `Failed to get run status: ${runId}`;
+    let errorMessage = `Failed to get run status: ${runId}`;
+    if (typeof error === "object" && error !== null && "error" in error) {
+      if (typeof error.error === "string") {
+        errorMessage = error.error;
+      }
+    }
     throw new ExperimentsApiError(errorMessage, status);
   }
 

@@ -147,11 +147,13 @@ export function formatApiErrorMessage({
     // set LANGWATCH_ENDPOINT=localhost:5570 instead of http://localhost:5570).
     // Add a hint — the raw phrase tells the user nothing actionable.
     const combined = `${base} ${causeMsg ?? ""} ${causeCode ?? ""}`.toLowerCase();
-    if (
-      combined.includes("unknown scheme") ||
-      combined.includes("err_invalid_url") ||
-      combined.includes("failed to parse url")
-    ) {
+    if (combined.includes("unknown scheme")) {
+      return `${formatted} — check your LANGWATCH_ENDPOINT (must start with http:// or https://)`;
+    }
+    if (combined.includes("err_invalid_url")) {
+      return `${formatted} — check your LANGWATCH_ENDPOINT (must start with http:// or https://)`;
+    }
+    if (combined.includes("failed to parse url")) {
       return `${formatted} — check your LANGWATCH_ENDPOINT (must start with http:// or https://)`;
     }
     return formatted;
@@ -185,12 +187,12 @@ export function formatApiErrorMessage({
       // says nothing `code` did not. Our own sentence for the code is the
       // difference between "This capability needs the Enterprise plan" and the
       // slug itself. When the server did write prose, it wins.
-      if (
-        !isCodeAsMessage({ code: codeField, message: fromMessage }) &&
-        fromMessage &&
-        !isGeneric(fromMessage)
-      ) {
-        return fromMessage;
+      if (!isCodeAsMessage({ code: codeField, message: fromMessage })) {
+        if (fromMessage) {
+          if (!isGeneric(fromMessage)) {
+            return fromMessage;
+          }
+        }
       }
       return sentenceForCode(codeField);
     }
@@ -203,14 +205,16 @@ export function formatApiErrorMessage({
     //    `body.error` is an object with its own (potentially generic) message.
     const meaningful = firstMeaningful(fromMessage, fromError, fromDetail, fromReason);
     if (meaningful) {
-      if (
-        fromError &&
-        fromMessage &&
-        fromMessage !== fromError &&
-        !isGeneric(fromError) &&
-        !isGeneric(fromMessage)
-      ) {
-        return `${fromError}: ${fromMessage}`;
+      if (fromError) {
+        if (fromMessage) {
+          if (fromMessage !== fromError) {
+            if (!isGeneric(fromError)) {
+              if (!isGeneric(fromMessage)) {
+                return `${fromError}: ${fromMessage}`;
+              }
+            }
+          }
+        }
       }
       return meaningful;
     }
@@ -251,7 +255,22 @@ export function formatApiErrorMessage({
 
     // Collapse empty / near-empty payloads to a friendlier message — there's
     // nothing for the user to see in `{}` anyway.
-    if (!raw || raw === "{}" || raw === '""' || raw === "null") {
+    if (!raw) {
+      return options.status
+        ? `Request failed with status ${options.status}`
+        : "Unknown error occurred";
+    }
+    if (raw === "{}") {
+      return options.status
+        ? `Request failed with status ${options.status}`
+        : "Unknown error occurred";
+    }
+    if (raw === '""') {
+      return options.status
+        ? `Request failed with status ${options.status}`
+        : "Unknown error occurred";
+    }
+    if (raw === "null") {
       return options.status
         ? `Request failed with status ${options.status}`
         : "Unknown error occurred";

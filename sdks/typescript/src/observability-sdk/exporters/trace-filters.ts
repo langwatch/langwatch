@@ -114,9 +114,10 @@ export function valueMatches(value: string, rule: Match): boolean {
   }
 
   if (rule.matches instanceof RegExp) {
+    const flags = rule.matches.flags;
     const re =
-      ignoreCase && !rule.matches.flags.includes("i")
-        ? new RegExp(rule.matches.source, (rule.matches.flags || "") + "i")
+      ignoreCase && !flags.includes("i")
+        ? new RegExp(rule.matches.source, (flags || "") + "i")
         : rule.matches;
     return re.test(raw);
   }

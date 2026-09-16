@@ -26,7 +26,8 @@ declare const __CLI_VERSION__: string;
  * for a daemon must never learn that one exists because it failed.
  */
 function debugLog(message: string): void {
-  if (!process.env.DEBUG?.includes("langwatch")) return;
+  const debugFlag = process.env.DEBUG;
+  if (!debugFlag?.includes("langwatch")) return;
   process.stderr.write(`langwatch:daemon ${message}\n`);
 }
 
@@ -104,8 +105,12 @@ export async function runCli(argv: string[]): Promise<void> {
     // correct one. We do not spawn a replacement here, because the old daemon
     // may still be unlinking its socket and the two would race for the bind.
     await requestStop(identity.socketPath);
-  } else if (isAutoSpawnEnabled(process.env) && argv[1] && recordMissAndDecideToSpawn(identity)) {
-    spawnDaemon({ cliPath: argv[1], env, identity });
+  } else if (isAutoSpawnEnabled(process.env)) {
+    if (argv[1]) {
+      if (recordMissAndDecideToSpawn(identity)) {
+        spawnDaemon({ cliPath: argv[1], env, identity });
+      }
+    }
   }
 
   await runInProcess(argv);

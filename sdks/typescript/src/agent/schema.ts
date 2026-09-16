@@ -214,7 +214,18 @@ const coerce = ({
 }): AgentParameterValue => {
   if (spec.type === "number") {
     const asNumber = typeof value === "number" ? value : Number(value);
-    if (typeof value === "boolean" || !Number.isFinite(asNumber) || String(value).trim() === "") {
+    if (typeof value === "boolean") {
+      throw new AgentParameterError(
+        `parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`,
+      );
+    }
+    if (!Number.isFinite(asNumber)) {
+      throw new AgentParameterError(
+        `parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`,
+      );
+    }
+    const stringValue = String(value).trim();
+    if (stringValue === "") {
       throw new AgentParameterError(
         `parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`,
       );

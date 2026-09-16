@@ -79,7 +79,9 @@ export function resolveEnabled({
   env?: NodeJS.ProcessEnv;
 }): boolean {
   const flag = env.LANGWATCH_AGENT_CONNECT;
-  if (isSet(flag) && !isTruthy(flag)) return false;
+  if (isSet(flag)) {
+    if (!isTruthy(flag)) return false;
+  }
   if (explicit !== undefined) return explicit;
   return !isTruthy(env.CI);
 }

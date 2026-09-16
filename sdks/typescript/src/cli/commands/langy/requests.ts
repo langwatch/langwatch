@@ -105,7 +105,8 @@ export function packageManagerOf(root: string): string | undefined {
     ["Cargo.lock", "cargo"],
   ];
   for (const [file, manager] of lockfiles) {
-    if (fs.existsSync(path.join(root, file))) return manager;
+    const lockfilePath = path.join(root, file);
+    if (fs.existsSync(lockfilePath)) return manager;
   }
   return undefined;
 }
@@ -241,9 +242,12 @@ export async function ensureSignedIn({
 }: {
   login: (options: { device: boolean }) => Promise<void>;
 }): Promise<{ apiKey: string; endpoint: string; projectId?: string }> {
-  if (!hasDeviceSession() && !process.env.LANGWATCH_API_KEY?.trim()) {
-    console.log(chalk.gray("No login on this machine yet. Signing in first."));
-    await login({ device: true });
+  const apiKeyEnv = process.env.LANGWATCH_API_KEY;
+  if (!hasDeviceSession()) {
+    if (!apiKeyEnv?.trim()) {
+      console.log(chalk.gray("No login on this machine yet. Signing in first."));
+      await login({ device: true });
+    }
   }
   const credentials = await resolveCredentials();
   return {
@@ -264,8 +268,14 @@ export function collapseByConversation(requests: ControlRequest[]): ControlReque
   const newest = new Map<string, ControlRequest>();
   for (const request of requests) {
     const held = newest.get(request.conversationId);
-    if (!held || Date.parse(request.createdAt) > Date.parse(held.createdAt)) {
+    if (!held) {
       newest.set(request.conversationId, request);
+    } else {
+      const requestCreatedAt = Date.parse(request.createdAt);
+      const heldCreatedAt = Date.parse(held.createdAt);
+      if (requestCreatedAt > heldCreatedAt) {
+        newest.set(request.conversationId, request);
+      }
     }
   }
   return [...newest.values()].sort(

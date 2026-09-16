@@ -115,8 +115,8 @@ async function walkRolloutFiles(
       const full = join(dir, e.name);
       if (e.isDirectory()) {
         if (depth < 3 && (await walk(full, depth + 1))) return true;
-      } else if (e.isFile() && (await onFile(full, e.name))) {
-        return true;
+      } else if (e.isFile()) {
+        if (await onFile(full, e.name)) return true;
       }
     }
     return false;
@@ -256,7 +256,8 @@ export async function findRecentRollouts(
 ): Promise<string[]> {
   const out: string[] = [];
   await walkRolloutFiles(sessionsRoot, async (full, name) => {
-    if (!name.startsWith("rollout-") || !name.endsWith(".jsonl")) return false;
+    if (!name.startsWith("rollout-")) return false;
+    if (!name.endsWith(".jsonl")) return false;
     try {
       const s = await stat(full);
       if (s.mtimeMs >= sinceMs) out.push(full);

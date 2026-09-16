@@ -74,7 +74,9 @@ function readWorktreeName({
   });
   if (!gitDir || !commonDir) return undefined;
   // Both may come back relative to the directory, so resolve before comparing.
-  if (path.resolve(directory, gitDir) === path.resolve(directory, commonDir)) {
+  const resolvedGitDir = path.resolve(directory, gitDir);
+  const resolvedCommonDir = path.resolve(directory, commonDir);
+  if (resolvedGitDir === resolvedCommonDir) {
     return undefined;
   }
 

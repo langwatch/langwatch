@@ -41,7 +41,19 @@ export const parseTeamFlags = (
 ): { teamId: string; role: ManagementRole }[] =>
   values.map((value) => {
     const parts = value.split(":");
-    if (parts.length !== 2 || parts.some((part) => !part.trim())) {
+    if (parts.length !== 2) {
+      throw new ManagementFlagError(
+        `Invalid team assignment "${value}". Expected teamId:role, for example team_abc:MEMBER.`,
+      );
+    }
+    let hasEmptyPart = false;
+    for (const part of parts) {
+      if (!part.trim()) {
+        hasEmptyPart = true;
+        break;
+      }
+    }
+    if (hasEmptyPart) {
       throw new ManagementFlagError(
         `Invalid team assignment "${value}". Expected teamId:role, for example team_abc:MEMBER.`,
       );

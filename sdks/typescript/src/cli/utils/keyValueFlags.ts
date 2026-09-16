@@ -90,7 +90,10 @@ export const coerceParameterValue = ({
   if (type === "string") return value;
   if (type === "number") {
     const asNumber = Number(value);
-    return value.trim() !== "" && Number.isFinite(asNumber) ? asNumber : value;
+    if (value.trim() === "") return value;
+    if (!Number.isFinite(asNumber)) return value;
+
+    return asNumber;
   }
   if (type === "boolean") {
     if (value === "true") return true;
@@ -100,7 +103,9 @@ export const coerceParameterValue = ({
   if (value === "true") return true;
   if (value === "false") return false;
   const asNumber = Number(value);
-  if (Number.isFinite(asNumber) && String(asNumber) === value) return asNumber;
+  if (Number.isFinite(asNumber)) {
+    if (String(asNumber) === value) return asNumber;
+  }
   return value;
 };
 

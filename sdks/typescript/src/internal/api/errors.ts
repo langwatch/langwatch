@@ -138,7 +138,8 @@ export class LangWatchApiError extends Error {
 
   async safeParseBody(response: Response): Promise<void> {
     try {
-      if (response.headers.get("Content-Type")?.includes("application/json")) {
+      const contentType = response.headers.get("Content-Type");
+      if (contentType?.includes("application/json")) {
         const json = await response.json();
 
         this.body = json;

@@ -85,17 +85,22 @@ function expandGlob(root: string, pattern: string): string[] {
     for (const directory of directories) {
       if (segment !== "*") {
         const candidate = join(directory, segment);
-        if (existsSync(candidate) && statSync(candidate).isDirectory()) next.push(candidate);
+        if (!existsSync(candidate)) continue;
+        const candidateStat = statSync(candidate);
+        if (!candidateStat.isDirectory()) continue;
 
+        next.push(candidate);
         continue;
       }
 
       if (!existsSync(directory)) continue;
 
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
-          next.push(join(directory, entry.name));
-        }
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith(".")) continue;
+        if (entry.name === "node_modules") continue;
+
+        next.push(join(directory, entry.name));
       }
     }
 

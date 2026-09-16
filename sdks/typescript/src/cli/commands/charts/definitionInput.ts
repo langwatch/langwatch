@@ -37,14 +37,10 @@ export const parseParameterFlags = (flags: string[]): Record<string, ChartParame
 const coerceScalar = (raw: string): ChartParameterValue => {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === "string" ||
-      typeof parsed === "number" ||
-      typeof parsed === "boolean" ||
-      parsed === null
-    ) {
-      return parsed;
-    }
+    if (typeof parsed === "string") return parsed;
+    if (typeof parsed === "number") return parsed;
+    if (typeof parsed === "boolean") return parsed;
+    if (parsed === null) return parsed;
   } catch {
     // Not JSON — a plain string value.
   }

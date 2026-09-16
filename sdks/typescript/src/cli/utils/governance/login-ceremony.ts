@@ -127,7 +127,8 @@ function windowPhrase(window: string): string {
 function formatResetDay(resetsAt: string | null | undefined): string | null {
   if (!resetsAt) return null;
   const date = new Date(resetsAt);
-  if (Number.isNaN(date.getTime())) return null;
+  const dateMs = date.getTime();
+  if (Number.isNaN(dateMs)) return null;
   // Reset boundaries are computed in UTC on the server, so format the
   // promised day on the same clock instead of the terminal's zone.
   return date.toLocaleDateString("en-US", {

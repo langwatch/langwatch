@@ -105,12 +105,12 @@ export const SECRET_ENVIRONMENT_SUFFIXES: readonly string[] = [
 /** True when a command may read this variable. */
 export function inheritsVariable(name: string): boolean {
   const upper = name.toUpperCase();
-  if (SECRET_ENVIRONMENT_SUFFIXES.some((veto) => upper.endsWith(veto))) {
-    return false;
+  for (const veto of SECRET_ENVIRONMENT_SUFFIXES) {
+    if (upper.endsWith(veto)) return false;
   }
   if (INHERITED_ENVIRONMENT.has(name)) return true;
-  if (INHERITED_ENVIRONMENT_PREFIXES.some((family) => name.startsWith(family))) {
-    return true;
+  for (const family of INHERITED_ENVIRONMENT_PREFIXES) {
+    if (name.startsWith(family)) return true;
   }
   return INHERITED_ENVIRONMENT_SUFFIXES.some((family) => upper.endsWith(family));
 }
@@ -207,7 +207,10 @@ export function excludeLogDirFromGit(root: string): void {
   try {
     fs.mkdirSync(info, { recursive: true });
     const current = fs.existsSync(excludeFile) ? fs.readFileSync(excludeFile, "utf8") : "";
-    if (current.split("\n").some((line) => line.trim() === entry)) return;
+    const currentLines = current.split("\n");
+    for (const line of currentLines) {
+      if (line.trim() === entry) return;
+    }
     const separator = current === "" || current.endsWith("\n") ? "" : "\n";
     fs.appendFileSync(excludeFile, `${separator}${entry}\n`);
   } catch {

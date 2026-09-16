@@ -272,8 +272,10 @@ export class FileManager {
             continue;
           }
           walkDir(fullPath, relativeFilePath);
-        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
-          files.push(path.join(promptsDir, relativeFilePath));
+        } else if (entry.isFile()) {
+          if (entry.name.endsWith(".prompt.yaml")) {
+            files.push(path.join(promptsDir, relativeFilePath));
+          }
         }
       }
     };
@@ -316,13 +318,15 @@ export class FileManager {
           } catch {
             // Directory not empty or other error, ignore
           }
-        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
-          // Extract prompt name from materialized file path
-          const promptName = relativeFilePath.replace(/\.prompt\.yaml$/, "");
+        } else if (entry.isFile()) {
+          if (entry.name.endsWith(".prompt.yaml")) {
+            // Extract prompt name from materialized file path
+            const promptName = relativeFilePath.replace(/\.prompt\.yaml$/, "");
 
-          if (!currentDependencies.has(promptName)) {
-            fs.unlinkSync(fullPath);
-            cleaned.push(promptName);
+            if (!currentDependencies.has(promptName)) {
+              fs.unlinkSync(fullPath);
+              cleaned.push(promptName);
+            }
           }
         }
       }

@@ -28,7 +28,11 @@ export function resolveTransport({
   env?: NodeJS.ProcessEnv;
 }): AgentTransport {
   const candidate = isSet(explicit) ? explicit : env.LANGWATCH_AGENT_TRANSPORT;
-  return isSet(candidate) && candidate.trim().toLowerCase() === "http" ? "http" : "websocket";
+  if (!isSet(candidate)) return "websocket";
+  const normalized = candidate.trim().toLowerCase();
+  if (normalized === "http") return "http";
+
+  return "websocket";
 }
 
 export interface SocketLike {

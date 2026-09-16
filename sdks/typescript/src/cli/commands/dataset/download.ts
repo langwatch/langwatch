@@ -12,7 +12,13 @@ import { handleDatasetCommandError } from "./error-handler";
 export const escapeCsvField = (value: unknown): string => {
   if (value === null || value === undefined) return "";
   const str = typeof value === "string" ? value : JSON.stringify(value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+  if (str.includes(",")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  if (str.includes('"')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  if (str.includes("\n")) {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;

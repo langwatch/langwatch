@@ -164,7 +164,9 @@ const isMessage = (value: unknown): value is AgentMessage =>
 /** One of the four reply shapes as the `{ output, session }` the result frame carries. */
 export function normalizeReply(reply: unknown): AgentResult {
   if (typeof reply === "string") return { output: reply };
-  if (Array.isArray(reply) && reply.every(isMessage)) return { output: reply };
+  if (Array.isArray(reply)) {
+    if (reply.every(isMessage)) return { output: reply };
+  }
   if (isMessage(reply)) return { output: reply };
   if (typeof reply === "object" && reply !== null && "output" in reply) {
     const { output, session } = reply as { output: unknown; session?: unknown };

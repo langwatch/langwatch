@@ -16,7 +16,17 @@ import { handleDatasetCommandError } from "./error-handler";
 export const parseColumns = (columnsStr: string): DatasetColumnType[] => {
   return columnsStr.split(",").map((pair) => {
     const parts = pair.trim().split(":");
-    if (parts.length !== 2 || !parts[0]?.trim() || !parts[1]?.trim()) {
+    if (parts.length !== 2) {
+      throw new Error(
+        `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
+      );
+    }
+    if (!parts[0]?.trim()) {
+      throw new Error(
+        `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
+      );
+    }
+    if (!parts[1]?.trim()) {
       throw new Error(
         `Invalid column format: "${pair.trim()}". Expected "name:type" (e.g. "input:string")`,
       );

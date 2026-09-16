@@ -81,7 +81,8 @@ export const formatTable = ({
  */
 export const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "—";
+  const dateMs = date.getTime();
+  if (Number.isNaN(dateMs)) return "—";
 
   const now = new Date();
   const diffMs = Math.max(0, now.getTime() - date.getTime());

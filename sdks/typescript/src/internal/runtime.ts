@@ -37,32 +37,38 @@ export function detectRuntime(globals?: any): JsRuntime {
   }
 
   try {
-    if (
-      "Deno" in g &&
-      typeof g.Deno === "object" &&
-      g.Deno &&
-      "version" in g.Deno &&
-      typeof g.Deno.version === "object"
-    ) {
-      return "deno";
+    if ("Deno" in g) {
+      if (typeof g.Deno === "object") {
+        if (g.Deno) {
+          if ("version" in g.Deno) {
+            if (typeof g.Deno.version === "object") {
+              return "deno";
+            }
+          }
+        }
+      }
     }
-    if (
-      "Bun" in g &&
-      typeof g.Bun === "object" &&
-      g.Bun &&
-      "version" in g.Bun &&
-      typeof g.Bun.version === "string"
-    ) {
-      return "bun";
+    if ("Bun" in g) {
+      if (typeof g.Bun === "object") {
+        if (g.Bun) {
+          if ("version" in g.Bun) {
+            if (typeof g.Bun.version === "string") {
+              return "bun";
+            }
+          }
+        }
+      }
     }
-    if (
-      "process" in g &&
-      typeof g.process === "object" &&
-      g.process &&
-      typeof g.process.versions === "object" &&
-      typeof g.process.versions.node === "string"
-    ) {
-      return "node";
+    if ("process" in g) {
+      if (typeof g.process === "object") {
+        if (g.process) {
+          if (typeof g.process.versions === "object") {
+            if (typeof g.process.versions.node === "string") {
+              return "node";
+            }
+          }
+        }
+      }
     }
     if (typeof g.window?.document !== "undefined" && g === g.window) {
       return "web";

@@ -87,13 +87,20 @@ export function walkFiles(
           continue;
 
         visit(path);
-      } else if (entry.isFile() && accept(path)) {
-        found.push(path);
+        continue;
       }
+
+      if (!entry.isFile()) continue;
+      if (!accept(path)) continue;
+
+      found.push(path);
     }
   };
 
-  if (existsSync(root) && statSync(root).isDirectory()) visit(root);
+  if (existsSync(root)) {
+    const stat = statSync(root);
+    if (stat.isDirectory()) visit(root);
+  }
 
   return found.sort();
 }

@@ -14,10 +14,12 @@ A test whose subject cannot be read off its own imports is reported and LEFT
 ALONE, because a guessed home reads as a deliberate one afterwards.`;
 
 const argv = process.argv.slice(2);
-if (argv.includes("--help") || argv.includes("-h")) {
+const showHelpAndExit = () => {
   process.stdout.write(`${USAGE}\n`);
   process.exit(0);
-}
+};
+if (argv.includes("--help")) showHelpAndExit();
+if (argv.includes("-h")) showHelpAndExit();
 
 const rootFlag = argv.indexOf("--root");
 const root = resolve(rootFlag === -1 ? process.cwd() : (argv[rootFlag + 1] ?? "."));

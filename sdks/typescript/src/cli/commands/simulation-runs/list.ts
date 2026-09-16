@@ -92,10 +92,14 @@ export const listSimulationRunsCommand = async (options: {
 
     const matchesFilters = (run: SimulationRunListItem): boolean => {
       if (options.status) {
-        if (run.status.toUpperCase() !== options.status.toUpperCase()) return false;
+        const runStatus = run.status.toUpperCase();
+        const filterStatus = options.status.toUpperCase();
+        if (runStatus !== filterStatus) return false;
       }
       if (options.name) {
-        if (!(run.name ?? "").toLowerCase().includes(options.name.toLowerCase())) return false;
+        const runName = (run.name ?? "").toLowerCase();
+        const filterName = options.name.toLowerCase();
+        if (!runName.includes(filterName)) return false;
       }
       return true;
     };
@@ -111,7 +115,12 @@ export const listSimulationRunsCommand = async (options: {
     // cursor while it has found nothing, then stops at the first page with a
     // match: the pages come newest first, so that page holds the most recent
     // runs the filter reaches.
-    while (hasClientFilters && runs.length === 0 && page.hasMore && page.nextCursor) {
+    while (true) {
+      if (!hasClientFilters) break;
+      if (runs.length !== 0) break;
+      if (!page.hasMore) break;
+      if (!page.nextCursor) break;
+
       if (scanned >= FILTER_SCAN_RUN_CEILING) {
         scanStoppedEarly = true;
         break;

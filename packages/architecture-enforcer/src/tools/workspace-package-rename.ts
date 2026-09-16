@@ -29,8 +29,9 @@ function sourceEdits(
   to: string,
   allStringLiterals: boolean,
 ): TextEdit[] {
-  const kind =
-    file.endsWith(".tsx") || file.endsWith(".jsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  let kind: ts.ScriptKind = ts.ScriptKind.TS;
+  if (file.endsWith(".tsx")) kind = ts.ScriptKind.TSX;
+  if (file.endsWith(".jsx")) kind = ts.ScriptKind.TSX;
 
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
   const edits: TextEdit[] = [];
@@ -57,15 +58,18 @@ function sourceEdits(
   const visit = (node: ts.Node): void => {
     if (allStringLiterals && ts.isStringLiteralLike(node)) {
       add(node);
-    } else if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+    } else if (ts.isImportDeclaration(node)) {
       add(node.moduleSpecifier);
-    } else if (
-      ts.isImportEqualsDeclaration(node) &&
-      ts.isExternalModuleReference(node.moduleReference)
-    ) {
-      add(node.moduleReference.expression);
-    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
-      add(node.argument.literal);
+    } else if (ts.isExportDeclaration(node)) {
+      add(node.moduleSpecifier);
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        add(node.moduleReference.expression);
+      }
+    } else if (ts.isImportTypeNode(node)) {
+      if (ts.isLiteralTypeNode(node.argument)) {
+        add(node.argument.literal);
+      }
     } else if (ts.isCallExpression(node)) {
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";

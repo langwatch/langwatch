@@ -120,9 +120,10 @@ function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): S
     if (!existsSync(directory)) continue;
 
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isDirectory() && ids.has(entry.name)) {
-        roots.push({ module: entry.name, directory: join(directory, entry.name) });
-      }
+      if (!entry.isDirectory()) continue;
+      if (!ids.has(entry.name)) continue;
+
+      roots.push({ module: entry.name, directory: join(directory, entry.name) });
     }
   }
 
@@ -217,7 +218,8 @@ function readFile({
   const reader: Reader = { source, module, tables, constants: literalConstants(source), found };
 
   const visit = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) readSql(reader, node);
+    if (ts.isStringLiteralLike(node)) readSql(reader, node);
+    if (ts.isTemplateExpression(node)) readSql(reader, node);
 
     if (ts.isCallExpression(node)) {
       const table = insertedTable(reader, node);

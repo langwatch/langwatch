@@ -400,14 +400,11 @@ function resolvedWebUse(
   const target = webPackageForSpecifier(webPackages, specifier);
   const capability = capabilityForSpecifier(webPackages, specifier);
 
-  if (
-    !target ||
-    !capability ||
-    capability.kind !== "surface" ||
-    !packageExports(target).has(capability.exportPath)
-  ) {
-    return void 0;
-  }
+  if (!target) return void 0;
+  if (!capability) return void 0;
+  if (capability.kind !== "surface") return void 0;
+  const exports = packageExports(target);
+  if (!exports.has(capability.exportPath)) return void 0;
 
   return { target, capability };
 }
@@ -485,23 +482,30 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
     return "a Node.js builtin";
   }
 
-  if (
-    /^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier) ||
-    /^@langwatch\/prisma-client(?:\/|$)/.test(specifier) ||
-    specifier.startsWith("@prisma/")
-  ) {
+  if (/^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier)) {
+    return "server, API, worker, or Prisma implementation";
+  }
+  if (/^@langwatch\/prisma-client(?:\/|$)/.test(specifier)) {
+    return "server, API, worker, or Prisma implementation";
+  }
+  if (specifier.startsWith("@prisma/")) {
     return "server, API, worker, or Prisma implementation";
   }
 
-  if (/^(?:@app|@ee)(?:\/|$)/.test(specifier) || /(?:^|\/)platform\/app(?:\/|$)/.test(specifier)) {
+  if (/^(?:@app|@ee)(?:\/|$)/.test(specifier)) {
+    return "legacy platform/app implementation";
+  }
+  if (/(?:^|\/)platform\/app(?:\/|$)/.test(specifier)) {
     return "legacy platform/app implementation";
   }
 
-  if (
-    /^(?:~|@)\/(?:server|env)(?:\/|$)/.test(specifier) ||
-    /^(?:~|@)\/utils\/env(?:\/|$)/.test(specifier) ||
-    /(?:^|\/)env(?:\/|$)/.test(specifier)
-  ) {
+  if (/^(?:~|@)\/(?:server|env)(?:\/|$)/.test(specifier)) {
+    return "environment module";
+  }
+  if (/^(?:~|@)\/utils\/env(?:\/|$)/.test(specifier)) {
+    return "environment module";
+  }
+  if (/(?:^|\/)env(?:\/|$)/.test(specifier)) {
     return "environment module";
   }
 
@@ -521,7 +525,9 @@ const commentFreeSources = new Map<string, string>();
  */
 function withoutComments(source: string): string {
   // No comment marker, nothing to blank, and no reason to parse the file.
-  if (!source.includes("//") && !source.includes("/*")) return source;
+  if (!source.includes("//")) {
+    if (!source.includes("/*")) return source;
+  }
 
   const known = commentFreeSources.get(source);
   if (known !== void 0) return known;
@@ -597,13 +603,20 @@ function readsProcessEnvironment(source: string): boolean {
   const visit = (node: ts.Node): void => {
     if (found) return;
 
-    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+    if (ts.isPropertyAccessExpression(node)) {
+      const owner = node.expression;
+      const key = node.name.text;
+
+      if (ts.isIdentifier(owner) && owner.text === "process" && key === "env") {
+        found = true;
+
+        return;
+      }
+    } else if (ts.isElementAccessExpression(node)) {
       const owner = node.expression;
       let key: string | undefined;
 
-      if (ts.isPropertyAccessExpression(node)) {
-        key = node.name.text;
-      } else if (ts.isStringLiteralLike(node.argumentExpression)) {
+      if (ts.isStringLiteralLike(node.argumentExpression)) {
         key = node.argumentExpression.text;
       }
 
@@ -760,7 +773,10 @@ function forbiddenWebPresentationImport({
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
   if (forbiddenCapability) return forbiddenCapability;
 
-  if (/^(?:~|@)\//.test(specifier) || specifier.startsWith("#")) {
+  if (/^(?:~|@)\//.test(specifier)) {
+    return "an application or package source alias";
+  }
+  if (specifier.startsWith("#")) {
     return "an application or package source alias";
   }
 
@@ -770,8 +786,10 @@ function forbiddenWebPresentationImport({
     return "a feature-web public entry";
   }
 
-  if (specifier.startsWith("@langwatch/") && !isPortableFirstPartyImport({ specifier, portable })) {
-    return "a first-party implementation package instead of a portable module, a contract, or the Design System";
+  if (specifier.startsWith("@langwatch/")) {
+    if (!isPortableFirstPartyImport({ specifier, portable })) {
+      return "a first-party implementation package instead of a portable module, a contract, or the Design System";
+    }
   }
 
   return void 0;
@@ -789,12 +807,12 @@ function forbiddenFrontendFeatureImport({
 
   const declaredWebCapability = /^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier);
 
-  if (
-    specifier.startsWith("@langwatch/") &&
-    !declaredWebCapability &&
-    !isPortableFirstPartyImport({ specifier, portable })
-  ) {
-    return "a first-party implementation package outside platform or a declared web capability";
+  if (specifier.startsWith("@langwatch/")) {
+    if (!declaredWebCapability) {
+      if (!isPortableFirstPartyImport({ specifier, portable })) {
+        return "a first-party implementation package outside platform or a declared web capability";
+      }
+    }
   }
 
   return void 0;
@@ -955,7 +973,28 @@ function lintDeclaredCapabilities(
         const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
         const pkg = webPackageForSpecifier(webPackages, specifier);
 
-        if (!capability || !pkg || !packageExports(pkg).has(capability.exportPath)) {
+        if (!capability) {
+          violations.push({
+            policy: "ui-web-capability-declaration",
+            file: cataloguePath,
+            specifier,
+            message: `Declared ${kind} capability must name one exact exported screens/* or surfaces/* entry.`,
+          });
+
+          continue;
+        }
+        if (!pkg) {
+          violations.push({
+            policy: "ui-web-capability-declaration",
+            file: cataloguePath,
+            specifier,
+            message: `Declared ${kind} capability must name one exact exported screens/* or surfaces/* entry.`,
+          });
+
+          continue;
+        }
+        const exports = packageExports(pkg);
+        if (!exports.has(capability.exportPath)) {
           violations.push({
             policy: "ui-web-capability-declaration",
             file: cataloguePath,
@@ -1393,10 +1432,8 @@ function lintUiSourceBoundaries(
         });
       }
 
-      if (
-        capability.kind === "screen" &&
-        !importerFeature.uses.screens.includes(sourceImport.specifier)
-      ) {
+      const screens = importerFeature.uses.screens;
+      if (capability.kind === "screen" && !screens.includes(sourceImport.specifier)) {
         violations.push({
           policy: "ui-screen-declaration",
           file,
@@ -1406,10 +1443,8 @@ function lintUiSourceBoundaries(
         });
       }
 
-      if (
-        capability.kind === "surface" &&
-        !importerFeature.uses.surfaces.includes(sourceImport.specifier)
-      ) {
+      const surfaces = importerFeature.uses.surfaces;
+      if (capability.kind === "surface" && !surfaces.includes(sourceImport.specifier)) {
         violations.push({
           policy: "ui-surface-declaration",
           file,
@@ -1572,7 +1607,17 @@ function lintWebScreenClosures(
 
       const entry = resolve(pkg.root, target);
 
-      if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
+      if (!isWithin(sourceRoot, entry)) {
+        violations.push({
+          policy: "ui-screen-closure",
+          file: pkg.manifestPath,
+          specifier: exportPath,
+          message: "A screen export must resolve to a local source module.",
+        });
+
+        continue;
+      }
+      if (!existsSync(entry)) {
         violations.push({
           policy: "ui-screen-closure",
           file: pkg.manifestPath,
@@ -1658,20 +1703,40 @@ function surfaceClosureStep({
     isWithin(implementation, current),
   );
 
-  if (forbidden || escapedSurface || (surfaceId !== void 0 && surfaceId !== capability.id)) {
-    const dependencyPath = chain
-      .map((path) => relative(sourceRoot, path).split(sep).join("/"))
-      .join(" -> ");
+  const dependencyPath = chain
+    .map((path) => relative(sourceRoot, path).split(sep).join("/"))
+    .join(" -> ");
 
+  if (forbidden) {
     violations.push({
       policy: "ui-surface-closure",
       file: current,
       specifier: exportPath,
-      message: forbidden
-        ? `Surface ${JSON.stringify(capability.id)} reaches forbidden local ${JSON.stringify(forbidden)} implementation via ${dependencyPath}.`
-        : escapedSurface
-          ? `Surface ${JSON.stringify(capability.id)} escapes its package implementation layers via ${dependencyPath}.`
-          : `Surface ${JSON.stringify(capability.id)} reaches another surface ${JSON.stringify(surfaceId)} via ${dependencyPath}.`,
+      message: `Surface ${JSON.stringify(capability.id)} reaches forbidden local ${JSON.stringify(forbidden)} implementation via ${dependencyPath}.`,
+      allowed:
+        "A shareable surface may depend only on its own implementation and portable presentation collaborators.",
+    });
+
+    return { violations, next };
+  }
+  if (escapedSurface) {
+    violations.push({
+      policy: "ui-surface-closure",
+      file: current,
+      specifier: exportPath,
+      message: `Surface ${JSON.stringify(capability.id)} escapes its package implementation layers via ${dependencyPath}.`,
+      allowed:
+        "A shareable surface may depend only on its own implementation and portable presentation collaborators.",
+    });
+
+    return { violations, next };
+  }
+  if (surfaceId !== void 0 && surfaceId !== capability.id) {
+    violations.push({
+      policy: "ui-surface-closure",
+      file: current,
+      specifier: exportPath,
+      message: `Surface ${JSON.stringify(capability.id)} reaches another surface ${JSON.stringify(surfaceId)} via ${dependencyPath}.`,
       allowed:
         "A shareable surface may depend only on its own implementation and portable presentation collaborators.",
     });
@@ -1764,7 +1829,17 @@ function lintWebSurfaceClosures(
 
       const entry = resolve(pkg.root, target);
 
-      if (!isWithin(sourceRoot, entry) || !existsSync(entry)) {
+      if (!isWithin(sourceRoot, entry)) {
+        violations.push({
+          policy: "ui-surface-closure",
+          file: pkg.manifestPath,
+          specifier: exportPath,
+          message: "A surface export must resolve to a local source module.",
+        });
+
+        continue;
+      }
+      if (!existsSync(entry)) {
         violations.push({
           policy: "ui-surface-closure",
           file: pkg.manifestPath,
@@ -1842,8 +1917,9 @@ function webPrivateModuleForFile(
   const segments = relative(sourceRoot, file).split(sep);
   const [first, second, third, fourth] = segments;
 
-  if (segments.length === 1 && (isWebRootException(file) || flatPublicEntries.has(file))) {
-    return { kind: "package-entry" };
+  if (segments.length === 1) {
+    if (isWebRootException(file)) return { kind: "package-entry" };
+    if (flatPublicEntries.has(file)) return { kind: "package-entry" };
   }
 
   if (first === "screens") return { kind: "screen" };
@@ -1853,30 +1929,47 @@ function webPrivateModuleForFile(
   if (first === "features" && second && WEB_FEATURE_NAME.test(second)) {
     if (third === "index.ts") return { kind: "feature-entry", feature: second };
 
-    if (
-      (third === "model" || third === "behavior" || third === "ui") &&
-      (third !== "ui" || (fourth !== void 0 && WEB_UI_LAYERS.has(fourth)))
-    ) {
+    if (third === "model" || third === "behavior") {
       return {
         kind: "feature",
         feature: second,
         layer: third,
-        uiLayer: third === "ui" ? fourth : void 0,
+        uiLayer: void 0,
       };
+    }
+    if (third === "ui") {
+      if (fourth !== void 0 && WEB_UI_LAYERS.has(fourth)) {
+        return {
+          kind: "feature",
+          feature: second,
+          layer: third,
+          uiLayer: fourth,
+        };
+      }
+
+      return void 0;
     }
 
     return void 0;
   }
 
-  if (
-    (first === "model" || first === "behavior" || first === "ui") &&
-    (first !== "ui" || (second !== void 0 && WEB_UI_LAYERS.has(second)))
-  ) {
+  if (first === "model" || first === "behavior") {
     return {
       kind: "global",
       layer: first,
-      uiLayer: first === "ui" ? second : void 0,
+      uiLayer: void 0,
     };
+  }
+  if (first === "ui") {
+    if (second !== void 0 && WEB_UI_LAYERS.has(second)) {
+      return {
+        kind: "global",
+        layer: first,
+        uiLayer: second,
+      };
+    }
+
+    return void 0;
   }
 
   return void 0;
@@ -1962,7 +2055,8 @@ function readWebFeatureDeclarations(sourceRoot: string): {
       });
     }
 
-    if (result.data.dependencies.includes(entry.name)) {
+    const dependencies = result.data.dependencies;
+    if (dependencies.includes(entry.name)) {
       violations.push({
         policy: "ui-web-feature-declaration",
         file: declarationPath,
@@ -2030,20 +2124,19 @@ function webPrivateImportViolations({
 }): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
 
-  if (
-    (module.kind === "global" || module.kind === "feature" || module.kind === "feature-entry") &&
-    (target.kind === "screen" || target.kind === "surface")
-  ) {
-    violations.push({
-      policy: "ui-web-public-boundary-leakage",
-      file,
-      line: sourceImport.line,
-      specifier: sourceImport.specifier,
-      message:
-        "Private feature-web implementation may not depend inward on a public screen or surface boundary.",
-    });
+  if (module.kind === "global" || module.kind === "feature" || module.kind === "feature-entry") {
+    if (target.kind === "screen" || target.kind === "surface") {
+      violations.push({
+        policy: "ui-web-public-boundary-leakage",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message:
+          "Private feature-web implementation may not depend inward on a public screen or surface boundary.",
+      });
 
-    return violations;
+      return violations;
+    }
   }
 
   // A door is the package's own front step onto its shared implementation,
@@ -2093,22 +2186,33 @@ function webPrivateImportViolations({
     return violations;
   }
 
-  if (
-    module.kind === "feature-entry" &&
-    ((target.kind === "feature" && target.feature !== module.feature) ||
-      (target.kind === "feature-entry" && target.feature !== module.feature))
-  ) {
-    violations.push({
-      policy: "ui-web-feature-entry-leakage",
-      file,
-      line: sourceImport.line,
-      specifier: sourceImport.specifier,
-      message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
-      allowed:
-        "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
-    });
+  if (module.kind === "feature-entry") {
+    if (target.kind === "feature" && target.feature !== module.feature) {
+      violations.push({
+        policy: "ui-web-feature-entry-leakage",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
+        allowed:
+          "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
+      });
 
-    return violations;
+      return violations;
+    }
+    if (target.kind === "feature-entry" && target.feature !== module.feature) {
+      violations.push({
+        policy: "ui-web-feature-entry-leakage",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message: `Web feature entry ${JSON.stringify(module.feature)} may not compose another private feature.`,
+        allowed:
+          "Keep the entry to its own feature API; compose another feature only from a ui/sections module with a declared dependency.",
+      });
+
+      return violations;
+    }
   }
 
   if (module.kind === "feature" && target.kind === "feature-entry") {
@@ -2163,26 +2267,30 @@ function webPrivateImportViolations({
     return violations;
   }
 
-  if (
-    (module.kind === "global" || module.kind === "feature") &&
-    (target.kind === "global" || target.kind === "feature") &&
-    !(
-      module.kind === "feature" &&
-      target.kind === "feature" &&
-      module.feature !== target.feature
-    ) &&
-    !canPrivateLayerDependOn(module, target)
-  ) {
-    violations.push({
-      policy: "ui-web-layer-direction",
-      file,
-      line: sourceImport.line,
-      specifier: sourceImport.specifier,
-      message:
-        "Feature-web private layers may not depend upward on a composing UI or behavior layer.",
-      allowed:
-        "model is independent; behavior uses model; elements use model; blocks compose elements; sections compose blocks, elements, and behavior.",
-    });
+  if (module.kind === "global" || module.kind === "feature") {
+    if (target.kind === "global" || target.kind === "feature") {
+      if (
+        module.kind === "feature" &&
+        target.kind === "feature" &&
+        module.feature !== target.feature
+      ) {
+        return violations;
+      }
+      if (canPrivateLayerDependOn(module, target)) {
+        return violations;
+      }
+
+      violations.push({
+        policy: "ui-web-layer-direction",
+        file,
+        line: sourceImport.line,
+        specifier: sourceImport.specifier,
+        message:
+          "Feature-web private layers may not depend upward on a composing UI or behavior layer.",
+        allowed:
+          "model is independent; behavior uses model; elements use model; blocks compose elements; sections compose blocks, elements, and behavior.",
+      });
+    }
   }
 
   return violations;
@@ -2227,14 +2335,18 @@ function lintWebPrivateStructure(
       const segments = relative(sourceRoot, file).split(sep);
       const module = webPrivateModuleForFile(sourceRoot, file, flatPublicEntries);
 
-      if (segments.length === 1 && !isWebRootException(file) && !flatPublicEntries.has(file)) {
-        violations.push({
-          policy: "ui-web-root-flat",
-          file,
-          message: "Feature-web production source may not live flat at src/.",
-          allowed:
-            "Use package-global model, behavior, or ui; a named private feature; or a public screen or surface boundary.",
-        });
+      if (segments.length === 1) {
+        if (!isWebRootException(file)) {
+          if (!flatPublicEntries.has(file)) {
+            violations.push({
+              policy: "ui-web-root-flat",
+              file,
+              message: "Feature-web production source may not live flat at src/.",
+              allowed:
+                "Use package-global model, behavior, or ui; a named private feature; or a public screen or surface boundary.",
+            });
+          }
+        }
       }
 
       if (segments[0] === "components") {
@@ -2317,7 +2429,9 @@ function lintWebPrivateStructure(
         }
       }
 
-      if (lowLinks.get(feature) !== indices.get(feature)) return;
+      const featureLowLink = lowLinks.get(feature);
+      const featureIndex = indices.get(feature);
+      if (featureLowLink !== featureIndex) return;
 
       const component: string[] = [];
       let member: string | undefined;
@@ -2409,15 +2523,12 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
       const target = webPackageForSpecifier(webPackages, specifier);
       const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
 
-      if (
-        !target ||
-        !governed.has(target.name) ||
-        !capability ||
-        capability.kind !== "surface" ||
-        !packageExports(target).has(capability.exportPath)
-      ) {
-        continue;
-      }
+      if (!target) continue;
+      if (!governed.has(target.name)) continue;
+      if (!capability) continue;
+      if (capability.kind !== "surface") continue;
+      const exports = packageExports(target);
+      if (!exports.has(capability.exportPath)) continue;
 
       allowed.add(`${source.name}->${target.name}`);
     }

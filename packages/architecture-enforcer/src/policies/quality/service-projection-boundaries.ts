@@ -20,9 +20,9 @@ function isDomainServiceFile(path: string): boolean {
 }
 
 function declarationName(node: ts.DeclarationName | undefined): string | null {
-  if (node && (ts.isIdentifier(node) || ts.isStringLiteral(node))) {
-    return node.text;
-  }
+  if (!node) return null;
+  if (ts.isIdentifier(node)) return node.text;
+  if (ts.isStringLiteral(node)) return node.text;
 
   return null;
 }
@@ -96,23 +96,28 @@ function memberExposesProjectionWrite(member: ts.TypeElement | ts.ClassElement):
   return name !== null && PROJECTION_WRITE_METHODS.has(name);
 }
 
+function signatureTypeNodes(
+  member:
+    | ts.MethodSignature
+    | ts.MethodDeclaration
+    | ts.GetAccessorDeclaration
+    | ts.SetAccessorDeclaration,
+): ts.TypeNode[] {
+  const parameterTypes = member.parameters.flatMap((parameter) =>
+    parameter.type ? [parameter.type] : [],
+  );
+
+  return member.type ? [...parameterTypes, member.type] : parameterTypes;
+}
+
 function memberTypeNodes(member: ts.TypeElement | ts.ClassElement): ts.TypeNode[] {
-  if (ts.isPropertySignature(member) || ts.isPropertyDeclaration(member)) {
-    return member.type ? [member.type] : [];
-  }
+  if (ts.isPropertySignature(member)) return member.type ? [member.type] : [];
+  if (ts.isPropertyDeclaration(member)) return member.type ? [member.type] : [];
 
-  if (
-    ts.isMethodSignature(member) ||
-    ts.isMethodDeclaration(member) ||
-    ts.isGetAccessorDeclaration(member) ||
-    ts.isSetAccessorDeclaration(member)
-  ) {
-    const parameterTypes = member.parameters.flatMap((parameter) =>
-      parameter.type ? [parameter.type] : [],
-    );
-
-    return member.type ? [...parameterTypes, member.type] : parameterTypes;
-  }
+  if (ts.isMethodSignature(member)) return signatureTypeNodes(member);
+  if (ts.isMethodDeclaration(member)) return signatureTypeNodes(member);
+  if (ts.isGetAccessorDeclaration(member)) return signatureTypeNodes(member);
+  if (ts.isSetAccessorDeclaration(member)) return signatureTypeNodes(member);
 
   return [];
 }
@@ -166,14 +171,14 @@ function typeExposesProjectionWrite(
   types: PackageTypes,
   seen: Set<TypeDeclaration>,
 ): boolean {
-  if (
-    (ts.isMethodSignature(node) ||
-      ts.isMethodDeclaration(node) ||
-      ts.isPropertySignature(node) ||
-      ts.isPropertyDeclaration(node)) &&
-    memberExposesProjectionWrite(node)
-  ) {
-    return true;
+  if (ts.isMethodSignature(node)) {
+    if (memberExposesProjectionWrite(node)) return true;
+  } else if (ts.isMethodDeclaration(node)) {
+    if (memberExposesProjectionWrite(node)) return true;
+  } else if (ts.isPropertySignature(node)) {
+    if (memberExposesProjectionWrite(node)) return true;
+  } else if (ts.isPropertyDeclaration(node)) {
+    if (memberExposesProjectionWrite(node)) return true;
   }
 
   let reference: string | null = null;
@@ -191,12 +196,8 @@ function typeExposesProjectionWrite(
 
     const declarations = types.declarationsByName.get(canonicalName) ?? [];
 
-    if (
-      declarations.some((declaration) =>
-        declarationExposesProjectionWrite(declaration, types, seen),
-      )
-    ) {
-      return true;
+    for (const declaration of declarations) {
+      if (declarationExposesProjectionWrite(declaration, types, seen)) return true;
     }
   }
 
@@ -244,15 +245,15 @@ function lintServiceFile(
   const seen = new Set<string>();
 
   for (const statement of sourceFile.statements) {
-    if (!ts.isClassDeclaration(statement) || !statement.name?.text.endsWith("Service")) {
-      continue;
-    }
+    if (!ts.isClassDeclaration(statement)) continue;
+    const serviceName = statement.name?.text;
+    if (!serviceName?.endsWith("Service")) continue;
 
     for (const dependency of serviceDependencyTypes(statement)) {
       if (!typeExposesProjectionWrite(dependency, types, new Set())) continue;
 
       const dependencyText = dependency.getText(sourceFile);
-      const key = `${statement.name.text}:${dependencyText}`;
+      const key = `${serviceName}:${dependencyText}`;
       if (seen.has(key)) continue;
 
       seen.add(key);

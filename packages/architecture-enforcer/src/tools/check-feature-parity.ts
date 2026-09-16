@@ -42,7 +42,8 @@ function findRepoRoot(from: string): string {
   let directory = from;
 
   for (;;) {
-    if (existsSync(join(directory, "pnpm-workspace.yaml"))) return directory;
+    const marker = join(directory, "pnpm-workspace.yaml");
+    if (existsSync(marker)) return directory;
 
     const parent = dirname(directory);
 
@@ -982,16 +983,14 @@ function parseFeature(absPath: string): Scenario[] {
       continue;
     }
 
-    if (
-      !trimmed.startsWith("Given") &&
-      !trimmed.startsWith("When") &&
-      !trimmed.startsWith("Then") &&
-      !trimmed.startsWith("And") &&
-      !trimmed.startsWith("But") &&
-      !trimmed.startsWith("|")
-    ) {
-      pendingTags = [];
-    }
+    if (trimmed.startsWith("Given")) continue;
+    if (trimmed.startsWith("When")) continue;
+    if (trimmed.startsWith("Then")) continue;
+    if (trimmed.startsWith("And")) continue;
+    if (trimmed.startsWith("But")) continue;
+    if (trimmed.startsWith("|")) continue;
+
+    pendingTags = [];
   }
 
   return scenarios;
@@ -1008,7 +1007,8 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
   }
 
   for (const entry of entries) {
-    if (SKIP_DIR.has(entry) || entry.startsWith(".")) continue;
+    if (SKIP_DIR.has(entry)) continue;
+    if (entry.startsWith(".")) continue;
 
     const full = join(root, entry);
     let s;
@@ -1044,7 +1044,8 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
       );
     }
 
-    if (!statSync(root).isDirectory()) {
+    const rootStat = statSync(root);
+    if (!rootStat.isDirectory()) {
       throw new Error(
         `Configured specs root is not a directory: ${root}. ` +
           `Fix SPECS_ROOTS in scripts/check-feature-parity.ts.`,
@@ -1173,7 +1174,19 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
   while (i < len) {
     const ch = src[i];
 
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+    if (ch === " ") {
+      i++;
+      continue;
+    }
+    if (ch === "\t") {
+      i++;
+      continue;
+    }
+    if (ch === "\n") {
+      i++;
+      continue;
+    }
+    if (ch === "\r") {
       i++;
       continue;
     }
@@ -1354,7 +1367,19 @@ function skipGoSpaceAndComments(src: string, start: number, limit: number): numb
   while (i < limit) {
     const ch = src[i];
 
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+    if (ch === " ") {
+      i++;
+      continue;
+    }
+    if (ch === "\t") {
+      i++;
+      continue;
+    }
+    if (ch === "\n") {
+      i++;
+      continue;
+    }
+    if (ch === "\r") {
       i++;
       continue;
     }
@@ -1563,7 +1588,19 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
   while (i < len) {
     const ch = src[i];
 
-    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+    if (ch === " ") {
+      i++;
+      continue;
+    }
+    if (ch === "\t") {
+      i++;
+      continue;
+    }
+    if (ch === "\n") {
+      i++;
+      continue;
+    }
+    if (ch === "\r") {
       i++;
       continue;
     }

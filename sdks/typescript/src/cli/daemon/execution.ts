@@ -370,11 +370,10 @@ export class ExecutionWindow {
     // agent-mode markers -- a daemon spawned by an agent inherits
     // CLAUDECODE=1, and a later human caller must not be misread as one.
     for (const key of Object.keys(process.env)) {
-      if (
-        (key.startsWith("LANGWATCH_") || AGENT_MODE_ENV_VAR_SET.has(key)) &&
-        !(key in request.env)
-      ) {
-        delete process.env[key];
+      if (key.startsWith("LANGWATCH_")) {
+        if (!(key in request.env)) delete process.env[key];
+      } else if (AGENT_MODE_ENV_VAR_SET.has(key)) {
+        if (!(key in request.env)) delete process.env[key];
       }
     }
     Object.assign(process.env, request.env);

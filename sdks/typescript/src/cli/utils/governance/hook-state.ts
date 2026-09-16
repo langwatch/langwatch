@@ -79,7 +79,8 @@ export function pruneStaleState({ stateDir, now }: { stateDir: string; now: () =
       if (!entry.endsWith(".json")) continue;
       const file = path.join(stateDir, entry);
       try {
-        if (now() - fs.statSync(file).mtimeMs > STATE_MAX_AGE_MS) {
+        const age = now() - fs.statSync(file).mtimeMs;
+        if (age > STATE_MAX_AGE_MS) {
           fs.unlinkSync(file);
         }
       } catch {

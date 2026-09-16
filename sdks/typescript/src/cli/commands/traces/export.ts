@@ -296,7 +296,13 @@ function csvNumber(value: number | null | undefined): string {
 }
 
 function csvEscape(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+  if (value.includes(",")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  if (value.includes('"')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  if (value.includes("\n")) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;

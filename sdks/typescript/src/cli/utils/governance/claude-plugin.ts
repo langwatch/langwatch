@@ -82,7 +82,8 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+/;
  * worked is not something a coding session should narrate.
  */
 function debugLog(message: string): void {
-  if (!process.env.DEBUG?.includes("langwatch")) return;
+  const debugFlag = process.env.DEBUG;
+  if (!debugFlag?.includes("langwatch")) return;
   process.stderr.write(`langwatch:claude-plugin ${message}\n`);
 }
 
@@ -217,7 +218,8 @@ function pointsAtOwnedRepo(value: unknown): boolean {
   try {
     const url = new URL(raw);
     if (!OWNED_PROTOCOLS.has(url.protocol)) return false;
-    if (!OWNED_HOSTS.has(url.hostname.toLowerCase())) return false;
+    const hostname = url.hostname.toLowerCase();
+    if (!OWNED_HOSTS.has(hostname)) return false;
     // A query or a fragment means the path is not the whole address, and we do
     // not know what the rest of it does.
     if (url.search !== "" || url.hash !== "") return false;
@@ -423,7 +425,8 @@ function updateEligibility(): ClaudePluginUpdateResult | null {
   // from spending a probe and a fetch every day to reach the same conclusion.
   if (!readUserScopeInstall()) return { action: "absent" };
 
-  if (checkedRecently(lastCheckedAt())) return { action: "checked_recently" };
+  const lastChecked = lastCheckedAt();
+  if (checkedRecently(lastChecked)) return { action: "checked_recently" };
 
   // Record the check BEFORE running it, and give up when that cannot be done.
   // A stamp that does not land is a check with no memory, and a check with no

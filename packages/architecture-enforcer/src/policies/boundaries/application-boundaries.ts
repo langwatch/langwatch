@@ -378,10 +378,16 @@ function lintCompositionSourceShape(
 
     const source = files.map((file) => sourceText({ file })).join("\n");
 
-    if (
-      !/export\s+(?:default\s+)?class\s+[A-Za-z_$][\w$]*/.test(source) ||
-      !/static\s+create\s*\(/.test(source)
-    ) {
+    if (!/export\s+(?:default\s+)?class\s+[A-Za-z_$][\w$]*/.test(source)) {
+      violations.push({
+        policy: "composition-source",
+        file: join(pkg.root, "src"),
+        message:
+          "An Enterprise composition package must export a composition class with static create.",
+      });
+      continue;
+    }
+    if (!/static\s+create\s*\(/.test(source)) {
       violations.push({
         policy: "composition-source",
         file: join(pkg.root, "src"),
@@ -418,19 +424,17 @@ function lintRuntimeConstructionImports(
   }
 
   for (const [packageRoot, imports] of groups) {
-    if (
-      imports.has(API_RUNTIME) &&
-      imports.has(WORKER_RUNTIME) &&
-      packageRoot !== "tools/dev-runtime"
-    ) {
-      violations.push({
-        policy: "application-boundary",
-        file: join(root, packageRoot, "src"),
-        message: `${packageRoot} imports both API and worker runtime construction entry points.`,
-        allowed:
-          "Only the private tools/dev-runtime contributor composition may combine both runtimes.",
-      });
-    }
+    if (!imports.has(API_RUNTIME)) continue;
+    if (!imports.has(WORKER_RUNTIME)) continue;
+    if (packageRoot === "tools/dev-runtime") continue;
+
+    violations.push({
+      policy: "application-boundary",
+      file: join(root, packageRoot, "src"),
+      message: `${packageRoot} imports both API and worker runtime construction entry points.`,
+      allowed:
+        "Only the private tools/dev-runtime contributor composition may combine both runtimes.",
+    });
   }
 
   const devRuntime = packages.find((pkg) => pkg.kind === "dev-runtime");
@@ -454,9 +458,9 @@ function lintRuntimeConstructionImports(
       (pkg) => pkg.kind === "application" && pkg.applicationRole === role,
     );
 
-    if (!application || exportedSubpaths(application).has("./runtime")) {
-      continue;
-    }
+    if (!application) continue;
+    const subpaths = exportedSubpaths(application);
+    if (subpaths.has("./runtime")) continue;
 
     violations.push({
       policy: "application-boundary",
@@ -482,9 +486,11 @@ function legacyArea(legacyRoot: string, file: string): LegacyArea {
   if (
     /^(?:server|app\/api|pages\/api|mcp|tasks|runtime\/(?:app|worker|combined|testing))(?:\/|$)/.test(
       sourcePath,
-    ) ||
-    /^(?:server\.mts|start\.ts|workers\.ts)$/.test(sourcePath)
+    )
   ) {
+    return "backend";
+  }
+  if (/^(?:server\.mts|start\.ts|workers\.ts)$/.test(sourcePath)) {
     return "backend";
   }
 
@@ -697,12 +703,19 @@ function readLegacyBaseline(root: string): {
 
     const importerKeys = Object.keys(importers);
 
-    if (
-      importerKeys.some(
-        (importer, index) =>
-          importer !== [...importerKeys].sort((left, right) => left.localeCompare(right))[index],
-      )
-    ) {
+    const sortedImporterKeys = [...importerKeys].sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    let importerKeysUnsorted = false;
+    for (let index = 0; index < importerKeys.length; index++) {
+      if (importerKeys[index] !== sortedImporterKeys[index]) {
+        importerKeysUnsorted = true;
+        break;
+      }
+    }
+
+    if (importerKeysUnsorted) {
       violations.push({
         policy: "application-migration-baseline",
         file: path,
@@ -713,11 +726,25 @@ function readLegacyBaseline(root: string): {
     for (const importer of importerKeys) {
       const specifiers = importers[importer];
 
-      if (
-        !Array.isArray(specifiers) ||
-        specifiers.length === 0 ||
-        specifiers.some((specifier) => typeof specifier !== "string")
-      ) {
+      if (!Array.isArray(specifiers)) {
+        violations.push({
+          policy: "application-migration-baseline",
+          file: path,
+          message: `Legacy application boundary baseline importer ${importer} has invalid specifiers.`,
+        });
+
+        continue;
+      }
+      if (specifiers.length === 0) {
+        violations.push({
+          policy: "application-migration-baseline",
+          file: path,
+          message: `Legacy application boundary baseline importer ${importer} has invalid specifiers.`,
+        });
+
+        continue;
+      }
+      if (specifiers.some((specifier) => typeof specifier !== "string")) {
         violations.push({
           policy: "application-migration-baseline",
           file: path,
@@ -777,7 +804,8 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
   const baselineByKey = new Map(baseline.map((edge) => [legacyEdgeKey(edge), edge]));
 
   for (const edge of actual) {
-    if (baselineByKey.has(legacyEdgeKey(edge))) continue;
+    const key = legacyEdgeKey(edge);
+    if (baselineByKey.has(key)) continue;
 
     violations.push({
       policy: "application-migration",
@@ -790,7 +818,8 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
   }
 
   for (const edge of baseline) {
-    if (actualByKey.has(legacyEdgeKey(edge))) continue;
+    const key = legacyEdgeKey(edge);
+    if (actualByKey.has(key)) continue;
 
     violations.push({
       policy: "application-migration-baseline",

@@ -68,17 +68,13 @@ function sourceSegments(path: string): readonly string[] {
 function remnantKind(file: string): LegacyFeatureFragmentKind {
   if (file.includes("/runtime/")) return "composition";
 
-  if (
-    file.includes("/app/api/") ||
-    file.includes("/server/api/routers/") ||
-    file.includes("/server/routes/")
-  ) {
-    return "transport";
-  }
+  if (file.includes("/app/api/")) return "transport";
+  if (file.includes("/server/api/routers/")) return "transport";
+  if (file.includes("/server/routes/")) return "transport";
 
-  if (file.includes("/components/") || file.includes("/hooks/") || file.includes("/pages/")) {
-    return "page-shell";
-  }
+  if (file.includes("/components/")) return "page-shell";
+  if (file.includes("/hooks/")) return "page-shell";
+  if (file.includes("/pages/")) return "page-shell";
 
   if (/\.(?:adapter|client)\.[cm]?[jt]sx?$/.test(file)) {
     return "infrastructure-adapter";
@@ -140,7 +136,14 @@ export function collectLegacyFeatureFragments(
     const matchingFeatures = new Set<string>();
 
     for (const owner of subjectOwners) {
-      if (!segments.some((segment) => owner.forms.has(segment))) continue;
+      let matchesOwner = false;
+      for (const segment of segments) {
+        if (owner.forms.has(segment)) {
+          matchesOwner = true;
+          break;
+        }
+      }
+      if (!matchesOwner) continue;
 
       matchingFeatures.add(owner.feature);
     }
@@ -239,9 +242,15 @@ function readBaseline(root: string): {
     baseline.push(entryResult.data);
   }
 
-  if (
-    baseline.some((entry, index) => index > 0 && compareFragments(baseline[index - 1]!, entry) > 0)
-  ) {
+  let isUnsorted = false;
+  for (let index = 1; index < baseline.length; index++) {
+    if (compareFragments(baseline[index - 1]!, baseline[index]!) > 0) {
+      isUnsorted = true;
+      break;
+    }
+  }
+
+  if (isUnsorted) {
     violations.push({
       policy: "legacy-feature-fragment-baseline",
       file: path,
@@ -283,7 +292,8 @@ export function lintLegacyFeatureFragments(snapshot: WorkspaceSnapshot): Archite
   const baselineByKey = new Map(baseline.map((fragment) => [fragmentKey(fragment), fragment]));
 
   for (const fragment of actual) {
-    if (baselineByKey.has(fragmentKey(fragment))) continue;
+    const key = fragmentKey(fragment);
+    if (baselineByKey.has(key)) continue;
 
     violations.push({
       policy: "legacy-feature-fragment",
@@ -295,7 +305,8 @@ export function lintLegacyFeatureFragments(snapshot: WorkspaceSnapshot): Archite
   }
 
   for (const fragment of baseline) {
-    if (actualByKey.has(fragmentKey(fragment))) continue;
+    const key = fragmentKey(fragment);
+    if (actualByKey.has(key)) continue;
 
     violations.push({
       policy: "legacy-feature-fragment-baseline",

@@ -148,7 +148,10 @@ export const experimentStatusCommand = async (
       const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 
       let lastReadError: Error | null = null;
-      while (!TERMINAL_STATUSES.has(status.status) && Date.now() < deadline) {
+      while (true) {
+        if (TERMINAL_STATUSES.has(status.status)) break;
+        if (Date.now() >= deadline) break;
+
         spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
         await sleep(pollMs);
         try {

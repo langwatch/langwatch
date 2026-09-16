@@ -301,18 +301,18 @@ function dependencyViolations(
   if (!target) return runtimeViolation ? [runtimeViolation] : [];
 
   const targetViolations = DEPENDENCY_TARGET_CHECKS.flatMap((check) => {
-    if (
-      check === crossFeatureCheck &&
-      pkg.kind === "web" &&
-      target.kind === "web" &&
-      allowedWebDependencies.has(`${pkg.name}->${target.name}`)
-    ) {
-      return [];
-    }
+    const runCheck = () => {
+      const violation = check(pkg, target, dependency);
 
-    const violation = check(pkg, target, dependency);
+      return violation ? [violation] : [];
+    };
 
-    return violation ? [violation] : [];
+    if (check !== crossFeatureCheck) return runCheck();
+    if (pkg.kind !== "web") return runCheck();
+    if (target.kind !== "web") return runCheck();
+    if (!allowedWebDependencies.has(`${pkg.name}->${target.name}`)) return runCheck();
+
+    return [];
   });
 
   return runtimeViolation ? [runtimeViolation, ...targetViolations] : targetViolations;

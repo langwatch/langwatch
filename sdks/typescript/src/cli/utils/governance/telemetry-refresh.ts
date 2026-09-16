@@ -223,7 +223,8 @@ export function refreshClaudeUserTelemetryEnv({
 }): string | null {
   const target = appSettingsTargetFor("claude");
   if (!target) return null;
-  if (!appEnvHasAnyVar(target, Object.keys(vars))) return null;
+  const varNames = Object.keys(vars);
+  if (!appEnvHasAnyVar(target, varNames)) return null;
   const current = appEnvValues(target);
   if (!otelWiringLooksLangwatchAuthored(current)) return null;
   try {
@@ -280,7 +281,8 @@ export function refreshCodexOtelBlockTo({
   token: string;
   environment: string;
 }): string | null {
-  if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
+  const codexConfigPath = defaultCodexConfigPath();
+  if (!codexHasOtelBlock(codexConfigPath)) return null;
   const result = writeCodexOtelBlock({
     baseEndpoint: endpoint,
     ingestionToken: token,
@@ -338,7 +340,8 @@ export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boole
   const target = claudeProjectSettingsTarget(cwd);
   const keys = telemetryEnvVarNames("claude");
   if (!appEnvHasAnyVar(target, keys)) return false;
-  if (!otelWiringLooksLangwatchAuthored(appEnvValues(target))) return false;
+  const envValues = appEnvValues(target);
+  if (!otelWiringLooksLangwatchAuthored(envValues)) return false;
   const changed = removeAppEnvVars(target, keys);
   if (changed) removeSettingsFileIfEmpty(target.path);
   return changed;
@@ -382,7 +385,10 @@ function excludeClaudeLocalSettingsFromGit(cwd: string): void {
     } catch {
       // ENOENT - created below.
     }
-    if (existing.split("\n").some((l) => l.trim() === line)) return;
+    const existingLines = existing.split("\n");
+    for (const l of existingLines) {
+      if (l.trim() === line) return;
+    }
     fs.mkdirSync(path.dirname(excludePath), { recursive: true });
     const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
     fs.writeFileSync(excludePath, `${existing}${sep}${line}\n`);
@@ -394,7 +400,8 @@ function excludeClaudeLocalSettingsFromGit(cwd: string): void {
 function claudeUserWiringNeedsRefresh(expectedEndpoint: string): boolean {
   const target = appSettingsTargetFor("claude");
   if (!target) return false;
-  if (!appEnvHasAnyVar(target, telemetryEnvVarNames("claude"))) return false;
+  const claudeVarNames = telemetryEnvVarNames("claude");
+  if (!appEnvHasAnyVar(target, claudeVarNames)) return false;
   const current = appEnvValues(target);
   if (!otelWiringLooksLangwatchAuthored(current)) return false;
   return current.OTEL_EXPORTER_OTLP_ENDPOINT !== expectedEndpoint;
@@ -462,9 +469,12 @@ export async function refreshTelemetryWiringForLogin(
       // ahead of the pin check — a pinned codex needs them exactly as a personal one does.
       // A config already pointing at this login skips the refresh below, so a device whose
       // [otel] block predates either would never be given one; both calls are idempotent.
-      if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
-        assertCodexTurnHarvest();
-        assertCodexAgentGuidance();
+      if (tool === "codex") {
+        const codexConfigPath = defaultCodexConfigPath();
+        if (codexHasOtelBlock(codexConfigPath)) {
+          assertCodexTurnHarvest();
+          assertCodexAgentGuidance();
+        }
       }
       if (cfg.tool_project_keys?.[tool]?.secret) {
         // Project-pinned wiring is deliberate scope, not stale personal
@@ -517,7 +527,8 @@ export async function refreshTelemetryWiringForLogin(
   // the login that wrote it. Re-sync it with this login's gateway URL
   // when present - no ingest key involved.
   try {
-    if (codexHasGatewayBlock(defaultCodexConfigPath())) {
+    const codexConfigPath = defaultCodexConfigPath();
+    if (codexHasGatewayBlock(codexConfigPath)) {
       const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
       if (result.action !== "unchanged") {
         labels.push(`codex gateway block (${displayCodexConfigPath()})`);

@@ -220,7 +220,15 @@ export function removeCopilotAppAgent(
   io: AgentIo = defaultIo,
 ): boolean {
   const files = copilotAppAgentFiles(platform, home);
-  if (!files.some((f) => io.fileExists(f))) return false; // nothing installed
+
+  let anyFileExists = false;
+  for (const f of files) {
+    if (io.fileExists(f)) {
+      anyFileExists = true;
+      break;
+    }
+  }
+  if (!anyFileExists) return false; // nothing installed
 
   // A missing register descriptor means the OS registration is either gone
   // or unreachable (partial prior removal) — the surviving files are stray

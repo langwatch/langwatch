@@ -111,11 +111,14 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     }
 
     // Handle chat messages (single message or array)
-    if (
-      isChatMessage(value) ||
-      (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))
-    ) {
+    if (isChatMessage(value)) {
       return processChatMessages(value);
+    } else if (Array.isArray(value)) {
+      if (value.length > 0) {
+        if (isChatMessageArray(value)) {
+          return processChatMessages(value);
+        }
+      }
     }
 
     // Handle arrays (non-chat messages)

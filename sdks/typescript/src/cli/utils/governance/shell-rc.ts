@@ -355,13 +355,8 @@ export async function maybeOfferIngestionShellRcPersist({
   // Already installed for this endpoint, even if this shell hasn't sourced the
   // rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
   // stale wrapper for a different endpoint doesn't suppress installing this one.
-  if (
-    rcHasLangwatchBlock({
-      shell,
-      requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(Boolean) as string[],
-      markers,
-    })
-  ) {
+  const requiredKeys = [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(Boolean) as string[];
+  if (rcHasLangwatchBlock({ shell, requiredKeys, markers })) {
     return;
   }
   const target = rcPath(shell);

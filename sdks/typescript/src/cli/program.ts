@@ -887,7 +887,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
-      if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
+      const normalizedTool = tool.trim().toLowerCase().replace(/-/g, "_");
+      if (normalizedTool !== "claude_code") return;
       const { SESSION_CONTEXT_GUIDANCE } = await import("./utils/governance/session-guidance.js");
       process.stdout.write(
         `${JSON.stringify({

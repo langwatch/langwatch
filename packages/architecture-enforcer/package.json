@@ -24,7 +24,6 @@
     "rename-feature-sources": "node --experimental-transform-types src/tools/rename-feature-sources.cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run",
     "colocate-tests": "node --experimental-transform-types src/tools/colocate-tests.cli.ts",
     "check:ts-budget": "node --experimental-transform-types src/tools/declaration-budget.cli.ts --root ../..",
     "check:feature-parity": "node --experimental-transform-types src/tools/check-feature-parity.ts",

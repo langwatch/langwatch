@@ -95,7 +95,15 @@ function readFeatureConfiguration(
 
   const keys = Object.keys(value as Record<string, unknown>);
 
-  if (keys.some((key) => !FEATURE_CONFIGURATION_KEYS.has(key))) {
+  let hasUnknownKey = false;
+  for (const key of keys) {
+    if (!FEATURE_CONFIGURATION_KEYS.has(key)) {
+      hasUnknownKey = true;
+      break;
+    }
+  }
+
+  if (hasUnknownKey) {
     violations.push({
       policy: "feature-source-subject",
       file: path,
@@ -328,15 +336,15 @@ export function discoverClassifiedPackages(root: string): {
     });
   }
 
-  if (
-    existsSync(enterpriseLicense) &&
-    !/^#\s+LangWatch Enterprise License\s*$/m.test(readFileSync(enterpriseLicense, "utf8"))
-  ) {
-    violations.push({
-      policy: "enterprise-license",
-      file: enterpriseLicense,
-      message: "enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
-    });
+  if (existsSync(enterpriseLicense)) {
+    const licenseText = readFileSync(enterpriseLicense, "utf8");
+    if (!/^#\s+LangWatch Enterprise License\s*$/m.test(licenseText)) {
+      violations.push({
+        policy: "enterprise-license",
+        file: enterpriseLicense,
+        message: "enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
+      });
+    }
   }
 
   if (existsSync(enterpriseManifest)) {
@@ -350,11 +358,23 @@ export function discoverClassifiedPackages(root: string): {
       });
     }
 
-    if (
-      typeof manifest.license !== "string" ||
-      !/LICENSE\.md/i.test(manifest.license) ||
-      /Apache-2\.0/i.test(manifest.license)
-    ) {
+    if (typeof manifest.license !== "string") {
+      violations.push({
+        policy: "enterprise-license",
+        file: enterpriseManifest,
+        message:
+          "The Enterprise root manifest must identify enterprise/LICENSE.md rather than an Apache license.",
+        allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
+      });
+    } else if (!/LICENSE\.md/i.test(manifest.license)) {
+      violations.push({
+        policy: "enterprise-license",
+        file: enterpriseManifest,
+        message:
+          "The Enterprise root manifest must identify enterprise/LICENSE.md rather than an Apache license.",
+        allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
+      });
+    } else if (/Apache-2\.0/i.test(manifest.license)) {
       violations.push({
         policy: "enterprise-license",
         file: enterpriseManifest,

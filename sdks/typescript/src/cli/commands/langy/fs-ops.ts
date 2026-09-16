@@ -325,8 +325,13 @@ export function findFiles({ params, root }: { params: LocalFindParams; root: str
   const found: string[] = [];
   for (const relative of walkFiles({ from, root, rules })) {
     if (found.length >= limit) break;
-    if (matcher.test(relative) || matcher.test(path.basename(relative))) {
+    if (matcher.test(relative)) {
       found.push(relative);
+    } else {
+      const base = path.basename(relative);
+      if (matcher.test(base)) {
+        found.push(relative);
+      }
     }
   }
   if (found.length === 0) return `No file matches ${params.pattern}.`;

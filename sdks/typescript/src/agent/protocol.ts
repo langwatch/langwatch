@@ -153,10 +153,12 @@ const isStringList = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(isString);
 
 const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null => {
-  if (!Array.isArray(frame.agents) || !isString(frame.instanceId)) return null;
+  if (!Array.isArray(frame.agents)) return null;
+  if (!isString(frame.instanceId)) return null;
   const agents: RegisteredAgent[] = [];
   for (const entry of frame.agents) {
-    if (!isRecord(entry) || !isString(entry.name)) return null;
+    if (!isRecord(entry)) return null;
+    if (!isString(entry.name)) return null;
     const id = isString(entry.id) ? entry.id : isString(entry.agentId) ? entry.agentId : null;
     if (id === null) return null;
     agents.push({
@@ -207,7 +209,8 @@ const readDeadline = (value: unknown): number | null => {
 };
 
 const readCall = (frame: Record<string, unknown>): CallFrame | null => {
-  if (!isString(frame.callId) || !isString(frame.agentId)) return null;
+  if (!isString(frame.callId)) return null;
+  if (!isString(frame.agentId)) return null;
   const messages = isMessageList(frame.messages) ? frame.messages : [];
   const run = isRecord(frame.run) ? frame.run : {};
   return {
@@ -242,7 +245,8 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !isString(parsed.type)) return null;
+  if (!isRecord(parsed)) return null;
+  if (!isString(parsed.type)) return null;
   switch (parsed.type) {
     case "registered":
       return readRegistered(parsed);
