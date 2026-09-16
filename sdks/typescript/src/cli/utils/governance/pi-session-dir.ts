@@ -54,12 +54,62 @@ import { fileURLToPath } from "node:url";
 /** The variable pi itself reads, second in its own precedence order. */
 export const PI_SESSION_DIR_ENV = "PI_CODING_AGENT_SESSION_DIR";
 
+/**
+ * The variable that moves pi's whole agent directory, not just its sessions.
+ *
+ * pi builds the name rather than writing it down — `config.js:406` is
+ * ``export const ENV_AGENT_DIR = `${APP_NAME.toUpperCase()}_CODING_AGENT_DIR`;``
+ * over an `APP_NAME` of `pi` (`config.js:401`), which is how a rebranded build
+ * of the same agent reads a different variable. We hard-code the `pi` spelling
+ * because `pi` is the binary this wrapper spawns.
+ */
+export const PI_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
+
 /** The flag pi itself accepts, first in its own precedence order. */
 const SESSION_DIR_FLAG = "--session-dir";
 
-/** pi's settings file, the third place a relocated directory can be named. */
-export function piSettingsPath(home: string = homedir()): string {
-  return join(home, ".pi", "agent", "settings.json");
+/**
+ * pi's agent directory — the root every other path here hangs off.
+ *
+ * `~/.pi/agent` is only its default. `config.js:420-426` reads
+ * {@link PI_AGENT_DIR_ENV} first and, when it is set, returns it through
+ * `expandTildePath`, which is `normalizePath(path)` with no options
+ * (`config.js:408-410`) — the same call {@link normalizeNamedPiDir} already
+ * mirrors, so it is reused here rather than spelled a second time. Only when
+ * the variable is unset does pi fall back to `join(homedir(), ".pi", "agent")`.
+ *
+ * This matters because the variable moves BOTH the settings file
+ * (`getSettingsPath`, `config.js:440-442`) and the sessions root
+ * (`getSessionsDir`, `config.js:457-459`). A reader that hard-codes
+ * `~/.pi/agent` for a user who set it reads a settings file that is not pi's
+ * and walks a directory pi never wrote to, and does both without an error to
+ * notice — the same silent miss this whole file exists to close.
+ *
+ * One deliberate divergence: pi's test is `if (envDir)`, so a value of only
+ * spaces is a directory named with spaces to pi, while we trim first and treat
+ * it as unset. That matches how {@link resolvePiSessionDir} already treats a
+ * blank {@link PI_SESSION_DIR_ENV}, and a user who exported whitespace meant
+ * nothing by it.
+ */
+export function piAgentDir({
+  env = process.env,
+  home = homedir(),
+}: {
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+} = {}): string {
+  const named = env[PI_AGENT_DIR_ENV]?.trim();
+  if (named) return normalizeNamedPiDir(named, home);
+  return join(home, ".pi", "agent");
+}
+
+/**
+ * pi's settings file, the third place a relocated session directory can be
+ * named. It lives in the agent directory, so a relocated agent directory takes
+ * it with it — resolve one with {@link piAgentDir} rather than passing a home.
+ */
+export function piSettingsPath(agentDir: string = piAgentDir()): string {
+  return join(agentDir, "settings.json");
 }
 
 /**
@@ -67,8 +117,8 @@ export function piSettingsPath(home: string = homedir()): string {
  * file itself. Callers that want somewhere to read from want
  * {@link defaultPiProjectSessionsDir}.
  */
-export function defaultPiSessionsRoot(home: string = homedir()): string {
-  return join(home, ".pi", "agent", "sessions");
+export function defaultPiSessionsRoot(agentDir: string = piAgentDir()): string {
+  return join(agentDir, "sessions");
 }
 
 /**
@@ -88,15 +138,26 @@ export function encodePiCwdDirName(cwd: string): string {
 /**
  * Where pi writes this working directory's sessions when nothing has moved
  * them. This is the directory a reader reads; its parent never holds files.
+ *
+ * pi's own `getDefaultSessionDirPath` (`core/session-manager.js:242-247`) puts
+ * the agent directory through `resolvePath` as well as the cwd. That is not
+ * mirrored, and deliberately: `join` already normalises `..` and a trailing
+ * separator, so the only shape `resolvePath` would change is a RELATIVE agent
+ * directory, which it would resolve against `process.cwd()` — the same
+ * directory our caller reads from, so the filesystem lands in the same place
+ * either way. Adding it would buy an identical read and cost this function its
+ * one useful property, that every input arrives as an argument. Checked, not
+ * assumed: pi's `resolvePath` is `isAbsolute(x) ? resolve(x) : resolve(base, x)`
+ * over `process.cwd()` (`utils/paths.js:81-85`).
  */
 export function defaultPiProjectSessionsDir({
   cwd,
-  home = homedir(),
+  agentDir = piAgentDir(),
 }: {
   cwd: string;
-  home?: string;
+  agentDir?: string;
 }): string {
-  return join(defaultPiSessionsRoot(home), encodePiCwdDirName(resolve(cwd)));
+  return join(defaultPiSessionsRoot(agentDir), encodePiCwdDirName(resolve(cwd)));
 }
 
 /**
@@ -209,6 +270,12 @@ export function normalizeNamedPiDir(named: string, home = homedir()): string {
  * A named directory is returned as pi reads it — see
  * {@link normalizeNamedPiDir}, which is not the same as "as typed". Only the
  * default gains the per-project segment, for the same reason.
+ *
+ * The lowest two sources both hang off pi's agent directory, so it is resolved
+ * once from the same `env` and shared: a user who moved that directory gets
+ * their settings file read from where they moved it AND their default sessions
+ * looked for underneath it. Resolving it twice, or resolving only one of them,
+ * is how half of a relocation gets honoured.
  */
 export async function resolvePiSessionDir({
   toolArgs = [],
@@ -229,8 +296,10 @@ export async function resolvePiSessionDir({
   const fromEnv = env[PI_SESSION_DIR_ENV]?.trim();
   if (fromEnv) return normalizeNamedPiDir(fromEnv, home);
 
-  const fromSettings = await readSettingsSessionDir(piSettingsPath(home));
+  const agentDir = piAgentDir({ env, home });
+
+  const fromSettings = await readSettingsSessionDir(piSettingsPath(agentDir));
   if (fromSettings) return normalizeNamedPiDir(fromSettings, home);
 
-  return defaultPiProjectSessionsDir({ cwd, home });
+  return defaultPiProjectSessionsDir({ cwd, agentDir });
 }

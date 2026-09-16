@@ -642,7 +642,10 @@ describe("given a default pi install, where pi writes below the sessions root", 
       home,
       cwd,
     });
-    const root = defaultPiSessionsRoot(home);
+    // Spelled out rather than resolved from the environment: this test is about
+    // the depth capture reads at, so the agent root it compares against should
+    // not come from the same resolver the assertion is testing.
+    const root = defaultPiSessionsRoot(join(home, ".pi", "agent"));
 
     // The resolved directory is below the root, not the root. Asserted here as
     // well as on the string, because everything after this depends on it.

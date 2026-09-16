@@ -13,7 +13,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   defaultPiProjectSessionsDir,
   encodePiCwdDirName,
+  PI_AGENT_DIR_ENV,
   PI_SESSION_DIR_ENV,
+  piAgentDir,
   piSettingsPath,
   resolvePiSessionDir,
   sessionDirFromArgs,
@@ -28,17 +30,31 @@ let home: string;
  */
 const cwd = "/work/project";
 
+/**
+ * pi's default agent root under the throwaway HOME, written out rather than
+ * asked of {@link piAgentDir}, so a test that expects the default is asserting
+ * against a literal and not against whatever the resolver currently returns.
+ */
+const defaultAgentDir = () => join(home, ".pi", "agent");
+
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "lw-pi-session-dir-"));
-  mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+  mkdirSync(defaultAgentDir(), { recursive: true });
 });
 
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-const writeSettings = (contents: string) => {
-  writeFileSync(piSettingsPath(home), contents);
+const writeSettings = (contents: string, agentDir = defaultAgentDir()) => {
+  writeFileSync(piSettingsPath(agentDir), contents);
+};
+
+/** A relocated agent root, created empty, the way `PI_CODING_AGENT_DIR` leaves it. */
+const makeAgentDir = (name: string) => {
+  const agentDir = join(home, name);
+  mkdirSync(agentDir, { recursive: true });
+  return agentDir;
 };
 
 describe("resolving pi's session directory", () => {
@@ -224,7 +240,7 @@ describe("resolving pi's session directory", () => {
         cwd,
       });
 
-      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
 
     /**
@@ -279,7 +295,7 @@ describe("resolving pi's session directory", () => {
         cwd,
       });
 
-      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
   });
 
@@ -289,7 +305,7 @@ describe("resolving pi's session directory", () => {
 
       await expect(
         resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
-      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
 
     it("falls through when the file is not an object", async () => {
@@ -297,7 +313,7 @@ describe("resolving pi's session directory", () => {
 
       await expect(
         resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
-      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
 
     it("falls through when sessionDir is not a string", async () => {
@@ -305,7 +321,7 @@ describe("resolving pi's session directory", () => {
 
       await expect(
         resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
-      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
 
     it("falls through when sessionDir is blank", async () => {
@@ -313,7 +329,7 @@ describe("resolving pi's session directory", () => {
 
       await expect(
         resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
-      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }));
     });
 
     it("lets a broken settings file fall through to the variable, not past it", async () => {
@@ -326,6 +342,128 @@ describe("resolving pi's session directory", () => {
       });
 
       expect(resolved).toBe("/from-env");
+    });
+  });
+
+  /**
+   * `PI_CODING_AGENT_DIR` moves pi's whole agent directory, and with it both
+   * places this resolver reads: the settings file (`config.js:440-442`) and the
+   * sessions root (`config.js:457-459`), because each is a `join` onto
+   * `getAgentDir()` (`config.js:420-426`). A resolver that hard-codes
+   * `~/.pi/agent` reads a settings file pi is not writing and walks a sessions
+   * tree pi is not filling, and reports no error for either.
+   *
+   * These tests give the relocated root a name that is not `.pi/agent` and put
+   * nothing in the default one, so anything still looking at the default has
+   * nowhere to accidentally succeed.
+   */
+  describe("given pi's whole agent directory has been moved", () => {
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("looks for the default sessions under the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(join(agentDir, "sessions", "--work-project--"));
+      expect(resolved.startsWith(defaultAgentDir())).toBe(false);
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("reads the settings file out of the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+      writeSettings(JSON.stringify({ sessionDir: "/named-in-moved" }), agentDir);
+      // The default root holds a settings file naming somewhere else, so
+      // reading the wrong one resolves to the wrong directory rather than to
+      // the default and can be told apart from simply missing the file.
+      writeSettings(JSON.stringify({ sessionDir: "/named-in-default" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe("/named-in-moved");
+    });
+
+    /**
+     * pi passes the variable through `expandTildePath`, which is
+     * `normalizePath` with no options (`config.js:408-410`), so a leading tilde
+     * is a home reference to pi and never a directory called `~`. JSON is not
+     * the only place a user cannot expand one themselves: a variable set from a
+     * config file or a `.env` reaches the process unexpanded too.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
+    it("expands a tilde in the moved agent directory", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: "~/relocated-agent" },
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(join(agentDir, "sessions", "--work-project--"));
+      expect(resolved.startsWith("~")).toBe(false);
+    });
+
+    /**
+     * The two relocations compose rather than compete: the agent directory says
+     * WHERE the settings file is, and the settings file still says where the
+     * sessions are. Getting this wrong in either direction — reading the
+     * default settings, or letting the moved root override a directory the user
+     * named — is a separate bug from not reading the variable at all.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
+    it("still lets the moved settings file name a session directory of its own", async () => {
+      const agentDir = makeAgentDir("relocated-agent");
+      writeSettings(JSON.stringify({ sessionDir: "~/pi-sessions" }), agentDir);
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: agentDir },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(join(home, "pi-sessions"));
+      expect(resolved.startsWith(agentDir)).toBe(false);
+    });
+
+    /** @scenario "A session kept somewhere other than the default place is still found" */
+    it("treats a blank agent directory as unset", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_AGENT_DIR_ENV]: "   " },
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(
+        defaultPiProjectSessionsDir({ cwd, agentDir: defaultAgentDir() }),
+      );
+    });
+
+    /**
+     * The regression guard for the overwhelmingly common case: nobody sets the
+     * variable, and the answer is exactly what it was before it was read at all.
+     *
+     * @scenario "A default pi launch is read from the folder pi makes for this project"
+     */
+    it("resolves to pi's own default when the variable is absent", () => {
+      expect(piAgentDir({ env: {}, home })).toBe(join(home, ".pi", "agent"));
+      expect(piSettingsPath(piAgentDir({ env: {}, home }))).toBe(
+        join(home, ".pi", "agent", "settings.json"),
+      );
     });
   });
 });
