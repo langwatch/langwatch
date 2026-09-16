@@ -5,7 +5,7 @@ import type { GrantsService } from "@langwatch/authz-server";
 import { generate } from "@langwatch/ksuid";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
-  type OrganizationUserRole,
+  OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -16,6 +16,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { grantsService } from "~/server/app-layer/authz/runtime";
+import { CannotDisableLastAdminError } from "~/server/app-layer/organizations/errors";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -786,6 +787,7 @@ export class ScimService {
     organizationId: string;
     connectionId: string | null;
   }): Promise<void> {
+    await this.refuseIfItClosesTheOrganization({ userId: id, organizationId });
     if (scimGrantsWritePathEnabled()) {
       await this.deprovision.removeAccess({
         userId: id,
@@ -795,6 +797,67 @@ export class ScimService {
       });
     }
     await this.userService.deactivate({ id });
+  }
+
+  /**
+   * A directory may not deactivate the last administrator who can still sign
+   * in.
+   *
+   * THE ORGANIZATION CANNOT RECOVER FROM THIS FROM INSIDE THE PRODUCT, which
+   * is the same reason `setMemberDisabled` refuses it by hand
+   * (`organization.prisma.repository.ts`, `CannotDisableLastAdminError`). The
+   * SCIM path reached the same outcome around the side: a full sync asserts
+   * the set of people the directory knows about and deactivates the rest, and
+   * an administrator invited by hand is in nobody's directory. Observed: a
+   * first sync reported "1 created and 4 deactivated" and one of the four was
+   * the organization's only administrator, whose live session died mid-page
+   * and whose password was then refused. Getting back in took a hand-written
+   * SCIM call, and there is no screen that makes one.
+   *
+   * ADOPTION IS NOT THE BUG AND IS LEFT ALONE. A token reaching a person no
+   * connection has claimed is deliberate — `ScimDirectoryIdentityService`
+   * says so, and it is what lets a directory take over members who predate
+   * it. What is refused here is narrower and is about the organization rather
+   * than about the person: the act that would leave nobody able to administer
+   * it.
+   *
+   * ACTIVE MEANS ABLE TO SIGN IN, so the count excludes a member whose user
+   * is already deactivated as well as one whose membership is disabled. The
+   * membership-only definition would let a single push deactivate two
+   * administrators one after another, each passing the guard because the
+   * other's `disabledAt` had not been written.
+   */
+  private async refuseIfItClosesTheOrganization({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const member = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    });
+    // Not an administrator here, or not a member at all: nothing this act can
+    // close.
+    if (member?.role !== OrganizationUserRole.ADMIN) return;
+
+    const remainingAdmins = await this.prisma.organizationUser.count({
+      where: {
+        organizationId,
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+        userId: { not: userId },
+        user: { deactivatedAt: null },
+      },
+    });
+    if (remainingAdmins === 0) {
+      // A handled refusal, so the SCIM boundary answers the directory a
+      // stable code and a sentence rather than flattening it to a 500. The
+      // push fails and the person is left exactly as they were, which is the
+      // same order the deactivation itself keeps.
+      throw new CannotDisableLastAdminError();
+    }
   }
 
   /**

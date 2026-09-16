@@ -128,30 +128,42 @@ export function migrationBlockers({
  */
 function memberWhereClauses({
   organizationId,
-  replacementConnectionId,
-  liveStates,
+  linkedUserIds,
   cursor,
 }: {
   organizationId: string;
-  replacementConnectionId: string;
-  liveStates: string[];
+  /** Members already carrying a live identifier on the replacement. */
+  linkedUserIds: string[];
   cursor: string | null;
 }) {
   const memberWhere = { organizationId, disabledAt: null } as const;
-  const onReplacement = {
-    connectionId: replacementConnectionId,
-    state: { in: liveStates },
-  } as const;
+  // THROUGH THE IDENTIFIER IDS, NOT THROUGH A RELATION THAT DOES NOT EXIST.
+  // This read was `user: { identifiers: { some: … } }`, and there is no
+  // `identifiers` relation on `User` — `Identifier` carries a bare `userId`
+  // with an index and no back-reference (see `model Identifier` in
+  // schema.prisma, and the comment there about why one user legitimately
+  // holds several). Prisma rejected the argument at runtime, so this threw
+  // every single time it ran, for every organization, unconditionally.
+  //
+  // It was not a contained failure: `getSetup` embeds the migration view, so
+  // any organization that had registered a replacement lost its whole
+  // Identity provider page to a 500 — and the Authentication overview then
+  // degraded to "Single sign-on — Not set up" for an organization with live
+  // single sign-on and a migration under way. Nothing in the product could
+  // undo it, because the control that would is mounted on the page that
+  // 500s.
+  //
+  // The caller resolves the ids first and passes them in, which keeps this
+  // function what it was: a pure description of three where clauses.
   return {
     memberWhere,
-    linkedWhere: {
-      ...memberWhere,
-      user: { identifiers: { some: onReplacement } },
-    } as const,
+    linkedWhere: { ...memberWhere, userId: { in: linkedUserIds } } as const,
     stragglerWhere: {
       ...memberWhere,
-      ...(cursor ? { userId: { gt: cursor } } : {}),
-      user: { identifiers: { none: onReplacement } },
+      userId: {
+        notIn: linkedUserIds,
+        ...(cursor ? { gt: cursor } : {}),
+      },
     } as const,
   };
 }
@@ -488,10 +500,21 @@ export class PrismaSsoMigrationProgressRepository
     cursor: string | null;
     limit: number;
   }) {
+    // Who is already on the replacement, asked of the identifiers themselves.
+    // Bounded by the organization's own membership, and `distinct` because one
+    // person legitimately holds several identifiers on one connection.
+    const linked = await this.prisma.identifier.findMany({
+      where: {
+        connectionId: replacement.connectionId,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    const linkedUserIds = linked.map((row) => row.userId);
     const { memberWhere, linkedWhere, stragglerWhere } = memberWhereClauses({
       organizationId,
-      replacementConnectionId: replacement.connectionId,
-      liveStates: [...LIVE_IDENTIFIER_STATES],
+      linkedUserIds,
       cursor,
     });
     const [activeCount, linkedCount, stragglerRows] = await Promise.all([

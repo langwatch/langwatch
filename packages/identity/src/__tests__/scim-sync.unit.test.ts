@@ -321,6 +321,45 @@ describe("reduceScimSync", () => {
       expect(state.state).toBe("REVOKED");
       expect(state.lastPushedAtMs).toBe(T0 + 1);
     });
+
+    /** @scenario "Issuing a new token brings a revoked connection back" */
+    it("comes back when a new token is issued, which is the advice we give", () => {
+      // Revoking a leaked token and issuing another is exactly what the
+      // token screen tells an administrator to do. Absorbing the new token
+      // turned that advice into a trap: the connection reported "Sync has
+      // ended" for good while provisioning worked underneath it, and only a
+      // platform operator's redrive could move it.
+      const state = fold([
+        tokenIssued(),
+        userPushed(),
+        {
+          type: SCIM_TOKEN_REVOKED_EVENT_TYPE,
+          occurredAt: T0 + 9,
+          data: { ...identity, tokenId: "tok_1", cause: "rotation" },
+        },
+        tokenIssued(T0 + 10),
+      ]);
+
+      expect(state.state).toBe("TOKEN_ISSUED");
+    });
+
+    /** @scenario "A push that arrives after a revocation still does not revive it" */
+    it("is still not resurrected by a push that arrives after the revocation", () => {
+      // The invariant the absorbing state was written for survives: only the
+      // administrator's own act lifts it, never a straggling directory call
+      // on a token that should have stopped verifying.
+      const state = fold([
+        tokenIssued(),
+        {
+          type: SCIM_TOKEN_REVOKED_EVENT_TYPE,
+          occurredAt: T0 + 9,
+          data: { ...identity, tokenId: "tok_1", cause: "teardown" },
+        },
+        userPushed(T0 + 10),
+      ]);
+
+      expect(state.state).toBe("REVOKED");
+    });
   });
 
   describe("given the whole history replayed twice", () => {

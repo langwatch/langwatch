@@ -55,6 +55,14 @@ const GLOBAL_MODELS = [
   // and claimed BEFORE any user is known to hold it, which is the whole
   // point - it is what decides who gets to.
   "IdentifierReservation",
+  // The sign-in lock-out counter (GAC-09): keyed on an HMAC of the address
+  // that was TYPED, and deliberately not on a user. An address with no
+  // account behind it is counted, locked and refused exactly like one that
+  // resolves — which is the whole point, because answering the two
+  // differently would make the door an oracle for who has an account here.
+  // There is therefore no tenant in hand when the row is read: it is read
+  // before the address has been resolved to anybody at all.
+  "SignInAttemptLock",
   // Credential tables, per-user in exactly the sense `Account` is. A passkey
   // and a TOTP enrollment belong to a person, not to a project — and the
   // ceremonies that read them are keyed by credential id BEFORE any user is

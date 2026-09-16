@@ -240,7 +240,12 @@ function DirectoryCardWaiting({
         {attention
           ? `${attention.status.headline} — the connector says what it could not apply.`
           : waiting
-            ? "The token is issued and your provider pushes on its own schedule — when the first one lands, members, groups and sync times fill themselves in. Nobody has to sign in for it to work."
+            ? // SAYS NOTHING ABOUT A TOKEN, because this card cannot see one.
+              // `waiting` means a CONNECTION exists and nothing has arrived
+              // through it — it is not evidence that anybody has issued a
+              // provisioning token, and this line asserted one had. It read
+              // "The token is issued" on an organization holding none.
+              "Your provider pushes on its own schedule — when the first one lands, members, groups and sync times fill themselves in. Nobody has to sign in for it to work."
             : "Paste a provisioning token into your identity provider and this card keeps itself current — members, groups and sync times arrive and stay in step on their own. Nobody has to sign in for it to work."}
       </Text>
     </VStack>

@@ -382,3 +382,55 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Given somebody the directory removed from "acme"
     Then they hold no membership and no role binding there
     And their account itself survives, because it is theirs and not the organization's
+
+  # ── The organization's own way in is not the directory's to close ──────
+  #
+  # A directory that adopts unclaimed members (above) necessarily reaches the
+  # administrator somebody invited by hand, because that person is in nobody's
+  # directory. A full sync asserts the set it knows about and deactivates the
+  # rest — so on a real stack the first sync reported "1 created and 4
+  # deactivated" and one of the four was the organization's only
+  # administrator. Their live session died mid-page and their password was
+  # then refused, and there is no screen in the product that undoes it.
+  #
+  # Adoption stays. What is refused is narrower, and is about the organization
+  # rather than the person: the one act that leaves nobody able to administer
+  # it. It is the refusal `setMemberDisabled` already makes by hand.
+
+  @unit
+  Scenario: A directory cannot deactivate the last administrator who can still sign in
+    Given "acme" whose only administrator was invited by hand
+    When the directory pushes that administrator as inactive
+    Then the push is refused
+    And the administrator is left exactly as they were
+
+  @unit
+  Scenario: A directory may deactivate an administrator while another can still get in
+    Given "acme" with a second administrator who can sign in
+    When the directory pushes the first administrator as inactive
+    Then the deprovision goes through
+
+  @unit
+  Scenario: An administrator who is already deactivated does not count as a way in
+    Given "acme" whose other administrators have all been deactivated
+    When the directory pushes the remaining administrator as inactive
+    Then the push is refused
+    # Counting memberships alone would let one sync deactivate two
+    # administrators in turn, each passing because the other's membership had
+    # not been marked yet.
+
+  @unit
+  Scenario: Issuing a new token brings a revoked connection back
+    Given a connection whose token was revoked
+    When an administrator issues another one
+    Then the connection reports itself as waiting for the directory again
+    # Revoke and issue another is the advice the token screen itself gives.
+    # While a revocation absorbed everything, taking that advice left the
+    # connection reading "sync has ended" for good while provisioning worked
+    # underneath it, and only a platform operator could move it.
+
+  @unit
+  Scenario: A push that arrives after a revocation still does not revive it
+    Given a connection whose token was revoked
+    When a straggling push arrives on the old token
+    Then the connection stays revoked

@@ -81,8 +81,8 @@ export function ConnectorsOverview({
             about it under the page title. */}
         <Text color="fg.muted" fontSize="sm">
           Your identity provider talks to us over SCIM. Each token works against
-          one single sign-on connection and only manages the people that
-          connection provisioned.
+          one single sign-on connection: it manages the people that connection
+          provisioned, and can take on members no directory has claimed yet.
         </Text>
         <CopyValueRows
           rows={[
@@ -144,10 +144,13 @@ export function TokensSection({
           <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
             From then on the provider can create, update and remove people in
             this organization on its own — nobody signs in to do it. Each token
-            works against one single sign-on connection and can only touch the
-            people that connection provisioned, so revoking one stops exactly
-            that provider and nothing else. The value is shown once when it is
-            issued; if it is lost or leaked, revoke it and issue another.
+            works against one single sign-on connection: it manages the people
+            that connection provisioned, and can take on members no directory
+            has claimed yet — members somebody invited by hand, for instance.
+            It never reaches people another connection provisioned, and
+            revoking it stops exactly that provider and nothing else. The value
+            is shown once when it is issued; if it is lost or leaked, revoke it
+            and issue another.
           </Text>
         </SettingsDisclosure>
       </VStack>
@@ -634,8 +637,9 @@ function GenerateTokenDialog({
         <Dialog.Body paddingBottom={6}>
           <VStack gap={4} align="start">
             <Text>
-              This token manages only the people its connection provisioned, so
-              choose the connection your identity provider syncs from.
+              This token manages the people its connection provisioned, and can
+              take on members no directory has claimed yet — so choose the
+              connection your identity provider syncs from.
             </Text>
             <VStack gap={1} align="start" width="full">
               <Text fontWeight="600" fontSize="sm">

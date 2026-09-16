@@ -1,3 +1,4 @@
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import {
   OrganizationUserRole,
   Prisma,
@@ -31,6 +32,34 @@ export class PrismaSsoMembershipRepository {
   }
 
   /**
+   * Whether this person belongs to any organization at all.
+   *
+   * THROUGH `Organization`, NOT `OrganizationUser`. This is the one question
+   * on this repository that names no organization — it asks about a person
+   * across all of them — and `OrganizationUser` keyed only by `userId` is
+   * exactly the shape the org-tenancy guard refuses (ADR-021). The refusal
+   * is a plain `Error`, so it does not degrade to a handled failure: it came
+   * back as a 500 on `identity.myTestArrival` for every signed-in reader,
+   * with an all-zero trace id and no log line.
+   *
+   * And the 500 was not merely noise. `resolveOrglessDestination` routes a
+   * test arrival to its own explanatory screen only when this read says so,
+   * and the caller cannot tell a query that ERRORED from one that answered
+   * "no" — so a successful test sign-in landed on "create your organization",
+   * which is the exact outcome that screen exists to prevent.
+   *
+   * `two-step-account.adapter.ts` and `sign-in-security-adapters.ts` both
+   * carry the same fix: ask the organizations, filtered by membership.
+   */
+  async hasAnyMembership({ userId }: { userId: string }): Promise<boolean> {
+    const anyOrganization = await this.prisma.organization.findFirst({
+      where: { members: { some: { userId } } },
+      select: { id: true },
+    });
+    return anyOrganization !== null;
+  }
+
+  /**
    * Whether this address belongs to the one person the SSO setup exemption is
    * for: the administrator who registered a connection, who is still a member
    * of the organization it belongs to.
@@ -44,6 +73,17 @@ export class PrismaSsoMembershipRepository {
    * the truth to `Identifier` while `User.email` remains a copy for accounts the
    * backfill has not finalized (ADR-101 §5). Asking only one of them would make
    * the setup sign-in work for some administrators and not others.
+   *
+   * THREE READS RATHER THAN ONE JOIN, and not by preference. `Identifier`
+   * carries a bare `userId` with deliberately no foreign key — its DETACHED
+   * rows are tombstones that outlive the thing they point at — so there is no
+   * Prisma relation from `User` to traverse. This was one query with a nested
+   * `user.identifiers.some` filter, which Prisma rejects outright with
+   * "Unknown argument `identifiers`": the sign-in threw rather than deciding,
+   * and the plugin's own `catch {}` turned that into
+   * `SSO_USER_RESOLUTION_FAILED` with the cause discarded. It failed only on
+   * this path — a connection whose domain is not live — which is why it
+   * survived.
    */
   async findRegistrantAtAddress({
     organizationId,
@@ -56,24 +96,34 @@ export class PrismaSsoMembershipRepository {
   }): Promise<boolean> {
     const address = email.trim().toLowerCase();
     if (!address) return false;
-    const membership = await this.prisma.organizationUser.findFirst({
-      where: {
-        organizationId,
-        userId,
-        OR: [
-          { user: { email: { equals: address, mode: "insensitive" } } },
-          {
-            user: {
-              identifiers: {
-                some: { value: address, verifiedAt: { not: null } },
-              },
-            },
-          },
-        ],
-      },
-      select: { userId: true },
+
+    // Membership first: it is the cheaper half and the one that fails for a
+    // registrant who has since left, which is the case this guard exists for.
+    if (!(await this.findMembership({ userId, organizationId }))) return false;
+
+    const legacyAddress = await this.prisma.user.findFirst({
+      where: { id: userId, email: { equals: address, mode: "insensitive" } },
+      select: { id: true },
     });
-    return membership !== null;
+    if (legacyAddress !== null) return true;
+
+    const identifier = await this.prisma.identifier.findFirst({
+      where: {
+        userId,
+        // Folded the way the projection folded it when it was written, which
+        // is NFKC as well as lower-case. A hand-rolled `toLowerCase()` here
+        // compares unequal to a value the store had already normalized, so a
+        // unicode homograph would slip past a match that should have hit.
+        value: normalizeIdentifierValue(address),
+        // A verified address the person still holds. `verifiedAt` alone would
+        // also match a DETACHED tombstone — an address they proved once and
+        // have since removed — and letting that through would keep a
+        // connection dialable by an address its owner had given up.
+        state: { in: ["VERIFIED", "PRIMARY"] },
+      },
+      select: { id: true },
+    });
+    return identifier !== null;
   }
 
   async findBoundMemberIdentity({
@@ -89,29 +139,35 @@ export class PrismaSsoMembershipRepository {
   }): Promise<boolean> {
     const address = email.trim().toLowerCase();
     if (!address || !accountId) return false;
+
+    // `orgMemberships` IS a relation and stays in the join; `identifiers` is
+    // not one, for the same reason as `findRegistrantAtAddress` above, so the
+    // address half is asked separately. This read is only reached once a
+    // domain's proof has LAPSED, which is why it threw for nobody until it
+    // threw for somebody.
     const account = await this.prisma.account.findFirst({
       where: {
         provider: connectionId,
         providerAccountId: accountId,
         user: {
           orgMemberships: { some: { organizationId, disabledAt: null } },
-          OR: [
-            { email: { equals: address, mode: "insensitive" } },
-            {
-              identifiers: {
-                some: {
-                  value: address,
-                  verifiedAt: { not: null },
-                  state: { in: ["VERIFIED", "PRIMARY"] },
-                },
-              },
-            },
-          ],
         },
+      },
+      select: { userId: true, user: { select: { email: true } } },
+    });
+    if (account === null) return false;
+
+    if (account.user.email?.trim().toLowerCase() === address) return true;
+
+    const identifier = await this.prisma.identifier.findFirst({
+      where: {
+        userId: account.userId,
+        value: normalizeIdentifierValue(address),
+        state: { in: ["VERIFIED", "PRIMARY"] },
       },
       select: { id: true },
     });
-    return account !== null;
+    return identifier !== null;
   }
 
   /**

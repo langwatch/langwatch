@@ -1,5 +1,6 @@
 "use client";
 
+import { looksLikeSsoConnectionId } from "@langwatch/identity";
 import { passkeyClient } from "@better-auth/passkey/client";
 import { ssoClient } from "@better-auth/sso/client";
 import { twoFactorClient } from "better-auth/client/plugins";
@@ -325,6 +326,49 @@ export const signIn = async (
     // redirect the browser — the caller has to do it.
     if (shouldRedirect) {
       navigate(callbackURL ?? "/");
+    }
+    return { ok: true };
+  }
+
+  // A CONNECTION IS NOT A SOCIAL PROVIDER, AND THE SOCIAL PLUGIN HAS NEVER
+  // HEARD OF IT. An organization's own connection is registered with the
+  // `sso()` plugin, which serves `/sign-in/sso` and keys on the CONNECTION
+  // ID; `/sign-in/social` answers that id with 404 PROVIDER_NOT_FOUND.
+  //
+  // Every non-credential sign-in went through the social call below, so the
+  // one path this whole feature exists for — a person typing their work
+  // address, being routed to their organization's provider, and going — hit
+  // that 404, which the screen swallowed into a spinner that never resolved.
+  // The test sign-in on the setup page worked the entire time, because
+  // `useTestSignIn` has always called `signIn.sso` directly, which is what
+  // made the failure look like a routing problem rather than a dialling one.
+  //
+  // `looksLikeSsoConnectionId` is the same predicate `/auth/error` uses
+  // before it dials a bounce target, so the two agree about what a
+  // connection id is.
+  if (looksLikeSsoConnectionId(provider)) {
+    const result = await client.signIn.sso({
+      providerId: provider,
+      callbackURL: callbackURL ?? "/",
+    });
+    if (result.error) {
+      return {
+        error: result.error.message ?? "OAuthSignin",
+        code: result.error.code,
+        status: result.error.status,
+        ok: false,
+      };
+    }
+    if (
+      shouldRedirect &&
+      result.data &&
+      typeof result.data === "object" &&
+      "url" in result.data
+    ) {
+      const url = (result.data as { url?: string }).url;
+      if (url) {
+        navigate(url);
+      }
     }
     return { ok: true };
   }

@@ -342,7 +342,22 @@ export function reduceScimSync({
   fact: ScimSyncFact;
 }): ScimSyncState {
   const touched = { ...state, updatedAtMs: fact.occurredAt };
-  if (state.state === "REVOKED") return touched;
+  // REVOKED absorbs everything the DIRECTORY does, for the reason above: a
+  // push arriving after a revocation comes from a token that should already
+  // have stopped verifying, and folding it as a return to SYNCING would
+  // report a torn-down connection as healthy.
+  //
+  // ISSUING A NEW TOKEN IS NOT SOMETHING THE DIRECTORY DOES. It is an
+  // administrator taking the exact action this product's own advice tells
+  // them to take when a token leaks — "revoke it and issue another" — and
+  // absorbing it made that advice a trap: the connection read "Sync has
+  // ended / No push yet" permanently while provisioning worked underneath,
+  // and the only thing that could move it was a platform operator's redrive
+  // (`pipelines/scim-sync/pipeline.ts`). So this one fact passes the gate and
+  // everything else is still absorbed.
+  if (state.state === "REVOKED" && fact.type !== SCIM_TOKEN_ISSUED_EVENT_TYPE) {
+    return touched;
+  }
 
   switch (fact.type) {
     case SCIM_TOKEN_ISSUED_EVENT_TYPE:
