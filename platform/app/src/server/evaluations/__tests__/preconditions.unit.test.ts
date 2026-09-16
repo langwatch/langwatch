@@ -637,6 +637,34 @@ describe("evaluatePreconditions()", () => {
     });
   });
 
+  describe("given a precondition: metadata.value matches_regex '^prod'", () => {
+    const preconditions = [
+      {
+        field: "metadata.value" as const,
+        key: "env",
+        rule: "matches_regex" as const,
+        value: "^prod",
+      },
+    ];
+
+    describe("when a trace arrives with custom metadata env 'production'", () => {
+      it("anchors against the value itself, not a serialized container", () => {
+        // A regex is tested against a stringified array when the resolver
+        // hands back a list, so ^-anchored patterns silently stop matching.
+        // The resolver must stay a plain string for a single candidate.
+        const traceData = makeTraceData({
+          customMetadata: { env: "production" },
+        });
+        expect(
+          evaluatePreconditions({
+            traceData,
+            preconditions,
+          }),
+        ).toBe(true);
+      });
+    });
+  });
+
   // ── Multiple preconditions (AND logic) ──
   describe("given preconditions: traces.origin is 'application' AND input contains 'help'", () => {
     const preconditions = [

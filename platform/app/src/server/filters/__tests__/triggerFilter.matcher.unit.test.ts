@@ -266,6 +266,38 @@ describe("matchesTriggerFilters", () => {
 
       expect(matchesTriggerFilters(data, filters)).toBe(false);
     });
+
+    it("matches the bare attribute even when a canonical key also exists", () => {
+      // ClickHouse ORs the three candidates rather than taking the first,
+      // so a filter on the bare value matches there and has to match here.
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "metadata.env": "canonical-value",
+          env: "bare-value",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["bare-value"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+
+    it("falls back to the bare attribute when the canonical key is blank", () => {
+      const data = buildPreconditionTraceDataFromFoldState(
+        makeFoldStateWithAttributes({
+          "langwatch.origin": "application",
+          "metadata.env": "",
+          env: "bare-value",
+        }),
+      );
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["bare-value"] },
+      };
+
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
   });
 
   describe("when filtering by topics.topics", () => {

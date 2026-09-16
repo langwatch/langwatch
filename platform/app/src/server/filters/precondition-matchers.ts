@@ -108,13 +108,21 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
     if (!resolved) return null;
     // Canonical `metadata.{key}` and legacy `langwatch.metadata.{key}` are
     // already hoisted into customMetadata with their prefix stripped.
-    const hoisted = data.customMetadata?.[resolved];
-    if (hoisted != null) return hoisted;
+    const hoisted = data.customMetadata?.[resolved] ?? null;
     // Bare OTEL attribute. extractCustomMetadata deliberately keeps standard
     // resource prefixes (service., http., telemetry., …) out of
     // customMetadata, so this candidate has to come from the raw attributes
     // or the filter can never match what the ClickHouse preview counted.
-    return data.attributes?.[decoded] ?? null;
+    const bare = data.attributes?.[decoded] ?? null;
+    // ClickHouse ORs its three candidates rather than taking the first
+    // (clickhouse/filter-conditions.ts), so when both are present and
+    // disagree, hand back both and let the caller match either. Staying a
+    // plain string in every other case keeps `matches_regex`, which
+    // JSON.stringifies an array, reading the value and not its encoding.
+    if (hoisted != null && bare != null && hoisted !== bare) {
+      return [hoisted, bare];
+    }
+    return hoisted ?? bare;
   },
 
   // Span fields
