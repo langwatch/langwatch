@@ -20,14 +20,6 @@
   // made oxlint report one finding twice under two plugin names — 1,488
   // duplicate warnings across valid-expect, no-conditional-expect,
   // require-to-throw-message and five others.
-  // The lint runs from the repository root — `oxlint .` — rather than a hand
-  // written path list. The list was a denylist by omission: 25 workspace
-  // packages were never linted, `plugins/langwatch` (a published plugin) among
-  // them at 1,331 findings, and `packages/oxlint-rules`, which is the linter's
-  // own rules. Nobody chose those exclusions; they were simply never added.
-  // oxlint honours .gitignore, so node_modules and dist need no mention here.
-  "ignorePatterns": ["**/*.generated.ts", "**/*.generated.tsx"],
-
   // The lint runs from the repository root -- `oxlint .` -- rather than a hand
   // written path list. That list was a denylist by omission: 25 workspace
   // packages were never linted, `plugins/langwatch` (a published plugin) among
@@ -35,10 +27,21 @@
   // own rules. Nobody chose those exclusions; they were never added.
   //
   // oxlint honours .gitignore, so node_modules and dist need no mention. A
-  // generated file is ignored because the fix for one is in its generator.
-  "ignorePatterns": ["**/*.generated.ts", "**/*.generated.tsx"],
+  // generated file is ignored because the fix for one is in its generator --
+  // which is also why the two entries below are here. `session-context.mjs` is
+  // a vendored bundle, 412 KB of minified output on a single 237,525-character
+  // line, and it carried 1,309 of this repository's findings on its own: 14.7%
+  // of the total, none of them actionable, because the plugin ships the
+  // artefact and builds it somewhere else. Reading them as debt overstated
+  // every count by a seventh and pointed the work at a file no edit survives.
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "**/*.generated.tsx",
+    "**/*.generated.js",
+    "plugins/langwatch/scripts/session-context.mjs"
+  ],
 
-  "plugins": ["react", "unicorn", "typescript", "oxc", "vitest"],
+"plugins": ["react", "unicorn", "typescript", "oxc", "vitest"],
   "rules": {
     "complexity": ["error", { "max": 25 }],
     "no-nested-ternary": "error",
