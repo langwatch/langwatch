@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
-import { PrismaSsoMigrationProgressRepository } from "./sso-migration-progress.prisma.repository";
+import type { PrismaSsoMigrationProgressRepository } from "./sso-migration-progress.prisma.repository";
 
 interface LegacyAccountEvidence {
   remaining: number;

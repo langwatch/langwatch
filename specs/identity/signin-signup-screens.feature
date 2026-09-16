@@ -421,7 +421,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The interstitial's CONTRACT ships with D13 and is bound below (verified
   # email in, decision out, nothing rendered when there is nothing to offer).
   # Which organizations will take an address, and the words that go with them,
-  # are D12's - so this stays parked until D12 fills the seam.
+  # are D12's, and D12 has filled the seam - so this is bound rather than
+  # parked, against the page at /auth/join.
   @integration
   Scenario: Sign-up offers my team before offering a new workspace
     Given my verified domain matches an organization that allows joining
