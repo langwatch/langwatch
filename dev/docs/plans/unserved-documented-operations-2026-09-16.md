@@ -35,6 +35,55 @@ that nobody documented can no longer read as missing.
 
 Artefacts: `.apidiff/report-20260916-r5.json`, `.apidiff/ledger-20260916-r5.json`.
 
+## Status after the first two valid runs (r8, r9)
+
+r7 died at `pnpm install --frozen-lockfile` on a lockfile that had been
+committed without `@langwatch/api-client-web`. r8 and r9 are the first runs
+since Sep 14 whose credentials all survived, so their counts are the first that
+mean anything.
+
+| | r6 (invalid) | r8 | r9 |
+| --- | ---: | ---: | ---: |
+| differing operations | 94 | 89 | **81** |
+| distinct causes | 24 | 21 | 17 |
+
+Closed, each confirmed by a run rather than by reading the code:
+
+| cause | closed by |
+| --- | --- |
+| `status-class-mismatch:401-200` / `401-201` (5) | nothing — they were the dead organization credential, and vanished once the SCIM probe stopped deleting the user it hangs off |
+| `permission-diff:404-500` (2) | scenarios throwing `ScenarioNotFoundError` instead of downgrading it |
+| `not-found-as-500:404-500` (3), `status-class-mismatch:200-500` (1), `mutation-not-visible` (1) | `SuiteService.testSuiteToSuite` no longer handing a test-suite row to the strict suite schema |
+| `handled-refusal-degraded:403-500` (2) | `AnalyticsApp` implementing `assertCustomChartPlaygroundEnabled` over the peer APIs it already held |
+
+Two classes that are **not** defects, checked against the transcripts rather
+than assumed:
+
+- **`permission-leak` (4)** — no tenant data crosses. `model-providers`
+  returns the caller's own catalogue on both sides; the branch adds an `id`
+  (`system_anthropic`) on rows that are global catalogue entries, and
+  apidiff's heuristic reads a newly-exposed id as a leak. `model-defaults`'
+  id is an organization-scoped default read by a key inside that
+  organization. `prompts/tags` is identical on both sides.
+- **`permission-diff:200-403` / `200-404` (4)** — the direction is main 200 →
+  branch 403/404 for a FOREIGN key. `GET /api/secrets` answering 200 to a key
+  from another organization is a leak the branch closed.
+
+### The one behavioural difference left, and why it is not a wiring fix
+
+`GET /api/simulation-runs` answers 503: the scenario module mounts
+`createSimulationRunsRest()` while `simulations` is a collaborator no process
+supplies, which `scenario.server.ts`'s own comment admits. Composing it
+read-only (the chosen shape) needs a `SimulationWindowedRepository`, and no
+production implementation exists — only test doubles that ignore `fallback`
+entirely. The shared policy it is meant to adapt is `TraceWindowedReadService`,
+which lives in **modules/trace**, and a module may reach a peer only through
+the peer's `*Api` token. So the honest order of work is: extract the shared
+partition-window read policy (ADR-067) into a package both modules import,
+then adapt it for scenario, then compose the ClickHouse read repository and add
+`clickhouse` to `ScenarioApp.reads`. Inventing a window policy here would
+silently decide how much ClickHouse every simulation read scans.
+
 ## Totals
 
 | | Sep 12 | Sep 14 | Sep 16 |
