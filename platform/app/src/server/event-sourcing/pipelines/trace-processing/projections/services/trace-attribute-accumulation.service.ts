@@ -273,9 +273,18 @@ export class TraceAttributeAccumulationService {
 
     // Causality depth must survive into the fold state: events that carry no
     // span payload (origin_resolved) have no other way to see it, and the
-    // evaluation-trigger loop guard reads it there. Reserved keys are exempt
-    // from analytics trimming and skipped by the filter builders, so this is
-    // not user-visible.
+    // evaluation-trigger loop guard reads it there.
+    //
+    // This key IS user-visible, deliberately. Reserved keys are kept by
+    // analytics trimming (00039_create_trace_analytics.sql) and only
+    // `langwatch.reserved.media_refs.*` is hidden from the trace drawer
+    // (TraceSummaryAccordions.filterReservedMediaRefAttributes), so the depth
+    // shows up as a trace metadata row, in the trace-attribute-keys facet, and
+    // in the search/export metadata map. That follows the existing precedent
+    // for `langwatch.reserved.log_record_count` (see trace-summary.mapper.ts),
+    // which flows to external consumers unchanged. It carries no user data —
+    // it is a small integer — so it is surfaced rather than special-cased.
+    //
     // Arrives as an int on the OTLP path and as a string on others, so accept
     // both and store the canonical decimal form.
     const causalityDepth = spanAttrs["langwatch.reserved.causality_depth"];
