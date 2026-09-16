@@ -48,13 +48,9 @@ function ReportsContent() {
 
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
 
-  // Gates the new dashboard-widget "Add chart" flow client-side to match the
-  // server-side enforcement in the dashboardWidgets tRPC router
-  // (enforceCustomChartPlaygroundEnabled) — without this, a user with the
-  // flag off would get a drawer whose Save always fails. `enabled` defaults
-  // to false while the query is loading, so the button starts as the legacy
-  // link and (for flagged-in accounts) swaps to the drawer once resolved,
-  // rather than flashing the drawer open state first.
+  // Gates the new "Add chart" flow client-side to match server enforcement
+  // (enforceCustomChartPlaygroundEnabled): `enabled` defaults false while
+  // loading, so the button starts as the legacy link, never flashing open.
   const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
     "release_custom_chart_playground",
     {

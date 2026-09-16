@@ -1,9 +1,7 @@
 /**
- * The heatmap colour ramp. `colorScale` is author-supplied and Babel-compiled
- * in the sandbox with no type checking, so a 3-digit CSS shorthand (`#abc`)
- * reaches the ramp as ordinary input — it must expand, not silently blank the
- * cell with `rgb(NaN, NaN, NaN)`.
- *
+ * The heatmap colour ramp: `colorScale` is author-supplied and Babel-compiled
+ * with no type checking, so a 3-digit shorthand (`#abc`) must expand rather
+ * than silently blank the cell with `rgb(NaN, NaN, NaN)`.
  * @see specs/analytics/custom-chart-playground.feature
  */
 

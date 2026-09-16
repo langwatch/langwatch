@@ -110,9 +110,8 @@ const resizeHandleOf = (item: HTMLElement): HTMLElement => {
 
 /**
  * Presses on `target`, moves by the given delta, and releases. A resize
- * settles in one move; a move that has to displace a neighbour is fed
- * intermediate positions, the way a real pointer arrives, so the grid sees
- * the card cross the neighbour rather than teleport past it.
+ * settles in one move; a displacing move is fed intermediate positions,
+ * like a real pointer, so the grid sees the card cross, not teleport.
  */
 function drag({
   target,

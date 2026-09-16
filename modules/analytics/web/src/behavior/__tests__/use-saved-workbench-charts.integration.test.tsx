@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Which of the two things Save does: the hook holds one piece of state —
- * which chart is open — the whole difference between pressing Save twice
- * and having one chart vs two with no way to tell which is shown. Only the
- * tRPC client is faked, at its module boundary, so the real branch is tested.
+ * Pins which of the two things Save does: one piece of state — which chart
+ * is open — decides overwrite vs duplicate. Only the tRPC client is faked.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
@@ -234,11 +232,9 @@ describe("saving a workbench chart", () => {
   describe("given the write succeeds but refreshing the list then fails", () => {
     describe("when the member saves", () => {
       /**
-       * The chart is on the server by this point. Reporting the refresh failure
-       * as a failed save sends them back to press Save again — and because the
-       * hook now holds the new chart as the open one, the second press writes
-       * back rather than duplicating, but the copy they were shown was a lie
-       * either way.
+       * The chart is already saved by this point. Reporting the refresh failure
+       * as a failed save would make them retry, silently overwriting the chart
+       * they were just falsely told failed to save, rather than duplicating it.
        */
       it("does not tell them the save failed", async () => {
         const { result, onError } = mountHook();

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The chart's contract with the Vega runtime: what is asserted here is ours —
- * the options a chart is embedded with, when a view is rebuilt versus fed,
- * and that every failure has its own state. What Vega draws is Vega's.
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * The chart's contract with the Vega runtime: embed options, rebuild vs
+ * feed, and that every failure has its own state. What Vega draws is Vega's.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

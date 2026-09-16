@@ -1,9 +1,7 @@
 /**
- * What the query cost, from the server's own accounting. Rendered under the result in every
- * mode, because the number of rows and the bytes behind them are how a member tells an answer
- * that is cheap to keep running from one that needs narrowing. Labels are spelled out ("rows
- * returned", not "rows"), per `dev/docs/best_practices/copywriting.md`; `ms`, `KB` and `MB` stay
- * as symbols because they are the standard ones.
+ * What the query cost, from the server's own accounting: rows and bytes
+ * are how a member tells a cheap answer from one that needs narrowing.
+ * Labels spell out ("rows returned"); `ms`/`KB`/`MB` stay as symbols.
  */
 
 import { HStack, Text } from "@chakra-ui/react";

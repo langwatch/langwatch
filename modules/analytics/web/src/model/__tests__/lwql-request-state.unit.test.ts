@@ -1,11 +1,6 @@
 /**
- * The workbench's request machine: draft, submitted snapshot, outcome.
- *
- * Driven through the controller with a fake executor rather than through the
- * reducer alone, because half the rules the feature file states are about
- * whether a REQUEST is issued — a reducer assertion could only ever prove that
- * some state did not change.
- *
+ * The workbench's request machine: draft, snapshot, outcome — driven
+ * through a fake executor, since rules test whether a REQUEST fires.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

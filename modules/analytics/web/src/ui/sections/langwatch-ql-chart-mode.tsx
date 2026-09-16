@@ -73,10 +73,9 @@ const starterFor = (result: LangWatchQLChartResult): string =>
   });
 
 /**
- * What a member can rely on the policy accepting, said next to where they
- * type. A reference, not the rulebook — the validator's refusals name their
- * own rule; transforms are read straight off the allowlist so this copy
- * cannot fall behind what the policy actually accepts.
+ * What a member can rely on the policy accepting, said next to where
+ * they type — a reference, not the rulebook. Transforms are read straight
+ * off the allowlist, so this copy can't fall behind what's actually accepted.
  */
 function SpecPolicyPanel({
   errors,
@@ -290,10 +289,9 @@ export function LangWatchQLChartMode({
 }
 
 /**
- * Hands the workbench a reader over the current specification text, so Save
- * can capture the member's spec without the editor re-registering on every
- * keystroke. The reader answers `undefined` while the text does not parse to
- * an object — an unparseable spec is not a saveable one.
+ * Hands the workbench a reader over the current specification text, so
+ * Save can capture it without the editor re-registering every keystroke.
+ * Answers `undefined` while the text doesn't parse — unparseable isn't saveable.
  */
 function useRegisteredSpecReader({
   specText,

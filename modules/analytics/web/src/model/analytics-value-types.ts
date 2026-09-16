@@ -1,10 +1,7 @@
 /**
- * The three type helpers the analytics vocabulary is written in.
- *
- * `platform/app/src/utils/types.ts` holds these next to nine unrelated ones and
- * is imported by two hundred modules that have nothing to do with a chart. What
- * the registry, the money formatter and the series type actually name is these
- * three, so they travel and the rest does not.
+ * The three type helpers the analytics vocabulary is written in, pulled out
+ * of `platform/app/src/utils/types.ts` (200+ unrelated importers) since only
+ * these three — registry, money formatter, series type — need to travel.
  */
 
 /** An amount and the currency it is counted in, as a cost series reads it. */

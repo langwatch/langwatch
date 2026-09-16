@@ -1,9 +1,7 @@
 /**
- * The filters one SERIES of a custom graph is narrowed by, mounted INLINE by the builder rather
- * than through the drawer registry — this family's own overlay, with exactly one opener. That is
- * why there is no `setFlowCallbacks` side channel here: the registry-wide workaround exists only
- * because a drawer address can carry strings but not a function; mounted inline, `onChange` is
- * just a prop.
+ * The filters one SERIES of a custom graph is narrowed by, mounted INLINE
+ * — this family's own overlay with exactly one opener, so no
+ * `setFlowCallbacks` side channel: `onChange` is just a prop here.
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";

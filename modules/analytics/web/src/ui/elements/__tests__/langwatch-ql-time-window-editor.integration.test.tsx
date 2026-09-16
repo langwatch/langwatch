@@ -1,8 +1,7 @@
 /**
  * @vitest-environment jsdom
- * What the time-window fields commit, and what they refuse to commit. Driven at the component
- * rather than through the workbench, since the workbench only makes a window observable once
- * Run is pressed — by which point the half-typed states this suite is about are long gone.
+ * What the time-window fields commit, driven at the component: the workbench
+ * only makes a window observable once Run is pressed, long after half-typed states.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -17,11 +16,9 @@ const WINDOW = {
 };
 
 /**
- * The editor with its window held still.
- *
- * `value` never moves in reply to `onOverride`, which is deliberate: the fields
- * then keep showing what was typed, so each case can assert what was committed
- * and what is on screen as two separate facts.
+ * The editor with its window held still: `value` never moves in reply to
+ * `onOverride`, so the fields keep showing what was typed, letting each
+ * case assert what was committed and what's on screen separately.
  */
 function renderEditor() {
   const onOverride = vi.fn();

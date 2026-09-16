@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Chart mode as a member uses it: an edit redraws the chart, with the
- * database never asked and nothing written down. Monaco and `vega-embed` are
- * replaced at the module boundary — what's under test is this surface's
- * reaction to an edit. Spec: analytics-lwql-workbench.feature.
+ * Chart mode as a member uses it: an edit redraws the chart, with no
+ * database call and nothing written. Monaco and `vega-embed` are stubbed.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

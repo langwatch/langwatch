@@ -1,14 +1,7 @@
 /**
- * Saving and reopening the chart a member built in the workbench.
- *
- * Holds one piece of state of its own — which saved chart is open — and that is
- * what makes Save mean two different things honestly: with a chart open it
- * writes back to that chart, and with none open it creates one. A workbench
- * that always created would leave a member who pressed Save twice with two
- * charts and no way to tell which the dashboard is showing.
- *
- * Returns state and callbacks, never JSX.
- *
+ * Saving and reopening the chart a member built in the workbench. One
+ * piece of state — which saved chart is open — decides whether Save
+ * writes back or creates, so pressing Save twice never orphans a chart.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
@@ -23,10 +16,9 @@ export interface WorkbenchChartDraft {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
-   * The specification the member is looking at, when they have opened the
-   * chart at all. Absent saves the query alone — which is a whole record, not
-   * a broken one: the workbench derives a starter specification from the
-   * result shape when such a chart is opened.
+   * The specification the member is looking at, if a chart is open. Absent
+   * saves the query alone — a whole record, not a broken one, since the
+   * workbench derives a starter spec from the result shape when opened.
    */
   readonly vegaLiteSpec?: Record<string, unknown>;
 }
@@ -106,7 +98,10 @@ export function useSavedWorkbenchCharts({
   };
 }
 
-/** What every write shares: the project, the opened-chart state, the list, and where refusals go. */
+/**
+ * What every write shares: the project, the opened-chart state, the list,
+ * and where refusals go.
+ */
 interface ChartWriteContext {
   projectId: string;
   setOpened: Dispatch<SetStateAction<SavedChartSummary | null>>;

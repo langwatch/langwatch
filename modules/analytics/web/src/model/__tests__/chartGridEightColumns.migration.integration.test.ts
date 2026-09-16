@@ -1,9 +1,7 @@
 /**
  * The one-time conversion of chart placements from the two-column grid to
- * the eight-column one, as the `chart_grid_eight_columns` Prisma migration
- * performs it. Rows are seeded in the old unit and the migration's SQL is
- * run over them, so the assertion is on the statements that actually ship.
- *
+ * the eight-column one, via the `chart_grid_eight_columns` migration. Rows
+ * are seeded in the old unit and the migration SQL run over them directly.
  * @see specs/analytics/chart-grid-resize.feature
  */
 

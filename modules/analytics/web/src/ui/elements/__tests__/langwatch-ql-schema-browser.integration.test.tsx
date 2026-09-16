@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The schema browser shows what the response carried, documents it, refuses to
- * offer a withheld column, and narrows on a search.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Shows what the response carried, documents it, refuses a withheld
+ * column, and narrows on a search.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

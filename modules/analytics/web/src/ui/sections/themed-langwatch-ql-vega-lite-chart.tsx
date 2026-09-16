@@ -1,10 +1,7 @@
 /**
- * A Vega-Lite chart, wearing this deployment's theme.
- *
- * `platform/app/src/features/analytics-query/components/LangWatchQLVegaLiteChart.tsx`,
- * moved with the surfaces it served. Same split as the chart-mode adapter
- * beside it: the chart takes a resolved theme and this is the only module that
- * knows how to resolve one.
+ * A Vega-Lite chart, wearing this deployment's theme — moved from
+ * `platform/app` with the surfaces it served. Same split as the chart-mode
+ * adapter: the chart takes a resolved theme, and only this module resolves one.
  */
 
 import { LangWatchQLVegaLiteChart as VegaLiteChart } from "./langwatch-ql-vega-lite-chart.tsx";

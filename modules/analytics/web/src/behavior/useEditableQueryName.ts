@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { DashboardWidgetQuery } from "../model/dashboardWidgetDefinition.ts";
 
 /**
- * Click-to-edit state for a query's `LW.query` handle name: the draft, the
- * input ref it focuses on entry, and commit/cancel. Commit only fires an
- * `onChange` when the name actually changed, so a click that edits nothing
- * can't churn the query list.
+ * Click-to-edit state for a query's `LW.query` handle name: the draft,
+ * the input ref, and commit/cancel. Commit only fires `onChange` when the
+ * name actually changed, so editing nothing can't churn the query list.
  */
 export function useEditableQueryName({
   query,

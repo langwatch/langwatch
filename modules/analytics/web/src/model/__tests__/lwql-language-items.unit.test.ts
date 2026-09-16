@@ -1,10 +1,6 @@
 /**
- * The language the editor offers beyond the schema: keywords and functions.
- *
- * The list is assistance for a read-only surface, so what matters is that the
- * words a member reaches for first are there, that nothing suggested could
- * write, and that the list stays clean enough to trust.
- *
+ * Keywords and functions the editor offers beyond the schema — assistance
+ * for a read-only surface, so nothing suggested could write.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -15,10 +11,9 @@ import { LWQL_LANGUAGE_ITEMS } from "../lwql-language-items.ts";
 const labels = LWQL_LANGUAGE_ITEMS.map((item) => item.label);
 
 /**
- * Anchored at the start and closed with a word boundary rather than `$`: a
- * label is refused for the statement it opens, so `INSERT INTO` has to be
- * caught by the same rule that catches `INSERT`. `GROUP BY` and `ORDER BY`
- * stay safe because no forbidden word is their first one.
+ * Anchored at the start and closed with a word boundary rather than `$`:
+ * a label is refused for the statement it opens, so `INSERT INTO` is
+ * caught by the same rule as `INSERT`, while `GROUP BY` stays safe.
  */
 const WRITING_STATEMENT =
   /^(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|SET|ATTACH|DETACH|RENAME|OPTIMIZE|SYSTEM)\b/i;

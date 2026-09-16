@@ -17,10 +17,9 @@ const isOfferedStep = (seconds: number): seconds is LangWatchQLGranularityStep =
   (LWQL_GRANULARITY_STEPS as readonly number[]).includes(seconds);
 
 /**
- * Decodes `id:seconds,id:seconds` into a lookup.
- *
- * Malformed entries are dropped rather than throwing: the source is a URL a
- * member can hand-edit, and a typo should cost the pick it names, not the page.
+ * Decodes `id:seconds,id:seconds` into a lookup. Malformed entries are
+ * dropped rather than throwing: the source is a URL a member can hand-edit,
+ * and a typo should cost the pick it names, not the page.
  */
 export function parseWidgetGranularity(
   encoded: string | undefined,

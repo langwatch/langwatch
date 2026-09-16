@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Monaco is replaced by a stub at the module boundary: assertions cover what the
- * workbench registers and hands to it, which is ours, not what Monaco does with
- * it, which is not.
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Monaco is stubbed at the module boundary: assertions cover what the
+ * workbench registers and hands to it — ours, not what Monaco does with it.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

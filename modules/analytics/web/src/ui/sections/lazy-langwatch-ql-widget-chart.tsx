@@ -1,8 +1,7 @@
 /**
- * The boundary that keeps Vega out of the dashboard bundle: Vega, Vega-Lite,
- * vega-embed and the generated schema validator are megabytes every Reports
- * member would load regardless of whether a workbench chart is on the page.
- * Mount this, not the widget-chart module directly.
+ * The boundary that keeps Vega out of the dashboard bundle: those
+ * megabytes would load for every Reports member regardless of whether a
+ * workbench chart is on the page. Mount this, not the widget-chart module.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

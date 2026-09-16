@@ -1,10 +1,7 @@
 /**
  * What a freshly-created dashboard widget starts with: a React/TSX file
- * (the Code pane) and the named LangWatchQL statements it may run. Neither
- * SQL travels from the frame — these are the pieces the persisted
- * `CustomGraph.graph` stores together, in the shape
- * `DashboardWidgetDefinition` (`../dashboardWidgetDefinition.ts`)
- * describes.
+ * and the named LangWatchQL statements it may run — the pieces
+ * `CustomGraph.graph` persists as a `DashboardWidgetDefinition`.
  */
 
 import type { DashboardWidgetQuery } from "../dashboardWidgetDefinition.ts";
@@ -18,22 +15,18 @@ GROUP BY bucket
 ORDER BY bucket`;
 
 /**
- * The query a freshly-created widget starts with, named "main" so a widget
- * that goes on to call `LW.query("main", {})` finds it without renaming
- * anything. No declared parameters: the statement only uses the reserved
- * window/granularity placeholders, which the executor supplies regardless of
- * what a query declares.
+ * The starter widget's query, named "main" so `LW.query("main", {})`
+ * finds it unrenamed. No declared parameters: it only uses the reserved
+ * window/granularity placeholders the executor always supplies.
  */
 export const STARTER_WIDGET_QUERIES: DashboardWidgetQuery[] = [
   { name: "main", sql: BUCKETED_TRACES_SQL },
 ];
 
 /**
- * A real Recharts component wired to the widget's own "main" query, so
- * "+ New widget" proves the whole pipeline immediately: compile-and-mount,
- * `LW.useChartQuery(name, params)` dispatch, parent-side validation (this
- * call passes no params, matching "main"'s zero declared parameters), and a
- * real ClickHouse round trip rendering as a bar chart that fills its card.
+ * A real Recharts component wired to "main", so "+ New widget" proves the
+ * whole pipeline at once: compile-and-mount, `LW.useChartQuery` dispatch,
+ * parameter validation, and a real ClickHouse round trip rendering a chart.
  */
 export const STARTER_WIDGET_CODE = `import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 

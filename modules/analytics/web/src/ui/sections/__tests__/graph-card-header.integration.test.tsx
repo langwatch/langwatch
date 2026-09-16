@@ -1,10 +1,7 @@
 /**
- * What a dashboard card's header offers.
- *
- * The file used to pin the alert-button wiring (Phase 5.2 of ADR-034), which is
- * the behaviour this move removed — see the note inside.
- *
  * @vitest-environment jsdom
+ * What a dashboard card's header offers. Used to pin the alert-button
+ * wiring (ADR-034 Phase 5.2), removed here — see the note inside.
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -52,17 +49,9 @@ describe("GraphCardHeader", () => {
   });
 
   /**
-   * THE ALERT ENTRY POINTS ARE GONE, AND SO ARE THE TWO TESTS THAT PINNED THEM.
-   *
-   * Both scenarios asserted that the bell and the "Add alert" button opened the
-   * automations drawer pre-filled with this graph and its first series. That
-   * drawer's registry entry was deleted when the automations family moved, so
-   * the two call sites had not compiled since; the header drops them, and a
-   * test for behaviour a screen no longer has is a test that cannot fail
-   * honestly. Deleted rather than rewritten into an assertion of absence
-   * dressed up as a feature — what replaces them is the one below, which says
-   * plainly that the header offers no way to author an alert, so the day a
-   * cross-feature overlay capability lands somebody has to come back here.
+   * THE ALERT ENTRY POINTS ARE GONE, along with the tests that pinned them —
+   * deleted, not rewritten into an absence assertion, since such a test
+   * can't fail honestly. Revisit when a cross-feature overlay capability lands.
    */
   describe("given a saved builder graph", () => {
     describe("when its header renders", () => {

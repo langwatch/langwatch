@@ -92,10 +92,8 @@ function TopicsContent() {
 }
 
 /**
- * The page guard is the routes section's, not this module's: `platform/app`
- * wrapped these in `withPermissionGuard("analytics:view")` (and `DashboardLayout`
- * on two), both stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, the
- * composing app's own route tree.
+ * The page guard is the routes section's, not this module's:
+ * `analytics-routes.tsx` wraps these in `withPermissionGuard("analytics:view")`
+ * (and `DashboardLayout` on two), in the composing app's own route tree.
  */
 export default TopicsContent;

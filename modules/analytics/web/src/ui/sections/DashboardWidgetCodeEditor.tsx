@@ -1,10 +1,7 @@
 /**
- * The dashboard widget author's Monaco pane: one dynamic import and one set of editor
- * options, shared by the in-card Code view and the edit drawer so the two
- * surfaces can never drift on wrapping, folding, font size or theme.
- *
- * The import stays lazy — Monaco is large, and a page of chart widgets should
- * pay for it only once someone actually opens code.
+ * The dashboard widget author's Monaco pane, shared by the in-card Code
+ * view and the edit drawer so both can never drift on wrapping, folding,
+ * font size or theme. The import stays lazy — Monaco is large.
  */
 
 import { Box } from "@chakra-ui/react";
@@ -32,10 +29,9 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
 };
 
 /**
- * Monaco's TypeScript worker checks against an ambient lib that knows nothing
- * of this repo, so semantic validation (imports, JSX types) is all false
- * positives and is turned off; syntax validation stays on for real syntax
- * errors. `jsx` must still be set or Monaco's parser rejects TSX outright.
+ * Monaco's TypeScript worker checks against an ambient lib that knows
+ * nothing of this repo, so semantic validation is all false positives and
+ * turned off. `jsx` must still be set or the parser rejects TSX outright.
  */
 const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -75,10 +71,9 @@ const PARAM_TOKEN_CLASS_DECLARED = "lw-sql-param-declared";
 const PARAM_TOKEN_CLASS_UNDECLARED = "lw-sql-param-undeclared";
 
 /**
- * One shared stylesheet for the three token classes below — injected once,
- * since decorations only carry a className, not inline colors. Colors are
- * fixed (not theme-derived) because they must read clearly on both the
- * `vs` and `vs-dark` Monaco themes this editor switches between.
+ * One shared stylesheet for the three token classes below, injected once
+ * since decorations only carry a className. Colors are fixed, not
+ * theme-derived, so they read on both `vs` and `vs-dark` Monaco themes.
  */
 function ensureParamTokenStyles() {
   const id = "lw-sql-param-token-styles";

@@ -1,8 +1,7 @@
 /**
- * The real-browser lane: Vega draws to canvas, loads its own grammars and
- * refuses `eval`, which jsdom cannot observe. KNOWN GAP: CI does not run
- * this lane yet — `run-package-suites.sh` only invokes `test`/`test:unit`,
- * so `test:browser` runs locally only.
+ * The real-browser lane: Vega draws to canvas and refuses `eval`, which
+ * jsdom cannot observe. KNOWN GAP: `run-package-suites.sh` only invokes
+ * `test`/`test:unit`, so `test:browser` runs locally only, not in CI.
  */
 
 import { playwright } from "@vitest/browser-playwright";

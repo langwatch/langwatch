@@ -21,12 +21,9 @@ import { useAnalyticsPeriod } from "./use-analytics-period.ts";
 import type { AnalyticsReadScope } from "./analytics-api.ts";
 
 /**
- * How this family writes a query string.
- *
- * `allowEmptyArrays` is a real `qs` option that its published types do not
- * declare; the application suppressed the error with a `@ts-ignore` and a
- * shrug. Widening the literal to `IStringifyOptions` says the same thing to the
- * compiler without disabling a line of it.
+ * How this family writes a query string: `allowEmptyArrays` is a real
+ * `qs` option its published types omit (suppressed before with a
+ * `@ts-ignore`); widening to `IStringifyOptions` fixes the type honestly.
  */
 const QS_WRITE_OPTIONS: qs.IStringifyOptions & { allowEmptyArrays?: boolean } = {
   allowDots: true,

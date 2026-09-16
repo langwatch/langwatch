@@ -77,10 +77,9 @@ export const chartGridCardHeightPx = (rowSpan: number): number =>
   rowSpan * CHART_GRID_ROW_HEIGHT_PX + (rowSpan - 1) * CHART_GRID_MARGIN_PX;
 
 /**
- * The first row below every card listed — where a new card goes so it sits
- * under the existing ones rather than on top of the tallest. A card ends at
- * `gridRow + rowSpan`, so the bottom is the largest of those, or row 0 when
- * the grid is empty.
+ * The first row below every card listed, so a new card sits under the
+ * existing ones. A card ends at `gridRow + rowSpan`, so the bottom is the
+ * largest of those, or row 0 when the grid is empty.
  */
 export const chartGridBottomRow = (
   cards: readonly { gridRow: number; rowSpan: number }[],

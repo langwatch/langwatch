@@ -1,10 +1,7 @@
 /**
- * Which window the address means.
- *
- * The reading half of the period control, pure so the question "what range is
- * this chart drawn over" is answerable without a router. Every analytics read
- * keys on the two dates, so getting this wrong is not a cosmetic bug — it is
- * every chart on the page querying a window nobody asked for.
+ * Which window the address means: the reading half of the period control,
+ * pure so "what range is this drawn over" is answerable without a router.
+ * Every chart keys on the two dates, so getting this wrong misqueries all.
  */
 
 import { describe, expect, it } from "vitest";
@@ -72,10 +69,9 @@ describe("the analytics period", () => {
       });
 
       /**
-       * A backwards range is a query for nothing at all: every chart would
-       * report empty and nothing on screen would say why. Ordering the two
-       * instants makes the worst case a one-instant window rather than a page
-       * of silently empty charts.
+       * A backwards range is a query for nothing: every chart would report
+       * empty with no explanation. Ordering the two instants makes the
+       * worst case a one-instant window, not a page of silently empty charts.
        */
       it("orders a backwards range rather than querying a negative window", () => {
         const reading = readAnalyticsPeriod({

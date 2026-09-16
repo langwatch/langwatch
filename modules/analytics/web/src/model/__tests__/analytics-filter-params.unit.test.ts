@@ -1,9 +1,7 @@
 /**
- * What the address says the charts are narrowed to.
- *
- * The reading and the counting are pure here so the two failures that matter
- * are unit-testable: a filter the reader set that the charts never see, and a
- * filter the reader cleared that the charts still apply.
+ * What the address says the charts are narrowed to: reading and counting
+ * are pure so the two failures that matter are unit-testable — a filter
+ * set that charts never see, and a filter cleared that charts still apply.
  */
 
 import { describe, expect, it } from "vitest";

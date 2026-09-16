@@ -1,8 +1,7 @@
 /**
- * What a coarsened dashboard widget tells the member. Its own module, no
- * imports beyond the vocabulary, because the widget that renders it reaches
- * Chakra, tRPC and the lazy Vega boundary — the copy is the part worth
- * testing directly, naming both steps and the ceiling that forced the change.
+ * What a coarsened dashboard widget tells the member. Its own module,
+ * since the widget rendering it reaches Chakra, tRPC and the lazy Vega
+ * boundary — the copy alone is what's worth testing directly.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

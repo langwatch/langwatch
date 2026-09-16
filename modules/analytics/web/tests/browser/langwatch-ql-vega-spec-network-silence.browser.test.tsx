@@ -178,11 +178,9 @@ async function poll(check: () => boolean, timeoutMs = 5_000): Promise<boolean> {
 type CorpusOutcome = string;
 
 /**
- * Validates one fixture and attempts to render it, reporting what happened.
- *
- * Rendering is attempted for every fixture, refused or not: a refusal that
- * only ever happens in a direct call to the validator would say nothing about
- * what the component does when it is handed the same specification.
+ * Validates one fixture and attempts to render it, reporting what
+ * happened — rendering is attempted even when refused, since a refusal
+ * seen only in the validator says nothing about what the component does.
  */
 async function attemptToRender(entry: CorpusEntry): Promise<CorpusOutcome> {
   const validation = validateVegaLiteSpec({

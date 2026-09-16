@@ -1,9 +1,7 @@
 /**
- * The boundary that keeps Vega out of every bundle but this one. Vega, Vega-Lite, vega-embed
- * and the generated schema validator are several megabytes only a member who opens Chart mode
- * ever needs; everything that reaches them is behind this one lazy import. Mount this, not
- * the chart-mode module — importing that directly puts Vega back in the entry chunk, and
- * nothing would look wrong.
+ * The boundary that keeps Vega out of every bundle but this one — only a
+ * member opening Chart mode needs those megabytes. Mount this, not the
+ * chart-mode module directly, or Vega lands back in the entry chunk unnoticed.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

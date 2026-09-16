@@ -201,7 +201,6 @@ function CustomReportsSection({ slug }: { slug: string }) {
 /**
  * The page guard is the routes section's, not this module's: the
  * `analytics:view` permission and layout chrome are stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in
- * front of the same loader registry — not duplicated here.
+ * `analytics-routes.tsx`, in front of the same loader registry.
  */
 export default AnalyticsContent;

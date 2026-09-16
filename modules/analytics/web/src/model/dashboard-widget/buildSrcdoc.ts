@@ -1,9 +1,7 @@
 /**
  * Composes the sandboxed frame's document. React, ReactDOM, Recharts and
- * Babel load standalone from a CDN as render-blocking UMD `<script>` tags,
- * so their globals are already there by the time the shim and author
- * runtime run. The widget's source is embedded as a JS string, not markup —
- * it's a React/TSX file, compiled and mounted by the shim after `lw:init`.
+ * Babel load standalone from a CDN as UMD `<script>` tags before the shim
+ * runs. The widget's source embeds as a JS string, compiled after `lw:init`.
  */
 
 import { buildAuthorRuntimeScript } from "./authorRuntime";
@@ -11,10 +9,9 @@ import { buildChartsLibScript } from "./chartsLibSource";
 import { buildShimScript } from "./shimSource";
 
 /**
- * Pinned to exact versions (not ranges) so UNPKG can never resolve a newer
- * release out from under a saved widget, and lower than the app's own
- * React/Recharts: React 19 dropped the UMD build these `<script>` tags need,
- * so the sandbox stays on the last UMD-shipping majors — 18 and recharts 2.
+ * Pinned to exact versions so UNPKG can never resolve a newer release out
+ * from under a saved widget. React 19 dropped the UMD build these tags
+ * need, so the sandbox stays on the last UMD-shipping majors: 18 and 2.
  */
 const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
   "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
@@ -27,12 +24,9 @@ const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
 ];
 
 /**
- * Embeds `source` as a JS string literal safe to inline inside a `<script>`
- * element. `JSON.stringify` handles quoting and control characters; the one
- * thing it does not know about is HTML: a literal `</script` inside the
- * string would close the element early regardless of the JS syntax around
- * it, since the HTML tokenizer never looks at JS semantics. That is the only
- * sequence guarded here.
+ * Embeds `source` as a JS string literal safe to inline in a `<script>`
+ * tag. `JSON.stringify` handles quoting, but not HTML: a literal
+ * `</script` inside the string would close the element regardless of JS syntax.
  */
 function toInlineScriptLiteral(source: string): string {
   return JSON.stringify(source).replace(/<\/script/gi, "<\\/script");

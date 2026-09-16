@@ -1,19 +1,7 @@
 /**
- * Chart mode drawing a categorical result in a real browser.
- *
- * `langwatch-ql-chart-mode.integration.test.tsx` replaces `vega-embed` at the
- * module boundary, so it can prove what the surface *asks* Vega for and
- * nothing about what Vega does with it. Here the whole runtime is real: a
- * result goes in, a validated specification is compiled by Vega-Lite, embedded
- * by Vega, and drawn as SVG — and the assertions are about the marks that come
- * out and the geometry they have.
- *
- * Only `@monaco-editor/react` is stubbed, so the specification editor is a
- * plain textarea. The real one fetches Monaco from a public CDN by default; a
- * chart test that reached for it would be flaky and would make a network call
- * on a surface whose whole point is that it makes none.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Chart mode drawing a categorical result in a real browser: the whole
+ * Vega runtime is real here, unlike the jsdom suite which stubs `vega-embed`
+ * at the boundary. Only `@monaco-editor/react` is stubbed, to avoid a CDN fetch.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -123,13 +111,9 @@ describe("LangWatchQL chart mode in real Chromium", () => {
           </ChakraProvider>,
         );
 
-        // The member writes their own bar specification over the starting
-        // point in the Specification view, then returns to the chart — the
-        // same component instance, so the edit survives the switch.
-        // The specification editor is behind `lazy(() => import(...))` and a
-        // Suspense boundary, so the stub arrives a dynamic import after the
-        // first paint — longer than Testing Library's one-second default gives
-        // it when this lane's four files each drive their own Chromium.
+        // The member writes a bar spec over the starting point, then returns
+        // to the chart (same instance, so the edit survives). The editor is
+        // lazy + Suspense, so the stub arrives later than the 1s default wait.
         const editor = await screen.findByTestId("spec-editor-input", {}, { timeout: 10_000 });
         await userEvent.fill(editor, JSON.stringify(BAR_SPECIFICATION));
         rerender(
@@ -146,12 +130,9 @@ describe("LangWatchQL chart mode in real Chromium", () => {
         expect(chartView()?.querySelector("svg")).not.toBeNull();
         expect(chartView()).toHaveAttribute("data-chart-status", "ready");
 
-        // The accessible name survives a REAL embed. Vega writes its own
-        // `role="graphics-document"` / `aria-label="Vega visualization"` onto
-        // the element it embeds into, so the component keeps its name on a
-        // wrapper Vega never touches — this assertion was impossible while the
-        // name sat on the mount point itself, and the jsdom suite could not
-        // see the difference because it stubs `vega-embed`.
+        // The accessible name survives a REAL embed: Vega writes its own
+        // `role`/`aria-label` onto the embedded element, so the name must
+        // live on a wrapper Vega never touches — invisible to the jsdom suite.
         expect(chartView()).toHaveAttribute("role", "img");
         expect(chartView()?.getAttribute("aria-label")).toContain("Chart of the result of SELECT");
         expect(chartView()?.getAttribute("aria-label")).not.toContain("Vega visualization");

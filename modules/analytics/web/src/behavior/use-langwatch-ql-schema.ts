@@ -1,11 +1,7 @@
 /**
- * The LangWatchQL schema for the signed-in member, mapped for the workbench.
- *
- * Fetched once and left alone: every background refresh option is off, because
- * the surface makes exactly one promise about when it talks to the server, and
- * a schema that reloaded itself would break it just as surely as a rerunning
- * query would.
- *
+ * The LangWatchQL schema for the signed-in member: fetched once and left
+ * alone, since every background refresh option is off — the surface makes
+ * one promise about when it talks to the server, and reloading would break it.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

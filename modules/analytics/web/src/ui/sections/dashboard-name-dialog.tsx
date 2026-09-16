@@ -1,8 +1,7 @@
 /**
- * Naming a new dashboard: mounted inline by the section that offers it,
- * rather than through the drawer registry — that registry is application
- * chrome a packaged screen has nothing above it to supply, and this dialog
- * has exactly one opener.
+ * Naming a new dashboard: mounted inline, not through the drawer registry
+ * — that registry is application chrome a packaged screen can't supply,
+ * and this dialog has exactly one opener.
  */
 
 import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";

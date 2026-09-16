@@ -1,9 +1,7 @@
 /**
- * The chart half of a dashboard widget, behind the Vega boundary. Split
- * from the widget so nothing Vega-Lite loads until it has rows to draw —
- * mount via `LazyLangWatchQLWidgetChart`, never import this directly, or
- * megabytes of Vega land back in the entry chunk. Validation isn't
- * repeated here — {@link LangWatchQLVegaLiteChart} refuses on its own.
+ * The chart half of a dashboard widget, behind the Vega boundary. Mount
+ * via `LazyLangWatchQLWidgetChart`, never import this directly, or
+ * megabytes of Vega land in the entry chunk. Validation isn't repeated here.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
@@ -22,10 +20,9 @@ export interface LangWatchQLWidgetChartProps {
   readonly columns: readonly LangWatchQLDatasetColumn[];
   readonly rows: readonly Record<string, unknown>[];
   /**
-   * The specification saved with the chart, or `undefined` for a chart saved
-   * as a query alone — which is a whole record, not a broken one. A starter
-   * derived from the result shape is drawn for it, the same one the workbench
-   * offers for such a chart.
+   * The specification saved with the chart, or `undefined` for a
+   * query-alone chart — a whole record, not a broken one. A starter is
+   * derived from the result shape, the same one the workbench offers.
    */
   readonly vegaLiteSpec?: Record<string, unknown>;
   /** How the chart is described to a reader who cannot see it. */

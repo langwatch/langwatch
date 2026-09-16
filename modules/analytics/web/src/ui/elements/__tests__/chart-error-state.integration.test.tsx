@@ -65,10 +65,9 @@ describe("<ChartErrorState />", () => {
 
   describe("when the failure is a handled error", () => {
     /**
-     * THE CODE SLUG IS THE ONE THING A PACKAGE CAN STILL PIN HERE — the
-     * presentation registry is `platform/app`'s and does not travel, so this
-     * asserts only the failed action, never the code slug (#5984: the wire
-     * message IS the code).
+     * THE CODE SLUG is the one thing a package can still pin here — the
+     * presentation registry is `platform/app`'s and doesn't travel, so this
+     * asserts only the failed action, never the slug (#5984).
      */
     it("names the action that failed and never the code slug", () => {
       renderChartErrorState({ error: handledError("query_timeout") });

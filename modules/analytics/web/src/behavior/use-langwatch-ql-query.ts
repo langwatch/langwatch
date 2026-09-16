@@ -1,10 +1,7 @@
 /**
- * The workbench's request state, bound to React.
- *
- * A thin application binding around the Analytics package request machine.
- * This adds one controller per mount, a subscription, and disposal that aborts
- * whatever is in flight.
- *
+ * The workbench's request state, bound to React: a thin application
+ * binding around the Analytics package request machine, adding one
+ * controller per mount, a subscription, and disposal that aborts in flight.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

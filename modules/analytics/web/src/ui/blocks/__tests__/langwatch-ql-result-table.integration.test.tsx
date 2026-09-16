@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
  * jsdom never lays out, so `@tanstack/react-virtual`'s scroll-element
- * `offsetWidth`/`offsetHeight` read `0` unless stubbed — stubbing them gives
- * the virtualizer a real viewport, so "only a bounded window is materialized"
- * is a claim this suite can actually fail.
+ * dimensions read `0` unless stubbed, giving the virtualizer a real viewport.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -237,11 +235,9 @@ describe("the LangWatchQL result table", () => {
 
     describe("when that cell renders in the table", () => {
       /**
-       * Every row is one `ROW_HEIGHT`, and the virtualizer sizes the scroll
-       * range from that constant rather than from measurement. A preview that
-       * renders its own line breaks makes the row taller than the range it was
-       * counted into, so the padding rows no longer add up and the scrollbar
-       * stops matching the rows under it.
+       * Every row is one `ROW_HEIGHT`; the virtualizer sizes the scroll
+       * range from that constant, not measurement. A preview with its own
+       * line breaks makes the row taller, so padding and scroll stop matching.
        */
       it("previews it on a single line", () => {
         renderTable(withNewlines());
@@ -254,10 +250,9 @@ describe("the LangWatchQL result table", () => {
       });
 
       /**
-       * Collapsing the preview loses the line breaks, so the value has to stay
-       * reachable — otherwise the table would show a version of the value with
-       * no way to get at the real one. Length is not what makes it expandable
-       * here: this value is well under the clip limit.
+       * Collapsing the preview loses the line breaks, so the value must
+       * stay reachable — otherwise the table shows a value with no way to
+       * get at the real one, even though it's under the clip limit.
        */
       it("still offers the whole value", async () => {
         renderTable(withNewlines());

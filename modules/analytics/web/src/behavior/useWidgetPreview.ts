@@ -11,11 +11,9 @@ import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor.ts";
 const PREVIEW_DEBOUNCE_MS = 600;
 
 /**
- * The half of a widget editor identical across the create drawer, the card
- * and the in-place editor: a DEBOUNCED draft, the abortable executor its
- * queries run against, declared-parameter defaults, the `LW.navigate` host
- * handler, and `dashboardContext`. Only `widgetId`/`dashboardId`/`widgetName`
- * vary per surface; the draft itself stays with each caller.
+ * Shared across the create drawer, card and in-place editor: a debounced
+ * draft, its abortable executor, parameter defaults, `LW.navigate`, and
+ * `dashboardContext`. Only id/name fields vary; the draft stays per caller.
  */
 export function useWidgetPreview({
   code,

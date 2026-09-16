@@ -1,17 +1,7 @@
 /**
- * The chart specification editor.
- *
- * It edits text and reports how much is wrong with it. That is the whole of it:
- * changing a chart is a change to how the result is drawn, never a change to
- * the query, so nothing here can cause the database to be asked anything. The
- * editor holds no query hook, issues no request, and writes nothing anywhere —
- * a specification lives as long as the member is looking at this result and no
- * longer.
- *
- * The problems themselves are rendered by the policy panel beside this editor;
- * what this keeps is the live count, as a status line a screen reader hears
- * without having to find the panel.
- *
+ * The chart specification editor: edits text and reports how much is
+ * wrong, never touching the query or database. The problems render in
+ * the policy panel; this keeps the live count as a screen-reader status line.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

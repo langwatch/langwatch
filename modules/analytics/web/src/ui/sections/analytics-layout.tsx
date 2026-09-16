@@ -1,9 +1,7 @@
 /**
- * The rail and the header every analytics page sits in. Chrome (sidebar, top
- * bar, drawer mount) belongs to the route tree, not a screen, so this drops
- * the outermost wrapper — these pages are children of a layout route the
- * composing app still serves. Which entry is selected ARRIVES AS A PROP: a
- * governed screen may not read the address for what the router already knows.
+ * The rail and the header every analytics page sits in — chrome (sidebar,
+ * top bar, drawer mount) belongs to the route tree, so this drops the
+ * outermost wrapper. Which entry is selected ARRIVES AS A PROP, never read.
  */
 
 import { Container, HStack, VStack } from "@chakra-ui/react";

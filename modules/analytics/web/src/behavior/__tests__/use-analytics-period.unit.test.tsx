@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The render seam that keeps a relative window still. `analytics-period.ts`
- * takes `now`, which is testable but a loaded gun: reading it straight out of
- * render would hand a NEW `endDate` every render, keying `{ startDate,
- * endDate }` reads into an endless refetch loop. Regression pin: the window
- * a render sees must be REFERENTIALLY the one before it, unless it changed.
+ * Pins the render seam: `now` must stay referentially stable across
+ * renders, or `{ startDate, endDate }` keys into an endless refetch loop.
  */
 
 import { renderHook } from "@testing-library/react";

@@ -140,11 +140,9 @@ export function useDashboardWidgetExecutor(
   );
 
   /**
-   * Fills every declared parameter from its default (there is no other
-   * source of a value here), so a required parameter with no default simply
-   * fails validation — the same "cannot run standalone without one" outcome
-   * a disabled button would express, reached through the one validation path
-   * instead of a second rule to keep in sync with it.
+   * Fills every declared parameter from its default, so a required
+   * parameter with no default simply fails validation — the same outcome
+   * a disabled button would express, through the one validation path.
    */
   const runStandalone = useCallback(
     async (query: DashboardWidgetQuery) => {

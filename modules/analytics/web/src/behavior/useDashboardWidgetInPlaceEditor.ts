@@ -6,9 +6,8 @@ import { useWidgetPreview } from "./useWidgetPreview.ts";
 
 /**
  * The in-place editor's draft (seeded from and reverted to the persisted
- * widget), the debounced preview it feeds, and the executor/context that
- * preview runs against. Extracted so `DashboardWidgetInPlaceEditor` stays a
- * thin render over `DashboardWidgetEditDrawer`.
+ * widget), its debounced preview, and the executor/context it runs
+ * against — extracted so the component stays a thin render.
  */
 export function useDashboardWidgetInPlaceEditor({
   id,

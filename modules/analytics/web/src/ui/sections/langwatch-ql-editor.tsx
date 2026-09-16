@@ -1,8 +1,7 @@
 /**
  * The SQL editor, with assistance drawn from the live schema response —
- * every suggestion comes from a projection of what the schema endpoint
- * returned, nothing more. Never rewrites what is typed, only marks
- * refusal positions: the statement that runs must be the one written.
+ * suggestions are a projection of what the endpoint returned, nothing
+ * more. Never rewrites what is typed, only marks refusal positions.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -29,10 +28,9 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
 };
 
 /**
- * The editor is as tall as the statement, within reason: a few lines of SQL
- * get a few lines of editor, and the result below keeps the rest of the page.
- * The ceiling stops a long statement from pushing the result off screen — past
- * it the editor scrolls internally.
+ * The editor is as tall as the statement, within reason: a few lines of
+ * SQL get a few lines of editor, so the result keeps the rest of the page.
+ * Past the ceiling, a long statement scrolls internally instead of pushing it off.
  */
 const EDITOR_MIN_HEIGHT = 116;
 const EDITOR_MAX_HEIGHT = 380;

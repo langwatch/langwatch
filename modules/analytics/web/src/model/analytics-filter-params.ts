@@ -14,10 +14,9 @@ export type FilterParam =
   | Record<string, Record<string, string[]>>;
 
 /**
- * The filters with nothing selected removed.
- *
- * A SHALLOW check on the nested shapes, on purpose: `{ "eval-1": [] }` means
- * "key picked, values still coming" and the nested editor needs it kept.
+ * The filters with nothing selected removed — a SHALLOW check on the
+ * nested shapes, on purpose: `{ "eval-1": [] }` means "key picked, values
+ * still coming," which the nested editor needs kept.
  */
 export const filterOutEmptyFilters = (
   filters: Partial<Record<FilterField, FilterParam | string>> | undefined,

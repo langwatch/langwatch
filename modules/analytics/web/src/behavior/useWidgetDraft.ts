@@ -16,12 +16,9 @@ function queriesEqual(
 }
 
 /**
- * The name/code/queries draft for one persisted widget (the card and the in-place editor).
- * Reseeds whenever the persisted record changes underneath it (a save from this surface, or a
- * refetch), and exposes `resetToWidget` for a discarded edit and `isDirty` for the Save gate.
- * `isFrozen` suspends reseeding: while the edit drawer is open the chart previews the LIVE
- * draft, so a background refetch remapping `widget.queries` must not clobber an in-progress
- * edit.
+ * The name/code/queries draft for one persisted widget, reseeded whenever
+ * the persisted record changes — except while `isFrozen`, which suspends
+ * reseeding so a background refetch can't clobber an in-progress edit.
  */
 export function useWidgetDraft({
   widget,

@@ -1,9 +1,7 @@
 /**
- * The filter catalogue is a COPY, and this is what keeps it honest. `availableFilters` beside
- * this test is a family-local copy of `platform/app/src/server/filters/registry.ts`, taken
- * because thirty-odd platform modules still read the original and deletes-only forbids
- * repointing them. The vocabulary itself is not copied — `filterFieldsEnum` is
- * `@langwatch/analytics-contract`'s — so a field added there without an entry here fails here.
+ * `availableFilters` here is a family-local copy of the platform's filter
+ * registry (thirty-odd modules still read the original). The vocabulary
+ * itself isn't copied: a field added to `filterFieldsEnum` fails here.
  */
 
 import { filterFieldsEnum } from "@langwatch/analytics-contract";

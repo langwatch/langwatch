@@ -1,20 +1,7 @@
 /**
- * A link, inside a package that may not import a router.
- *
- * `platform/app`'s `~/components/ui/link` renders its internal href through
- * `react-router`'s Link, which is an import ADR-004 seals off from a
- * feature-web package. So this one keeps the anchor, which is what makes a link
- * a link (open in a new tab, copy the address, middle-click), and hands an
- * ordinary left-click to the host's navigate so the page still changes without
- * a full reload.
- *
- * The SIXTH copy of a dozen lines of policy — user-web, gateway-web,
- * governance-web and organization-web carry the same one — rather than a
- * component worth a shared package of its own. A web package may not import
- * another web package, so the alternative is a surface on one of them
- * publishing twelve lines. Six copies is the point at which that surface starts
- * to look cheaper than the sixth copy, and it is recorded here rather than
- * built, because a page move does not own the Design System's boundary.
+ * A link, inside a package that may not import a router: ADR-004 seals
+ * off `react-router` here, so this keeps a plain anchor and hands
+ * left-click to the host's navigate — the sixth copy of this policy.
  */
 
 import { Link as ChakraLink } from "@chakra-ui/react";

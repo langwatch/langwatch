@@ -1,8 +1,7 @@
 /**
  * The widget editor: a wide drawer with a live chart preview, Code and
- * Queries tabs. Holds no draft state of its own — every value and handler
- * comes from the card that opened it, so the preview live-updates because
- * both read and write the exact same state.
+ * Queries tabs, holding no draft state — every value and handler comes
+ * from the card that opened it, so both read/write the exact same state.
  */
 
 import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";

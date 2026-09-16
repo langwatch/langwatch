@@ -98,10 +98,9 @@ export type CustomGraphInput = {
 };
 
 /**
- * The charted read, as the shaping helpers below take it. Stated
- * structurally rather than as `UseTRPCQueryResult<inferRouterOutputs<…>>`,
- * which a governed screen may not import; the payload is the analytics
- * contract's own declaration, so a wire change fails here.
+ * The charted read, as the shaping helpers below take it: stated
+ * structurally, not as `UseTRPCQueryResult<...>` (a governed screen may
+ * not import it) — the payload is the analytics contract's own type.
  */
 type TimeseriesQuery = {
   data: AnalyticsTimeseriesResult | undefined;
@@ -130,10 +129,9 @@ function toQueryString(params: Record<string, string | string[]>): string {
 export const summaryGraphTypes: CustomGraphInput["graphType"][] = ["summary", "pie", "donnut"];
 
 /**
- * The floor a row of figures holds, in pixels — the tallest form of a
- * figure (label, number, and once a comparison arrives, a change line),
- * so the row never grows or shrinks as data lands. `input.height` does not
- * reach here: it sizes a plotting area, and a figure row has none.
+ * The floor a row of figures holds, in pixels — the tallest form (label,
+ * number, and a change line once comparison arrives), so the row never
+ * resizes as data lands. `input.height` sizes a plotting area; this has none.
  */
 const SUMMARY_ROW_MIN_HEIGHT = "101px";
 
@@ -225,10 +223,9 @@ const CustomGraph_ = React.memo(
     const project = host.project();
 
     /**
-     * Which series the reader has clicked out of the legend. In component
-     * state, not browser storage, since a governed screen may not touch
-     * that store (`ui-screen-closure`); the toggle lasts the page's life,
-     * and the picks are one click to redo.
+     * Which series the reader has clicked out of the legend — component
+     * state, not browser storage (`ui-screen-closure`). The toggle lasts
+     * the page's life, and the picks are one click to redo.
      */
     const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(() => new Set());
 

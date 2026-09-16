@@ -1,9 +1,7 @@
 /**
- * The sandboxed chart frame plus its bridge lifecycle.
- *
- * `sandbox="allow-scripts"` and NEVER `allow-same-origin`: the frame runs
- * author code with an opaque origin, no cookies, no parent DOM. All it can do
- * is talk over the transferred MessagePort.
+ * The sandboxed chart frame plus its bridge lifecycle. `sandbox=
+ * "allow-scripts"` and NEVER `allow-same-origin`: the frame runs author
+ * code with an opaque origin, no cookies, no parent DOM, only a MessagePort.
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";

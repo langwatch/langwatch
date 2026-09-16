@@ -358,22 +358,9 @@ function AnalyticsCustomGraphContent({
                   />
                   <HStack gap={2}>
                     {/*
-                     * THE ALERT ENTRY POINTS DID NOT TRAVEL, and this is where
-                     * the other two of the automations family's seven platform
-                     * breaks stop being breaks.
-                     *
-                     * Both — the bell that edits an existing alert and the
-                     * "Add alert" button that authors one — called
-                     * `openDrawer("automation", …)`, and that registry entry was
-                     * DELETED when the automations family moved. Authoring an
-                     * alert is `@langwatch/automation-web`'s drawer, a web
-                     * package may not import another web package, and the chrome
-                     * layout route that would mount a registry for a packaged
-                     * screen is separate work. Every alert already authored
-                     * still fires and the automations pages still edit them;
-                     * what is gone is the shortcut from a chart to its alert.
-                     * RECORDED as one of the first customers of a cross-feature
-                     * overlay capability.
+                     * THE ALERT ENTRY POINTS DID NOT TRAVEL — two of the automations family's
+                     * seven platform breaks. Both called a drawer registry entry deleted when
+                     * automations moved; alerts still fire and edit, only the shortcut is gone.
                      */}
                     <Menu.Root>
                       <Menu.Trigger asChild>

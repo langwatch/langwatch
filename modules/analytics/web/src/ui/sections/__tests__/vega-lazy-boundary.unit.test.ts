@@ -1,10 +1,7 @@
 /**
- * Where Vega is allowed to be reached from. Vega, Vega-Lite, vega-embed and
- * the schema validator are megabytes only a chart surface needs, and one
- * static import puts all of it in the entry chunk invisibly. The claim:
- * every module in this feature that reaches a Vega package is reachable only
- * behind a lazy boundary (a `Lazy…` wrapper's dynamic `import()`), never
- * imported directly.
+ * Where Vega is allowed to be reached from: Vega, Vega-Lite, vega-embed
+ * and the schema validator are megabytes only a chart surface needs. Every
+ * module reaching one must sit behind a lazy `import()`, never imported directly.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -40,12 +37,9 @@ const GENERATED_VALIDATOR = "vegaLiteSchemaValidator.generated";
 const EXTENSIONS = [".ts", ".tsx", ".js"];
 
 /**
- * Static `import`/`export … from` specifiers. Deliberately not `import()`.
- * The clause between keyword and `from` is bounded so one match can't span
- * two statements: unbounded (`[\s\S]*?`), an `export type Foo = string;`
- * followed by a Vega import could match as one `export type …` span, which
- * `TYPE_ONLY` discards whole — reporting no Vega while it was statically
- * imported, the one direction this file must not fail in.
+ * Static `import`/`export … from` specifiers, deliberately not `import()`.
+ * The clause is bounded so one match can't span two statements — unbounded,
+ * a type-only export before a Vega import could hide it undetected.
  */
 const STATIC_IMPORT =
   /(?:^|\n)\s*(?:import|export)(?:[^;\n]|\n(?!\s*(?:import|export)\b))*?\sfrom\s+["']([^"']+)["']|(?:^|\n)\s*import\s+["']([^"']+)["']/g;

@@ -2,9 +2,8 @@
 
 /**
  * Two properties are pinned here because both fail SILENTLY: dropping
- * `excludeUnknownBuckets` puts an "unknown" bucket at the top of a
- * leaderboard, reading as a real user; a failed read must render a retry
- * state, since an empty plot is indistinguishable from "no traffic".
+ * `excludeUnknownBuckets` puts "unknown" atop a leaderboard as a real
+ * user; a failed read must render retry, not an empty "no traffic" plot.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -33,10 +32,9 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
 }));
 
 /**
- * Recharts measures its own container, and jsdom reports every box as zero — so
- * a real `ResponsiveContainer` renders nothing at all and every assertion about
- * a plotted series would pass vacuously. Giving it a size is the only way this
- * file can see what the chart drew.
+ * Recharts measures its own container, but jsdom reports every box as
+ * zero, so `ResponsiveContainer` renders nothing and series assertions
+ * pass vacuously. Giving it a size is the only way to see what it drew.
  */
 vi.mock("recharts", async () => {
   const actual = await vi.importActual<typeof import("recharts")>("recharts");
@@ -102,12 +100,9 @@ function bucketed() {
 }
 
 /**
- * The group labels the chart actually plotted, read off its own axis.
- *
- * Not `getByText`: recharts renders a label as an SVG `tspan` inside a `text`,
- * and a substring matcher would have said "unknown is absent" for a chart that
- * plotted `User unknown` — which is the exact failure this file exists to
- * catch, so it has to read the labels rather than search for them.
+ * The group labels the chart actually plotted, read off its own axis —
+ * not `getByText`, since a substring matcher would say "unknown is absent"
+ * for a chart that plotted `User unknown`, the exact failure this file catches.
  */
 function plottedGroups(): string[] {
   return [...document.querySelectorAll(".recharts-cartesian-axis-tick-value")].map(

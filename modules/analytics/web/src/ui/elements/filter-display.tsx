@@ -87,10 +87,8 @@ const FilterValue = ({
 
 /**
  * One nested filter group, flattened into the lines the value cell prints.
- *
- * Lifted out of the loop it used to sit inside: a saved filter can be nested
- * twice (`evaluations.<monitor>.passed`), and reading all three levels inline
- * put six blocks inside one function. The shape it reads is unchanged.
+ * Lifted out of the loop it sat inside: a saved filter nests twice
+ * (`evaluations.<monitor>.passed`), which put six blocks in one function.
  */
 function describeNestedFilter(value: Record<string, unknown>): string[] {
   const lines: string[] = [];

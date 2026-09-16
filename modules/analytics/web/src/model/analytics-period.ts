@@ -1,8 +1,7 @@
 /**
- * The range every analytics read is scoped to, read out of the address.
- * Pure means it takes `now` — calling this straight from a render body
- * gives a new `endDate` every frame, so every query refetches forever.
- * `behavior/use-analytics-period.ts` is the render seam that memoises it.
+ * The range every analytics read is scoped to. Pure means it takes `now`
+ * — calling this straight from a render body gives a new `endDate` every
+ * frame; `behavior/use-analytics-period.ts` is the render seam that memoises it.
  */
 
 import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
@@ -11,12 +10,9 @@ import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
 export type AnalyticsPeriod = { startDate: Date; endDate: Date };
 
 /**
- * Relative range presets. The key is what gets serialised into the address as
- * `?period=<key>`. `minutes` is the lookback window from "now".
- *
- * `days` is the equivalent inclusive day count exposed to consumers via
- * `daysDifference`. For sub-day windows it clamps to 1 — analytics queries
- * already do their own `Math.max` so this stays compatible.
+ * Relative range presets: the key serialises into the address as
+ * `?period=<key>`; `days` is the inclusive day count for `daysDifference`,
+ * clamped to 1 for sub-day windows since queries already `Math.max` it.
  */
 export const ANALYTICS_RELATIVE_PRESETS = [
   { key: "15m", label: "Last 15 minutes", minutes: 15, days: 1 },
@@ -51,9 +47,8 @@ const isValidDateString = (dateString: string): boolean => {
 
 /**
  * The [start, end] window a relative preset means, anchored to `now`.
- *
- * Day-based presets snap the start to start-of-day, which is what the day
- * quick selectors have always meant.
+ * Day-based presets snap the start to start-of-day, which is what the
+ * day quick selectors have always meant.
  */
 export const computeRelativeWindow = (
   presetKey: AnalyticsPresetKey,

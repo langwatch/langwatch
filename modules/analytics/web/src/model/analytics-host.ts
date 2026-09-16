@@ -12,10 +12,9 @@ export type AnalyticsHostProject = {
   slug: string;
   name: string;
   /**
-   * Whether anything has ever been ingested.
-   *
-   * The overview page leads with a setup prompt until it has, which is the one
-   * thing on these pages that is about the project rather than the range.
+   * Whether anything has ever been ingested. The overview page leads with
+   * a setup prompt until it has — the one thing on these pages that is
+   * about the project rather than the range.
    */
   hasFirstMessage: boolean;
 };
@@ -29,10 +28,9 @@ export type AnalyticsRouteReading = {
 };
 
 /**
- * A short confirmation of something the reader just did.
- *
- * The shared feedback capability's shape, unwidened: a title and an optional
- * description, and no action. Nothing this family confirms needs a button.
+ * A short confirmation of something the reader just did: the shared
+ * feedback capability's shape, unwidened — title, optional description,
+ * no action, since nothing this family confirms needs a button.
  */
 export type AnalyticsSuccessNotice = {
   title: string;
@@ -41,10 +39,9 @@ export type AnalyticsSuccessNotice = {
 };
 
 /**
- * A failure, as a screen knows it. The raw `error` travels, never a composed
- * sentence — customer-facing words are resolved from its `code` by the host's
- * presentation registry (#5984). `fallbackTitle` names the failed action, so
- * an unrecognised code still says what the reader was doing.
+ * A failure, as a screen knows it: the raw `error` travels, never a
+ * composed sentence — words are resolved from its `code` by the host's
+ * presentation registry (#5984). `fallbackTitle` names the failed action.
  */
 export type AnalyticsFailureNotice = {
   error: unknown;

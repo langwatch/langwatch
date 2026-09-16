@@ -1,8 +1,7 @@
 /**
- * The workbench in a real browser: typing, running, and reading the result. Real geometry is
- * what this tier adds over the jsdom suite — under jsdom every element is zero by zero, so the
- * result table's row virtualizer can neither be shown to window nor shown to be wrong here.
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * The workbench in a real browser: typing, running, reading results. Real
+ * geometry is what this adds over jsdom, where every element is zero by
+ * zero, so the row virtualizer can't be shown right or wrong there.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -95,11 +94,9 @@ import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing.tsx";
 const SQL = "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 
 /**
- * The address the workbench is mounted at, period and all.
- *
- * The workbench reads the page's period for the time window it sends, and the
- * period is read off the analytics host rather than a router — so the range is
- * a fixture on the stub host, the same way the jsdom suite states it.
+ * The address the workbench is mounted at, period and all: the workbench
+ * reads the page's period off the analytics host, not a router, so the
+ * range is a fixture on the stub host, same as the jsdom suite.
  */
 const PAGE_QUERY = {
   startDate: "2026-02-20T00:00:00.000Z",
@@ -118,10 +115,9 @@ function renderWorkbench() {
 }
 
 /**
- * How long a first paint is given, and why it is not the library's default: the editor is
- * behind `lazy(() => import("@monaco-editor/react"))` and Suspense, so even the stubbed module
- * arrives a dynamic import later. Testing Library's default one-second wait failed roughly one
- * run in four with all four files of this lane driving their own Chromium context at once.
+ * How long a first paint is given, and why not the default: the editor
+ * is behind `lazy(import(...))` and Suspense, so even the stub arrives
+ * later. The default 1s wait failed ~1 run in 4 with four Chromiums at once.
  */
 const MOUNT_TIMEOUT = { timeout: 10_000 };
 

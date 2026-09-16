@@ -1,8 +1,7 @@
 /**
- * A specification is validated against the bundled Vega-Lite schema and the
- * LangWatchQL policy *before* Vega is loaded with it, so there is no path
- * through this component that renders an empty chart.
- *
+ * A specification is validated against the bundled Vega-Lite schema and
+ * the LangWatchQL policy *before* Vega loads it, so no path through this
+ * component renders an empty chart.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

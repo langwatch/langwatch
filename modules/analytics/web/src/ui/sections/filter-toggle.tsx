@@ -1,10 +1,7 @@
 /**
- * The rail's trigger, and the count on it.
- *
- * The RENDERING half of `platform/app/src/components/filters/FilterToggle.tsx`;
- * the `?show_filters=` reading and writing is `behavior/use-filter-toggle.ts`.
- * The platform module stays — `components/checks/TryItOut` renders it too, and
- * deletes-only forbids repointing that one.
+ * The rail's trigger and its count — the RENDERING half of
+ * `platform/app`'s `FilterToggle.tsx` (reading/writing is
+ * `behavior/use-filter-toggle.ts`). The platform module stays: `TryItOut` renders it too.
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";

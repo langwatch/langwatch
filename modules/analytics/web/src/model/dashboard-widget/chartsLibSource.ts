@@ -1,8 +1,7 @@
 /**
  * GENERATED — do not hand-edit. Produced by `node scripts/build-charts-lib.mjs`
- * from `bridge/chartsLib/index.ts`. Bundled by esbuild in IIFE format; reads
- * `window.React`/`window.Recharts` directly (not as modules) so it shares the
- * sandboxed frame's single React/Recharts instance rather than a second copy.
+ * from `bridge/chartsLib/index.ts`, bundled by esbuild in IIFE format. Reads
+ * `window.React`/`window.Recharts` directly, sharing the frame's one instance.
  */
 
 export function buildChartsLibScript(): string {

@@ -1,9 +1,7 @@
 /**
- * The native result table — a real `<table>`, not a grid of divs, so a
- * screen reader gets real row/column relationships; virtualization uses
- * spacer rows (not absolute positioning) to keep one `<tr>` per visible row.
- * `ListTable` isn't reused: its container clips overflow, which a wide
- * result must not do. See dev/docs/best_practices/list-table.md.
+ * The native result table — a real `<table>`, so a screen reader gets
+ * real row/column relationships; virtualization uses spacer rows to keep
+ * one `<tr>` per visible row. `ListTable` clips overflow, which this can't.
  */
 
 import { Alert, Box, Table, Text, VStack } from "@chakra-ui/react";
@@ -119,11 +117,9 @@ function columnId({ name, index }: { name: string; index: number }): string {
 }
 
 /**
- * A column definition per column of the result.
- *
- * The id is position-qualified because two columns can share a name and
- * react-table requires distinct ids. The header still shows the name as it
- * came.
+ * A column definition per column of the result. The id is
+ * position-qualified because two columns can share a name and react-table
+ * requires distinct ids; the header still shows the name as it came.
  */
 function columnDefs(columns: LangWatchQLQueryResult["columns"]): ColumnDef<LangWatchQLRow>[] {
   return columns.map((column, index) => ({
@@ -277,11 +273,9 @@ function SpacerRow({ height, columnCount }: { height: number; columnCount: numbe
 }
 
 /**
- * Says out loud that a repeated column name cost the member a column.
- *
- * Rows arrive keyed by name, so the second column of a repeated name has
- * already overwritten the first. Rendering both headers with the same values
- * under them would look like the result preserved two columns when it kept one.
+ * Says out loud that a repeated column name cost the member a column: rows
+ * arrive keyed by name, so the second overwrites the first. Showing both
+ * headers with the same values would look like two columns survived, not one.
  */
 function DuplicateColumnWarning({ names }: { names: readonly string[] }) {
   return (

@@ -1,15 +1,7 @@
 /**
- * The dashboard's refresh schedule: a tick every interval while the tab is
- * visible, no ticks while it is hidden, and one straight away on return if
- * the interval elapsed in the background. The choice is remembered per
- * browser.
- *
- * A tick does two things, both owned by the consumer: it bumps
- * `refreshedAt`, which travels to every sandboxed widget as part of its
- * dashboard context (a fresh value is what makes `LW.useChartQuery` re-run),
- * and it calls `onTick` for the page to invalidate the builder graphs and
- * placed charts that fetch through tRPC.
- *
+ * The dashboard's refresh schedule: a tick every interval while visible,
+ * none while hidden, and one on return if the interval elapsed. A tick
+ * bumps `refreshedAt` (re-running `LW.useChartQuery`) and calls `onTick`.
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 

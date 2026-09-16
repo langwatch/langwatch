@@ -1,10 +1,7 @@
 /**
- * What an analytics test mounts instead of an application: every screen and section here
- * reads its project, the reader's grants, the address and the two notices off
- * `AnalyticsHostApi`, so a test needs a host — this double, plus the Chakra provider.
- * Notices, navigations and query writes are RECORDED rather than performed, so a test asserts
- * on what the screen SAID. Sits at the package root like `index.ts` (a governed root-exception
- * entry point), and is deliberately not a package export — only this package's own suites use it.
+ * What an analytics test mounts instead of an application: a double for
+ * `AnalyticsHostApi` plus the Chakra provider. Notices, navigations and
+ * query writes are RECORDED, not performed, so tests assert what the screen SAID.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

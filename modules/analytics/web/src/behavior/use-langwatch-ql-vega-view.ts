@@ -183,11 +183,9 @@ interface LangWatchQLVegaViewRefs {
 }
 
 /**
- * Puts a view in the container and hands back the teardown for it.
- *
- * The abandoned flag is what makes a teardown that lands mid-embed safe: the
- * promise still settles, and the view it settles with is finalized on the spot
- * rather than left running with nothing pointing at it.
+ * Puts a view in the container and hands back its teardown. The abandoned
+ * flag makes a teardown that lands mid-embed safe: the promise still
+ * settles, and the view it settles with is finalized on the spot.
  */
 function embedLangWatchQLVegaView({
   container,
@@ -210,12 +208,9 @@ function embedLangWatchQLVegaView({
   let abandoned = false;
   setState(EMBEDDING);
 
-  // Guarded for the same reason `pushDatasetsIntoView` guards its own build: a
-  // throw here is synchronous, so it escapes before `embed`'s rejection
-  // handler exists and leaves the view stuck in `EMBEDDING` — a blank chart
-  // with no failure on screen, which is exactly the state this module says it
-  // never produces. The spec is caller-authored, so the input is not ours to
-  // trust even though no current path throws.
+  // Guarded for the same reason `pushDatasetsIntoView` does: a throw here is
+  // synchronous and escapes before `embed`'s rejection handler exists, leaving
+  // the view stuck in `EMBEDDING`. The spec is caller-authored, not ours to trust.
   let build: LangWatchQLVegaSpecBuild;
   try {
     build = buildLangWatchQLVegaSpec({
@@ -257,10 +252,9 @@ function embedLangWatchQLVegaView({
 }
 
 /**
- * Feeds new rows to a view that is already running.
- *
- * A throw from the update and a rejected run end the same way, because a view
- * that failed part-way through new data is in an unknown state either way.
+ * Feeds new rows to a view that is already running. A throw from the
+ * update and a rejected run end the same way, since a view that failed
+ * part-way through new data is in an unknown state either way.
  */
 function pushDatasetsIntoView({
   result,

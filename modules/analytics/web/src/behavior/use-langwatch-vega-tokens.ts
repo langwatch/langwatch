@@ -1,15 +1,13 @@
 /**
- * Resolving the application's theme into the literals a chart needs. This is
- * the only place Chakra and the chart meet: `langwatchVegaConfig` stays a pure
- * function so `visualization/` can never pull React or Chakra into a server
- * import, so the resolving happens here instead, in the component layer.
+ * Resolving the app's theme into the literals a chart needs — the only
+ * place Chakra and the chart meet, since `langwatchVegaConfig` stays pure
+ * so `visualization/` never pulls Chakra into a server import.
  */
 
 /**
- * The categorical range is the app's own chart palette, in the app's own
- * order: `rotatingColors.colors` is what `CustomGraph` colors its series from,
- * so a series third in a LangWatchQL chart matches the color a series third
- * anywhere else already has.
+ * The categorical range is the app's own chart palette, in its own order:
+ * `rotatingColors.colors` is what `CustomGraph` colors series from, so a
+ * series third here matches the color a series third elsewhere already has.
  */
 
 import { useToken } from "@chakra-ui/react";

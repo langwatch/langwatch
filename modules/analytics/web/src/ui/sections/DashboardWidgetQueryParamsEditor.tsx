@@ -1,8 +1,7 @@
 /**
- * Editor for one query's declared parameters — the validation contract
- * `validateDashboardWidgetQueryParams` checks a live `LW.query` call against. Each
- * row is a name, a JS type, and an optional default (the Run button's only
- * source of a value, since there is no separate "test values" input here).
+ * Editor for one query's declared parameters, checked against a live
+ * `LW.query` call by `validateDashboardWidgetQueryParams`. Each row is a
+ * name, JS type, and optional default — the Run button's only value source.
  */
 
 import {
@@ -49,10 +48,9 @@ function nameProblem(name: string): string | undefined {
 }
 
 /**
- * Whether every declared parameter across all queries clears the reserved-
- * prefix contract — the same `nameProblem` a row shows inline. The drawer's
- * Save gate reuses this so a `dashboard_context_`-prefixed declared name (which
- * the persisted definition rejects) can't be submitted, not just flagged.
+ * Whether every declared parameter clears the reserved-prefix contract —
+ * the same `nameProblem` a row shows inline. The Save gate reuses this so
+ * a `dashboard_context_`-prefixed name can't be submitted, not just flagged.
  */
 export function declaredParamsAreValid(
   queries: DashboardWidgetQuery[],

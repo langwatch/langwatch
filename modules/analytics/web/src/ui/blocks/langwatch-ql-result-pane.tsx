@@ -102,11 +102,9 @@ function resultChip({
 }
 
 /**
- * The refusal's own reasons, under the registry copy. This is the one place
- * the workbench reads `meta`: the shape is declared by the API
- * (`LangWatchQLViolation`), every message is customer-safe by construction,
- * and this pane is the named consumer. Without them a refusal would say "this
- * query isn't allowed here" and leave the member guessing which join to change.
+ * The refusal's own reasons, under the registry copy — the one place the
+ * workbench reads `meta`, declared by the API (`LangWatchQLViolation`) and
+ * customer-safe by construction. Without them a refusal names no join to fix.
  */
 function ViolationList({ failure }: { failure: LangWatchQLFailure }) {
   if (failure.violations.length === 0) return null;
@@ -167,10 +165,9 @@ function StaleNotice({ onRun }: { onRun: () => void }) {
 }
 
 /**
- * How much of the answer arrived, in the only number that is always true. It
- * cites rows actually returned, never a row ceiling — a response is also
- * capped by a byte budget, so naming "10,000" here would send a member
- * looking for rows that were never coming.
+ * How much of the answer arrived, in the only number always true: rows
+ * actually returned, never a row ceiling — a byte budget also caps
+ * responses, so naming "10,000" would send a member looking for more.
  */
 function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
   return (

@@ -1,12 +1,7 @@
 /**
- * The language the editor offers beyond the member's schema: SQL keywords and
- * the ClickHouse functions the LangWatchQL surface most often needs.
- *
- * These are editor assistance only — the server's validator remains the policy.
- * The lists are reviewed, not exhaustive: a keyword here must be one the
- * LangWatchQL endpoint can actually accept in a read-only SELECT, so nothing DDL,
- * nothing mutating, and no session or system clause is ever suggested.
- *
+ * The language the editor offers beyond the schema: SQL keywords and
+ * ClickHouse functions, reviewed for the LangWatchQL read-only SELECT —
+ * nothing DDL, mutating, or session/system is ever suggested.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

@@ -2,9 +2,8 @@ import type { FilterDefinition, FilterField } from "./analytics-filter-definitio
 
 /**
  * UI metadata for every filter field: display name, URL key, and key/subkey
- * requirements. The actual filter-option queries live in
- * `./clickhouse/filter-definitions.ts`; trace filtering conditions live in
- * `./clickhouse/filter-conditions.ts`.
+ * requirements. Filter-option queries live in `./clickhouse/filter-definitions.ts`;
+ * trace filtering conditions live in `./clickhouse/filter-conditions.ts`.
  */
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   "topics.topics": {

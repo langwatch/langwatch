@@ -1,9 +1,7 @@
 /**
- * A failure that is still true, said in place — the inline counterpart to a
- * toast (which is for something that just happened). A stripped port,
- * missing the code-keyed presentation registry and the copyable-trace-id
- * `ErrorActions` (both later `platform/app` slices), so a named failure
- * reads as the action plus the generic line until the registry moves.
+ * A failure that is still true, said in place — the inline counterpart to
+ * a toast. A stripped port missing the code-keyed presentation registry
+ * and copyable-trace-id `ErrorActions`, until those `platform/app` slices move.
  */
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";

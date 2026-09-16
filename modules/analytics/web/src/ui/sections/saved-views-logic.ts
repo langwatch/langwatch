@@ -1,8 +1,7 @@
 /**
- * Pure logic functions for saved views feature.
- *
- * Separated from the React hook to enable unit testing without
- * importing React or server-side dependencies (Prisma, registry).
+ * Pure logic functions for saved views, separated from the React hook so
+ * they unit-test without importing React or server-side dependencies
+ * (Prisma, registry).
  */
 
 import { differenceInCalendarDays, nowInstant } from "@langwatch/time";
@@ -53,10 +52,9 @@ export const DEFAULT_VIEWS: DefaultView[] = [
 ];
 
 /**
- * Normalizes a filter value for comparison.
- * - Arrays are sorted for order-insensitive matching
- * - undefined/null/empty arrays are treated as absent
- * - Nested objects have their arrays sorted recursively
+ * Normalizes a filter value for comparison: arrays sort for
+ * order-insensitive matching, undefined/null/empty arrays count as
+ * absent, and nested objects sort their arrays recursively.
  */
 export function normalizeFilterValue(value: FilterParam | undefined): FilterParam | undefined {
   if (value === undefined || value === null) return undefined;

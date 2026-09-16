@@ -10,10 +10,9 @@ import { useShowErrorToast } from "./analytics-feedback.ts";
 import { useWidgetPreview } from "./useWidgetPreview.ts";
 
 /**
- * All of the "+ Add chart" create-drawer state: a fresh starter draft, the
- * debounced preview it feeds, the executor and dashboard context the preview
- * runs against, and the create mutation. Kept out of the drawer component so
- * that component stays a thin render over `DashboardWidgetEditDrawer`.
+ * All of the "+ Add chart" create-drawer state: a fresh starter draft, its
+ * debounced preview, the executor/context the preview runs against, and the
+ * create mutation — kept out so the drawer stays a thin render.
  */
 export function useCreateDashboardWidgetDrawer({
   open,

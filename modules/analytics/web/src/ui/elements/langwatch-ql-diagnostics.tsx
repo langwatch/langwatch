@@ -1,8 +1,7 @@
 /**
- * The notes the backend attached to a result. Every diagnostic is rendered unfiltered and
- * unchanged — the API already under-reports, and each message names the fact that fired it,
- * so filtering or shortening would drop exactly the information that matters. Truncation is
- * visually prominent, the one diagnostic saying the numbers on screen aren't the whole answer.
+ * The notes the backend attached to a result, rendered unfiltered and
+ * unchanged: the API already under-reports, so shortening would drop
+ * exactly the information that matters. Truncation is visually prominent.
  * @see @langwatch/analytics-contract/diagnostics.ts
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */

@@ -50,10 +50,9 @@ describe("formatSeriesGroupName", () => {
 
   describe("given a different group-by that happens to bucket on 'passed'", () => {
     /**
-     * The verdict labels are keyed to the evaluation verdict group-by, not to
-     * the words. An evaluation label, or a metadata value, may legitimately be
-     * the string "passed" and must keep reading as its own bucket rather than
-     * being relabelled as an evaluation verdict.
+     * The verdict labels are keyed to the evaluation verdict group-by, not
+     * the words: an evaluation label or metadata value may legitimately be
+     * "passed" and must keep reading as its own bucket, not a verdict.
      */
     it("does not borrow the evaluation verdict labels", () => {
       expect(
@@ -84,10 +83,9 @@ describe("formatSeriesGroupName", () => {
 
   describe("given a row whose group value is empty", () => {
     /**
-     * Regression: the label prefix was `group?.label.toLowerCase() + " "`, and
-     * the group was only looked up when the key was truthy. An empty key made
-     * that `undefined + " "`, so the chart rendered the string "Undefined
-     * unknown" at the user.
+     * Regression: an empty group key made the label prefix compute
+     * `undefined + " "`, rendering the string "Undefined unknown" at the
+     * user instead of leaving the key unlabeled.
      */
     it("does not render the word 'undefined' at the user", () => {
       const name = rendered({

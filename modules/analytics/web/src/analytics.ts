@@ -1,10 +1,7 @@
 /**
- * The analytics family, as the browser application mounts it: nine keys across
- * eight screens (the chart builder serves two, via a MODE prop). Each entry is a
- * lazy loader, since every screen drags a chart library, filter editor or query
- * workbench that must not land in the app's main chunk. The owning feature mounts
- * the tRPC Provider these hooks run on, plus a host port for the project, grants,
- * address and notices.
+ * Lazy loaders for the analytics screens, since each drags a chart library,
+ * filter editor or query workbench that must not land in the main chunk.
+ * Callers must also mount the tRPC Provider, a host port, grants and notices.
  */
 
 import type { ComponentType } from "react";
@@ -23,12 +20,9 @@ type CustomGraphScreenLoader = () => Promise<{
 }>;
 
 /**
- * Three of these nine keys (`reports`, the two custom-chart keys) belong to
- * `@langwatch/dashboard-server` under the transport-ownership rule, but stay here
- * under the rule's own type exception: `graphPayloadSchema` is untyped, while these
- * screens name `CustomGraphInput` end to end. Splitting would also duplicate
- * `CustomGraph`, the 1,700-line renderer six of these screens share with the report
- * grid and the builder's preview, since a web package may not import another.
+ * These three screens qualify for `@langwatch/dashboard-server` under the
+ * transport-ownership rule, but stay here under its own type exception:
+ * moving would duplicate the 1,700-line `CustomGraph` renderer they share.
  */
 export const analyticsScreens = {
   overview: () => import("./ui/sections/analytics/analytics-overview.screen.tsx"),

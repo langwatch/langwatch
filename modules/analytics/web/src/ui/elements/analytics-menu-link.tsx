@@ -1,15 +1,7 @@
 /**
- * One entry of the analytics rail.
- *
- * A NARROWED copy of `platform/app/src/components/MenuLink`: what did not
- * travel is the pathname read that decided its own selected state. A governed
- * screen may not import a router, and the rail already knows which page it is
- * rendering — it is a prop of the layout — so selection arrives as `isSelected`
- * and the entry stops guessing. The annotations family narrowed the same
- * component the same way.
- *
- * The anchor is real, so a middle-click opens the page in a tab; an ordinary
- * left-click goes to the host's navigate.
+ * One entry of the analytics rail: a NARROWED copy of `platform/app`'s
+ * `MenuLink` without its own pathname read (a governed screen can't import
+ * a router), so selection arrives as `isSelected` from the layout instead.
  */
 
 import { HStack, Link as ChakraLink, Spacer, Text } from "@chakra-ui/react";

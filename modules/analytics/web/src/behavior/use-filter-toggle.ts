@@ -1,9 +1,7 @@
 /**
- * Whether the filter rail is open, and the count on its trigger, via
- * `?show_filters=`. A page whose rail is open by default writes
- * `show_filters=false` to close it and removes the key to open it, and a page
- * closed by default does the opposite — keeping the default page address
- * free of a parameter that says what it already means.
+ * Whether the filter rail is open, via `?show_filters=`: a page open by
+ * default writes `show_filters=false` to close it, and a page closed by
+ * default does the opposite — the default address never states its default.
  */
 
 import { useCallback } from "react";

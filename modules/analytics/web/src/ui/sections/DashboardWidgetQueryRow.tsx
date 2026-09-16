@@ -1,8 +1,7 @@
 /**
- * One query, as the Queries tab's accordion shows it: the `LW.query` handle
- * (name), its SQL, its declared parameters, a Run button that tests the
- * CURRENT row content standalone (no chart involved), and its last result —
- * whichever run, live or standalone, produced one most recently.
+ * One query, as the Queries tab's accordion shows it: the `LW.query`
+ * handle, SQL, declared parameters, a Run button testing the CURRENT row
+ * standalone, and its last result — whichever run produced one most recently.
  */
 
 import {
@@ -162,12 +161,9 @@ export function DashboardWidgetQueryRow({
 }
 
 /**
- * Click-to-edit query name, same pattern as EditableWidgetName — but
- * hand-rolled rather than reused: that component is sized for a card title (a
- * tooltip, a fading pencil icon), and an `<input>` can't nest inside
- * `Accordion.ItemTrigger` (it renders a `<button>`), so the name lives as a
- * SIBLING of the trigger rather than inside it. The trigger itself shrinks to
- * just the chevron — the one thing that still toggles the row.
+ * Click-to-edit query name, hand-rolled rather than reusing
+ * EditableWidgetName: an `<input>` can't nest inside `Accordion.ItemTrigger`
+ * (a `<button>`), so the name sits as a SIBLING, and the trigger keeps just the chevron.
  */
 function QueryNameField({
   edit,

@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- * What the dashboard widget asks for, and which answer it draws — none of it is visible from
- * the component's props alone, so these assertions pin the wire-level request and the response
- * ordering. The tRPC client is mocked at `~/utils/api` (not driven through a real one) so a
- * mutation's resolution can be held open and released out of order, which is the whole shape of
- * the race being pinned. @see specs/analytics/lwql-saved-charts.feature
+ * Pins the wire-level request and response ordering, since neither is visible
+ * from props. The tRPC client is mocked so a mutation can resolve out of order.
+ * @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -223,13 +221,9 @@ describe("the LangWatchQL dashboard widget", () => {
       });
 
       const alert = await screen.findByRole("alert");
-      // THE REGISTRY'S WORDS ARE `platform/app`'s AND DO NOT TRAVEL. This used
-      // to assert the resolved copy for `lwql_unparseable`; the package alert
-      // says what the registry itself says for a code it does not list, so what
-      // is asserted here is what a package can still guarantee — the widget
-      // names the action that failed rather than inventing a diagnosis, and the
-      // wire message, which since #5984 IS the code slug, never reaches the
-      // reader.
+      // THE REGISTRY'S WORDS ARE `platform/app`'s AND DO NOT TRAVEL: this only
+      // asserts what a package can still guarantee — the widget names the
+      // failed action, and the wire message (the code slug, #5984) never shows.
       expect(alert).toHaveTextContent("Couldn't run this chart's query");
       expect(alert).not.toHaveTextContent(/lwql_unparseable/);
     });

@@ -10,12 +10,9 @@ import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**
- * All of a dashboard-widget row's edit state: the parse of the row into an
- * editable draft, the drawer's open flag, the dashboard-period time window the
- * preview runs against, and the single mutation both the drawer's Save and the
- * card's inline rename go through. Kept out of `DraggableGraphCard` so the card
- * itself stays a thin render — the mixing of parse/mutate/cache/drawer state in
- * one place is exactly what this hook exists to own.
+ * All of a dashboard-widget row's edit state: the draft, the drawer's
+ * open flag, the preview's time window, and the mutation both Save and
+ * inline rename share. Kept out so `DraggableGraphCard` stays a thin render.
  */
 export function useDraggableGraphCard({
   graph,

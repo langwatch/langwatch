@@ -1,10 +1,7 @@
 /**
- * Text that is clamped to its cell and readable in full on hover. Not
- * `platform/app`'s `HoverableBigText`, which was refused promotion to the
- * Design System (it carries an expand-to-dialog path needing an undesigned
- * render-prop seam, see `dev/docs/plans/ui-family-move-manifests.md`) — every
- * use in this family passed `expandable={false}` anyway, so this is just the
- * clamp-and-tooltip half that family actually needs.
+ * Text clamped to its cell and readable in full on hover — not
+ * `platform/app`'s `HoverableBigText` (refused Design System promotion for
+ * an undesigned expand-to-dialog seam); this is just the clamp-and-tooltip half.
  */
 
 /**

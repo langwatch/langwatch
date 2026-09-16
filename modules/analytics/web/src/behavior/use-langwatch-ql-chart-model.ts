@@ -1,8 +1,7 @@
 /**
- * Everything the LangWatchQL chart decides before it draws anything: validation,
- * the value scan, the running Vega view, and the refusals/warnings they produce
- * form one chain where each step reads the last one's answer and none renders,
- * leaving the component with only the actual markup.
+ * Everything the LangWatchQL chart decides before it draws anything:
+ * validation, the value scan, and the running Vega view form one chain
+ * where each step reads the last one's answer, leaving only markup.
  * @see ../components/LangWatchQLVegaLiteChart.tsx — the only consumer
  */
 
@@ -122,10 +121,9 @@ export function useLangWatchQLChartModel({
 }
 
 /**
- * The refusals to show, in the order they were decided: a specification that
- * did not pass, then a result with nothing in it, then a failure from inside
- * the chart runtime. Only one kind is ever shown, because only one is ever
- * reached.
+ * The refusals to show, in the order they were decided: a failed
+ * specification, then an empty result, then a runtime failure. Only
+ * one kind is ever shown, because only one is ever reached.
  */
 function collectFailures({
   validation,

@@ -90,10 +90,9 @@ function renderPane(state: LangWatchQLRequestState, chartSlot?: ReactNode) {
 }
 
 /**
- * Switches result mode the way a member does, and refuses to continue if it didn't. The guard
- * is the point: the tab selects on focus rather than click, so an unguarded switch could silently
- * no-op and every downstream "still visible" assertion would pass for the wrong reason. It throws
- * rather than asserts so the failure is credited to the case that asked for the switch.
+ * Switches result mode and refuses to continue if it didn't. The guard is
+ * the point: the tab selects on focus not click, so an unguarded switch
+ * could silently no-op. Throws so the failure credits the asking case.
  */
 async function selectResultMode(mode: "Table" | "Chart") {
   await userEvent.click(screen.getByRole("tab", { name: mode }));
@@ -109,11 +108,8 @@ async function selectResultMode(mode: "Table" | "Chart") {
 
 /**
  * What the pane handed the host's error renderer for this payload.
- *
- * `isRegistered` is the property that matters and the one a package can still
- * check: the pane recognised the payload as a HANDLED error and passed the
- * code on, rather than shrugging and handing over something unnamed. The words
- * themselves are the host's, and are asserted where the registry lives.
+ * `isRegistered` is the property that matters: the pane recognised the
+ * payload as HANDLED and passed the code on, not something unnamed.
  */
 function renderedCopy(error: unknown) {
   const handled = readHandledError(error);

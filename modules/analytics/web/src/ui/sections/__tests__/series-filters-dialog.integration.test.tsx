@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Regression for `platform/app`: reloading re-mounted `SeriesFiltersDrawer`
- * via the registry with `filters`/`onChange` undefined, crashing the
- * drawer. Mounted inline that can't happen, but the scenarios stay — a
- * defensive default that stops being exercised quietly stops working.
+ * Regression: the registry re-mounted `SeriesFiltersDrawer` with `filters`/
+ * `onChange` undefined, crashing it. Mounted inline that can't happen, but stays tested.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";

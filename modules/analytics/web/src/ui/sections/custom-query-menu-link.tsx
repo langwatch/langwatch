@@ -1,8 +1,7 @@
 /**
- * The analytics menu's entry for the Custom query page, offered only where the
- * backend says the LangWatchQL query path is provisioned — the gate is a server
- * answer, never a client flag, since nothing a browser is told should put this
- * link on a deployment that can't run the query behind it.
+ * The analytics menu's entry for the Custom query page, offered only
+ * where the backend says LangWatchQL is provisioned — a server answer,
+ * never a client flag, so this never links to a deployment that can't run it.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

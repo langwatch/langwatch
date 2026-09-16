@@ -8,12 +8,7 @@ type FilterIconWithBadgeProps = {
   size?: number;
 };
 
-/**
- * FilterIconWithBadge
- * A self-contained filter icon with count badge overlay.
- * Automatically reads the filter count from filter params,
- * or accepts an optional count override.
- */
+/** A filter icon with a count badge, read from filter params or overridden. */
 export function FilterIconWithBadge({ count, size = 14 }: FilterIconWithBadgeProps) {
   const { filterCount } = useFilterParams();
   const displayCount = count ?? filterCount;

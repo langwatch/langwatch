@@ -1,20 +1,15 @@
 import { uppercaseFirstLetter } from "./string-casing.ts";
 
 /**
- * Display naming for the group-by bucket of a chart series.
- *
- * This was a chain of `.replace()` calls applied to an already-composed
- * sentence, so reading it meant reconstructing which sentence each
- * replacement was aimed at, and nothing covered it. It is a pure function
- * here so the cases can be stated once and tested.
+ * Display naming for the group-by bucket of a chart series. Once a chain
+ * of `.replace()` calls on an already-composed sentence, untested and hard
+ * to trace; now a pure function so the cases are stated once and tested.
  */
 
 /**
- * `evaluations.evaluation_passed` buckets rows by verdict, and the names are query values, not
- * display copy. `unknown` reads wrong rendered literally ("Evaluation passed unknown"): it holds
- * three populations at once — score-only evaluators, still-processing, and errored — so the label
- * stays deliberately vague rather than naming just one. Splitting the bucket into its three real
- * populations is a separate backend fix (#5080); this is only the display-layer half.
+ * `evaluations.evaluation_passed` names are query values, not display copy:
+ * `unknown` covers three populations (score-only, still-processing, errored),
+ * so it stays deliberately vague. Splitting it is a backend fix (#5080).
  */
 const VERDICT_LABELS: Record<string, string> = {
   passed: "Evaluation Passed",
@@ -38,10 +33,9 @@ export interface SeriesGroupNameInput {
 }
 
 /**
- * The group fragment for a series, or `""` when the series is not grouped.
- *
- * Callers with a single series render this as the whole series name; callers
- * with several render it parenthesised after the series name.
+ * The group fragment for a series, or `""` when not grouped. A single
+ * series renders this as the whole series name; several render it
+ * parenthesised after the series name.
  */
 export const formatSeriesGroupName = ({
   groupBy,

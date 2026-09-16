@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * What the card menu offers, and to which kind of card.
- *
- * Two claims a member would be hurt by getting wrong. The datapoint picker must
- * not appear on a builder graph — there is no granularity contract behind it,
- * so every step would be a control that does nothing. And a saved LangWatchQL
- * chart must offer no Edit item at all — the workbench page it used to open
- * was removed, so a menu item that still pointed at it would send a member to
- * a route that no longer exists, which is worse than not offering it.
- *
- * Drives the real Chakra menus rather than asserting on props, because "the
- * member can reach it" is the claim, and a prop that never renders satisfies a
- * prop assertion.
- *
+ * What the card menu offers, per kind: no datapoint picker on a builder
+ * graph, and no Edit item on a saved chart (its workbench route is gone).
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

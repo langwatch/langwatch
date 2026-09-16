@@ -44,10 +44,9 @@ export function queryNamesAreValid(queries: DashboardWidgetQuery[]): boolean {
 }
 
 /**
- * Realigns the index-keyed open-accordion values after the row at
- * `removedIndex` is removed: drop that row's value and shift every value above
- * it down by one, so an open row below the deleted one keeps its open state
- * instead of being read against a now-shifted (or missing) index.
+ * Realigns the index-keyed open-accordion values after `removedIndex` is
+ * removed: drop that value and shift every value above it down by one,
+ * so an open row keeps its state instead of a now-shifted index.
  */
 export function remapOpenValuesAfterRemoval(
   openValues: string[],
@@ -104,13 +103,9 @@ export function DashboardWidgetQueriesPanel({
     setOpenValues((prev) => remapOpenValuesAfterRemoval(prev, index));
   };
 
-  // Opens the first query by default — a drawer landing on this tab with
-  // every row collapsed makes a member click through before they see any
-  // SQL at all. Controlled (not defaultValue): DashboardWidgetQueryRow reads
-  // this same state to pick its own chevron — Chakra's built-in indicator
-  // applies no rotation here (`transform: none` in both states, verified),
-  // so the open/closed icon has to be driven explicitly rather than left to
-  // the framework.
+  // Opens the first query by default so a drawer doesn't land fully collapsed.
+  // Controlled, not defaultValue: DashboardWidgetQueryRow reads this to drive
+  // its own chevron, since Chakra's built-in indicator never rotates here.
   const [openValues, setOpenValues] = useState<string[]>(
     queries.length > 0 ? [valueOf(0)] : [],
   );

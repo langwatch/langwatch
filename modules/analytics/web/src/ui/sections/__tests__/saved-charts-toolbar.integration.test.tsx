@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Save and Open, as a member meets them. The toolbar takes callbacks rather than a tRPC
- * client, so these drive the real component against the real Chakra menus. The claim that
- * matters is the one a member would be hurt by getting wrong: that Save with a chart open
- * writes back to that chart instead of quietly leaving them with two.
+ * Save and Open, driving the real component against real Chakra menus:
+ * Save with a chart open must write back, not quietly leave two.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

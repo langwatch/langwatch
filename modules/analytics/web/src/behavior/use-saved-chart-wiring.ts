@@ -1,9 +1,7 @@
 /**
  * Everything Save and Open need from the workbench. `openedRevision` bumps
- * whenever a saved chart is opened, used as a React key so the parameters
- * form and chart remount and read their saved starting values — without
- * either arbitrating against what the member is halfway through typing.
- * Returns state and callbacks, never JSX.
+ * whenever a saved chart opens, keying the parameters form and chart to
+ * remount and read their saved values, without fighting a half-typed edit.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

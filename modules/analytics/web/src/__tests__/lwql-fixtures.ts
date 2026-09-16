@@ -1,10 +1,7 @@
 /**
- * Fixtures shared by the workbench suites.
- *
- * One schema response and one result shape, so a suite that asserts "the
- * surface shows exactly what the response carried" is comparing against the
- * same literal the surface was given rather than against a second hand-written
- * list that could drift into agreement with a bug.
+ * Fixtures shared by the workbench suites: one schema response and one
+ * result shape, so assertions compare against the literal the surface was
+ * given, not a second hand-written list that could drift into agreement.
  */
 
 import type { LangWatchQLQueryResult, LangWatchQLSchema } from "@langwatch/analytics-contract";

@@ -1,7 +1,6 @@
 /**
- * The result table's value formatting, at the level where the distinctions are
- * decided rather than drawn.
- *
+ * The result table's value formatting, at the level where the distinctions
+ * are decided rather than drawn.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

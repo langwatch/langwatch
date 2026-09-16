@@ -1,8 +1,7 @@
 /**
- * Everything the SQL editor teaches Monaco, and everything it takes back. Kept out of the
- * component because it is lifecycle, not markup — providers register once per mount and
- * dispose on unmount. The assistance is the schema response only: no dataset, column or
- * physical table name is written here.
+ * Everything the SQL editor teaches Monaco: kept out of the component since
+ * it is lifecycle, not markup — providers register once per mount and
+ * dispose on unmount. Assistance is the schema response only, nothing live.
  */
 
 import type { Monaco, OnMount } from "@monaco-editor/react";
@@ -31,9 +30,8 @@ const LWQL_MARKER_OWNER = "lwql";
 type ReadSchema = () => LangWatchQLSchemaModel;
 
 /**
- * Suggestions, drawn from the live schema every time the widget opens.
- *
- * The range comes from the word being typed, so accepting an entry replaces
+ * Suggestions, drawn from the live schema every time the widget opens. The
+ * range comes from the word being typed, so accepting an entry replaces
  * that word rather than appending to it.
  */
 function completionProvider({

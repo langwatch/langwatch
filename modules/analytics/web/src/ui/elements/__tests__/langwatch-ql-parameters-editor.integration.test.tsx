@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Parameters are sent as a record keyed by name, so two rows sharing a name
- * silently collapse to one entry (the later row wins) — nothing about that
- * is visible in the form. This test holds the form to reporting the
- * collision and refusing to call itself sendable.
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Two rows sharing a name silently collapse to one entry (later wins);
+ * this test holds the form to reporting that collision, unsendable.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

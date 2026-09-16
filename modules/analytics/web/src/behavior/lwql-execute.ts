@@ -1,9 +1,7 @@
 /**
- * How a submission reaches the LangWatchQL endpoint: the vanilla tRPC
- * client, not `useMutation` — the request must be abortable (leaving the
- * workbench mid-query cancels the HTTP request, not just ignores the
- * answer), and the mutation hook exposes no such signal. Same seam
- * `spanTreePagedQuery` uses for the span tree.
+ * Uses the vanilla tRPC client, not `useMutation` — the request must be
+ * abortable, since leaving the workbench mid-query cancels the HTTP call
+ * rather than just ignoring the answer. Same seam `spanTreePagedQuery` uses.
  */
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
@@ -26,10 +24,9 @@ export interface LangWatchQLQueryTransport {
 }
 
 /**
- * Binds an executor to one project.
- *
- * The app supplies the typed tRPC mutation as a named transport port. The
- * feature request machine only knows that one submission can be aborted.
+ * Binds an executor to one project: the app supplies the typed tRPC
+ * mutation as a named transport port, and the feature request machine
+ * only knows that one submission can be aborted.
  */
 export function createLangWatchQLExecute({
   transport,

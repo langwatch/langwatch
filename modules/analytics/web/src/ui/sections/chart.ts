@@ -1,11 +1,7 @@
 /**
- * The chart runtime, as the surfaces that mount it name it.
- *
- * The `./chart` export's target. It lives beside the sections it composes
- * rather than under `model/`, because it re-exports two of them and the two
- * hooks behind them — a `model` module that reached upward like this is what
- * `ui-web-layer-direction` exists to stop, and moving the barrel is the fix
- * rather than exempting it.
+ * The chart runtime, as the surfaces that mount it name it: lives beside
+ * the sections it composes, not under `model/`, since a `model` reaching
+ * upward is what `ui-web-layer-direction` exists to stop.
  */
 
 export * from "./langwatch-ql-chart-mode.tsx";

@@ -31,11 +31,9 @@ import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/brid
 const MAX_CONCURRENT_QUERIES = 8;
 
 /**
- * Runs one of the widget's declared queries for the frame, by name, with the
- * frame's param values. The parent resolves the name to SQL, validates the
- * params against that query's declared parameters, and maps any failure to a
- * {@link ChartQueryError} before rejecting — the bridge forwards whatever it
- * is given and never reads `error.message` itself.
+ * Runs one declared query for the frame, by name, with its param values.
+ * The parent resolves the name to SQL, validates params, and maps any
+ * failure to a {@link ChartQueryError} — forwarded as-is, never read here.
  */
 export type ChartFrameExecuteQuery = (args: {
   queryName: string;
@@ -58,11 +56,9 @@ export interface CreateFrameBridgeOptions {
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
-   * `LW.navigate(target, params)` from the frame. Forwarded as-is —
+   * `LW.navigate(target, params)` from the frame, forwarded as-is —
    * allowlist checking and route resolution happen in the caller (see
-   * `useDashboardWidgetChartNavigate`), not here. Omitted entirely, a navigate
-   * message is silently dropped (a no-op is the correct behavior when a
-   * widget host has no router to navigate with).
+   * `useDashboardWidgetChartNavigate`). Omitted, navigate messages no-op.
    */
   readonly onNavigate?: (args: {
     target: string;

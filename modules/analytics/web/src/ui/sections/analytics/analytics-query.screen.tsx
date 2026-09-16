@@ -1,9 +1,7 @@
 /**
- * Custom query — the LangWatchQL workbench. Two gates, both server-answered:
- * a permission guard for membership, and an availability query for whether
- * the deployment can run LangWatchQL at all. Neither can be flipped from the
- * browser, keeping the surface off a deployment with no restricted identity
- * to run a customer's SQL as.
+ * Custom query — the LangWatchQL workbench, gated twice, both
+ * server-answered: membership, and whether the deployment can run
+ * LangWatchQL at all. Neither can be flipped from the browser.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -19,12 +17,9 @@ import { analyticsApi, type LangWatchQLUnavailableReason } from "../../../behavi
 type AvailabilityReason = LangWatchQLUnavailableReason;
 
 /**
- * The backend's own unavailable state, worded by the error registry rather
- * than by this page. Two different refusals, both backend availability
- * data: a switch the member's own administrator can turn on, and a
- * deployment that has nothing to run the query as. A query failure is a
- * third, distinct case — it carries no `reason` and must not be read as
- * either, so it renders through the same registry unmapped.
+ * The backend's own unavailable state, worded by the error registry: an
+ * administrator-toggled switch, or a deployment with nothing to run the
+ * query as. A query failure carries no `reason` and renders unmapped.
  */
 function AvailabilityFallback({
   error,
@@ -106,8 +101,7 @@ export function CustomQueryPage() {
 
 /**
  * The page guard is the routes section's, not this module's:
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx` wraps
- * these in `withPermissionGuard("analytics:view")` (and `DashboardLayout`
- * on two of them) — stated once, in front of the same loader registry.
+ * `analytics-routes.tsx` wraps these in `withPermissionGuard("analytics:view")`
+ * (and `DashboardLayout` on two) — stated once, in front of the loader registry.
  */
 export default CustomQueryPage;

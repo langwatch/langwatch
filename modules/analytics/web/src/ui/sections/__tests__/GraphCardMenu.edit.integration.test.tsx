@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
- * Where a card's Edit action lands, by kind: a dashboard widget opens the
- * edit drawer in place, but a saved LangWatchQL chart has no editor surface
- * anymore (its workbench route was removed) — so it gets no Edit action.
+ * Where a card's Edit action lands: a dashboard widget opens its edit
+ * drawer in place; a saved LangWatchQL chart gets none (its route is gone).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,9 +1,7 @@
 /**
- * Restart policy for a sandboxed chart frame the bridge tore down: backs off
- * with a growing pause up to {@link FRAME_RESTART_MAX_ATTEMPTS}, and a frame
- * healthy for {@link FRAME_HEALTHY_RESET_MS} earns its attempts back.
- * Restarts wait while the tab is hidden, since background-tab throttling
- * silenced the heartbeat in the first place.
+ * Restart policy for a torn-down sandboxed chart frame: backs off with a
+ * growing pause up to {@link FRAME_RESTART_MAX_ATTEMPTS}, resets after
+ * {@link FRAME_HEALTHY_RESET_MS} healthy, and waits while the tab is hidden.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

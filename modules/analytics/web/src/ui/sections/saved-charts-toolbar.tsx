@@ -1,8 +1,7 @@
 /**
- * Save and Open, in the query card's header. The chart menu manages the one that's open
- * (rename/delete only make sense for a specific chart) and asks before deleting, since
- * nothing here is recoverable. Save reads "Save" when a chart is open, or "Save chart" and
- * asks for a name first when none is.
+ * Save and Open, in the query card's header. The chart menu manages the
+ * one that's open and asks before deleting, since nothing here is
+ * recoverable. Save reads "Save chart" and asks for a name when none is open.
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  * @see specs/analytics/lwql-saved-charts.feature
  */
@@ -33,11 +32,9 @@ export interface SavedChartsToolbarProps {
 }
 
 /**
- * Asks for a name. One field and one action: a Cancel button beside Save is left out
- * deliberately, since the dialog's own dismissal already means "not now" and two ways to back
- * out is one too many. The field is seeded once, at mount, never re-seeded — so the caller
- * must mount a fresh one per opening (see the `key` where it's rendered); a controlled `open`
- * never says when it opened, so re-seeding on it isn't possible.
+ * Asks for a name. One field, one action — no Cancel beside Save, since
+ * dismissal already means "not now". The field seeds once at mount and
+ * never reseeds, so the caller must mount a fresh one per opening (see `key`).
  */
 function NameDialog({
   title,
@@ -108,11 +105,9 @@ function NameDialog({
 }
 
 /**
- * The name of the chart that is open, and what can be done to it.
- *
- * Only rendered while one is open, because rename, save-as-new and delete are
- * all questions about a specific chart. Delete asks before it acts: a saved
- * chart is not recoverable, and Delete sits one item below Rename.
+ * The name of the chart that is open, and what can be done to it — only
+ * rendered while one is open, since rename, save-as-new and delete are all
+ * questions about a specific chart. Delete asks first: nothing here is recoverable.
  */
 function OpenedChartMenu({
   chartId,

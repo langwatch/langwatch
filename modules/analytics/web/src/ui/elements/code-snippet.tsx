@@ -1,10 +1,7 @@
 /**
- * A read-only snippet, highlighted and copyable. A web package may not
- * import another web package for its highlighter, so this goes through the
- * Design System's shared Shiki adapter, rendered via Chakra's own
- * `CodeBlock`. Highlighting is lazy by construction: the adapter loads its
- * grammars on first render, so a page that never opens this never downloads
- * them.
+ * A read-only snippet, highlighted and copyable through the Design
+ * System's shared Shiki adapter (a web package may not import another for
+ * its highlighter). Lazy by construction: grammars load on first render.
  */
 
 import { ClientOnly, CodeBlock, IconButton } from "@chakra-ui/react";

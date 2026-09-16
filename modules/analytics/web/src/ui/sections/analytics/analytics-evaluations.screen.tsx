@@ -488,8 +488,7 @@ function EvaluationsContent() {
 
 /**
  * The page guard is the routes section's, not this module's: permission
- * gating and layout chrome are stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in
+ * gating and layout chrome are stated once in `analytics-routes.tsx`, in
  * front of the loader registry these screens are children of.
  */
 export default EvaluationsContent;
