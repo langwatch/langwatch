@@ -11,17 +11,22 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | handover written | wave 3 | now (wave 4 landed) |
-| --- | ---: | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 9,771 | **9,208** |
-| oxlint warnings | 17,947 | 1,631 | 1,632 | **1,632** |
-| oxlint total | 24,022 | 14,884 | 11,403 | **10,840** |
-| — of which `comment-block-size` | 6,168 | 6,168 | 2,685 | **2,119** |
-| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **14,243** | **13,680** |
+| | drive start | handover written | wave 3 | wave 4 | now (wave 5 landed) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| oxlint errors | 6,075 | 13,253 | 9,771 | 9,208 | **8,695** |
+| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,632** |
+| oxlint total | 24,022 | 14,884 | 11,403 | 10,840 | **10,327** |
+| — of which `comment-block-size` | 6,168 | 6,168 | 2,685 | 2,119 | **1,593** |
+| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 | 2,840 (see note) |
+| **true total** | **27,159** | **17,645** | **14,243** | **13,680** | **13,167** |
 
-Down 13,479 from the drive's start. The comment sweep has cleared **4,049 of
-6,168, or 66%**, across eighteen areas.
+Down 13,992 from the drive's start. The comment sweep has cleared **4,575 of
+6,168, or 74%**, across twenty-four areas.
+
+Wave 5 cleared 525 and the tree fell by 526 — one *better* than arithmetic, the
+first tranche not to leak. Contrast wave 4, which cleared 578 and moved 566.
+The difference is how much concurrent work landed alongside, not anything about
+the sweep; see the ratchet note below, which still stands.
 
 **The enforcer number is not comparable to the 2,761.** Measured it prints
 `2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
