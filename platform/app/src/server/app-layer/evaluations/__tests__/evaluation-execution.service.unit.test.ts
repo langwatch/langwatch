@@ -579,6 +579,62 @@ describe("EvaluationExecutionService", () => {
 
         expect(result.status).toBe("error");
       });
+
+      // The evaluator End node's fields are normalized to
+      // details/passed/score/label by an editor-side effect
+      // (EndPropertiesPanel.tsx:69-95) that only runs when the panel is
+      // opened, and its own note at :54-59 records that stored nodes have
+      // drifted off-contract before. nlpgo returns the resolved inputs
+      // verbatim (engine.go:399), so a legacy workflow can hand back a
+      // `status` the run succeeded in producing. See #8163.
+      //
+      // Spec: specs/evaluators/workflow-evaluator-skipped-verdict.feature
+      /** @scenario "A workflow that declined the row is recorded as skipped" */
+      it("keeps a skipped verdict when the workflow declined the row", async () => {
+        const { service } = createTestService({
+          workflowExecutor: {
+            runEvaluationWorkflow: vi.fn().mockResolvedValue({
+              result: {
+                status: "skipped",
+                details: "Total tokens exceed the maximum of 16384: 30001",
+              },
+              status: "success",
+            }),
+          },
+        });
+
+        const result = await service.executeForTrace({
+          ...defaultParams,
+          evaluatorType: "custom/my-workflow",
+        });
+
+        expect(result.status).toBe("skipped");
+        expect((result as { details?: string }).details).toBe(
+          "Total tokens exceed the maximum of 16384: 30001",
+        );
+      });
+
+      /** @scenario "A status this path cannot support falls back to processed" */
+      it("falls back to processed for a status it does not recognize", async () => {
+        const { service } = createTestService({
+          workflowExecutor: {
+            runEvaluationWorkflow: vi.fn().mockResolvedValue({
+              // "error" is not honoured here: an error verdict carries
+              // error_type and traceback, which this path cannot supply, so
+              // only "skipped" is allowlisted.
+              result: { status: "error", score: 0.8 },
+              status: "success",
+            }),
+          },
+        });
+
+        const result = await service.executeForTrace({
+          ...defaultParams,
+          evaluatorType: "custom/my-workflow",
+        });
+
+        expect(result.status).toBe("processed");
+      });
     });
 
     describe("given thread-level evaluation", () => {

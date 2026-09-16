@@ -663,8 +663,28 @@ const customEvaluation = async (
     } as any;
   }
 
+  // A successful run is not automatically a verdict: an evaluator can decline
+  // the row and say so in `status`. Overwriting it with "processed" stores a
+  // completed evaluation that has no score, which is the #8163 shape.
+  //
+  // `status` does reach here, so do not "simplify" this back to a constant.
+  // An evaluator node's outputs always carry it (nlpgo engine.go:1059-1061),
+  // an edge drawn with no handles on either end merges every upstream output
+  // into the target's inputs (engine.go:1411-1415), and an End node returns
+  // its resolved inputs verbatim (engine.go:399) — so an evaluator wired
+  // straight into End surfaces its own `status` here.
+  //
+  // The editor normalizes an evaluator End node's fields to
+  // details/passed/score/label (EndPropertiesPanel.tsx:69-95), which makes
+  // that look impossible. It is not: the normalization is an effect that runs
+  // only while the properties panel is mounted, and the panel's own note at
+  // :54-59 records stored nodes that drifted off-contract.
+  //
+  // Allowlist rather than forward the field: an "error" verdict needs
+  // error_type/traceback this path has no way to supply, so anything
+  // unrecognized stays "processed".
   return {
     ...result,
-    status: "processed",
+    status: result?.status === "skipped" ? "skipped" : "processed",
   };
 };

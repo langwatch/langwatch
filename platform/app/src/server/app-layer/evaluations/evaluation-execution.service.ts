@@ -669,7 +669,15 @@ export class EvaluationExecutionService {
       return { ...response.result, status: "error" } as SingleEvaluationResult;
     }
 
-    return { ...response.result, status: "processed" };
+    // Same allowlist as runEvaluation and resultMapper.mapEvaluatorResult: a
+    // successful run can still be a declined row, and overwriting a "skipped"
+    // status stores a verdict-less "processed" evaluation (#8163). Only
+    // "skipped" is honoured — an "error" verdict needs error_type/traceback
+    // that this path cannot supply.
+    return {
+      ...response.result,
+      status: response.result?.status === "skipped" ? "skipped" : "processed",
+    };
   }
 }
 
