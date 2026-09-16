@@ -9,21 +9,47 @@ screenshots. The flows were the instrument; the defects are the output. **Five
 of the eight fixed defects were things that made the feature not work at all**,
 and three of those were introduced earlier in the same session.
 
-Nothing is committed. Read §0 before acting on anything.
+Read §0 before acting on anything.
 
 ---
 
 ## 0. State — this section wins where it contradicts anything below
 
-### Everything is uncommitted
+### It is committed now, and rebased onto main (2026-09-17, coordinator session)
 
-173 changed paths in the working tree, 65 of them untracked (excluding
-`.artifacts/`). That is **my work and the branch owner's WIP interleaved** — I
-never staged, committed or stashed anything. `git stash` was never run. Before
-any commit, separate the two: the owner's in-flight files include
-`useSignInSecurity.ts`, `signInSecurity.ts`, `SignInSecurityCards.tsx`,
-`sign-in-security-adapters.ts` and the deletion of
-`platform/app/src/server/breakGlassExpiryWorker.ts`.
+The working tree is clean but for the untracked `.artifacts/`. Three commits sit
+on top of the old tip `99c40e9bb7`, and the branch was then rebased onto
+`origin/main` — 36 commits replayed, **0 behind main**, `pnpm typecheck` exit 0
+afterwards.
+
+| Commit (post-rebase) | What is in it |
+| --- | --- |
+| `008daecd48` | `fix(identity)` — defects 1, 3, 4, 5, 6, 7, defect 8's pure date logic, and the two copy corrections. 15 files. Every file compiles against the old tip: nothing in it imports a file left outside it. |
+| `9bc430f561` | `docs(identity)` — this handover. |
+| `98ede9d535` | `wip(identity)` — **everything else, 160 files, deliberately labelled rather than folded into the fix commit.** Reshape or re-author it freely; nothing below it depends on its message. |
+
+**A clean authorship split was not achievable, and that is the finding.** The
+last commit on the branch is 13:17 and every dirty path was newer, so the clock
+separates nothing; and the two bodies of work share files outright. Defect 2's
+fix lives *inside* `sign-in-security-adapters.ts`, which is an untracked file
+the branch owner created — so defect 2 is in the wip commit, not the fix commit.
+`SingleSignOnSetup.tsx` and `BreakGlassSection.tsx` carry defect 8 *and* import
+the untracked `ConnectionNameRow` / `SsoSettingsTable`; `error.tsx` imports the
+untracked `signInErrorCodes.ts`. All of those went to the wip commit so the fix
+commit stays self-contained. The split therefore **under-commits on purpose**:
+some of the session's own work is in the wip commit, and none of the owner's
+work is in the fix commit.
+
+**Restore point: tag `backup/identity-sso-pre-rebase-20260917` (`aab6ab3`)** — the
+entire pre-split, pre-rebase working tree as one commit, `.artifacts/` excluded.
+One `git reset --hard` to that tag puts everything back.
+
+The one rebase conflict was `useLandingRedirect.ts`: main's #8155 replaced the
+inline orgless test with `belongsToNoOrganization`, this branch added
+`testArrival` to the same call. Resolved by keeping both and unifying the local
+`isOrgless` const on main's helper, which also stops the test-arrival query being
+asked during an unanswered organization read — `undefined` now means "not known
+yet" there too, not "none".
 
 ### Checks, as actually run
 
@@ -149,6 +175,13 @@ interrupted mid-change. It holds `mergeNameParts` and `namePartsIn`, both pure
 and both correct as far as they go, intended for 4b. Either finish 4b or delete
 the file; it currently imports nothing and nothing imports it.
 
+**Still true as of 2026-09-17.** The file is now committed (inside the wip
+commit `98ede9d535`) rather than untracked, so it is no longer at risk of being
+lost — but it is still dead code and still nothing imports it. Read both
+functions before wiring: they already handle all three PATCH spellings and the
+half-a-name merge, which is the whole of 4b's logic. What is missing is the call
+site in `scim.service.ts:1005`, the tests, and the spec scenario.
+
 ### 4b. SCIM PATCH does not interoperate with Okta or Entra — highest value
 
 `ee/scim/scim.service.ts:1005` skips any operation whose `value` is not an
@@ -235,12 +268,36 @@ account to it.
 
 ## 5. Blocked, needs a person
 
-- **Publishing the 90 screenshots.** Both house routes are refused by the
-  permission classifier: uploading to `img402.dev` (the `browser-test` skill's
-  documented flow) and pushing to `langwatch/pr-screenshots`. Committing them
-  fails `specs/ci/no-committed-screenshots.feature`. Needs either a Bash
-  permission rule or a person to attach them. Note img402's free tier has
-  **7-day retention**; the `pr-screenshots` repo does not.
+- **Publishing the screenshots. Re-confirmed blocked 2026-09-17, and it is the
+  auto-mode Bash classifier, not the network.** `curl -F … img402.dev/api/free`
+  is refused, and so is `gh auth status` — while `gh repo view` answers fine, so
+  reads are permitted and only the publishing verbs are not. Committing them
+  fails `specs/ci/no-committed-screenshots.feature`. **Needs a Bash permission
+  rule or a person to attach them.** Note img402's free tier has **7-day
+  retention**; `langwatch/pr-screenshots` does not — but it is a **PUBLIC**
+  repo, which matters for the next bullet.
+
+- **Six of the 90 frames render credentials and must not be published as they
+  are**: `02-activate-scim/07-token-issued-shown-once.png` (a SCIM bearer token
+  in the clear, by design — it is the "shown once" screen),
+  `02-activate-scim/15-idp-provision-panel-filled.png` (the same token pasted
+  in), `01-activate-sso/10-idp-app-registered.png`,
+  `01-activate-sso/11-` and `13-oidc-form-filled-*.png` (IdP client secret), and
+  `03-migrate-sso/09-replacement-form-filled.png` (client id and secret). All
+  are local simulator values on `*.langwatch.localhost` and the SCIM token was
+  revoked in the very next frame, so the blast radius is nil — but they would
+  trip secret scanning on a public repo. Redact or withhold those six.
+
+- **A fresh post-rebase capture already exists** at
+  `platform/app/.pr-screenshots/pr7633-after-rebase/` (7 frames, gitignored by
+  `**/.pr-screenshots/`), taken by `…/capture-fixes.ts` in the same directory
+  against the rebased stack. It carries one result worth keeping: **no 5xx
+  response on any of the six pages**, which is the live verification that
+  defects 3 and 7 — both of which used to 500 on exactly those routes — hold
+  after the rebase. It also shows the Directory card reading "Your provider
+  pushes on its own schedule" rather than the false "The token is issued", and
+  still reading "Waiting for the first push / Needs attention" after four real
+  members exist, which is §4g's first item, unfixed and now photographed.
 - **Rewriting the PR body** waits on that, and on a decision about whether this
   session's work is committed — the current body is stale regardless (it says
   the PR is in draft when it is not, cites migration `20260907120001_identity_sso`
