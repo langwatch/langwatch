@@ -267,7 +267,35 @@ report before any count.
 One lane is running: `gov-rest-serves-25`. When it lands, collect it, then run
 apidiff at the enterprise tier. Nothing else is outstanding.
 
-### The build tier: what is actually true, third revision of this answer
+### The build tier is the wrong axis entirely - ruled by the user, 2026-09-17
+
+**Licensing is not an environment variable and not a build input.** A self-hosting
+customer adds a licence to their organization inside the running application and
+the features turn on. That is the product's model, and its consequence is stated
+plainly: **licensing and the enterprise modules always have to be mounted.**
+Entitlement gates at request time, per organization, exactly as the standing
+"always mounted, refuse the request, never a 404" ruling already said about
+routes. This extends it from routes to the whole tier.
+
+So the generated module list should carry the enterprise modules **always**, and
+`LANGWATCH_BUILD_TIER` as a gate on what is installed is the defect rather than
+the mechanism. **`ADR-144 §6` contradicts this** - it says enterprise entries are
+emitted only in the enterprise build - so that section needs amending, and the
+amendment is the decision above, not a fresh one to take.
+
+Two consequences:
+
+- **The apidiff tier work is cancelled.** A lane had finished `-tier` support in
+  `tools/apidiff` and `tools/havenrun`; it was stopped and its diff discarded,
+  because with one list there is nothing to select and apidiff needs no change.
+  The generate-before-install ordering problem dissolves with it: if the list
+  always carries 49 modules, `modules/package.json` always declares 49 and the
+  lockfile always matches.
+- **The blocker moves to a token collision** - see below, and it is now on the
+  critical path rather than beside it.
+
+The tracing below is kept because it is still true about the *mechanism*, and
+whoever amends ADR-144 will need it. It is no longer a plan.
 
 Rev 2 called it a decision for the user. Rev 3 called it "a prefix on the apidiff
 command". **Both are wrong.** The prefix claim came from reading
@@ -464,6 +492,42 @@ again on the next member.
 **Where this leaves the 25.** Proved declared, and their boot graph resolves.
 Not yet proved to answer, because no process on this branch boots far enough to
 serve anything - blocked on the worker, not on governance or scim.
+
+### The blocker: two tokens named "licensing"
+
+With the enterprise modules always installed, this is what stops the boot. Found
+by booting, not by any static check.
+
+| Token | Declared at | Type |
+| ----- | ----------- | ---- |
+| `ActivatedLicenseSource` | `modules/entitlement/contract/src/license-source.ts:9` | `EntitlementSource` |
+| `LicensingApi` | `enterprise/modules/licensing/contract/src/licensing.api.ts:59` | `LicensingApi` |
+
+Both are `moduleApi(...)` carrying the name `"licensing"`, and they are different
+objects. **Duplicate detection is by name; dependency resolution is by object
+identity.** So the pair is unresolvable by wiring:
+
+- process provides `ActivatedLicenseSource` **and** the module provides
+  `LicensingApi` -> `DuplicateProviderError: licensing is provided more than
+  once, by: the process, licensing`;
+- guard the process provision the way `coreAuditLog` guards its own -> the
+  duplicate clears and `MissingProviderError: Feature "entitlement" declares
+  dependency "license" on licensing, and no installed feature provides it`
+  takes its place, because entitlement resolves the *object* the process stopped
+  providing.
+
+Both were reproduced, in that order. The guard was written, proved to swap one
+error for the other, and reverted - the duplicate error names both providers and
+is the better diagnostic to leave in place.
+
+This is the same defect as governance's four `moduleApi("governance")` tokens,
+in a second module, and it is a design decision rather than a patch. The obvious
+shape - have the licensing module declare the core token as its `contract` so
+there is one object - costs the module its own `LicensingApi` surface, because a
+module provides exactly one contract. Do not guess between that and renaming.
+
+`entitlement` cannot import from enterprise, so whatever token both sides share
+has to live in a core contract.
 
 ### Then
 
