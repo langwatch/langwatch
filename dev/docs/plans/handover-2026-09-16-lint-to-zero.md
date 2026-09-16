@@ -199,6 +199,36 @@ Areas still untouched, largest first, from the measurement above:
 `packages/clickhouse-client` 77, `modules/workflow` 69, `packages/api` 68, then
 a long tail.
 
+### Fifty-three inert `biome-ignore` comments — a decision, not a task
+
+Found while clearing `modules/prompt`'s last three findings. **Biome is not in
+this toolchain**: no `biome.json` anywhere, no `@biomejs/biome` in any
+`package.json`, no script invoking it. CLAUDE.md is right that oxlint and oxfmt
+are the only JavaScript linter and formatter here.
+
+So every `// biome-ignore lint/...` comment in the tree is read by no tool that
+runs. There are **53** of them, concentrated in `modules/ops/server` (9),
+`modules/analytics/web` (7), `modules/trace/web` (5) and
+`enterprise/modules/governance` (5). Verified on the prompt file: oxlint reports
+no empty-function finding there with or without the directive, and oxlint does
+not parse `biome-ignore` syntax in any case.
+
+They matter to this drive only where one is over 100 columns and so trips
+`comment-block-size` itself. Three were; they were shortened to fit rather than
+deleted, because **deleting 3 of 53 is a policy decision in disguise** and this
+is the user's call, not a sweep lane's:
+
+- **Delete all 53** — they assert a suppression no tool honours, and a reader
+  reasonably believes a `biome-ignore` is load-bearing. Cheapest to reason about.
+- **Keep them** — they document *why* a block is intentionally empty, which is
+  real information even with the rule name attached to a dead linter.
+- **Convert them** to the oxlint equivalent where the rule exists here, and
+  delete the rest. Most work, most honest result.
+
+Note that several sit on genuinely empty function bodies that oxlint does not
+currently flag, so converting is not a mechanical rewrite — it needs a rule to
+convert *to*, and for some there is not one.
+
 ### The mop-up nobody should forget
 
 18 `comment-block-size` findings remain inside areas already swept and reported
