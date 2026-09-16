@@ -40,7 +40,7 @@ function service(repo: ScimRepository): ScimService {
     auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
       findByEmail: vi.fn(async () => null),
-      tryFindById: vi.fn(async () => null),
+      findById: vi.fn(async () => null),
       create: vi.fn(),
       updateProfile: vi.fn(),
       deactivate: vi.fn(),

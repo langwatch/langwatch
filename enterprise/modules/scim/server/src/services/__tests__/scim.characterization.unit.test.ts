@@ -76,7 +76,7 @@ function service(
     auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
       findByEmail: vi.fn(async () => null),
-      tryFindById: vi.fn(async () => null),
+      findById: vi.fn(async () => null),
       create: vi.fn(),
       updateProfile: vi.fn(),
       deactivate: vi.fn(),
@@ -254,7 +254,7 @@ describe("SCIM characterization: provisioning invariants", () => {
         pendingSsoSetup: false,
         lastLoginAt: null,
       })),
-      tryFindById: vi.fn(async () => ({
+      findById: vi.fn(async () => ({
         id: "user_1",
         email: "member@example.com",
         name: "Member",
@@ -317,7 +317,7 @@ describe("SCIM characterization: provisioning invariants", () => {
         const writer = new GrantsFake();
         const users = {
           findByEmail: vi.fn(async () => null),
-          tryFindById: vi.fn(async () => ({
+          findById: vi.fn(async () => ({
             id: "user_1",
             email: "member@example.com",
             name: "Member",

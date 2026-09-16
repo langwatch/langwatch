@@ -80,7 +80,7 @@ function userService(): ScimUserProvisioning {
   // patch that reached user creation or a profile write would mean the casing
   // parity under test had routed somewhere it should not.
   return {
-    tryFindById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
+    findById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     deactivate: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     reactivate: vi.fn(async () => current),
     findByEmail: vi.fn(notReached),

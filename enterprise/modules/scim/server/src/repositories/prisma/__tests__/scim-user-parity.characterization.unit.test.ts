@@ -62,7 +62,7 @@ function harness(
   let currentUser = options.currentUser ?? user();
   const users = {
     findByEmail: vi.fn(async () => options.existingUser ?? null),
-    tryFindById: vi.fn(async () => currentUser),
+    findById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
     updateProfile: vi.fn(async (_input: UpdateUserProfileInput) => currentUser),
     deactivate: vi.fn(async () => {

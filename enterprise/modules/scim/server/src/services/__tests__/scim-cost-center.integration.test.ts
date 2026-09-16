@@ -77,7 +77,7 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
    */
   const provisioning = (): ScimUserProvisioning => ({
     findByEmail: ({ email }) => prisma.user.findUnique({ where: { email } }),
-    tryFindById: ({ id }) => prisma.user.findUnique({ where: { id } }),
+    findById: ({ id }) => prisma.user.findUnique({ where: { id } }),
     create: ({ name, email }) => prisma.user.create({ data: { name, email } }),
     updateProfile: ({ id, name, email }) =>
       prisma.user.update({ where: { id }, data: { name, email } }),
