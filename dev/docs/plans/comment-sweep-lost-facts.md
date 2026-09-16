@@ -214,3 +214,54 @@ reviewed it: both facts survive — the interface documents the legacy builder's
 configuration, and ADR-034's `availableOn` metadata moved to
 `../routing/field-availability.ts`. Recorded because it is the one place in the
 sweep so far where a lane changed meaning rather than length.
+
+---
+
+## modules/analytics/web — lane `comments-analytics-2b`
+
+Three candidates, and **all three are really about web package boundaries**,
+which makes them worth reading alongside
+`dev/docs/plans/web-package-boundaries-migration.md` rather than on their own.
+
+1. **The handled-error reader is a fifth copy** —
+   `web/src/model/handled-error.ts` (was 19 lines). The file recorded that
+   these nine lines are duplicated verbatim in `@langwatch/gateway-web`,
+   `@langwatch/annotation-web`, `@langwatch/automation-web` and
+   `@langwatch/enterprise-governance-web`, with a stated plan to converge on
+   one shared reader once the presentation registry leaves `platform/app`.
+   Survived the cut: "trusts nothing from the wire", "pending one shared
+   registry". Lost: that there are five copies and what unblocks the merge.
+
+2. **`analytics-link.tsx` is the sixth copy of a policy** (was 18 lines). The
+   router-free-link policy of ADR-004, duplicated across `user-web`,
+   `gateway-web`, `governance-web` and `organization-web`. The file carried the
+   actual **cost/benefit reasoning for not extracting it yet** — six copies
+   versus a shared surface. Survived: "sixth copy of this policy". Lost: the
+   reasoning, which is the part a future reader needs to decide differently.
+
+3. **The "alert entry points removed" incident**, told across
+   `web/src/ui/sections/__tests__/graph-card-header.integration.test.tsx` (13
+   lines) and `web/src/ui/sections/analytics/custom-graph.screen.tsx` (16
+   lines, a JSX comment). The automations-family move deleted the drawer
+   registry entry that the bell and "Add alert" button called; **a web package
+   may not import another web package**, so the shortcut cannot be restored
+   directly; and this is deliberately "one of the first customers of a
+   cross-feature overlay capability" — a forward-looking marker for when that
+   capability lands. Survived: a "revisit when the overlay capability lands"
+   gist in each.
+
+**Why these three matter beyond the sweep.** Each one is a duplication or a
+missing feature that exists *because* web-to-web imports are constrained, and
+each carried the reasoning for tolerating it. That reasoning is precisely what
+the web-package-boundaries drive needs when it decides what to extract into
+`surfaces/*`. Lanes 7-16 of that drive have never run; these notes are evidence
+for them, not just losses.
+
+---
+
+## sdks/typescript — lanes `comments-sdk-typescript` and `-2`
+
+Two smaller losses the second lane named: two files had a spec-file pointer
+dropped to fit the budget (recoverable from the routes under test), and two
+trailing comments were relocated to their own line — semantically identical
+after comment-stripping, and verified as such at collection.
