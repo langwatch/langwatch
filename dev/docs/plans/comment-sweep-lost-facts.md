@@ -431,3 +431,45 @@ it.
 Citations verified still in the tree after the sweep: `Ariana QA finding G13`
 (wrapped across a line break, so a single-line grep misses it), all six
 dark-mode contrast ratios, and the `ISO 8601` reference.
+
+## Wave 4 — `apps/api` and `apps/worker`
+
+Three candidates, and the first is the most valuable thing this register has
+collected: it is not documentation of a design, it is the diagnosis of a live
+regression that nobody has fixed yet.
+
+16. **The 400-becomes-500 REST regression, with its root cause and its fix.**
+    `apps/api/src/app/__tests__/api-canonical-error.integration.test.ts`, an
+    18-line block cut to a one-line pin of today's behaviour. `origin/main`
+    answers 400 `malformed_request` for an unparseable body; the
+    declared-router runtime answers 500 `internal_error`. The cause, which is
+    the part that took someone a day: in `packages/api/src/rest/runtime.ts`,
+    `validators()` installs the hook that raises `requestValidationErrorFrom`
+    but **not** the wrapper that `build()` in
+    `packages/api/src/rest/request.ts:284-301` puts *around* the validator.
+    Hono raises a malformed body as `HTTPException(400)` from inside its own
+    validator, before any hook runs, and that exception carries no `error`
+    string, so it also misses `isStatusCarryingError` and collapses to an
+    opaque 500. The test is **deliberately pinned to the wrong behaviour**;
+    whoever flips `runtime.ts` back to 400/`malformed_request` must flip this
+    test in the same change, and without this note the failing test reads as
+    the bug rather than as the alarm.
+
+17. **The kubelet liveness budget the worker's boot ordering is sized against.**
+    `apps/worker/src/platform/liveness/worker-boot-plan.ts`. Gone: production
+    allows a 30s initial delay plus 6x10s periods, so roughly 90 seconds, and
+    the two named things that eat it are a slow GitHub download and slow
+    trycloudflare DNS. The paired unit test still carries "~90s", but the
+    30s + 6x10s breakdown and both named causes now exist nowhere. The
+    ordering constraints survive; the number that justifies them does not,
+    which means the next person to add a boot step has no budget to check
+    against.
+
+18. **Why `ERR_IMPORT_ATTRIBUTE_MISSING` appeared late, and why it is silent.**
+    `apps/worker/src/platform/infrastructure/worker-token-counter.adapter.ts`.
+    Gone: `tsx` used to absorb a missing `with` import attribute silently,
+    which is the whole reason the failure only started showing up once the
+    esbuild-bundled runtime shipped — and that it still fails quietly today,
+    because the surrounding catch falls back to a default encoding instead of
+    throwing. A silent fallback with no record of its own history is the kind
+    of thing that gets rediscovered from scratch.
