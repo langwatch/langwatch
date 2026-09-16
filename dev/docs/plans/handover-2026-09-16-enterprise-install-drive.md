@@ -1,16 +1,33 @@
-# Handover: the enterprise install drive — 2026-09-16 (rev 2)
+# Handover: the enterprise install drive — 2026-09-16 (rev 3)
 
 You are the coordinator. Read `.claude/coordinator/COORDINATOR.md`, then this.
 The live roster is `.claude/coordinator/LANES.md`; the drive's standing decision
-is `.claude/manifests/BRIEF-governance-install.md`. **No lane of this drive is
-active.** The one `active` row in the roster (`fallible-langy`) belongs to peer
-session 4a7a3221 and is not yours.
+is `.claude/manifests/BRIEF-governance-install.md`. One lane of this drive is
+active: `gov-rest-serves-25`. The other three rows belong to a peer lint session
+and are not yours.
 
-## The goal, as the user set it
+## The goal, corrected against the report rather than restated
 
-apidiff reads **21 operations as missing on the branch** — 17 `/api/scim/v2/*`
-and `/api/scim-tokens`, 4 `/api/governance/ingestion-templates`. main served
-them; this branch answers 404. Get them served.
+Rev 2 said 21 operations — 17 SCIM and 4 ingestion-templates. **That undercounts.
+The measured figure is 25**, read out of `.apidiff/20260916-100008/findings.jsonl`
+(313 findings, 81 `absent-on-branch`):
+
+- **7** `/api/governance/ingestion-templates` routes: `GET`, `POST`, `GET /admin`,
+  `POST /clone`, `GET /{id}`, `DELETE /{id}`, `PATCH /{id}/ottl-rules`
+- **18** SCIM routes: 3 `/api/scim-tokens` and 15 `/api/scim/v2/*`
+
+main served them; this branch answers 404. Get them served. Do not quote the
+21 again — recount from the newest `findings.jsonl` if you need the number.
+
+**No CLI or ingest governance route appears anywhere in the missing list.** That
+fact is what makes the remaining work small, and it is checkable in one command:
+
+```bash
+python3 -c "
+import json
+rows=[json.loads(l) for l in open('.apidiff/20260916-100008/findings.jsonl')]
+print([r['name'] for r in rows if r['kind']=='absent-on-branch' and 'governance' in r['name']])"
+```
 
 The user's ruling, from earlier the same day and not up for renegotiation:
 enterprise module routes are **always mounted**, and an organization without the
@@ -18,153 +35,73 @@ entitlement gets a **refusal on the request**, never a 404 from an unmounted
 route. SCIM already behaves this way (`plan_not_entitled`); nothing about the
 refusal changes. Only the wiring does.
 
-## Read this first: the previous revision's next action was wrong
+## Where the drive actually is
 
-Rev 1 said "repair the 18 dead-alias imports in
-`enterprise/modules/governance/server/src`, it is bounded work, then re-measure."
-That was run as lane `gov-dead-alias-gate` and it is now answered. **It is not
-bounded work, and "18 dead-alias imports" was not the shape of the problem.**
+Seven commits, all by explicit pathspec, nothing of the three peer sessions swept:
 
-What is actually true, measured rather than inferred:
+| Commit | What it closed |
+| ------ | -------------- |
+| `64a6fa18a5` | the `defineChannels` lint fiction removed repo-wide |
+| `5760338939` | governance + composition, 92 files |
+| `36167dbde4` | scim onto ADR-144 |
+| `036ed58a11` | the generator's enterprise tier, broken since 12 Sept |
+| `f2903dca53` | three dead error codes retired, REST fixture repaired |
+| `0b812f031d` | scim repointed onto the governance token that is provided |
+| `3817590eed` | departments off the unsuppliable facade, onto the registry |
 
-- `pnpm -w typecheck:declarations --project .` from the package directory exits 1
-  with **13 errors across 9 files**, down from 45 / 18 at the start of the day.
-  Every figure here was taken by the coordinator's own run, not from a report.
-  The gate is still shut — `tsc --noEmit` still never runs for this package — but
-  this is the first real movement it has ever had.
-- Only one of the four dead-alias classes was ever repointable
-  (`~/generated/prisma/client` -> `@langwatch/prisma-client/generated`). Done.
-- Three services were genuine residue and are deleted, with no stranded callers:
-  `agent-listing-port.service.ts`, `people-listing-port.service.ts`,
-  `source-pull-status.service.ts`, each with its own test. Zero passing tests lost —
-  they could not collect, which is why the failing-suite count fell 37 -> 34.
+The chain to the 25 has three links. Two are closed:
 
-**Two of the five files rev 1 told the lane to delete had live importers.** The
-coordinator's importer grep used a trailing quote (`grep '<name>"'`) and this repo
-writes imports with the `.ts` extension, so it matched nothing real.
-`agents-listing-outcome.service.ts` is exported from the module's own `index.ts`;
-`source-credential-access.service.ts` is imported by two composition services.
-The lane refused both and said why. If you write an ownership or residue table,
-**match on the extension, and have the lane re-verify rather than trusting it.**
+- **The generator** resolves at enterprise tier and emits `governanceServer` and
+  `scimServer`. Closed by `036ed58a11`.
+- **SCIM** reads `["prisma"]`, is on ADR-144, and its whole use of the governance
+  token is two operations — `departmentResolveByNameOrCreate` and
+  `departmentAssignUser` (`services/scim-cost-center.service.ts:42,48`). Both now
+  come off `repositories.departments`. Closed by `0b812f031d` + `3817590eed`.
+- **`GovernanceApp` constructs.** Open, and the whole of what remains. It is the
+  lane `gov-rest-serves-25`.
 
-## The 45 errors, decomposed — the thing this drive never had
+## What remains, and why it is small
 
-Four classes. Only the fourth looks lane-able, and it isn't either.
+`GovernanceRestApi` is **9 operations** — 2 department (landed) and 7 ingestion
+template. Every one is repository-backed. The app's constructor builds only six
+services, and five of them (`personalUsageDashboards`, three `cli*`, two
+`ingest*`) serve contracts that are **not in the apidiff delta at all**.
 
-**1. Dead monolith aliases.** `~/utils/ssrfProtection` in **4 files** — a class
-nobody had catalogued before today — plus two remaining `@ee/event-sourcing/*`
-and `../activity-monitor/ingestionCredentials`. The names `MS_PER_DAY`,
-`EmittedUsageHint` and `COST_RESTATEMENT_LOOKBACK_DAYS` are declared nowhere in
-the live tree either. These need re-deriving or porting; there is nothing to
-repoint to. Note the pre-conversion sources are still readable under
-`.claude/worktrees/*/platform/app/ee/**` — that is where
-`INGESTION_PULL_LISTING_OUTCOME`'s real values were recovered from
-(`{ LISTED: "listed", REFUSED: "refused" } as const`, plus its type). Those are
-other checkouts, not this branch: fine as evidence, never as an import target.
+So the remaining work is: write `MemoryIngestionTemplateRepository` (the one
+missing twin of nineteen), add `ingestionTemplates` to the bundle, build the
+already-existing `IngestionTemplateService` from it, point seven calls at it, and
+put the CLI/ingest bag behind an optional slot so boot can supply what is left.
 
-**2. Module -> composition imports.** `../logic/identityEvidence` and
-`../governanceOcsfEvents.clickhouse.repository` resolve only inside
-`enterprise/packages/composition/api/src/governance/`. Repointing them would
-entrench the exact direction this drive exists to remove, so they wait for the
-move, like the ClickHouse repositories did.
+`.claude/manifests/gov-rest-serves-25.md` carries the steps.
 
-**3. Free functions that became class methods; callers never updated.**
-`decryptCredentials` is now `IngestionCredentialsService.decrypt()`
-(`services/ingestion-credentials.service.ts`); `isSameDataverseEnvironment` and
-`isDataverseEnvironmentOrigin` are now on `DataverseEnvironmentService`.
-The credentials one **cannot be fixed inside the module**: `withSourceCredentials`'s
-two callers are in composition and have no `GovernanceEncryptor` to pass, and the
-encryptor is a governance *member*. That makes it install-shape work — ADR-144's,
-not a repoint.
+## The four `moduleApi("governance")` tokens
 
-**4. Stripped imports whose targets are alive — and still not mechanical.** Six
-of the ten names missing from `governance.members.ts` do exist in the contract:
-`GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE`, `GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE`,
-`RecordVkLifecycleCommandData`, `RecordBudgetCrossingCommandData`
-(`governance-events.ts`), and `IngestionKeyMintCommand`, `IssuedIngestionKey`
-(`ingestion-source-key.commands.ts`). **None of the six is re-exported from the
-contract's `index.ts`**, so restoring them is a change to the contract's public
-surface, not an added import line. The remaining four — `ProjectWithTeam`,
-`InternalProject`, `InternalProjectQuery`, `TraceProcessingEvent` — are declared
-nowhere. All ten sit in a coordinator-held file that is also `gov-app-adr144`'s
-central file.
+Rev 2 found two. There are **four**, and the two extra are declared in transport
+files rather than the contract:
 
-**The conclusion that follows.** The governance server package is mid-move from
-two directions at once — out of the monolith and out of the composition package —
-and because the declaration build has never run, nobody had ever seen how much of
-that move is unfinished. The typecheck gate does not open with a sweep. It opens
-with the ADR-144 conversion, which owns `governance.members.ts`, the contract
-surface and the encryptor seam. Everything else is downstream of it.
+| Token | Declared at | Operations |
+| ----- | ----------- | ---------- |
+| `GovernanceApi` | `contract/src/governance.api.ts:337` | 102 |
+| `GovernanceRestApi` | `contract/src/governance.api.ts:380` | 9 |
+| `GovernanceCliRestApi` | `server/src/transport/governance-cli.rest.ts:51` | — |
+| `GovernanceIngestRestApi` | `server/src/transport/governance-ingest.rest.ts:36` | — |
 
-## What is left, in order
+`LocalFeatureApis` keys bindings by **object identity**, not by the name passed to
+`moduleApi`. The app's `contract` is `GovernanceRestApi`, so the other three
+tokens are claimed by nothing. That is why the CLI and ingest transports could
+not have resolved an app even if they were mounted, and it is the reason dropping
+them from `.withTransports(...)` costs nothing today.
 
-1. **`GovernanceApp` onto ADR-144** — `.claude/manifests/gov-app-adr144.md`, opus,
-   currently `blocked` with its handoff on disk. It is now the critical path, not
-   step 3. Re-scope it before spawning: it blocked twice on coordinator scoping
-   errors, and the decomposition above is the map it was missing. It converts
-   all-at-once — `feature-installer.ts:874` derives `members` from `reads`, so
-   there is no half-conversion that typechecks.
-2. **Six legacy collaborators, and most are not channels.** Superseded the
-   "two channels" line, which was wrong twice. Six interfaces have their only
-   live implementation in `enterprise/packages/composition/api/src/governance/`:
-   `GovernanceEventingChannel` (governance-eventing, 20857 bytes),
-   `TraceAlertTriggerMatchChannel` (governance-subscriber, 5584),
-   `GovernanceSignalChannel` (governance-signals, 4268),
-   `AdminWorkspaceViewOcsfChannel` (admin-workspace-view-audit, 3165),
-   `IngestionSourceLifecycleChannel` (ingestion-source, 2525),
-   `GovernanceWebhookChannel` (governance-webhook, 2472).
+Collapsing the four is a later drive (option A), deliberately not now.
 
-   They are all named `*Channel` because the legacy `GovernanceInfrastructure`
-   bag called them that. By ADR-144 §9 a channel is messages to or from something
-   the module does not own, **over a conduit**. Judged by what each file imports:
-   `governance-signals`, `governance-subscriber` and `ingestion-source` open no
-   conduit at all (only governance's own server, `observability` and `time`) and
-   are **services**; `admin-workspace-view-audit` imports a ClickHouse repository
-   and `project-contract`, so it is a **repository plus a peer dependency**;
-   `governance-webhook` imports `@langwatch/eventing` **and** the webhook module,
-   so it is genuinely split; only `governance-eventing` is plainly a channel.
+## Scoreboard
 
-   **Building to the `*Channel` names would manufacture five channels ADR-144
-   forbids** - the same class of fiction removed from the enforcer's advice
-   strings today. The classification is a decision, and it is the re-scoped
-   `gov-app-adr144` lane's first deliverable, ahead of any code.
-
-3. **The install itself** — catalogue, `dev/scripts/generate-modules.mjs`, and
-   **two** composition roots. `apps/worker` installs governance as well as
-   `apps/api`. This is also when the additive ClickHouse duplication gets deleted.
-4. **SCIM's last blocker**: `ScimSyncLifecycle` needs Identity's ledger-commit,
-   which `IdentityApi` does not expose. Parked on a bespoke member — precedent
-   `project.app.ts`'s `topicClustering`. Decide: grow `IdentityApi`, or accept it
-   un-suppliable.
-5. **Re-run apidiff** and confirm the 21.
-
-## Scoreboard — unmoved, and it will not move until the install lands
-
-apidiff run `20260916-r11`, base `7b5e10e7ae`. Report and ledger in
-`.apidiff/{report,ledger}-20260916-r11.json`.
-
-| | |
-| --- | --- |
-| union operations | 340 |
-| **probed and equal (real parity)** | **128** |
-| skipped, never probed | 106 |
-| differing | 82 |
-| root causes | 17, **0 new** against the r9 baseline |
-
-Of the 82 differing, 68 are missing-on-one-side and **21 of those are this drive**.
-
-## The tree, and why nothing is committed
-
-`dirty=326` (260 tracked, 66 untracked). **Three background jobs are writing to
-this checkout**: 981f27d9 (this drive), 4a7a3221 (lint-to-zero) and 2e744849.
-`.claude/coordinator/LANES.md` is written concurrently by at least two of them —
-a row was cleared by a peer between two reads this session. Nothing this drive
-has produced across eight lanes is committed, because **the user has not
-authorised commits**. That is the standing state, not an oversight. The branch is
-3045 ahead of `origin/main` and 7 behind.
-
-When commits are authorised, collect by explicit pathspec per COORDINATOR.md §7
-and never `git add -A` — two peer sessions have uncommitted work in this tree.
+| | rev 2 | now |
+| --- | --- | --- |
+| declarations gate | 13 errors / 9 files | 13 / 9, unchanged |
+| apidiff operations this drive owns | 21 (miscounted) | 25 (measured) |
+| chain links closed | 0 of 3 | 2 of 3 |
+| drive commits | 0 | 7 |
 
 ## Decisions taken — do NOT relitigate
 
@@ -184,7 +121,27 @@ and never `git add -A` — two peer sessions have uncommitted work in this tree.
 - **Spec buckets:** rebind where the behaviour lives elsewhere, rewrite where the
   code superseded the promise, `@unimplemented` only where genuinely absent.
 
+- **Option C, taken 2026-09-16: install `governanceRest` only.** The CLI and
+  ingest transports come out of `.withTransports(...)`; every method and every
+  `implements` clause stays, and the CLI/ingest bag moves behind one optional
+  slot. Justified because no CLI or ingest route is in the apidiff missing list,
+  and because their tokens (`GovernanceCliRestApi`, `GovernanceIngestRestApi`)
+  are claimed by no app, so those transports could never have resolved one.
+  Reaching the 102-operation `GovernanceApi` means `createGovernanceInstallation`
+  and its 30-slot options type - out of scope for parity, by decision.
+
 ## Traps that have each cost real time
+
+- **`governance: []` in the generated members file is correct output, not a
+  failure.** The generator derives that list from `static readonly reads` alone
+  (`dev/scripts/generate-modules.mjs:53`); boot adds the chosen repository tier's
+  own `requires` on top. A module that reads no process member prints `[]` and is
+  right to. SCIM prints `["prisma"]` only because it has no repositories registry
+  and builds its adapter from `members.prisma` itself. One lane lost most of a
+  run to reading `[]` as the blocker, on a manifest that told it to.
+- **Count the apidiff delta from `findings.jsonl`, never from a handover.** Two
+  revisions carried 21 when the file says 25, and 4 governance routes when it
+  says 7.
 
 1. **`timeout` does not exist on macOS.** `timeout 420 pnpm ...` exits 127 having
    run nothing, and a grep over its empty output reports zero errors. That read as
@@ -246,64 +203,61 @@ and never `git add -A` — two peer sessions have uncommitted work in this tree.
 Use a **clean worktree** for `-branch-dir`: with `-no-haven` the branch instance is
 that directory itself, so a dirty tree boots dirty. Read `credentialChecks` in the
 report before any count.
-
 ## Next action
 
-**The classification is settled; the remaining 13 declaration errors are the
-path.** `gov-app-adr144` ran on opus and delivered it: of the six interfaces the
-legacy bag named `*Channel`, **exactly one is a channel** —
-`GovernanceEventingChannel`. `AdminWorkspaceViewOcsfChannel` is a repository,
-`TraceAlertTriggerMatchChannel` a peer dependency on the automation module,
-`GovernanceWebhookChannel` a `WebhookApi` peer plus two members,
-`GovernanceSignalChannel` splits three ways into the one eventing channel, and
-`IngestionSourceLifecycleChannel` is a service over it. The renames are **not**
-applied: `enterprise/packages/composition/**` imports all six by name, so they
-land with the composition deletions at install time, not before. The rename
-table is in `.claude/handoffs/gov-app-adr144.md`.
+One lane is running: `gov-rest-serves-25`. When it lands, collect it, then run
+apidiff at the enterprise tier. Nothing else is outstanding.
 
-The 13 remaining errors, by file:
+### The build tier is not a decision, and rev 2 was wrong to call it one
+
+Rev 2 said the install was "blocked on one decision that is the user's", between
+amending ADR-144 §6, forcing the flag in `start:prepare:files`, or accepting the
+OSS 404. **None of those is needed.** Traced end to end:
+
+- `dev/scripts/generate-modules.mjs:172` reads `LANGWATCH_BUILD_TIER` from the
+  process environment and widens `tiers` to `["core","enterprise"]`.
+- `start:prepare:files` (root `package.json:54`) runs `generate:modules`.
+- apidiff runs `pnpm run start:prepare:files` on each side with
+  `havenEnv(state.environ(), slug)`, and `havenrun.Env`
+  (`tools/havenrun/havenrun.go:110`) inherits **everything** except
+  `ManagedEnvKeys` - `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`,
+  `REDIS_DB_INDEX`, `LANGWATCH_SLUG` - plus apidiff's one extra,
+  `LANGWATCH_INSTANCE_ADMIN_API_KEY`.
+
+`LANGWATCH_BUILD_TIER` is in none of those lists, so it passes straight through.
+Measuring the enterprise build is:
+
+```bash
+LANGWATCH_BUILD_TIER=enterprise <the apidiff invocation>
+```
+
+No ADR amendment, no committed enterprise-tier generated list, no licensing call.
+ADR-144 §6 says enterprise entries are emitted only in the enterprise build; this
+measures the enterprise build, which is precisely what §6 describes.
+
+Verified on today's tree, in process, writing nothing:
 
 ```
-3  repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts
-2  services/databricks-genie-puller.service.ts
-2  repositories/prisma/prisma.provider-account-lookup.repository.ts
-1  each: services/{pulled-usage-eventing,microsoft-directory-read,copilot-bots,
-        azure-cost-management,admin-api-users}.service.ts
-1  repositories/clickhouse/clickhouse.governance-clickhouse.repositories.ts
+enterprise server modules: 49 (core: 44)
+governanceServer present: true   scimServer present: true
+governance: []   scim: ["prisma"]
 ```
 
-Two of them are the `~/utils/ssrfProtection` class — a module that exists
-nowhere — and one is the ClickHouse resolver TS2322 that ADR-144's member
-wrapper was meant to answer. None is a sweep.
+**Report it honestly when it passes**: what reaches parity is the *enterprise*
+build. The OSS build deliberately serves less, and the two-image split the user
+asked for is the follow-up that makes that deliberate rather than incidental.
 
-**Three decisions are open and each belongs to a person, not a lane:**
+### Then
 
-1. **`AutomationApi` exposes no record-match operation.** `TraceAlertTriggerMatchChannel`
-   is a peer dependency on the automation module, but the operation it needs is
-   not on the peer's API. Grow `AutomationApi`, or keep the bespoke member.
-2. **`cost_usd` defaults to `"0"`, and the code argues it should not.**
-   `azure-cost-management.service.ts:663` argues an absent dollar figure must
-   stay absent; the schema's `.default("0")` contradicts it. This decides what a
-   customer's SIEM shows for a non-USD bill — a product decision.
-3. **`pulled-usage-eventing.service.ts:87`** is two structurally different
-   `PulledUsageEvent` unions meeting in eventing's generics.
+1. Collect `gov-rest-serves-25`; run the package suite and `typecheck:one`
+   yourself before committing.
+2. `LANGWATCH_BUILD_TIER=enterprise` apidiff run; expect the 25 to clear.
+3. Follow-ups, in the user's stated order of preference: the two-image split
+   (OSS and enterprise), then option A, collapsing the four
+   `moduleApi("governance")` tokens into one.
 
-**Still not committed.** `dev/scripts/commit-slice.sh` was refused by the
-permission classifier twice, the second not transient. Nothing from this drive,
-the lint fix, or tonight's caller edits is committed. The slices are built and
-verified and a boot-breaking stranded import in
-`composition/api/src/index.ts` is already fixed. This needs a Bash permission
-rule or another route the user chooses; do not route around it.
-
-**A live overlap to watch.** The concurrent lint drive's `comment-w11` owns
-`packages/architecture-enforcer`, `.claude/skills/**` and `dev/docs/**` — the
-same paths as this session's uncommitted `defineChannels` fix. Flagged in
-`LANES.md`; a sweep there could silently revert it while it is uncommitted.
-
-**Method note, because it cost this session twice.** Two manifest claims were
-wrong because a grep tested a spelling rather than a fact: `grep '<name>"'`
-missed every importer, since this repo writes imports with the `.ts` extension;
-and a grep for a name inside a contract's `index.ts` reported "not re-exported"
-when that file carries **40 star exports**. Both were caught by lanes. Verify a
-negative by resolving the module or through the language server, never with a
-pattern.
+**Known and deferred:** `@langwatch/infrastructure` is still not a dependency of
+the governance server package. Adding it regenerates the lockfile, which absorbs
+every other session's uncommitted `package.json` edits, and three peer sessions
+are live in this checkout. It is not needed for the 25 - the app reads no process
+member - so it waits for the lane that genuinely imports it.
