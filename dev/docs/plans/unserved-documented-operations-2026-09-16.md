@@ -292,3 +292,31 @@ architectural:
 Until one is chosen, `ScenarioSimulationsUnavailableError` stays: it is a
 truthful refusal, and ADR-133 would retire it only once a process can actually
 compose the thing.
+
+## Two checks that are off, and what is holding each
+
+**`gateway-server` typecheck.** Its `tsconfig.build.json` named a file that the
+`eventing/` folder move (`bb5318119f`) deleted, which is a hard `TS6053`, so the
+declaration build and therefore the whole check had not run since. Repointed in
+`60708e784f`. With it repointed the check reaches the compiler and reports
+**twenty pre-existing errors in seven files**, including
+`twilioCredential.service.ts` importing `~/server/modelProviders/modelProvider.repository`,
+an address that only existed in the monolith. Untouched, and listed here so the
+next change to that module is not surprised by them.
+
+**`analytics-server` declaration build.** Six `TS2883`: the inferred type of
+each REST family export "cannot be named without a reference to `RouteAccess`".
+Every route that declares an access kind rather than a permission puts
+`RouteAccess` in `RestTransportRoute`, and `build()` returns an anonymous
+`Readonly<{ protocol; namespace; router }>`, so the export's type can only be
+written by naming a type the `@langwatch/api/rest` entry does not publish. This
+blocks every package whose closure includes analytics — `gateway-server` among
+them, so the check above is still masked by it.
+
+Re-exporting `RouteAccess` from `@langwatch/api/rest` clears all six in one
+line, and was tried and reverted: that barrel's own header states the
+access-policy vocabulary is deliberately not re-exported there and that a
+consumer imports it from the entry point that owns it. The fix that honours
+that is to give `build()`'s return a published name and annotate the six
+exports with it. `packages/api` is being rewritten by another session, so it is
+left for whoever holds that file.
