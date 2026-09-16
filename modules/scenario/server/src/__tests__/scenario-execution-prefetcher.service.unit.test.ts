@@ -156,7 +156,7 @@ describe("prefetchWithFixture", () => {
     };
   }
 
-  describe("child environment readiness", () => {
+  describe("given child environment readiness", () => {
     const promptTarget: TargetConfig = {
       type: "prompt",
       referenceId: "prompt_123",
@@ -228,7 +228,7 @@ describe("prefetchWithFixture", () => {
     });
   });
 
-  describe("model selection", () => {
+  describe("when selecting a model", () => {
     describe("given a prompt with a specific model configured", () => {
       const promptWithModel = {
         id: "prompt_123",
@@ -510,7 +510,7 @@ describe("prefetchWithFixture", () => {
     });
   });
 
-  describe("user-simulator and judge model selection", () => {
+  describe("when selecting the user-simulator and judge model", () => {
     const httpAgent = {
       id: "agent_http",
       type: "http" as const,
@@ -843,7 +843,7 @@ describe("prefetchWithFixture", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when handling errors", () => {
     describe("given scenario does not exist", () => {
       describe("when prefetching scenario data", () => {
         it("returns failure with scenario not found error", async () => {
@@ -1163,7 +1163,7 @@ describe("prefetchWithFixture", () => {
     });
   });
 
-  describe("code agent prefetch", () => {
+  describe("when prefetching a code agent", () => {
     describe("given a code agent exists with Python code and inputs/outputs", () => {
       const codeAgent = {
         id: "agent_456",
@@ -1262,7 +1262,7 @@ describe("prefetchWithFixture", () => {
     });
   });
 
-  describe("successful prefetch", () => {
+  describe("when the prefetch succeeds", () => {
     describe("given all dependencies return valid data", () => {
       const promptWithModel = {
         id: "prompt_123",
@@ -2061,7 +2061,7 @@ describe("prefetchWithFixture", () => {
       });
     });
 
-    describe("spec-version gating of the legacy default fallback", () => {
+    describe("when spec-version gates the legacy default fallback", () => {
       // Nodes own their model since spec_version 1.5: a modelless llm param
       // on a modern DSL is stale state that must NOT be silently substituted
       // with DEFAULT_MODEL — it stays unhydrated so the engine raises its

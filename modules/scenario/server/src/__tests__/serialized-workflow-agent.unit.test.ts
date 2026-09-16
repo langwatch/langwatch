@@ -149,7 +149,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     vi.unstubAllEnvs();
   });
 
-  describe("basic contract", () => {
+  describe("given its basic contract", () => {
     it("has AGENT role", () => {
       const adapter = new SerializedWorkflowAgentAdapter({
         config: defaultConfig,
@@ -550,7 +550,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
   });
 
-  describe("the fetch deadline it arms", () => {
+  describe("when the adapter arms a fetch deadline", () => {
     /** Never resolves; rejects only when the adapter's own timer aborts it. */
     const abortAwareFetch = (signal: AbortSignal) =>
       new Promise<Response>((_resolve, reject) => {

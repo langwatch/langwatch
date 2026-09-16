@@ -87,7 +87,7 @@ describe("PromptBrowserWindowContent Layout Mode Detection", () => {
     localStorage.clear();
   });
 
-  describe("single window detection", () => {
+  describe("when detecting a single window", () => {
     it("detects single window when there is only one window", () => {
       store.getState().addTab({ data: createTabData() });
 
@@ -131,7 +131,7 @@ describe("PromptBrowserWindowContent Layout Mode Detection", () => {
     });
   });
 
-  describe("layout mode mapping", () => {
+  describe("when mapping layout mode", () => {
     it("maps single window to horizontal layout", () => {
       store.getState().addTab({ data: createTabData() });
 

@@ -59,7 +59,7 @@ describe("buildConversationMarkdownChunks", () => {
     });
   });
 
-  describe("joinConversationMarkdown", () => {
+  describe("joinConversationMarkdown()", () => {
     it("concatenates chunk markdown for clipboard export", () => {
       const chunks = buildConversationMarkdownChunks("conv-1", [
         makeTurn({ output: "out", assistantText: "out" }),

@@ -154,7 +154,7 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("currentVersionId prop", () => {
+  describe("given the currentVersionId prop", () => {
     it("marks latest version as current when currentVersionId is not provided", async () => {
       renderWithChakra(
         <VersionHistoryListPopover

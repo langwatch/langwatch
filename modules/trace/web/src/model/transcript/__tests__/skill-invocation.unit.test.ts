@@ -8,7 +8,7 @@ import {
 } from "../skill-invocation.ts";
 
 describe("skillInvocation", () => {
-  describe("isSkillToolName", () => {
+  describe("isSkillToolName()", () => {
     describe("given the Skill tool name", () => {
       it("recognizes it as a skill", () => {
         expect(isSkillToolName("Skill")).toBe(true);
@@ -27,7 +27,7 @@ describe("skillInvocation", () => {
     });
   });
 
-  describe("skillSlugFromInput", () => {
+  describe("skillSlugFromInput()", () => {
     describe("when the input carries a skill slug", () => {
       it("extracts the skill name", () => {
         expect(skillSlugFromInput({ skill: "surf-pr", args: "" })).toBe("surf-pr");
@@ -59,7 +59,7 @@ describe("skillInvocation", () => {
     });
   });
 
-  describe("isSkillSpan", () => {
+  describe("isSkillSpan()", () => {
     describe("given a Skill tool span", () => {
       /** @scenario "A skill span is flagged in the tree" */
       it("flags a tool-type span named Skill", () => {
@@ -85,7 +85,7 @@ describe("skillInvocation", () => {
     });
   });
 
-  describe("skillInvocationFromToolUse", () => {
+  describe("skillInvocationFromToolUse()", () => {
     describe("when the tool_use is a Skill run", () => {
       it("resolves to the skill with its slug", () => {
         expect(

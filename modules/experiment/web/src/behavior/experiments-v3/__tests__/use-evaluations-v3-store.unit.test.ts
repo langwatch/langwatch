@@ -16,7 +16,7 @@ describe("useEvaluationsV3Store", () => {
     useEvaluationsV3Store.getState().reset();
   });
 
-  describe("Dataset operations", () => {
+  describe("when performing dataset operations", () => {
     it("sets cell value in active dataset", () => {
       const store = useEvaluationsV3Store.getState();
       store.setCellValue(DEFAULT_TEST_DATA_ID, 0, "input", "Hello world");
@@ -93,7 +93,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Multi-dataset operations", () => {
+  describe("when performing multi-dataset operations", () => {
     const createTestDataset = (id: string, name: string): DatasetReference => ({
       id,
       name,
@@ -229,7 +229,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Target operations", () => {
+  describe("when performing target operations", () => {
     const createTestTarget = (id: string): TargetConfig => ({
       id,
       type: "prompt",
@@ -437,7 +437,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Global evaluator operations", () => {
+  describe("when performing global evaluator operations", () => {
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
       id,
       evaluatorType: "langevals/exact_match",
@@ -559,7 +559,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Evaluator mapping operations (evaluators apply to all targets)", () => {
+  describe("when performing evaluator mapping operations (evaluators apply to all targets)", () => {
     const createTestTarget = (id: string): TargetConfig => ({
       id,
       type: "prompt",
@@ -629,7 +629,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("UI state operations", () => {
+  describe("when performing UI state operations", () => {
     it("opens overlay with target", () => {
       const store = useEvaluationsV3Store.getState();
       store.openOverlay("target", "target-1");
@@ -733,7 +733,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Results operations", () => {
+  describe("when performing results operations", () => {
     it("sets results", () => {
       const store = useEvaluationsV3Store.getState();
       store.setResults({
@@ -787,7 +787,7 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Undo/Redo (temporal)", () => {
+  describe("when performing undo/redo (temporal) operations", () => {
     it("tracks dataset changes in undo history", async () => {
       const store = useEvaluationsV3Store.getState();
 

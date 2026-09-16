@@ -83,7 +83,7 @@ describe("FieldsFilters", () => {
     vi.clearAllMocks();
   });
 
-  describe("rendering", () => {
+  describe("when rendering", () => {
     it("renders filter buttons", () => {
       renderComponent();
       expect(screen.getByText("Label")).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe("FieldsFilters", () => {
     });
   });
 
-  describe("popover interaction", () => {
+  describe("when interacting with the popover", () => {
     it("opens popover when clicking filter button", async () => {
       const user = userEvent.setup();
       renderComponent();

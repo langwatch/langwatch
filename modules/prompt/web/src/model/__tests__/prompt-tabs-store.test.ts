@@ -81,7 +81,7 @@ describe("DraggableTabsBrowserStore", () => {
     localStorage.clear();
   });
 
-  describe("initial state", () => {
+  describe("given an initial state", () => {
     it("has empty windows array", () => {
       expect(store.getState().windows).toEqual([]);
     });
@@ -91,7 +91,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("addTab", () => {
+  describe("addTab()", () => {
     it("creates first tabbedWindow when none exist", () => {
       store.getState().addTab({ data: createTabData() });
 
@@ -119,7 +119,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("removeTab", () => {
+  describe("removeTab()", () => {
     describe("when tab is not active", () => {
       it("removes tab without changing activeTabId", () => {
         store.getState().addTab({ data: createTabData() });
@@ -212,7 +212,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("moveTab", () => {
+  describe("moveTab()", () => {
     describe("when moving tab between windows", () => {
       it("removes from source and adds to target", () => {
         store.getState().addTab({ data: createTabData() });
@@ -319,7 +319,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("splitTab", () => {
+  describe("splitTab()", () => {
     describe("when splitting a tab", () => {
       it("creates new tabbedWindow after source tabbedWindow", () => {
         store.getState().addTab({ data: createTabData() });
@@ -396,7 +396,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("setActiveTab", () => {
+  describe("setActiveTab()", () => {
     it("sets tab and tabbedWindow as active", () => {
       store.getState().addTab({ data: createTabData() });
       store.getState().addTab({ data: createTabData() });
@@ -413,7 +413,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("setActiveWindow", () => {
+  describe("setActiveWindow()", () => {
     it("updates activeWindowId", () => {
       store.getState().addTab({ data: createTabData() });
       const firstTabId = store.getState().windows[0]?.tabs[0]?.id;
@@ -429,7 +429,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("updateTabData", () => {
+  describe("updateTabData()", () => {
     it("applies updater function to tab data", () => {
       store.getState().addTab({ data: createTabData({ meta: { title: "Original" } }) });
 
@@ -448,7 +448,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("persistence", () => {
+  describe("when persisting", () => {
     describe("when updating one tab's data with other large tabs open", () => {
       it("does not rewrite the untouched tab's full content", () => {
         store.getState().addTab({
@@ -499,7 +499,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("rehydration recovery", () => {
+  describe("when recovering from rehydration", () => {
     describe("when reading the legacy single-key persisted format", () => {
       it("adopts the embedded tab data and migrates it to per-tab keys", async () => {
         const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
@@ -642,7 +642,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("getByTabId", () => {
+  describe("getByTabId()", () => {
     it("returns tab data when tab exists", () => {
       const tabData = createTabData({ meta: { title: "Test" } });
       store.getState().addTab({ data: tabData });
@@ -661,7 +661,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("isTabIdActive", () => {
+  describe("isTabIdActive()", () => {
     describe("when tab is active in any tabbedWindow", () => {
       it("returns true", () => {
         store.getState().addTab({ data: createTabData() });
@@ -691,7 +691,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("reset", () => {
+  describe("reset()", () => {
     it("clears all windows and sets activeWindowId to null", () => {
       store.getState().addTab({ data: createTabData() });
       store.getState().reset();
@@ -725,7 +725,7 @@ describe("DraggableTabsBrowserStore", () => {
     });
   });
 
-  describe("variableValues", () => {
+  describe("when reading variableValues", () => {
     it("initializes with empty variableValues", () => {
       store.getState().addTab({ data: createTabData() });
 

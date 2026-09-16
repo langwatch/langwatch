@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("ParameterField", () => {
-  describe("Select Parameters", () => {
+  describe("given select parameters", () => {
     // Uses unified 'reasoning' field with dynamic label
     const reasoningConfig: SelectParameterConfig = {
       type: "select",

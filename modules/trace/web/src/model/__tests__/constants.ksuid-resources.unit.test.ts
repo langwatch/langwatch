@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { KSUID_RESOURCES } from "../constants.ts";
 
 describe("KSUID resource patterns", () => {
-  describe("SCENARIO resource", () => {
+  describe("when reading the SCENARIO resource", () => {
     const generateScenarioId = () => generate(KSUID_RESOURCES.SCENARIO).toString();
 
     /** @scenario New scenario ID uses "scenario_" prefix with KSUID */

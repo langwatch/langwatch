@@ -94,7 +94,7 @@ describe("child-logger", () => {
     });
   });
 
-  describe("encode/decode round-trip", () => {
+  describe("when encoding and decoding a round trip", () => {
     it("drops undefined and empty-string values", () => {
       const encoded = encodeScenarioLogContext({
         projectId: "proj_1",

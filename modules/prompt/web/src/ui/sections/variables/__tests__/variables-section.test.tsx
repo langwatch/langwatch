@@ -43,7 +43,7 @@ describe("VariablesSection", () => {
     cleanup();
   });
 
-  describe("header", () => {
+  describe("given the header", () => {
     it("displays Variables title by default", () => {
       renderComponent();
       expect(screen.getByText("Variables")).toBeInTheDocument();
@@ -71,14 +71,14 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("empty state", () => {
+  describe("given an empty state", () => {
     it("shows empty message when no variables", () => {
       renderComponent({ variables: [] });
       expect(screen.getByText("No variables defined")).toBeInTheDocument();
     });
   });
 
-  describe("displaying variables", () => {
+  describe("when displaying variables", () => {
     it("renders variable list", () => {
       const variables: Variable[] = [
         { identifier: "question", type: "str" },
@@ -91,7 +91,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("adding variables", () => {
+  describe("when adding variables", () => {
     it("calls onChange with new variable when add button clicked", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
@@ -121,7 +121,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("editing variable name", () => {
+  describe("when editing a variable name", () => {
     it("enters edit mode on click", async () => {
       const user = userEvent.setup();
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
@@ -282,7 +282,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("removing variables", () => {
+  describe("when removing variables", () => {
     it("shows delete button when canAddRemove is true", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({ variables, onChange: vi.fn(), canAddRemove: true });
@@ -349,7 +349,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("mapping UI", () => {
+  describe("given the mapping UI", () => {
     it("shows mapping dropdown when showMappings is true", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({
@@ -420,7 +420,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("type selector on icon", () => {
+  describe("given the type selector on the icon", () => {
     /** @scenario The type selector shows its type label as an outline button */
     it("shows the type label as an outline button", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
@@ -468,7 +468,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("runtime values (values and onValueChange props)", () => {
+  describe("given runtime values (values and onValueChange props)", () => {
     it("displays value in the input field when values prop is provided", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       renderComponent({
@@ -544,7 +544,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("locked variables", () => {
+  describe("given locked variables", () => {
     it("hides delete button for locked variables", () => {
       const variables: Variable[] = [
         { identifier: "input", type: "str" },
@@ -601,7 +601,7 @@ describe("VariablesSection", () => {
     });
   });
 
-  describe("disabled mappings", () => {
+  describe("given disabled mappings", () => {
     it("hides mapping input when disabled", () => {
       const variables: Variable[] = [{ identifier: "input", type: "str" }];
       renderComponent({

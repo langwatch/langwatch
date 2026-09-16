@@ -54,7 +54,7 @@ describe("VariableInsertMenu", () => {
     cleanup();
   });
 
-  describe("rendering", () => {
+  describe("when rendering", () => {
     it("renders when isOpen is true", () => {
       renderComponent();
       // Should show sources
@@ -101,7 +101,7 @@ describe("VariableInsertMenu", () => {
     });
   });
 
-  describe("filtering with query prop", () => {
+  describe("when filtering with the query prop", () => {
     it("filters fields based on query prop", () => {
       renderComponent({ query: "output" });
 
@@ -124,7 +124,7 @@ describe("VariableInsertMenu", () => {
     });
   });
 
-  describe("selection", () => {
+  describe("when selecting", () => {
     it("calls onSelect when clicking a field", async () => {
       const user = userEvent.setup();
       const onSelect = vi.fn();
@@ -164,7 +164,7 @@ describe("VariableInsertMenu", () => {
     });
   });
 
-  describe("highlighting", () => {
+  describe("when highlighting", () => {
     it("highlights first item by default (index 0)", () => {
       renderComponent({ highlightedIndex: 0 });
       // The first field "input" should have blue.50 background
@@ -179,7 +179,7 @@ describe("VariableInsertMenu", () => {
     });
   });
 
-  describe("create variable option", () => {
+  describe("when showing the create variable option", () => {
     it("shows create option when no exact match and onCreateVariable provided", () => {
       const onCreateVariable = vi.fn();
       renderComponent({ query: "my_custom", onCreateVariable });
@@ -296,7 +296,7 @@ describe("VariableInsertMenu", () => {
     });
   });
 
-  describe("type mismatch warning", () => {
+  describe("given a type mismatch warning", () => {
     it("renders with expectedType prop without error", () => {
       // This test just verifies the component handles expectedType prop
       // Visual verification of warning icons is done via integration/e2e tests

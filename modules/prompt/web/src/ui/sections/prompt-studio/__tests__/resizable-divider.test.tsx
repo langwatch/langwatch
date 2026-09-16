@@ -35,7 +35,7 @@ describe("ResizableDivider", () => {
     cleanup();
   });
 
-  describe("click to toggle", () => {
+  describe("when clicking to toggle", () => {
     it("calls onToggle when clicked without dragging", () => {
       const onToggle = vi.fn();
       renderDivider({ onToggle });
@@ -83,7 +83,7 @@ describe("ResizableDivider", () => {
     });
   });
 
-  describe("drag to resize", () => {
+  describe("when dragging to resize", () => {
     it("calls onPositionChange during drag", () => {
       const onPositionChange = vi.fn();
       renderDivider({ onPositionChange });
@@ -130,7 +130,7 @@ describe("ResizableDivider", () => {
     });
   });
 
-  describe("visual behavior", () => {
+  describe("given its visual behavior", () => {
     it("renders with correct role for accessibility", () => {
       renderDivider({});
 

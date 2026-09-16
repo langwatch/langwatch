@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDefaultFormValues } from "../default-form-values.ts";
 
 describe("buildDefaultFormValues", () => {
-  describe("unified defaults", () => {
+  describe("given no overrides", () => {
     it("creates prompt with input variable", () => {
       const defaults = buildDefaultFormValues();
 
@@ -49,7 +49,7 @@ describe("buildDefaultFormValues", () => {
     });
   });
 
-  describe("with overrides", () => {
+  describe("given overrides", () => {
     it("allows overriding the model", () => {
       const defaults = buildDefaultFormValues({
         version: {
@@ -86,7 +86,7 @@ describe("buildDefaultFormValues", () => {
     });
   });
 
-  describe("llm configuration", () => {
+  describe("given llm configuration", () => {
     it("sets temperature to undefined by default (not all models support it)", () => {
       const defaults = buildDefaultFormValues();
 

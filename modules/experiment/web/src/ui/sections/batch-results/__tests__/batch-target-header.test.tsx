@@ -55,7 +55,7 @@ describe("BatchTargetHeader", () => {
     cleanup();
   });
 
-  describe("Basic Rendering", () => {
+  describe("when rendering", () => {
     it("renders target name", () => {
       const target = createTargetColumn({ name: "My Prompt Target" });
 
@@ -98,7 +98,7 @@ describe("BatchTargetHeader", () => {
     });
   });
 
-  describe("Summary Badge", () => {
+  describe("when rendering the summary badge", () => {
     it("does not render summary when aggregates is null", () => {
       const target = createTargetColumn();
 

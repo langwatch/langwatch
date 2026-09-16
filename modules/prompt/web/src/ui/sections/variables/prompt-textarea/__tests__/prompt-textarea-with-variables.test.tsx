@@ -82,7 +82,7 @@ describe("PromptTextAreaWithVariables", () => {
     cleanup();
   });
 
-  describe("rendering", () => {
+  describe("when rendering", () => {
     it("renders textarea with placeholder", () => {
       renderComponent({ placeholder: "Enter your prompt..." });
       expect(screen.getByPlaceholderText("Enter your prompt...")).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("text input", () => {
+  describe("when inputting text", () => {
     it("calls onChange when typing (debounced)", async () => {
       vi.useFakeTimers();
       const onChange = vi.fn();
@@ -121,7 +121,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("variable warnings", () => {
+  describe("given variable warnings", () => {
     it("shows warning for undefined variables", () => {
       renderComponent({
         value: "Hello {{undefined_var}}",
@@ -144,7 +144,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("Add variable button", () => {
+  describe("given the add variable button", () => {
     it("shows Add variable button on hover when enabled", async () => {
       const user = userEvent.setup();
       const { container } = renderComponent({ showAddContextButton: true });
@@ -198,7 +198,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("{{ trigger and menu behavior", () => {
+  describe("given the {{ trigger and menu behavior", () => {
     // Note: Menu rendering tests are limited in jsdom since Portal renders outside component tree
     // These tests focus on component setup and callback wiring
 
@@ -248,7 +248,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("variable creation callbacks", () => {
+  describe("given variable creation callbacks", () => {
     it("accepts onCreateVariable callback", () => {
       const onCreateVariable = vi.fn();
 
@@ -277,14 +277,14 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("disabled state", () => {
+  describe("given a disabled state", () => {
     it("textarea is disabled when disabled prop is true", () => {
       renderComponent({ disabled: true });
       expect(screen.getByRole("textbox")).toBeDisabled();
     });
   });
 
-  describe("keyboard handling", () => {
+  describe("when handling keyboard input", () => {
     it("handles Escape key without error when menu is not open", () => {
       const onChange = vi.fn();
       renderComponent({ onChange, variables: mockVariables });
@@ -312,7 +312,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("debouncing behavior", () => {
+  describe("given debouncing behavior", () => {
     it("updates local value immediately on typing", () => {
       const onChange = vi.fn();
       renderComponent({ onChange });
@@ -395,7 +395,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("external value sync", () => {
+  describe("when syncing the external value", () => {
     it("syncs external value when not typing", async () => {
       const onChange = vi.fn();
       const { rerender } = render(
@@ -417,7 +417,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("role prop", () => {
+  describe("given the role prop", () => {
     it("sets data-role attribute on textarea", () => {
       renderComponent({ role: "system" });
 
@@ -433,7 +433,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("borderless mode", () => {
+  describe("given borderless mode", () => {
     it("renders without errors in borderless mode", () => {
       renderComponent({ borderless: true });
       expect(screen.getByRole("textbox")).toBeInTheDocument();
@@ -445,7 +445,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("Add variable button behavior", () => {
+  describe("given the add variable button's behavior", () => {
     it("clicking Add variable button does not crash", async () => {
       const user = userEvent.setup();
       const { container } = renderComponent({
@@ -472,7 +472,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("variable highlighting", () => {
+  describe("when highlighting variables", () => {
     it("does not show warning when all variables are defined", () => {
       renderComponent({
         value: "Hello {{question}} and {{context}}",
@@ -506,7 +506,7 @@ describe("PromptTextAreaWithVariables", () => {
     });
   });
 
-  describe("menu trigger detection", () => {
+  describe("when detecting the menu trigger", () => {
     it("does not trigger menu for complete variables", () => {
       const onChange = vi.fn();
       renderComponent({

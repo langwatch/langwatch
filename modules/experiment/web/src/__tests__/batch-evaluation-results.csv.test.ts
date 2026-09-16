@@ -38,7 +38,7 @@ const createTargetOutput = (overrides: Partial<BatchTargetOutput> = {}): BatchTa
 });
 
 describe("csvExport", () => {
-  describe("buildCsvHeaders", () => {
+  describe("buildCsvHeaders()", () => {
     /** @scenario Export results to CSV */
     /** @scenario CSV contains all columns */
     it("returns index header for empty data", () => {
@@ -104,7 +104,7 @@ describe("csvExport", () => {
     });
   });
 
-  describe("buildCsvData", () => {
+  describe("buildCsvData()", () => {
     it("handles empty data with just index header", () => {
       const data = createMinimalData();
       const { headers, rows } = buildCsvData(data);
@@ -574,7 +574,7 @@ describe("csvExport", () => {
     });
   });
 
-  describe("generateCsvContent", () => {
+  describe("generateCsvContent()", () => {
     it("generates valid CSV string", () => {
       const data = createMinimalData({
         datasetColumns: [{ name: "input", hasImages: false }],
@@ -603,7 +603,7 @@ describe("csvExport", () => {
     });
   });
 
-  describe("multi-target CSV export from ES data", () => {
+  describe("given multi-target CSV export from ES data", () => {
     const createESData = (
       overrides: Partial<ExperimentRunWithItems> = {},
     ): ExperimentRunWithItems => ({

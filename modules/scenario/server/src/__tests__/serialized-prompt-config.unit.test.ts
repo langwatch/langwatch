@@ -166,7 +166,7 @@ describe("SerializedPromptConfigAdapter", () => {
     expect(result).toBe("Generated response");
   });
 
-  describe("template interpolation", () => {
+  describe("when interpolating the template", () => {
     it("replaces {{input}} in system prompt with last user message", async () => {
       const config: PromptConfigData = {
         ...defaultConfig,

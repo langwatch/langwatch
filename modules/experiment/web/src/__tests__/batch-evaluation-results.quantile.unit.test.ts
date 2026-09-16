@@ -27,7 +27,7 @@ describe("quantile", () => {
     });
   });
 
-  describe("the bounds a 95% interval asks for", () => {
+  describe("given the bounds a 95% interval asks for", () => {
     it("stays inside the sample at both ends", () => {
       const sorted = Array.from({ length: 1000 }, (_, i) => i);
 

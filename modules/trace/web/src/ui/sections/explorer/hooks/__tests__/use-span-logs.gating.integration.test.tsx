@@ -82,7 +82,7 @@ describe("useSpanLogs gating", () => {
     });
   });
 
-  describe("while the header is still loading", () => {
+  describe("when the header is still loading", () => {
     it("holds the traceLogs query back rather than firing blind", () => {
       headerQuery.mockReturnValue({
         data: undefined,

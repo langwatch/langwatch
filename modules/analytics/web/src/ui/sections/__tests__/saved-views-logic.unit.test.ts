@@ -505,7 +505,7 @@ describe("savedViewsLogic", () => {
 
   // --- DEFAULT_VIEWS ---
 
-  describe("DEFAULT_VIEWS", () => {
+  describe("when reading DEFAULT_VIEWS", () => {
     it("has 6 default views in order", () => {
       expect(DEFAULT_VIEWS).toHaveLength(6);
       expect(DEFAULT_VIEWS.map((v) => v.name)).toEqual([
@@ -531,7 +531,7 @@ describe("savedViewsLogic", () => {
 
   // --- MAX_VIEW_NAME_LENGTH ---
 
-  describe("MAX_VIEW_NAME_LENGTH", () => {
+  describe("when reading MAX_VIEW_NAME_LENGTH", () => {
     it("is 50", () => {
       expect(MAX_VIEW_NAME_LENGTH).toBe(50);
     });
@@ -539,7 +539,7 @@ describe("savedViewsLogic", () => {
 
   // --- SavedView schema ---
 
-  describe("SavedView schema", () => {
+  describe("when validating the SavedView schema", () => {
     it("contains id, name, filters, optional query, and optional period", () => {
       const view: SavedView = {
         id: "v1",

@@ -86,7 +86,7 @@ describe("showVersionBadge logic", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("given edge cases", () => {
     it("handles empty tabs array", () => {
       const result = shouldShowVersionBadge({
         isOutdated: false,

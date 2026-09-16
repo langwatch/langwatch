@@ -109,7 +109,7 @@ describe("Playground Variables Section Integration", () => {
     cleanup();
   });
 
-  describe("locked input variable", () => {
+  describe("given a locked input variable", () => {
     it("shows input variable with info icon", () => {
       renderVariablesSection({
         variables: [{ identifier: "input", type: "str" }],
@@ -152,7 +152,7 @@ describe("Playground Variables Section Integration", () => {
     });
   });
 
-  describe("adding and removing variables", () => {
+  describe("when adding and removing variables", () => {
     it("can add a new variable", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
@@ -206,7 +206,7 @@ describe("Playground Variables Section Integration", () => {
     });
   });
 
-  describe("variable values", () => {
+  describe("when reading variable values", () => {
     it("displays values for variables", () => {
       renderVariablesSection({
         variables: [
@@ -284,7 +284,7 @@ describe("PromptTabbedSection Store Integration", () => {
     localStorage.clear();
   });
 
-  describe("variable values persistence", () => {
+  describe("when persisting variable values", () => {
     it("stores variable values in tab data", () => {
       // Create tab with initial variable values
       store.getState().addTab({
@@ -373,7 +373,7 @@ describe("PromptTabbedSection Store Integration", () => {
     });
   });
 
-  describe("demonstrations tab logic", () => {
+  describe("when running demonstrations tab logic", () => {
     it("demonstrates transposeColumnsFirstToRowsFirstWithId returns empty for no data", async () => {
       const { transposeColumnsFirstToRowsFirstWithId } =
         await import("@langwatch/workflow-contract");
@@ -508,7 +508,7 @@ describe("PromptTabbedSection Layout Modes", () => {
     tabIdRef.current = "test-tab-id";
   });
 
-  describe("vertical layout mode", () => {
+  describe("given vertical layout mode", () => {
     it("shows resizable divider in vertical mode", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
 
@@ -524,7 +524,7 @@ describe("PromptTabbedSection Layout Modes", () => {
     });
   });
 
-  describe("horizontal layout mode", () => {
+  describe("given horizontal layout mode", () => {
     it("hides resizable divider in horizontal mode", () => {
       renderPromptTabbedSection({ layoutMode: "horizontal" });
 
@@ -544,7 +544,7 @@ describe("PromptTabbedSection Layout Modes", () => {
     });
   });
 
-  describe("common features", () => {
+  describe("given features common to both layout modes", () => {
     it("shows Conversation tab in both modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
       expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();

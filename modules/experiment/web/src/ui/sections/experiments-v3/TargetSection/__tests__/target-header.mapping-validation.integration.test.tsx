@@ -149,7 +149,7 @@ afterEach(() => {
 // ============================================================================
 
 describe("mappingValidation utility", () => {
-  describe("extractFieldsFromContent", () => {
+  describe("extractFieldsFromContent()", () => {
     it("extracts fields from template content", () => {
       const content = "Hello {{name}}, your order {{orderId}} is ready.";
       const fields = extractFieldsFromContent(content);
@@ -172,7 +172,7 @@ describe("mappingValidation utility", () => {
     });
   });
 
-  describe("getUsedFields", () => {
+  describe("getUsedFields()", () => {
     it("extracts used fields from prompt messages", () => {
       const target = createTestTarget("r1", [{ identifier: "question", type: "str" }]);
       const fields = getUsedFields(target);
@@ -194,7 +194,7 @@ describe("mappingValidation utility", () => {
     });
   });
 
-  describe("getTargetMissingMappings", () => {
+  describe("getTargetMissingMappings()", () => {
     it("identifies missing mappings for used fields", () => {
       const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
       const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
@@ -234,7 +234,7 @@ describe("mappingValidation utility", () => {
     });
   });
 
-  describe("targetHasMissingMappings", () => {
+  describe("targetHasMissingMappings()", () => {
     it("returns true when mappings are missing", () => {
       const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
       expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(true);
@@ -255,7 +255,7 @@ describe("mappingValidation utility", () => {
     });
   });
 
-  describe("validateWorkbench", () => {
+  describe("validateWorkbench()", () => {
     it("returns valid when all targets have mappings", () => {
       const targets = [
         createTestTarget("r1", [{ identifier: "question", type: "str" }], {

@@ -19,7 +19,7 @@ const herrBody = ({ type, message }: { type: string; message: string }) =>
   JSON.stringify({ error: { type, message } });
 
 describe("format-execution-error helpers (lw#3439)", () => {
-  describe("cleanErrorDetail", () => {
+  describe("cleanErrorDetail()", () => {
     it("removes ANSI escape sequences", () => {
       const raw = "\x1b[31mred error\x1b[0m on line 1";
       expect(cleanErrorDetail(raw)).toBe("red error on line 1");
@@ -274,7 +274,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("formatEngineError", () => {
+  describe("formatEngineError()", () => {
     it("formats a user-code failure from the engine traceback", () => {
       const out = formatEngineError({
         engineError: {
@@ -321,7 +321,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("formatHttpError", () => {
+  describe("formatHttpError()", () => {
     it("formats a customer-fault herr envelope as a user-code failure", () => {
       const out = formatHttpError({
         status: 400,
@@ -432,7 +432,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("formatFetchError", () => {
+  describe("formatFetchError()", () => {
     it("formats a timeout with the configured ms", () => {
       const out = formatFetchError({
         cause: new Error("aborted"),
@@ -495,7 +495,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
   });
 
-  describe("redactInternalAddresses", () => {
+  describe("redactInternalAddresses()", () => {
     it("removes an ipv4 address and port", () => {
       expect(redactInternalAddresses("connect to 10.4.2.11:5561")).not.toMatch(
         /10\.4\.2\.11|5561/,

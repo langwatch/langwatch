@@ -18,7 +18,7 @@ describe("SerializedAgentRegistryAdapter", () => {
   };
   const nlpServiceUrl = "http://localhost:8080";
 
-  describe("prompt adapter", () => {
+  describe("given a prompt-type adapter", () => {
     it("creates SerializedPromptConfigAdapter for prompt type", () => {
       const adapterData: TargetAdapterData = {
         type: "prompt",
@@ -39,7 +39,7 @@ describe("SerializedAgentRegistryAdapter", () => {
     });
   });
 
-  describe("http adapter", () => {
+  describe("given an http-type adapter", () => {
     it("creates SerializedHttpAgentAdapter for http type", () => {
       const adapterData: TargetAdapterData = {
         type: "http",
@@ -61,7 +61,7 @@ describe("SerializedAgentRegistryAdapter", () => {
     });
   });
 
-  describe("code adapter", () => {
+  describe("given a code-type adapter", () => {
     it("creates SerializedCodeAgentAdapter for code type", () => {
       const adapterData: TargetAdapterData = {
         type: "code",

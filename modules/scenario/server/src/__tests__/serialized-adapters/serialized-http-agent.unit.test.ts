@@ -296,7 +296,7 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("body templating", () => {
+  describe("when templating the body", () => {
     it("replaces {{messages}} placeholder", async () => {
       const config: HttpAgentData = {
         ...defaultConfig,
@@ -404,7 +404,7 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("trace context propagation", () => {
+  describe("when propagating trace context", () => {
     const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
     const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
 
@@ -496,7 +496,7 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("header value templating", () => {
+  describe("when templating header values", () => {
     const TRACE_ID = "0af7651916cd43dd8448eb211c80319c";
     const TRACEPARENT = `00-${TRACE_ID}-b7ad6b7169203331-01`;
 
@@ -562,7 +562,7 @@ describe("SerializedHttpAgentAdapter", () => {
     });
   });
 
-  describe("URL template interpolation", () => {
+  describe("when interpolating the URL template", () => {
     it("renders {{threadId}} placeholder in url", async () => {
       const config: HttpAgentData = {
         ...defaultConfig,
@@ -689,7 +689,7 @@ describe("SerializedHttpAgentAdapter", () => {
       });
     });
 
-    describe("SSRF regression", () => {
+    describe("when guarding against SSRF", () => {
       beforeEach(() => {
         mockSsrfSafeFetch.mockRejectedValue(new Error("Access to private IP denied"));
       });

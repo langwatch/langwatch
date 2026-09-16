@@ -7,7 +7,7 @@ import type { DatasetColumn } from "../types.ts";
 import { convertInlineToRowRecords, filterEmptyRows } from "../dataset-conversion.ts";
 
 describe("Save as dataset utilities", () => {
-  describe("filterEmptyRows", () => {
+  describe("filterEmptyRows()", () => {
     it("removes rows where all values are empty strings", () => {
       const records = [
         { id: "row_0", input: "hello", expected_output: "world" },
@@ -57,7 +57,7 @@ describe("Save as dataset utilities", () => {
     });
   });
 
-  describe("convertInlineToRowRecords", () => {
+  describe("convertInlineToRowRecords()", () => {
     it("converts column-based to row-based records without IDs", () => {
       const columns: DatasetColumn[] = [
         { id: "input", name: "input", type: "string" },

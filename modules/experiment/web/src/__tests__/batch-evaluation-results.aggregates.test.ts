@@ -16,7 +16,7 @@ describe("computeBatchTargetAggregates", () => {
     outputFields: ["output"],
   });
 
-  describe("completedRows counting", () => {
+  describe("when counting completedRows", () => {
     it("counts rows with output as completed", () => {
       const targetCol = createTargetColumn("gpt-4");
       const rows: BatchResultRow[] = [
@@ -157,7 +157,7 @@ describe("computeBatchTargetAggregates", () => {
     });
   });
 
-  describe("evaluator aggregates from API evaluations", () => {
+  describe("when deriving evaluator aggregates from API evaluations", () => {
     it("computes average score from evaluator results", () => {
       const targetCol = createTargetColumn("gpt-4");
       const rows: BatchResultRow[] = [
@@ -277,7 +277,7 @@ describe("computeBatchTargetAggregates", () => {
     });
   });
 
-  describe("pass rate computation", () => {
+  describe("when computing the pass rate", () => {
     it("returns null passRate when all evaluator results have passed: null", () => {
       // This is the key case: evaluators like response_length only produce scores
       // and have passed: null for all results. We should NOT show 0% pass rate.

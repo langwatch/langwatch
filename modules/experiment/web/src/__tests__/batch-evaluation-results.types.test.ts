@@ -12,7 +12,7 @@ const createTimestamps = () => ({
 });
 
 describe("transformBatchEvaluationData", () => {
-  describe("basic metadata", () => {
+  describe("given basic metadata", () => {
     it("extracts run metadata correctly", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -71,7 +71,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("empty states", () => {
+  describe("given empty states", () => {
     it("handles empty dataset", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -111,7 +111,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("V2 format (legacy, no targets)", () => {
+  describe("given V2 format (legacy, no targets)", () => {
     it("transforms V2 data with flat predicted values", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -272,7 +272,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("V3 format (with explicit targets)", () => {
+  describe("given V3 format (with explicit targets)", () => {
     it("transforms V3 data with multiple targets", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -451,7 +451,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("dataset column detection", () => {
+  describe("when detecting dataset columns", () => {
     it("detects multiple dataset columns", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -534,7 +534,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("multiple rows", () => {
+  describe("given multiple rows", () => {
     it("handles sparse row indices correctly", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -584,7 +584,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("API evaluations (derived target)", () => {
+  describe("given API evaluations (derived target)", () => {
     it("derives a virtual target when no targets and no predicted values exist", () => {
       const data: ExperimentRunWithItems = {
         experimentId: "exp-1",
@@ -864,7 +864,7 @@ describe("transformBatchEvaluationData", () => {
     });
   });
 
-  describe("API evaluations with explicit targets (multi-target comparison)", () => {
+  describe("given API evaluations with explicit targets (multi-target comparison)", () => {
     it("associates evaluator results with correct targets when targets are defined", () => {
       // This is the exact structure from the Python SDK when comparing multiple targets
       // Dataset entries are SHARED (no target_id on dataset)

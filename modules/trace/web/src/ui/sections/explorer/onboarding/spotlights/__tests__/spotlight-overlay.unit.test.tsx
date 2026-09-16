@@ -275,7 +275,7 @@ describe("anchor settle predicates", () => {
     ...over,
   });
 
-  describe("isAnchorParkedOffscreen", () => {
+  describe("isAnchorParkedOffscreen()", () => {
     describe("given the anchor's left edge is at or past the right viewport edge", () => {
       it("reports it parked off-screen", () => {
         expect(isAnchorParkedOffscreen(rect({ left: VW }), VW, 0)).toBe(true);
@@ -298,7 +298,7 @@ describe("anchor settle predicates", () => {
     });
   });
 
-  describe("isAnchorSettled", () => {
+  describe("isAnchorSettled()", () => {
     describe("given the anchor is on-screen and unchanged since the last frame", () => {
       it("reports it settled", () => {
         expect(isAnchorSettled(rect(), rect(), VW, 0)).toBe(true);

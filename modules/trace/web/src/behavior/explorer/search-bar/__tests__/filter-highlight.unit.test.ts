@@ -275,7 +275,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("operator matrix — comparison ops produce a single token", () => {
+  describe("when comparison operators produce a single token", () => {
     it.each([
       ["greater-than", "cost:>5"],
       ["greater-or-equal", "cost:>=5"],
@@ -292,7 +292,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("regex fallback — comparison-range alternative", () => {
+  describe("when the regex fallback handles a comparison-range alternative", () => {
     // The regex fallback fires when liqe's parser fails (mid-typing, dangling AND,
     // unmatched paren).
     it("recognises `duration:>1000 AND` (regex fallback) as a single token", () => {
@@ -327,7 +327,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("operator matrix — range form (KNOWN BUG)", () => {
+  describe("when the range form is used (KNOWN BUG)", () => {
     it("`cost:[1 TO 10]` decoration is BROKEN — liqe's Tag.location for ranges starts at `[` and has no `end`", () => {
       // KNOWN BUG: liqe gives a Tag-with-RangeExpression a location of `{ start: 5 }`
       // (the `[` offset) with NO `end` field.
@@ -339,7 +339,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("operator matrix — quoted values", () => {
+  describe("when the value is quoted", () => {
     it("preserves the quotes inside the token span — they're part of the value", () => {
       const plan = buildDecorationPlan('errorMessage:"rate limit"');
       const tokenSlots = plan.slots.filter((s) => s.className.includes("filter-token"));
@@ -377,7 +377,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("scenario field accent", () => {
+  describe("when the field is a scenario field", () => {
     it.each([
       "scenario",
       "scenarioRun",
@@ -392,7 +392,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("numeric field accent", () => {
+  describe("when the field is a numeric field", () => {
     it.each([
       "duration",
       "cost",
@@ -408,7 +408,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("negation interaction with field-type accents", () => {
+  describe("when negation interacts with field-type accents", () => {
     it("a NOT-prefixed scenario field gets the exclude class — exclude wins over scenario", () => {
       const plan = buildDecorationPlan("NOT scenarioVerdict:success");
       const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
@@ -423,7 +423,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — chip evolution one keystroke at a time", () => {
+  describe("given partial typing, chip evolution happens one keystroke at a time", () => {
     // Pin the per-keystroke decoration plan as a user types `status:error`. Each step
     // is what the editor would render BETWEEN keystrokes — used by the user to decide
     // whether to keep typing.
@@ -459,7 +459,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — never emits a delete widget on free text", () => {
+  describe("given partial typing, it never emits a delete widget on free text", () => {
     // Critical regression: previously the X button rendered for any tag
     // including ImplicitField. Now it only renders on recognised
     // `field:value` tags.
@@ -471,7 +471,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     );
   });
 
-  describe("partial typing — chip transitions from null-value → real-value cleanly", () => {
+  describe("given partial typing, the chip transitions from null-value → real-value cleanly", () => {
     it("`status:` → `status:e` keeps one widget but the value flips from null to `e`", () => {
       const before = buildDecorationPlan("status:");
       const after = buildDecorationPlan("status:e");
@@ -485,7 +485,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — extending a query keeps existing widgets stable", () => {
+  describe("given partial typing, extending a query keeps existing widgets stable", () => {
     it("adding ` AND model:` does NOT erase the first widget; second appears once a value lands", () => {
       const a = buildDecorationPlan("status:error");
       const b = buildDecorationPlan("status:error AND model:");
@@ -518,7 +518,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — backspacing through a value reflows correctly", () => {
+  describe("given partial typing, backspacing through a value reflows correctly", () => {
     it("typed `status:error` then backspaces keeps exactly one widget at every stage (chip survives empty value)", () => {
       // Each step is what the highlighter sees on the next render. The
       // half-built Tag (EmptyExpression) still gets a chip — same shape
@@ -541,7 +541,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — silent miscarriages still light up a fallback chip", () => {
+  describe("given partial typing, silent miscarriages still light up a fallback chip", () => {
     it("`status: error` (space after colon) renders the empty `status:` chip but `error` stays free-text", () => {
       // Liqe parses this as a LogicalExpression of an empty `status:` and
       // free-text `error`. The empty `status:` arm gets a chip (since it
@@ -582,7 +582,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — paren forms", () => {
+  describe("given partial typing, paren forms are handled", () => {
     it("`(` alone falls back to regex (no chip)", () => {
       expect(buildDecorationPlan("(").slots).toEqual([]);
     });
@@ -610,7 +610,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — leading whitespace offsets are exact", () => {
+  describe("given partial typing, leading whitespace offsets are exact", () => {
     it("`   status:error` shifts both the slot AND the widget position by leadingWs", () => {
       const plan = buildDecorationPlan("   status:error");
       const tokenSlot = plan.slots.find((s) => s.className.includes("filter-token"));
@@ -629,7 +629,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — NBSP normalisation", () => {
+  describe("given partial typing, NBSP is normalised", () => {
     it("after value-accept, the highlighter normalises U+00A0 → space before parsing", () => {
       // The editor inserts NBSP after a value-accept so contenteditable
       // doesn't collapse the trailing space. The highlighter must NOT
@@ -650,7 +650,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     });
   });
 
-  describe("partial typing — incremental wildcards", () => {
+  describe("given partial typing, wildcards are applied incrementally", () => {
     // While the user is in the middle of typing a wildcard value, the
     // chip should remain stable (no flicker between recognised/not).
     it.each([

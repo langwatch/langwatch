@@ -50,7 +50,7 @@ describe("VariableMappingInput", () => {
     vi.useRealTimers(); // Ensure fake timers are always restored
   });
 
-  describe("rendering", () => {
+  describe("when rendering", () => {
     it("renders with placeholder text", () => {
       renderComponent({ placeholder: "Select a source..." });
       expect(screen.getByPlaceholderText("Select a source...")).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("dropdown interaction", () => {
+  describe("when interacting with the dropdown", () => {
     it("opens dropdown on focus", async () => {
       const user = userEvent.setup();
       renderComponent();
@@ -193,7 +193,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("selection", () => {
+  describe("when selecting", () => {
     it("calls onMappingChange with source mapping when field is selected", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
@@ -235,7 +235,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("value input", () => {
+  describe("when inputting a value", () => {
     it("typing does not immediately set mapping (only searches)", async () => {
       const onMappingChange = vi.fn();
       renderComponent({ onMappingChange });
@@ -282,7 +282,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("disabled state", () => {
+  describe("given a disabled state", () => {
     it("does not open dropdown when disabled", async () => {
       const user = userEvent.setup();
       renderComponent({ disabled: true });
@@ -296,7 +296,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("keyboard navigation", () => {
+  describe("when navigating with the keyboard", () => {
     it("selects first field with Enter (initial highlight)", async () => {
       const onMappingChange = vi.fn();
       renderComponent({ onMappingChange });
@@ -396,7 +396,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("use as value option", () => {
+  describe("when showing the use as value option", () => {
     it("shows 'use as value' option when user types", async () => {
       renderComponent();
 
@@ -466,7 +466,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("clearing source mapping", () => {
+  describe("when clearing source mapping", () => {
     /** @scenario Remove root badge clears all */
     it("clears mapping when clicking the X button on the tag", async () => {
       const user = userEvent.setup();
@@ -532,7 +532,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("continued editing after selection", () => {
+  describe("when editing continues after selection", () => {
     it("allows typing after selecting a source to search for another", async () => {
       const onMappingChange = vi.fn();
       const mapping: FieldMapping = {
@@ -580,7 +580,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("prop synchronization", () => {
+  describe("when synchronizing props", () => {
     it("updates display when mapping prop changes externally", async () => {
       const onMappingChange = vi.fn();
 
@@ -674,7 +674,7 @@ describe("VariableMappingInput", () => {
     });
   });
 
-  describe("nested fields", () => {
+  describe("given nested fields", () => {
     const nestedSources: AvailableSource[] = [
       {
         id: "trace",
@@ -1013,7 +1013,7 @@ describe("VariableMappingInput", () => {
       });
     });
 
-    describe("selecting field with children marks it complete AND opens nested dropdown", () => {
+    describe("when selecting a field with children, it marks it complete and opens the nested dropdown", () => {
       /**
        * The "cascading selection" UX pattern: selecting a field with children
        * immediately opens its nested dropdown.

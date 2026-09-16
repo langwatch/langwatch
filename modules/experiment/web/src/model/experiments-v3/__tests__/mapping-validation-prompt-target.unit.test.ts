@@ -7,7 +7,7 @@ import {
 } from "../mapping-validation.ts";
 
 describe("mappingValidation", () => {
-  describe("prompt target validation", () => {
+  describe("given a prompt target", () => {
     const createPromptTargetConfig = (overrides: Partial<TargetConfig> = {}): TargetConfig =>
       ({
         id: "target-prompt-1",

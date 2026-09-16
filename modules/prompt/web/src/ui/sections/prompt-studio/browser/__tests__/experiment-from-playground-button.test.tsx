@@ -221,7 +221,7 @@ describe("ExperimentFromPlaygroundButton", () => {
     localStorage.clear();
   });
 
-  describe("button visibility", () => {
+  describe("when checking button visibility", () => {
     it("renders Experiment button with Flask icon", () => {
       store.getState().addTab({ data: createTabData({ title: "Test Prompt" }) });
 
@@ -239,7 +239,7 @@ describe("ExperimentFromPlaygroundButton", () => {
     });
   });
 
-  describe("dialog content", () => {
+  describe("when rendering dialog content", () => {
     it("shows singular message for single prompt", async () => {
       const user = userEvent.setup();
       store.getState().addTab({
@@ -296,7 +296,7 @@ describe("ExperimentFromPlaygroundButton", () => {
     });
   });
 
-  describe("experiment creation", () => {
+  describe("when creating an experiment", () => {
     it("creates experiment with saved prompt - compares using areFormValuesEqual", async () => {
       const user = userEvent.setup();
 
@@ -475,7 +475,7 @@ describe("ExperimentFromPlaygroundButton", () => {
     });
   });
 
-  describe("auto-mapping", () => {
+  describe("when auto-mapping", () => {
     it("auto-maps target inputs to dataset columns", async () => {
       const user = userEvent.setup();
       // Create a prompt with "input" as an input field
@@ -521,7 +521,7 @@ describe("ExperimentFromPlaygroundButton", () => {
     });
   });
 
-  describe("cancel behavior", () => {
+  describe("when cancelling", () => {
     it("closes dialog on cancel", async () => {
       const user = userEvent.setup();
       store.getState().addTab({

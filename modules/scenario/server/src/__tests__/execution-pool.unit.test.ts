@@ -225,7 +225,7 @@ describe("ScenarioExecutionPoolService", () => {
     });
   });
 
-  describe("wasCancelled", () => {
+  describe("wasCancelled()", () => {
     it("returns false for non-cancelled runs", () => {
       expect(pool.wasCancelled("run-1")).toBe(false);
     });
@@ -236,7 +236,7 @@ describe("ScenarioExecutionPoolService", () => {
     });
   });
 
-  describe("drain", () => {
+  describe("drain()", () => {
     it("clears pending queue and kills running children", () => {
       pool.submit(makeJob("run-1"));
       pool.submit(makeJob("run-2"));
@@ -250,7 +250,7 @@ describe("ScenarioExecutionPoolService", () => {
     });
   });
 
-  describe("inFlightJobs", () => {
+  describe("when reading inFlightJobs", () => {
     describe("when jobs are running and buffered", () => {
       it("returns both running and pending job data", () => {
         pool.submit(makeJob("run-1")); // running

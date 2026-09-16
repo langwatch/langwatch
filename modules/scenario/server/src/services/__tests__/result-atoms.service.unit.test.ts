@@ -159,7 +159,7 @@ describe("getOverview", () => {
     });
   });
 
-  describe("the cost of a group", () => {
+  describe("when computing the cost of a group", () => {
     /**
      * The denominator is given, never inferred, so the page can say "across 4
      * of 6 runs" instead of printing a total that looks complete.
@@ -177,7 +177,7 @@ describe("getOverview", () => {
     });
   });
 
-  describe("the trend of a group", () => {
+  describe("when computing the trend of a group", () => {
     /** @scenario "A group carries one trend point per run" */
     it("reads oldest first", async () => {
       const trend: RawTrendRow[] = [
@@ -225,7 +225,7 @@ describe("getOverview", () => {
     });
   });
 
-  describe("the pass-rate-over-time series", () => {
+  describe("when computing the pass-rate-over-time series", () => {
     /**
      * A bucket nothing ran in is returned as empty, so the chart draws a gap. A
      * zero-height bar there would read as a run in which everything failed.

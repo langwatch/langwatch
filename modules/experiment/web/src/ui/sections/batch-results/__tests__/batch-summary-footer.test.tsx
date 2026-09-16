@@ -48,7 +48,7 @@ describe("BatchSummaryFooter", () => {
     cleanup();
   });
 
-  describe("Evaluation Stats", () => {
+  describe("when rendering evaluation stats", () => {
     it("displays evaluation name and pass rate", () => {
       const run = createRunSummary();
 
@@ -126,7 +126,7 @@ describe("BatchSummaryFooter", () => {
     });
   });
 
-  describe("Cost Display", () => {
+  describe("when displaying cost", () => {
     /** @scenario Run shows summary information */
     /** @scenario Cost appears in experiment results UI */
     it("displays total cost", () => {
@@ -168,7 +168,7 @@ describe("BatchSummaryFooter", () => {
     });
   });
 
-  describe("Stopped State", () => {
+  describe("given a stopped state", () => {
     it("shows stopped indicator", () => {
       const run = createRunSummary({
         timestamps: {
@@ -185,7 +185,7 @@ describe("BatchSummaryFooter", () => {
     });
   });
 
-  describe("Progress Bar", () => {
+  describe("when rendering the progress bar", () => {
     it("shows progress bar when showProgress and running", () => {
       const run = createRunSummary({
         timestamps: {
@@ -222,7 +222,7 @@ describe("BatchSummaryFooter", () => {
     });
   });
 
-  describe("Stop Button", () => {
+  describe("when rendering the stop button", () => {
     it("shows stop button when onStop provided and running", async () => {
       const onStop = vi.fn();
       const run = createRunSummary({

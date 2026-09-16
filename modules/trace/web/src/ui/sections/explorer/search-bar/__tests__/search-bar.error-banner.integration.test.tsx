@@ -273,7 +273,7 @@ describe("<SearchBar /> unified error banner", () => {
     });
   });
 
-  describe("AI error persistence — given an AI error set in the store", () => {
+  describe("given an AI error set in the store", () => {
     const aiError: AiActionError = {
       code: "ai_query_provider_error",
       cause: handledCause("ai_query_provider_error", { provider: "anthropic" }),

@@ -40,7 +40,7 @@ describe("BatchTargetCell", () => {
     cleanup();
   });
 
-  describe("Output Display", () => {
+  describe("when displaying output", () => {
     /** @scenario Display target output with cost and duration */
     it("renders string output", () => {
       const targetOutput = createTargetOutput({
@@ -171,7 +171,7 @@ describe("BatchTargetCell", () => {
     });
   });
 
-  describe("Evaluator Results", () => {
+  describe("when rendering evaluator results", () => {
     /** @scenario Display evaluator chips below target output */
     /** @scenario Evaluator chip shows pass status */
     /** @scenario Evaluator chip shows fail status */
@@ -274,7 +274,7 @@ describe("BatchTargetCell", () => {
     });
   });
 
-  describe("Controlled ports", () => {
+  describe("given a controlled port", () => {
     it("renders a described failure instead of the raw fallback", () => {
       const describeFailure = vi.fn(() => ({
         title: "A useful failure",
@@ -324,7 +324,7 @@ describe("BatchTargetCell", () => {
     });
   });
 
-  describe("Metadata Display", () => {
+  describe("when displaying metadata", () => {
     it("displays latency when duration is present", () => {
       const targetOutput = createTargetOutput({
         duration: 1500,
@@ -379,7 +379,7 @@ describe("BatchTargetCell", () => {
     });
   });
 
-  describe("Output Unwrapping", () => {
+  describe("when unwrapping output", () => {
     it("unwraps single output field when object has only 'output' key", () => {
       const targetOutput = createTargetOutput({
         output: { output: "The actual answer is 42" },

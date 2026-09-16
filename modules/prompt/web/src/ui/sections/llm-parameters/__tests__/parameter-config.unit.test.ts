@@ -19,7 +19,7 @@ import {
 } from "../parameter-config.ts";
 
 describe("Parameter Config", () => {
-  describe("PARAMETER_CONFIG", () => {
+  describe("when reading PARAMETER_CONFIG", () => {
     it("has temperature config", () => {
       const config = PARAMETER_CONFIG.temperature;
       expect(config).toBeDefined();
@@ -67,7 +67,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("getParameterConfig", () => {
+  describe("getParameterConfig()", () => {
     it("returns config for known parameter", () => {
       const config = getParameterConfig("temperature");
       expect(config).toBeDefined();
@@ -80,7 +80,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("getDisplayParameters", () => {
+  describe("getDisplayParameters()", () => {
     it("returns default parameters for empty array", () => {
       const params = getDisplayParameters([]);
       expect(params).toEqual(DEFAULT_SUPPORTED_PARAMETERS);
@@ -123,7 +123,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("getParameterDefault", () => {
+  describe("getParameterDefault()", () => {
     it("returns default for temperature", () => {
       expect(getParameterDefault("temperature")).toBe(1);
     });
@@ -141,7 +141,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("isReasoningParameter", () => {
+  describe("isReasoningParameter()", () => {
     it("returns true for unified reasoning", () => {
       expect(isReasoningParameter("reasoning")).toBe(true);
     });
@@ -159,7 +159,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("supportsTemperature", () => {
+  describe("supportsTemperature()", () => {
     it("returns true when temperature is in supported params", () => {
       expect(supportsTemperature(["temperature", "max_tokens"])).toBe(true);
     });
@@ -169,7 +169,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("supportsReasoning", () => {
+  describe("supportsReasoning()", () => {
     it("returns true when unified reasoning is supported", () => {
       expect(supportsReasoning(["reasoning", "max_tokens"])).toBe(true);
     });
@@ -179,7 +179,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("DEFAULT_SUPPORTED_PARAMETERS", () => {
+  describe("when reading DEFAULT_SUPPORTED_PARAMETERS", () => {
     it("includes temperature", () => {
       expect(DEFAULT_SUPPORTED_PARAMETERS).toContain("temperature");
     });
@@ -189,7 +189,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("PARAMETER_DISPLAY_ORDER", () => {
+  describe("when reading PARAMETER_DISPLAY_ORDER", () => {
     it("has reasoning params first", () => {
       expect(PARAMETER_DISPLAY_ORDER.indexOf("reasoning")).toBeLessThan(
         PARAMETER_DISPLAY_ORDER.indexOf("temperature"),
@@ -203,7 +203,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("getParameterConfigWithModelOverrides", () => {
+  describe("getParameterConfigWithModelOverrides()", () => {
     it("returns base config when no reasoningConfig provided", () => {
       const config = getParameterConfigWithModelOverrides("temperature");
       expect(config?.type).toBe("slider");
@@ -323,7 +323,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("PARAM_NAME_MAPPING", () => {
+  describe("when reading PARAM_NAME_MAPPING", () => {
     it("maps top_p to topP", () => {
       expect(PARAM_NAME_MAPPING.top_p).toBe("topP");
     });
@@ -339,7 +339,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("toFormKey", () => {
+  describe("toFormKey()", () => {
     it("converts snake_case to camelCase", () => {
       expect(toFormKey("top_p")).toBe("topP");
       expect(toFormKey("frequency_penalty")).toBe("frequencyPenalty");
@@ -352,7 +352,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("toInternalKey", () => {
+  describe("toInternalKey()", () => {
     it("converts camelCase to snake_case", () => {
       expect(toInternalKey("topP")).toBe("top_p");
       expect(toInternalKey("frequencyPenalty")).toBe("frequency_penalty");
@@ -365,7 +365,7 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("unified reasoning options", () => {
+  describe("given unified reasoning options", () => {
     it("does not include none in reasoning fallback options", () => {
       const config = PARAMETER_CONFIG.reasoning;
       expect(config?.type).toBe("select");

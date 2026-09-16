@@ -175,7 +175,7 @@ describe("ComparisonCharts", () => {
     });
   });
 
-  describe("Per-Evaluator Charts", () => {
+  describe("when rendering per-evaluator charts", () => {
     it("renders separate chart for each evaluator score", () => {
       const comparisonData = [
         createMockRunData("run-1", Date.now() - 60000, { hasScores: true }),
@@ -222,7 +222,7 @@ describe("ComparisonCharts", () => {
     });
   });
 
-  describe("Metrics Selector", () => {
+  describe("when rendering the metrics selector", () => {
     it("shows metrics selector button", () => {
       const comparisonData = [
         createMockRunData("run-1", Date.now() - 60000),
@@ -298,7 +298,7 @@ describe("ComparisonCharts", () => {
     });
   });
 
-  describe("X-Axis Options", () => {
+  describe("when rendering X-axis options", () => {
     it("shows X-axis selector with Runs option", () => {
       const comparisonData = [
         createMockRunData("run-1", Date.now() - 60000),
@@ -564,7 +564,7 @@ describe("ComparisonCharts", () => {
     });
   });
 
-  describe("Chart Ordering", () => {
+  describe("when ordering charts", () => {
     it("sorts runs by creation time (oldest first)", () => {
       // Create runs with different timestamps
       const olderRun = createMockRunData("older-run", Date.now() - 120000);
@@ -583,7 +583,7 @@ describe("ComparisonCharts", () => {
     });
   });
 
-  describe("Per-Target Metric Calculation", () => {
+  describe("when calculating per-target metrics", () => {
     /**
      * Test data with DIFFERENT evaluator scores for each target.
      * This is critical for verifying that per-target metrics are computed correctly.
@@ -711,7 +711,7 @@ describe("ComparisonCharts", () => {
       },
     ];
 
-    describe("computeTargetMetrics", () => {
+    describe("computeTargetMetrics()", () => {
       it("computes correct average score for GPT-4 target", () => {
         const rows = createMultiTargetRows();
         const metrics = computeTargetMetrics(rows, "gpt-4");
@@ -821,7 +821,7 @@ describe("ComparisonCharts", () => {
       });
     });
 
-    describe("computeRunMetrics (global averages)", () => {
+    describe("when computing run metrics (global averages)", () => {
       it("computes global average score across ALL targets", () => {
         const data: BatchEvaluationData = {
           runId: "test-run",
@@ -954,7 +954,7 @@ describe("ComparisonCharts", () => {
       });
     });
 
-    describe("Component integration", () => {
+    describe("when the component is fully integrated", () => {
       const createMultiTargetRunWithDifferentScores = (): ComparisonRunData => ({
         runId: "multi-target-run",
         runName: "Multi Target Run",

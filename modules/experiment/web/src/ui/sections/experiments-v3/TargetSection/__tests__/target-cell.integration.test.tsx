@@ -132,7 +132,7 @@ describe("TargetCellContent", () => {
     cleanup();
   });
 
-  describe("Trace Link", () => {
+  describe("when rendering the trace link", () => {
     it("renders trace button when traceId is provided", () => {
       const target = createTarget();
 
@@ -203,7 +203,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Output Display", () => {
+  describe("when displaying output", () => {
     it("renders output text", () => {
       const target = createTarget();
 
@@ -307,7 +307,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Output Truncation", () => {
+  describe("when truncating output", () => {
     it("truncates output at MAX_DISPLAY_CHARS and shows indicator", () => {
       const target = createTarget();
       // Generate text longer than MAX_DISPLAY_CHARS (10000)
@@ -334,7 +334,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Overflow and Fade Effect", () => {
+  describe("given overflow, the fade effect appears", () => {
     it("renders output content in a container", () => {
       const target = createTarget();
 
@@ -366,7 +366,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Expanded Output View", () => {
+  describe("given the expanded output view", () => {
     // Mock getBoundingClientRect for positioning
     beforeEach(() => {
       Element.prototype.getBoundingClientRect = vi.fn(() => ({
@@ -565,7 +565,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Fade Overlay", () => {
+  describe("given the fade overlay", () => {
     const mockScrollHeight = (height: number) => {
       Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
         configurable: true,
@@ -672,7 +672,7 @@ describe("TargetCellContent", () => {
     });
   });
 
-  describe("Loading State (Skeleton)", () => {
+  describe("given a loading state (skeleton)", () => {
     it("shows skeleton when isLoading is true and no output", () => {
       const target = createTarget();
 

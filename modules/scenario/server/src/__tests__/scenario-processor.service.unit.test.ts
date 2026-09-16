@@ -125,7 +125,7 @@ function deferred<T>(): {
 }
 
 describe("ScenarioProcessorService", () => {
-  describe("failed runs", () => {
+  describe("given a failed run", () => {
     /** @scenario Include job metadata in failure events */
     it("finishes with the complete run and target context", async () => {
       const fixture = processorFixture();
@@ -153,7 +153,7 @@ describe("ScenarioProcessorService", () => {
     });
   });
 
-  describe("worker drain", () => {
+  describe("when the worker drains", () => {
     let fixture: ReturnType<typeof processorFixture>;
     let killSignals: (number | NodeJS.Signals | undefined)[];
 
@@ -213,7 +213,7 @@ describe("ScenarioProcessorService", () => {
     });
   });
 
-  describe("cancellation subscription", () => {
+  describe("given a cancellation broadcast", () => {
     /** @scenario "Worker kills its own child process on cancel broadcast" */
     /** @scenario "Worker ignores cancel broadcast for scenarios it does not own" */
     it("kills only the owned child and marks that run as cancelled", async () => {

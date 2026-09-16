@@ -7,14 +7,14 @@ import { AUTH_STRATEGIES, applyAuthentication } from "@langwatch/scenario-server
 import type { AuthConfig } from "@langwatch/scenario-contract";
 
 describe("AUTH_STRATEGIES", () => {
-  describe("none", () => {
+  describe("none()", () => {
     it("returns empty headers", () => {
       const result = AUTH_STRATEGIES.none({ type: "none" });
       expect(result).toEqual({});
     });
   });
 
-  describe("bearer", () => {
+  describe("bearer()", () => {
     it("returns Authorization header with Bearer token", () => {
       const result = AUTH_STRATEGIES.bearer({
         type: "bearer",
@@ -31,7 +31,7 @@ describe("AUTH_STRATEGIES", () => {
     });
   });
 
-  describe("api_key", () => {
+  describe("api_key()", () => {
     it("returns custom header with API key", () => {
       const result = AUTH_STRATEGIES.api_key({
         type: "api_key",
@@ -49,7 +49,7 @@ describe("AUTH_STRATEGIES", () => {
     });
   });
 
-  describe("basic", () => {
+  describe("basic()", () => {
     it("returns Authorization header with Base64 encoded credentials", () => {
       const result = AUTH_STRATEGIES.basic({
         type: "basic",

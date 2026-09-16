@@ -40,7 +40,7 @@ function makeTraceData(overrides: Partial<PreconditionTraceData> = {}): Precondi
 // ---------------------------------------------------------------------------
 
 describe("PRECONDITION_FIELD_MATCHERS", () => {
-  describe("input matcher", () => {
+  describe("when using the input matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS.input!;
 
     it("returns the input value from trace data", () => {
@@ -52,7 +52,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("output matcher", () => {
+  describe("when using the output matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS.output!;
 
     it("returns the output value from trace data", () => {
@@ -64,7 +64,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("traces.origin matcher", () => {
+  describe("when using the traces.origin matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.origin"]!;
 
     it("returns null when origin is undefined", () => {
@@ -88,7 +88,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("traces.error matcher", () => {
+  describe("when using the traces.error matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.error"]!;
 
     it("returns 'true' when hasError is true", () => {
@@ -104,7 +104,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.user_id matcher", () => {
+  describe("when using the metadata.user_id matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.user_id"]!;
 
     it("returns userId from trace data", () => {
@@ -116,7 +116,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.thread_id matcher", () => {
+  describe("when using the metadata.thread_id matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.thread_id"]!;
 
     it("returns threadId from trace data", () => {
@@ -124,7 +124,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.customer_id matcher", () => {
+  describe("when using the metadata.customer_id matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.customer_id"]!;
 
     it("returns customerId from trace data", () => {
@@ -132,7 +132,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.labels matcher", () => {
+  describe("when using the metadata.labels matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.labels"]!;
 
     it("returns labels array from trace data", () => {
@@ -144,7 +144,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.prompt_ids matcher", () => {
+  describe("when using the metadata.prompt_ids matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.prompt_ids"]!;
 
     it("returns promptIds array from trace data", () => {
@@ -152,13 +152,13 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("metadata.key matcher", () => {
+  describe("when using the metadata.key matcher", () => {
     it("is null (key-selector, not matchable)", () => {
       expect(PRECONDITION_FIELD_MATCHERS["metadata.key"]).toBeNull();
     });
   });
 
-  describe("metadata.value matcher", () => {
+  describe("when using the metadata.value matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["metadata.value"]!;
 
     describe("when key is provided", () => {
@@ -194,7 +194,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("spans.type matcher", () => {
+  describe("when using the spans.type matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.type"]!;
 
     it("returns spanTypes array from trace data", () => {
@@ -202,7 +202,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("spans.model matcher", () => {
+  describe("when using the spans.model matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["spans.model"]!;
 
     it("returns spanModels array from trace data", () => {
@@ -210,7 +210,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("topics.topics matcher", () => {
+  describe("when using the topics.topics matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.topics"]!;
 
     it("returns topicId wrapped in array when present", () => {
@@ -222,7 +222,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("topics.subtopics matcher", () => {
+  describe("when using the topics.subtopics matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["topics.subtopics"]!;
 
     it("returns subTopicId wrapped in array when present", () => {
@@ -234,7 +234,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("annotations.hasAnnotation matcher", () => {
+  describe("when using the annotations.hasAnnotation matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["annotations.hasAnnotation"]!;
 
     it("returns 'true' when annotationIds is non-empty", () => {
@@ -250,7 +250,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("events.event_type matcher", () => {
+  describe("when using the events.event_type matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["events.event_type"]!;
 
     it("returns event types from trace data", () => {
@@ -268,7 +268,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("events.metrics.key matcher", () => {
+  describe("when using the events.metrics.key matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["events.metrics.key"]!;
 
     it("returns metric keys for a specific event type", () => {
@@ -311,7 +311,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("events.event_details.key matcher", () => {
+  describe("when using the events.event_details.key matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["events.event_details.key"]!;
 
     it("returns event detail keys for a specific event type", () => {
@@ -341,7 +341,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("non-matchable fields", () => {
+  describe("given non-matchable fields", () => {
     const nonMatchableFields: PreconditionField[] = [
       "evaluations.evaluator_id",
       "evaluations.evaluator_id.guardrails_only",

@@ -76,7 +76,7 @@ describe("BatchEvaluationResultsTable", () => {
     cleanup();
   });
 
-  describe("Loading State", () => {
+  describe("given a loading state", () => {
     /** @scenario Show loading skeleton while fetching results */
     it("shows skeleton when loading", () => {
       render(<BatchEvaluationResultsTable data={null} isLoading disableVirtualization />, {
@@ -89,7 +89,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Empty State", () => {
+  describe("given an empty state", () => {
     /** @scenario Show empty state when no results */
     it("shows empty message when no data", () => {
       render(<BatchEvaluationResultsTable data={null} isLoading={false} disableVirtualization />, {
@@ -110,7 +110,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Column Headers", () => {
+  describe("when rendering column headers", () => {
     it("renders row number column (empty header, shows row numbers in cells)", () => {
       const data = createTestData();
 
@@ -149,7 +149,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Row Data", () => {
+  describe("when rendering row data", () => {
     it("renders row number", () => {
       const data = createTestData();
 
@@ -237,7 +237,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Multiple Rows", () => {
+  describe("given multiple rows", () => {
     it("renders all rows", () => {
       const data = createTestData({
         rows: [
@@ -285,7 +285,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Multiple Targets", () => {
+  describe("given multiple targets", () => {
     it("renders columns for each target", () => {
       const data = createTestData({
         targetColumns: [
@@ -331,7 +331,7 @@ describe("BatchEvaluationResultsTable", () => {
     });
   });
 
-  describe("Column Visibility", () => {
+  describe("when controlling column visibility", () => {
     it("hides columns when hiddenColumns prop includes column name", () => {
       const data = createTestData({
         datasetColumns: [

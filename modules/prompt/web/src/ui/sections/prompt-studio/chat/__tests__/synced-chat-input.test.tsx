@@ -131,7 +131,7 @@ describe("SyncedChatInput", () => {
     localStorage.clear();
   });
 
-  describe("sync checkbox visibility", () => {
+  describe("when checking sync checkbox visibility", () => {
     it("hides sync checkbox when only one tab exists", () => {
       // Add single tab
       store.getState().addTab({ data: createTabData() });
@@ -174,7 +174,7 @@ describe("SyncedChatInput", () => {
     });
   });
 
-  describe("textarea", () => {
+  describe("given the textarea", () => {
     it("renders textarea with placeholder", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
@@ -206,7 +206,7 @@ describe("SyncedChatInput", () => {
     });
   });
 
-  describe("send button", () => {
+  describe("given the send button", () => {
     it("renders send button", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;

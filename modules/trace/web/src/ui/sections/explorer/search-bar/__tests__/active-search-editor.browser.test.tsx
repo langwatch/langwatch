@@ -75,7 +75,7 @@ function plainText(el: HTMLElement): string {
 afterEach(cleanup);
 
 describe("SearchBar in real Chromium", () => {
-  describe("typing a complete tag", () => {
+  describe("when typing a complete tag", () => {
     it("renders one .filter-token span and the editor text matches the typed query", async () => {
       renderEditor();
       const editor = getEditor();
@@ -88,7 +88,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("typing two tags joined by AND", () => {
+  describe("when typing two tags joined by AND", () => {
     it("renders two tokens plus an AND keyword span — no merged tokens", async () => {
       renderEditor();
       const editor = getEditor();
@@ -107,7 +107,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("the @ trigger", () => {
+  describe("given the @ trigger", () => {
     it("never inserts a literal `@` into the editor — the dropdown opens with the cursor anchored", async () => {
       renderEditor();
       const editor = getEditor();
@@ -133,7 +133,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("Enter on a value-mode dropdown match", () => {
+  describe("when Enter is pressed on a value-mode dropdown match", () => {
     it("accepts the suggestion and adds a trailing space so the next clause can be typed cleanly", async () => {
       renderEditor();
       const editor = getEditor();
@@ -157,7 +157,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("the per-token X widget", () => {
+  describe("given the per-token X widget", () => {
     it("removes only that tag and collapses the surrounding AND keyword", async () => {
       renderEditor();
       const editor = getEditor();
@@ -284,7 +284,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("Backspace through a token boundary", () => {
+  describe("when Backspace crosses a token boundary", () => {
     it("erases characters one at a time and reflows the decorations", async () => {
       renderEditor();
       const editor = getEditor();
@@ -334,7 +334,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("Mixing free text and a tag", () => {
+  describe("when mixing free text and a tag", () => {
     it("`refund AND status:error` renders the tag highlighted and leaves `refund` as plain text", async () => {
       renderEditor();
       const editor = getEditor();
@@ -352,7 +352,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("Parenthesised group", () => {
+  describe("given a parenthesised group", () => {
     it("decorates both parens and emits delete widgets for each inner tag", async () => {
       renderEditor();
       const editor = getEditor();
@@ -375,7 +375,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: typing `status:error`, Enter, space, AND", () => {
+  describe("when typing `status:error`, Enter, space, AND (regression)", () => {
     it("renders status:error as a single token, AND as a separate keyword once a right operand is typed, and never glues them into one merged token", async () => {
       renderEditor();
       const editor = getEditor();
@@ -434,7 +434,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: NBSP must not silently fuse two clauses", () => {
+  describe("when NBSP must not silently fuse two clauses (regression)", () => {
     it("after accepting a value, the inserted whitespace is U+00A0 (NBSP) so contenteditable doesn't collapse it on the next keystroke", async () => {
       renderEditor();
       const editor = getEditor();
@@ -474,7 +474,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: raw-key sequence reproduces the bug if it exists", () => {
+  describe("when a raw-key sequence reproduces the bug if it exists (regression)", () => {
     it("press-by-press: type status:error, Enter (which Tab-accepts in handleKey), then a single A — the editor MUST show the A as plain text, not glued onto `error`", async () => {
       renderEditor();
       const editor = getEditor();
@@ -543,7 +543,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: incremental typing after Enter must not extend the previous tag", () => {
+  describe("when incremental typing after Enter must not extend the previous tag (regression)", () => {
     it("after `status:error[Enter]`, typing `A` lands as plain text outside the tag — not as `status:errorA`", async () => {
       renderEditor();
       const editor = getEditor();
@@ -603,7 +603,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: submit path (Enter on a value not in the static dict) opens a fresh clause", () => {
+  describe("when the submit path (Enter on a value not in the static dict) opens a fresh clause (regression)", () => {
     it("after `model:gpt-5-mini[Enter]`, the next char lands outside the tag instead of gluing onto the value", async () => {
       renderEditor();
       const editor = getEditor();
@@ -629,7 +629,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: long sequence of accept + type cycles", () => {
+  describe("when a long sequence of accept + type cycles runs (stress)", () => {
     it("running 3 accept-then-type cycles in a row produces 3 separate tokens, no fusion", async () => {
       renderEditor();
       const editor = getEditor();
@@ -656,7 +656,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: type, delete, type — interspersed Backspaces", () => {
+  describe("when interspersed Backspaces occur during type, delete, type (stress)", () => {
     it("Backspace-deleting the value mid-tag and retyping does not corrupt token boundaries", async () => {
       renderEditor();
       const editor = getEditor();
@@ -675,7 +675,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: clear and retype", () => {
+  describe("when clearing and retyping (stress)", () => {
     it("backspacing through the whole query then typing fresh content refreshes decorations cleanly", async () => {
       renderEditor();
       const editor = getEditor();
@@ -701,7 +701,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: typing a value containing a hyphen", () => {
+  describe("when typing a value containing a hyphen (stress)", () => {
     it("`model:gpt-5-mini` is one token even though the value contains hyphens", async () => {
       renderEditor();
       const editor = getEditor();
@@ -714,7 +714,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: typing a value containing a dot", () => {
+  describe("when typing a value containing a dot (stress)", () => {
     it("`attribute.langwatch.user_id:abc` is one token", async () => {
       renderEditor();
       const editor = getEditor();
@@ -727,7 +727,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: typing a wildcard mid-value then continuing", () => {
+  describe("when typing a wildcard mid-value then continuing (stress)", () => {
     it("`model:gpt-*` then ` AND status:error` produces two tokens with the wildcard preserved", async () => {
       renderEditor();
       const editor = getEditor();
@@ -744,7 +744,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: stuttered typing produces no duplicate decorations", () => {
+  describe("when stuttered typing produces no duplicate decorations (stress)", () => {
     it("typing the same string twice doesn't double-decorate the second pass", async () => {
       renderEditor();
       const editor = getEditor();
@@ -760,7 +760,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: typing `OR` between tags", () => {
+  describe("when typing `OR` between tags (stress)", () => {
     it("`status:error OR status:warning` renders two tokens + an OR keyword", async () => {
       renderEditor();
       const editor = getEditor();
@@ -776,7 +776,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: trailing whitespace forms", () => {
+  describe("given trailing whitespace forms (stress)", () => {
     it("typing a regular space at end-of-doc is acceptable — parser strips it", async () => {
       renderEditor();
       const editor = getEditor();
@@ -802,7 +802,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: rapid Enter presses", () => {
+  describe("when rapid Enter presses occur (stress)", () => {
     it("pressing Enter on an empty editor accepts the first field — empty editor opens the field-list dropdown by design", async () => {
       renderEditor();
       const editor = getEditor();
@@ -828,7 +828,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: paste-like rapid input", () => {
+  describe("when paste-like rapid input occurs (stress)", () => {
     it("dumping a long query in one shot still parses every clause", async () => {
       renderEditor();
       const editor = getEditor();
@@ -844,7 +844,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: typing parentheses around an OR group", () => {
+  describe("when typing parentheses around an OR group (stress)", () => {
     it("`(status:error OR status:warning) AND model:gpt-5-mini` decorates parens, OR, and AND separately", async () => {
       renderEditor();
       const editor = getEditor();
@@ -861,7 +861,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: NOT prefix interactions", () => {
+  describe("given NOT prefix interactions (stress)", () => {
     it("`NOT status:error AND model:gpt-5-mini` decorates NOT + excluded token + AND + tag", async () => {
       renderEditor();
       const editor = getEditor();
@@ -893,7 +893,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: clicking the X mid-query", () => {
+  describe("when clicking the X mid-query (stress)", () => {
     it("removing the middle of three tags collapses both ANDs and leaves exactly one AND", async () => {
       renderEditor();
       const editor = getEditor();
@@ -930,7 +930,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("stress: parent/child synchronisation", () => {
+  describe("given parent/child synchronisation (stress)", () => {
     it("after typing, `applyQueryText` fires per keystroke (live commit) — applied list grows steadily", async () => {
       const { applied } = renderEditor();
       const editor = getEditor();
@@ -948,7 +948,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("the rendered token chip is visually contiguous with its X widget", () => {
+  describe("when the token chip renders, it is visually contiguous with its X widget", () => {
     it("after value-accept, the token's right edge touches the delete button's left edge — no visible gap from the trailing NBSP", async () => {
       renderEditor();
       const editor = getEditor();
@@ -992,7 +992,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("Range value", () => {
+  describe("given a range value", () => {
     // Note: `cost:[1 TO 10]` can't be tested via userEvent.keyboard because
     // `[...]` is reserved syntax for special-key actions in user-event. The
     // bracket-range parsing path is covered by `filterHighlight.unit.test`.
@@ -1010,7 +1010,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("operator matrix — comparison forms render as numeric (green) chips", () => {
+  describe("when comparison forms render as numeric (green) chips", () => {
     it.each([
       ["greater-than", "cost:>5"],
       ["greater-equal", "cost:>=5"],
@@ -1027,7 +1027,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("operator matrix — quoted values with spaces", () => {
+  describe("when quoted values contain spaces", () => {
     it('`errorMessage:"rate limit"` is one chip and the X carries the unquoted value', async () => {
       renderEditor();
       const editor = getEditor();
@@ -1042,7 +1042,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("operator matrix — wildcards in different positions", () => {
+  describe("when wildcards appear in different positions", () => {
     it.each([
       ["trailing", "model:gpt-*"],
       ["leading", "model:*-mini"],
@@ -1058,7 +1058,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("operator matrix — scenario fields get the purple accent", () => {
+  describe("when scenario fields get the purple accent", () => {
     it.each(["scenarioVerdict:success", "scenarioStatus:failed"])(
       "`%s` is rendered with filter-token-scenario",
       async (query) => {
@@ -1073,7 +1073,7 @@ describe("SearchBar in real Chromium", () => {
     );
   });
 
-  describe("free-text fragments NEVER get a delete widget", () => {
+  describe("given a free-text fragment, it never gets a delete widget", () => {
     // Critical UX regression — previously the X button rendered for any
     // parseable Tag, including ImplicitField (free text). Now it only
     // renders on recognised `field:value` shapes.
@@ -1093,7 +1093,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("partial typing — chip arrives at the colon and survives backspaces", () => {
+  describe("given partial typing, the chip arrives at the colon and survives backspaces", () => {
     it("after `status:`, exactly one chip is visible (with no value yet)", async () => {
       renderEditor();
       const editor = getEditor();
@@ -1136,7 +1136,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: silent miscarriages get visible feedback", () => {
+  describe("when silent miscarriages get visible feedback (regression)", () => {
     it("`status: error` (space after colon) renders a half-built `status:` chip and `error` as plain text", async () => {
       renderEditor();
       const editor = getEditor();
@@ -1166,7 +1166,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("editing an existing chip reopens the dropdown", () => {
+  describe("when editing an existing chip, it reopens the dropdown", () => {
     it("clicking inside the value of a static chip reopens value-mode suggestions for that field", async () => {
       // Boots with a pre-rendered `status:error` chip — mirrors the
       // saved-query / sidebar-toggle path that produces a chip the user
@@ -1262,7 +1262,7 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
-  describe("regression: chip colour matches field type", () => {
+  describe("when chip colour matches field type (regression)", () => {
     it("`scenarioVerdict:success` is purple (scenario), `cost:>5` is green (numeric), `status:error` is blue (categorical)", async () => {
       renderEditor();
       const editor = getEditor();

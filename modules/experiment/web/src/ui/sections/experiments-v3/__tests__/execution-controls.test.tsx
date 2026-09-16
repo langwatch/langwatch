@@ -67,7 +67,7 @@ describe("ExecutionControls", () => {
     cleanup();
   });
 
-  describe("Idle State", () => {
+  describe("given an idle state", () => {
     it("renders Evaluate button when idle", () => {
       renderControls();
 
@@ -94,7 +94,7 @@ describe("ExecutionControls", () => {
     });
   });
 
-  describe("Running State", () => {
+  describe("given a running state", () => {
     beforeEach(() => {
       mockStatus = "running";
       mockRunId = "run-123";
@@ -124,7 +124,7 @@ describe("ExecutionControls", () => {
     });
   });
 
-  describe("Completed State", () => {
+  describe("given a completed state", () => {
     beforeEach(() => {
       mockStatus = "completed";
       mockProgress = { completed: 5, total: 5 };
@@ -143,7 +143,7 @@ describe("ExecutionControls", () => {
     });
   });
 
-  describe("Error State", () => {
+  describe("given an error state", () => {
     beforeEach(() => {
       mockStatus = "error";
       mockError = "Something went wrong";
@@ -156,7 +156,7 @@ describe("ExecutionControls", () => {
     });
   });
 
-  describe("Stopped State", () => {
+  describe("given a stopped state", () => {
     beforeEach(() => {
       mockStatus = "stopped";
       mockProgress = { completed: 3, total: 5 };
@@ -169,7 +169,7 @@ describe("ExecutionControls", () => {
     });
   });
 
-  describe("Compact Mode", () => {
+  describe("given compact mode", () => {
     it("renders smaller button in compact mode", () => {
       renderControls({ compact: true });
 
