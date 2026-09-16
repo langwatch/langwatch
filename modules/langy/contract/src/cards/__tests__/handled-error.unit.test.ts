@@ -275,6 +275,30 @@ describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
     expect(parseHandledError({ status: 400, body }).code).not.toBe("bad_request");
   });
 
+  it("reads the canonical fields at the root, where the /api/ surface now writes them", () => {
+    // The REST surface stopped nesting its refusals under `error`: a caller
+    // reads `body.code`. Dialect 4 no longer matches such a body, so the flat
+    // reading below it must — otherwise every SDK call would report a named
+    // refusal as an unnamed one.
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        type: "not_found",
+        code: "scenario_not_found",
+        message: "Scenario abc was not found.",
+        retryable: false,
+        meta: { scenarioId: "abc" },
+      },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "scenario_not_found",
+      message: "Scenario abc was not found.",
+      isHandled: true,
+    });
+    expect(parsed.meta).toMatchObject({ scenarioId: "abc" });
+  });
+
   it("still reads an envelope that carries only the status class", () => {
     const parsed = parseHandledError({
       status: 404,

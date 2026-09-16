@@ -168,8 +168,8 @@ describe("the /api/webhooks/v1 door", () => {
       const response = await request("/api/webhooks/v1/endpoints");
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("webhook_endpoints_not_entitled");
+      const body = (await response.json()) as { code: string };
+      expect(body.code).toBe("webhook_endpoints_not_entitled");
     });
   });
 
@@ -237,8 +237,8 @@ describe("the /api/webhooks/v1 door", () => {
       const res = await request("/api/webhooks/v1/events/req_nothing_here:completed");
 
       expect(res.status).toBe(404);
-      const body = (await res.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("webhook_event_not_found");
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe("webhook_event_not_found");
     });
 
     /** @scenario A malformed event id is refused the same way as a missing one */
@@ -302,10 +302,11 @@ describe("the /api/webhooks/v1 door", () => {
         const res = await request(`/api/webhooks/v1/events${query}`);
         expect(res.status).toBe(400);
         const body = (await res.json()) as {
-          error: { code: string; meta?: { target?: string; fields?: string[] } };
+          code: string;
+          meta?: { target?: string; fields?: string[] };
         };
-        expect(body.error.code).toBe("validation_error");
-        expect(body.error.meta?.fields).toEqual(expect.arrayContaining([missing]));
+        expect(body.code).toBe("validation_error");
+        expect(body.meta?.fields).toEqual(expect.arrayContaining([missing]));
       }
     });
 
@@ -316,8 +317,8 @@ describe("the /api/webhooks/v1 door", () => {
       const res = await request(`/api/webhooks/v1/events?from=${now}&to=${now - 60_000}`);
 
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("validation_error");
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe("validation_error");
     });
   });
 });
