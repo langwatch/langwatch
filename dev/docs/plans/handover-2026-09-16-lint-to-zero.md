@@ -13,16 +13,16 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 | | drive start | handover written | now |
 | --- | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 10,540 |
+| oxlint errors | 6,075 | 13,253 | 9,771 |
 | oxlint warnings | 17,947 | 1,631 | 1,632 |
-| oxlint total | 24,022 | 14,884 | **12,172** |
-| — of which `comment-block-size` | 6,168 | 6,168 | **3,454** |
+| oxlint total | 24,022 | 14,884 | **11,403** |
+| — of which `comment-block-size` | 6,168 | 6,168 | **2,685** |
 | architecture-enforcer | 3,137 | 2,761 | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **15,012** |
+| **true total** | **27,159** | **17,645** | **14,243** |
 
-Down 12,147 from the drive's start, 2,633 of it in this session.
+Down 12,916 from the drive's start, 3,402 of it in this session.
 
-**The enforcer number is not comparable to the 2,761.** Measured now it prints
+**The enforcer number is not comparable to the 2,761.** Measured it prints
 `2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
 rows)`. The 2,761 never stated whether stale rows were counted, so the real
 movement is either 99 down or 79 up. Whoever next touches the enforcer half
@@ -83,31 +83,17 @@ Full numbers in `dev/docs/plans/lint-to-zero-2026-09-15.md`.
 
 ### Wave 1 — the comment sweep (6,168 findings, 3,585 files)
 
-**Progress: 2,714 of 6,168 cleared.** 1,813 by the first five lanes, 136 by a
-correction to the rule itself (`@integration`, `@vitest-environment` and
-`@regression` were being counted as prose though no author can delete them),
-and 765 by the second tranche.
+**Progress: 3,483 of 6,168 cleared — 56%.** 1,813 by the first five lanes,
+136 by a correction to the rule itself (`@integration`, `@vitest-environment`
+and `@regression` were counted as prose though no author can delete them), 765
+by the second tranche and 769 by the third.
 
-Collected so far: `sdks/typescript` 550, `modules/analytics` 408,
+Areas now at zero: `sdks/typescript` 550, `modules/analytics` 408,
 `modules/trace` 381, `modules/scenario` 279, `modules/gateway` 204,
-`packages/eventing` 174 of 194 (partial), `modules/ops` 172,
-`modules/identity` 163, `modules/model-provider` 156.
-
-
-The bulk of the remaining total. **Sonnet, medium effort, standard context** —
-mechanical per block, but each needs judgement about what may be lost.
-
-The budget is 5 lines **including** `/**` and `*/`, so **3 content lines, about
-230 characters**. Blocks average nearer 300, so this is not tightening; it is
-deciding what to drop, or moving the narrative to an ADR and leaving one line
-pointing at it (the user's stated preference — prefer the ADR for anything that
-is genuinely load-bearing).
-
-A worked example of the method is commit `91c5a9382e`
-(`apps/ui/e2e/langy/local-control-fixture.ts`, 11 blocks). **Expect two passes:**
-a draft written to "about five lines" lands on six every time. Lane closes only
-when `oxlint --config .oxlintrc.jsonc <paths>` reports zero `comment-block-size`
-for its own paths.
+`packages/eventing` 194, `modules/ops` 172, `modules/automation` 166,
+`modules/identity` 163, `modules/model-provider` 156, `modules/prompt` 154,
+`modules/coding-agent` 150, `dev` 144 of 147,
+`enterprise/modules/governance` 121, `modules/auth` 117.
 
 One lane per area, largest first:
 
