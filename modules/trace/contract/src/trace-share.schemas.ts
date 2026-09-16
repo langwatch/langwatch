@@ -28,7 +28,7 @@ import { spanTreeNodeSchema } from "./trace.ts";
  * that forgets to null it fails the output parse instead of shipping PII to
  * an anonymous viewer.
  */
-const sharedTraceHeaderSchema = traceHeaderSchema
+const sharedTraceHeaderPickedSchema = traceHeaderSchema
   .pick({
     traceId: true,
     timestamp: true,
@@ -70,8 +70,12 @@ const sharedTraceHeaderSchema = traceHeaderSchema
     lastUsedPromptSpanId: true,
     attributes: true,
     privacy: true,
-  })
-  .extend({ userId: z.null() });
+  });
+
+const sharedTraceHeaderSchema = z.object({
+  ...sharedTraceHeaderPickedSchema.shape,
+  userId: z.null(),
+});
 
 const sharedSpanTreeNodeSchema = spanTreeNodeSchema.pick({
   spanId: true,
@@ -152,33 +156,34 @@ const sharedTraceEventSchema = z.object({
  * and the error message follow content visibility (`gateEvaluations`); the
  * stacktrace is pinned empty so internal frames never reach a viewer.
  */
-const sharedEvaluationSchema = evaluationSchema
-  .pick({
-    evaluation_id: true,
-    evaluator_id: true,
-    span_id: true,
-    name: true,
-    type: true,
-    is_guardrail: true,
-    evaluation_thread_id: true,
-    status: true,
-    passed: true,
-    score: true,
-    label: true,
-    details: true,
-    retries: true,
-    timestamps: true,
-  })
-  .extend({
-    error: z
-      .object({
-        has_error: z.literal(true),
-        message: z.string(),
-        stacktrace: z.array(z.string()).max(0),
-      })
-      .optional()
-      .nullable(),
-  });
+const sharedEvaluationPickedSchema = evaluationSchema.pick({
+  evaluation_id: true,
+  evaluator_id: true,
+  span_id: true,
+  name: true,
+  type: true,
+  is_guardrail: true,
+  evaluation_thread_id: true,
+  status: true,
+  passed: true,
+  score: true,
+  label: true,
+  details: true,
+  retries: true,
+  timestamps: true,
+});
+
+const sharedEvaluationSchema = z.object({
+  ...sharedEvaluationPickedSchema.shape,
+  error: z
+    .object({
+      has_error: z.literal(true),
+      message: z.string(),
+      stacktrace: z.array(z.string()).max(0),
+    })
+    .optional()
+    .nullable(),
+});
 
 export const sharedTraceDtoSchema = z.object({
   project: z.object({

@@ -91,7 +91,8 @@ export const runBlobCleanupInputSchema = z.object({
   dryRun: z.boolean().default(true),
 });
 
-export const runBlobCleanupCommandSchema = runBlobCleanupInputSchema.extend({
+export const runBlobCleanupCommandSchema = z.object({
+  ...runBlobCleanupInputSchema.shape,
   requestedBy: z.string().min(1),
 });
 
@@ -103,7 +104,8 @@ export const deleteBlobInputSchema = z.object({
   hash: z.string().min(1).max(200),
 });
 
-export const deleteBlobCommandSchema = deleteBlobInputSchema.extend({
+export const deleteBlobCommandSchema = z.object({
+  ...deleteBlobInputSchema.shape,
   requestedBy: z.string().min(1),
 });
 
@@ -117,11 +119,13 @@ export type DeleteBlobResult = z.infer<typeof deleteBlobResultSchema>;
  * the typed confirmation the destructive (non-dry-run) form requires. A sweep
  * that reclaims is not something to reach by mis-clicking a toggle.
  */
-export const runBlobCleanupOperatorInputSchema = runBlobCleanupInputSchema.extend({
+export const runBlobCleanupOperatorInputSchema = z.object({
+  ...runBlobCleanupInputSchema.shape,
   confirm: z.literal("RECLAIM").optional(),
 });
 
 /** The operator-transport form of the delete: the blob plus its confirmation. */
-export const deleteBlobOperatorInputSchema = deleteBlobInputSchema.extend({
+export const deleteBlobOperatorInputSchema = z.object({
+  ...deleteBlobInputSchema.shape,
   confirm: z.literal("DELETE"),
 });

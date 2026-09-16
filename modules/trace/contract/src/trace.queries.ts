@@ -13,7 +13,8 @@ export const spanTreeTransportInputSchema = z.object({
 export type SpanTreeTransportInput = z.infer<typeof spanTreeTransportInputSchema>;
 
 /** Transport input plus the resolved authorization capability for the service. */
-export const spanTreeInputSchema = spanTreeTransportInputSchema.extend({
+export const spanTreeInputSchema = z.object({
+  ...spanTreeTransportInputSchema.shape,
   canSeeCosts: z.boolean(),
 });
 
@@ -30,7 +31,8 @@ export const spanTreeDeltaTransportInputSchema = z.object({
 export type SpanTreeDeltaTransportInput = z.infer<typeof spanTreeDeltaTransportInputSchema>;
 
 /** Transport input plus the resolved authorization capability for the service. */
-export const spanTreeDeltaInputSchema = spanTreeDeltaTransportInputSchema.extend({
+export const spanTreeDeltaInputSchema = z.object({
+  ...spanTreeDeltaTransportInputSchema.shape,
   canSeeCosts: z.boolean(),
 });
 
@@ -59,7 +61,7 @@ export const traceByIdInputSchema = z
 
 export type TraceByIdInput = z.infer<typeof traceByIdInputSchema>;
 
-export const traceDerivedEventsInputSchema = traceByIdInputSchema.extend({
+export const traceDerivedEventsInputSchema = traceByIdInputSchema.safeExtend({
   occurredAtMs: z.number().int().nonnegative().optional(),
   foldVersion: z.number().int().nonnegative().optional(),
 });

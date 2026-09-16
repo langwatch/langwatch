@@ -69,7 +69,7 @@ export const simulationRunQueuedEventDataSchema = z.object({
 });
 export type SimulationRunQueuedEventData = z.infer<typeof simulationRunQueuedEventDataSchema>;
 
-export const SimulationRunQueuedEventSchema = simulationEventSchema.extend({
+export const SimulationRunQueuedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.QUEUED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.QUEUED),
   data: simulationRunQueuedEventDataSchema,
@@ -90,7 +90,7 @@ export const simulationRunStartedEventDataSchema = z.object({
 });
 export type SimulationRunStartedEventData = z.infer<typeof simulationRunStartedEventDataSchema>;
 
-export const SimulationRunStartedEventSchema = simulationEventSchema.extend({
+export const SimulationRunStartedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.STARTED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.STARTED),
   data: simulationRunStartedEventDataSchema,
@@ -110,7 +110,7 @@ export type SimulationMessageSnapshotEventData = z.infer<
   typeof simulationMessageSnapshotEventDataSchema
 >;
 
-export const SimulationMessageSnapshotEventSchema = simulationEventSchema.extend({
+export const SimulationMessageSnapshotEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT),
   version: z.literal(SIMULATION_EVENT_VERSIONS.MESSAGE_SNAPSHOT),
   data: simulationMessageSnapshotEventDataSchema,
@@ -142,7 +142,7 @@ export const simulationRunFinishedEventDataSchema = z.object({
 });
 export type SimulationRunFinishedEventData = z.infer<typeof simulationRunFinishedEventDataSchema>;
 
-export const SimulationRunFinishedEventSchema = simulationEventSchema.extend({
+export const SimulationRunFinishedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.FINISHED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.FINISHED),
   data: simulationRunFinishedEventDataSchema,
@@ -167,7 +167,7 @@ export const simulationRunEvaluatedEventDataSchema = z.object({
 });
 export type SimulationRunEvaluatedEventData = z.infer<typeof simulationRunEvaluatedEventDataSchema>;
 
-export const SimulationRunEvaluatedEventSchema = simulationEventSchema.extend({
+export const SimulationRunEvaluatedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.EVALUATED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.EVALUATED),
   data: simulationRunEvaluatedEventDataSchema,
@@ -187,7 +187,7 @@ export type SimulationTextMessageStartEventData = z.infer<
   typeof simulationTextMessageStartEventDataSchema
 >;
 
-export const SimulationTextMessageStartEventSchema = simulationEventSchema.extend({
+export const SimulationTextMessageStartEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START),
   version: z.literal(SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_START),
   data: simulationTextMessageStartEventDataSchema,
@@ -210,7 +210,7 @@ export type SimulationTextMessageEndEventData = z.infer<
   typeof simulationTextMessageEndEventDataSchema
 >;
 
-export const SimulationTextMessageEndEventSchema = simulationEventSchema.extend({
+export const SimulationTextMessageEndEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END),
   version: z.literal(SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_END),
   data: simulationTextMessageEndEventDataSchema,
@@ -232,7 +232,7 @@ export type SimulationRunMetricsComputedEventData = z.infer<
   typeof simulationRunMetricsComputedEventDataSchema
 >;
 
-export const SimulationRunMetricsComputedEventSchema = simulationEventSchema.extend({
+export const SimulationRunMetricsComputedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED),
   data: simulationRunMetricsComputedEventDataSchema,
@@ -253,7 +253,7 @@ export type SimulationRunCancelRequestedEventData = z.infer<
   typeof simulationRunCancelRequestedEventDataSchema
 >;
 
-export const SimulationRunCancelRequestedEventSchema = simulationEventSchema.extend({
+export const SimulationRunCancelRequestedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED),
   data: simulationRunCancelRequestedEventDataSchema,
@@ -278,7 +278,7 @@ export type SimulationRunAgentInstanceRecordedEventData = z.infer<
   typeof simulationRunAgentInstanceRecordedEventDataSchema
 >;
 
-export const SimulationRunAgentInstanceRecordedEventSchema = simulationEventSchema.extend({
+export const SimulationRunAgentInstanceRecordedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.AGENT_INSTANCE_RECORDED),
   data: simulationRunAgentInstanceRecordedEventDataSchema,
@@ -297,7 +297,7 @@ export type SimulationRunCutAtLimitRecordedEventData = z.infer<
   typeof simulationRunCutAtLimitRecordedEventDataSchema
 >;
 
-export const SimulationRunCutAtLimitRecordedEventSchema = simulationEventSchema.extend({
+export const SimulationRunCutAtLimitRecordedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.CUT_AT_LIMIT_RECORDED),
   data: simulationRunCutAtLimitRecordedEventDataSchema,
@@ -314,7 +314,7 @@ export const simulationRunDeletedEventDataSchema = z.object({
 });
 export type SimulationRunDeletedEventData = z.infer<typeof simulationRunDeletedEventDataSchema>;
 
-export const SimulationRunDeletedEventSchema = simulationEventSchema.extend({
+export const SimulationRunDeletedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.DELETED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.DELETED),
   data: simulationRunDeletedEventDataSchema,
@@ -335,7 +335,7 @@ export const simulationSetArchivedEventDataSchema = z.object({
 });
 export type SimulationSetArchivedEventData = z.infer<typeof simulationSetArchivedEventDataSchema>;
 
-export const SimulationSetArchivedEventSchema = simulationEventSchema.extend({
+export const SimulationSetArchivedEventSchema = z.object({ ...simulationEventSchema.shape,
   type: z.literal(SIMULATION_SET_EVENT_TYPES.ARCHIVED),
   version: z.literal(SIMULATION_EVENT_VERSIONS.SET_ARCHIVED),
   data: simulationSetArchivedEventDataSchema,

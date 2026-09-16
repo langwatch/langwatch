@@ -19,7 +19,7 @@ export type LangyEgressAllowlist = z.infer<typeof langyEgressAllowlistSchema>;
 export const langyEgressProjectInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type LangyEgressProjectInput = z.infer<typeof langyEgressProjectInputSchema>;
 export const langySetEgressInputSchema = langyEgressProjectInputSchema
-  .extend({ allowlist: langyEgressAllowlistSchema })
+  .safeExtend({ allowlist: langyEgressAllowlistSchema })
   .strict();
 export type LangySetEgressInput = z.infer<typeof langySetEgressInputSchema>;
 export const langyConversationMessageRoleSchema = z.enum(["user", "assistant", "system", "tool"]);
@@ -81,7 +81,7 @@ export const langyConversationInputSchema = z
 export type LangyConversationInput = z.infer<typeof langyConversationInputSchema>;
 
 export const langyTurnInputSchema = langyConversationInputSchema
-  .extend({
+  .safeExtend({
     turnId: langyTurnIdSchema,
     idempotencyKey: z.string().min(1).max(256),
     messages: z.array(z.unknown()).min(1),
@@ -90,12 +90,12 @@ export const langyTurnInputSchema = langyConversationInputSchema
   .strict();
 export type LangyTurnInput = z.infer<typeof langyTurnInputSchema>;
 export const langyMessageInputSchema = langyConversationInputSchema
-  .extend({ messageId: langyMessageIdSchema })
+  .safeExtend({ messageId: langyMessageIdSchema })
   .strict();
 export type LangyMessageInput = z.infer<typeof langyMessageInputSchema>;
 
 export const langyStopTurnInputSchema = langyConversationInputSchema
-  .extend({ turnId: langyTurnIdSchema })
+  .safeExtend({ turnId: langyTurnIdSchema })
   .strict();
 export type LangyStopTurnInput = z.infer<typeof langyStopTurnInputSchema>;
 

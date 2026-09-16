@@ -128,7 +128,7 @@ export const scenarioVersionSummarySchema = z
 export type ScenarioVersionSummary = z.infer<typeof scenarioVersionSummarySchema>;
 
 export const scenarioVersionDetailSchema = scenarioVersionSummarySchema
-  .extend({
+  .safeExtend({
     fields: scenarioSnapshotFieldsSchema,
     schemaVersion: z.number().int().positive(),
   })
@@ -137,7 +137,7 @@ export type ScenarioVersionDetail = z.infer<typeof scenarioVersionDetailSchema>;
 
 export const scenarioVersionListInputSchema = scenarioIdInputSchema
   .omit({ id: true })
-  .extend({
+  .safeExtend({
     scenarioId: z.string().min(1),
     limit: z.number().int().min(1).max(100).optional(),
     cursor: z.number().int().optional(),
@@ -147,18 +147,18 @@ export type ScenarioVersionListInput = z.infer<typeof scenarioVersionListInputSc
 
 export const scenarioVersionInputSchema = scenarioVersionListInputSchema
   .pick({ projectId: true, scenarioId: true })
-  .extend({ version: z.number().int().positive() })
+  .safeExtend({ version: z.number().int().positive() })
   .strict();
 export type ScenarioVersionInput = z.infer<typeof scenarioVersionInputSchema>;
 
 export const scenarioVersionRestoreInputSchema = scenarioVersionInputSchema
-  .extend({ actor: scenarioActorSchema })
+  .safeExtend({ actor: scenarioActorSchema })
   .strict();
 export type ScenarioVersionRestoreInput = z.infer<typeof scenarioVersionRestoreInputSchema>;
 
 export const scenarioMoveInputSchema = scenarioIdInputSchema
   .omit({ id: true })
-  .extend({
+  .safeExtend({
     scenarioId: z.string().min(1),
     testSuiteId: z.string().min(1).nullable(),
   })
@@ -167,7 +167,7 @@ export type ScenarioMoveInput = z.infer<typeof scenarioMoveInputSchema>;
 
 export const scenarioDuplicateInputSchema = scenarioIdInputSchema
   .omit({ id: true })
-  .extend({
+  .safeExtend({
     scenarioId: z.string().min(1),
     lastUpdatedById: z.string().min(1).optional(),
   })

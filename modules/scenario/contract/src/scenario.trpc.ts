@@ -53,9 +53,10 @@ const dateRangeFields = {
   endDate: z.number().int().nonnegative().optional(),
 } as const;
 
-const scenarioIdSchema = projectSchema.extend({ id: z.string() });
+const scenarioIdSchema = z.object({ ...projectSchema.shape, id: z.string() });
 
-export const scenarioTrpcCreateSchema = projectSchema.extend({
+export const scenarioTrpcCreateSchema = z.object({
+  ...projectSchema.shape,
   name: z.string().min(1),
   situation: z.string(),
   criteria: z.array(z.string()).default([]),
@@ -78,7 +79,8 @@ export const scenarioTrpcCreateSchema = projectSchema.extend({
   callerVoice: callerVoiceConfigSchema.optional(),
 });
 
-export const scenarioTrpcUpdateSchema = projectSchema.extend({
+export const scenarioTrpcUpdateSchema = z.object({
+  ...projectSchema.shape,
   id: z.string(),
   name: z.string().min(1).optional(),
   situation: z.string().optional(),
@@ -101,7 +103,8 @@ export const scenarioTrpcUpdateSchema = projectSchema.extend({
   expectedVersion: z.number().int().min(1).optional(),
 });
 
-export const scenarioTrpcRunSchema = projectSchema.extend({
+export const scenarioTrpcRunSchema = z.object({
+  ...projectSchema.shape,
   scenarioId: z.string(),
   target: simulationTargetSchema,
   /** Optional set id; defaults to the internal on-platform set for ad-hoc runs. */
@@ -169,21 +172,28 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
 
   /** A test suite id files the case there; null unfiles it. */
   .mutation("moveToTestSuite")
-  .withInput(projectSchema.extend({ scenarioId: z.string(), testSuiteId: z.string().nullable() }))
+  .withInput(
+    z.object({
+      ...projectSchema.shape,
+      scenarioId: z.string(),
+      testSuiteId: z.string().nullable(),
+    }),
+  )
   .withOutput(scenarioSchema)
 
   .mutation("duplicate")
-  .withInput(projectSchema.extend({ scenarioId: z.string() }))
+  .withInput(z.object({ ...projectSchema.shape, scenarioId: z.string() }))
   .withOutput(scenarioSchema)
 
   .mutation("batchArchive")
-  .withInput(projectSchema.extend({ ids: z.array(z.string()).min(1) }))
+  .withInput(z.object({ ...projectSchema.shape, ids: z.array(z.string()).min(1) }))
   .withOutput(scenarioBatchArchiveResultSchema)
 
   // -- version history -------------------------------------------------------
   .query("listVersions")
   .withInput(
-    projectSchema.extend({
+    z.object({
+      ...projectSchema.shape,
       scenarioId: z.string(),
       limit: z.number().int().min(1).max(100).optional(),
       cursor: z.number().int().optional(),
@@ -192,11 +202,15 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withOutput(scenarioVersionPageSchema)
 
   .query("getVersion")
-  .withInput(projectSchema.extend({ scenarioId: z.string(), version: z.number().int().min(1) }))
+  .withInput(
+    z.object({ ...projectSchema.shape, scenarioId: z.string(), version: z.number().int().min(1) }),
+  )
   .withOutput(scenarioVersionDetailSchema)
 
   .mutation("restoreVersion")
-  .withInput(projectSchema.extend({ scenarioId: z.string(), version: z.number().int().min(1) }))
+  .withInput(
+    z.object({ ...projectSchema.shape, scenarioId: z.string(), version: z.number().int().min(1) }),
+  )
   .withOutput(scenarioSchema)
 
   // -- running one -----------------------------------------------------------
@@ -210,7 +224,8 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
 
   .mutation("cancelJob")
   .withInput(
-    projectSchema.extend({
+    z.object({
+      ...projectSchema.shape,
       scenarioSetId: z.string(),
       batchRunId: z.string(),
       scenarioRunId: z.string(),
@@ -220,25 +235,25 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withOutput(scenarioCancelJobResultSchema)
 
   .mutation("cancelBatchRun")
-  .withInput(projectSchema.extend({ scenarioSetId: z.string(), batchRunId: z.string() }))
+  .withInput(z.object({ ...projectSchema.shape, scenarioSetId: z.string(), batchRunId: z.string() }))
   .withOutput(scenarioCancelBatchRunResultSchema)
 
   // -- reading what ran ------------------------------------------------------
   .query("getScenarioSetsData")
-  .withInput(projectSchema.extend(dateRangeFields))
+  .withInput(z.object({ ...projectSchema.shape, ...dateRangeFields }))
   .withOutput(simulationSetDataSchema.array())
 
   /** One suite's runs, or every suite's when no set is named. */
   .query("getSuiteRunData")
   .withInput(
-    projectSchema
-      .extend({
-        scenarioSetId: z.string().optional(),
-        limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(),
-        sinceTimestamp: z.number().optional(),
-      })
-      .extend(dateRangeFields),
+    z.object({
+      ...projectSchema.shape,
+      scenarioSetId: z.string().optional(),
+      limit: z.number().min(1).max(100).default(20),
+      cursor: z.string().optional(),
+      sinceTimestamp: z.number().optional(),
+      ...dateRangeFields,
+    }),
   )
   .withOutput(simulationAllSuitesRunDataSchema)
 
@@ -249,7 +264,11 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
    */
   .query("getLastResultSummaries")
   .withInput(
-    projectSchema.extend({ scenarioIds: z.array(z.string()).optional() }).extend(dateRangeFields),
+    z.object({
+      ...projectSchema.shape,
+      scenarioIds: z.array(z.string()).optional(),
+      ...dateRangeFields,
+    }),
   )
   .withOutput(simulationLastResultSummarySchema.array())
 
@@ -258,49 +277,52 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
    * window. Clients poll this and invalidate the run reads when it advances.
    */
   .query("getSuiteRunFreshness")
-  .withInput(projectSchema.extend({ scenarioSetId: z.string().optional() }).extend(dateRangeFields))
+  .withInput(
+    z.object({ ...projectSchema.shape, scenarioSetId: z.string().optional(), ...dateRangeFields }),
+  )
   .withOutput(simulationRunFreshnessSchema)
 
   .query("getScenarioSetRunData")
   .withInput(
-    projectSchema
-      .extend({
-        scenarioSetId: z.string(),
-        limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(),
-      })
-      .extend(dateRangeFields),
+    z.object({
+      ...projectSchema.shape,
+      scenarioSetId: z.string(),
+      limit: z.number().min(1).max(100).default(20),
+      cursor: z.string().optional(),
+      ...dateRangeFields,
+    }),
   )
   .withOutput(simulationScenarioSetRunDataSchema)
 
   /** @deprecated Use `getSuiteRunData`. Kept for backward compatibility. */
   .query("getAllScenarioSetRunData")
-  .withInput(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+  .withInput(z.object({ ...projectSchema.shape, scenarioSetId: z.string(), ...dateRangeFields }))
   .withOutput(simulationRunDataSchema.array())
 
   .query("getRunState")
-  .withInput(projectSchema.extend({ scenarioRunId: z.string() }))
+  .withInput(z.object({ ...projectSchema.shape, scenarioRunId: z.string() }))
   .withOutput(simulationRunDataSchema)
 
   .query("getScenarioSetBatchRunCount")
-  .withInput(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+  .withInput(z.object({ ...projectSchema.shape, scenarioSetId: z.string(), ...dateRangeFields }))
   .withOutput(simulationBatchRunCountSchema)
 
   .query("getScenarioSetBatchHistory")
   .withInput(
-    projectSchema
-      .extend({
-        scenarioSetId: z.string(),
-        limit: z.number().min(1).max(100).default(8),
-        cursor: z.string().optional(),
-      })
-      .extend(dateRangeFields),
+    z.object({
+      ...projectSchema.shape,
+      scenarioSetId: z.string(),
+      limit: z.number().min(1).max(100).default(8),
+      cursor: z.string().optional(),
+      ...dateRangeFields,
+    }),
   )
   .withOutput(simulationBatchHistorySchema)
 
   .query("getBatchRunData")
   .withInput(
-    projectSchema.extend({
+    z.object({
+      ...projectSchema.shape,
       scenarioSetId: z.string(),
       batchRunId: z.string(),
       sinceTimestamp: z.number().optional(),
@@ -310,18 +332,18 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
   .withOutput(simulationBatchRunDataSchema)
 
   .query("getExternalSetSummaries")
-  .withInput(projectSchema.extend(dateRangeFields))
+  .withInput(z.object({ ...projectSchema.shape, ...dateRangeFields }))
   .withOutput(simulationExternalSetSummarySchema.array())
 
   /** @deprecated Use `getSuiteRunData` without a set id. */
   .query("getAllSuiteRunData")
   .withInput(
-    projectSchema
-      .extend({
-        limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(),
-      })
-      .extend(dateRangeFields),
+    z.object({
+      ...projectSchema.shape,
+      limit: z.number().min(1).max(100).default(20),
+      cursor: z.string().optional(),
+      ...dateRangeFields,
+    }),
   )
   .withOutput(simulationAllSuitesRunDataSchema)
 
@@ -359,14 +381,18 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
 
   .query("getResultsOverview")
   .withInput(
-    resultsFilterSchema.extend({ groupBy: z.enum(["plan", "scenario", "target", "none"]) }),
+    z.object({
+      ...resultsFilterSchema.shape,
+      groupBy: z.enum(["plan", "scenario", "target", "none"]),
+    }),
   )
   .withOutput(resultsOverviewSchema)
 
   /** One page of atoms, newest first: the drill-down, never a total. */
   .query("getResultAtoms")
   .withInput(
-    resultsFilterSchema.extend({
+    z.object({
+      ...resultsFilterSchema.shape,
       limit: z.number().int().min(1).max(MAX_ATOM_PAGE).default(100),
       cursor: z.string().optional(),
     }),
@@ -379,7 +405,8 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
    */
   .query("getRunConfigurations")
   .withInput(
-    projectSchema.extend({
+    z.object({
+      ...projectSchema.shape,
       startDate: z.number().int().nonnegative().optional(),
       endDate: z.number().int().nonnegative().optional(),
       limit: z.number().int().min(1).max(MAX_RUN_CONFIGURATIONS).optional(),

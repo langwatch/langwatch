@@ -19,7 +19,8 @@ export const spanReceivedEventDataSchema = z.object({
   piiRedactionLevel: piiRedactionLevelSchema,
 });
 
-export const spanReceivedEventSchema = traceIngressEventEnvelopeSchema.extend({
+export const spanReceivedEventSchema = z.object({
+  ...traceIngressEventEnvelopeSchema.shape,
   type: z.literal(SPAN_RECEIVED_EVENT_TYPE),
   data: spanReceivedEventDataSchema,
   metadata: spanReceivedEventMetadataSchema,

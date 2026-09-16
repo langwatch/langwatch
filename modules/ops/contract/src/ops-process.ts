@@ -22,7 +22,8 @@ export const opsProcessRefInputSchema = z.object({
 });
 
 /** One message inside one process instance's outbox. */
-export const opsProcessMessageInputSchema = opsProcessRefInputSchema.extend({
+export const opsProcessMessageInputSchema = z.object({
+  ...opsProcessRefInputSchema.shape,
   messageId: z.string().min(1).max(64),
 });
 
@@ -58,7 +59,8 @@ export const opsListUpcomingWakesInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(20),
 });
 
-export const opsListProcessOutboxInputSchema = opsProcessRefInputSchema.extend({
+export const opsListProcessOutboxInputSchema = z.object({
+  ...opsProcessRefInputSchema.shape,
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(20),
 });
@@ -142,7 +144,8 @@ export type ProcessOutboxMessageView = z.infer<typeof processOutboxMessageViewSc
  * a row can be redriven straight from the list, and the trace id so the
  * operator can reach the failure itself.
  */
-export const deadOutboxMessageViewSchema = processOutboxMessageViewSchema.extend({
+export const deadOutboxMessageViewSchema = z.object({
+  ...processOutboxMessageViewSchema.shape,
   processName: z.string(),
   projectId: z.string(),
   processKey: z.string(),

@@ -96,12 +96,12 @@ export const scenarioTestSuiteIdInputSchema = z
 export type ScenarioTestSuiteIdInput = z.infer<typeof scenarioTestSuiteIdInputSchema>;
 
 export const scenarioTestSuiteRenameInputSchema = scenarioTestSuiteIdInputSchema
-  .extend({ name: z.string().trim().min(1) })
+  .safeExtend({ name: z.string().trim().min(1) })
   .strict();
 export type ScenarioTestSuiteRenameInput = z.infer<typeof scenarioTestSuiteRenameInputSchema>;
 
 export const scenarioTestSuiteUpdateInputSchema = scenarioTestSuiteIdInputSchema
-  .extend({
+  .safeExtend({
     name: z.string().trim().min(1).optional(),
     description: z.string().nullable().optional(),
     targets: z.array(jsonValueSchema).optional(),
@@ -147,7 +147,7 @@ const scenarioFieldsSchema = z
   })
   .strict();
 
-export const scenarioCreateInputSchema = scenarioFieldsSchema.extend({
+export const scenarioCreateInputSchema = scenarioFieldsSchema.safeExtend({
   projectId: z.string().min(1),
   actor: scenarioActorSchema.optional(),
 });
@@ -155,7 +155,7 @@ export type ScenarioCreateInput = z.infer<typeof scenarioCreateInputSchema>;
 
 export const scenarioUpdateInputSchema = scenarioFieldsSchema
   .partial()
-  .extend({
+  .safeExtend({
     ...scenarioIdInputSchema.shape,
     actor: scenarioActorSchema.optional(),
     expectedVersion: z.number().int().positive().optional(),

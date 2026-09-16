@@ -49,8 +49,8 @@ export const experimentDspyStepSchema = z.object({
   updatedAt: z.number(),
 });
 
-export const experimentDspyStepSummarySchema = experimentDspyStepSchema
-  .pick({
+export const experimentDspyStepSummarySchema = z.object({
+  ...experimentDspyStepSchema.pick({
     tenantId: true,
     experimentId: true,
     runId: true,
@@ -60,12 +60,11 @@ export const experimentDspyStepSummarySchema = experimentDspyStepSchema
     label: true,
     optimizerName: true,
     createdAt: true,
-  })
-  .extend({
-    llmCallsTotal: z.number(),
-    llmCallsTotalTokens: z.number(),
-    llmCallsTotalCost: z.number(),
-  });
+  }).shape,
+  llmCallsTotal: z.number(),
+  llmCallsTotalTokens: z.number(),
+  llmCallsTotalCost: z.number(),
+});
 
 export const experimentDspyStepLookupSchema = z.object({
   tenantId: z.string(),

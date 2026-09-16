@@ -7,7 +7,7 @@ import { scenarioVersionSummarySchema, scenarioVersionDetailSchema } from "./sce
 
 /** One saved version, with the human name resolved for the author it stores as an id. */
 export const scenarioVersionSummaryWithAuthorSchema = scenarioVersionSummarySchema
-  .extend({ authorName: z.string().nullable() })
+  .safeExtend({ authorName: z.string().nullable() })
   .strict();
 export type ScenarioVersionSummaryWithAuthor = z.infer<
   typeof scenarioVersionSummaryWithAuthorSchema

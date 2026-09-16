@@ -3,7 +3,7 @@ import { z } from "zod";
 import { organizationGroupBindingSchema, organizationGroupMemberSchema } from "./group.ts";
 
 /** One access binding, with the human name of the scope it resolved to. */
-export const groupBindingWithScopeNameSchema = organizationGroupBindingSchema.extend({
+export const groupBindingWithScopeNameSchema = organizationGroupBindingSchema.safeExtend({
   scopeName: z.string().nullable(),
 });
 export type GroupBindingWithScopeName = z.infer<typeof groupBindingWithScopeNameSchema>;

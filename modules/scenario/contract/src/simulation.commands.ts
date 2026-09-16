@@ -17,39 +17,43 @@ const simulationRunDetailsSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const simulationQueueRunSchema = simulationRunIdentitySchema
-  .extend(simulationRunDetailsSchema.shape)
-  .extend({
-    secretParameters: z.record(z.string(), z.string()).optional(),
-    target: z
-      .object({
-        type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
-        referenceId: z.string(),
-      })
-      .optional(),
-  });
+export const simulationQueueRunSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
+  ...simulationRunDetailsSchema.shape,
+  secretParameters: z.record(z.string(), z.string()).optional(),
+  target: z
+    .object({
+      type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+      referenceId: z.string(),
+    })
+    .optional(),
+});
 export type SimulationQueueRun = z.infer<typeof simulationQueueRunSchema>;
 
-export const simulationStartRunSchema = simulationRunIdentitySchema.extend(
-  simulationRunDetailsSchema.shape,
-);
+export const simulationStartRunSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
+  ...simulationRunDetailsSchema.shape,
+});
 export type SimulationStartRun = z.infer<typeof simulationStartRunSchema>;
 
-export const simulationMessageSnapshotSchema = simulationRunIdentitySchema.extend({
+export const simulationMessageSnapshotSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   messages: z.array(simulationMessageSchema),
   traceIds: z.array(z.string()).default([]),
   status: z.string().optional(),
 });
 export type SimulationMessageSnapshot = z.infer<typeof simulationMessageSnapshotSchema>;
 
-export const simulationTextMessageStartSchema = simulationRunIdentitySchema.extend({
+export const simulationTextMessageStartSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   messageId: z.string(),
   role: z.string(),
   messageIndex: z.number().optional(),
 });
 export type SimulationTextMessageStart = z.infer<typeof simulationTextMessageStartSchema>;
 
-export const simulationTextMessageEndSchema = simulationRunIdentitySchema.extend({
+export const simulationTextMessageEndSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   messageId: z.string(),
   role: z.string(),
   content: z.string(),
@@ -59,7 +63,8 @@ export const simulationTextMessageEndSchema = simulationRunIdentitySchema.extend
 });
 export type SimulationTextMessageEnd = z.infer<typeof simulationTextMessageEndSchema>;
 
-export const simulationFinishRunSchema = simulationRunIdentitySchema.extend({
+export const simulationFinishRunSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   results: z
     .object({
       verdict: z.enum(["success", "failure", "inconclusive"]),
@@ -86,12 +91,14 @@ export const simulationDeleteRunSchema = simulationRunIdentitySchema;
 export type SimulationDeleteRun = z.infer<typeof simulationDeleteRunSchema>;
 
 /** The connected agent instance that answered a run, reported by the child. */
-export const simulationRecordAgentInstanceSchema = simulationRunIdentitySchema.extend({
+export const simulationRecordAgentInstanceSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }),
 });
 export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
 
-export const simulationComputeRunMetricsSchema = simulationRunIdentitySchema.extend({
+export const simulationComputeRunMetricsSchema = z.object({
+  ...simulationRunIdentitySchema.shape,
   traceId: z.string(),
   metrics: z
     .object({

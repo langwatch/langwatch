@@ -41,7 +41,7 @@ export const personalWorkspaceSchema = z
   .strict();
 export type PersonalWorkspace = z.infer<typeof personalWorkspaceSchema>;
 
-export const ensuredPersonalWorkspaceSchema = personalWorkspaceSchema.extend({
+export const ensuredPersonalWorkspaceSchema = personalWorkspaceSchema.safeExtend({
   created: z.boolean(),
 });
 export type EnsuredPersonalWorkspace = z.infer<typeof ensuredPersonalWorkspaceSchema>;

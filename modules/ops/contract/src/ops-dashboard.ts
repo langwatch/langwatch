@@ -55,7 +55,8 @@ export const queueSummaryInfoSchema = z.object({
 });
 export type QueueSummaryInfo = z.infer<typeof queueSummaryInfoSchema>;
 
-export const queueInfoSchema = queueSummaryInfoSchema.extend({
+export const queueInfoSchema = z.object({
+  ...queueSummaryInfoSchema.shape,
   groups: z.array(groupInfoSchema),
 });
 export type QueueInfo = z.infer<typeof queueInfoSchema>;

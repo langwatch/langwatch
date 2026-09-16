@@ -19,7 +19,7 @@ export type OrganizationGroupRestMember = z.infer<typeof organizationGroupRestMe
 
 export const organizationGroupRestSummarySchema = organizationGroupSchema
   .omit({ organizationId: true, updatedAt: true })
-  .extend({
+  .safeExtend({
     memberCount: z.number().int().nonnegative(),
     bindings: z.array(organizationGroupBindingSchema),
   });
@@ -51,7 +51,7 @@ export type OrganizationGroupRestRenamed = z.infer<typeof organizationGroupRestR
 
 export const organizationGroupRestDetailsSchema = organizationGroupSchema
   .omit({ organizationId: true, createdAt: true, updatedAt: true })
-  .extend({
+  .safeExtend({
     members: z.array(organizationGroupRestMemberSchema),
     bindings: z.array(organizationGroupBindingSchema),
   });
@@ -98,10 +98,12 @@ export const organizationGroupRestAddMemberSchema = z.object({
 
 export const organizationGroupRestParamsSchema = z.object({ id: z.string().min(1) });
 
-export const organizationGroupRestMemberParamsSchema = organizationGroupRestParamsSchema.extend({
+export const organizationGroupRestMemberParamsSchema = z.object({
+  ...organizationGroupRestParamsSchema.shape,
   userId: z.string().min(1),
 });
 
-export const organizationGroupRestBindingParamsSchema = organizationGroupRestParamsSchema.extend({
+export const organizationGroupRestBindingParamsSchema = z.object({
+  ...organizationGroupRestParamsSchema.shape,
   bindingId: z.string().min(1),
 });

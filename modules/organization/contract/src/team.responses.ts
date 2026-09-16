@@ -41,7 +41,7 @@ const teamProjectSchema = z
   .strict();
 
 /** A team (or the organization's teams), each with its members and its projects. */
-export const teamWithProjectsSchema = organizationTeamWithMembersSchema.extend({
+export const teamWithProjectsSchema = organizationTeamWithMembersSchema.safeExtend({
   projects: z.array(teamProjectSchema),
 });
 export type TeamWithProjects = z.infer<typeof teamWithProjectsSchema>;

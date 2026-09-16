@@ -19,7 +19,7 @@ const waitingSinceSchema = z
 
 /** Everything this person has asked to join and not yet heard back on. */
 export const joinRequestMineSchema = waitingSinceSchema
-  .extend({ organizationId: z.string().min(1) })
+  .safeExtend({ organizationId: z.string().min(1) })
   .array();
 export type JoinRequestMine = z.infer<typeof joinRequestMineSchema>;
 
@@ -35,7 +35,7 @@ export type JoinRequestWriteAck = z.infer<typeof joinRequestWriteAckSchema>;
 
 /** One request waiting on this organization's admins, named for the reviewer. */
 export const joinRequestPendingSchema = waitingSinceSchema
-  .extend({
+  .safeExtend({
     userId: z.string().min(1),
     name: z.string(),
     domain: z.string(),

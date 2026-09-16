@@ -45,7 +45,8 @@ export const scenarioIdSchema = z.string();
  * Common fields shared by all scenario events including batch tracking and scenario identification.
  * Extends the base event schema with scenario-specific identifiers.
  */
-const baseScenarioEventSchema = baseEventSchema.extend({
+const baseScenarioEventSchema = z.object({
+  ...baseEventSchema.shape,
   batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
@@ -154,7 +155,8 @@ export const scenarioAgentSchema = z.object({
  * User-defined metadata fields pass through via `.passthrough()`; the
  * `langwatch` namespace is strictly validated.
  */
-export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
+export const scenarioRunStartedSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.RUN_STARTED),
   metadata: z
     .object({
@@ -207,7 +209,8 @@ export type ScenarioResults = z.infer<typeof scenarioResultsSchema>;
  * Captures the completion of a scenario run with final status and evaluation results.
  * Status indicates success/failure, while results contain detailed evaluation outcomes.
  */
-export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
+export const scenarioRunFinishedSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.RUN_FINISHED),
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
@@ -345,7 +348,8 @@ const scenarioAnthropicMessageSchema = z.object({
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
  */
-export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
+export const scenarioMessageSnapshotSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
   messages: z.array(
     z.intersection(
@@ -367,7 +371,8 @@ export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
  * Scenario Text Message Start Event Schema
  * Emitted when a message begins (placeholder). Persisted via event-sourcing.
  */
-export const scenarioTextMessageStartSchema = baseScenarioEventSchema.extend({
+export const scenarioTextMessageStartSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_START),
   messageId: z.string(),
   role: z.string(),
@@ -378,7 +383,8 @@ export const scenarioTextMessageStartSchema = baseScenarioEventSchema.extend({
  * Scenario Text Message End Event Schema
  * Emitted when a message is complete with full content. Persisted via event-sourcing.
  */
-export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
+export const scenarioTextMessageEndSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_END),
   messageId: z.string(),
   role: z.string(),
@@ -392,7 +398,8 @@ export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
  * Scenario Text Message Content Event Schema (broadcast only)
  * Streaming delta for real-time UX, not persisted.
  */
-export const scenarioTextMessageContentSchema = baseScenarioEventSchema.extend({
+export const scenarioTextMessageContentSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_CONTENT),
   messageId: z.string(),
   delta: z.string(),
@@ -401,7 +408,8 @@ export const scenarioTextMessageContentSchema = baseScenarioEventSchema.extend({
 /**
  * Scenario Tool Call Start Event Schema (broadcast only)
  */
-export const scenarioToolCallStartSchema = baseScenarioEventSchema.extend({
+export const scenarioToolCallStartSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_START),
   toolCallId: z.string(),
   toolCallName: z.string(),
@@ -411,7 +419,8 @@ export const scenarioToolCallStartSchema = baseScenarioEventSchema.extend({
 /**
  * Scenario Tool Call Args Event Schema (broadcast only)
  */
-export const scenarioToolCallArgsSchema = baseScenarioEventSchema.extend({
+export const scenarioToolCallArgsSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_ARGS),
   toolCallId: z.string(),
   delta: z.string(),
@@ -420,7 +429,8 @@ export const scenarioToolCallArgsSchema = baseScenarioEventSchema.extend({
 /**
  * Scenario Tool Call End Event Schema (broadcast only)
  */
-export const scenarioToolCallEndSchema = baseScenarioEventSchema.extend({
+export const scenarioToolCallEndSchema = z.object({
+  ...baseScenarioEventSchema.shape,
   type: z.literal(ScenarioEventType.TOOL_CALL_END),
   toolCallId: z.string(),
 });

@@ -140,7 +140,8 @@ const workbenchLocatorSchema = z.object({
 export const getWorkbenchStateInputSchema = workbenchLocatorSchema;
 export type GetWorkbenchStateInput = z.infer<typeof getWorkbenchStateInputSchema>;
 
-export const saveWorkbenchStateInputSchema = workbenchLocatorSchema.extend({
+export const saveWorkbenchStateInputSchema = z.object({
+  ...workbenchLocatorSchema.shape,
   state: z.unknown(),
   expectedVersion: z.number().optional(),
   actor: workbenchActorSchema,

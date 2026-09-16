@@ -368,7 +368,8 @@ export const baseSpanSchema = z.object({
 
 export type BaseSpan = z.infer<typeof baseSpanSchema>;
 
-export const lLMSpanSchema = baseSpanSchema.extend({
+export const lLMSpanSchema = z.object({
+  ...baseSpanSchema.shape,
   type: z.literal("llm"),
   // TODO: deprecate field, standardize on litellm model names
   vendor: z.string().optional().nullable(),
@@ -377,7 +378,8 @@ export const lLMSpanSchema = baseSpanSchema.extend({
 
 export type LLMSpan = z.infer<typeof lLMSpanSchema>;
 
-export const rAGSpanSchema = baseSpanSchema.extend({
+export const rAGSpanSchema = z.object({
+  ...baseSpanSchema.shape,
   type: z.literal("rag"),
   contexts: z.array(rAGChunkSchema),
 });
@@ -763,7 +765,7 @@ const omittedForDataset = {
  * carries.
  */
 export const datasetSpanSchema = z.union([
-  baseSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
-  lLMSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
-  rAGSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),
+  z.object({ ...baseSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
+  z.object({ ...lLMSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
+  z.object({ ...rAGSpanSchema.omit(omittedForDataset).shape, ...datasetSpanShape }),
 ]);

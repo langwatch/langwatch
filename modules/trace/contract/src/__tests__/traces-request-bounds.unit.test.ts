@@ -12,11 +12,15 @@ const ENTERPRISE_IDS = resolveRequestBound("traceIdsMax", "ENTERPRISE");
 
 const ids = (count: number) => Array.from({ length: count }, (_, index) => `trace-${index}`);
 
-const inputOf = (procedure: string) => {
-  const member = tracesTrpc.members[procedure];
-  if (!member) throw new Error(`tracesTrpc declares no procedure ${procedure}`);
+type TracesTrpcProcedure = keyof typeof tracesTrpc.members;
 
-  return member.input;
+const isDeclared = (procedure: string): procedure is TracesTrpcProcedure =>
+  Object.hasOwn(tracesTrpc.members, procedure);
+
+const inputOf = (procedure: string) => {
+  if (!isDeclared(procedure)) throw new Error(`tracesTrpc declares no procedure ${procedure}`);
+
+  return tracesTrpc.members[procedure].input;
 };
 
 describe("traces request-bound schemas", () => {

@@ -98,17 +98,20 @@ const redactionFlagsShape = {
 } as const;
 
 /** `list`: one page of the grid, redacted for the viewer. */
-export const tracesV2ListPageSchema = traceListPageSchema.extend({
-  items: z.array(traceListViewItemSchema.extend(redactionFlagsShape)),
+export const tracesV2ListPageSchema = z.object({
+  ...traceListPageSchema.shape,
+  items: z.array(z.object({ ...traceListViewItemSchema.shape, ...redactionFlagsShape })),
 });
 
 /** `sessions`: one page of the Sessions lens, cost- and title-gated. */
-export const tracesV2SessionsPageSchema = sessionGroupsResultSchema.extend({
+export const tracesV2SessionsPageSchema = z.object({
+  ...sessionGroupsResultSchema.shape,
   sessions: z.array(
-    sessionGroupDtoSchema.extend({
+    z.object({
+      ...sessionGroupDtoSchema.shape,
       ...redactionFlagsShape,
-      codingAgent: sessionGroupCodingAgentDtoSchema
-        .extend({ titleRedacted: z.boolean().optional() })
+      codingAgent: z
+        .object({ ...sessionGroupCodingAgentDtoSchema.shape, titleRedacted: z.boolean().optional() })
         .nullable(),
     }),
   ),

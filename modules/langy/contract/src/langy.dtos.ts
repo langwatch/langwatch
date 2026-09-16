@@ -36,7 +36,8 @@ export const langyConversationListCursorSchema = z.object({
 export type LangyConversationListCursorDto = z.infer<typeof langyConversationListCursorSchema>;
 
 /** Detail read for an opened conversation. Adds lifecycle status. */
-export const langyConversationDetailSchema = langyConversationListItemSchema.extend({
+export const langyConversationDetailSchema = z.object({
+  ...langyConversationListItemSchema.shape,
   status: langyConversationStatusSchema.default("active"),
 });
 export type LangyConversationDetailDto = z.infer<typeof langyConversationDetailSchema>;

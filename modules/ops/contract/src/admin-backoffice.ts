@@ -41,7 +41,8 @@ export const adminOperationRequestSchema = z.object({
   params: adminOperationParamsSchema,
 });
 
-export const adminOperationInputSchema = adminOperationRequestSchema.extend({
+export const adminOperationInputSchema = z.object({
+  ...adminOperationRequestSchema.shape,
   actorId: z.string().min(1),
   req: adminAuditRequestSchema,
 });

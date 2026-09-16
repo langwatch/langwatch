@@ -23,7 +23,8 @@ const workbenchAttributionShape = {
 } as const;
 
 /** `getEvaluationsV3BySlug`: the full experiment and the workbench state a page opens on. */
-export const experimentWorkbenchPageSchema = experimentSchema.extend({
+export const experimentWorkbenchPageSchema = z.object({
+  ...experimentSchema.shape,
   workbenchState: persistedEvaluationsV3StateSchema.nullable(),
   version: z.number(),
   ...workbenchAttributionShape,
@@ -63,18 +64,22 @@ export const experimentWorkbenchVersionProbeSchema = z.object({
  * `saveEvaluationsV3`: the saved experiment, carrying the version THIS write
  * landed on rather than the counter the row happened to hold.
  */
-export const experimentSavedWorkbenchSchema = experimentSchema.extend({
+export const experimentSavedWorkbenchSchema = z.object({
+  ...experimentSchema.shape,
   version: z.number(),
 });
 
 /** `listWorkbenchVersions`: the history drawer, with each author's name resolved. */
 export const experimentWorkbenchVersionsPageSchema = z.object({
-  versions: z.array(workbenchVersionSummarySchema.extend({ authorName: z.string().nullable() })),
+  versions: z.array(
+    z.object({ ...workbenchVersionSummarySchema.shape, authorName: z.string().nullable() }),
+  ),
   nextCursor: z.number().nullable(),
 });
 
 /** `getExperimentWithDSLBySlug`: one experiment plus the workflow behind it. */
-export const experimentWithDslSchema = experimentSchema.extend({
+export const experimentWithDslSchema = z.object({
+  ...experimentSchema.shape,
   /** Optional as well as nullable: a row with no state reads back undefined. */
   workbenchState: z.json().nullable().optional(),
   dsl: studioWorkflowSchema.optional(),
@@ -83,7 +88,8 @@ export const experimentWithDslSchema = experimentSchema.extend({
 /** `getAllForEvaluationsList`: one page of the evaluations list. */
 export const experimentEvaluationsListPageSchema = z.object({
   experiments: z.array(
-    experimentSchema.extend({
+    z.object({
+      ...experimentSchema.shape,
       workbenchState: z.json().nullable().optional(),
       workflow: workflowWithVersionSchema.nullable(),
       runsSummary: z.object({

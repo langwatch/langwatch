@@ -25,8 +25,9 @@ import {
  * Extends the target object rather than `targetConfigSchema`: the refinement
  * stays on the latter, which is what validates the state written back.
  */
-export const addTargetPayloadSchema = targetConfigObjectSchema
-  .extend({
+export const addTargetPayloadSchema = z
+  .object({
+    ...targetConfigObjectSchema.shape,
     id: z
       .string()
       .min(1)
@@ -229,14 +230,14 @@ const isKnownEvaluatorType = (evaluatorType: string): boolean =>
     (prefix) => evaluatorType.startsWith(prefix) && evaluatorType.length > prefix.length,
   );
 
-export const addEvaluatorPayloadSchema = evaluatorConfigSchema
-  .pick({
-    evaluatorType: true,
-    dbEvaluatorId: true,
-    comparison: true,
-    localEvaluatorConfig: true,
-  })
-  .extend({
+export const addEvaluatorPayloadSchema = z
+  .object({
+    ...evaluatorConfigSchema.pick({
+      evaluatorType: true,
+      dbEvaluatorId: true,
+      comparison: true,
+      localEvaluatorConfig: true,
+    }).shape,
     id: z
       .string()
       .min(1)
@@ -317,8 +318,9 @@ export type SetCellValuePayload = z.infer<typeof setCellValuePayloadSchema>;
 export const addColumnPayloadSchema = z
   .object({
     datasetId: z.string().describe("Id of the inline dataset to add to."),
-    column: datasetColumnSchema
-      .extend({
+    column: z
+      .object({
+        ...datasetColumnSchema.shape,
         id: z.string().optional().describe("Defaults to the column name."),
         type: z.string().default("string").describe('Column type, for example "string" or "json".'),
       })

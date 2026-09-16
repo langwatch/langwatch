@@ -53,7 +53,8 @@ export const scenarioRunRestResponseSchema = z.object({
     ),
 });
 
-export const scenarioRunRestResponseWithPlatformUrlSchema = scenarioRunRestResponseSchema.extend({
+export const scenarioRunRestResponseWithPlatformUrlSchema = z.object({
+  ...scenarioRunRestResponseSchema.shape,
   platformUrl: z.string().url(),
 });
 

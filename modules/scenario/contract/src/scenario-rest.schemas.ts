@@ -66,7 +66,8 @@ export const scenarioRestResponseSchema = z.object({
     ),
 });
 
-export const scenarioRestResponseWithPlatformUrlSchema = scenarioRestResponseSchema.extend({
+export const scenarioRestResponseWithPlatformUrlSchema = z.object({
+  ...scenarioRestResponseSchema.shape,
   platformUrl: z.string().url(),
 });
 
@@ -101,7 +102,8 @@ export const scenarioRestVersionListResponseSchema = z.object({
     .describe("Pass as cursor to read the page below this one. Null on the last page."),
 });
 
-export const scenarioRestVersionDetailResponseSchema = scenarioRestVersionSummarySchema.extend({
+export const scenarioRestVersionDetailResponseSchema = z.object({
+  ...scenarioRestVersionSummarySchema.shape,
   schemaVersion: z.number().int().describe("The shape the snapshot was written in."),
   snapshot: z
     .object({
@@ -176,7 +178,8 @@ export const scenarioRestUpdateSchema = z.object({
 });
 
 export const scenarioRestIdParamsSchema = z.object({ id: z.string().min(1) });
-export const scenarioRestIdVersionParamsSchema = scenarioRestIdParamsSchema.extend({
+export const scenarioRestIdVersionParamsSchema = z.object({
+  ...scenarioRestIdParamsSchema.shape,
   version: z.coerce.number().int().min(1),
 });
 export const scenarioRestArchivedSchema = z.object({ id: z.string(), archived: z.boolean() });

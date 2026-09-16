@@ -11,7 +11,10 @@ import { traceEditOverlayDtoSchema, traceEditOverlayOrNullSchema } from "./trace
 
 const traceScopeSchema = z.object({ projectId: z.string(), traceId: z.string() });
 
-const upsertInputSchema = traceScopeSchema.extend({ patch: traceEditOverlayPatchSchema });
+const upsertInputSchema = z.object({
+  ...traceScopeSchema.shape,
+  patch: traceEditOverlayPatchSchema,
+});
 
 export const traceEditOverlayTrpc = defineTrpcContract("traceEditOverlay")
   .query("getByTraceId")

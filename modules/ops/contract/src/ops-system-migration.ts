@@ -12,7 +12,8 @@ export const opsMigrationTenantInputSchema = z.object({
   migrationName: z.string().min(1).max(200),
 });
 
-export const opsEnrollMigrationTenantInputSchema = opsMigrationTenantInputSchema.extend({
+export const opsEnrollMigrationTenantInputSchema = z.object({
+  ...opsMigrationTenantInputSchema.shape,
   // Typed confirmation for the cutover migration, same reasoning as the
   // rollback's: enrolling an organization for cutover is what lets the next
   // pass flip which tables answer every permission check for it.
@@ -31,13 +32,12 @@ export const opsSearchMigrationOrganizationsInputSchema = z.object({
   query: z.string().max(200),
 });
 
-export const opsRunSystemMigrationForOrganizationInputSchema = opsMigrationTenantInputSchema.extend(
-  {
-    // Typed confirmation for the cutover migration - a targeted cutover run is
-    // exactly the flip the enrollment confirmation guards.
-    confirm: z.literal("RUN").optional(),
-  },
-);
+export const opsRunSystemMigrationForOrganizationInputSchema = z.object({
+  ...opsMigrationTenantInputSchema.shape,
+  // Typed confirmation for the cutover migration - a targeted cutover run is
+  // exactly the flip the enrollment confirmation guards.
+  confirm: z.literal("RUN").optional(),
+});
 
 export const opsAssertLegacyWritersDrainedInputSchema = z.object({
   migrationName: z.string().min(1).max(200),

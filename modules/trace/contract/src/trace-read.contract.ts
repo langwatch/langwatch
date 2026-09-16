@@ -156,7 +156,8 @@ export type TraceLegacyListInput = TraceLegacyFilterInput & {
  * things that read joins on — the guardrail that blocked it, if one did, and
  * whether it carries annotations.
  */
-export const traceWithGuardrailSchema = traceSchema.extend({
+export const traceWithGuardrailSchema = z.object({
+  ...traceSchema.shape,
   lastGuardrail: evaluationResultSchema.and(z.object({ name: z.string().optional() })).optional(),
   annotations: z.object({ hasAnnotation: z.boolean(), count: z.number() }).optional(),
 });
@@ -201,4 +202,7 @@ export const distinctFieldNamesResultSchema = z.object({
 });
 
 /** One sampled trace, flagged with whether it met the evaluator's conditions. */
-export const sampledTraceSchema = traceSchema.extend({ passesPreconditions: z.boolean() });
+export const sampledTraceSchema = z.object({
+  ...traceSchema.shape,
+  passesPreconditions: z.boolean(),
+});

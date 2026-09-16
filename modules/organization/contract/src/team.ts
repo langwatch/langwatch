@@ -84,9 +84,10 @@ export const changeOrganizationTeamMemberInputSchema = z
   })
   .strict();
 
-export const addOrganizationTeamMemberInputSchema = changeOrganizationTeamMemberInputSchema.extend({
-  role: organizationTeamRoleSchema,
-});
+export const addOrganizationTeamMemberInputSchema =
+  changeOrganizationTeamMemberInputSchema.safeExtend({
+    role: organizationTeamRoleSchema,
+  });
 export type AddOrganizationTeamMemberInput = z.infer<typeof addOrganizationTeamMemberInputSchema>;
 
 export type RemoveOrganizationTeamMemberInput = z.infer<
@@ -159,7 +160,7 @@ export const organizationTeamMemberSchema = z
   .strict();
 export type OrganizationTeamMember = z.infer<typeof organizationTeamMemberSchema>;
 
-export const organizationTeamWithMembersSchema = organizationTeamSchema.extend({
+export const organizationTeamWithMembersSchema = organizationTeamSchema.safeExtend({
   members: z.array(organizationTeamMemberSchema),
 });
 export type OrganizationTeamWithMembers = z.infer<typeof organizationTeamWithMembersSchema>;
@@ -176,13 +177,13 @@ export const getOrganizationTeamBySlugInputSchema = z
 export type GetOrganizationTeamBySlugInput = z.infer<typeof getOrganizationTeamBySlugInputSchema>;
 
 export const getOrganizationTeamBySlugForMemberInputSchema =
-  getOrganizationTeamBySlugInputSchema.extend({ userId: z.string().min(1) });
+  getOrganizationTeamBySlugInputSchema.safeExtend({ userId: z.string().min(1) });
 export type GetOrganizationTeamBySlugForMemberInput = z.infer<
   typeof getOrganizationTeamBySlugForMemberInputSchema
 >;
 
 export const getOrganizationTeamWithMembersInputSchema =
-  getOrganizationTeamBySlugInputSchema.extend({
+  getOrganizationTeamBySlugInputSchema.safeExtend({
     callerUserId: z.string().min(1),
     callerCanManage: z.boolean(),
   });
@@ -277,7 +278,7 @@ export type OrganizationProjectOnlyAccess = z.infer<typeof organizationProjectOn
 
 export const organizationProjectAccessMemberSchema = organizationTeamAccessMemberSchema
   .omit({ viaGroupId: true })
-  .extend({
+  .safeExtend({
     source: z.enum(["team", "direct", "override"]),
     teamRole: organizationTeamMemberRoleSchema.optional(),
   });

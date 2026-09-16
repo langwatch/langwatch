@@ -76,7 +76,7 @@ const traceEventSchema = z.object({
  */
 const eventMetadataBaseSchema = eventMetadataSchema;
 
-export const spanRecordedEventSchema = traceEventSchema.extend({
+export const spanRecordedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(SPAN_RECORDED_EVENT_TYPE),
   data: recordTraceSpanEventDataSchema,
   metadata: eventMetadataBaseSchema,
@@ -199,7 +199,7 @@ export const topicAssignedEventDataSchema = z.object({
   isIncremental: z.boolean(),
 });
 
-export const topicAssignedEventSchema = traceEventSchema.extend({
+export const topicAssignedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(TOPIC_ASSIGNED_EVENT_TYPE),
   data: topicAssignedEventDataSchema,
   metadata: topicAssignedEventMetadataSchema,
@@ -239,7 +239,7 @@ export const logRecordReceivedEventDataSchema = z.object({
   piiRedactionLevel: piiRedactionLevelSchema,
 });
 
-export const logRecordReceivedEventSchema = traceEventSchema.extend({
+export const logRecordReceivedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: logRecordReceivedEventDataSchema,
   metadata: logRecordReceivedEventMetadataSchema,
@@ -259,7 +259,7 @@ export const logContributedEventDataSchema = logTraceContributionSchema.omit({
   occurredAt: true,
 });
 
-export const logContributedEventSchema = traceEventSchema.extend({
+export const logContributedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
   data: logContributedEventDataSchema,
   metadata: eventMetadataBaseSchema,
@@ -284,7 +284,7 @@ export const metricDataPointCorrelatedEventMetadataSchema = z
 
 export const metricDataPointCorrelatedEventDataSchema = z.object(metricCorrelationFields);
 
-export const metricDataPointCorrelatedEventSchema = traceEventSchema.extend({
+export const metricDataPointCorrelatedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
   data: metricDataPointCorrelatedEventDataSchema,
   metadata: metricDataPointCorrelatedEventMetadataSchema,
@@ -318,7 +318,7 @@ export const originResolvedEventDataSchema = z.object({
   reason: z.string(),
 });
 
-export const originResolvedEventSchema = traceEventSchema.extend({
+export const originResolvedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
   data: originResolvedEventDataSchema,
   metadata: originResolvedEventMetadataSchema,
@@ -351,7 +351,7 @@ export const annotationAddedEventDataSchema = z.object({
   annotationId: z.string(),
 });
 
-export const annotationAddedEventSchema = traceEventSchema.extend({
+export const annotationAddedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_ADDED_EVENT_TYPE),
   data: annotationAddedEventDataSchema,
   metadata: annotationAddedEventMetadataSchema,
@@ -384,7 +384,7 @@ export const annotationRemovedEventDataSchema = z.object({
   annotationId: z.string(),
 });
 
-export const annotationRemovedEventSchema = traceEventSchema.extend({
+export const annotationRemovedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_REMOVED_EVENT_TYPE),
   data: annotationRemovedEventDataSchema,
   metadata: annotationRemovedEventMetadataSchema,
@@ -419,7 +419,7 @@ export const annotationsBulkSyncedEventDataSchema = z.object({
   annotationIds: z.array(z.string()),
 });
 
-export const annotationsBulkSyncedEventSchema = traceEventSchema.extend({
+export const annotationsBulkSyncedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(ANNOTATIONS_BULK_SYNCED_EVENT_TYPE),
   data: annotationsBulkSyncedEventDataSchema,
   metadata: annotationsBulkSyncedEventMetadataSchema,
@@ -459,7 +459,7 @@ export const traceNameChangedEventDataSchema = z.object({
   changedByUserId: z.string().nullable(),
 });
 
-export const traceNameChangedEventSchema = traceEventSchema.extend({
+export const traceNameChangedEventSchema = z.object({ ...traceEventSchema.shape,
   type: z.literal(TRACE_NAME_CHANGED_EVENT_TYPE),
   data: traceNameChangedEventDataSchema,
   metadata: traceNameChangedEventMetadataSchema,

@@ -44,7 +44,8 @@ const pageOffsetInput = z
   });
 
 /** What a legacy trace read may be scoped by, and what a caller may send. */
-export const traceFilterInputSchema = sharedFiltersInputSchema.extend({
+export const traceFilterInputSchema = z.object({
+  ...sharedFiltersInputSchema.shape,
   pageOffset: pageOffsetInput,
   // Non-negative integers only (#2163): a fractional or negative page size
   // reaches ClickHouse as a LIMIT and fails there instead of at the boundary.
@@ -54,7 +55,8 @@ export const traceFilterInputSchema = sharedFiltersInputSchema.extend({
 });
 
 /** The same, plus the paging and ordering the list/search read understands. */
-export const traceListInputSchema = traceFilterInputSchema.extend({
+export const traceListInputSchema = z.object({
+  ...traceFilterInputSchema.shape,
   groupBy: z.string().optional(),
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
@@ -81,7 +83,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(tracesForProjectResultSchema)
 
   .query("getById")
-  .withInput(traceScopeSchema.extend({ withEditOverlay: withEditOverlayInput }))
+  .withInput(z.object({ ...traceScopeSchema.shape, withEditOverlay: withEditOverlayInput }))
   .withOutput(traceSchema)
 
   .query("getEvaluations")
@@ -144,7 +146,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(traceSchema.array())
 
   .query("getSampleTracesDataset")
-  .withInput(traceFilterInputSchema.merge(sampleExtrasSchema))
+  .withInput(z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }))
   .withOutput(traceSchema.array())
 
   .query("getFieldNames")
@@ -152,7 +154,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(distinctFieldNamesResultSchema)
 
   .mutation("getAllForDownload")
-  .withInput(traceListInputSchema.merge(downloadExtrasSchema))
+  .withInput(z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape }))
   .withOutput(tracesForProjectResultSchema)
 
   /**

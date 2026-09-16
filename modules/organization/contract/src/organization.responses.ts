@@ -94,7 +94,7 @@ export type OrganizationInviteResent = z.infer<typeof organizationInviteResentSc
 
 /** One pending invitation, as the members screen's admin list renders it. */
 export const organizationListedInviteSchema = organizationInviteRowSchema
-  .extend({
+  .safeExtend({
     inviteUrl: z.string(),
     displayStatus: z.enum([
       "PENDING",
@@ -117,7 +117,7 @@ export const organizationListedInvitesSchema = organizationListedInviteSchema.ar
 export const organizationInviteAcceptedSchema = z
   .object({
     success: z.literal(true),
-    invite: organizationInviteRowSchema.extend({ organization: organizationRowSchema }),
+    invite: organizationInviteRowSchema.safeExtend({ organization: organizationRowSchema }),
     project: z
       .object({ slug: z.string().min(1) })
       .strict()

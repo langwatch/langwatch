@@ -69,15 +69,15 @@ export const organizationManagementRestUpdateMemberSchema = z
     }
   });
 
-export const organizationManagementRestMemberWithTeamsSchema =
-  organizationManagementRestMemberSchema.extend({
-    teams: z.array(organizationManagementRestMemberTeamSchema),
-  });
+export const organizationManagementRestMemberWithTeamsSchema = z.object({
+  ...organizationManagementRestMemberSchema.shape,
+  teams: z.array(organizationManagementRestMemberTeamSchema),
+});
 
-export const organizationManagementRestUpdatedMemberSchema =
-  organizationManagementRestMemberSchema.extend({
-    teamsLeftWithoutAdmin: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
-  });
+export const organizationManagementRestUpdatedMemberSchema = z.object({
+  ...organizationManagementRestMemberSchema.shape,
+  teamsLeftWithoutAdmin: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+});
 
 const organizationManagementRestAccessBindingSchema = z.object({
   id: z.string(),
@@ -149,7 +149,9 @@ export const organizationManagementRestCreateInvitesSchema = z.object({
 });
 
 export const organizationManagementRestCreatedInvitesSchema = z.object({
-  invites: z.array(organizationManagementRestInviteSchema.extend({ emailNotSent: z.boolean() })),
+  invites: z.array(
+    z.object({ ...organizationManagementRestInviteSchema.shape, emailNotSent: z.boolean() }),
+  ),
 });
 
 export const organizationManagementRestListMembersQuerySchema = z.object({

@@ -77,7 +77,8 @@ export const opsQueueDlqGroupSchema = z.object({
 });
 export type OpsQueueDlqGroup = z.infer<typeof opsQueueDlqGroupSchema>;
 
-export const opsQueueDlqGroupWithQueueSchema = opsQueueDlqGroupSchema.extend({
+export const opsQueueDlqGroupWithQueueSchema = z.object({
+  ...opsQueueDlqGroupSchema.shape,
   queueName: z.string(),
   queueDisplayName: z.string(),
 });

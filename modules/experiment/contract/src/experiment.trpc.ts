@@ -41,7 +41,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .mutation("saveExperiment")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       workbenchState: legacyWorkbenchStateSchema,
       dsl: studioWorkflowSchema,
@@ -56,7 +56,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
    */
   .mutation("saveEvaluationsV3")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       state: persistedEvaluationsV3StateSchema,
       expectedVersion: z.number().int().optional(),
@@ -65,7 +65,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   .withOutput(experimentSavedWorkbenchSchema)
 
   .query("getEvaluationsV3BySlug")
-  .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentSlug: z.string() }))
   .withOutput(experimentWorkbenchPageSchema)
 
   /**
@@ -74,7 +74,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
    * when it is behind, so tab switching costs one point read, not one blob.
    */
   .query("getWorkbenchVersion")
-  .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentSlug: z.string() }))
   .withOutput(experimentWorkbenchVersionProbeSchema)
 
   /**
@@ -87,7 +87,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("listWorkbenchVersions")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       experimentId: z.string(),
       limit: z.number().int().min(1).max(100).optional(),
       cursor: z.number().int().optional(),
@@ -97,26 +97,26 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .mutation("commitWorkbenchVersion")
   .withInput(
-    projectScopeSchema.extend({ experimentId: z.string(), commitMessage: z.string().min(1) }),
+    z.object({ ...projectScopeSchema.shape, experimentId: z.string(), commitMessage: z.string().min(1) }),
   )
   .withOutput(workbenchSaveResultSchema)
 
   .mutation("restoreWorkbenchVersion")
   .withInput(
-    projectScopeSchema.extend({ experimentId: z.string(), version: z.number().int().min(1) }),
+    z.object({ ...projectScopeSchema.shape, experimentId: z.string(), version: z.number().int().min(1) }),
   )
   .withOutput(workbenchSaveResultSchema)
 
   /** Publishes the experiment and returns the monitor row origin/main returned. */
   .mutation("saveAsMonitor")
-  .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string() }))
   .withOutput(experimentPublishedMonitorSchema)
 
   // ── The experiments a project lists ──────────────────────────────
 
   .query("getExperimentBySlugOrId")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       experimentId: z.string().optional(),
       experimentSlug: z.string().optional(),
     }),
@@ -125,7 +125,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getExperimentWithDSLBySlug")
   .withInput(
-    projectScopeSchema.extend({ experimentSlug: z.string(), randomSeed: z.number().optional() }),
+    z.object({ ...projectScopeSchema.shape, experimentSlug: z.string(), randomSeed: z.number().optional() }),
   )
   .withOutput(experimentWithDslSchema)
 
@@ -135,7 +135,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
 
   .query("getAllForEvaluationsList")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       pageOffset: z.number().optional(),
       pageSize: z.number().optional(),
     }),
@@ -153,7 +153,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
    * page that has always called it.
    */
   .mutation("deleteExperiment")
-  .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string() }))
   .withOutput(experimentArchivedSchema)
 
   .mutation("copy")
@@ -170,12 +170,12 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   // ── The runs recorded against one ────────────────────────────────
 
   .query("getExperimentDSPyRuns")
-  .withInput(projectScopeSchema.extend({ experimentSlug: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentSlug: z.string() }))
   .withOutput(z.array(dSPyRunsSummarySchema))
 
   .query("getExperimentDSPyStep")
   .withInput(
-    projectScopeSchema.extend({
+    z.object({ ...projectScopeSchema.shape,
       experimentSlug: z.string(),
       runId: z.string(),
       index: z.string(),
@@ -184,11 +184,11 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   .withOutput(dSPyStepSchema)
 
   .query("getExperimentBatchEvaluationRuns")
-  .withInput(projectScopeSchema.extend({ experimentId: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string() }))
   .withOutput(experimentRunListSchema)
 
   .query("getExperimentBatchEvaluationRun")
-  .withInput(projectScopeSchema.extend({ experimentId: z.string(), runId: z.string() }))
+  .withInput(z.object({ ...projectScopeSchema.shape, experimentId: z.string(), runId: z.string() }))
   .withOutput(experimentRunWithItemsSchema.nullable())
 
   .build();
