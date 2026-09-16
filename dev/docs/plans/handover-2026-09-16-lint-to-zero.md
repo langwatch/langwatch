@@ -217,30 +217,54 @@ convert *to*, and for some there is not one.
 
 ### The mop-up nobody should forget
 
-18 `comment-block-size` findings remain inside areas already swept and reported
-clean. None is a regression — **every one is a file that was dirty or untracked
-when its lane ran, and was therefore correctly excluded from the slice.** They
-break down two ways:
+**24 `comment-block-size` findings remain inside areas already swept.** None is a
+regression. Measured with an exact path boundary — note that
+`startswith("modules/auth")` also matches `modules/authz` and will tell you
+there are 100.
 
-- **9 are inside files another session has dirty** (`gateway-composition.build.ts`,
-  `gateway-platform.rest.ts`, `ops-clickhouse-explain.rest.ts`,
-  `join-request-notifier.service.ts`,
-  `join-request-lifecycle-dispatcher.service.unit.test.ts`,
-  `model-provider-evidence-service.composition.ts`), plus
-  `prisma.gateway-organization-directory.repository.ts`, which was untracked
-  during the gateway sweep and arrived in git with `491fc125ab`. They can only
-  be cut once that session's work settles.
-- **9 are over-long comment *lines*, not blocks** — 100-column violations
-  reported under the same rule id, in `modules/analytics/web` (6) and
-  `sdks/typescript` (3). Most are `biome-ignore` / `eslint-disable` directives,
-  which cannot simply be wrapped: the fix is the one-line relocation used in
-  commit `095936beea`.
+| where | n | why |
+| --- | ---: | --- |
+| `modules/gateway` | 4 | inside another session's dirty files |
+| `modules/identity` | 3 | " |
+| `modules/auth` | 3 | all in `auth-cli-device-flow.rest.ts`, dirty |
+| `modules/ops` | 1 | " |
+| `modules/model-provider` | 1 | " |
+| `modules/analytics` | 6 | over-long comment *lines*, not blocks |
+| `sdks/typescript` | 3 | " |
+| `dev/scripts` | 3 | the two big headers, escalated — see below |
 
-The lesson is about method, not regression: **a slice built against a dirty tree
-silently under-reports its area, and the excluded files are invisible in the
-lane's own "zero findings" result.** Every lane here reported its area clean and
-every one was telling the truth about its slice. Whoever finishes an area should
-re-measure it against a clean tree before calling it done.
+So: **12 blocked behind another session's uncommitted work**, **9 are 100-column
+violations reported under the same rule id** (mostly `biome-ignore` /
+`eslint-disable` directives, which cannot simply be wrapped — the fix is the
+one-line relocation used in `095936beea`), and **3 are a deliberate decision**.
 
-Nothing enforces the sweep either — no ratchet stops a new over-budget block
-landing in a swept area. That has not been observed yet, but nothing prevents it.
+At zero and verified: `modules/trace`, `modules/scenario`, `modules/automation`,
+`packages/eventing`, `modules/prompt`, `modules/coding-agent`,
+`enterprise/modules/governance`.
+
+The method lesson: **a slice built against a dirty tree silently under-reports
+its area, and the excluded files are invisible in the lane's own "zero findings"
+result.** Every lane here reported its area clean and every one was telling the
+truth about its slice. Re-measure an area against a clean tree before calling it
+done.
+
+### The two `dev/scripts` headers — a decision, not a task
+
+`dev/scripts/check-queue.mjs` (58 lines) and `dev/scripts/dev-supervisor.mjs`
+(140 lines, plus a 132-column line). The `w3-dev` lane deliberately left both and
+escalated, which was correct: these are not narration.
+
+- `check-queue.mjs` documents the **environment contract** every agent in this
+  repo passes through — `CHECK_SLOTS`, `CHECK_QUEUE_HELD`, `CHECK_PRESSURE`,
+  including the rule that an agent shell may not gate the queue off. Much of it
+  is restated in CLAUDE.md, and the script already has `--explain`.
+- `dev-supervisor.mjs` carries a **PID table** showing an abandoned stack's
+  process group. The table *is* the argument for why the supervisor exists;
+  compressed to three lines it becomes an assertion nobody can check.
+
+Neither belongs in a 5-line budget, and neither should be deleted. The options:
+a `dev/docs/` page each with a one-line pointer (cheapest, keeps them readable);
+an ADR for the supervisor's process-group design plus `--help` text for the
+queue's environment contract (most correct, most work); or an explicit,
+documented exemption. **This is a writing task, not a sweep task** — Fable's
+band, once someone picks the destination.
