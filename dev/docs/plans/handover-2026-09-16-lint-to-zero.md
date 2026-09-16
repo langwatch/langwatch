@@ -606,6 +606,54 @@ Worth knowing while you are there: `stand-in-cast` did NOT fire on
 `as unknown as T` and `as any`, and a narrowing `as T` is deliberately left
 alone - so the seam rule is what covers that case, not the cast rule.
 
+## THE PACKAGE-SUITES CI JOB WAS DEAD, AND IS FIXED (2026-09-17)
+
+`.github/package-suites.excluded` lines 23-24 (`@langwatch/worker`,
+`@langwatch/ui`) carried no `# reason`. `run-package-suites.sh` hard-errors on a
+bare name and `read_register ... || exit 1` kills the run, so the job exited
+**before discovering a single package**. It is wired into
+`langwatch-app-ci.yml:895`, and this was committed state since `e702359c53`
+("Cutover A").
+
+**Every workspace package suite had been unrun in CI since then** - reading green,
+because a suite CI never starts cannot fail. Two comments fixed it. The gate's own
+test passes 20/20.
+
+This is the fourth measurement defect this drive has found, and the largest: a
+vendored bundle counted as debt, a declarations gate short-circuited out of
+running, a suppression ledger hiding 8,904 findings, and now a CI job that
+refused to start.
+
+## `test:unit` IS GONE; `test` IS THE ONE NAME (2026-09-17)
+
+168 packages declared both `test` and `test:unit`, **157 with byte-identical
+commands**. pnpm cannot express "prefer `test:unit` else `test`", and that is the
+whole reason the gate carries 316 lines of bash to choose. Every package's `test`
+is now set to exactly what CI ran before, so the change is behaviour-preserving by
+construction; `test:unit` is absent workspace-wide, and CI, 17 docs and the
+harness message follow it.
+
+Side effect worth having: 8 manifests had `test: vitest` - **watch mode**, which
+hangs a local `pnpm test` and only worked in CI because vitest detects `CI`.
+
+**The gate can now shrink, but it cannot vanish, and here is the constraint.**
+`pnpm -r --report-summary --no-bail --filter '!excluded' run test` does the
+discovery, the serial run and the per-package status (verified: it writes
+`pnpm-exec-summary.json`). What it does NOT do is notice that an *excluded* entry
+names a package the workspace no longer has - `--filter '!nonexistent'` matches
+nothing, silently. The old script checks that, and dropping the check would
+recreate exactly the class of defect above. A rewrite was written and reverted for
+that reason: keep a workspace-membership check, or do not do it.
+
+## THE BIGGEST FAMILY IS ARCHITECTURAL, MEASURED NOT ASSUMED
+
+`module-app-only-across-packages` is 1,158, with 786 in `apps/worker` alone across
+four composition files. It is 828 DISTINCT symbols - a long tail, not a few
+repeated imports - and **1,058 of the 1,158 are value imports**, not type-only
+(the rule already allows a type-only import whose name ends `Infrastructure`).
+So it is ADR-144 work: a composition root reaching into a module's server package
+instead of through its `*Api` token. There is no scoping fix and no cheap subset.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
