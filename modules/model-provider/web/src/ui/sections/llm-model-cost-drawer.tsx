@@ -56,9 +56,8 @@ function findEditedCost({
 
 /**
  * Editing keeps the row's scope; new and cloned rows default to the current
- * project. The org/team rows let an admin push one cost policy down the
- * cascade (PROJECT -> TEAM -> ORGANIZATION) instead of every project
- * re-entering it.
+ * project. Org/team rows let an admin push one cost policy down the
+ * cascade instead of every project re-entering it.
  */
 function initialScope({
   editedCost,

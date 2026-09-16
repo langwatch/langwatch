@@ -1,10 +1,7 @@
 /**
- * The input shapes the custom model-cost tRPC surface parses.
- *
- * Two of them carry a caller-supplied `regex`, accepted only when the pattern
- * compiles and is free of catastrophic backtracking. The factories stay
- * parameterized so a caller with its own predicate can still build the shape;
- * the declared schemas below run the contract's own check.
+ * The input shapes the custom model-cost tRPC surface parses. Two carry a
+ * caller-supplied `regex`, accepted only when it compiles and is free of
+ * catastrophic backtracking; the contract's own check runs in the schemas below.
  */
 import { z } from "zod";
 import { isSafeCostRegex } from "./model-cost.ts";

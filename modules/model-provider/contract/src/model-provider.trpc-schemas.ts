@@ -19,10 +19,9 @@ import {
 } from "./model-provider-list-entry.ts";
 
 /**
- * The scope-assignment shape the clients send. Deliberately not the
- * contract's `modelProviderScopeSchema`, which is `.strict()`: this input has
- * always accepted (and dropped) unknown keys, and tightening it here would
- * turn a forward-compatible client into a validation error.
+ * The scope-assignment shape the clients send — deliberately not the
+ * contract's `.strict()` `modelProviderScopeSchema`: this input has always
+ * accepted unknown keys, and tightening it would break forward-compat clients.
  */
 export const modelProviderScopeAssignmentInputSchema = z.object({
   scopeType: modelProviderScopeTypeSchema,
@@ -30,10 +29,9 @@ export const modelProviderScopeAssignmentInputSchema = z.object({
 });
 
 /**
- * Shared input shape for the provider write paths: name the tenant with
- * either handle, and refuse a request that names neither. A create with
- * no project also has to say where the credential lands, since there is
- * no project to default the scope set from.
+ * Shared input shape for provider write paths: name the tenant with either
+ * handle, refusing neither. A create with no project must also say where
+ * the credential lands, since there's no project to default the scope from.
  */
 export const modelProviderTenantAnchorFields = {
   projectId: z.string().optional(),
@@ -66,12 +64,9 @@ export const modelProviderUpdateTrpcInputSchema = z
     id: z.string().optional(),
     ...modelProviderTenantAnchorFields,
     provider: z.string(),
-    // Human-readable label shown in the settings list and the model
-    // selector group headers. Defaults to the humanized provider name
-    // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
-    // column; now exposing it on the write path so operators can
-    // distinguish multiple same-provider instances at different
-    // scopes.
+    // Human-readable label for the settings list and model-selector group
+    // headers. Defaults to the humanized provider name ("openai" → "OpenAI")
+    // when omitted; lets operators distinguish same-provider instances.
     name: z.string().trim().min(1).max(128).optional(),
     enabled: z.boolean(),
     customKeys: z.object({}).passthrough().optional().nullable(),
@@ -82,13 +77,11 @@ export const modelProviderUpdateTrpcInputSchema = z
       .optional()
       .nullable(),
     defaultModel: z.string().optional(),
-    // The slug that addresses THIS instance in a gateway model string
-    // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone;
-    // an empty string clears it. The length and the message both come
-    // from the same module the service validates against, so the schema
-    // cannot start accepting a handle the service will refuse. The shape
-    // and the reserved names are checked in the service, which owns the
-    // rule the gateway reads.
+    // The slug addressing THIS instance in a gateway model string
+    // ("eu/claude-sonnet-5"). Omitted leaves the stored handle alone; an
+    // empty string clears it. Length and message match the service's own
+    // validation module, so the two can't drift; reserved names are
+    // checked there too.
     routingHandle: z
       .string()
       .max(ROUTING_HANDLE_MAX_LENGTH, ROUTING_HANDLE_RULE)

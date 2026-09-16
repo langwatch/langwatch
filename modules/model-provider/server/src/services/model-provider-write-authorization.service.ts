@@ -31,10 +31,9 @@ export class ModelProviderWriteAuthorizationService {
   }
 
   /**
-   * The same scope-by-scope check against the CREDENTIAL a request arrived on
-   * rather than against its owner. One mapping, one refusal, two principals:
-   * a transport that authorizes the owner alone lets a deliberately narrow key
-   * write with its owner's grants.
+   * The same scope-by-scope check against the CREDENTIAL a request arrived
+   * on, not its owner. One mapping, one refusal, two principals: authorizing
+   * only the owner would let a deliberately narrow key write with their grants.
    */
   async assertApiKeyCanWriteDefault(
     apiKey: ModelDefaultApiKeyPrincipal,

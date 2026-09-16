@@ -1,8 +1,7 @@
 /**
- * What this package's suites mount a screen inside. The host port is abstract,
- * so a test constructs a fake that RECORDS what a screen asked of it, rather
- * than mocking a module — not exported, since only this package's tests should
- * construct a host.
+ * What this package's suites mount a screen inside. A fake host RECORDS
+ * what a screen asked of it, rather than mocking a module; not exported,
+ * since only this package's tests should construct one.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,8 +1,7 @@
 /**
- * What the Model Providers and Model Costs screens ask of the application they are mounted in,
- * since ADR-004 seals a feature-web package off from `@langwatch/ui`, the router, toasts and the
- * session client. `openPlatformDrawer` exists because three overlays are `platform/app` drawers
- * with outside callers, so a screen only names the drawer and the host writes the address.
+ * What the Model Providers and Model Costs screens ask of the host, per
+ * ADR-004's package boundary. `openPlatformDrawer` exists because three
+ * overlay drawers have outside callers: a screen names the drawer, the host writes its address.
  */
 
 import { createContext, useContext } from "react";
@@ -21,10 +20,9 @@ export type ModelProviderHostScope = {
 };
 
 /**
- * The organization, teams and projects the reader can see — used by the scope filter and by a
- * provider row's scope chips. Declared structurally rather than importing `AvailableScopes`
- * from `@langwatch/authz-web`, to avoid a second `ui-screen-closure` finding for a shape the
- * port can spell out itself.
+ * The organization, teams and projects the reader can see — used by the scope
+ * filter and by a provider row's chips. Declared structurally rather than
+ * importing `AvailableScopes`, to avoid a second `ui-screen-closure` finding.
  */
 export type ModelProviderAvailableScopes = {
   organization: { id: string; name: string } | null;
@@ -46,12 +44,9 @@ export type ModelProviderSuccessNotice = {
 };
 
 /**
- * A failure, as a screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as a screen knows it. The raw `error` travels rather than a
+ * screen-composed sentence, since a handled error's wire message is its
+ * code slug; `fallbackTitle` names the action that failed instead.
  */
 export type ModelProviderFailureNotice = {
   error: unknown;
@@ -60,12 +55,9 @@ export type ModelProviderFailureNotice = {
 };
 
 /**
- * A `platform/app` drawer these screens open by address rather than by mounting.
- *
- * All three are registered in `platform/app/src/components/drawerRegistry.ts`
- * and two of them have openers outside this family, so none of them may be
- * deleted by this move and none may be copied into this package — a registry is
- * composition, and a screen only ever needed the address.
+ * A `platform/app` drawer, opened by address rather than mounting.
+ * Registered in `platform/app/src/components/drawerRegistry.ts`; two of
+ * three have outside openers, so none may move or be copied here.
  */
 export type ModelProviderPlatformDrawer =
   | "editModelProvider"
@@ -96,19 +88,16 @@ export abstract class ModelProviderHostApi {
   abstract failed(failure: ModelProviderFailureNotice): void;
 
   /**
-   * Whether the application already showed this failure to the reader (so it isn't toasted
-   * twice). Recorded gap, answered `false`: the backing `WeakSet` lives on `platform/app`'s
-   * MutationCache, which the `apps/ui` client build doesn't wrap — same gap the datasets
-   * family recorded for `isReportedGlobally`.
+   * Whether the app already showed this failure (so it isn't toasted twice).
+   * Recorded gap, answered `false`: the `WeakSet` lives on `platform/app`'s
+   * MutationCache, which `apps/ui`'s build doesn't wrap (same gap datasets recorded).
    */
   abstract isReportedGlobally(error: unknown): boolean;
 
   /**
-   * Puts a `platform/app` drawer's address in the URL. `params` use the drawer's own
-   * (unprefixed) names; the host writes the `drawer.*` query keys, as `openDrawer` does. Known
-   * gap shared with the agents, me, automations and gateway families: nothing mounts the
-   * registry above an `apps/ui`-served screen yet, so the address is right but the drawer
-   * doesn't open.
+   * Puts a `platform/app` drawer's address in the URL, using the drawer's own
+   * unprefixed `params` names; known gap shared with agents, me, automations
+   * and gateway: nothing mounts the registry above an `apps/ui` screen yet.
    */
   abstract openPlatformDrawer(request: {
     drawer: ModelProviderPlatformDrawer;
@@ -122,11 +111,9 @@ const ModelProviderHostContext = createContext<ModelProviderHostApi | undefined>
 export const ModelProviderHostProvider = ModelProviderHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means a screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host these screens are mounted in. Missing means a screen was rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useModelProviderHost(): ModelProviderHostApi {
   const host = useContext(ModelProviderHostContext);

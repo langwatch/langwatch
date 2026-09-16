@@ -39,12 +39,9 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, React.React
 };
 
 /**
- * Provider icons that are flat monochrome marks — they ship with a
- * hardcoded near-black fill (or with no `fill` at all, so they default to
- * SVG's own black). On the dark theme that lands as near-invisible.
- * Coloured-brand icons (Groq orange, AWS yellow, GoogleCloud primaries,
- * Cerebras orange) are left alone — they're brand-coloured marks that
- * read well in both modes already.
+ * Provider icons that are flat monochrome marks — hardcoded near-black (or
+ * no `fill`, defaulting to SVG black), near-invisible on the dark theme.
+ * Coloured-brand icons are left alone; they already read well in both modes.
  */
 export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "openai",
@@ -125,10 +122,8 @@ export function inferProvider(model: string): ProviderKey | null {
 
 /**
  * The tiny provider mark rendered before a model name in a dense row.
- *
- * Smaller than the model selector's icon, which targets a touch-friendly
- * dropdown row: a preview row is dense, so the mark complements the mono label
- * instead of dominating it.
+ * Smaller than the model selector's icon (a touch-friendly dropdown row):
+ * a preview row is dense, so the mark complements the label, not dominates it.
  */
 export function ProviderIcon({ model, size }: { model: string; size: "compact" | "comfortable" }) {
   const provider = inferProvider(model);

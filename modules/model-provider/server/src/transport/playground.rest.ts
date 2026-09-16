@@ -1,8 +1,7 @@
 /**
  * `POST /api/playground` — the model playground's streaming proxy. The door
- * resolves nobody: the project is named in a header, so the signed-in person
- * and their standing on it arrive as one bound fact, and the route answers its
- * own 401 and 403 from that fact in the sentences it has always used.
+ * resolves nobody: the project comes from a header, so the signed-in person
+ * and their standing on it are one bound fact the route's 401/403 read from.
  */
 import { createOpenAI } from "@ai-sdk/openai";
 import { publicRoute } from "@langwatch/api/access";

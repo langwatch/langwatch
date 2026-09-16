@@ -29,10 +29,8 @@ export type AmbientScope = {
 
 /**
  * The filter as the row predicate sees it, ambient kinds already resolved.
- *
- * Exported so a caller that filters rows of a different shape — the
- * default-models table, whose scopes spell the pair `{ type, id }` — resolves
- * once and asks `isScopeInFilter` itself.
+ * Exported so a caller with a different row shape resolves once and asks
+ * `isScopeInFilter` itself.
  */
 export function resolveRowFilter(
   filter: ScopeFilterValue,
@@ -43,9 +41,8 @@ export function resolveRowFilter(
 
 /**
  * Rows whose scopes sit on the same branch of the org tree as the filter.
- *
  * A row with no scopes at all is dropped by a specific filter and kept by
- * "all", which is what the platform util did: `[].some(...)` is `false`.
+ * "all", matching the platform util: `[].some(...)` is `false`.
  */
 export function filterRowsByScope<T extends RowWithScopes>(
   rows: readonly T[],

@@ -253,10 +253,9 @@ export abstract class ModelCostProject {
 }
 
 /**
- * The scope derivation the cost listing asks for.
- *
- * `ModelProviderProjectScopeService` answers it, and so does the wider
- * `ModelProviderScopeService` that composes it.
+ * The scope derivation the cost listing asks for — answered by both
+ * `ModelProviderProjectScopeService` and the wider `ModelProviderScopeService`
+ * that composes it.
  */
 export abstract class ModelCostProjectScope {
   abstract tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null>;
@@ -301,12 +300,9 @@ export abstract class ModelProviderEgress {
 }
 
 /**
- * The stored-credential probe itself.
- *
- * Separated from {@link ModelProviderCatalog} because it is the one catalogue
- * answer that leaves the process: a deployment with no egress of its own can
- * compose every other catalogue answer and refuse this one by name, rather
- * than reporting an unchecked credential as a working one.
+ * The stored-credential probe, separated from {@link ModelProviderCatalog}
+ * because it's the one answer that leaves the process: a deployment with no
+ * egress can refuse it by name, rather than reporting an unchecked credential as working.
  */
 export abstract class ModelProviderCredentialProbe {
   abstract probe(input: {
@@ -314,10 +310,9 @@ export abstract class ModelProviderCredentialProbe {
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict>;
   /**
-   * The credential already stored for a project — or the one this deployment's
-   * environment supplies — probed against a base URL the caller may override.
-   * The gateway is handed over rather than held, because which rows this probe
-   * may read is the application's answer and not the fence's.
+   * The stored (or this deployment's own environment) credential, probed
+   * against a caller-overridable base URL. The gateway is passed in, not
+   * held: which rows this probe reads is the application's, not the fence's.
    */
   abstract probeStored(input: {
     projectId: string;

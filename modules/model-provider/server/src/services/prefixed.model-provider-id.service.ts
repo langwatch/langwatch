@@ -1,12 +1,9 @@
 import { ModelProviderIdService } from "../app/model-provider.members.ts";
 
 /**
- * The three id prefixes Model Provider's rows are read back by.
- *
- * They belong to the feature rather than to whatever process happens to write
- * a row: an operator reading `model_default_…` out of a log knows which table
- * it is in, and a second process minting `default_…` would break that for
- * everyone. What the process supplies is only the random half.
+ * The three id prefixes Model Provider's rows are read back by. They belong
+ * to the feature, not the writing process: an operator reading
+ * `model_default_…` in a log knows the table; the process supplies only the random half.
  */
 const PREFIXES = {
   provider: "model_provider",

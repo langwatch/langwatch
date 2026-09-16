@@ -47,11 +47,9 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
 }
 
 /**
- * The `redis` member, faked to the three calls this module's own connection
- * counter makes. Not a full `RedisConnection` — nothing here reaches
- * `testConnection` — so the cast at the boundary is the same "narrow double"
- * idiom `modules/agent/server/src/app/__tests__/memory-redis.ts` uses for the
- * same type.
+ * The `redis` member, faked to the three calls this module's connection
+ * counter makes — not a full `RedisConnection`, since nothing here reaches
+ * `testConnection`. Same "narrow double" idiom as `modules/agent`'s.
  */
 function fakeRedis(): RedisConnection {
   return {

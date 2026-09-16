@@ -106,10 +106,9 @@ function readsCredentialsFromEnvironment(provider: ModelProviderEditorValue): bo
 }
 
 /**
- * The draft the drawer opens with. The skip-permissions list is always
- * seeded, because that field does not belong to the gateway; the gateway
- * knobs are seeded only when their section renders, so toggling the flag has
- * no payload-shape side effects.
+ * The draft the drawer opens with. Skip-permissions is always seeded,
+ * since it doesn't belong to the gateway; gateway knobs seed only when
+ * their section renders, so toggling the flag has no payload-shape effects.
  */
 function initialDraftFor({
   gatewayMenuEnabled,
@@ -198,9 +197,8 @@ function anchorSchemaWideMessage({
 
 /**
  * The credential refusals keyed by field, or null when the keys parse.
- * oauth-device providers skip the check entirely: the user never types
- * credentials here, so a name or scope-only save must not trip on the token
- * schema.
+ * oauth-device providers skip the check entirely — the user never types
+ * credentials here, so a name-only or scope-only save can't trip the token schema.
  */
 function findCredentialFieldErrors({
   displayKeys,
@@ -270,12 +268,9 @@ function finishSave({
 }
 
 /**
- * Credentials, or the provider's own sign-in flow. oauth-device providers
- * (codex) credential through that flow: the drawer swaps the API-key fields
- * for it, and the sign-in poll has already persisted the row server-side, so
- * the drawer's Save has nothing left to do. The coding-defaults ask is queued
- * to the page-level host — a dialog mounted in this drawer would be unmounted
- * the moment it opened.
+ * Credentials, or the provider's own sign-in flow. oauth-device (codex)
+ * persists via that flow's poll, so Save has nothing left to do; the
+ * coding-defaults ask queues to the page host, since a dialog here would unmount on open.
  */
 function ProviderCredentialsArea({
   actions,

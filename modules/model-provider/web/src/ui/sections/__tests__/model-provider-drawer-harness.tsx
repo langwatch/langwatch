@@ -55,11 +55,8 @@ export function keyedRow({
 
 /**
  * Wires the two sources `EditModelProviderForm` reads: the collapsed
- * per-provider-type record `useModelProvidersSettings` hands back (mocked
- * directly — its own real implementation reaches a `workflow-web` studio-host
- * boundary this suite has no business asserting on), and the flat list
- * `useAllModelProvidersList` reads through `model-provider-api`'s
- * `listAllFor{Organization,Project}ForFrontend` queries.
+ * per-provider-type record from `useModelProvidersSettings` (mocked, since
+ * its real form reaches a `workflow-web` boundary), and the flat list.
  */
 export function makePrimeQueries({
   providersSettingsMock,
@@ -95,10 +92,9 @@ export function makePrimeQueries({
 }
 
 /**
- * `CredentialsSection` labels each credential input with a plain `Text`
- * (no `htmlFor`/`id` association), so `getByLabelText` can't find it.
- * Walk up from the label text node to the first ancestor that contains
- * an `<input>` descendant (the field's own wrapper) and return that input.
+ * `CredentialsSection` labels each input with a plain `Text` (no
+ * `htmlFor`/`id`), so `getByLabelText` can't find it. Walk up to the first
+ * ancestor with an `<input>` descendant and return that input.
  */
 export function inputFor(labelText: string): HTMLInputElement {
   const label = screen.getByText(labelText);
@@ -130,10 +126,9 @@ export function fieldWrapper(labelText: string): HTMLElement {
 }
 
 /**
- * Chakra's `Field.RequiredIndicator` renders `aria-hidden="true"` (default
- * children `"*"`) only when the enclosing `Field.Root` is `required`, and
- * renders nothing at all otherwise — so its presence in the field's own
- * wrapper is the required marker.
+ * Chakra's `Field.RequiredIndicator` renders `aria-hidden="true"` only when
+ * the enclosing `Field.Root` is `required`, rendering nothing otherwise —
+ * so its presence in the field's wrapper is the required marker.
  */
 export function isMarkedRequired(labelText: string): boolean {
   const wrapper = fieldWrapper(labelText);

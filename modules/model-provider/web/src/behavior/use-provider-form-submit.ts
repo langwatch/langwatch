@@ -84,10 +84,9 @@ export type UseProviderFormSubmitActions = {
 export type UseProviderFormSubmitReturn = UseProviderFormSubmitState & UseProviderFormSubmitActions;
 
 /**
- * What the drawer's Advanced section adds to the update payload. `gateway` is
- * null when that section is not rendered, so a save never clears rate limits
- * the operator cannot see; skip-permissions is undefined when unrendered, and
- * an empty array when the operator cleared it.
+ * What the drawer's Advanced section adds to the update payload. `gateway`
+ * is null when unrendered, so a save never clears rate limits the operator
+ * can't see; skip-permissions is undefined when unrendered, empty when cleared.
  */
 export type AdvancedGatewayPayload = {
   gateway: {
@@ -218,12 +217,9 @@ function mismatchToast({
 }
 
 /**
- * When editing an existing provider, the stored key is shown masked. Decide
- * whether anything changed by ignoring those placeholders — an untouched key
- * must not count as an edit — but send the form as the customer left it,
- * placeholders included: each one tells the server to keep the credential
- * already on file. An empty object would be validated against the provider's
- * keysSchema, so it becomes absence instead.
+ * The stored key shows masked; ignore placeholders when deciding if
+ * anything changed, but send them as-is so the server keeps the credential
+ * on file. An empty object would fail `keysSchema`, so it's sent as absence.
  */
 function customKeysToSendFor({
   customKeys,
@@ -371,12 +367,9 @@ function roleWrites({
 }
 
 /**
- * Best-effort: a single failed scope (RBAC blocking an org write for a
- * non-admin, say) must not kill a submit whose provider row already landed.
- * A silent allSettled would also hide ALL three role writes failing, leaving
- * a success toast over an empty cascade, so the rejections come back as a
- * warning naming which role failed and why. A tRPC rejection's message is the
- * code slug, so `describeError` supplies the copy written for that code.
+ * Best-effort: one failed scope must not kill a submit whose row already landed. A
+ * silent allSettled would hide all three failing behind a false success toast;
+ * since a tRPC message is just the code slug, `describeError` supplies the copy.
  */
 async function reportRoleWriteFailures(writes: RoleWrite[]): Promise<ModelProviderToast | null> {
   const results = await Promise.allSettled(writes.map((w) => w.promise));

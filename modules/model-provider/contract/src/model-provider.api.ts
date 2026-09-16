@@ -175,9 +175,8 @@ export interface ModelProviderApi {
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void>;
   /**
    * Probes a credential the caller supplied, after checking they may write
-   * the tenant they named. Nothing downstream re-authorizes this: the probe
-   * goes straight out to the provider with those keys, so the check here IS
-   * the authorization.
+   * the tenant they named. Nothing downstream re-authorizes: the probe goes
+   * straight to the provider with those keys, so this check IS the authorization.
    */
   validateApiKey(
     input: ModelProviderCredentialProbeRequest,

@@ -1,8 +1,7 @@
 /**
- * The same `safe-regex2` verdict the server applies at the write boundary
- * (`model-cost-regex-safety.service.ts`), asked here too so the form's refusal never disagrees
- * with the mutation's. A family-local copy, since a browser bundle may not import the server
- * package for four lines over one dependency — `@langwatch/data-privacy-web` does the same.
+ * The same `safe-regex2` verdict the server applies at the write boundary,
+ * asked here too so the form's refusal never disagrees with the mutation's.
+ * A family-local copy, since a browser bundle may not import the server package.
  */
 
 import safe from "safe-regex2";

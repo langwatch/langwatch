@@ -1,9 +1,7 @@
 /**
- * How this family tells the reader how an action turned out. The toaster and
- * `showErrorToast` are application singletons a feature-web package may not
- * reach, so they're re-bound to the host port, handing over the raw error
- * rather than a composed sentence since the composing application resolves
- * customer copy from the error's own `code`.
+ * How this family tells the reader how an action turned out. The toaster
+ * and `showErrorToast` are application singletons, re-bound to the host
+ * port; the raw error travels, since the app resolves copy from its `code`.
  */
 
 import { useCallback, useMemo } from "react";
@@ -63,11 +61,9 @@ export type ModelProviderErrorToastOptions = {
 };
 
 /**
- * Reports a failure, unless the application has already put it on screen.
- *
- * `isReportedGlobally` is asked first for the same reason the model-costs table
- * asks it: a refusal the application already rendered as a modal must not also
- * arrive as a toast.
+ * Reports a failure, unless the application already put it on screen.
+ * `isReportedGlobally` is asked first, same as the model-costs table: a
+ * refusal already rendered as a modal must not also arrive as a toast.
  */
 export function useShowErrorToast(): (options: ModelProviderErrorToastOptions) => void {
   const host = useModelProviderHost();

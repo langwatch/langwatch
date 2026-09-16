@@ -15,29 +15,23 @@ import {
 
 export type RegistryModelProviderCatalogOptions = {
   /**
-   * Whether LangWatch supplies a provider's credentials for an organization,
-   * and with what. The composition root adapts its Enterprise service onto
-   * this; a deployment with no managed providers passes the unmanaged
-   * stand-in below and every provider is the customer's own.
+   * Whether LangWatch supplies a provider's credentials, and with what. The
+   * composition root adapts its Enterprise service onto this; a deployment
+   * with none passes the unmanaged stand-in below.
    */
   managed: ModelProviderManagedGateway;
   /** Probes a credential against the provider itself. */
   probe: ModelProviderCredentialProbe;
   /**
    * The process configuration a SYSTEM provider's credential is read from.
-   *
-   * Passed in whole rather than read here: which variables carry a provider
-   * key is the registry's business, but whether this process has them is the
-   * deployment's, and a package that read `process.env` would be answering for
-   * a deployment it cannot see.
+   * Passed in whole rather than read here: which variables carry a key is
+   * the registry's business, but whether this process has them is the deployment's.
    */
   systemProviderEnvironment: Readonly<Record<string, string | undefined>>;
   /**
-   * Whether this deployment is the hosted one.
-   *
-   * System providers are only ever enabled on it: a self-hosted install that
-   * happened to have `OPENAI_API_KEY` in its environment would otherwise find
-   * a provider it never configured switched on for every project.
+   * Whether this deployment is the hosted one. System providers are only
+   * ever enabled on it — a self-hosted install with `OPENAI_API_KEY` set
+   * would otherwise find a provider it never configured switched on.
    */
   isSaas: boolean;
 };
@@ -123,12 +117,9 @@ export class RegistryModelProviderCatalogAdapter extends ModelProviderCatalog {
   }
 
   /**
-   * The stored-credential probe, handed back whole.
-   *
-   * `validateApiKey` above narrows the same verdict to what the save path
-   * needs, because a save is a yes-or-no decision. A reader is not: this
-   * returns the probe's own answer so "we could not check this" survives the
-   * trip to the browser instead of arriving as a pass.
+   * The stored-credential probe, handed back whole. `validateApiKey` above
+   * narrows the same verdict to a yes/no for the save path; a reader isn't,
+   * so "we could not check this" survives to the browser instead of a pass.
    */
   testConnection(
     provider: string,

@@ -1,8 +1,7 @@
 /**
- * Gated on `traces:view`, not the cost permission, since the preview answer carries
- * span metadata (model names, token counts, trace ids) rather than cost-rule config. The
- * row's link writes the trace drawer's address instead of navigating, since it opens in
- * a new tab and must not lose the mid-edit form.
+ * Gated on `traces:view`, not the cost permission, since the preview shows
+ * span metadata (model names, token counts, trace ids), not cost-rule config.
+ * The row links via address, not navigation, so a new tab won't lose the mid-edit form.
  */
 
 import { Badge, Box, chakra, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
@@ -268,10 +267,8 @@ function PreviewBody({
 
 /**
  * Live "which spans would this regex match" preview for the model cost
- * drawer. Reads recent spans from the current project and prices them with
- * the rates being edited, so the user sees the rule working (or not) before
- * saving. Rows open the trace drawer in a new tab; when nothing matches,
- * the recently-seen models are offered as one-click exact-match fills.
+ * drawer, priced with the rates being edited so the user sees the rule
+ * working before saving. No matches offers one-click exact-match fills.
  */
 export function LLMModelCostMatchingSpans({
   input,

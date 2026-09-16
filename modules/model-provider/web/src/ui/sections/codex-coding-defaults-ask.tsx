@@ -45,9 +45,8 @@ export const useCodexCodingDefaultsAskStore = create<CodexCodingDefaultsAskState
 
 /**
  * Mounted once on the model-providers settings page. Renders the queued ask,
- * except when Langy's default already resolves to a codex model: a
- * re-authentication of an existing connection would otherwise re-ask a
- * question that is already answered.
+ * except when Langy's default already resolves to a codex model — otherwise
+ * a re-authentication would re-ask an already-answered question.
  */
 export function CodexCodingDefaultsAskHost() {
   const pending = useCodexCodingDefaultsAskStore(
@@ -86,9 +85,8 @@ export function CodexCodingDefaultsAskHost() {
 
 /**
  * The accept path: run the same LANGY+FAST role writes the Langy and
- * onboarding sign-ins perform inline, bring the open UI along, toast the
- * outcome, and close. On failure the error rides the toast and the dialog
- * stays open for another try.
+ * onboarding sign-ins perform inline, bring the open UI along, toast, and
+ * close. On failure the error rides the toast and the dialog stays open.
  */
 async function acceptCodexCodingDefaults({
   applyDefaults,
@@ -108,12 +106,10 @@ async function acceptCodexCodingDefaults({
   try {
     await applyDefaults({ projectId, scopes });
     // Every default-model answer refreshes, including the Langy pill's own
-    // `getResolvedDefault` — tRPC keys the cache on the procedure path, so this
-    // reaches the entry langy-web's hook created. What `platform/app` also did
-    // here, snapping the pill to the new model, cannot travel: that helper is
-    // `@langwatch/langy-web`'s and langy-web depends on THIS package, so
-    // importing it back would be a cycle. The pill's data is refreshed; only
-    // the store's follow is missing.
+    // `getResolvedDefault` (tRPC keys the cache on the procedure path). What
+    // `platform/app` also did here — snapping the pill to the new model —
+    // can't travel: that helper is `@langwatch/langy-web`'s, and langy-web
+    // depends on THIS package, so importing it back would be a cycle.
     await utils.modelProvider.invalidate();
     host.succeeded({ title: "Codex set as the Langy and Fast default" });
     onClose();

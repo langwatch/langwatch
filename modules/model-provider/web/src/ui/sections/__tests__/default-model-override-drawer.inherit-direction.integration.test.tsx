@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Regression for a bug where the org-scope drawer offered "Inherit (from project)" — inheritance
  * only flows wide to narrow — saving it as empty config surfaced a raw 500 and stacked rows.
  * Binds specs/model-providers/role-based-default-models.feature.

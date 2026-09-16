@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Server-side, an org-scoped ADMIN binding grants everything regardless of custom
  * team role, so the hook's resolution must fall back to that before the role's own list.
  * Spec: specs/rbac/fetch-org-role-permission-resolution.feature

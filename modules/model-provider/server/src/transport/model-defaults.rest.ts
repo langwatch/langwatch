@@ -1,8 +1,7 @@
 /**
- * `/api/model-defaults` — the default-model cascade for CLI and external API
- * callers, over the same application the tRPC surface uses. The application
- * gates each target scope against the KEY OWNER; the door adds the key's own
- * ceiling and `authorizeRequestedScopes`, which asks the CREDENTIAL too.
+ * `/api/model-defaults` — the default-model cascade for CLI/API callers.
+ * The application gates each scope against the KEY OWNER; this door adds
+ * the key's own ceiling and `authorizeRequestedScopes`, asking the CREDENTIAL too.
  */
 import {
   baseResponses,
@@ -184,10 +183,9 @@ function requireKeyOwner(credential: ModelDefaultsCredential): { id: string } {
 }
 
 /**
- * The scopes a write NAMES, authorized against the credential rather than
- * against its owner. The application checks the same scopes against the key
- * owner; without this a project-restricted key minted by an administrator
- * wrote the organization's defaults with the administrator's grants.
+ * The scopes a write NAMES, checked against the credential — not its
+ * owner, which the application checks already. Skip this and a
+ * project-restricted key could write org defaults with the admin's grants.
  */
 async function authorizeRequestedScopes({
   app,

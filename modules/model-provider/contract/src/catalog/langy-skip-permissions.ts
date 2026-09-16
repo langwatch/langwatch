@@ -29,11 +29,9 @@ export function firstInvalidSkipPattern(
 }
 
 /**
- * Whether a bare model id matches any pattern in the list.
- *
- * A pattern that does not compile is skipped rather than thrown on: the write
- * path refuses those, so one reaching a read means stored data written before
- * the rule existed, and a single bad line must not deny every model.
+ * Whether a bare model id matches any pattern in the list. A pattern that
+ * doesn't compile is skipped, not thrown on: the write path refuses those,
+ * so a bad line reaching a read must not deny every model.
  */
 export function matchesSkipList({
   patterns,

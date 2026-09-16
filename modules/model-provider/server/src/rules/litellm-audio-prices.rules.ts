@@ -115,9 +115,8 @@ function describe(mode: string, pricing: LLMModelPricing): string {
 
 /**
  * Maps litellm audio price entries to catalog entries: `audio_speech`,
- * `audio_transcription` and `realtime` entries from supported providers
- * that carry at least one expressible rate and no inexpressible one. Ids in
- * `excludeIds` (the overlay's own ids) are skipped.
+ * `audio_transcription` and `realtime` from supported providers with at
+ * least one expressible rate and none inexpressible. `excludeIds` skips the overlay's own ids.
  */
 export function mapLitellmAudioModels(
   prices: Record<string, LitellmPriceEntry>,
@@ -175,10 +174,9 @@ export function mapLitellmAudioModels(
 }
 
 /**
- * Catalog-shaped pricing for every model litellm publishes, keyed by catalog
- * id. Wider than `mapLitellmAudioModels` on purpose — every mode and
- * provider — because the drift audit compares whatever it CAN express
- * against the overlay's hand-written rates.
+ * Catalog-shaped pricing for every model litellm publishes, keyed by
+ * catalog id. Wider than `mapLitellmAudioModels` on purpose, since the
+ * drift audit compares whatever it CAN express against the overlay's rates.
  */
 export function litellmPricingById(
   prices: Record<string, LitellmPriceEntry>,

@@ -99,14 +99,11 @@ export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Prop
   );
 }
 
-/** Three provider logos stacked with negative left-margins so each
- *  one overlaps the next by ~8px. Icons come from the shared registry
- *  so adding/removing a provider only changes one map.
- *
- *  Sized 20px so the row reads as 'these are providers' from a
- *  glance — smaller than the dropdown's 24px chips but larger than a
- *  lucide icon, and the colored brand marks make the row obviously
- *  about model selection without a label. */
+/**
+ * Three provider logos stacked with negative left-margins so each overlaps
+ * the next by ~8px, from the shared icon registry. Sized 20px — between the
+ * dropdown's 24px chips and a lucide icon — so the row reads as "providers" without a label.
+ */
 function StackedProviderIcons() {
   return (
     <HStack gap={0} flexShrink={0} aria-hidden>

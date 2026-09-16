@@ -1,9 +1,6 @@
 import type { WireOf } from "@langwatch/api/web";
 /**
- * Default Models — every policy the caller can see, one row per policy. The
- * page-level scope filter narrows rows inclusively (parents + children),
- * the same predicate the Model Providers table above uses. "+ Add config"
- * and Edit open `defaultModelOverride` via `ModelProviderHostApi.openPlatformDrawer`.
+ * Default Models — every policy the caller can see, one row per policy.
  * Contract: specs/model-providers/role-based-default-models.feature,
  *           specs/model-providers/model-default-config-cascade.feature.
  */
@@ -140,13 +137,10 @@ export function DefaultModelsSection({
 
   const data = dataQuery.data;
 
-  // Fresh accounts (no providers + no configs) hide the section entirely so the
-  // page reads as a single "add a provider to get started" affordance. Old
-  // accounts that nuked their providers but still have orphan configs DO see the
-  // table (with red "Update needed" badges) so they can rebuild from there.
-  // Hidden via display:none rather than an early return so the
-  // getDefaultModelsForProject observer stays mounted and reacts to an
-  // invalidation the moment a provider is added, with no waterfall remount.
+  // Fresh accounts (no providers + no configs) hide the section entirely; an
+  // account that nuked its providers but kept orphan configs still sees the
+  // table (red "Update needed" badges) to rebuild from there. Hidden via
+  // display:none, not an early return, so the query observer stays mounted.
   const isHidden = noProvidersConfigured && data.configs.length === 0;
 
   const openAdd = () => host.openPlatformDrawer({ drawer: "defaultModelOverride" });
@@ -432,11 +426,9 @@ function ConfigCell({
 }
 
 /**
- * Hover-revealed pencil next to a model chip. Click jumps straight to the row's
- * edit drawer so the reader does not have to hunt for the 3-dot menu when they
- * are already eyeing the model they want to change. The drawer edits the whole
- * policy, not just the cell, which matches the data model — one config is one
- * JSON blob across roles.
+ * Hover-revealed pencil next to a model chip. Click jumps straight to the
+ * row's edit drawer, since the drawer edits the whole policy — not just
+ * the cell — matching the data model of one config as one JSON blob.
  */
 function ChipWithEdit({
   children,

@@ -34,13 +34,10 @@ describe("given a project-scoped row and an organization-scoped row that both de
 
 describe("given a project-scoped row and an organization-scoped row whose winning row is returned last", () => {
   describe("when display names are built across both rows", () => {
-    // The mirror of "given a project-scoped row and an organization-scoped
-    // row..." above, which lists its winner (the project-scoped row)
-    // first and so stays green even with the precedence sort removed
-    // entirely (arrival-order-wins) — verified by knocking the sort out.
-    // AC3's scenario promises the winner resolves "in either order";
-    // together with the case above, this pair proves that for the scope
-    // tier specifically, not just for the id tiebreak below.
+    // Mirror of the prior case, with the winner (project-scoped) listed
+    // first — stays green even with the precedence sort removed entirely,
+    // verified by knocking the sort out. AC3 promises "either order";
+    // together with the case above, this proves it for the scope tier.
     it("prefers the project-scoped row's name whichever order the rows arrive in", () => {
       const projectRow = makeProvider({
         provider: "vendorN",
@@ -130,14 +127,10 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
 
 describe("given two rows scoped only via the legacy singular scopeType field (no scopes[] array)", () => {
   describe("when display names are built across both rows", () => {
-    // `registry.ts` keeps the collapsed `scopeType`/`scopeId` pair "for
-    // legacy callers that still key by scopeType/scopeId" alongside the
-    // plural `scopes[]` grant set every other scoped fixture in this file
-    // uses. Neither row here sets `scopes`, so `scopeRank`'s fallback
-    // branch (`: [row.scopeType]`) is the only thing that can rank them.
-    // The organization row deliberately has the lexicographically LOWER
-    // id, so only a correct read of that fallback branch — not the id
-    // tiebreak — can make the project row win.
+    // Neither row sets `scopes[]`, so only `scopeRank`'s legacy fallback
+    // branch (`: [row.scopeType]`) can rank them. The organization row
+    // deliberately has the lexicographically LOWER id, so only a correct
+    // read of that fallback — not the id tiebreak — makes the project row win.
     it("prefers the project-scoped row's name over the organization-scoped row's name", () => {
       const projectRow = makeProvider({
         provider: "vendorP",

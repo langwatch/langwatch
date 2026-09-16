@@ -98,10 +98,9 @@ async function resolveModel({
 }
 
 /**
- * The cascade's own answer, or null when a resolver-internal failure (DB, race) leaves the
- * conservative "any enabled provider" rescue to answer instead. `ModelNotConfiguredError` MUST
- * propagate so the tRPC interceptor maps it to MODEL_NOT_CONFIGURED and the frontend opens the
- * missing-model popup with the feature+role in context.
+ * The cascade's own answer, or null when a resolver-internal failure (DB,
+ * race) leaves the "any enabled provider" rescue to answer instead.
+ * `ModelNotConfiguredError` MUST propagate so the frontend can open the missing-model popup.
  */
 async function tryResolveFeatureDefault({
   projectId,
@@ -139,10 +138,9 @@ async function tryResolveFeatureDefault({
 }
 
 /**
- * Cascade picked a model but the backing provider is disabled. Silently swapping to another
- * enabled provider is dangerous — the user thinks they are calling the one they configured —
- * so this is a typed error the frontend can answer with a one-click swap to the cascade-next
- * candidate, or a deep link to settings.
+ * Cascade picked a model but the backing provider is disabled. Silently
+ * swapping to another is dangerous — the user thinks they're calling the
+ * one they configured — so this is typed for a one-click swap or a settings deep link.
  */
 async function disabledProviderError({
   resolved,

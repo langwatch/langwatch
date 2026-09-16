@@ -8,9 +8,8 @@ import { nowInstant } from "@langwatch/time";
 
 /**
  * The Codex device-sign-in state machine, headless: start a device code,
- * poll until approved, expose the connected account. `CodexSignIn` renders
- * it; the hook owns every timer and mutation so the component stays purely
- * presentational (spec: specs/model-providers/codex-account-provider.feature).
+ * poll until approved, and expose the account, keeping `CodexSignIn` presentational.
+ * Spec: specs/model-providers/codex-account-provider.feature
  */
 
 export type CodexSignInPhase =

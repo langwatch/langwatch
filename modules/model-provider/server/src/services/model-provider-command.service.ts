@@ -468,10 +468,9 @@ function humanize(provider: string): string {
 }
 
 /**
- * The skip-permissions list this write stores. Omitting the field leaves the
- * stored list alone; an empty list is a cleared field, and a cleared field
- * means the provider's registry default applies, so it is stored as null
- * rather than as an empty array that would read as "trust nothing".
+ * The skip-permissions list this write stores. Omitting the field leaves
+ * the stored list alone; an empty list clears it, so the registry default
+ * applies — stored as null, not an empty array reading as "trust nothing".
  */
 function skipPermissionsForWrite(
   parsed: ModelProviderWriteInput,

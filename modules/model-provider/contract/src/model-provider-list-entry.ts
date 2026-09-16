@@ -1,9 +1,7 @@
 /**
- * One row of the provider LIST the browser renders — checked, not inferred from the
- * composed router, since a feature-web screen can't name that. Deliberately narrower
- * than `LegacyModelProvider` (no credential value, no `extraHeaders`/`providerConfig`);
- * `isSystem` is optional because the transport doesn't send it yet (see
- * `dev/docs/plans/ui-family-move-manifests.md`).
+ * One row of the provider LIST the browser renders — checked, not inferred,
+ * since a feature-web screen can't name the composed router. `isSystem` is
+ * optional: the transport doesn't send it yet (dev/docs/plans/ui-family-move-manifests.md).
  */
 
 import { z } from "zod";

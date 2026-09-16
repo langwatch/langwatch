@@ -33,12 +33,10 @@ describe("given a real display name and a legacy identity row that collide on th
   });
 
   describe("when the legacy row is returned first", () => {
-    // This is the case that actually exercises the identity-skip rule:
-    // with every precedence tier tied, the stable sort leaves the legacy
-    // row first, so only skipping its identity entry (`displayName ===
-    // modelId`) stops it from writing "gpt-5.1" ahead of the real row's
-    // configured name. Drop that skip and only this ordering goes red —
-    // verified by sabotage.
+    // Exercises the identity-skip rule: with every precedence tier tied,
+    // the stable sort leaves the legacy row first, so skipping its
+    // identity entry is what stops it overwriting the real row's name.
+    // Verified by sabotage: drop that skip and this ordering goes red.
     it("resolves the configured name when a legacy row is returned first", () => {
       const result = buildCustomModelDisplayNames([legacyRow, realRow]);
 
@@ -147,12 +145,10 @@ describe("given a persisted row and a row with no id whose winning row is return
     // Mirror case (winner first, loser last) catches last-write-wins vs.
     // real persisted-tier rule; only the pair together pins precedence.
     it("prefers the persisted row's name whichever order the rows arrive in", () => {
-      // Same discriminating shape as the case above: neither row carries
-      // scopes, so the enabled and scope tiers tie and the id tiebreak
-      // alone would hand this to the id-less row — an absent id sorts
-      // below every real one. Only a persisted tier ahead of that
-      // tiebreak keeps a synthesized placeholder from outranking a
-      // stored row, regardless of arrival order.
+      // Same discriminating shape as above: with scope and enabled tiers
+      // tied, the id tiebreak alone would hand this to the id-less row (an
+      // absent id sorts below every real one). Only a persisted tier ahead
+      // of that tiebreak keeps a placeholder from outranking a stored row.
       const placeholderRow = makeProvider({
         provider: "vendorJ",
         enabled: true,
@@ -242,12 +238,10 @@ describe("given two equally-eligible rows whose lexicographically lowest id is r
 
 describe("given a whitespace-only display name on a narrower-scoped row and a real display name on a broader-scoped row for the same model id", () => {
   describe("when display names are built across both rows", () => {
-    // This already held before this change: the blank/whitespace check is
-    // per-entry and unconditional, so it never even reaches a scope
-    // comparison. Kept as a forward guard — a precedence implementation
-    // that picks "the winning row by tier, then reads its name" instead
-    // of "the winning REAL name" would regress this by letting a
-    // blank-named narrower row shadow a real broader one.
+    // The blank/whitespace check is per-entry and unconditional, so it
+    // never reaches a scope comparison. Kept as a forward guard: an impl
+    // that reads "the winning row's name" instead of "the winning REAL
+    // name" would regress by letting a blank narrower row shadow a real one.
     it("resolves the broader-scoped row's real name over the narrower-scoped row's blank name", () => {
       const blankProjectRow = makeProvider({
         provider: "vendorH",

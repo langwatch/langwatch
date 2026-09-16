@@ -43,19 +43,16 @@ export type UseModelProviderFormParams = {
   teamId?: string;
   organizationId?: string;
   /**
-   * Permission predicates used to decide the default scope selection for
-   * a brand-new provider (iter 109). The form opens at the widest scope
-   * the user can manage: ORGANIZATION if they have organization:manage,
-   * else TEAM if they have team:manage, else PROJECT. Callers wire these
-   * from useOrganizationTeamProject's hasPermission helper.
+   * Decide the default scope for a brand-new provider: the widest the user
+   * can manage — ORGANIZATION, else TEAM, else PROJECT. Wired from
+   * useOrganizationTeamProject's hasPermission helper.
    */
   canManageOrganization?: boolean;
   canManageTeam?: boolean;
   /**
-   * Optional advanced-gateway payload callback used by the unified
-   * Save. The drawer wires this when the AI Gateway feature flag is
-   * on for the caller's org; throwing (malformed JSON) aborts submit
-   * so the parent can render the inline parse error.
+   * Optional advanced-gateway payload for the unified Save, wired by the
+   * drawer when the AI Gateway flag is on. Throwing (malformed JSON) aborts
+   * submit so the parent can render the inline parse error.
    */
   getAdvancedPayload?: () => AdvancedGatewayPayload | null;
   onSuccess?: () => void;
@@ -64,10 +61,9 @@ export type UseModelProviderFormParams = {
 
 export type UseModelProviderFormState = {
   /**
-   * User-facing name. Defaults to the humanized provider string
-   * ("openai" → "OpenAI"); operators override it when they run
-   * multiple instances of the same provider at different scopes
-   * so the list and model-selector groups stay distinguishable.
+   * User-facing name, defaulting to the humanized provider string
+   * ("openai" → "OpenAI"). Operators override it when running multiple
+   * instances of one provider, so lists and model-selector groups stay distinguishable.
    */
   name: string;
   /**
@@ -88,10 +84,9 @@ export type UseModelProviderFormState = {
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
   /**
-   * Multi-scope selection (iter 109). Every write sends this array to
-   * the tRPC layer and the service fail-closes the whole write if any
-   * single scope is unmanageable by the caller. For backwards-compat
-   * reads, `scopeType` still exposes the narrowest entry's tier.
+   * Multi-scope selection. Every write sends this array to the tRPC layer,
+   * which fail-closes the whole write if any scope is unmanageable by the
+   * caller. `scopeType` still exposes the narrowest entry's tier, for reads.
    */
   scopes: ScopeSelection[];
   /** Narrowest scope tier from `scopes` — kept for the legacy picker. */
@@ -101,12 +96,9 @@ export type UseModelProviderFormState = {
     customKeysRoot?: string;
   };
   /**
-   * True when any user-editable form field differs from the loaded
-   * provider's initial values. Drives the Save button's disabled state
-   * so a drawer opened-and-immediately-saved no-op stays out of the
-   * mutation path entirely (and never produces a misleading "Updated"
-   * toast). Advanced (Gateway) fields live outside this hook, so the
-   * parent form ORs in its own advanced-draft dirty signal.
+   * True when a form field differs from the loaded values. Drives Save's
+   * disabled state, so a no-op save never fires a misleading "Updated" toast.
+   * Advanced fields live outside this hook; the parent ORs in its own signal.
    */
   isDirty: boolean;
 };
@@ -227,12 +219,9 @@ function jsonSignature(value: unknown): string {
 }
 
 /**
- * Dirty detection drives the Save button. Compared per-field so the helpers
- * that already know about MASKED_KEY_PLACEHOLDER are reused — a naive
- * JSON.stringify of customKeys would always look dirty, because the form
- * shows the masked sentinel while the stored value is the real key. Headers
- * compare on key and value only: the form carries a `concealed` flag the
- * stored header knows nothing about.
+ * Compared per-field: a naive JSON.stringify of customKeys always looks
+ * dirty, since the form shows a masked sentinel while the stored value is
+ * real. Headers skip the form-only `concealed` flag the stored side lacks.
  */
 function hasUnsavedChanges({
   customEmbeddingsModels,

@@ -22,9 +22,8 @@ export type UseDefaultProviderSelectionReturn = UseDefaultProviderSelectionState
 
 /**
  * Tracks the in-form state for the "Use as default" toggle and its three
- * model selectors. With the legacy per-project default-model scalar columns
- * gone, selectors start empty rather than pre-filled; writes route through
- * the canonical default-assignment service against ModelDefaultConfig.
+ * model selectors. Selectors start empty, not pre-filled, since the legacy
+ * scalar columns are gone; writes route through the default-assignment service.
  */
 export function useDefaultProviderSelection({
   enabledProvidersCount,

@@ -1,8 +1,7 @@
 /**
- * The application a suite drives, over the memory repositories and stand-ins
+ * The application a suite drives, over memory repositories and stand-ins
  * for what a deployment would supply: a registry with no managed providers,
- * an identifier suffix that does not move, and a rate limiter that never
- * refuses. Nothing here reaches a network or a database.
+ * a fixed id suffix, and a rate limiter that never refuses. No network, no DB.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";

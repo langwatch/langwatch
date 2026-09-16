@@ -83,10 +83,9 @@ function readAuditBaseline(): AuditBaseline {
 }
 
 /**
- * The one raw-pricing key the SDK's generated schema does not declare:
- * `input_cache_write_1h`, present for 32 of 413 models on a 2026-08-15 pull,
- * all Anthropic. Reading it needs the raw response, fetched once more
- * without the SDK and looked up by model id.
+ * The one raw-pricing key the SDK's generated schema omits:
+ * `input_cache_write_1h` (32 of 413 models, all Anthropic, as of 2026-08-15).
+ * Needs the raw response, fetched once more without the SDK.
  */
 async function fetchRawPricing(apiKey: string): Promise<Map<string, RawPricing>> {
   const byId = new Map<string, RawPricing>();
@@ -261,11 +260,9 @@ export type ModelRegistrySyncResult = {
 };
 
 /**
- * Fetches every model from OpenRouter (chat plus the separate embeddings
- * endpoint), merges in the audio/transcription/realtime family from
- * litellm's price registry (which OpenRouter does not route), audits the
- * result against litellm, and writes `model-catalog.json`. The overlay file
- * is read for exclusion and drift comparison; this task never writes it.
+ * Fetches every model from OpenRouter (chat plus embeddings), merges in
+ * litellm's audio/transcription/realtime family, and writes
+ * `model-catalog.json`. The overlay file is read, but never written, here.
  */
 export async function syncModelRegistry({
   apiKey,

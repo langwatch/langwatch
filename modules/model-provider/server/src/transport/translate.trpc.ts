@@ -1,10 +1,7 @@
 /**
- * The server half of `translate.*`.
- *
- * Gated on trace-view rather than on a translate-specific permission:
- * read-only members must not be shown an action that then refuses. The
- * provider-failure policy is the application's, so what a customer reads when
- * a model call fails is the same here as everywhere else.
+ * The server half of `translate.*`. Gated on trace-view, not a
+ * translate-specific permission, since read-only members must not see an
+ * action that then refuses. Provider-failure policy is the app's, same everywhere.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { ModelProviderApi, translateTrpc } from "@langwatch/model-provider-contract";

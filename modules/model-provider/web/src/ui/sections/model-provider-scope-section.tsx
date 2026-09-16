@@ -103,13 +103,10 @@ export function ProviderScopeSection({
 
   if (!hasOrgOrTeam) return null;
 
-  // Dropdown-only: the Organization / This team / This project /
-  // Multiple quick-pick chips were redundant in practice and have been
-  // dropped from both the provider drawer and the default-models
-  // override drawer. The dropdown already surfaces every reachable
-  // scope. The chip variant is preserved on `ScopeChipPicker`
-  // (`showQuickPicks` prop) for future surfaces where the chip-row UX
-  // makes sense.
+  // Dropdown-only: the quick-pick chips (Organization / This team / This
+  // project / Multiple) were redundant and dropped from both drawers. The
+  // dropdown already surfaces every reachable scope; the chip variant stays
+  // on `ScopeChipPicker` (`showQuickPicks`) for future chip-row UX.
   return (
     <VStack align="start" width="full" gap={1.5}>
       <SmallLabel>Scope</SmallLabel>

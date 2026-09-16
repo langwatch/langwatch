@@ -1,8 +1,7 @@
 /**
  * Where codex models may run (spec:
- * specs/model-providers/codex-account-provider.feature — "Where Codex may
- * be used"). One gate, four enforcement points; these pin the gate and the
- * two server write/resolve behaviours that depend on it.
+ * specs/model-providers/codex-account-provider.feature). One gate, four
+ * enforcement points; these pin the gate and two server behaviours.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -74,13 +73,10 @@ describe("codexRestrictions", () => {
   });
 
   describe("given the two sibling scenario feature keys", () => {
-    // The scenario run's agent-under-test resolution (issue #6634) is a
-    // NEW, separate feature key from "scenarios.generator" (the FAST-role
-    // authoring assist used by scenario generation, not by a run) — see
-    // specs/scenarios/simulation-run-model-resolution.feature. It must be
-    // DEFAULT-role (never codex-eligible) so a project whose FAST/coding
-    // default is codex still resolves a real inference model for the
-    // agent under test.
+    // The agent-under-test key (#6634) is separate from "scenarios.generator"
+    // (the FAST-role authoring assist, not the run) — see
+    // specs/scenarios/simulation-run-model-resolution.feature. It must stay
+    // DEFAULT-role so a codex FAST/coding default still resolves a real model.
     describe("when the run-time agent-under-test key is checked", () => {
       it("registers it as DEFAULT-role and refuses codex", () => {
         const feature = featureByKey("scenarios.agent_under_test");

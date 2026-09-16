@@ -1,8 +1,7 @@
 /**
- * One public entry for this family's URL-addressed drawers (the `@langwatch/evaluator-web/drawers`
- * shape), restoring the three settings surfaces deleted in `cc91631cd8`.
- * `CodexCodingDefaultsAskHost` isn't a drawer — it's published here as the other half of one that
- * closes on connect.
+ * One public entry for this family's URL-addressed drawers, restoring the
+ * three settings surfaces deleted in `cc91631cd8`. `CodexCodingDefaultsAskHost`
+ * isn't a drawer — published here as the other half of one that closes on connect.
  */
 
 export {

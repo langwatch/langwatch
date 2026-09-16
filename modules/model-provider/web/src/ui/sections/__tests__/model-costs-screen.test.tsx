@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * New tests — the moved screen and its old wrapper had none, only the drawer beneath did. Pins the
  * write-control grant, each editor action's address, and the raw-error-to-host failure path.
  * Spec: specs/model-providers/model-cost-scoping.feature

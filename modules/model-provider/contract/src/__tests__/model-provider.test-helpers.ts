@@ -1,10 +1,7 @@
 /**
  * Shared test factories for the custom-model display-name test files.
- *
- * Centralizes `makeProvider` so every file that builds provider-row
- * fixtures — the resolver's concern-split test files and
- * `customModelDisplayNames.unit.test.ts` — derives them from one
- * definition rather than copies that can drift apart.
+ * Centralizes `makeProvider` so every file building provider-row fixtures
+ * derives them from one definition rather than copies that can drift apart.
  */
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 

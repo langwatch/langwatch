@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
  * The one-off walk that encrypts model-provider keys already sitting in the
- * clear. The row conversion is the feature package's; what this suite drives is
- * the walk itself — that it writes only the rows that need it, counts what it
- * did, and can be run again without re-encrypting an encrypted row.
+ * clear. Drives the walk itself: it writes only rows that need it, counts
+ * what it did, and can run again without re-encrypting an encrypted row.
  */
 import type { ModelProviderCredentialCipher } from "@langwatch/model-provider-server";
 import { describe, expect, it } from "vitest";

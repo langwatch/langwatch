@@ -9,11 +9,9 @@ const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
 
 /**
- * How long ago a moment was, compactly.
- *
- * No space between the number and the unit so it stays tight at the preview
- * row's size, and an explicit "ago" so a reader scanning a dense row is not
- * left wondering whether `16d` is an age or a duration.
+ * How long ago a moment was, compactly. No space between the number and
+ * unit so it stays tight at the preview row's size, and an explicit "ago"
+ * so `16d` doesn't read as a duration.
  */
 export function formatRelativeTimeAgo(timestamp: number): string {
   const elapsed = nowInstant().epochMilliseconds - timestamp;

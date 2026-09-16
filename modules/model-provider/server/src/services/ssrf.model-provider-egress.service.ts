@@ -17,21 +17,17 @@ export type ModelProviderEgressPolicy = Readonly<{
   /** The literal hostname allowlist that relaxes the local block, and only it. */
   allowedHosts: readonly string[];
   /**
-   * Whether an outbound TLS certificate is verified.
-   *
-   * Deliberately its own value rather than derived from `blockLocal`: on-prem
-   * operators routinely call services with self-signed certificates, which has
-   * nothing to do with whether private addresses are reachable, and tying the
-   * two means one of the two deployments gets the wrong answer.
+   * Whether an outbound TLS certificate is verified. Deliberately its own
+   * value rather than derived from `blockLocal`: on-prem operators routinely
+   * hit self-signed certs, unrelated to whether private addresses are reachable.
    */
   verifyTls: boolean;
 }>;
 
 /**
- * The guarded way out of the process for a credential probe against a customer-chosen URL —
- * routed through the shared SSRF fence (metadata denylist, private-address block, IP pinning).
- * Redirects are refused rather than followed, since a cross-origin redirect can carry
- * `x-api-key`/`x-goog-api-key`/`xi-api-key` straight through to the new host.
+ * The guarded way out of the process for a credential probe against a
+ * customer URL, routed through the shared SSRF fence (denylist, private
+ * block, IP pinning). Redirects are refused, since one could leak an API key.
  */
 export class SsrfModelProviderEgressAdapter extends ModelProviderEgress {
   static create(input: { policy: ModelProviderEgressPolicy }): SsrfModelProviderEgressAdapter {

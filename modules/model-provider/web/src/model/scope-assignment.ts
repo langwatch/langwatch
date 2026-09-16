@@ -1,8 +1,7 @@
 /**
- * Which tier a configuration row targets, and the id of the thing it points at. ADR-021's
- * canonical shape, restated here (not imported from `platform/app`'s Zod schema, which a browser
- * package may not reach) since nothing here parses one — the scope picker hands it over already
- * validated and the server re-parses at the boundary.
+ * Which tier a configuration row targets, and the id it points at. ADR-021's
+ * canonical shape, restated here (a browser package can't import
+ * `platform/app`'s schema) since the scope picker hands it over pre-validated.
  */
 
 import type { ModelProviderScopeType } from "@langwatch/model-provider-contract";

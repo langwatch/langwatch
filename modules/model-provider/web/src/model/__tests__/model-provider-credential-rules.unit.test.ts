@@ -34,9 +34,8 @@ function requiredKeysFor(
 
 /**
  * Every provider whose schema accepts one credential in place of another.
- * Kept as a table rather than a list of openai tests: the rule is meant to
- * hold for the shape, not for a provider, and a fourth provider adopting it
- * joins here by adding a row.
+ * Kept as a table, not a list of openai tests: the rule holds for the
+ * shape, not a provider, so a fourth adopter joins by adding a row.
  */
 const eitherOrProviders = [
   {

@@ -14,12 +14,9 @@ import {
 } from "./memory.model-provider.database.ts";
 
 /**
- * The default-models cascade in memory.
- *
- * A scope is held by at most one config, which the Postgres twin enforces by
- * detaching the scope from whoever held it and deleting a config left holding
- * nothing. Both happen here for the same reason: a scope held twice makes the
- * cascade answer differently depending on which row is read first.
+ * The default-models cascade in memory. A scope is held by at most one
+ * config, matching the Postgres twin — else the cascade could answer
+ * differently depending on which duplicate-holding row is read first.
  */
 export class MemoryModelDefaultRepository implements ModelDefaultRepository {
   static create(

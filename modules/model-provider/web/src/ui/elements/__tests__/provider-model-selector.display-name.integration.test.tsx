@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Regression for #5759 (label resolved where `selectOptions` is built, not at render, since search
  * filters on `item.label`). Queries scope to listbox/trigger since `Select.HiddenSelect` mirrors
  * every item as a native `<option>` too.

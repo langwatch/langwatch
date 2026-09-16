@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * #7892: the Gateway dispatch path pins Azure's api-version itself and silently drops a
  * caller-supplied one, while direct dispatch still honors it. Pins the drawer's per-field helper
  * text. Covers @integration scenarios from specs/ai-gateway/azure-api-version-override.feature.

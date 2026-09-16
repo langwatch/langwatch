@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Regression for #5759: ModelChip used to rebuild its label from the raw model id, ignoring the
  * configured custom-model display name. `displayNames` is optional, so dropping it at a call site
  * would compile silently — these tests are what makes that fail instead.

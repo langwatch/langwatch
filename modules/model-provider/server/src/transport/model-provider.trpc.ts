@@ -1,8 +1,7 @@
 /**
- * The server half of `modelProvider.*`. A provider write reaches the tenant
- * its BODY names, and which permission that needs depends on which handle
- * arrived, so those declare `serviceAuthorized`: the application's per-scope
- * `assertCanWrite` is the check, and the declaration says what it enforces.
+ * The server half of `modelProvider.*`. A write's permission depends on
+ * which tenant handle its BODY names, so each declares `serviceAuthorized`:
+ * the app's per-scope `assertCanWrite` is the check; the declaration states it.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import {

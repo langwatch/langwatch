@@ -1,9 +1,7 @@
 /**
- * Renders a connection-test verdict from its stable `code`, carrying the seven codes the probe
- * raises verbatim (unlike `describe-error.ts` elsewhere, since here the specific sentence is the
- * whole feature) — kept in step with `platform/app`'s presentation registry by
- * `provider-refusal-copy.unit.test.ts`. The provider's own sentence is never rendered, since a
- * rejected-credential body (e.g. Gemini's) can echo the credential back.
+ * Renders a connection-test verdict from its stable `code` — unlike
+ * `describe-error.ts`, here the specific sentence IS the feature. The
+ * provider's own sentence never renders, since a credential body can echo it back.
  */
 
 /** The generic line for a failure we cannot name, and the floor under the rest. */
@@ -96,10 +94,8 @@ export function describeRefusal(domainError: {
 
 /**
  * The whole explanation as one string, for a slot that can only take text.
- *
- * The stand-in for `platform/app`'s `describeError`, used where the probe
- * itself failed to run rather than where a provider refused — there is no code
- * to read on that path, so it says what the reader was doing and stops.
+ * The stand-in for `platform/app`'s `describeError`, used when the probe
+ * itself failed to run — there's no code to read, so it names the action and stops.
  */
 export function describeFailure({ fallbackTitle }: { fallbackTitle: string }): string {
   return `${fallbackTitle}. ${UNKNOWN_FAILURE_DESCRIPTION}`;

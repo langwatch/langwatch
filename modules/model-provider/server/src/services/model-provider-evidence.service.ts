@@ -7,11 +7,9 @@ import type {
 } from "../repositories/model-provider-evidence.repository.ts";
 
 /**
- * Whether a project has a model provider attached and switched on — one boolean, kept separate
- * from `ModelProviderApi` since this reads no auth/credential state. Checks the full
- * PROJECT -> TEAM -> ORGANIZATION cascade, since an org-wide credential counts for every project
- * under it. Returns false rather than throwing on an unreadable project, so the checklist never
- * wrongly reports the step done.
+ * Whether a project has a model provider attached and switched on — kept
+ * separate from `ModelProviderApi`, checking the full PROJECT -> TEAM ->
+ * ORGANIZATION cascade. Returns false, not a throw, on an unreadable project.
  */
 export class ModelProviderEvidenceService {
   private constructor(

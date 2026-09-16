@@ -153,10 +153,9 @@ export function ModelProviderAdvancedSection({
     disabledAt?: TimeInput | null;
   };
   /**
-   * Controlled accordion expansion. Lifted so the parent form can
-   * auto-expand on malformed JSON at Save time — otherwise the inline
-   * `jsonError` renders inside collapsed content and the user gets no
-   * feedback. `[]` = collapsed, `[ADVANCED_ACCORDION_VALUE]` = expanded.
+   * Controlled accordion expansion, lifted so the parent can auto-expand on
+   * malformed JSON at Save — otherwise `jsonError` renders inside collapsed
+   * content with no feedback. `[]` = collapsed, `[ADVANCED_ACCORDION_VALUE]` = expanded.
    */
   accordionValue: string[];
   onAccordionValueChange: (value: string[]) => void;

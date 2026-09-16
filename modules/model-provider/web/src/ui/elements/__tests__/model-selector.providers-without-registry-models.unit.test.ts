@@ -1,8 +1,7 @@
 /**
- * The Agent Platform door serves chat but not embeddings (verified live: `:batchEmbedContents`
- * 404s on aiplatform.googleapis.com), so embedding pickers must not offer a registry model that
- * credential cannot actually run. Covers @unit scenarios from
- * specs/model-providers/google-agent-platform.feature.
+ * The Agent Platform door serves chat but not embeddings (verified live:
+ * `:batchEmbedContents` 404s on aiplatform.googleapis.com), so embedding
+ * pickers must not offer a registry model that credential can't run.
  */
 import { describe, expect, it } from "vitest";
 import { providersWithoutRegistryModels } from "../model-selector.tsx";

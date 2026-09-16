@@ -1,10 +1,7 @@
 /**
- * `useOrganizationTeamProject`, answered from the host port rather than the
- * application module of the same name a feature-web package cannot reach.
- * Nothing here fetches: it derives from readings the host already made,
- * rebuilding `availableScopes()`'s flat team/project lists into the nested
- * shape the editor's scope picker wants, rather than growing a second shape
- * on the port itself.
+ * `useOrganizationTeamProject`, answered from the host port a feature-web
+ * package can't reach. Nothing here fetches: it rebuilds `availableScopes()`'s
+ * flat lists into the nested shape the scope picker wants, not a second port shape.
  */
 
 import { useMemo } from "react";

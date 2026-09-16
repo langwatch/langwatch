@@ -34,11 +34,9 @@ export function isLatestAlias(model: string): boolean {
 }
 
 /**
- * Generic "newest chat model for this provider" picker. Callers supply
- * a parse function that decides whether a model id is in-scope and
- * extracts its sort key. The catalog walk, mode/provider filter, and
- * version sort are shared because all providers follow the same shape —
- * only the id grammar differs.
+ * Generic "newest chat model for this provider" picker. Callers supply a
+ * parse function deciding scope and sort key. The catalog walk, filter and
+ * version sort are shared, since every provider follows the same shape.
  */
 function pickLatestChat(
   provider: string,
@@ -91,10 +89,9 @@ export function resolveLatestAlias(model: string): string | null {
 }
 
 /**
- * If the input is a latest-alias, returns the resolved concrete model id.
- * Otherwise returns the input unchanged. Use this at every read-time
- * boundary that hands a model id to a downstream service that doesn't
- * understand aliases.
+ * If the input is a latest-alias, returns the resolved concrete model id;
+ * otherwise returns it unchanged. Use this at every read-time boundary
+ * handing a model id to a downstream service that doesn't understand aliases.
  */
 export function expandLatestAlias(model: string): string {
   const resolved = resolveLatestAlias(model);

@@ -215,12 +215,10 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
                     void llmModelCosts.refetch();
                   },
                   onError: (error) => {
-                    // The application put a refusal on screen itself through a
-                    // global interceptor, and toasting it again would say it
-                    // twice. Nothing above a package-served screen holds that
-                    // interceptor yet, so `isReportedGlobally` answers false and
-                    // the toast is what the reader gets - which is the outcome
-                    // this branch exists to guarantee either way.
+                    // The application already put a refusal on screen via a global
+                    // interceptor; toasting again would say it twice. Nothing above
+                    // a package-served screen holds that interceptor yet, so
+                    // `isReportedGlobally` answers false and the toast is the outcome either way.
                     if (host.isReportedGlobally(error)) return;
                     host.failed({ error, fallbackTitle: "Error deleting LLM model cost" });
                   },

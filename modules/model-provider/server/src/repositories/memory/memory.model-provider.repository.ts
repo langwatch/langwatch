@@ -14,10 +14,9 @@ import {
 } from "./memory.model-provider.database.ts";
 
 /**
- * A write refused because another row in the organization already answers to
- * the routing handle. The twin of the Postgres unique index, raised as its own
- * type so {@link MemoryModelProviderRepository.isRoutingHandleConflict} can
- * recognise it the way the Prisma repository recognises P2002.
+ * A write refused because another row in the organization already answers
+ * to the routing handle — the twin of the Postgres unique index, so
+ * `isRoutingHandleConflict` can recognise it the way Prisma recognises P2002.
  */
 export class MemoryRoutingHandleConflictError extends Error {
   constructor(handle: string) {

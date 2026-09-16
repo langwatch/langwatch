@@ -1,9 +1,6 @@
 /**
- * The redirect policy the credential probe used to assert on its own fetch call
- * now lives in the egress the composition root hands it, so this is where the
- * scenario binds. Moved from
- * `platform/app/src/server/modelProviders/__tests__/providerValidation.unit.test.ts`.
- *
+ * The redirect policy the credential probe asserted on its own fetch now
+ * lives in the egress the composition root hands it, so the scenario binds here.
  * Spec: specs/model-providers/credential-validation.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

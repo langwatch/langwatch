@@ -123,9 +123,8 @@ export class StubCodexAccounts extends CodexAccountService {
 
 /**
  * The application under test: a real app over the memory repositories, with
- * the operations a suite decided answering in place of the stored ones. The
- * checks the app runs before a probe leaves - the per-scope write standing  - 
- * are the real ones, because that gate is the whole authorization.
+ * the operations a suite decided to override. The checks the app runs
+ * before a probe leaves are the real ones, since that gate is the whole authorization.
  */
 export function mountableModelProviderApp(options: {
   modelProviders?: Partial<ModelProviderApi>;

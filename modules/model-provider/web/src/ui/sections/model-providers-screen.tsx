@@ -195,10 +195,9 @@ function ProviderRow({
 }
 
 /**
- * The providers table, or the honest states that stand in for it: a skeleton
- * while the list is in flight, and a guided empty state with the same add
- * action as the header - without one where the reader is looking, the only
- * way forward is a top-right button that is easy to miss.
+ * The providers table, or the honest states standing in for it: a skeleton
+ * while the list is in flight, and a guided empty state with the header's
+ * add action, since a top-right-only button is easy to miss.
  */
 function ProvidersPanel({
   addProviderDisabledReason,
@@ -478,14 +477,10 @@ export default function ModelProvidersScreen() {
         scopeNameById={scopeNameById}
       />
 
-      {/* Default Models renders whenever the project has providers OR orphan
-          default-model configs. The section hides itself when BOTH are empty
-          (fresh accounts only) - an old account that nuked its providers still
-          sees the table so it can spot and fix the now-invalid orphan defaults.
-          Mounting it unconditionally lets its query fire in parallel with the
-          provider list above instead of waterfalling. Defaults are a per-project
-          setting, so before the first project the section has nothing to read
-          and stays out. */}
+      {/* Renders whenever the project has providers OR orphan default-model
+          configs; hides only when both are empty. An account that nuked its
+          providers still sees the table to fix orphan defaults. Mounted
+          unconditionally so its query fires in parallel, not waterfalled. */}
       {projectId && (
         <DefaultModelsSection
           filter={scopeFilter}
@@ -647,10 +642,9 @@ function AddModelProviderMenu({
 }
 
 /**
- * Skeleton render of the providers table - keeps the page from flashing a bare
- * spinner on first load (or on a refocus refetch that follows an upstream
- * error). Matches the real table's shape (header + three rows of provider chip,
- * scope chip and 3-dot menu) so the layout doesn't jump when the data lands.
+ * Skeleton render of the providers table — keeps the page from flashing a
+ * bare spinner on first load or a refetch after an upstream error. Matches
+ * the real table's shape so the layout doesn't jump when data lands.
  */
 function ProvidersTableSkeleton() {
   return (

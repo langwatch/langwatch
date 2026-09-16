@@ -3,10 +3,9 @@ import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**
- * One step of the annotation queue walk: the item on screen, where it sits in
- * the queue, and the ids either side of it. Reads one item at a time so the
- * item can carry its whole trace, rather than resolving the whole queue to
- * render one conversation.
+ * One step of the annotation queue walk: the item on screen, its position,
+ * and the ids either side. Reads one item at a time so it can carry its
+ * whole trace, rather than resolving the whole queue to render one conversation.
  */
 export function useAnnotationQueueWalk({
   queueItemId,

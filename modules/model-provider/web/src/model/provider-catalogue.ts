@@ -16,10 +16,9 @@ export type AddableProvider = {
   provider: string;
   name: string;
   /**
-   * Sign-in providers (Codex) are a niche, subscription-billed harness rather
-   * than a general API-key provider, so they sort to the bottom of this menu.
-   * On Langy / onboarding the surface-aware grid promotes them to the top
-   * instead (see `providersForSurface`).
+   * Sign-in providers (Codex) are niche and subscription-billed, so they
+   * sort to the bottom of this menu. Langy/onboarding's surface-aware grid
+   * promotes them to the top instead (see `providersForSurface`).
    */
   authFlow: "api-key" | "oauth-device" | undefined;
 };
@@ -75,12 +74,9 @@ export function sortProvidersForTable<T extends OrderableProviderRow>(rows: read
 }
 
 /**
- * Scope id to the name it should read as.
- *
- * Without this lookup, a provider bound to two teams renders as two identical
- * "Team" pills. `platform/app` walked the organization graph for it; the host
- * hands over the same three lists the scope filter offers, so one read answers
- * both.
+ * Scope id to the name it should read as. Without this, a provider bound
+ * to two teams renders as two identical "Team" pills. The host hands over
+ * the same three lists the scope filter offers, so one read answers both.
  */
 export function scopeNamesOf(available: ModelProviderAvailableScopes): Map<string, string> {
   const names = new Map<string, string>();

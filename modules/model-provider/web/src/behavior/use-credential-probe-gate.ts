@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * Decides whether a credential still has to be probed before saving. A failed
  * probe cannot tell a bad key from a network restriction or provider outage,
  * so the first refusal explains itself and the next Save goes through unprobed.
- *
  * @param customKeys - The credentials as currently entered
  * @param resetKey - Resets the refusal when the form targets a new provider
  */
@@ -25,12 +24,10 @@ export function useCredentialProbeGate({
   }, [resetKey]);
 
   // Editing any credential re-arms the probe, so a corrected key is checked
-  // again rather than saved on the strength of the previous refusal.
-  //
-  // Comparing fingerprints rather than holding a boolean is what makes that
-  // safe while a probe is still in flight: the refusal records the credentials
-  // it was actually about, so a key edited mid-probe does not inherit the old
-  // key's verdict and slip through unprobed.
+  // again rather than saved on the previous refusal. Comparing fingerprints,
+  // not a boolean, keeps this safe while a probe is in flight: the refusal
+  // records the credentials it was about, so a mid-probe edit can't inherit
+  // the old verdict and slip through unprobed.
   const wasRefused = refusedCredentials === credentialsFingerprint;
 
   // Both callbacks keep a stable identity across renders. The save handlers

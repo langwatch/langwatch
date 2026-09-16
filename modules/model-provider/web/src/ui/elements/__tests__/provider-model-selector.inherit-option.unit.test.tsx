@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Regression: the Inherit row looked clickable but INHERIT_SENTINEL was missing from the Chakra
  * collection, so hover/click silently fell through to the first real model below it. Binds
  * specs/model-providers/model-default-config-cascade.feature.

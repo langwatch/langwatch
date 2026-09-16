@@ -1,8 +1,7 @@
 /**
- * Unit tests for model ID translation at the LiteLLM boundary.
- *
- * LiteLLM expects model IDs with dashes but llmModels.json uses dots.
- * This module tests the runtime dot-to-dash conversion.
+ * Unit tests for model ID translation at the LiteLLM boundary. LiteLLM
+ * expects dashes but llmModels.json uses dots; this tests the runtime
+ * dot-to-dash conversion.
  */
 
 import { describe, expect, it } from "vitest";

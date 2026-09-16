@@ -1,8 +1,5 @@
 /**
- * The cascade the Default Models table renders, as pure functions. Every
- * cell shows the FINAL RESOLVED state for the row's scope — pinned versus
- * inherited is only differentiated in the edit drawer — so the walk is
- * stated here rather than in the component, testable without a DOM.
+ * The cascade the Default Models table renders, as pure, DOM-free functions.
  * Contract: specs/model-providers/role-based-default-models.feature,
  *           specs/model-providers/model-default-config-cascade.feature.
  */
@@ -69,10 +66,8 @@ export function compareConfigsByScopeThenName(
 
 /**
  * Most-specific scope a policy attaches to (PROJECT > TEAM > ORGANIZATION).
- *
- * The cell uses this as the anchor for the cascade walk, so a row showing
- * "Team Platform + Project edge" resolves at the project — the model code
- * running on that project would actually see.
+ * The cell uses this as the cascade walk's anchor — a row showing "Team
+ * Platform + Project edge" resolves at what the model on that project sees.
  */
 export function mostSpecificScope(
   scopes: ModelDefaultConfigSnapshot["scopes"],
@@ -87,10 +82,9 @@ export function mostSpecificScope(
 }
 
 /**
- * The anchor's own parent chain, most specific first: a project walks project,
- * its own team, then the organization; a team walks team then organization. A
- * parent tier whose id can't be resolved from the hierarchy is skipped rather
- * than loosely matched.
+ * The anchor's own parent chain, most specific first: project walks project,
+ * team, organization; team walks team, organization. A parent tier whose id
+ * can't be resolved from the hierarchy is skipped rather than loosely matched.
  */
 function cascadeChainFor(anchor: AnchorScope, hierarchy: ScopeHierarchy): AnchorScope[] {
   const organizationId = hierarchy.organization?.id ?? null;
@@ -107,10 +101,9 @@ function cascadeChainFor(anchor: AnchorScope, hierarchy: ScopeHierarchy): Anchor
 }
 
 /**
- * Cascading walk for a single key, mirroring the server resolver's chain
- * (anchor, then its own parent scopes). Chain ids come from `hierarchy`
- * rather than matching parent tiers by type alone, which would surface
- * values from teams the anchor project does not belong to.
+ * Cascading walk for a single key, mirroring the server resolver's chain.
+ * Chain ids come from `hierarchy` rather than matching parent tiers by type
+ * alone, which would surface values from teams the anchor doesn't belong to.
  */
 export function resolveAtScope({
   key,

@@ -27,10 +27,9 @@ export type ModelProviderDefinition = {
   restrictedToFeatureKeys?: readonly string[];
   deprecated?: { replacedBy: string };
   /**
-   * Regular expression sources naming the models of this provider that may run a Langy
-   * conversation with the permission checks skipped on the developer's machine (ADR-129).
-   * The list is the provider's default; an operator can replace it on the provider row.
-   * Matched against the BARE model id, anchored at the start by every entry below.
+   * Regex sources naming this provider's models allowed to run a Langy
+   * conversation with permission checks skipped locally (ADR-129), matched
+   * against the bare model id anchored at the start; overridable per row.
    */
   langySkipPermissionsModels: readonly string[];
 };

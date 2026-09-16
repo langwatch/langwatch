@@ -1,9 +1,7 @@
 /**
- * Flat (uncollapsed) list of every stored provider row the caller can see —
- * one entry per row, never deduped by provider type. `useModelProvidersSettings`
- * collapses to one winner per type, which drops non-winning rows from a
- * multi-instance setup and silently misses an id lookup against it (#5380).
- * The providers table reads this instead.
+ * Flat (uncollapsed) list of every stored provider row — never deduped by
+ * type. `useModelProvidersSettings` collapses to one winner per type, which
+ * drops non-winning rows and silently misses an id lookup against them (#5380).
  */
 
 import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
@@ -15,10 +13,9 @@ import { useModelProviderHost } from "../model/model-provider-host.ts";
 import { modelProviderApi } from "./model-provider-api.ts";
 
 /**
- * A fresh `[]` per render with no data would re-fire any memo depending on
- * `providers` every render (the render-loop class behind #5380). This
- * module-level constant keeps the empty-list identity stable; `readonly`
- * since every caller shares the one instance.
+ * A fresh `[]` per render would re-fire any memo depending on `providers`
+ * every render (the render-loop class behind #5380). This module-level
+ * constant keeps the empty-list identity stable for every caller.
  */
 const NO_PROVIDERS: readonly ModelProviderListRow[] = [];
 
@@ -72,20 +69,17 @@ export function useAllModelProvidersList() {
 }
 
 /**
- * Whether `modelProviderId` names an actual stored row.
- *
- * Neither absent nor the Add-flow sentinel `"new"`. Shared so every caller that
- * branches on "is there a specific row to resolve" uses the same rule.
+ * Whether `modelProviderId` names an actual stored row: neither absent nor
+ * the Add-flow sentinel `"new"`. Shared so every caller uses the same rule.
  */
 export function isResolvableProviderId(modelProviderId: string | undefined): boolean {
   return !!modelProviderId && modelProviderId !== "new";
 }
 
 /**
- * Resolves a single row by id out of the flat list above. Shared by the
- * editor form's edit-target memo and the drawer's title lookup, so the two
- * can never resolve different rows for the same id (#5380). Generic over
- * the row so callers get back exactly what they passed in.
+ * Resolves a single row by id. Shared by the editor form's edit-target memo
+ * and the drawer's title lookup, so the two can never resolve different rows
+ * for the same id (#5380). Generic, so callers get back what they passed in.
  */
 export function findModelProviderById<T extends { id: string }>({
   providers,

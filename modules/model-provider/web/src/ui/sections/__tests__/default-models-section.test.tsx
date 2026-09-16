@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * "+ Add config" and Edit are asserted as the host being asked for the drawer, not as `openDrawer`
  * calls, since `defaultModelOverride` is still `platform/app`'s and this screen only addresses it.
  * Spec: specs/model-providers/role-based-default-models.feature

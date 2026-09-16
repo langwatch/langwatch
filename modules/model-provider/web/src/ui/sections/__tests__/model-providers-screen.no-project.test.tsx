@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * Providers are org-scoped, so every action works with or without a project — the page used to
  * disable adding/editing/deleting with none, a dead end for an org tracking only coding agents.
  * Spec: specs/model-providers/providers-without-a-project.feature

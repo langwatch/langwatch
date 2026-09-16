@@ -9,12 +9,9 @@ export function getProviderFromModel(model: string): string {
 }
 
 /**
- * Whether a credential field holds a secret. Drives password masking in the
- * form, redaction on every read path, and which fields a partial write keeps.
- *
- * The answer defaults to yes: a field is public only when
- * `PUBLIC_CREDENTIAL_FIELDS` names it, so a provider that adds a credential
- * is covered before anyone remembers to classify it.
+ * Whether a credential field holds a secret — drives password masking,
+ * redaction and partial-write keeps. Defaults to yes: a field is public
+ * only when `PUBLIC_CREDENTIAL_FIELDS` names it, covering new fields by default.
  */
 export function isSecretCredentialField(key: string): boolean {
   return !PUBLIC_CREDENTIAL_FIELDS.has(key);
@@ -218,9 +215,8 @@ export function hasUserEnteredNewApiKey(customKeys: Record<string, string>): boo
 
 /**
  * Whether one credential field now holds something other than what was
- * stored for it. Emptying a field counts: it is how a base URL gets
- * removed, and reading that as "nothing happened" left Save disabled with
- * no way to undo the endpoint.
+ * stored. Emptying counts: it's how a base URL gets removed, and reading
+ * that as "nothing happened" left Save disabled with no way to undo it.
  */
 function credentialFieldChanged({
   value,
@@ -254,10 +250,9 @@ export function hasUserModifiedNonApiKeyFields(
 }
 
 /**
- * Whether any credential the customer can actually see has changed.
- * Fields still holding the masked placeholder are the ones they never
- * touched, so they are skipped rather than compared against a secret the
- * browser never receives.
+ * Whether any credential the customer can actually see has changed. Fields
+ * still holding the masked placeholder are ones they never touched, so
+ * they're skipped rather than compared against a secret the browser never receives.
  */
 export function hasUserModifiedAnyCredential({
   customKeys,
@@ -300,10 +295,9 @@ export function filterMaskedApiKeys(customKeys: Record<string, string>): Record<
 }
 
 /**
- * Determines whether the "Use as Default Provider" toggle should be
- * auto-enabled when opening the drawer. With the legacy default-model
- * scalar columns gone, only the "first provider in the project" case
- * remains: any further provider added needs an explicit opt-in.
+ * Whether "Use as Default Provider" auto-enables when opening the drawer.
+ * With the legacy default-model scalar columns gone, only the "first
+ * provider in the project" case remains — any further one needs opt-in.
  */
 export function shouldAutoEnableAsDefault({
   enabledProvidersCount,

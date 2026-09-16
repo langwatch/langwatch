@@ -1,8 +1,7 @@
 /**
- * Builds ModelProviderInfrastructure (previously hand-composed). ModelProviderApp.create
- * builds from redis and config. Two intentional branches: managed is always
- * UnmanagedModelProviderGatewayAdapter (core module may not import Enterprise); spans is
- * always undefined (avoids untyped peer in dependency-token system).
+ * Builds ModelProviderInfrastructure (previously hand-composed) from redis
+ * and config. Two intentional branches: managed is always Unmanaged (core
+ * may not import Enterprise); spans is always undefined (no untyped peer).
  */
 import { nanoid } from "nanoid";
 import type { ProjectApi } from "@langwatch/project-contract";

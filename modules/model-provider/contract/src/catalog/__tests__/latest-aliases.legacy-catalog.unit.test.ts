@@ -1,9 +1,7 @@
 /**
  * Alias resolution against a catalog that predates OpenAI's named tiers.
- *
- * Lives in its own file because the catalog is injected through a
- * module mock, which is per-file: the sibling `latestAliases.unit.test`
- * pins behaviour against a catalog that does carry GPT-5.6.
+ * Lives in its own file since the catalog mock is per-file: the sibling
+ * `latestAliases.unit.test` pins behaviour against a catalog with GPT-5.6.
  */
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,12 +1,9 @@
 import { ModelProviderManagedGateway } from "../app/model-provider.members.ts";
 
 /**
- * The managed-provider answer for a deployment that has none.
- *
- * Named rather than defaulted: "no organization is managed, and parameters
- * travel unchanged" is the true answer for every self-hosted install, and
- * stating it here is what keeps a deployment that DOES have managed providers
- * from getting it by omission.
+ * The managed-provider answer for a deployment that has none. Named rather
+ * than defaulted: "no organization is managed" is the true answer for every
+ * self-hosted install, keeping one WITH managed providers from getting it by omission.
  */
 export class UnmanagedModelProviderGatewayAdapter extends ModelProviderManagedGateway {
   static create(): UnmanagedModelProviderGatewayAdapter {

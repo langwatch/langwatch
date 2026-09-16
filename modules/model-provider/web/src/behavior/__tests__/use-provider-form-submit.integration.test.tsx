@@ -288,11 +288,9 @@ describe("useProviderFormSubmit()", () => {
 
       it("still invalidates getDefaultModelsForProject so the section refetches the auto-seeded row", async () => {
         // First-provider create runs seedOnboardingDefaultsForProvider
-        // server-side regardless of the "use as default provider" checkbox.
-        // The Default Models card on the settings page binds to
-        // getDefaultModelsForProject, so it MUST be invalidated even when
-        // the user didn't opt into the user-pick replay — otherwise the
-        // section reads stale "no configs" until window-focus refetch.
+        // server-side regardless of the "use as default" checkbox. The
+        // Default Models card binds to getDefaultModelsForProject, so it
+        // MUST invalidate even without opting into the user-pick replay.
         const snapshot = buildSnapshot({
           useAsDefaultProvider: false,
           projectDefaultModel: null,
@@ -426,12 +424,10 @@ describe("useProviderFormSubmit()", () => {
     });
 
     describe("when saving a required-key provider without re-entering the masked key", () => {
-      // openai requires OPENAI_API_KEY. Opening the edit drawer and clicking
-      // Save without re-typing the key posts the masked key (stripped) plus the
-      // still-empty OPENAI_BASE_URL, leaving { OPENAI_BASE_URL: "" }. The server
-      // validates that against the required-key schema and rejects it ("key
-      // went blank, couldn't save"). With no real change the payload must be
-      // undefined so the stored credentials are preserved.
+      // openai requires OPENAI_API_KEY. Save-without-retyping posts the
+      // masked key (stripped) plus the still-empty OPENAI_BASE_URL, which
+      // the required-key schema rejects. With no real change, the payload
+      // must be undefined so stored credentials are preserved.
       const openaiSchema = z.object({
         OPENAI_API_KEY: z.string().min(1),
         OPENAI_BASE_URL: z.string().optional(),

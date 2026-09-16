@@ -38,10 +38,9 @@ export class ModelProviderAuthorizationService {
   }
 
   /**
-   * The same question asked of the CREDENTIAL rather than of the person who
-   * minted it: an API key's own scope restrictions intersected with what its
-   * owner may still do. A key narrowed to one project answers `false` for its
-   * organization even when its owner is an administrator.
+   * The same question asked of the CREDENTIAL rather than the person who
+   * minted it: an API key's own restrictions intersected with what its
+   * owner may still do — narrowed to one project answers `false` even for an admin owner.
    */
   async apiKeyCanWrite(
     apiKey: ModelDefaultApiKeyPrincipal,

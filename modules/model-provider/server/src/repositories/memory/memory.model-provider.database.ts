@@ -6,11 +6,9 @@ import type {
 } from "@langwatch/model-provider-contract";
 
 /**
- * The rows the four memory twins share.
- *
- * One store rather than four, because the provider rows the evidence read
- * counts are the provider rows the provider repository writes: two arrays
- * would let a test attach a provider the checklist cannot see.
+ * The rows the four memory twins share. One store rather than four: the
+ * provider rows the evidence read counts are the ones the provider
+ * repository writes, so two arrays could let a test attach a provider the checklist can't see.
  */
 export class MemoryModelProviderDatabase {
   static create(): MemoryModelProviderDatabase {

@@ -1,8 +1,7 @@
 /**
- * A stored cost rule as the settings table reads it. The stored row spells
- * "this rule sets no rate" as `null`, which a table cell wants as "absent"
- * instead — converting once here keeps that translation out of every cell.
- * A family-local copy; the old module survives for `LLMModelCostDrawer`.
+ * A stored cost rule as the settings table reads it: `null` ("no rate set")
+ * converts once here to "absent" for the cell. A family-local copy; the old
+ * module survives for `LLMModelCostDrawer`.
  */
 
 import type { ModelCost as StoredModelCost } from "@langwatch/model-provider-contract";

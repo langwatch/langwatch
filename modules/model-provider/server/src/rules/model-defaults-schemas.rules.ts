@@ -6,11 +6,9 @@ const scopeAttachmentSchema = z.object({
 });
 
 /**
- * Body of POST /api/model-defaults. The JSON payload carries the
- * model-per-role / model-per-feature-key entries; absence of a key
- * means "inherit from a higher scope" — see the cascading-default-
- * models ADR (dev/docs/adr/020). Scopes is the list of (scopeType,
- * scopeId) attachments — at least one entry required.
+ * Body of POST /api/model-defaults. Absence of a key means "inherit from a
+ * higher scope" — see the cascading-default-models ADR (dev/docs/adr/020).
+ * `scopes` is the (scopeType, scopeId) attachment list; at least one required.
  */
 export const createModelDefaultConfigInputSchema = z.object({
   config: z.record(z.string(), z.string()),
@@ -18,10 +16,9 @@ export const createModelDefaultConfigInputSchema = z.object({
 });
 
 /**
- * Body of PUT /api/model-defaults/:id. Both fields are optional —
- * caller can update just the payload or just the scope attachments.
- * Sending `scopes: []` deletes the config (an unattached config can
- * never be hit by the resolver).
+ * Body of PUT /api/model-defaults/:id. Both fields are optional — update
+ * just the payload or just the scope attachments. Sending `scopes: []`
+ * deletes the config (an unattached config can never be hit by the resolver).
  */
 export const updateModelDefaultConfigInputSchema = z.object({
   config: z.record(z.string(), z.string()).optional(),
@@ -52,10 +49,9 @@ const effectiveResolutionSchema = z
 
 export const apiResponseModelDefaultsSchema = z.object({
   /**
-   * Identity of the project this snapshot is for (echoed from the
-   * API-key context) plus its team + organization. CLI / API consumers
-   * use these ids to form scope refs for follow-up POST/PUT/DELETE
-   * calls without a separate whoami round trip.
+   * Identity of the project this snapshot is for (echoed from the API-key
+   * context) plus its team + organization. Consumers use these ids to form
+   * scope refs for follow-up calls without a separate whoami round trip.
    */
   scope: z.object({
     projectId: z.string(),
