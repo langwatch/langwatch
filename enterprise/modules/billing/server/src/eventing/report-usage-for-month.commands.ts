@@ -120,12 +120,10 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       }
 
       if (lookup.outcome === "not_usage_billed") {
-        // Debug, like the two skips below it. A free or legacy plan reaching
-        // this handler is the system working: the dispatch is per active
-        // organization and takes no view on pricing, so every one of them
-        // arrives here and stops. Reporting that at warn put a permanent,
-        // recurring line in front of whoever greps for warnings during an
-        // incident.
+        // Debug, like the two skips below it: a free or legacy plan reaching
+        // here is the system working as designed (dispatch has no view on
+        // pricing), so warn would put a permanent, recurring line in front
+        // of whoever greps for warnings during an incident.
         logger.debug(
           { organizationId },
           "organization is not on usage-based pricing, skipping usage reporting",
@@ -179,11 +177,9 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   /**
-   * Two-phase checkpoint protocol:
-   * 1. Write `pendingReportedTotal` before calling Stripe (intent).
-   * 2. On success, promote to `lastReportedTotal` and clear pending.
-   *
-   * Returns true if self-dispatch should fire (delta was reported successfully).
+   * Two-phase checkpoint: writes `pendingReportedTotal` before calling
+   * Stripe (intent), then on success promotes it to `lastReportedTotal`
+   * and clears pending. Returns true when self-dispatch should fire.
    */
   private async reportForBillingMonth({
     organizationId,

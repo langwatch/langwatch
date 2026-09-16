@@ -7,12 +7,9 @@ import {
 import { CATEGORY_LABELS, DISPOSITION_LABELS, PII_LABELS } from "../../model/data-privacy-labels.ts";
 
 /**
- * What is ACTUALLY applied once the rules above cascade down.
- *
- * The scope selection is declared structurally rather than imported from
- * `@langwatch/authz-web`: this block reads three fields off it, and naming that
- * package here would add a second closure finding to the family for a shape
- * narrower than the import.
+ * What is ACTUALLY applied once the rules above cascade down. Declared
+ * structurally, not imported from `@langwatch/authz-web` — this block reads
+ * only three fields, narrower than that import's shape.
  */
 export type EffectiveScopeSelection =
   | { kind: "all" }
@@ -21,10 +18,9 @@ export type EffectiveScopeSelection =
   | { kind: "specific"; scopeType: string; scopeId: string; name?: string };
 
 /**
- * The effective view follows the scope filter: "All you can see" shows the
- * organization baseline, "This team" the team baseline, and a project the full
- * cascade. Team/org baselines are null for a personal-account project, which
- * falls back to its own project policy.
+ * The effective view follows the scope filter: org baseline for "All you
+ * can see", team baseline for "This team", full cascade for a project.
+ * Null team/org baselines (personal account) fall back to project policy.
  */
 export function pickEffectiveForScope(
   snapshot: DataPrivacySnapshot,

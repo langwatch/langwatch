@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The contract every topic backend answers the same way, stated once and run
- * against each backend the package can reach. The memory tier runs it always;
- * a Postgres backend joins the table as a second row when this package
- * declares that datastore.
+ * The contract every topic backend answers the same way, run against each
+ * reachable backend — the memory tier always, Postgres joining as a second
+ * row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
 import { MemoryTopicRepositories } from "../memory/memory.topic.repositories.ts";

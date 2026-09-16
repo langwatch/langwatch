@@ -91,12 +91,9 @@ export function targetingLabel(summary: TargetingSummary): string | null {
 }
 
 /**
- * Everything up to the first rule with no conditions at all, which matches
- * every context and makes every rule below it unreachable.
- *
- * "No conditions" is counted, not spelled out as "no organization and no
- * project": an age rule names neither of those and is emphatically not a
- * catch-all, so the shorter test would report the whole fleet for it.
+ * Everything up to the first rule with no conditions — it matches every
+ * context, so every rule below it is unreachable. Counted rather than
+ * spelled out, since an age rule names no org/project yet isn't a catch-all.
  */
 function splitAtCatchAll(rules: FeatureFlagRules): {
   reachable: FeatureFlagRules;
@@ -206,10 +203,9 @@ function pluralize({ count, noun }: { count: number; noun: string }): string | n
 }
 
 /**
- * Rendered in UTC on purpose: the stored value is a calendar day, and
- * formatting it in the operator's own zone shows the day before it west of
- * Greenwich — which would make the page disagree with the date the operator
- * typed into the rule.
+ * Rendered in UTC on purpose: the stored value is a calendar day, and the
+ * operator's own zone would show the day before it west of Greenwich —
+ * disagreeing with the date the operator typed into the rule.
  */
 function formatDate(value: string): string {
   const parsed = toEpochMs(value);

@@ -1,8 +1,7 @@
 /**
- * The server half of `dataPrivacy.*`: a permission and a handler per procedure
- * the contract already named. The two writes are authorized on the TARGET
- * scope's own tier after the app anchors it to the acting project's
- * organization, so a project member cannot push a rule up to the organization.
+ * The server half of `dataPrivacy.*`: a permission and a handler per
+ * procedure. Writes are authorized on the TARGET scope's own tier, anchored
+ * to the acting project's organization — no member can push a rule up.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

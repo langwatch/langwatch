@@ -5,10 +5,9 @@
 
 export const CLUSTERING_ERROR_CODES = {
   /**
-   * No usable model configuration for the clustering LLM or embeddings
-   * feature — the dominant production failure. Detected by us, while
-   * resolving the project's own configuration, so it is attributable with
-   * certainty.
+   * No usable model configuration for the clustering LLM or embeddings —
+   * the dominant production failure. Detected while resolving the
+   * project's own configuration, so it is attributable with certainty.
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
   /**
@@ -48,12 +47,9 @@ const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
 ]);
 
 /**
- * A clustering failure that knows what it is. Throw this wherever the cause is
- * established; everything else is treated as an internal fault.
- *
- * `message` is for operators — logs and the projection — and may contain raw
- * upstream detail. It is never sent to the product surface: the client is given
- * the code only, and picks fixed copy from it.
+ * A clustering failure that knows what it is; throw wherever the cause is
+ * established. `message` is for operators only (logs, projection) — the
+ * client gets the code, never the message, and picks fixed copy from it.
  */
 export class ClusteringError extends Error {
   readonly code: ClusteringErrorCode;

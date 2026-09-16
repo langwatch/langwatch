@@ -1,9 +1,7 @@
 /**
  * Human-readable labels for the PII entities each redaction level detects,
- * shown in the rule drawer's level tooltips. Pure constants so the settings
- * bundle never pulls in the server-side redaction engine; a unit test pins
- * each map to the engine's entity list so the copy cannot drift from what is
- * actually detected.
+ * shown in the rule drawer's tooltips. Pure constants, pinned by a test to
+ * the engine's entity list so copy cannot drift from what is detected.
  */
 
 /** Entities the essential level detects natively (pattern + checksum based). */

@@ -112,10 +112,9 @@ export const resolveGrowthEventsPriceId = ({
 };
 
 /**
- * Creates Stripe checkout line items for a Growth plan subscription.
- *
- * Returns a seat line item (quantity = coreMembers) and a metered events line
- * item (no quantity — Stripe tracks usage via usage records).
+ * Creates Stripe checkout line items for a Growth plan subscription: a
+ * seat line item (quantity = coreMembers) and a metered events line item
+ * (no quantity — Stripe tracks usage via usage records).
  */
 export const createCheckoutLineItems = ({
   coreMembers,

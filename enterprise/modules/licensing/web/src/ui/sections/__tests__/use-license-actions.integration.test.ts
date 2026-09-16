@@ -27,14 +27,10 @@ const { uploadMutationOptions, removeMutationOptions, publicEnvData, invalidateM
     toaster: { create: vi.fn() },
   }));
 
-// A full-page reload used to run in the same tick as the toast below and tore
-// it off the screen — the restart instruction is the one thing an operator has
-// to read. `trpc.invalidate()` replaced it, and this keeps the regression
-// guarded: the hook must not reload.
-//
-// The hook no longer reaches the browser at all — the host port has no reload
-// method — so this spy is the seam a reload would have to go through, and it
-// stays unwired.
+// `trpc.invalidate()` replaced a full-page reload that used to tear the
+// toast off-screen; this spy guards the regression. The hook cannot reach
+// the browser directly — the host port has no reload method — so this spy
+// is the unwired seam a reload would have to go through.
 const { reloadPage } = vi.hoisted(() => ({ reloadPage: vi.fn() }));
 
 vi.mock("../../../behavior/licensing-api.ts", () => ({

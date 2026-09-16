@@ -1,10 +1,7 @@
 /**
- * The billing period, spelled out next to an amount the customer is about to
- * confirm.
- *
- * Every period the payment provider can report gets its own words. Collapsing
- * the unknown ones to "per month" would put a wrong period beside a real
- * charge, so an unrecognised one says nothing rather than something false.
+ * The billing period, spelled out next to an amount the customer is about
+ * to confirm. Every provider period gets its own words; an unrecognised
+ * one says nothing rather than showing a wrong period as "per month".
  */
 export function formatBillingPeriod(interval: string): string {
   switch (interval) {

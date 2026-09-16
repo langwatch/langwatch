@@ -10,11 +10,8 @@ export type PublicAnonymousFeatureFlag = (typeof PUBLIC_ANONYMOUS_FEATURE_FLAGS)
 
 /**
  * Every publicly resolvable flag, resolved for one anonymous browser.
- *
- * Keyed loosely because the allowlist is empty today: an exhaustive record
- * over `never` cannot express the map a non-empty allowlist produces. The
- * bound that matters is the allowlist itself, enforced where the map is
- * built.
+ * Keyed loosely since the allowlist is empty today (a `never` record
+ * can't express a non-empty one); the real bound is enforced where the map is built.
  */
 export const publicAnonymousFlagMapSchema = z.object({}).strict();
 

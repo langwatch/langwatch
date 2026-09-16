@@ -36,12 +36,9 @@ function policyFor(
 }
 
 /**
- * The experiments a person can turn on for themselves, and — where they are
- * authorised — for a whole project or organisation.
- *
- * Fully controlled: it renders what it is given and reports intent upward.
- * It holds no query, no mutation and no permission logic, so the same list
- * can be shown from anywhere without dragging transport in with it.
+ * The experiments a person can turn on for themselves, and — where
+ * authorised — for a whole project or organisation. Fully controlled: no
+ * query, mutation or permission logic, so the same list renders from anywhere.
  */
 export function ExperimentsDialog({
   open,

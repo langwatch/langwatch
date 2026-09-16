@@ -54,10 +54,9 @@ export function emptyClusteringProject(): MemoryClusteringProject {
 }
 
 /**
- * The one store behind every memory-tier topic row, the way one Postgres
- * connection serves them: a cost recorded through the clustering repository is
- * the cost the same store answers with, and a project seeded once is the
- * project both repositories read.
+ * The one store behind every memory-tier topic row, like one Postgres
+ * connection serving them: a cost recorded via the clustering repository
+ * is what the store answers with; a project seeded once is shared by both.
  */
 export class TopicMemoryStore {
   static create(projects: Map<string, MemoryTopicProject> = new Map()): TopicMemoryStore {

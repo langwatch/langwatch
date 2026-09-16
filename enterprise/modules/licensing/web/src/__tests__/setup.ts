@@ -1,9 +1,6 @@
 /**
- * The jest-dom matchers, registered once for the package.
- *
- * The package has depended on `@testing-library/jest-dom` all along and
- * nothing imported it, so `toBeInTheDocument` was an unknown Chai property and
- * every assertion using it threw rather than failing — four tests that could
- * not pass whatever the component did.
+ * The jest-dom matchers, registered once for the package. Without this
+ * import, `toBeInTheDocument` is an unknown Chai property and every
+ * assertion using it throws rather than failing.
  */
 import "@testing-library/jest-dom/vitest";

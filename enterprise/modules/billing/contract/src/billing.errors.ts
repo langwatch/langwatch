@@ -22,11 +22,8 @@ export class UserEmailRequiredError extends HandledError {
 
 /**
  * Two requests created the billing customer at once and our re-read still
- * didn't see the id.
- *
- * Ours to get right, and it does resolve itself — which is exactly what the
- * `subscription_sync_failed` copy says ("this usually catches up on its own;
- * reload in a few minutes").
+ * didn't see the id. Resolves itself, which is what the
+ * `subscription_sync_failed` copy says ("catches up on its own; reload").
  */
 export class CustomerCreationRaceError extends HandledError {
   declare readonly code: "subscription_sync_failed";

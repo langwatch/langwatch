@@ -11,12 +11,9 @@ export interface DataPrivacyProject {
 }
 
 /**
- * The one question the ingestion paths ask of data privacy.
- *
- * `DataPrivacyResolutionService` answers it, and so does the wider
- * `DataPrivacyService` that composes it. Naming it is what lets the span
- * content-drop and PII-redaction services be composed by a process that can
- * resolve a policy but cannot write one.
+ * The one question ingestion paths ask of data privacy — answered by both
+ * `DataPrivacyResolutionService` and the wider `DataPrivacyService`, so a
+ * process can compose content-drop/PII-redaction while only resolving policy.
  */
 export interface DataPrivacyResolution {
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;

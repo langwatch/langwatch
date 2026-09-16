@@ -114,10 +114,9 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
   }
 
   /**
-   * The trial licence a paid subscription retires, read beside the row rather
-   * than selected with it: the repository's organization shape is shared with
-   * every other billing surface, and none of the rest has any business with a
-   * licence key.
+   * The trial licence a paid subscription retires, read beside the row
+   * rather than selected with it: the repository's organization shape is
+   * shared with every other billing surface, none of which needs a licence key.
    */
   private async withTrialLicense(
     subscription: BillingSubscriptionWithOrganization,

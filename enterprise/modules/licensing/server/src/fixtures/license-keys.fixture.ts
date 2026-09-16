@@ -1,8 +1,6 @@
 /**
- * Test RSA key pair for license signing and verification.
- * These keys are ONLY for testing - never use in production.
- *
- * gitleaks:allow -- test-only key fixtures, not real secrets
+ * Test RSA key pair for license signing and verification — test-only,
+ * never for production. gitleaks:allow -- test-only key fixtures, not real secrets.
  */
 
 // 2048-bit RSA private key for signing test licenses

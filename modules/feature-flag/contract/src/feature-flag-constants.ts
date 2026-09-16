@@ -5,10 +5,9 @@
  */
 
 /**
- * Cache TTL for user-facing feature flags in milliseconds.
- *
- * Held for the browser-facing flag surface. The client-side React Query
- * staleTime is deliberately longer; see the app's useFeatureFlag hook.
+ * Cache TTL for user-facing feature flags, in milliseconds. Held for the
+ * browser-facing flag surface — the client-side React Query staleTime is
+ * deliberately longer (see the app's useFeatureFlag hook).
  */
 export const FEATURE_FLAG_CACHE_TTL_MS = 5_000;
 

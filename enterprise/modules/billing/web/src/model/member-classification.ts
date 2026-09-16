@@ -7,21 +7,18 @@ import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { OrganizationUserRole } from "./prisma-types.ts";
 
 /**
- * A permission that grants nothing but a read.
- *
- * The ACTION half of `resource:action` decides it, read by splitting rather
- * than by a suffix match, exactly as the server copy does: a resource whose
- * name happens to end in "view" must not be mistaken for a view grant.
+ * A permission that grants nothing but a read. The ACTION half of
+ * `resource:action` decides it, split rather than suffix-matched — a
+ * resource ending in "view" must not be mistaken for a view grant.
  */
 function isViewOnlyPermission(permission: string): boolean {
   return permission.split(":")[1] === "view";
 }
 
 /**
- * A custom role that grants nothing but reads.
- *
- * Anything beyond `:view` — a create, an update, a delete, a manage — is what
- * elevates an `EXTERNAL` membership to a full seat.
+ * A custom role that grants nothing but reads. Anything beyond `:view` —
+ * a create, update, delete, or manage — elevates an `EXTERNAL` membership
+ * to a full seat.
  */
 function isViewOnlyCustomRole(permissions: string[]): boolean {
   return permissions.every(isViewOnlyPermission);

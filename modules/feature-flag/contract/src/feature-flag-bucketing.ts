@@ -33,12 +33,9 @@ export function bucketForSubject({
 }
 
 /**
- * Whether the subject falls inside a whole-percent rollout.
- *
- * `percentage` 0 admits nobody and 100 admits everybody. A target with no
- * bucketing subject — a system target, or any backend caller that is not a
- * person — never satisfies a percentage rule, rather than being treated as
- * bucket zero.
+ * Whether the subject falls inside a whole-percent rollout. 0 admits
+ * nobody, 100 admits everybody. A target with no bucketing subject
+ * (system, non-person) never satisfies it, rather than acting as bucket zero.
  */
 export function isWithinRolloutPercentage({
   flagKey,

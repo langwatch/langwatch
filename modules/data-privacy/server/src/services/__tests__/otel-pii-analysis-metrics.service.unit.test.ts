@@ -10,12 +10,9 @@ import {
 } from "../otel-pii-analysis-metrics.service.ts";
 
 /**
- * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * The names and labels are pinned as literals because they are read by name
- * outside this repository, and every way they can go wrong is silent: a panel
- * that names a series nobody writes renders empty, which reads as "no PII
- * checks are happening" rather than "the metric moved".
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature. Names and
+ * labels are pinned as literals, read by name outside this repository —
+ * an unwritten series renders empty, reading as "no PII checks" not "moved".
  */
 describe("given the PII analysis metrics pushed over OTLP", () => {
   const metrics = createRecordingMeterProvider();

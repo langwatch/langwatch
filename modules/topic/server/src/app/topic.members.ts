@@ -11,9 +11,8 @@ export interface StagedLangevalsPayload {
   readonly url: string;
   /**
    * Removes the parked object. Best-effort by contract: staged bodies carry
-   * customer trace data and provider credentials, so the caller always asks,
-   * and a bucket lifecycle rule on the staging prefix is the fallback for the
-   * crash paths where the ask never happens.
+   * customer trace data and provider credentials, so the caller always asks;
+   * a bucket lifecycle rule is the fallback for crash paths where it doesn't.
    */
   discard(): Promise<void>;
 }
@@ -38,10 +37,9 @@ export interface LangevalsPayloadStaging {
 }
 
 /**
- * The clustering runner's ClickHouse boundary: just enough of the client for
- * the trace_summaries page queries. Mirrors the data-retention server
- * precedent — the feature declares its own narrow port and composition
- * adapts the real client; no Trace repositories are imported.
+ * The clustering runner's ClickHouse boundary: just enough of the client
+ * for the trace_summaries page queries. Mirrors data-retention's own narrow
+ * port; composition adapts the real client, no Trace repositories imported.
  */
 export type TopicClusteringClickHouseQueryParams = Record<string, string | number | string[]>;
 
@@ -88,12 +86,9 @@ export interface TopicClusteringCommands {
 }
 
 /**
- * The langevals boundary for topic clustering (the workspace member at
- * services/langevals/evaluators/topic_clustering — contract.md §11).
- *
- * The composition-side implementation posts through the app's staged fetch:
- * langevals runs on AWS Lambda, which hard-caps sync invokes at 6 MB, so
- * anything past the staging threshold rides over S3 via a presigned URL.
+ * The langevals boundary for topic clustering (contract.md §11). Posts via
+ * the app's staged fetch: langevals runs on AWS Lambda (6 MB sync-invoke
+ * cap), so payloads past the threshold ride over S3 via a presigned URL.
  */
 export type TopicClusteringLangevalsKind =
   | "topic_clustering_batch"

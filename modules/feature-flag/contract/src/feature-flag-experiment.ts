@@ -2,12 +2,9 @@ import { z } from "zod";
 import { frontendFeatureFlagSchema, type FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 
 /**
- * The targets an experiment can be evaluated for.
- *
- * `system` is deliberately excluded rather than handled: it is a backend
- * kill-switch identity with no person, no browser and no tenant, so it can
- * neither enrol nor be bucketed. Excluding it from the type makes the
- * unanswerable case unrepresentable instead of silently answering it.
+ * The targets an experiment can be evaluated for. `system` is deliberately
+ * excluded: it is a backend kill-switch identity with no person, browser or
+ * tenant, so excluding it makes the unanswerable case unrepresentable.
  */
 export type AuthenticatedExperimentTarget =
   | { kind: "project"; userId: string; projectId: string; organizationId: string }
@@ -32,12 +29,9 @@ export interface FeatureFlagExperiment {
 }
 
 /**
- * An owner's policy for one tenant scope.
- *
- * `inherit` is the absence of a policy and delegates to the individual's own
- * opt-in. `enabled` and `disabled` are explicit and both outrank the
- * individual, so an owner can switch an experiment on for a whole project as
- * well as off.
+ * An owner's policy for one tenant scope. `inherit` delegates to the
+ * individual's own opt-in; `enabled`/`disabled` are explicit and outrank
+ * it, so an owner can switch an experiment on or off for a whole project.
  */
 export const experimentTenantPolicySchema = z.enum(["inherit", "enabled", "disabled"]);
 
@@ -105,11 +99,9 @@ export const experimentCatalogueEntrySchema = z
   .strict();
 
 /**
- * Whether this target may see the experiment at all.
- *
- * A signed-out visitor sees only an experiment that explicitly opted into
- * pre-authentication evaluation. Everything else is invisible to them: no
- * value, no metadata, no acknowledgement it exists.
+ * Whether this target may see the experiment at all. A signed-out visitor
+ * sees only an experiment that opted into pre-authentication evaluation —
+ * everything else is invisible: no value, no metadata, no acknowledgement.
  */
 export function isExperimentVisibleToTarget({
   experiment,

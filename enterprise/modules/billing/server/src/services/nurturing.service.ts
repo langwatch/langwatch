@@ -40,10 +40,8 @@ export type NurturingServiceOptions = {
 
 /**
  * Wraps the Customer.io Pipelines API with fire-and-forget semantics.
- *
- * Callers use optional chaining (`nurturing?.identifyUser(...)`) when the
- * service may be absent (e.g. self-hosted without Customer.io).
- * Defense-in-depth: methods silently no-op if the API key is missing.
+ * Callers use optional chaining (service may be absent, e.g. self-hosted);
+ * methods also no-op silently if the API key is missing (defense-in-depth).
  */
 export class NurturingService {
   private readonly apiKey: string | undefined;

@@ -21,10 +21,9 @@ export type PiiChoice = "inherit" | PiiLevel;
 export type SecretsChoice = "inherit" | "on" | "off";
 
 /**
- * The drawer's audience selection: everyone with access (all members), the
- * standard role groups (admins, members, viewers), the personal-project
- * owners, plus the organization's custom RBAC groups. Everything off/empty =
- * "no one" (fully hidden).
+ * The drawer's audience selection: all members, the standard role groups,
+ * personal-project owners, or the organization's custom RBAC groups.
+ * Everything off/empty means "no one" (fully hidden).
  */
 export interface AudienceFormState {
   admins: boolean;
@@ -233,10 +232,9 @@ export function inheritFormState(): RuleFormState {
 }
 
 /**
- * The resolved policy a rule at `scopeType` inherits when a field is left on
- * "inherit": a project inherits its team baseline, a team or department the
- * organization baseline, and the organization the platform default. Used only
- * to label the "Inherit" choice with the value it currently resolves to.
+ * The resolved policy a rule at `scopeType` inherits: project → team
+ * baseline, team/department → organization baseline, organization →
+ * platform default. Used only to label the "Inherit" choice.
  */
 export function inheritedBaselineForScope({
   scopeType,
@@ -257,12 +255,9 @@ export function inheritedBaselineForScope({
 }
 
 /**
- * Reverse of `buildRuleConfig`: hydrate the drawer's form state from a stored
- * config, for editing an existing rule. A field the config does not set shows
- * as "inherit" (not as a concrete default), so the drawer reflects exactly what
- * the rule pins versus what it leaves to the wider scope. The single audience
- * control is seeded from the first restrict category or restrict attribute rule,
- * which is what the drawer applies to every restricted item.
+ * Reverse of `buildRuleConfig`, for editing: an omitted field shows as
+ * "inherit", not a concrete default. The single audience control seeds
+ * from the first restrict rule and applies to every restricted item.
  */
 export function configToFormState(config: DataPrivacyConfig): RuleFormState {
   const dispositions: Record<ContentCategory, CategoryChoice> = {

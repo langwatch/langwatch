@@ -5,11 +5,9 @@ import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 
 /**
- * A ClickHouse outage and a verified zero are both ordinary, and they call
- * for different responses: the reporting command must skip the month on an
- * outage but may legitimately report zero. A bare `number | null` cannot
- * carry that distinction once the total itself can be zero, so the outage is
- * named instead of collapsed into a value the query never actually produced.
+ * A ClickHouse outage and a verified zero call for different responses:
+ * skip the month on outage, but a legitimate zero may be reported. Named
+ * so the outage isn't collapsed into a value the query never produced.
  */
 export type BillableEventsTotalResult =
   | { outcome: "counted"; total: number }

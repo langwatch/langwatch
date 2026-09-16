@@ -7,12 +7,9 @@ import {
 import type { TopicClusteringMetrics } from "../eventing/topic-clustering.intent.ts";
 
 /**
- * The two series names, pinned because two processes write them.
- *
- * The App writes them through its own `prom-client` registry; a worker
- * composed from packages writes them over OTLP. Same counter, same histogram,
- * same `outcome` and `mode` labels — an operator asking "how many clustering
- * pages failed" must not have to know which process ran them.
+ * The two series names, pinned because two processes write them: the App
+ * via `prom-client`, a worker via OTLP — same counter, histogram, and
+ * `outcome`/`mode` labels, so a query need not know which process ran it.
  */
 export const TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME = "topic_clustering_page_total";
 export const TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME =

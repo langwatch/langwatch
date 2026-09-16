@@ -1,8 +1,7 @@
 /**
- * The Data Privacy family, as the browser application mounts it. One screen,
- * one address (`/settings/data-privacy`), exposed as a LOADER so the rule
- * drawer and the audience picker stay out of the application's own chunk. The
- * owning frontend feature mounts the tRPC provider and the host port.
+ * The Data Privacy family, as the browser application mounts it. One
+ * screen, one address (`/settings/data-privacy`), exposed as a LOADER so
+ * the rule drawer and audience picker stay out of the app's own chunk.
  */
 
 import type { ComponentType } from "react";

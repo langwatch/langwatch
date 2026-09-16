@@ -295,11 +295,9 @@ export class OtlpRecordPiiRedactionService {
   }
 
   /**
-   * The log/metric counterpart of the span half's identifier hold-out, over a
-   * flattened record. `attributeNames` restores the real name where the
-   * record is keyed by an addressing path; passed for `attributes` only —
-   * never `resourceAttributes`, which is keyed by its own names already and
-   * would resolve against an unrelated attribute path if handed the map.
+   * The log/metric counterpart of the span half's identifier hold-out.
+   * `attributeNames` restores the real name for a path-keyed record —
+   * `attributes` only, never `resourceAttributes`, which is keyed by its own names already.
    */
   private collectRecordEntries(
     batch: RedactionBatch,

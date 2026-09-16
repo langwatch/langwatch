@@ -75,10 +75,9 @@ export type OrganizationLicenseCandidate = {
 };
 
 /**
- * Persistence and seat-count port. Concrete database adapters stay in apps,
- * except the one read plan resolution makes: `tryReadLicense` is inherited
- * from {@link OrganizationLicense} so a process that only resolves plans
- * can compose that read alone, without the seat counts this port also carries.
+ * Persistence and seat-count port. Concrete database adapters stay in
+ * apps, except `tryReadLicense`, inherited from `OrganizationLicense` so a
+ * plan-resolution-only process can compose that read alone, without seats.
  */
 export interface LicenseStorage {
   findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;

@@ -583,10 +583,9 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
 });
 
 /**
- * The run id is how the pipeline attaches a trace to its simulation run. A
- * shape rule read it as a vendor key and wrote `[SECRET]` over it, so every
- * trace of every run in a project addressed the same wrong run, and the cost
- * of all of them landed on a run that never existed.
+ * The run id links a trace to its simulation run. A shape rule once read it
+ * as a vendor key and redacted it, misattributing every trace in a run to
+ * the wrong (nonexistent) run.
  */
 describe("OtlpSpanPiiRedactionService scenario run id attribute", () => {
   /** @scenario "A simulation trace keeps the run id that links it to its run" */
@@ -600,12 +599,9 @@ describe("OtlpSpanPiiRedactionService scenario run id attribute", () => {
 });
 
 /**
- * The log and metric pipelines flatten a decoded OTLP tree into one record
- * keyed by a JSON path, because two attributes may share a name and each value
- * still needs its own address. A path can never satisfy a sensitive-NAME rule,
- * so before `attributeNames` those rules never fired here at all: an
- * `authorization` attribute was left to the value-shape rules, and a plain-text
- * one survived them. The name travels beside the path now.
+ * Log/metric pipelines flatten OTLP into records keyed by JSON path (two
+ * attributes can share a name). A path alone can never satisfy a
+ * sensitive-NAME rule, so `attributeNames` carries the name beside it.
  */
 describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
   const pathKeyed = () => ({
@@ -663,10 +659,9 @@ describe("OtlpSpanPiiRedactionService, given path-keyed log attributes", () => {
 });
 
 /**
- * The identifier hold-out (`isHeldOutIdentifierAttribute`) is checked again
- * on the STRICT path: the original is never stored, so an id leaked to the
- * analysis service is lost for good. A pure-decimal trace id proves the NAME
- * half specifically, since it isn't opaque-shaped on its own.
+ * `isHeldOutIdentifierAttribute` is checked again on the STRICT path: the
+ * original is never stored, so a leak here is lost for good. A pure-decimal
+ * trace id proves the NAME half, since it isn't opaque-shaped alone.
  */
 describe("OtlpSpanPiiRedactionService identifier hold-out on the analysis-service path", () => {
   /** A decimal trace address: reserved by name, not by shape. */

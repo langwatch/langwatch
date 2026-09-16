@@ -1,9 +1,7 @@
 /**
- * What a process composes billing's process-side work from: the ClickHouse,
- * Redis and Stripe substrates it already holds, and the rows it was handed.
- * Every repository and service behind these stays private to this feature
- * server — a composition states which substrates it has, never which class to
- * construct.
+ * What a process composes billing's process-side work from: the
+ * ClickHouse, Redis and Stripe substrates it already holds. Everything
+ * behind these stays private — composition states substrates, never classes.
  */
 import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
 import { BillableEventsMeterClickHouseRepository } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";

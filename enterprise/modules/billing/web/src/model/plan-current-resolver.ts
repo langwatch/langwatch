@@ -8,11 +8,9 @@ type ActivePlanLike = {
 };
 
 /**
- * The plan a self-hosted deployment runs on without a license. It is flagged
- * `free`, but it is not the Cloud Free tier and is not capped like one: seats,
- * teams, projects and its own trace history are all uncapped there. Marking
- * that tier as current would show an operator the two-seat, fifty-thousand-event
- * numbers of a tier they are not on and are not limited by.
+ * The plan a self-hosted deployment runs on without a license. Flagged
+ * `free`, but not the Cloud Free tier — seats, teams, projects and trace
+ * history are all uncapped, unlike that tier's limited numbers.
  */
 const OPEN_SOURCE_PLAN_TYPE = "OPEN_SOURCE";
 

@@ -193,12 +193,9 @@ const licenseMetadataShape = {
 } as const;
 
 /**
- * The license an organization is running on, as its settings page reads it.
- *
- * Four answers, not one with optional fields: no license at all, a license too
- * corrupted to read anything out of, one that reads but does not check out,
- * and a good one. Only the last two carry seat and volume figures, because
- * only they have a plan to measure against.
+ * The license an organization is running on. Four answers, not optional
+ * fields: no license, corrupted, unverifiable, or good — only the last two
+ * carry seat/volume figures, since only they have a plan to measure against.
  */
 export const licenseStatusSchema: z.ZodType<LicenseStatus> = z.union([
   z.object({ hasLicense: z.literal(false), valid: z.literal(false) }).strict(),

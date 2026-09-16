@@ -4,9 +4,8 @@ import type { TopicClusteringRepository } from "../../repositories/topic-cluster
 
 /**
  * Unit tests for the ADR-051 legacy-project schedule seed. Only the
- * boundaries are stubbed — the repository's paging query, the
- * already-scheduled lookup, and the bootstrap command. The paging loop, the
- * outcome counters, and the skip/failure bookkeeping under test stay real.
+ * boundaries are stubbed (paging query, already-scheduled lookup,
+ * bootstrap command) — paging, counters and skip/failure bookkeeping stay real.
  */
 
 /** A fake repository whose eligible-project walk serves `pages` in order, then empties. */

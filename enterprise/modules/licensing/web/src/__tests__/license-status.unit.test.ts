@@ -69,10 +69,8 @@ function createValidLicenseStatus(expiresAt = "2099-12-31") {
 
 /**
  * Creates an invalid LicenseStatus with all required resource fields.
- *
- * `expired` is the server's verdict on whether the signature checked out and
- * only the term ran out, which is why these helpers set it explicitly rather
- * than letting the date imply it.
+ * `expired` is the server's verdict that only the term ran out (signature
+ * checked out) — set explicitly here rather than letting the date imply it.
  */
 function createInvalidLicenseStatus({
   expiresAt = "2023-12-31",

@@ -2,12 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { NurturingService } from "../services/nurturing.service.ts";
 
 /**
- * Wiring unit tests for NurturingService app construction patterns.
- *
- * These test the service construction patterns that presets.ts uses
- * without importing the full App dependency graph (which requires
- * generated Prisma/ES types). The actual wiring in presets.ts follows
- * the same pattern tested here.
+ * Wiring unit tests for NurturingService app construction patterns — the
+ * same patterns presets.ts uses, tested without importing the full App
+ * dependency graph (which needs generated Prisma/ES types).
  */
 
 // Suppress logger output.

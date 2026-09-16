@@ -9,10 +9,8 @@ import {
 
 /**
  * Event DATA schemas for the topic-clustering-processing pipeline (ADR-051)
- * — the portable payload values every boundary (command, event envelope,
- * process intent) parses against. The event ENVELOPES (EventSchema
- * extensions) live in `@langwatch/topic-server`, where the eventing
- * dependency belongs.
+ * — the portable payload every boundary parses against. Event ENVELOPES live
+ * in `@langwatch/topic-server`, where the eventing dependency belongs.
  */
 
 /**
@@ -52,9 +50,8 @@ export type TopicClusteringRunStartedEventData = z.infer<
 
 /**
  * TopicClusteringRunCompleted — one clustering page finished (including
- * gate-skipped pages). `runId` identifies the logical run (all pages of one
- * backlog walk share it); `nextSearchAfter` present means the backlog has
- * more pages and the process should continue the walk.
+ * gate-skipped pages). `runId` identifies the logical run (shared by all
+ * pages); `nextSearchAfter` present means more pages remain to walk.
  */
 export const topicClusteringRunCompletedEventDataSchema = z.object({
   /** Logical run identity, e.g. `20260717T093000` or `manual-1789000000000`. */
@@ -97,11 +94,9 @@ export type TopicClusteringRunFailedEventData = z.infer<
 >;
 
 /**
- * One topic or subtopic in the recorded model. Ids are the SAME nanoids the
- * assignTopic path writes into ClickHouse TopicId/SubTopicId, so they must
- * pass through unchanged. `centroid`/`p95Distance` are the clustering
- * working state incremental runs need; carrying them makes the model fully
- * rebuildable by replay.
+ * One topic or subtopic in the recorded model. Ids are the SAME nanoids
+ * assignTopic writes into ClickHouse TopicId/SubTopicId — they must pass
+ * through unchanged, and `centroid`/`p95Distance` make it replay-rebuildable.
  */
 export const topicModelEntrySchema = z.object({
   id: z.string(),

@@ -3,11 +3,9 @@ import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE } from "@langwatch/plans";
 import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../model/plan-form-defaults.ts";
 
 /**
- * Spec: specs/licensing/license-generation.feature
- *
- * These defaults are both what the generator form shows and what it sends, so
- * a field missing here is a field silently missing from every license minted
- * through the product.
+ * Spec: specs/licensing/license-generation.feature. These defaults are
+ * both what the generator form shows and what it sends, so a field
+ * missing here is missing from every license minted through the product.
  */
 
 describe("planFormDefaults", () => {

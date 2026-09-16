@@ -1,9 +1,7 @@
 /**
- * The four organization reads and writes a Stripe webhook makes, in Postgres.
- *
- * The organization aggregate belongs to a core feature, so billing reaches four
- * named columns of it rather than that feature's repository — the same narrow
- * shape {@link BillingWebhookOrganization} declares.
+ * The four organization reads and writes a Stripe webhook makes, in
+ * Postgres — via `BillingWebhookOrganization`'s narrow shape, since the
+ * organization aggregate belongs to a core feature, not billing's own repository.
  */
 import type { Currency, PrismaClient } from "@langwatch/prisma-client/generated";
 

@@ -37,20 +37,16 @@ import { UncachedFeatureFlagCacheAdapter } from "../services/uncached-feature-fl
 export type FeatureFlagRow = { enabled: boolean; rules: FeatureFlagRules };
 
 /**
- * One cache entry.
- *
- * The row is wrapped so a cached absence (`row: null`) stays distinct from
- * a cache miss (`undefined`). Without the wrapper a hit for an absent row
+ * One cache entry. Wrapped so a cached absence (`row: null`) stays distinct
+ * from a cache miss (`undefined`) — unwrapped, a hit for an absent row
  * would shadow the registry default with `false`.
  */
 export type FeatureFlagCacheSlot = { row: FeatureFlagRow | null };
 
 /**
- * Cross-process cache for operator rows.
- *
- * The composition root owns the backing store, its key prefix and its TTL.
- * Entries hold the row rather than a pre-evaluated boolean, so one entry
- * serves every tenant and targeting stays a per-call computation.
+ * Cross-process cache for operator rows. The composition root owns the
+ * backing store, key prefix and TTL. Entries hold the row rather than a
+ * pre-evaluated boolean, so targeting stays a per-call computation.
  */
 export interface FeatureFlagCache {
   /** `undefined` is a miss; a slot holding `row: null` is a cached absence. */
@@ -61,9 +57,8 @@ export interface FeatureFlagCache {
 
 /**
  * This deployment's environment overrides: the force-enable list plus every
- * per-flag override `resolveFeatureFlagConfig` reads by env var name. Parsed
- * straight from the process config the same way identity's `ADMIN_EMAILS`
- * is, so a deployment's flag overrides need no wiring beyond its own `.env`.
+ * per-flag override, read by env var name via `resolveFeatureFlagConfig` —
+ * parsed straight from `.env`, with no extra wiring needed.
  */
 const featureFlagAppConfigSchema: FeatureConfigSchema<FeatureFlagConfig> = {
   parse: (value: unknown): FeatureFlagConfig => {
@@ -98,10 +93,9 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
   };
   static readonly configSchema = featureFlagAppConfigSchema;
   /**
-   * No process member: the shared cache tier `installApiFeatureFlag` used to
-   * receive (deleted by b383462d96) was always the uncached stub in every
-   * deployment that wired it, so `create` builds that same no-op itself
-   * rather than reading a real member for a tier nothing ever populated.
+   * No process member: the cache tier `installApiFeatureFlag` used to read
+   * was always an uncached stub in every deployment, so `create` builds
+   * that same no-op itself rather than reading a member nothing populated.
    */
   static readonly reads = reads();
 

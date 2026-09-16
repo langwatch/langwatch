@@ -1,8 +1,6 @@
 /**
- * InvoicesBlock - displays recent invoices from Stripe.
- *
- * Shows a card with a table of recent invoices including invoice number,
- * date, amount, status badge, and PDF download link.
+ * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
+ * status badge, and PDF download link.
  */
 import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { Download, ExternalLink } from "lucide-react";

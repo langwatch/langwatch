@@ -58,11 +58,9 @@ export interface DataPrivacyDirectoryReader {
   }): Promise<DataPrivacyOrganizationDirectory>;
 
   /**
-   * The organization that owns a scope target, or null when the target does
-   * not exist.
-   *
-   * The anchor every gate on a scope-targeted mutation checks against — NOT a
-   * caller-supplied project id, which could name a different organization.
+   * The organization that owns a scope target, or null when it doesn't
+   * exist. The anchor every gate on a scope-targeted mutation checks
+   * against — NOT a caller-supplied project id, which could name a different organization.
    */
   findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null>;
 }

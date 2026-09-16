@@ -146,11 +146,9 @@ function press({ element, code }: { element: HTMLElement; code: string }): void 
 }
 
 /**
- * What dnd-kit is telling screen readers right now.
- *
- * The sensor measures its droppable rects off the main flow, so a keypress
- * sent before that lands finds no geometry and moves nothing. Waiting on the
- * announcement waits on the sensor's own account of what it did.
+ * What dnd-kit is telling screen readers right now. The sensor measures
+ * its droppable rects off the main flow, so a keypress sent too early
+ * finds no geometry — waiting on this waits on the sensor's own account.
  */
 function announcement(): string {
   return document.querySelector("[aria-live]")?.textContent ?? "";

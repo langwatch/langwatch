@@ -26,11 +26,8 @@ export function isCorruptedLicense(status: Extract<LicenseStatus, { hasLicense: 
 
 /**
  * Whether the license is one LangWatch signed whose term has simply ended.
- *
- * The server answers this, because it is the only side that checked the
- * signature. Comparing `expiresAt` here would call a forged license expired
- * whenever its payload claimed a past date, and a forged license means nothing
- * at all.
+ * The server answers this — only it checked the signature. Comparing
+ * `expiresAt` here would call a forged license expired, which means nothing.
  */
 export function isLicenseExpired(status: LicenseStatus | undefined): boolean {
   if (!status?.hasLicense) return false;
@@ -39,12 +36,9 @@ export function isLicenseExpired(status: LicenseStatus | undefined): boolean {
 }
 
 /**
- * Whether the stored license binds the seat count it names.
- *
- * True for a valid license and for one whose term ended, since a license we
- * signed keeps metering what it sold. False for a license we did not sign and
- * for no license at all, where the deployment runs on the uncapped open-source
- * baseline and being over a seat count is not a thing that can happen.
+ * Whether the stored license binds the seat count it names. True for a
+ * valid or expired license — a signed license keeps metering what it sold.
+ * False otherwise: the deployment runs the uncapped open-source baseline.
  */
 export function licenseMetersSeats(
   status: LicenseStatus | undefined,

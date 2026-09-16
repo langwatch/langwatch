@@ -3,11 +3,9 @@ import { CONTACT_SALES_URL, FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN } from "..
 import { licenseValidationError } from "../index.ts";
 
 /**
- * The prose-keyed `LICENSE_ERROR_MESSAGES` / `getUserFriendlyLicenseError`
- * pair is gone: customer copy is keyed by error `code` in the presentation
- * registry now, and the only thing that still reads a `LICENSE_ERRORS`
- * literal is `licenseValidationError`, which maps a verdict onto that code.
- * What is worth pinning is that mapping — and that it fails closed.
+ * Customer copy is keyed by error `code` in the presentation registry now;
+ * `licenseValidationError` is what still maps a verdict onto that code.
+ * What's worth pinning here is that mapping — and that it fails closed.
  */
 describe("licenseValidationError", () => {
   describe("given a verdict from validateLicense", () => {

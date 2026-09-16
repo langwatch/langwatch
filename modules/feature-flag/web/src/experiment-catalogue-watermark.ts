@@ -28,8 +28,7 @@ function writeWatermark(version: number): void {
 
 /**
  * The unread dot, and the acknowledgement that clears it.
- *
- * `catalogueVersions` comes from the entries the backend actually returned,
+ * `catalogueVersions` comes from entries the backend actually returned,
  * so an experiment the viewer cannot see can never light the dot.
  */
 export function useExperimentCatalogueWatermark(catalogueVersions: readonly number[]): {

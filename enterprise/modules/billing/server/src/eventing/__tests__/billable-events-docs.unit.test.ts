@@ -31,10 +31,9 @@ function documentedEventTypes(): Set<string> {
 }
 
 /**
- * The four families a customer recognises, and the words the short answers may
- * use for each. Checking words rather than event types is the point: the short
- * answer speaks the customer's language, so it may say "simulation" or
- * "scenario" for `lw.simulation_run.*` and must not be forced to say either.
+ * The four families a customer recognises, and words the short answer may
+ * use for each. Checking words, not event types, is the point: it may say
+ * "simulation" or "scenario" for `lw.simulation_run.*`, not forced to either.
  */
 const BILLABLE_FAMILIES = [
   { family: "spans", synonyms: /\bspans?\b/i },
@@ -44,12 +43,9 @@ const BILLABLE_FAMILIES = [
 ] as const;
 
 /**
- * The definition itself — the "a billable event is ..." lead-in and the bullets
- * under it — not the whole `## Events` section. Scoped this tightly on purpose:
- * the section also links to the full list, and a pointer that happens to say
- * "an experiment sweep" would otherwise satisfy a check on the definition while
- * the definition still left experiments out. That is exactly the state this
- * test was written to catch.
+ * The definition itself — the "a billable event is ..." lead-in and its
+ * bullets — not the whole `## Events` section. Scoped tightly so a stray
+ * mention elsewhere can't mask the definition itself leaving something out.
  */
 function pricingDefinition(): string {
   const doc = readRepoFile(PRICING_DOC);

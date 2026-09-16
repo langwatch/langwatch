@@ -65,7 +65,10 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
   }
 }
 
-/** What a process composition root actually holds, to build a real activated-license source from. */
+/**
+ * What a process composition root actually holds, to build a real
+ * activated-license source from.
+ */
 export type ActivatedLicenseSourceOptions = Readonly<{
   /** Where an organization's activated license key is stored. */
   prisma: OrganizationLicenseDatabase;
@@ -79,13 +82,9 @@ export type ActivatedLicenseSourceOptions = Readonly<{
 }>;
 
 /**
- * The whole license leg of a deployment's plan resolution, built from the
- * one thing every process composition root actually holds: its Prisma
- * client. This is the one entry point a composition root calls — it
- * constructs {@link PrismaOrganizationLicenseRepository} and
- * {@link NodeLicenseCryptographyAdapter} internally, so no composition file
- * anywhere names either of them: the typed-Prisma seam and the signature
- * verifier both stay inside this package.
+ * The whole license leg of plan resolution, built from a composition
+ * root's Prisma client. The one entry point that builds the repository
+ * and signature verifier internally, so no composition file names either.
  */
 export function createActivatedLicenseSource(
   options: ActivatedLicenseSourceOptions,

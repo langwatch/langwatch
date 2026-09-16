@@ -8,11 +8,10 @@ import { z } from "zod";
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
   "release_ui_beta_annotations_trained_enabled",
-  // Governance: gates the personal-keys / admin oversight /
-  // RoutingPolicy / IngestionSource UI surfaces. On by default
-  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are
-  // operator-store rules. Distinct from `release_ui_ai_gateway_menu_enabled`
-  // because the gateway product ships on its own flag.
+  // Governance: gates personal-keys / admin oversight / RoutingPolicy /
+  // IngestionSource UI. On by default (ADR-038 Decision 7); SaaS rollout
+  // and per-org kill switches are operator-store rules. Distinct from
+  // `release_ui_ai_gateway_menu_enabled` (its own flag).
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
   // Composes ON TOP of `release_ui_ai_governance_enabled` to reveal the
@@ -24,14 +23,10 @@ export const FRONTEND_FEATURE_FLAGS = [
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
-  // The Langy home composition (the lit block leads, with a real composer in
-  // it). Rolls out on its own schedule ON TOP of `release_langy_enabled`:
-  // having Langy is necessary but not sufficient, so the panel can ship to a
-  // project long before its home page changes shape. Outranked by
-  // `release_ui_home_signal_focused_enabled`. See useHomeComposition.
-  // The signal-focused home composition (briefing sheet leads). Decides
-  // the homepage's layout ONLY — Langy access separately gates the
-  // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
+  // The signal-focused home composition (briefing sheet leads), outranking
+  // the default Langy home composition (lit block) that otherwise rolls out
+  // ON TOP of `release_langy_enabled`. Decides layout ONLY — Langy access
+  // separately gates the sheet's hand-to-Langy affordances.
   "release_ui_home_signal_focused_enabled",
   // Langy's minimised state as an edge peek of the panel itself (spec:
   // specs/langy/langy-peek-dock.feature). Flag off = the classic corner

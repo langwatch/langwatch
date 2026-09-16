@@ -58,11 +58,9 @@ export class ContentDropPolicyService {
   }
 
   /**
-   * Remove the given message roles (and optionally assistant `tool_calls`) from a
-   * conversation serialized as JSON. Handles the LangWatch
-   * `{ type: "chat_messages", value: [...] }` wrapper and a bare messages array.
-   * Returns the rewritten JSON and how many messages/tool-call sets were removed,
-   * or `null` when the value is not a conversation (left untouched, never thrown).
+   * Removes given message roles (and optional assistant `tool_calls`) from
+   * a serialized conversation (LangWatch wrapper or bare array). Returns
+   * `null`, untouched, when the value isn't a conversation — never thrown.
    */
   tryStripRolesFromChatArrayJson(
     json: string,

@@ -59,12 +59,9 @@ export function distinctIdForTarget(target: FeatureFlagTarget): string {
 }
 
 /**
- * The identity a percentage rule buckets on.
- *
- * A signed-in person buckets by user id, so their rollout answer is the same
- * in every browser. A visitor who is not signed in buckets by the anonymous
- * browser id. A system target has neither and returns undefined, so a
- * percentage rule never admits it.
+ * The identity a percentage rule buckets on: user id for a signed-in
+ * person (same in every browser), anonymous browser id for a visitor,
+ * undefined for a system target, which a percentage rule never admits.
  */
 export function bucketingIdForTarget(target: FeatureFlagTarget): string | undefined {
   if (target.kind === "system") return undefined;

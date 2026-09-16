@@ -37,11 +37,9 @@ const TopicHostContext = createContext<TopicHostApi | undefined>(void 0);
 export const TopicHostProvider = TopicHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means it was rendered outside
+ * the frontend feature that owns it — a composition fault, not something a
+ * screen can degrade around.
  */
 export function useTopicHost(): TopicHostApi {
   const host = useContext(TopicHostContext);

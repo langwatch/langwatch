@@ -1,8 +1,7 @@
 /**
- * The server half of `topics.*`: a permission and a handler per procedure the
- * contract already named. A topic name is derived from the messages it was
- * clustered out of, so `getAll` asks for `traces:view`; the clustering reads
- * describe the run rather than its content and stay at `project:view`.
+ * The server half of `topics.*`: a permission and a handler per procedure.
+ * A topic name derives from the messages clustered into it, so `getAll`
+ * needs `traces:view`; clustering reads (describing the run) stay at `project:view`.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

@@ -7,11 +7,9 @@ import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/mem
 import { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 
 /**
- * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature
- *
- * Resolving a project's policy asks nothing of the write graph — the project's
- * own row already carries the organization, team and department the inheritance
- * chain is built from.
+ * Spec: modules/data-privacy/specs/data-privacy-resolution-seam.feature.
+ * Resolving a project's policy asks nothing of the write graph — its own
+ * row already carries the organization, team and department the chain is built from.
  */
 
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;

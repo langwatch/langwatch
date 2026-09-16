@@ -1,8 +1,7 @@
 /**
- * The per-organization answer covers only organizations the caller belongs to
- * and omits the rest, which would otherwise make it a membership oracle. The
- * whole list is resolved in ONE membership read, asserted on the call count
- * because a per-organization resolver would answer the same values.
+ * The per-organization answer covers only organizations the caller belongs
+ * to, omitting the rest — otherwise a membership oracle. The whole list is
+ * resolved in ONE membership read, asserted by call count.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";

@@ -1,8 +1,7 @@
 /**
  * Private persistence capability for the clustering runner and the boot
- * migration: project existence, the topic model rows the runner pages
- * against, the cost ledger, and the pre-cutover seed reads. Implemented by
- * the Prisma repository; composition hands it the guarded client.
+ * migration: project existence, topic model rows, the cost ledger, and
+ * pre-cutover seed reads. Implemented by the Prisma repository.
  */
 
 import type { Instant } from "@langwatch/time";
@@ -77,11 +76,8 @@ export abstract class TopicClusteringRepository {
 
   /**
    * One page of eligible projects (past their first message), ascending by
-   * id, strictly after `afterId`. It CAN miss a project inserted mid-walk
-   * with an id lexically behind the cursor (ids are nanoid, not monotonic) —
-   * harmless here, because a project created after the walk started has
-   * `firstMessage: false` and gets its schedule from the projectMetadata
-   * subscriber's bootstrap on first trace, not from this walk.
+   * id. Can miss a project inserted mid-walk (nanoid ids aren't monotonic)
+   * — harmless, since it gets scheduled by projectMetadata's bootstrap instead.
    */
   abstract findEligibleProjectsPage(params: {
     afterId: string | null;

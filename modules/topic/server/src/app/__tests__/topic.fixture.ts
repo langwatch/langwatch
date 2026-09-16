@@ -7,11 +7,9 @@ export function topicTestWake(epochMilliseconds: number): Instant {
 }
 
 /**
- * The narrow slice of a generated Prisma client `PrismaProcessStore` actually
- * reads for `findByRef` (see `isProcessPersistencePrismaClient`), faked so the
- * installation test can boot `TopicApp` on its `prisma` member without a real
- * database. `nextWakeAt: null` is the "not scheduled" case; a caller passes a
- * date to fake a pending wake.
+ * The narrow slice of `PrismaProcessStore` actually read for `findByRef`,
+ * faked so the installation test can boot `TopicApp` without a real
+ * database. `nextWakeAt: null` means "not scheduled"; pass a date to fake a pending wake.
  */
 export function fakeTopicSchedulePrisma(nextWakeAt: Date | null = null): PrismaClient {
   return {

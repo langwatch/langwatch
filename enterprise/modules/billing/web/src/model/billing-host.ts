@@ -19,11 +19,9 @@ export type BillingSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984).
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * sentence the screen composed — words are resolved from `code` via the
+ * host's presentation registry (#5984).
  */
 export type BillingFailureNotice = {
   error: unknown;
@@ -36,22 +34,16 @@ export abstract class BillingHostPort {
   abstract organization(): BillingHostOrganization | undefined;
 
   /**
-   * The team an invitation sent from this page lands in, when there is one.
-   *
-   * The subscription page invites straight into the reader's active team so a
-   * bought seat is usable the moment it is accepted. Undefined means the
-   * invitation is organization-wide, which is what the platform page did when
-   * no team was in scope.
+   * The team an invitation from this page lands in. The subscription page
+   * invites into the reader's active team so a bought seat is usable at
+   * once; undefined means organization-wide, as the platform page did.
    */
   abstract activeTeamId(): string | undefined;
 
   /**
-   * The query string the page was opened with.
-   *
-   * Two keys are read: `success`, which Stripe appends on the way back from a
-   * completed checkout, and `upgraded_from`, which says a credit was applied.
-   * Both are notices about something that has ALREADY happened, so reading
-   * them off the address is the only way the page can know.
+   * The query string the page was opened with. Two keys matter: `success`
+   * (Stripe appends it after checkout) and `upgraded_from` (a credit was
+   * applied) — both notices of something already done, read off the address.
    */
   abstract routeQuery(): Readonly<Record<string, string | undefined>>;
 
@@ -65,20 +57,16 @@ export abstract class BillingHostPort {
   abstract navigate(to: string): void;
 
   /**
-   * Leaves the application for a URL it does not serve.
-   *
-   * A Stripe checkout is a REPLACEMENT of the current document rather than a
-   * new tab: the reader comes back to a return address Stripe redirects them
-   * to, and opening it beside the page leaves two copies of a checkout.
+   * Leaves the application for a URL it does not serve. A Stripe checkout
+   * replaces the current document rather than opening a new tab, so the
+   * reader returns to this same page instead of leaving two copies open.
    */
   abstract leaveTo(url: string): void;
 
   /**
-   * The origin Stripe returns the reader to.
-   *
-   * `window.location.origin` on the platform pages, asked of the host here so
-   * a screen never names `window` — and so a test can say where the checkout
-   * came back to.
+   * The origin Stripe returns the reader to — `window.location.origin` on
+   * the platform pages, asked of the host so a screen never names `window`
+   * and a test can say where the checkout came back to.
    */
   abstract applicationOrigin(): string;
 
@@ -93,11 +81,9 @@ const BillingHostContext = createContext<BillingHostPort | undefined>(void 0);
 export const BillingHostProvider = BillingHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means it was rendered outside
+ * the frontend feature that owns it — a composition fault, not something a
+ * screen can degrade around.
  */
 export function useBillingHost(): BillingHostPort {
   const host = useContext(BillingHostContext);

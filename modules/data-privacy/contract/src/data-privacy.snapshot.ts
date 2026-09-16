@@ -1,9 +1,7 @@
 /**
- * What the data-privacy settings page reads, as a portable shape.
- *
- * The browser names the shape it renders and may import no server package, so
- * the wire shape is declared here — the same parser the tRPC declaration
- * publishes as its answer, so the page and the door cannot drift apart.
+ * What the data-privacy settings page reads, as a portable shape. The
+ * browser may import no server package, so the wire shape lives here —
+ * the same parser the tRPC declaration publishes, so they cannot drift.
  */
 
 import { z } from "zod";
@@ -29,9 +27,8 @@ const namedScopeSchema = z.object({ id: z.string(), name: z.string() }).strict()
 
 /**
  * The scopes the caller may write a rule at, RBAC-filtered by the server.
- *
- * Every list empty means the caller may read the page and change nothing, which
- * is what hides the add and edit controls.
+ * Every list empty means the caller may read the page and change nothing —
+ * which hides the add and edit controls.
  */
 export const dataPrivacyScopeAvailableSchema = z
   .object({

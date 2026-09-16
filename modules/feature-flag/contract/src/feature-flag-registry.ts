@@ -21,11 +21,9 @@ export interface RegisteredExperiment {
 }
 
 /**
- * The flag vocabulary a service resolves against.
- *
- * Injected rather than imported so a test can supply its own definitions
- * instead of mutating the shipped registry, and so the validation below runs
- * over whatever vocabulary is actually in use.
+ * The flag vocabulary a service resolves against. Injected rather than
+ * imported, so a test can supply its own definitions instead of mutating
+ * the shipped registry, and validation runs over whatever is in use.
  */
 export interface FeatureFlagRegistry {
   readonly definitions: readonly FeatureFlagDefinition[];
@@ -45,10 +43,8 @@ export interface FeatureFlagRegistry {
 
 /**
  * Build a registry, refusing an invalid experiment definition outright.
- *
- * Validation lives here rather than at module scope so it covers every
- * vocabulary, including one a test builds, and so the failure names the
- * offending flag instead of appearing as an unrelated import error.
+ * Validation lives here, not at module scope, so it covers every
+ * vocabulary and names the offending flag instead of an import error.
  */
 export function createFeatureFlagRegistry({
   definitions,

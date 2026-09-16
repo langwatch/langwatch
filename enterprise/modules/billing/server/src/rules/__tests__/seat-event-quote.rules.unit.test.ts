@@ -1,8 +1,7 @@
 /**
- * A seat quote has to reproduce the number the customer read, not merely resemble it. Three
- * rules make that hold: the two money figures come off the previewed invoice the same way
- * every time, the change is applied at the instant it was priced, and a quote older than its
- * validity window is refused rather than repriced silently.
+ * A seat quote must reproduce the number the customer read, not merely
+ * resemble it: money figures come off the invoice deterministically, apply
+ * at the instant priced, and an expired quote is refused, never repriced.
  */
 import type Stripe from "stripe";
 import { afterEach, describe, expect, it, vi } from "vitest";

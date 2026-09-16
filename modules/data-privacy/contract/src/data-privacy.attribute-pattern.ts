@@ -1,10 +1,7 @@
 /**
- * Matching for custom attribute rules: a pattern is an attribute key, where
- * `*` matches any run of characters (including dots), e.g. `gen_ai.prompt.*`
- * matches `gen_ai.prompt.id` and `gen_ai.prompt.variables.name`. Everything
- * else is literal, so a pattern without `*` is an exact-key match. Patterns
- * compile to anchored regexes built only from escaped literals and `.*`, which
- * cannot backtrack catastrophically.
+ * Matching for custom attribute rules: `*` matches any run of characters
+ * (including dots), else literal. Compiles to anchored regexes from
+ * escaped literals and `.*` only, so it cannot backtrack catastrophically.
  */
 
 function escapeRegExp(literal: string): string {

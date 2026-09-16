@@ -10,17 +10,9 @@ import { LicensingEntitlementSourceAdapter } from "../licensing-entitlement-sour
 import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
 
 /**
- * Spec: specs/licensing/management-apis-enterprise-gate.feature
- *
- * The four resolution cases named in the entitlement-license-token
- * manifest, exercised with a REAL signature verification the fixtures
- * drive — never a stand-in for it. `createActivatedLicenseSource` (the one
- * entry point a process composition root calls) is a thin, three-line
- * composition of `PrismaOrganizationLicenseRepository`,
- * `NodeLicenseCryptographyAdapter` and this adapter's own `forDeployment`;
- * this file pins the one piece of that composition with real resolution
- * logic — `forDeployment` — over a plain `OrganizationLicense` fake, which
- * needs no Prisma double and therefore no cast to build.
+ * Spec: specs/licensing/management-apis-enterprise-gate.feature. The four
+ * resolution cases, exercised with REAL signature verification against a
+ * plain `OrganizationLicense` fake — no Prisma double, no cast needed.
  */
 
 /** The license row, as `PrismaOrganizationLicenseRepository` would read it. */

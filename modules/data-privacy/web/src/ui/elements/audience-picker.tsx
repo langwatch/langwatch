@@ -29,10 +29,9 @@ const AudienceItemIcon = ({ value }: { value: string }) => {
 };
 
 /**
- * The restrict-audience picker: one multi-select of groups, in the same chip
- * style as the scope picker. "All members" already covers everyone with
- * access, so picking it replaces the selection and picking anything narrower
- * drops it (see applyAudienceSelection).
+ * The restrict-audience picker: one multi-select of groups, in the scope
+ * picker's chip style. "All members" covers everyone, so selecting it
+ * replaces the rest; selecting narrower drops it (applyAudienceSelection).
  */
 export function AudiencePicker({
   audience,

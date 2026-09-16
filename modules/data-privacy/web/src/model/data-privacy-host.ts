@@ -26,12 +26,9 @@ export type PrivacySuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it. The raw `error` travels — the wire
+ * message of a handled error is its code slug, so composing copy from it
+ * would print the slug. `fallbackTitle` names the action that failed.
  */
 export type PrivacyFailureNotice = {
   error: unknown;
@@ -63,11 +60,9 @@ const DataPrivacyHostContext = createContext<DataPrivacyHostApi | undefined>(voi
 export const DataPrivacyHostProvider = DataPrivacyHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means it was rendered outside
+ * the frontend feature that owns it — a composition fault, not something a
+ * screen can degrade around.
  */
 export function useDataPrivacyHost(): DataPrivacyHostApi {
   const host = useContext(DataPrivacyHostContext);

@@ -54,11 +54,9 @@ export function privacyRuleAddress(rule: {
 }
 
 /**
- * The rule an address names, out of the rules the reader can see.
- *
- * Nothing is fetched to answer this: the snapshot the page already read carries
- * every readable rule, which is what let the platform drawer rebuild itself
- * from a pasted link and is what lets this one do the same.
+ * The rule an address names, out of the rules the reader can see. Nothing
+ * is fetched — the already-read snapshot carries every readable rule,
+ * which is what lets this rebuild itself from a pasted link.
  */
 export function privacyRuleForAddress(
   address: string | undefined,

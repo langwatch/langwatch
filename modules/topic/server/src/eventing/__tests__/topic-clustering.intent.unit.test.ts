@@ -322,10 +322,9 @@ describe("createTopicClusteringRunHandler", () => {
     });
 
     /**
-     * The regression that motivated moving classification to the throw site: an
-     * error we did not raise ourselves must never be reported as the customer's
-     * configuration being wrong, however much its text reads like it. The
-     * handler must take the classifier's "internal" verdict as-is.
+     * An error we did not raise ourselves must never be reported as the
+     * customer's configuration being wrong, however much its text reads like
+     * it — the handler takes the classifier's "internal" verdict as-is.
      */
     it("never blames the customer for an error the classifier cannot attribute", async () => {
       const commands = makeCommands();
@@ -350,10 +349,9 @@ describe("createTopicClusteringRunHandler", () => {
     });
 
     /**
-     * The failure path used to let a failing outcome-write propagate while the
-     * success path swallowed it. That asymmetry meant the WORST case — the page
-     * failed AND we could not say so — was the one that lost the record: the
-     * outbox marked the message dead and no run_failed was ever written.
+     * The WORST case — the page failed AND we could not say so — must never
+     * lose the record: the outbox would mark the message dead with no
+     * run_failed ever written.
      */
     describe("when recording the failure itself fails", () => {
       it("does not rethrow, so the outbox cannot retire the message without a recorded outcome", async () => {

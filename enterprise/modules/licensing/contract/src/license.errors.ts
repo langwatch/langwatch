@@ -8,12 +8,9 @@ import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { LICENSE_ERRORS, type LicenseError } from "./license-constants.ts";
 
 /**
- * The organization a license action names does not exist.
- *
- * Previously a bare `Error` matched by `instanceof` in three router handlers,
- * each re-wrapping it as a `TRPCError`. `instanceof` is same-process only and
- * breaks the moment a bundler loads two copies of this module, so the code is
- * the discriminant now and those handlers are gone.
+ * The organization a license action names does not exist. Matched by
+ * `code`, not `instanceof`, which breaks once a bundler loads two copies
+ * of this module.
  */
 export class OrganizationNotFoundError extends HandledError {
   declare readonly code: "organization_not_found";
@@ -28,12 +25,9 @@ export class OrganizationNotFoundError extends HandledError {
 }
 
 /**
- * The key isn't a license we can read — wrong format, or a signature that
- * doesn't verify.
- *
- * Both collapse to one code deliberately: a customer cannot act differently on
- * "malformed" than on "not signed by us", and telling them which one it is
- * only tells whoever is probing that they got the shape right.
+ * The key isn't a license we can read — wrong format, or a bad signature.
+ * One code for both: a customer cannot act differently on either, and
+ * naming which one only helps a prober confirm the shape was right.
  */
 export class LicenseKeyInvalidError extends HandledError {
   declare readonly code: "license_key_invalid";
@@ -62,11 +56,8 @@ export class LicenseExpiredError extends HandledError {
 
 /**
  * The signing key isn't a PEM private key — usually a public key, or a
- * fragment that lost its delimiters on the way through a chat window.
- *
- * Separate from the two codes above because this is the *issuer's* key, not
- * the customer's licence: the person seeing it is generating a licence, and
- * what they have to fix is the thing they pasted.
+ * fragment that lost its delimiters in a chat window. Separate from the
+ * codes above: this is the *issuer's* key, not the customer's licence.
  */
 export class LicenseSigningKeyNotPemError extends HandledError {
   declare readonly code: "license_signing_key_not_pem";

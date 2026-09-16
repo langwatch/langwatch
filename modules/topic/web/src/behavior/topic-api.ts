@@ -1,8 +1,7 @@
 /**
- * The procedures this package calls, and the hooks that call them. `topics` is
- * derived from the contract's `topicTrpc`; `project` is borrowed and spelled by
- * hand. The segment names are the React Query cache key — see ADR-004, which
- * also makes this module the package's one `@langwatch/api/web` import.
+ * The procedures this package calls, and the hooks that call them.
+ * Segment names are the React Query cache key (ADR-004) — this is the
+ * package's one `@langwatch/api/web` import.
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";

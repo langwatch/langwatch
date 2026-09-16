@@ -811,3 +811,40 @@ the budget rather than evading it.
     because `evaluation-data.service.ts` is outside this slice and taking it
     would have broken the scope check that catches peer contamination: give
     `fillServerOnlyTraceSources` that sentence, shortened to five lines.
+
+40. **What a marker attribute's value actually holds.**
+    `modules/data-privacy/contract/src/data-privacy.markers.ts`,
+    `PRIVACY_PII_INCOMPLETE_MARKER_ATTR`. The compliance-critical half survives —
+    the marker says strict redaction was *requested* and only the essential floor
+    applied, so the read path must not present the content as fully scrubbed.
+    Gone: "the value is the level that was requested (`strict`)." That is the
+    attribute's payload shape, and a reader of the constant alone now has no
+    statement of what to write or expect in it.
+
+    The block is already at the five-line budget, so the sentence could not stay
+    where it was. If it matters, it belongs on the attribute's type, not in the
+    prose.
+
+41. **Cross-references cut as recoverable, recorded so the judgement is
+    reviewable.** Each was assessed against the code beside it and judged
+    re-derivable; none is a constraint. Named here because a handoff is
+    gitignored and this register is not.
+
+    - `modules/github/server/src/eventing/github-branch-recheck.process.ts`: the
+      prune schedule mirrors the automations pipeline's webhook prune.
+    - `modules/annotation/web/src/ui/elements/period-picker.tsx`: the component
+      takes no size, variant or placement prop.
+    - `modules/data-retention/server/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts`
+      and `.../services/data-retention.service.ts`: sibling function names the
+      calling code already names a few lines away.
+    - `enterprise/modules/licensing/.../__tests__/licensing-entitlement-source.service.unit.test.ts`:
+      the composition of `createActivatedLicenseSource`, still recorded in the
+      service file beside it.
+
+    Every retention window, irreversibility statement, external GitHub API fact
+    and ClickHouse query constraint in those two slices survives - those were the
+    named hazards and they were held to.
+
+    One refactor note, not a lost fact: `billing-host.ts`, `licensing-host.ts`,
+    `data-privacy-host.ts` and `topic-host.ts` carry four near-identical
+    `useXHost()` guard blocks. A shared helper would carry one.

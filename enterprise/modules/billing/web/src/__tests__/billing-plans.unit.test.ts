@@ -1,8 +1,6 @@
 /**
- * Unit tests for currency-aware pricing strings in billing-plans.
- *
- * Verifies that getGrowthFeatures() and getGrowthPlanFeatures() produce
- * the correct per-100K events pricing line for each supported currency.
+ * Unit tests for currency-aware pricing strings in billing-plans: the
+ * per-100K events pricing line each currency's growth features produce.
  */
 
 import { describe, expect, it } from "vitest";

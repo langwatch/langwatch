@@ -33,19 +33,15 @@ const EMPTY_DROP_RESULT: SpanContentDropResult = {
 
 export interface OtlpSpanContentDropServiceOptions {
   /**
-   * Resolves the scope's policy.
-   *
-   * Narrowed to the one question this service asks. `DataPrivacyService`
-   * satisfies it, and so does the resolution-only service a process that
-   * cannot write a policy composes.
+   * Resolves the scope's policy. Narrowed to the one question this service
+   * asks — `DataPrivacyService` satisfies it, as does the resolution-only
+   * service a process that cannot write a policy composes.
    */
   dataPrivacy: DataPrivacyResolution;
   /**
-   * The kill switch, at the application's spelling
-   * (`LANGWATCH_DATA_PRIVACY_ENFORCEMENT`). With enforcement off the span is
-   * stored whole and the read path's visibility rules are the only protection
-   * left, which is exactly what the application does — so a process that
-   * ignored this would remove content the operator has not yet asked it to.
+   * The kill switch (`LANGWATCH_DATA_PRIVACY_ENFORCEMENT`). Off means the
+   * span is stored whole, read-path visibility rules are the only
+   * protection — ignoring this flag would drop content the operator hasn't asked for.
    */
   nativePolicyEnforced: boolean;
 }

@@ -16,10 +16,9 @@ export type ScopeKind =
 
 export interface UIRule {
   /**
-   * Identity for React and for drag-reordering. Rules carry no id of their
-   * own and two rules can be identical while the operator fills them in, so
-   * the list index cannot serve: reordering by index makes the wrong row
-   * animate and re-mounts inputs mid-edit.
+   * Identity for React and drag-reordering. Rules carry no id of their own
+   * and can be identical mid-edit, so the list index can't serve — it makes
+   * the wrong row animate and re-mounts inputs.
    */
   id: string;
   scopeKind: ScopeKind;
@@ -27,12 +26,9 @@ export interface UIRule {
   target: string;
   enabled: boolean;
   /**
-   * Conditions the stored rule carries that this one-field editor has no
-   * control for. A `match` is a conjunction, so a rule naming both an
-   * organization and an age would come back from the dialog as the
-   * organization alone — silently widening the rollout to that organization's
-   * whole history. Carrying them through means the dialog can only change
-   * what it can show.
+   * Conditions the stored rule carries that this editor cannot show. A
+   * `match` is a conjunction, so dropping one would silently widen the
+   * rollout — carrying them through limits the dialog to what it can show.
    */
   otherConditions: FeatureFlagRuleMatch;
 }
@@ -122,12 +118,9 @@ function without({
 }
 
 /**
- * Where an added rule goes.
- *
- * Rules are first-match-wins, and an "Everyone" rule matches every context,
- * so anything below one can never fire. Appending to a list that ends in
- * Everyone therefore hands the operator a rule that reads as live and is
- * dead — the new rule goes directly above it instead.
+ * Where an added rule goes. Rules are first-match-wins and "Everyone"
+ * matches everything, so appending after it would create a rule that reads
+ * as live but never fires — it goes directly above Everyone instead.
  */
 export function insertionIndexForNewRule(rules: UIRule[]): number {
   const last = rules[rules.length - 1];
@@ -164,10 +157,9 @@ export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
 }
 
 /**
- * Renders a stored `organizationCreatedAfter` for an `<input type="date">`,
- * which only accepts `YYYY-MM-DD`. Rows written by this dialog already carry
- * that shape; a full ISO instant written by hand is narrowed to its day
- * rather than silently emptying the field.
+ * Renders a stored `organizationCreatedAfter` for `<input type="date">`
+ * (`YYYY-MM-DD` only). A full ISO instant written by hand is narrowed to
+ * its day rather than silently emptying the field.
  */
 function toDateInputValue(stored: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(stored)) return stored;

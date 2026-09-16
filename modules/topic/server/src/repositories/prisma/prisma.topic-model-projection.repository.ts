@@ -17,12 +17,9 @@ import type { ProjectedTopic, TopicModelData } from "../../eventing/topic-model.
 const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";
 
 /**
- * Write-through store for the topic model projection: the cursor lives in
- * `TopicModelProjection` (one row per project), the model itself lives in
- * the `Topic` table — the SAME rows every topic surface reads, with the SAME
- * ids ClickHouse TopicId/SubTopicId references. Rows are reconciled
- * transactionally, so a replayed or redelivered event converges instead of
- * duplicating.
+ * Write-through store for the topic model projection: cursor in
+ * `TopicModelProjection`, model in `Topic` — the same rows/ids every topic
+ * surface and ClickHouse reference, reconciled transactionally so replay converges.
  */
 export class PrismaTopicModelProjectionRepository implements StateProjectionStore<TopicModelData> {
   private constructor(private readonly prisma: TopicModelProjectionDatabase) {}

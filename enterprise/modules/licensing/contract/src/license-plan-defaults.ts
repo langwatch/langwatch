@@ -21,10 +21,9 @@ export type ResolvedPlanLimits = {
 };
 
 /**
- * Resolves enforced plan limits from a license, defaulting maxMembersLite and
- * usageUnit but NOT webhookEndpointsEnabled (absence must stay distinguishable
- * from false, since the tier map decides it for older licenses).
- *
+ * Resolves enforced plan limits from a license, defaulting maxMembersLite
+ * and usageUnit but NOT webhookEndpointsEnabled — absence must stay
+ * distinguishable from false, since the tier map decides it for older licenses.
  * @param plan - License plan limits (the signed payload)
  * @returns The enforced limits with the levers the license does set resolved
  */

@@ -112,12 +112,10 @@ describe("BillableEventsMeterProjection", () => {
 
       await projection.store.append(mapped(projection, billableEvent()), STORE_CONTEXT);
 
-      // The key, the lifetime and the encoding are spelled out rather than
-      // read back from the constants they came from. The App writes this exact
-      // keyspace through its own `TtlCache<string>(10 * 60 * 1000,
-      // "ttlcache:org:resolve:")`, so what has to hold is agreement with a
-      // literal in another package, and an assertion phrased in terms of these
-      // constants would follow them wherever they drifted.
+      // The key, lifetime and encoding are spelled out, not read back from
+      // their constants: the App writes this exact keyspace via its own
+      // `TtlCache<string>(10 * 60 * 1000, "ttlcache:org:resolve:")`, so this
+      // assertion checks agreement with a literal in another package.
       expect(redis.get).toHaveBeenCalledWith("ttlcache:org:resolve:project_alpha");
       expect(redis.setex).toHaveBeenCalledWith(
         "ttlcache:org:resolve:project_alpha",

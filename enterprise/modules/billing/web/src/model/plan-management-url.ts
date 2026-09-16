@@ -34,12 +34,9 @@ export function shouldShowPlanLimits({
 }
 
 /**
- * What the plan action on the usage page is called.
- *
- * Unlike a fixed "Upgrade", this reflects the billing state the reader is
- * actually in: somebody already paying is MANAGING a subscription, not
- * upgrading one, and telling them otherwise reads as a page that has not
- * noticed they bought it.
+ * What the plan action on the usage page is called. Unlike a fixed
+ * "Upgrade", this reflects the billing state the reader is in — someone
+ * already paying is MANAGING a subscription, not upgrading one.
  */
 export function getPlanActionLabel({
   isSaaS,

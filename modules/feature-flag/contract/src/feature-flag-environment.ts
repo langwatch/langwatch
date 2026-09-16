@@ -1,8 +1,7 @@
 /**
- * Environment-override resolution for a flag key.
- *
- * Pure: boot supplies the reader while building typed feature-flag config.
- * The running service never reads process environment.
+ * Environment-override resolution for a flag key. Pure: boot supplies the
+ * reader while building typed feature-flag config — the running service
+ * never reads process environment.
  */
 
 /**

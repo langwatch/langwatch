@@ -11,10 +11,9 @@ export function makeProject(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * Fake runner boundaries: the production composition wires these to the
- * app's model-provider cascade, staged langevals fetch, guarded Prisma
- * client, and pipeline commands; here they are plain stubs. The returned
- * type keeps the vi.fn mock types so tests can assert calls directly.
+ * Fake runner boundaries: production wires these to the model-provider
+ * cascade, staged langevals fetch, guarded Prisma client, and pipeline
+ * commands — here they're plain stubs, typed to keep vi.fn mock types.
  */
 export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {}) {
   const deps = {

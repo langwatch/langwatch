@@ -31,12 +31,10 @@ const featureFlagRuleMatchSchema = z
      */
     percentage: z.number().int().min(0).max(100).optional(),
   })
-  // Future-proof: keep unknown fields on the parsed object rather than
-  // rejecting them, so a newer writer can ship a rule shape the running
-  // reader doesn't know yet and old rows keep deserializing after we
-  // extend the schema. The matcher itself fails closed on unknown keys
-  // (see matchesContext) so an unrecognized condition never silently
-  // matches every context.
+  // Future-proof: keeps unknown fields rather than rejecting them, so a
+  // newer writer's rule shape still deserializes here. The matcher itself
+  // fails closed on unknown keys (see matchesContext) — an unrecognized
+  // condition never silently matches everything.
   .passthrough();
 
 export const featureFlagRuleSchema = z.object({
@@ -83,18 +81,15 @@ export interface RuleEvaluationContext {
   projectId?: string;
   organizationId?: string;
   /**
-   * The stable identity a percentage rule buckets on: the user for an
-   * authenticated target, the anonymous browser id for an anonymous one.
-   * Absent for system and other non-person callers, which never satisfy a
-   * percentage rule.
+   * The stable identity a percentage rule buckets on: the user, or the
+   * anonymous browser id when there is no user. Absent for system callers,
+   * which never satisfy a percentage rule.
    */
   bucketingId?: string;
   /**
-   * When the calling organization was created. Only an age rule
-   * (`organizationCreatedAfter`) reads it, so callers leave it out and the
-   * store fetches it lazily — and only for a flag whose rules ask for it
-   * (see `readNeedsOrganizationAge`). Absent means "unknown", which no age
-   * rule matches.
+   * When the calling organization was created. Fetched lazily, only when a
+   * flag's rules ask for it (`readNeedsOrganizationAge`). Absent means
+   * "unknown" — no age rule matches.
    */
   organizationCreatedAt?: Instant | string | null;
 }
@@ -123,9 +118,8 @@ export function readNeedsOrganizationAge({
 }
 
 /**
- * Parses an unknown rules payload (typically straight off the JSONB
- * column) into the typed shape. Returns an empty list when the input
- * is null/undefined or fails validation — never throws — because a
+ * Parses an unknown rules payload (typically off the JSONB column).
+ * Never throws — returns an empty list on null/invalid input, because a
  * malformed rules blob must not turn a flag check into a 500.
  */
 export function parseRules(input: unknown): FeatureFlagRules {

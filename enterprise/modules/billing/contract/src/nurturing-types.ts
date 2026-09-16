@@ -1,8 +1,7 @@
 /**
- * Customer.io trait schema contract.
- *
- * Defines the complete data model pushed to Customer.io by nurturing integrations.
- * All call sites use these typed parameters instead of ad-hoc Record<string, unknown>.
+ * Customer.io trait schema contract: the complete data model pushed to
+ * Customer.io by nurturing integrations, typed instead of ad-hoc
+ * `Record<string, unknown>`.
  */
 
 // ---------------------------------------------------------------------------

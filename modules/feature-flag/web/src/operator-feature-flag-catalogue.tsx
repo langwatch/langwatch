@@ -27,10 +27,9 @@ import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog.tsx";
 import { summarizeTargeting, targetingLabel } from "./model/targeting-summary.ts";
 
 /**
- * The catalogue as the BROWSER receives it.
- *
- * The contract types `updatedAt` as `Date` because that is what the server
- * builds; nothing transforms the wire, so what arrives is the ISO string.
+ * The catalogue as the BROWSER receives it. The contract types `updatedAt`
+ * as `Date` because that is what the server builds; nothing transforms
+ * the wire, so what actually arrives is the ISO string.
  */
 export type OperatorFeatureFlagCatalogueRead = Omit<OperatorFeatureFlagCatalogue, "flags"> & {
   flags: OperatorFeatureFlag[];

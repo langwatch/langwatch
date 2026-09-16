@@ -5,11 +5,9 @@
  */
 
 /**
- * Stamped on a span when strict PII redaction was requested but the analysis
- * service (names, locations) could not run, so the native essential floor is
- * all that was applied. Lets the read path tell the viewer the deep redaction
- * did not complete instead of presenting the content as fully scrubbed. The
- * value is the level that was requested ("strict").
+ * Stamped on a span when strict PII redaction was requested but the
+ * analysis service (names, locations) couldn't run, so only the essential
+ * floor applied — flags this as incomplete rather than fully scrubbed.
  */
 export const PRIVACY_PII_INCOMPLETE_MARKER_ATTR = "langwatch.privacy.pii_incomplete";
 

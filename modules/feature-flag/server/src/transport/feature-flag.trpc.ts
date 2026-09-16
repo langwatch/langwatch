@@ -1,8 +1,7 @@
 /**
  * The server half of `featureFlag.*`: an access decision and a handler per
- * procedure the contract already named. Every one is service-authorized —
- * the app authorizes the exact tenant target, which is not the scope id a
- * declaration would read off the input.
+ * procedure. Every one is service-authorized — the app authorizes the
+ * exact tenant target, not the scope id a declaration would read off input.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

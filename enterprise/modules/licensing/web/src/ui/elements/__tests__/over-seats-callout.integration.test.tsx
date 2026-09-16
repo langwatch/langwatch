@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * See specs/licensing/seat-reconciliation.feature — the callout is what tells
- * an admin they have seats to give back, so it has to appear exactly when that
- * is true and stay quiet otherwise.
+ * specs/licensing/seat-reconciliation.feature: tells an admin they have
+ * seats to give back — must appear exactly when true, stay quiet otherwise.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

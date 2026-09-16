@@ -1,8 +1,7 @@
 /**
- * What one caller may do at each tier of the privacy scope chain. The read side
- * advertises a scope as writable using EXACTLY these answers, so the chip
- * picker can never offer a scope the save then rejects. The batched shapes are
- * batched because an organization's project list is every project it holds.
+ * What one caller may do at each tier of the privacy scope chain. The read
+ * side advertises a scope as writable using EXACTLY these answers, so the
+ * chip picker can never offer a scope the save then rejects.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 

@@ -69,10 +69,9 @@ export interface DataPrivacyApi {
   removeScopeRule(input: DataPrivacyScopeTarget & DataPrivacyCallerInput): Promise<void>;
 
   /**
-   * True when this project's resolved policy drops any span content at all —
-   * the interlock the ingest edge asks before it externalizes inline media,
-   * because storing bytes for a project whose policy is about to discard them
-   * keeps exactly what the customer asked us not to.
+   * True when this project's resolved policy drops any span content at
+   * all — the interlock the ingest edge checks before externalizing inline
+   * media, so bytes are never stored for content the policy will discard.
    */
   dropsAnyContent(input: { projectId: string }): Promise<boolean>;
 

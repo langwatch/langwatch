@@ -46,12 +46,9 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
 }
 
 /**
- * Prisma-backed implementation of SubscriptionRepository.
- * Handles only subscription-table CRUD -- no organization or team queries.
- */
-/**
- * Only what this repository touches, so composition names the slice it needs
- * rather than the whole generated client.
+ * Prisma-backed implementation of SubscriptionRepository (subscription-table
+ * CRUD only). `BillingSubscriptionDatabase` below is the narrow client
+ * slice composition needs, not the whole generated client.
  */
 export type BillingSubscriptionDatabase = Pick<
   PrismaClient,

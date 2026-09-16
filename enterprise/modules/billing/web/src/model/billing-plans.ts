@@ -88,12 +88,9 @@ export const getGrowthPlanFeatures = (currency: Currency): string[] => [
 export const WEBHOOK_FEATURE_LABEL = "Gateway webhooks for metering and rebilling";
 
 /**
- * What the Enterprise tier offers, with each bullet tied to the entitlement
- * that decides it where a contract can withhold one.
- *
- * The tie is the field name, not the sentence: a bullet whose copy is reworded
- * keeps describing the same capability, and nothing has to match prose to know
- * which capability a plan is missing.
+ * What the Enterprise tier offers, each bullet tied to the entitlement
+ * that decides it. The tie is the field name, not the sentence — reworded
+ * copy still describes the same capability, with nothing matching prose.
  */
 const ENTERPRISE_PLAN_FEATURE_ENTRIES: readonly {
   label: string;

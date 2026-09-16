@@ -12,11 +12,9 @@ export type LicensingSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984).
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * sentence the screen composed — words are resolved from `code` via the
+ * host's presentation registry (#5984).
  */
 export type LicensingFailureNotice = {
   error: unknown;
@@ -34,21 +32,16 @@ export abstract class LicensingHostApi {
   abstract isDeploymentSettled(): boolean;
 
   /**
-   * Where an operator without a license goes to buy one.
-   *
-   * The deployment's own Stripe link when it publishes one, and undefined when
-   * it does not, which is what makes the card fall back to the public pricing
-   * page rather than to a dead link.
+   * Where an operator without a license goes to buy one: the deployment's
+   * own Stripe link when it publishes one, undefined otherwise — so the
+   * card falls back to the public pricing page instead of a dead link.
    */
   abstract licensePurchaseUrl(): string | undefined;
 
   /**
-   * Drops every cached read.
-   *
-   * Activating or removing a license moves the ACTIVE PLAN, which half the
-   * application reads — navigation, feature gates, limit copy. This replaced a
-   * `window.location.reload()`, which refreshed the same state and tore the
-   * restart instruction off the screen milliseconds after it appeared.
+   * Drops every cached read: activating or removing a license moves the
+   * ACTIVE PLAN, which half the application reads (navigation, feature
+   * gates, limit copy) — not a page reload, which would tear off the notice.
    */
   abstract refreshPlanDerivedState(): void;
 
@@ -63,11 +56,9 @@ const LicensingHostContext = createContext<LicensingHostApi | undefined>(void 0)
 export const LicensingHostProvider = LicensingHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means it was rendered outside
+ * the frontend feature that owns it — a composition fault, not something a
+ * screen can degrade around.
  */
 export function useLicensingHost(): LicensingHostApi {
   const host = useContext(LicensingHostContext);

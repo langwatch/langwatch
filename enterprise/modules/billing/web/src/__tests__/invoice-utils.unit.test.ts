@@ -1,10 +1,6 @@
 /**
- * Unit tests for invoice display helper functions.
- *
- * Tests the pure functions extracted from InvoicesBlock:
- * - getInvoiceStatusColor: maps Stripe invoice status to Chakra color palette
- * - formatInvoiceDate: formats unix timestamps to readable dates
- * - formatInvoiceAmount: formats cents to currency strings
+ * Unit tests for the pure invoice display helpers extracted from
+ * InvoicesBlock (status color, date and amount formatting).
  */
 import { describe, expect, it } from "vitest";
 import {

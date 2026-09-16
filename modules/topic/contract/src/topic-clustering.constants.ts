@@ -1,9 +1,7 @@
 /**
  * Event and command type constants for the topic-clustering-processing
- * pipeline (ADR-051).
- *
- * Taxonomy: `lw.obs.topic_clustering.<identifier>` — aggregateId is the
- * projectId (one clustering stream per project, TenantId = projectId).
+ * pipeline (ADR-051). Taxonomy: `lw.obs.topic_clustering.<identifier>` —
+ * aggregateId is the projectId (one stream per project, TenantId = projectId).
  */
 
 export const TOPIC_CLUSTERING_EVENT_TYPES = {

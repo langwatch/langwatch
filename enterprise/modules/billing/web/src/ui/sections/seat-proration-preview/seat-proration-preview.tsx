@@ -95,11 +95,9 @@ function PreviewBody({
 }
 
 /**
- * What a seat change costs, and the button that confirms it.
- *
- * Fills the upgrade dialog's `seatProrationPreview` slot: the dialog belongs to
- * licensing, the price belongs to billing, and this is where the two meet.
- * specs/licensing/proration-preview.feature.
+ * What a seat change costs, and the button that confirms it. Fills the
+ * upgrade dialog's `seatProrationPreview` slot — licensing owns the dialog,
+ * billing the price. specs/licensing/proration-preview.feature.
  */
 export function SeatProrationPreview({
   variant,

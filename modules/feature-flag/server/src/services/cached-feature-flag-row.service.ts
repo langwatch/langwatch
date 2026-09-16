@@ -14,10 +14,9 @@ const LOCAL_MAX_KEYS = 5_000;
 type LocalEntry = { row: FeatureFlagRow | null; expiresAt: number };
 
 /**
- * Two-tier read of one operator row: per-process map, then the shared
- * cache, then the repository. A repository failure degrades to "no row" and
- * is logged, so an unhealthy database resolves flags to their registry
- * defaults rather than failing the caller.
+ * Two-tier read of one operator row: per-process map, then shared cache,
+ * then the repository. A repository failure degrades to "no row" (logged),
+ * so an unhealthy database resolves flags to registry defaults, not a caller failure.
  */
 export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
   private readonly logger = createLogger("langwatch:feature-flag-store");

@@ -11,12 +11,9 @@ export interface ExperimentSetting extends ExperimentSubject {
 }
 
 /**
- * Durable experiment settings: a person's own enrolment and an owner's
- * policy for a tenant scope, in one table keyed by subject.
- *
- * These are read per request rather than through the flag row cache: they
- * differ per person, so caching them behind one key per flag is exactly the
- * per-context fan-out the flag cache exists to avoid.
+ * Durable experiment settings: a person's enrolment and an owner's policy
+ * for a tenant scope, keyed by subject. Read per request, not through the
+ * flag row cache — that would be the per-context fan-out it exists to avoid.
  */
 export interface FeatureFlagExperimentRepository {
   /** Every setting among `flagKeys` for any of `subjects`. */

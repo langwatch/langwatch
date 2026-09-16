@@ -1,10 +1,7 @@
 /**
- * What a seat TYPE means, in the words a reader sees.
- *
- * The organization family writes the same explanation next to its member form,
- * its role field and its invite rows; licensing owns the plan those words
- * describe, so the copy lives here and travels as one surface rather than as
- * four private strings that drift apart.
+ * What a seat TYPE means, in the words a reader sees. Organization reuses
+ * this same copy across its member form, role field and invite rows —
+ * licensing owns the plan it describes, so it lives here as one surface.
  */
 export {
   LITE_MEMBER_EXPLANATION,

@@ -43,11 +43,9 @@ export type LicenseEmailDelivery = {
 };
 
 /**
- * Where a licence's tier can send its buyer, resolved from the plan catalogue.
- *
- * A plain structural type rather than an import of `PlanNextStepService`: this
- * package composes the resolver, and does not need the service's own shape to
- * do it.
+ * Where a licence's tier can send its buyer, resolved from the plan
+ * catalogue. A plain structural type, not an import of
+ * `PlanNextStepService` — this package composes the resolver.
  */
 export type LicenseFeaturesResolver = {
   find(input: { planType: string }): Promise<LicenseUnlockedFeatures | undefined>;
@@ -145,10 +143,9 @@ export class LicensePurchaseService {
   }
 
   /**
-   * What the issued tier unlocks, or nothing when the deployment composed no
-   * catalogue, or the tier could not be resolved. Never guessed: a licence
-   * page that drifted from what the licence actually grants is worse than no
-   * link at all.
+   * What the issued tier unlocks, or nothing when there is no catalogue or
+   * the tier can't resolve. Never guessed: a licence page drifting from
+   * what it actually grants is worse than no link at all.
    */
   private async tryResolveUnlockedFeatures(
     planType: string,

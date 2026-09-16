@@ -1,11 +1,9 @@
 import type { FeatureFlagCache, FeatureFlagCacheSlot } from "../app/feature-flag.app.ts";
 
 /**
- * The shared cache tier, absent. Every read past {@link CachedFeatureFlagRowAdapter}'s
- * own five-second per-process window goes to the repository. Ported from
- * `installApiFeatureFlag`'s `UncachedApiFeatureFlags` (deleted by b383462d96):
- * no deployment ever wired a cross-process store behind this tier, so the
- * App builds the same no-op rather than inventing a new cache implementation.
+ * The shared cache tier, absent. Every read past the five-second
+ * per-process window goes to the repository — no deployment ever wired a
+ * cross-process store here, so the App builds the same no-op instead.
  */
 export class UncachedFeatureFlagCacheAdapter implements FeatureFlagCache {
   static create(): UncachedFeatureFlagCacheAdapter {

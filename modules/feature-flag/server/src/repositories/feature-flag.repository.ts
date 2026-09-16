@@ -19,10 +19,9 @@ export interface FeatureFlagRepository {
   }): Promise<void>;
 
   /**
-   * `seedEnabled` is the row-level value written only when the row does not
-   * exist yet. The caller derives it from the registry default so an
-   * operator's first targeting rule cannot shadow that default for every
-   * context the rule does not name.
+   * `seedEnabled` is written only when the row does not exist yet, derived
+   * by the caller from the registry default — so an operator's first
+   * targeting rule cannot shadow that default for contexts it doesn't name.
    */
   upsertRules(input: {
     key: string;

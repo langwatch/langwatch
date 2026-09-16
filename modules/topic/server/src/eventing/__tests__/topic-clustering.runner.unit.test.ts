@@ -110,12 +110,10 @@ describe("clusterTopicsForProject", () => {
   });
 
   describe("when topics were just created by the run's previous page", () => {
-    // Regression: page 1 of a batch run writes topics with createdAt = now.
-    // Page 2 re-enters clusterTopicsForProject and recomputes the cadence
-    // gate from those fresh topics; if the gate fired, every batch backlog
-    // larger than one page ended after page one with a recently_clustered
-    // skip and no cursor. The gate throttles run STARTS only — a
-    // continuation page (searchAfter present) must go through.
+    // The cadence gate recomputed from topics page 1 just wrote would
+    // otherwise throttle every batch backlog after one page. The gate
+    // throttles run STARTS only — a continuation page (searchAfter
+    // present) must go through.
     const freshTopics = [{ id: "topic-1", parentId: null, createdAt: nowInstant() }];
 
     it("skips a NEW run as recently clustered", async () => {

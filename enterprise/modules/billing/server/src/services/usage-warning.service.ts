@@ -19,10 +19,9 @@ import type { NotificationService, UsageLimitEmailData } from "./billing-usage-n
 const logger = createLogger("langwatch:notifications:usageWarning");
 
 /**
- * Most calls check usage that has not crossed a warning threshold yet, or
- * find the warning already sent this month — "no email went out" is the
- * ordinary outcome, not an anomaly, so it is a named result rather than
- * `null`.
+ * Most calls find usage under threshold, or the warning already sent this
+ * month — "no email went out" is the ordinary outcome, not an anomaly, so
+ * it is a named result rather than `null`.
  */
 export type CheckAndSendWarningResult =
   | { outcome: "sent"; notification: Notification }

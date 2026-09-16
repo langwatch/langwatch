@@ -382,11 +382,9 @@ export type SyncStripePricesResult = {
 };
 
 /**
- * Pulls every price and meter this Stripe account has, resolves them onto
- * the fixed `STRIPE_PRICE_NAMES` / `STRIPE_METER_NAMES` keys by `lookup_key`
- * (or `langwatch_key` metadata for prices), and merges the result into the
- * on-disk catalog — the opposite environment's rows are kept untouched, so a
- * test-mode run never erases the live mapping and vice versa.
+ * Pulls every Stripe price/meter onto the fixed `STRIPE_PRICE_NAMES` /
+ * `STRIPE_METER_NAMES` keys and merges into the on-disk catalog — the
+ * opposite environment's rows stay untouched, so test-mode and live never erase each other.
  */
 export const syncStripePrices = async (params: {
   secretKey: string;
@@ -468,10 +466,9 @@ export const syncStripePrices = async (params: {
 };
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task
- * stripe-prices-sync`. Regenerates `stripe-catalog.json` in
- * `@langwatch/enterprise-billing-contract` from the deployment's Stripe
- * account, keyed by `STRIPE_SECRET_KEY`.
+ * The task-launcher entry (`pnpm --filter @langwatch/tasks task
+ * stripe-prices-sync`). Regenerates `stripe-catalog.json` in
+ * `@langwatch/enterprise-billing-contract`, keyed by `STRIPE_SECRET_KEY`.
  */
 export class StripePricesSyncTask extends Task {
   readonly name = "stripe-prices-sync";

@@ -1,9 +1,7 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- *
- * The three procedures and their schemas come from the contract's own
- * declaration, so the browser cannot name a shape the door does not serve.
+ * The procedures this package calls, and the hooks that call them. THE ONE
+ * GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE (ADR-004) — schemas come
+ * straight from the contract, so the browser cannot name an unserved shape.
  */
 
 import type { dataPrivacyTrpc } from "@langwatch/data-privacy-contract";

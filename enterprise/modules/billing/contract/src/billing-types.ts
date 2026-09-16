@@ -135,12 +135,8 @@ export type SignupNotificationPayload = {
 };
 
 // ---------------------------------------------------------------------------
-// Usage limits
-//
-// Read by both usage-limit services in the server package: one decides
-// whether a hard limit has been hit, the other whether an organization is
-// close enough to be warned. They live here because a type declared inside
-// either service would make the other import a service to reach it.
+// Usage limits — read by both usage-limit services (hard-limit vs warning);
+// declared here so neither has to import the other to reach it.
 // ---------------------------------------------------------------------------
 
 /** The counter cannot always answer; an unknown count is not a zero one. */

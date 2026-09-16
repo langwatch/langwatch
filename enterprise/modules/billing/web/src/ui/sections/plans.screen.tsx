@@ -1,9 +1,7 @@
 /**
- * The plan comparison, at `/settings/plans`.
- *
- * ONE READ AND ONE TABLE: which plan the organization is on, and what each of
- * the others would give them. The screen carries no chrome — the settings frame
- * is applied by whichever application serves the address.
+ * The plan comparison, at `/settings/plans`. ONE READ AND ONE TABLE: which
+ * plan the organization is on, and what each other would give them. No
+ * chrome — the settings frame is applied by whichever app serves the address.
  */
 
 import { Spinner } from "@chakra-ui/react";

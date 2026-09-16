@@ -23,9 +23,7 @@ const logger = createLogger("langwatch:topic-clustering:process-effects");
 
 /**
  * Classifies a clustering failure by TYPE, never by message text (ADR-051;
- * see topic-clustering.errors.ts for why). The classifier lives next to the
- * intent executor that consumes its verdict; composition wires it into the
- * pipeline's dispatch deps.
+ * see topic-clustering.errors.ts for why).
  */
 export function classifyClusteringError(error: unknown): ClassifiedClusteringError {
   if (error instanceof ClusteringError) {
@@ -48,12 +46,9 @@ export function classifyClusteringError(error: unknown): ClassifiedClusteringErr
 }
 
 /**
- * All topic-clustering-processing commands defined from event data schemas
- * (ADR-051 §1). Event data schemas are the single source of truth; command
- * data = envelope (tenantId, occurredAt, idempotencyKey?) + event data.
- *
- * The aggregate is the project: aggregateId = tenantId = projectId, so every
- * command for one project folds and subscribes in FIFO order.
+ * Topic-clustering-processing commands, each defined from its event data
+ * schema (ADR-051 §1). Aggregate = project, so per-project commands fold
+ * and subscribe in FIFO order.
  */
 
 export const RequestTopicClusteringCommand = defineCommand({
@@ -186,27 +181,22 @@ export const TOPIC_CLUSTERING_MAX_ATTEMPTS = 3;
 
 /**
  * The lease must OUTLIVE the slowest healthy clustering page, or a second
- * dispatcher re-leases the row mid-flight and re-runs the same page
- * concurrently. A page is up to 2000 traces through langevals batch
- * clustering (embeddings + LLM naming) — minutes, not seconds — so the
- * generic 30s default is unsafe here.
+ * dispatcher re-runs it mid-flight. A page can take minutes (up to 2000
+ * traces through langevals), so the generic 30s default is unsafe.
  */
 export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
- * Leased per drain AND dispatched concurrently (the pipeline declares both):
- * this constant is the effective clustering concurrency ADR-051 §4 promises,
- * matching the old worker's cap of 3. Bounding the lease batch to the same
- * number keeps leased-but-waiting messages from sitting invisible behind a
- * slow page for the whole lease.
+ * The effective clustering concurrency (ADR-051 §4), matching the old
+ * worker's cap of 3. Bounding the lease batch to the same number keeps
+ * waiting messages from sitting invisible behind a slow page.
  */
 export const TOPIC_CLUSTERING_OUTBOX_BATCH_SIZE = 3;
 
 /**
  * What one clustering page did (ADR-051). `nextSearchAfter` present means
- * the backlog has more pages — the caller owns continuing the walk (the
- * process manager via a continuation intent, or the CLI task via a loop);
- * the run port never schedules its own next page.
+ * more pages remain — the caller owns continuing the walk; the run port
+ * never schedules its own next page.
  */
 export interface TopicClusteringPageOutcome {
   mode: TopicClusteringRunMode;
@@ -281,9 +271,8 @@ export interface TopicClusteringDispatchDeps {
   runPort: TopicClusteringRun;
   /**
    * Late-bound on purpose: the executor is declared while the pipeline is
-   * being built, and these are the SAME pipeline's commands — they only
-   * exist after `.build()`. The registry supplies a getter it resolves
-   * post-build; dispatch happens long after that.
+   * still being built, and these are that SAME pipeline's commands — they
+   * only exist after `.build()`, which the registry resolves post-build.
    */
   commands: TopicClusteringOutcomeCommands;
   classifyError: TopicClusteringErrorClassifier;

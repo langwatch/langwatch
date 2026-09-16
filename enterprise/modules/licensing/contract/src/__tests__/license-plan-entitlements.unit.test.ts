@@ -4,11 +4,9 @@ import { applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../index.t
 import type { PlanInfo } from "../index.ts";
 
 /**
- * Spec: specs/licensing/plan-entitlements.feature
- *
- * The identity-preserving return is not a micro-optimization: callers
- * downstream assert on object identity, so a plan with nothing to fill has to
- * come back as itself.
+ * Spec: specs/licensing/plan-entitlements.feature. The identity-preserving
+ * return is not a micro-optimization: callers downstream assert on object
+ * identity, so a plan with nothing to fill must come back as itself.
  */
 
 const enterprisePlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({

@@ -1,10 +1,7 @@
 /**
- * The license card, over one read.
- *
- * Renamed from `LicenseStatus` on the way in: `LicenseStatus` is already the
- * CONTRACT's name for the payload this component renders, and a component and a
- * payload type sharing a name inside one package is a confusion the move can
- * settle for free.
+ * The license card, over one read. Renamed from `LicenseStatus`, which is
+ * already the CONTRACT's name for the payload this component renders —
+ * sharing a name between component and payload type invited confusion.
  */
 
 import { VStack } from "@chakra-ui/react";

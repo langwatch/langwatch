@@ -24,10 +24,9 @@ import { MemoryDataPrivacyPolicyRepository } from "../memory/memory.data-privacy
 import { PrismaDataPrivacyPolicyRepository } from "../prisma/prisma.data-privacy.repository.ts";
 
 /**
- * One backend under test. The namespace keeps a run's organization and scope
- * ids off every other row in a shared database: the stored unique key is
- * (scopeType, scopeId, personalOnly) across all organizations, so a fixed
- * scope id would collide with whatever else is in there.
+ * One backend under test. The namespace keeps a run's ids off every other
+ * row in a shared database: the stored unique key is (scopeType, scopeId,
+ * personalOnly) across all organizations, so a fixed id would collide.
  */
 type Backend = Readonly<{ repository: () => DataPrivacyPolicyRepository; namespace: () => string }>;
 
