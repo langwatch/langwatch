@@ -249,16 +249,18 @@ export async function resolveWrapperMode(
 	if (!policy.allowVk && !policy.allowOtelDirect) {
 		// Name only the lever that can actually be pulled. For most tools both
 		// are real, so the generic message is right. For pi it is not: allowVk
-		// is clamped false as a structural fact (pi ignores base-URL
-		// overrides), so an admin who followed the generic advice would enable
-		// the gateway, see nothing change, and have no way to learn why. That
-		// state is reachable only because this change forces allowVk false —
-		// so the message it produces is this change's to fix. ADR-132 §7.
+		// is clamped false because this CLI has no lever that moves pi's
+		// endpoint (pi reads it from its own model settings and ignores
+		// base-URL environment variables), so an admin who followed the
+		// generic advice would enable the gateway, see nothing change, and
+		// have no way to learn why. That state is reachable only because this
+		// change forces allowVk false, so the message it produces is this
+		// change's to fix. See ADR-132 §Invariants.
 		throw new GovernanceCliError(
 			403,
 			"tool_disabled",
 			tool === "pi"
-				? "Tool 'pi' is disabled in the platform policy: direct OTLP ingestion is off, and pi cannot use the gateway path at all — it ignores base-URL overrides, so a virtual key would never route its traffic through LangWatch. Ask your org admin to enable allow_otel_direct; enabling allow_vk would change nothing."
+				? "Tool 'pi' is disabled in the platform policy: direct OTLP ingestion is off, and the gateway path is not available for pi. pi reads each model's endpoint from its own model settings and ignores base-URL environment variables, so the langwatch CLI cannot route it through the gateway. Ask your org admin to enable allow_otel_direct; enabling allow_vk would change nothing."
 				: `Tool '${tool}' is disabled in the platform policy (both gateway and direct OTLP paths off). Ask your org admin to enable allow_vk or allow_otel_direct.`,
 		);
 	}
