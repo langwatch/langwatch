@@ -51,11 +51,20 @@ def removed_identifiers(rev_range):
 
 
 def source_files():
-    """Every tracked TypeScript source, minus build output."""
+    """Every TypeScript source git can see, committed or not, minus build output.
+
+    `--others --exclude-standard` is what makes this usable mid-drive. A lane's
+    work sits uncommitted for hours, and a brand-new file - the test double that
+    still defines the old name, the caller written against it - is exactly where
+    an orphan hides. Listing only tracked files reports a confident clean run
+    over a tree whose newest half it never opened.
+    """
     out = subprocess.run(
-        ["git", "ls-files", *SOURCE_GLOBS], capture_output=True, text=True, check=True
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", *SOURCE_GLOBS],
+        capture_output=True, text=True, check=True,
     ).stdout.split()
-    return [f for f in out if "/dist/" not in f and "/node_modules/" not in f]
+    seen = dict.fromkeys(out)  # --cached and --others can both name a path
+    return [f for f in seen if "/dist/" not in f and "/node_modules/" not in f]
 
 
 def index_tree(names):
