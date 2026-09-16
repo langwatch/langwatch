@@ -292,6 +292,38 @@
     // plugin. Relaxing those would not be leniency, it would be deleting
     // the rule, since tests are the only place they ever fire.
     // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // temporal-only does not reach the three packages we publish to npm.
+    //
+    // The rule's entire remedy is "call it from @langwatch/time", and that
+    // package is `"private": true` with `main` pointing at its own `src`.
+    // A customer running `npm i langwatch` cannot resolve a private
+    // workspace package, so in `langwatch`, `@langwatch/mcp-server` and
+    // `@langwatch/ksuid` the rule reports 224 findings whose only correct
+    // fix is unavailable at that address -- it is asking a published
+    // artefact to take a dependency that would break its install.
+    //
+    // This is a boundary, not debt: the platform reads one clock, and what
+    // we ship to customers is deliberately outside it, holding no workspace
+    // dependency a registry cannot serve. Bundling `@langwatch/time` into
+    // the SDK instead was considered and rejected -- it is built over
+    // Temporal and would push a polyfill into every customer's runtime to
+    // settle a vocabulary question internal to this repository.
+    //
+    // If `@langwatch/time` is ever published, delete this entry rather than
+    // narrowing it; the reason will have gone away entirely.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "sdks/typescript/**",
+        "mcp/typescript/**",
+        "packages/ksuid/**"
+      ],
+      "rules": {
+        "langwatch/temporal-only": "off"
+      }
+    },
+
     {
       "files": [
         "**/__tests__/**",
