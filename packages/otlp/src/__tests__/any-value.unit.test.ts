@@ -44,10 +44,8 @@ describe("otlpAnyValueSchema", () => {
   });
 
   /**
-   * The spec makes AnyValue a `oneof`, so this payload is not conformant. The
-   * ingestion path still has to accept it, because senders produce it — which
-   * is why exclusivity is resolved when the value is READ rather than rejected
-   * when it is parsed.
+   * AnyValue is spec'd as a `oneof`; this payload isn't conformant but senders
+   * produce it, so exclusivity is resolved on READ rather than rejected on parse.
    */
   it("accepts a value that sets more than one field, rather than enforcing the oneof", () => {
     const parsed = otlpAnyValueSchema.safeParse({ stringValue: "", intValue: 3 });

@@ -25,20 +25,16 @@ const monoFontFamily =
 
 /**
  * A restrained hairline in the status colour, mixed into the neutral border
- * rather than drawn on top of it — the same formula as the Langy card's
- * `accentBorder` (`features/asaplangy/tokens.ts`), which exists so a card can
- * carry a tone without wearing a coloured ring.
+ * rather than drawn on top — same formula as the Langy card's `accentBorder`
+ * (`features/asaplangy/tokens.ts`), for a tone without a coloured ring.
  */
 const statusHairline = (color: string) =>
   `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
 
 /**
- * The card material a toast wears in dark mode, whatever its status — the same
- * panel + hairline pair as `INSET` in `features/asaplangy/tokens.ts`. It is
- * repeated per `&[data-type=…]` because that is the shape (and specificity) of
- * Chakra's own filled defaults, which set `bg: red.solid` / `color:
- * red.contrast` and would otherwise survive the deep merge. Light mode keeps
- * those fills.
+ * The card material a toast wears in dark mode — same panel + hairline pair
+ * as `INSET` in `features/asaplangy/tokens.ts`, repeated per `&[data-type=…]`
+ * to outrank Chakra's own filled defaults. Light mode keeps those fills.
  */
 const toastPanel = {
   bg: "bg.panel",
@@ -63,11 +59,9 @@ export const designSystemConfig = defineConfig({
       bg: null,
     },
     // Chakra's `CodeBlock` paints highlighted lines via an absolutely
-    // positioned `::after` pseudo on `[data-line][data-highlight]`,
-    // backed by the `--highlight-bg` custom property and a hardcoded
-    // gray inline-start border. Override both globally so every code
-    // block (env-block in onboarding, pinned attributes in the trace
-    // drawer, …) lights up in the LangWatch tracing orange.
+    // positioned `::after` on `[data-line][data-highlight]`, backed by
+    // `--highlight-bg` and a hardcoded gray border. Overridden globally so
+    // every code block lights up in the LangWatch tracing orange.
     "[data-line][data-highlight], [data-line][data-diff]": {
       "--highlight-bg": "rgba(237, 137, 38, 0.18)",
     },
@@ -909,14 +903,10 @@ export const designSystemConfig = defineConfig({
       table: defineSlotRecipe({
         slots: ["root", "row", "cell", "columnHeader"],
         base: {
-          // Deliberately NO borderRadius and NO background on root. The table
-          // is border-collapse: collapse, where border-radius does not apply
-          // to internal elements, so a rounded root renders its square
-          // header/row/own paints as a clipped-corner artifact; and an opaque
-          // root background is a square slab that covers the containing
-          // card's rounded BORDER at the corners (cards don't clip their
-          // children). Tables inherit their surface; rounding and clipping
-          // belong to the container.
+          // Deliberately NO borderRadius and NO background on root. With
+          // border-collapse: collapse, a rounded root clips its square
+          // header/row paints, and an opaque background covers the card's
+          // rounded corners (cards don't clip children). Rounding is the container's job.
           root: {
             background: "transparent",
           },
@@ -957,12 +947,10 @@ export const designSystemConfig = defineConfig({
                 // container's own bottom edge — drop it.
                 "& tbody tr:last-of-type td": { borderBottomWidth: "0" },
               },
-              // Chakra's stock line variant paints every row bg="bg" (the PAGE
-              // background) — darker than the card surface in dark mode, so
-              // the whole body rendered as a mismatched slab. The override must
-              // use the same `bg` KEY the stock recipe uses: a `background`
-              // key merges alongside `bg` instead of replacing it, and the
-              // stock paint wins.
+              // Chakra's stock line variant paints every row bg="bg" (the
+              // PAGE background), a mismatched slab in dark mode. Must
+              // override the same `bg` KEY — a `background` key merges
+              // alongside it instead of replacing it, so the stock paint wins.
               row: {
                 bg: "transparent",
               },

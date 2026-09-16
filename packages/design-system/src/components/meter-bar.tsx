@@ -19,9 +19,8 @@ export interface MeterBarProps {
 
 /**
  * A thin rounded meter: one value against the width it is measured in.
- * Shared by the trace table's latency columns (value against the visible
- * page's p95) and the virtual-keys table's budget bar (period spend
- * against the budget's limit), so the two read as the same object.
+ * Shared by the trace table's latency columns (value against p95) and the
+ * virtual-keys table's budget bar (spend against limit) as one object.
  */
 export function MeterBar({
   fillRatio,

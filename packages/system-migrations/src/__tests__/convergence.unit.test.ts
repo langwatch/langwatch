@@ -1,10 +1,7 @@
 /**
- * The boot loop's own logic: when it runs another pass, when it stops, and
- * what a shutdown does to it. The pass itself is a fake - this is about the
- * loop, so no datastore, no runner and no migration is involved.
- *
- * Timers are faked because the loop deliberately waits between passes; every
- * test therefore has to drive the clock rather than wait on it.
+ * The boot loop's own logic: when to run another pass, when to stop, and
+ * what shutdown does. No datastore, runner or migration - timers are faked
+ * since the loop waits between passes, so tests drive the clock directly.
  */
 import type { MigrationPassSummary } from "../types.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

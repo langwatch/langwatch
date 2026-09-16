@@ -9,11 +9,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 export type { TenantDirectory };
 
 /**
- * The three reads that place a tenant, in the order the rule asks them: a
- * project is placed by the organization its team belongs to; an organization
- * places itself; and a user is placed nowhere in particular, because somebody
- * can be in several organizations and picking one would put their identity
- * history on a server chosen by accident.
+ * The three reads that place a tenant: a project by its team's organization,
+ * an organization by itself, and a user nowhere in particular - they can be
+ * in several organizations, and picking one would misplace their history.
  */
 export function prismaTenantDirectory(prisma: PrismaClient): TenantDirectory {
   return {

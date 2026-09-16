@@ -20,11 +20,9 @@ export interface SystemMigrationStateRepository {
   upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean>;
 
   /**
-   * Has ANY tenant finished this migration? The question a per-tenant gate
-   * asks before it asks its own: while the answer is no, no tenant can be
-   * past the gate, so the per-tenant read is pure cost. One cached read per
-   * pod then replaces one cached read per tenant, and it self-disables the
-   * moment an operator enrols the first one.
+   * Has ANY tenant finished this migration? While no, the per-tenant read is
+   * pure cost, so a per-tenant gate asks this first - one cached read per pod
+   * replacing one per tenant, self-disabling once the first tenant finishes.
    */
   hasFinalizedTenant(args: { migrationName: string }): Promise<boolean>;
 }

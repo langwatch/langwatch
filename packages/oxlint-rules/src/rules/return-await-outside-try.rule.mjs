@@ -1,22 +1,11 @@
 import { walk } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// `return await x` outside a try changes nothing the caller can observe: the
-// function already returns a promise, and nothing here can catch a rejection
-// and rewrap it, so awaiting first only adds a microtask tick before handing
-// the same settlement back. Inside a try (block, catch, or finally), the
-// await is load-bearing -- it is what lets that try's own catch/finally
-// observe the rejection before the function returns, which stripping it
-// would change. A `using`/`await using` declaration in scope disposes its
-// resource based on when the function's own execution completes, and an
-// async generator's `return` value is delivered through a `{ done: true,
-// value }` iterator result the caller may await further down its own chain
-// -- both are sites where the await is doing real work, so they are not
-// reported at all, never report-and-skip.
-//
-// Scope is `ReturnStatement` only. The arrow expression-body form
-// (`async () => await x`) has no ReturnStatement node and is out of scope
-// for v1.
+// `return await x` outside a try adds a microtask tick with no observable
+// effect, since nothing here can catch and rewrap a rejection. Inside a
+// try, the await is load-bearing - it lets that try's own catch/finally
+// observe the rejection. A `using` declaration or an async generator's
+// `return` is also load-bearing and never reported (scope: `ReturnStatement` only).
 
 const GOVERNED =
   /^(?:enterprise\/modules|modules|apps|packages|sdks\/typescript\/src|mcp\/typescript\/src)\//;

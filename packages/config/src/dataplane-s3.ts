@@ -72,11 +72,9 @@ export function parseDataplaneS3RoutingTable(
 }
 
 /**
- * The organization id a variable name addresses.
- *
- * The LAST `__` separates the label from the id, so a label may itself contain
- * one. A name with no separator at all is taken whole, which is how a
- * deployment that omitted the label still addresses the organization it meant.
+ * The organization id a variable name addresses. The LAST `__` separates the
+ * label from the id, so a label may itself contain one. No separator at all
+ * means the whole suffix is taken as the id.
  */
 function organizationIdOf(envVar: string): string {
   const suffix = envVar.slice(DATAPLANE_S3_ENV_PREFIX.length);

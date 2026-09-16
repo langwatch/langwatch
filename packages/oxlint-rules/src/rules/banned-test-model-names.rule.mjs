@@ -1,29 +1,11 @@
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// A test, fixture, scenario or seed that names a specific OpenAI model picks
-// one that is cheap and capable so the suite stays affordable to run; the
-// models below are either retired or cost more than the one everybody should
-// default to. Production source is ungoverned on purpose — a gateway's own
-// provider catalogue legitimately lists every model a provider ships,
-// deprecated ones included.
-//
-// Autofix: the matched banned-model substring is replaced with `gpt-5-mini`
-// in place, leaving the rest of the literal untouched. This is safe because
-// the rule's governed set is test-shaped files only — the one behaviour
-// change this can cause is a mocked or live-call test now naming
-// `gpt-5-mini`, which CI validates the same way it validates any other test
-// change. One exception: a `regex: "..."` property value is a matching
-// pattern, not prose — the banned name inside it anchors a specific
-// catalog/price-table row (`^(openai\/)?gpt-4o$`-shaped fixtures recur across
-// the model-provider and trace cost-matching suites), and replacing part of
-// an anchored pattern string silently changes what it matches rather than
-// failing loudly. That one shape is reported without a fix; the exact
-// occurrences it makes unsafe to sweep are file-level judgement calls a fixer
-// cannot make from the AST alone (a real catalog/pricing/reasoning-config
-// lookup keyed by the literal model id, or an alias table deliberately
-// mapping the banned name onto a different, modern one) — left as findings
-// for a human, not lint debt this rule pretends to close.
+// A test/fixture/scenario/seed that names a specific OpenAI model must use
+// one that is cheap and capable; the models below are retired or pricier.
+// Production source is ungoverned - a gateway's own catalogue must list every
+// model shipped. Autofix rewrites the substring to `gpt-5-mini`, except a
+// `regex: "..."` pattern value, which anchors a catalog row and is reported only.
 
 const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 const TEST_FILE = /\.test\.tsx?$/;

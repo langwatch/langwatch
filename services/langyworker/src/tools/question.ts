@@ -1,10 +1,7 @@
 /**
- * The `question` tool: Langy asks the user mid-turn and keeps the turn.
- *
- * The tool posts the question as a user wait, then long-polls it. The app
- * writes the durable event and the live entry the panel renders as a choices
- * card (ADR-060 §6). The answer comes back as the tool result, so Langy
- * continues the same turn with the plan it had.
+ * The `question` tool: Langy asks the user mid-turn and keeps the turn. It
+ * posts the question as a user wait, then long-polls it (ADR-060 §6). The
+ * answer comes back as the tool result, so Langy continues with the plan it had.
  */
 
 import { Type } from "typebox";
@@ -32,13 +29,9 @@ const POLL_RETRY_DELAY_MS = 1_000;
 const MAX_POLL_FAILURES = 3;
 
 /**
- * The longest the tool waits for an answer.
- *
- * It is the app's own question budget (`QUESTION_WAIT_BUDGET_MS` in
- * `platform/app/src/server/langy-local-control/constants.ts`). The app expires
- * the card and answers `expired` first; this is the net under it, so a worker
- * that cannot reach the app still ends its turn at the same minute the card
- * on screen stops waiting.
+ * The longest the tool waits for an answer: the app's own question budget
+ * (`QUESTION_WAIT_BUDGET_MS`). A net under the app's own expiry, so an
+ * unreachable worker still ends its turn when the card stops waiting.
  */
 export const WAIT_MAX_MS = 10 * 60 * 1000;
 

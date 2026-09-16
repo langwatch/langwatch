@@ -36,11 +36,9 @@ export {
 } from "./channels/tenant-broadcast.channel.ts";
 
 /*
- * Private runtime surface, kept only until its importers call the factories
- * above (`private-runtime-export` baseline, expires 2026-10-01):
- *   EmailDeliveryAdapter          -> createEmailDelivery
- *   RedisTenantBroadcastAdapter   -> createRedisTenantBroadcast
- *   EmailProviderService          -> resolveDefaultFrom
+ * Private runtime surface, kept until importers call the factories above
+ * (`private-runtime-export` baseline, expires 2026-10-01). The one non-obvious
+ * mapping: EmailProviderService below is what `resolveDefaultFrom` wraps.
  */
 export { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";
 export { RedisTenantBroadcastRepository as RedisTenantBroadcastAdapter } from "./repositories/redis/redis.tenant-broadcast.repository.ts";

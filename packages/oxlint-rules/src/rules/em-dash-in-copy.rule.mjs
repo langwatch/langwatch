@@ -1,15 +1,11 @@
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// `dev/docs/best_practices/copywriting.md` bans the em dash from anything a
-// customer reads: it is the most recognisable AI writing tic, and it slips
-// into JSX prose, tooltip strings and template copy the same way a comment
-// never would. Three narrow visitors cover where customer copy actually
-// lives — JSX text, a plain string literal, and each quasi of a template
-// literal checked on its own — rather than walking every node looking for
-// text. NO-FIX on purpose: the right replacement (comma, colon, or a
-// rewritten clause) is an editorial call an unattended fixer cannot make
-// safely against shipped prose.
+// dev/docs/best_practices/copywriting.md bans the em dash from anything a
+// customer reads - the most recognisable AI writing tic. Three narrow
+// visitors cover where copy lives: JSX text, a string literal, and each
+// template quasi, rather than walking every node. NO-FIX: the right
+// replacement is an editorial call an unattended fixer cannot make safely.
 
 const EM_DASH = "—";
 // A bare "—" placeholder (an empty table cell) has no word character on

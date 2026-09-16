@@ -10,11 +10,9 @@ import { defineRule } from "../define-rule.mjs";
 const BOUNDARY = /canonical-error|error-response|handled-error|\.boundary\.ts$/;
 
 // A family that published `{ status, message }` before the house shape existed
-// renders its own refusals, and that renderer travels with the declaration so a
-// published body cannot change because the installer moved. Inside it, and
-// inside the helpers it hands the refusal to, a status and a body ARE the
-// boundary. Exempting the whole FILE would exempt the route handlers beside it,
-// which is exactly where the mistake lives.
+// renders its own refusals; that renderer travels with the declaration so a
+// published body cannot change because the installer moved. Exempting the
+// whole FILE would exempt the route handlers beside it - the actual mistake.
 const FAMILY_RENDERER = "RestErrorHandler";
 
 const REFUSING_STATUS = /^[45]\d\d$/;

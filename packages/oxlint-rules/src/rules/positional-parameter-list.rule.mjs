@@ -1,15 +1,10 @@
 import { defineRule } from "../define-rule.mjs";
 
 // CLAUDE.md: a multi-argument function takes named parameters via object
-// destructuring (`fn({ a, b })`), not a positional list the caller has to
-// count to get right. A constructor is exempt — house DI takes its
-// collaborators positionally — and so is a function whose arity the callee
-// dictates (an array-callback, a Hono handler passed to `.use()`, anything
-// handed straight to a call). An overload signature is exempt in favour of
-// the implementation it describes: a bodyless class-method overload
-// (`TSEmptyBodyFunctionExpression`) is skipped and its `FunctionExpression`
-// implementation reported instead, and a free-function overload
-// (`TSDeclareFunction`) is never visited at all.
+// destructuring, not a positional list. Exempt: a constructor (house DI is
+// positional), a function whose arity the callee dictates (array-callback,
+// a Hono `.use()` handler), and an overload signature - reported on the
+// implementation it describes instead, never on the bare declaration.
 
 const GOVERNED = /^(?:enterprise\/modules|modules|apps|packages)\//;
 

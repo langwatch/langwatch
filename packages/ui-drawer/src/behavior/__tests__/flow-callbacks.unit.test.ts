@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * The flow-callback registry's close policy: a flow's registration ends with
- * the drawer it ran through, and a mounted component's does not.
- *
+ * the drawer it ran through; a mounted component's does not.
  * Spec: specs/features/drawer-flow-callbacks.feature
  */
 

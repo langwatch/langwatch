@@ -1,9 +1,6 @@
 /**
- * Parser-equivalence tests for the shared OTLP body helper: both the
- * project-keyed and org-keyed governance receivers must produce
- * byte-for-byte identical parsed output for the same wire input — the whole
- * architectural claim of the unified-substrate direction. Locks the contract
- * so the receiver rewire can't accidentally diverge the two call sites.
+ * Parser-equivalence tests: project-keyed and org-keyed receivers must
+ * produce identical parsed output for the same wire input.
  * @see specs/ai-gateway/governance/architecture-invariants.feature, receiver-shapes.feature
  */
 

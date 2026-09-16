@@ -1,8 +1,6 @@
 /**
- * Search input with a leading search icon.
- *
- * Wraps the existing InputGroup with a Search icon in the start element.
- * Renders with `role="searchbox"` for accessibility and testability.
+ * Search input with a leading search icon, wrapping InputGroup. Renders with
+ * `role="searchbox"` for accessibility and testability.
  */
 
 import type { InputProps } from "@chakra-ui/react";

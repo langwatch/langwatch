@@ -62,10 +62,8 @@ describe("otlpScalarValue", () => {
     });
 
     /**
-     * `low` is delivered as a SIGNED 32-bit integer, so any value at or above
-     * 2^31 arrives negative. Without masking it to 32 bits before the OR, its
-     * sign extends across the high half and the result is wrong by a multiple
-     * of 2^32 — a timestamp off by 4295 seconds rather than an obvious error.
+     * `low` is signed 32-bit; unmasked, its sign would extend across `high`
+     * and skew the result by a multiple of 2^32.
      */
     it("masks a negative low half rather than letting its sign reach the high half", () => {
       expect(otlpScalarValue({ intValue: { low: -1, high: 0 } })).toBe(2 ** 32 - 1);

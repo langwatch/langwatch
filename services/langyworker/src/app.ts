@@ -1,8 +1,7 @@
 /**
  * The worker application: config -> session -> ready, then the stdin command
- * loop. Commands are dispatched as they arrive (abort/ping are never queued
- * behind a running turn); turn commands chain through the runner, which
- * preempts a running turn per PROTOCOL.md.
+ * loop. Commands dispatch as they arrive (abort/ping never queue behind a
+ * running turn); turn commands chain through the runner per PROTOCOL.md.
  */
 
 import { readFileSync } from "node:fs";

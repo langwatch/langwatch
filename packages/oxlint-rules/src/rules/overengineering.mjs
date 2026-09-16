@@ -5,12 +5,10 @@ import {
   overengineeringFindings,
 } from "../../grammar/overengineering.mjs";
 
-// The one pass the three over-abstraction rules share. Each rule used to ask
-// the detectors for its own policy, so every `.ts` file was analysed three
-// times; the findings are now computed once per program and read three times.
-//
-// The memo is keyed by the Program node itself, so it cannot go stale: a new
-// parse is a new node, and a freed one takes its entry with it.
+// The one pass the three over-abstraction rules share: each once asked the
+// detectors separately, analysing every `.ts` file three times; now computed
+// once per program. Keyed by the Program node itself, so it cannot go stale -
+// a new parse is a new node, and a freed one takes its entry with it.
 
 const findingsByProgram = new WeakMap();
 

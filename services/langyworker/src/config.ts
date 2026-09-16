@@ -1,9 +1,7 @@
 /**
  * `$HOME/.langy-worker.json`, written by the manager's Provision step before
- * spawn. Secrets stay in the environment; the config references env var NAMES
- * (`baseUrlEnv`, `apiKeyEnv`). Unknown model keys pass through verbatim into
- * the generated pi model entry so new compat findings drop in without a
- * wrapper change.
+ * spawn. Secrets stay in the environment; config references env var NAMES.
+ * Unknown model keys pass through verbatim for compat without wrapper changes.
  */
 
 import { readFileSync } from "node:fs";

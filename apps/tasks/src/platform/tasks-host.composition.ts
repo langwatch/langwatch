@@ -29,11 +29,9 @@ function loggedAbsence(handle: string): undefined {
 }
 
 /**
- * The real `TaskHost` this process builds: whatever infrastructure the
- * environment actually configured, each handle composed once and closed
- * once. An absent leaf is logged by name at boot rather than stubbed —
- * exactly the vocabulary `TaskHost.require*` refuses by name at the call
- * site when a task reaches for a handle this environment never built.
+ * The real `TaskHost`: whatever infrastructure the environment configured,
+ * each handle composed once and closed once. An absent leaf is logged by
+ * name at boot, not stubbed - the vocabulary `TaskHost.require*` also uses.
  */
 export class TasksHost extends TaskHost<
   TasksConfig,
@@ -46,10 +44,9 @@ export class TasksHost extends TaskHost<
   readonly clickhouse: ClickHouseClient | undefined;
   readonly redis: RedisConnection | undefined;
   /**
-   * Always composed — building the runtime opens no connection, it only
-   * decides where a project's bytes belong. A BYOC or bucket lookup still
-   * refuses by name (`requirePrisma()`'s own error) the moment one is
-   * actually attempted without `DATABASE_URL`.
+   * Always composed - building the runtime opens no connection, it only
+   * decides where a project's bytes belong. A BYOC lookup still refuses by
+   * name the moment one is attempted without `DATABASE_URL`.
    */
   readonly objectStorage: TasksObjectStorage;
 

@@ -5,12 +5,11 @@ import { defineRule } from "../define-rule.mjs";
 // or Slack has no seam a test can stand in for, and no name for the message
 // it is really sending.
 
-// `tier` names the `channels/<tier>/` folder the concrete implementation
-// belongs in (see CHANNEL_TIERS in feature-layout-policy.mjs). Fixed per
-// conduit except AWS, where the same package covers several services; there
-// it is read off the specifier itself, and left as the literal placeholder
-// `<tier>` only when even that cannot tell SES from SQS from an untiered
-// service (e.g. S3), which the reader — who wrote the import — can name.
+// `tier` names the `channels/<tier>/` folder the implementation belongs in
+// (see CHANNEL_TIERS in feature-layout-policy.mjs). Fixed per conduit except
+// AWS, where the same package covers several services and `tier` is read off
+// the specifier itself, falling back to a literal `<tier>` placeholder only
+// when even that can't tell SES from SQS from an untiered service like S3.
 const CONDUIT_SPECIFIER = [
   { match: /^@langwatch\/eventing(?:\/|$)/, conduit: "the event bus", tier: "eventing" },
   { match: /^ioredis(?:\/|$)/, conduit: "Redis pub/sub", tier: "redis" },

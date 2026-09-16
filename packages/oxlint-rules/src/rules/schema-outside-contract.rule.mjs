@@ -35,12 +35,9 @@ function importSourceOf(context, identifier) {
 }
 
 /**
- * Whether `node` is Zod vocabulary this file authors itself, rather than
- * imports: a call chain that bottoms out at the local `z` (imported from
- * "zod"), or at another top-level const this same file builds the same way.
- * Composing an identifier imported from anywhere else - the contract - stops
- * the chain without marking it authored here, which is the exemption for
- * `.extend`/`.pick`/`.omit`/`.merge` on an imported schema.
+ * Whether `node` is Zod vocabulary this file authors: a chain bottoming out
+ * at the local `z` or another top-level const it builds. An identifier
+ * imported from elsewhere stops the chain unmarked - the extend/pick/omit/merge exemption.
  */
 function isAuthoredHere(node, context, locals, seen) {
   const value = unwrap(node);

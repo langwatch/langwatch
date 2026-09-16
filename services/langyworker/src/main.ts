@@ -1,9 +1,7 @@
 /**
- * langy-worker entry point.
- *
- * boot.js MUST stay the first import: ESM evaluates imported modules in
- * declaration order, so its stdout guard runs before the pi SDK (imported
- * transitively through app.js) can execute any side effect.
+ * langy-worker entry point. boot.js MUST stay the first import: ESM evaluates
+ * modules in declaration order, so its stdout guard runs before the pi SDK
+ * (imported transitively through app.js) can execute any side effect.
  */
 
 import { rawStdoutWrite } from "./boot.js";

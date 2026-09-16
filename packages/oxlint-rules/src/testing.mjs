@@ -11,11 +11,9 @@ import { renderMessage } from "./define-rule.mjs";
 // renaming a feature broke the lint suite. A fixture tree is the input now.
 
 /**
- * @typedef {object} Diagnostic
- * @property {string | undefined} messageId
- * @property {string} message The rendered `what` + `fix`, with `{{}}` filled in.
- * @property {Record<string, unknown>} data
- * @property {number | undefined} line
+ * @typedef {{ messageId: string | undefined, message: string,
+ *   data: Record<string, unknown>, line: number | undefined }} Diagnostic
+ * `message` is the rendered `what` + `fix`, with `{{}}` already filled in.
  */
 
 function withSilentTestHooks(run) {
@@ -79,11 +77,9 @@ export function runRule(rule, { code, cwd = process.cwd(), filename, options = [
 }
 
 /**
- * Asserts what `pnpm lint:fix` would leave behind. The fix is applied by the
- * linter's own fixer machinery rather than a shim, so a green test is evidence
- * about the real command and not about our reimplementation of it.
+ * Asserts what `pnpm lint:fix` would leave behind, via the linter's own fixer.
  * @param {{ meta: object, create: Function }} rule
- * @param {{ code: string, filename: string, output: string, cwd?: string, errors?: number, options?: unknown[] }} run
+ * @param {object} run `{ code, filename, output, cwd?, errors?, options? }`
  */
 export function expectFix(rule, { code, cwd = process.cwd(), errors = 1, filename, options = [], output }) {
   resetClassificationCache();

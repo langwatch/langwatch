@@ -1,13 +1,10 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Two shipped bugs, both in dev/docs/best_practices/zod.md: `.innerType()`
-// answers differently across the two installed Zod majors (3.25.76 and
-// 4.4.3), and a zod-3 `ZodError` fails `instanceof` against zod-4's class.
-// `_def` is reported on any object — a naming-convention gate would have
-// missed the file that motivated this rule (its schema variable is `s`, not
-// `*Schema`). The one exclusion is the tRPC host file, which has no public
-// accessor for a procedure's kind and reads `._def` because that is the
-// entire API surface for it.
+// Two shipped bugs, documented in dev/docs/best_practices/zod.md: `.innerType()`
+// differs across the two installed Zod majors, and zod-3 `ZodError` fails
+// `instanceof` against zod-4's class. `_def` fires on any object - a
+// naming-convention gate would miss non-`*Schema`-named variables. One
+// exclusion: the tRPC host file, whose only accessor for a procedure kind is `._def`.
 
 const WHITESPACE = /\s+/g;
 const TEXT_BUDGET = 40;

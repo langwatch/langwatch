@@ -1,10 +1,7 @@
 /**
- * Warming a drawer's code before someone opens it.
- *
- * Moved out of `platform/app/src/hooks/usePreloadDrawer.ts`. The hook there
- * read the one module-scope registry and the application's own `warmChunk`
- * directly; both are composition now, so the host builds a preloader once from
- * its composed registry and publishes the pair.
+ * Warming a drawer's code before someone opens it. Moved out of
+ * `platform/app/src/hooks/usePreloadDrawer.ts`, which read the module-scope
+ * registry and `warmChunk` directly; both are composition now.
  */
 
 import { useEffect } from "react";
@@ -24,11 +21,9 @@ export type DrawerPreloader = {
   /** Fetch one drawer's code now. */
   preload: (drawer: string) => Promise<void>;
   /**
-   * Fetch the code of the drawers this screen opens, once the browser is idle.
-   *
-   * Idle rather than on mount: the screen's own data is what the person waits
-   * for, and a warm-up next to it competes for the same connections and makes
-   * the visible wait longer.
+   * Fetch the code of the drawers this screen opens, once idle - not on
+   * mount, since the screen's own data is what the person waits for, and a
+   * warm-up next to it competes for the same connections.
    */
   usePreload: (...drawers: string[]) => void;
 };

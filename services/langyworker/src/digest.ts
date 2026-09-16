@@ -1,8 +1,7 @@
 /**
  * Handoff digest: a bounded plain-text rendering of the conversation for the
- * resumed worker's context seed. Newest messages are kept whole (up to a
- * per-message cap), oldest are dropped first; a truncation marker records the
- * drop. Hard bound: DIGEST_MAX_BYTES (64KB).
+ * resumed worker's context seed. Newest messages are kept whole, oldest
+ * dropped first with a truncation marker. Hard bound: DIGEST_MAX_BYTES (64KB).
  */
 
 import { truncateToBytes } from "./protocol.js";

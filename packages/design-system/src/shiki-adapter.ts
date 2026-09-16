@@ -46,11 +46,9 @@ for (const info of bundledLanguagesInfo) {
 }
 
 /**
- * Resolve a requested code-fence language to a canonical bundled Shiki
- * grammar id (via its aliases), a plain passthrough id, or "text" when Shiki
- * doesn't bundle it. Never throws — this removes the "Language `promql` not
- * found, you may need to load it first" failure mode. See
- * specs/traces-v2/code-block-language-fallback.feature
+ * Resolves a code-fence language to a canonical bundled Shiki grammar id, a
+ * plain passthrough, or "text" when unbundled. Never throws.
+ * @see specs/traces-v2/code-block-language-fallback.feature
  */
 export function normalizeShikiLang(lang: string | undefined | null): string {
   if (!lang) return "text";
@@ -137,12 +135,9 @@ export function useShikiAdapter(colorMode: string) {
 }
 
 /**
- * Renders `code` to an HTML string using the shared singleton highlighter,
- * lazy-loading the language grammar first. Uses `github-light` theme
- * (settings UI is light-theme only).
- *
- * Exposed as a named export so integration tests can spy on it:
- *   `vi.spyOn(shikiAdapter, 'codeToHtml')`
+ * Renders `code` to an HTML string with the shared singleton highlighter,
+ * using `github-light` theme (settings UI is light-theme only). Exposed as a
+ * named export so tests can `vi.spyOn(shikiAdapter, 'codeToHtml')`.
  */
 export async function codeToHtml({ code, lang }: { code: string; lang: string }): Promise<string> {
   return codeToHtmlThemed({ code, lang, theme: "github-light" });

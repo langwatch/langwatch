@@ -58,11 +58,9 @@ export type MailerConfiguration = Readonly<{
 }>;
 
 /**
- * The proxy settings a vendor HTTPS gateway consults.
- *
- * Only vendor HTTPS calls opt in. An SMTP relay is usually an internal host
- * that is reachable directly, so applying a globally-set proxy to it would
- * break working deployments; the SMTP gateway deliberately does not.
+ * The proxy settings a vendor HTTPS gateway consults. Only HTTPS calls opt
+ * in - an SMTP relay is usually reachable directly, so a globally-set proxy
+ * would break working deployments; the SMTP gateway deliberately skips it.
  */
 export type EmailOutboundProxyConfig = Readonly<{
   httpsProxy?: string;
@@ -71,10 +69,9 @@ export type EmailOutboundProxyConfig = Readonly<{
 }>;
 
 /**
- * One outbound email gateway. Implementations receive the already-normalized
- * `EmailContent` plus the resolved default `from`, and are responsible for
- * mapping the shared surface (bcc, reply-to, custom headers, attachments) onto
- * whatever their transport expects.
+ * One outbound email gateway. Implementations receive the normalized
+ * `EmailContent` plus the resolved default `from`, mapping the shared
+ * surface (bcc, reply-to, headers, attachments) onto their own transport.
  */
 export abstract class EmailGateway {
   /** One address or many, as every transport below wants to see them. */
@@ -101,10 +98,9 @@ export abstract class EmailDelivery {
 }
 
 /**
- * Raised when a gateway is selected but cannot be used: an unknown name, or a
- * known one whose credentials are absent. Thrown at send time rather than at
- * import time so a misconfigured mailer never prevents the process from
- * booting.
+ * Raised when a gateway is selected but cannot be used: an unknown name, or
+ * known but missing credentials. Thrown at send time, not import time, so a
+ * misconfigured mailer never prevents the process from booting.
  */
 export class EmailProviderConfigurationError extends Error {
   constructor(message: string) {

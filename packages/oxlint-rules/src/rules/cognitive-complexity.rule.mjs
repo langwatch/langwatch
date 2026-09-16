@@ -80,15 +80,10 @@ function describeConstruct(node) {
 
 export function cognitiveComplexity(functionNode) {
   let score = 0;
-  // Attribution is by the weight of a whole BLOCK, not by the single node
-  // with the largest delta. Those are different questions, and the second
-  // one answers badly: a function whose score is nesting spread over a
-  // dozen constructs has many nodes tied at the top, so "heaviest" became
-  // whichever the walk reached first. That named leaves no one should
-  // extract -- a `spent ? null : approval` ternary carrying 3 of 25 was
-  // reported as the reason for the whole score, while the catch block
-  // carrying 11 went unmentioned. A block is the thing a reader can lift
-  // out, so a block is what gets measured and named.
+  // Attribution is by the weight of a whole BLOCK, not the single node with
+  // the largest delta: "heaviest node" named a 3-of-25 ternary as the whole
+  // score's reason while an 11-point catch block went unmentioned. A block
+  // is the thing a reader can lift out, so a block is what gets measured.
   const blocks = [];
   const open = [];
   const note = (node, delta) => {

@@ -1,9 +1,7 @@
 /**
- * The members a process holds, built from the config that process parsed.
  * Built EAGERLY at boot, not re-derived per use — two constructions of the
  * same client would split one process into duplicate caches and dedup
- * keyspaces. An unconfigured member REFUSES BY NAME; an explicit `undefined`
- * override refuses too (exactOptionalPropertyTypes is off), never a silent omission.
+ * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
 import { createLogger } from "@langwatch/observability";
 import { buildClickHouse } from "./clickhouse-member.ts";
@@ -48,10 +46,9 @@ export class MemberSuppliedUndefinedError extends Error {
 }
 
 /**
- * Where a process's members come from, as the application root reads them.
- *
- * `order` is the construction order, so a root that builds several reads them
- * in an order where nothing is opened under something that is not yet open.
+ * Where a process's members come from. `order` is the construction order,
+ * so a root that builds several reads them in an order where nothing opens
+ * under something not yet open.
  */
 export interface MemberSource<Members> {
   readonly order: readonly (keyof Members & string)[];
@@ -101,10 +98,9 @@ export function createProcessMembers(options: {
   };
 
   /**
-   * The one directory both routed members place a tenant with. Built on the
-   * `prisma` member and never through a peer Api: project's own live tier
-   * reads ClickHouse, so member to Api to repositories back to member is a
-   * cycle.
+   * The one directory both routed members place a tenant with. Built on
+   * `prisma`, never a peer Api — Project's own live tier reads ClickHouse,
+   * so member-to-Api-to-repositories-back-to-member is a cycle.
    */
   let directory: ReturnType<typeof cachedTenantDirectory> | undefined;
   const tenantDirectory = (): ReturnType<typeof cachedTenantDirectory> => {

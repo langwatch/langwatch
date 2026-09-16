@@ -23,10 +23,9 @@ const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
 
 /**
- * The generated protobuf root, through whichever shape the loader hands it in.
  * `.../generated/root` is CommonJS: a bundler's interop shim (Vite) puts the
- * exports on `.default`, but Node's own ESM loader leaves them on the
- * namespace directly — reading `default` first, namespace second, covers both.
+ * exports on `.default`, Node's own ESM loader leaves them on the namespace —
+ * reading `default` first, namespace second, covers both.
  */
 export const otlpProtobufRoot: Record<string, any> =
   (rootModule as { default?: Record<string, any> }).default ??
@@ -45,10 +44,9 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 }
 
 /**
- * The most we will read off the wire, and the most we will hold after
- * decompressing — one number, since a compressed body's expansion ratio is
- * chosen by the sender and cannot be trusted. Applied once, here, because the
- * governance ingest routes carry no `bodyLimit` middleware of their own.
+ * The read cap and the post-decompress cap, as one number — a compressed
+ * body's expansion ratio is chosen by the sender and cannot be trusted.
+ * Applied here because the governance ingest routes carry no `bodyLimit`.
  */
 export const OTLP_MAX_BODY_BYTES = 10 * 1024 * 1024;
 
@@ -80,10 +78,8 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
 }
 
 /**
- * Release the reader without letting it throw: a torn-down stream's
- * `releaseLock()` can throw from a `finally` block, and that REPLACES the
- * real error already on its way out — the failure that matters was already
- * raised, so nothing here is worth reporting.
+ * Swallows the throw: a torn-down stream's `releaseLock()` can throw from a
+ * `finally` block, which would REPLACE the real error already on its way out.
  */
 function releaseQuietly(reader: { releaseLock: () => void }): void {
   try {
@@ -161,12 +157,9 @@ async function readWireBody(req: Request): Promise<Buffer> {
 }
 
 /**
- * Read the request body, decompressing per `Content-Encoding`.
- *
- * Throws on unsupported encodings, and on a body that passes
- * {@link OTLP_MAX_BODY_BYTES} either on the wire or on expanding — the caller
- * decides how to respond. Decompression is bounded by zlib itself, so an
- * oversized body stops being written the moment it crosses the line.
+ * Reads the request body, decompressing per `Content-Encoding`. Throws on
+ * unsupported encodings or a body over {@link OTLP_MAX_BODY_BYTES} — bounded
+ * by zlib itself, so an oversized body stops being written past the line.
  */
 export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
   const encoding = req.headers.get("content-encoding");
@@ -206,10 +199,9 @@ export async function readOtlpBody(req: Request): Promise<ArrayBuffer> {
 export type OtlpParseResult<T> = { ok: true; request: T } | { ok: false; error: string };
 
 /**
- * Parse an OTLP/HTTP traces export request from a decompressed body.
- * Accepts protobuf (default) or JSON (when Content-Type is
- * `application/json`). Falls back to JSON-then-protobuf-encode for
- * misconfigured callers — same fallback /v1/traces uses today.
+ * Parses an OTLP/HTTP traces export request. Accepts protobuf (default) or
+ * JSON (Content-Type `application/json`), falling back to JSON-then-protobuf
+ * for misconfigured callers, matching /v1/traces.
  */
 export function parseOtlpTraces(
   body: ArrayBuffer,
@@ -258,12 +250,10 @@ function parseWithFallback<T>(
     }
     return { ok: true, request };
   } catch (firstErr) {
-    // JSON-then-protobuf-encode fallback (mirrors hardened /v1/traces
-    // path): some clients send JSON without setting Content-Type, or
-    // send protobuf-shaped bytes with `application/json`. Re-encoding
-    // through the protobuf type both validates the structure and
-    // normalises any wire-format quirks before downstream consumers
-    // see it.
+    // JSON-then-protobuf-encode fallback (mirrors hardened /v1/traces path):
+    // some clients send JSON without Content-Type, or protobuf-shaped bytes
+    // with `application/json`. Re-encoding validates structure and
+    // normalises wire-format quirks before downstream consumers see it.
     try {
       const json = JSON.parse(Buffer.from(body).toString("utf-8")) as T;
       request = protoType.decode(new Uint8Array(protoType.encode(json).finish()));
@@ -290,10 +280,9 @@ function parseWithFallback<T>(
 const MAX_FAILURE_DETAIL = 120;
 
 /**
- * The whole reported failure is bounded here rather than left to add up from
- * the parts. Two details and a byte count already sum to within a few
- * characters of this, so the guarantee is stated once instead of re-derived
- * every time one of the pieces changes width.
+ * Bounded here rather than left to add up from the parts: two details and a
+ * byte count already sum close to this, so the guarantee is stated once
+ * instead of re-derived whenever a piece changes width.
  */
 const MAX_FAILURE_MESSAGE = 300;
 

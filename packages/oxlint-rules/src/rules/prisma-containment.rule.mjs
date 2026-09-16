@@ -16,11 +16,9 @@ const REPOSITORY_RUNTIME_HELPERS = new Set([
 const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
 /**
- * The package a file belongs to, for the boundary rules that ask what kind
- * of package they are standing in. `relative` is deliberately unprefixed
- * (unlike `classify`'s feature-package `relative`, which keeps `src/`), since
- * the composition-seam checks below match against `*.composition.ts` and
- * `platform/infrastructure/` at the package root.
+ * The package a file belongs to, for boundary rules asking what kind of
+ * package they stand in. `relative` is unprefixed, unlike `classify`'s own
+ * (keeps `src/`), matching `*.composition.ts` at the package root.
  */
 function prismaPackageOf(workspacePath) {
   const feature = workspacePath.match(
@@ -99,12 +97,9 @@ function quoted(names) {
 }
 
 /**
- * Names the bindings this import brought in that are not allowed here, and
- * the one imperative that fixes them: repository runtime helpers need the
- * repository/registry seam, repository client types need `import type` at
- * that same seam, and everything else (a connection or lifecycle symbol)
- * needs to stay a type import with the instance taken from the composition
- * root.
+ * Names the disallowed bindings and the fix for each: repository runtime
+ * helpers need the repository/registry seam, client types need `import type`
+ * there, everything else stays a type import backed by the composition root.
  */
 function describeFeaturePrismaViolation(node, importKind, adapter, registry) {
   const bindings = node.specifiers ?? [];

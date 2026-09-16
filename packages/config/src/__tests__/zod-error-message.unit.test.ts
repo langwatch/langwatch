@@ -4,8 +4,7 @@ import { zodErrorMessage } from "../zod-error-message.ts";
 
 /**
  * Spec: specs/api-reference/tracked-event-validation.feature
- *
- * A formatter must never throw from inside the catch block that is turning a
+ * A formatter must never throw from inside the catch block turning a
  * malformed predefined event into a useful 400 response.
  */
 

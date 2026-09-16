@@ -2,11 +2,9 @@ import { z } from "zod";
 import { fromError } from "zod-validation-error";
 
 /**
- * A readable validation message for a Zod 4 error.
- *
- * `z.prettifyError` is not enough on its own: for a union it renders
- * "✖ Invalid input" and drops the branch issues, so the reader never learns
- * which field was wrong. Union branches are flattened instead.
+ * A readable validation message for a Zod 4 error. `z.prettifyError` alone
+ * renders a union as "✖ Invalid input", dropping which branch failed - so
+ * union branches are flattened instead.
  */
 export function zodErrorMessage(error: unknown): string {
   if (error instanceof z.ZodError) {

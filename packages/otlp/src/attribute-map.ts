@@ -1,10 +1,9 @@
 import { otlpKeyValueSchema, type OtlpAnyValue } from "./any-value.ts";
 
 /**
- * The one value an `AnyValue` carries, read in oneof field order — the schema doesn't enforce
- * exclusivity, so order decides a payload setting more than one field, matching the collector.
- * `{low, high}` reassembles as a signed 64-bit int with `low` masked to 32 bits before the OR,
- * since it arrives signed and a `low` above 2^31 would otherwise corrupt the high half.
+ * Reads `AnyValue` in oneof field order — order decides a payload setting
+ * more than one field, matching the collector. `low` is masked to 32 bits
+ * before OR-ing into `high`, since it arrives signed and would else corrupt it.
  */
 export function otlpScalarValue(
   value: OtlpAnyValue,
@@ -42,10 +41,9 @@ export function otlpScalarValue(
 }
 
 /**
- * Flattens one `AnyValue` into `output`, keyed by its dotted path — `.` separates both kvlist
- * keys and array indices, so `{ a: { b: [1, 2] } }` becomes `a.b.0` and `a.b.1`. An array whose
- * items are all scalars never reaches this branch: {@link otlpScalarValue} already turns it into
- * one JSON string, so only a MIXED array — objects among the scalars — is indexed out here.
+ * Flattens one `AnyValue` into `output`, keyed by dotted path (`.` separates
+ * kvlist keys and array indices). Only a MIXED array reaches here — a scalar
+ * array already became one JSON string via {@link otlpScalarValue}.
  */
 function flatten(value: OtlpAnyValue, prefix: string, output: Record<string, unknown>): void {
   const primitive = otlpScalarValue(value);

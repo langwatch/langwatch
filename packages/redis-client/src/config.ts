@@ -1,10 +1,7 @@
 /**
- * Configuration resolution for the Redis client. `RedisConfigService` is the pure core of this
- * package, in the same sense as `AuthzEngine` in `@langwatch/authz`: every method is a function
- * of its arguments alone, so one instance serves any number of callers and tests construct it
- * freely. It never reads `process.env` — the composition root already validates env once, and
- * ambient state is what made the old module-level connection unloadable in a build, a test, or
- * a browser bundle. See ADR-093.
+ * `RedisConfigService` is a pure core, like `AuthzEngine` in `@langwatch/authz`: it never reads
+ * `process.env` itself, since ambient state made the old module-level connection unloadable in a
+ * build, test, or browser bundle. See ADR-093.
  */
 
 /** The raw, unparsed environment values this package understands. */
@@ -59,11 +56,9 @@ const DEFAULT_REDIS_PORT = 6379;
 const VALID_DB_INDEX = /^(?:[0-9]|1[0-5])$/;
 
 /**
- * Parses a database index into a validated 0-15 integer.
- *
- * Returns 0 for anything unset, malformed, or out of range — this is a dev
- * affordance (`pnpm dev` at PORT=5570 lands on DB 1, keeping worktrees off each
- * other's GroupQueue streams), not a hard config, so it never throws.
+ * Returns 0 for anything unset, malformed, or out of range — a dev affordance
+ * (`pnpm dev` at PORT=5570 lands on DB 1, keeping worktrees off each other's
+ * GroupQueue streams), not a hard config, so it never throws.
  */
 function parseDbIndex(raw: string | number | undefined): number {
   if (raw === void 0 || raw === "") return 0;
@@ -100,18 +95,15 @@ function resolveTls(url: string): RedisTlsSetting {
 }
 
 /**
- * Decides how — and whether — to connect, from a supplied environment.
- *
- * Stateless and pure by construction: `RedisConnectionService` composes one of
- * these rather than resolving configuration itself, so the decision is testable
- * without ever building a client.
+ * Decides how — and whether — to connect. Stateless and pure by construction:
+ * `RedisConnectionService` composes one of these rather than resolving
+ * configuration itself, so the decision is testable without a client.
  */
 export class RedisConfigService {
   /**
-   * Resolves the environment into a connection plan. Cluster endpoints win over a plain URL when
-   * both are set: a clustered deployment normally sets only `REDIS_CLUSTER_ENDPOINTS`, so "both"
-   * is the ambiguous case, and there the endpoint list is the more specific statement of intent
-   * while the leftover URL may well name a different server.
+   * Cluster endpoints win over a plain URL when both are set: a clustered
+   * deployment normally sets only `REDIS_CLUSTER_ENDPOINTS`, so "both" is the
+   * ambiguous case and the endpoint list is the more specific intent.
    */
   resolve(env: RedisEnvironment): RedisConfigResolution {
     const warnings: string[] = [];
@@ -152,11 +144,9 @@ export class RedisConfigService {
   }
 
   /**
-   * Whether this environment wants Redis at all.
-   *
-   * For callers that must decide their shape before a connection exists —
-   * better-auth picks its session-storage strategy at module scope — this
-   * answers the configuration question without needing a live client.
+   * Whether this environment wants Redis, for callers that must decide their
+   * shape before a connection exists — better-auth picks its session-storage
+   * strategy at module scope.
    */
   isConfigured(env: RedisEnvironment): boolean {
     return this.resolve(env).configured;

@@ -1,10 +1,7 @@
 /**
  * Blob storage as ONE client that routes itself: every call names the
- * project whose object it is, and this member resolves bucket, endpoint and
- * credentials from it. No `forProject` hands out a client, since a held
- * client is a client used for the wrong project one call later. A project
- * this deployment cannot place is refused, never defaulted to the shared
- * bucket — the exact failure this routing exists to prevent.
+ * project, resolving bucket, endpoint and credentials from it. No
+ * `forProject` handout, and an unplaceable project is refused, never defaulted.
  */
 import {
   DeleteObjectCommand,

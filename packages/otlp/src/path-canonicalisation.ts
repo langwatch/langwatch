@@ -33,11 +33,9 @@ export function canonicalOtlpPath(pathname: string): string | null {
 export const OTLP_CORRECTED_PATH_HEADER = "x-langwatch-otlp-corrected-path";
 
 /**
- * A corrected request is replayed through the canonical route as a new HTTP
- * request, so the original path can only travel with it as a header — and a
- * header is something the customer can send too. The value is prefixed with a
- * per-process secret so the receiver can tell its own replay from a caller
- * claiming one, and never reports a correction that did not happen.
+ * A corrected request replays as a new HTTP request, carrying the original
+ * path only as a header — which a customer could also send. Prefixed with a
+ * per-process secret so the receiver can tell its own replay from a forgery.
  */
 const CORRECTION_SECRET = randomUUID();
 

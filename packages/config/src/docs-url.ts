@@ -23,10 +23,9 @@ const PRODUCTION_RUNTIME: DocsRuntime = { mode: "production" };
 let installedRuntime: DocsRuntime = PRODUCTION_RUNTIME;
 
 /**
- * Tells this module which deployment it is resolving links for.
- *
- * Called by the application composition root, which is the one place that has
- * both the parsed public configuration and the document it came from.
+ * Tells this module which deployment it is resolving links for. Called by the
+ * application composition root, the one place holding both the parsed public
+ * configuration and the document it came from.
  */
 export function configureDocsRuntime(runtime: DocsRuntime): void {
   installedRuntime = runtime;
@@ -38,10 +37,8 @@ export function currentDocsRuntime(): DocsRuntime {
 }
 
 /**
- * The docs base URL for an explicitly named runtime.
- *
- * Pure: every branch is decided by the argument, so a test drives it by input
- * rather than by arranging a global.
+ * The docs base URL for an explicitly named runtime. Pure: every branch is
+ * decided by the argument, so a test drives it by input, not a global.
  */
 export function resolveDocsBaseUrl({ mode, hostname }: DocsRuntime): string {
   if (mode === "development" && hostname && LOCAL_HOSTS.has(hostname)) {
@@ -56,11 +53,9 @@ export function docsBaseUrl(): string {
 }
 
 /**
- * The canonical docs base URL, whatever runtime is asking.
- *
- * Named rather than spelled as a constant at the call site so the allowlist in
- * `read-handled-error` stays derived from the module that BUILDS docs links,
- * and cannot drift from what the server actually sends.
+ * The canonical docs base URL, whatever runtime is asking. Named rather than
+ * inlined at the call site so the allowlist in `read-handled-error` stays
+ * derived from the module that BUILDS docs links, never drifting from it.
  */
 export function canonicalDocsBaseUrl(): string {
   return resolveDocsBaseUrl({ mode: "production", hostname: "app.langwatch.ai" });

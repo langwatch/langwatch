@@ -1,15 +1,7 @@
 /**
- * The local workspace tools: `code_access` and the seven `local_*` mirrors of
- * pi's built-ins (ADR-129).
- *
- * A `local_*` call does not run in the worker. It is posted to the app, which
- * hands it to `langwatch langy --share-control` on the developer's machine and
- * gives the answer back on a long poll. The parameter names mirror the
- * built-in each tool stands in for, so the model keeps one habit.
- *
- * The worker's stderr goes to /dev/null (the manager sets cmd.Stderr = nil), so
- * a tool cannot log. Everything the model or the user must know travels in the
- * tool result.
+ * The local workspace tools: `code_access` and the `local_*` mirrors of pi's
+ * built-ins (ADR-129), posted to the app and answered via long poll from
+ * `langwatch langy --share-control`; stderr is /dev/null, so results carry everything.
  */
 
 import { Type } from "typebox";
@@ -45,10 +37,9 @@ const MAX_POLL_FAILURES = 3;
 const CALL_MAX_WAIT_MS = 20 * 60 * 1000;
 
 /**
- * What the model reads when the folder is not there.
- *
- * It names both ways on, because a reply that only reports the folder is gone
- * leaves the user with nothing to do next.
+ * What the model reads when the folder is not there. Names both ways on,
+ * since a reply reporting only that the folder is gone leaves the user with
+ * nothing to do next.
  */
 export const OFFLINE_PUSHBACK = [
   "The shared folder is not connected any more, so this call did not run.",
@@ -60,12 +51,8 @@ export const OFFLINE_PUSHBACK = [
 
 /**
  * What the model reads when LangWatch lost the call and the folder is still
- * there.
- *
- * A poll that answers "not found" says the app dropped the envelope, which is
- * a different thing from the machine going away. Sending the user to share
- * their folder again, while their command line sits connected, is advice they
- * cannot act on.
+ * there. "Not found" is the app dropping the envelope, not the machine going
+ * away - telling the user to re-share a still-connected folder is useless.
  */
 export const CALL_LOST_PUSHBACK = [
   "LangWatch lost this call, so it did not run. The shared folder is still connected.",
@@ -130,11 +117,9 @@ type CreateControlRequestResponse = {
 export class AppUnreachableError extends Error {}
 
 /**
- * The app answered, and it does not hold this call any more.
- *
- * A subclass of the one above, so every existing catch still reads it as a
- * call that did not run; the tools that can act on the difference test for
- * this one first.
+ * The app answered, and it does not hold this call any more. A subclass of
+ * the one above, so every existing catch still reads it as a call that did
+ * not run; tools that can act on the difference test for this one first.
  */
 export class CallLostError extends AppUnreachableError {}
 
@@ -283,11 +268,9 @@ async function isWorkspaceConnected({
 }
 
 /**
- * What a local call that did not run tells the model.
- *
- * The folder going away and the app losing the call are different things, and
- * only the first one is fixed by sharing the folder again, so the folder's own
- * state is read before either is said.
+ * What a local call that did not run tells the model. The folder going away
+ * and the app losing the call are different things - only the first is fixed
+ * by re-sharing, so the folder's own state is read before either is said.
  */
 export async function localCallPushback({
   signal,

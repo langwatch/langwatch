@@ -1,10 +1,7 @@
 /**
- * The fourteen members a process hands its modules, and the vocabulary of
- * each. The list is closed on purpose: an open one is the optional
- * collaborator production forgets to supply. A peer never travels through
- * here, which is why `audit` is not on it — the real sink is resolved as a
- * peer via `withAudit`. This file names no vendor SDK, so importing it for
- * types pulls in no client library; the root export carries the clients.
+ * The fourteen members a process hands its modules. Closed on purpose — an
+ * open list is the optional collaborator production forgets to supply.
+ * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -38,10 +35,9 @@ export interface StoredObject {
 }
 
 /**
- * Which project's object this is. Every call names one, because the member
- * resolves the bucket, the endpoint and the credentials from it: a caller
- * cannot obtain a client that addresses no project, and therefore cannot
- * address another project's bucket by holding on to the wrong one.
+ * Which project's object this is. Every call names one, since the member
+ * resolves bucket, endpoint and credentials from it — no client can be held
+ * and reused against the wrong project.
  */
 export interface StoredObjectAddress {
   readonly projectId: string;
@@ -106,12 +102,9 @@ export interface Telemetry {
 }
 
 /**
- * What the process hands a module, one record, fourteen keys.
- *
- * `clickhouse` and `objectStorage` are each ONE client that routes internally:
- * neither is a resolver a caller calls with a tenant or a project id, so
- * "every statement names its tenant" and "every object names its project" are
- * structural rather than rules a reader has to remember.
+ * What the process hands a module: one record, fourteen keys. `clickhouse`
+ * and `objectStorage` are each ONE client that routes internally, so "every
+ * statement names its tenant" is structural, not a rule to remember.
  */
 export interface ProcessMembers {
   readonly prisma: PrismaClient;
@@ -134,12 +127,9 @@ export interface ProcessMembers {
 export type MemberName = keyof ProcessMembers;
 
 /**
- * Every member name, in construction order.
- *
- * The order is load-bearing and is asserted by this package's tests: `prisma`
- * comes before `clickhouse` and `objectStorage` because both route on a
- * directory read through it, and `redis` comes before the three members built
- * over it, so no member is ever constructed under something not yet open.
+ * Every member name, in construction order - load-bearing, and asserted by
+ * this package's tests: `prisma` precedes `clickhouse`/`objectStorage` (both
+ * route through its directory read), `redis` precedes what's built over it.
  */
 export const MEMBER_NAMES = [
   "logger",
@@ -159,10 +149,9 @@ export const MEMBER_NAMES = [
 ] as const satisfies readonly MemberName[];
 
 /**
- * What a module says it reads, in one line: `static readonly reads =
- * reads("clock", "logger")`. The tuple is the type's source as well as
- * boot's, so a wrong name fails as `'"clcok"' is not assignable to
- * 'MemberName'` on the line the author wrote.
+ * What a module says it reads: `static readonly reads = reads("clock", "logger")`.
+ * The tuple is the type's source too, so a wrong name fails on the line
+ * the author wrote.
  */
 export function reads<const Names extends readonly MemberName[]>(...names: Names): Names {
   return names;

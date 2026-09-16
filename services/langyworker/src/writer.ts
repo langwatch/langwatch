@@ -1,7 +1,6 @@
 /**
- * The single ordered protocol writer. Every protocol line goes through one
- * instance of this class, which serializes writes through a promise chain and
- * resolves each write only when the stream's write callback fires (data handed
+ * The single ordered protocol writer: every line serializes through a promise
+ * chain and resolves only when the stream's write callback fires (data handed
  * to the OS pipe), so a flushed terminal line can never be lost on exit.
  */
 

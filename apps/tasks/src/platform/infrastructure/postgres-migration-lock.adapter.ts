@@ -16,11 +16,9 @@ function borrowClient(pool: PrismaDriverAdapter["pool"]) {
 type PoolClient = Awaited<ReturnType<typeof borrowClient>>;
 
 /**
- * `pg_advisory_lock` is session-scoped, so the connection that takes it must
- * be the connection that holds it and the one that gives it back. This adapter
- * owns a pool of its own for exactly that reason: a client borrowed from the
- * application's pool would be handed back to somebody else mid-migration, and
- * the lock would travel with it.
+ * `pg_advisory_lock` is session-scoped: the connection that takes it must be
+ * the one that gives it back. This adapter owns its own pool for that reason -
+ * a client borrowed from the application's pool could travel with it mid-migration.
  */
 export class PostgresMigrationLockAdapter extends MigrationLock {
   private connection: { adapter: PrismaDriverAdapter; client: PoolClient } | undefined;

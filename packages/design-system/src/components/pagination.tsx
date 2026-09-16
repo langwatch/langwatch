@@ -30,10 +30,8 @@ export interface PaginationProps {
   /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
   unitLabel?: string;
   /**
-   * Rows actually rendered on this page. Given, the range copy ends where the
-   * data ends rather than where a full page would; omitted or zero (a count
-   * nobody has taken yet), a full page is assumed and the range is capped by
-   * the total.
+   * Rows actually rendered on this page. Given, the range copy ends where
+   * the data ends; omitted or zero, a full page is assumed, capped by total.
    */
   visibleCount?: number;
   /**

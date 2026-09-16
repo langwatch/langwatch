@@ -1,25 +1,7 @@
 /**
- * Per-turn system prompt composition: persona + the turn's `system` block +
- * AGENTS.md, in that order. AGENTS.md goes LAST on purpose: its Replies rules
- * sit at the file's end, and the model weighs the end of the system prompt the
- * most. Instructions files append after the per-message system block, which
- * is the layout the reply-style suite was
- * tuned green against; with AGENTS.md mid-prompt the model slid back to
- * closing replies with next-action menus. Both blocks are byte-stable across
- * a conversation's turns, so the order does not affect provider prompt
- * caching.
- *
- * Mechanism (measured against pi 0.84.2 internals, verified against captured
- * provider requests): direct assignment to `session.agent.state.systemPrompt`
- * does NOT survive a prompt: `AgentSession.prompt()` resets it to the base
- * prompt on every call unless an extension's `before_agent_start` handler
- * returns `{ systemPrompt }` ("Replace the system prompt for this turn", the
- * documented extension contract). So the wrapper registers a tiny inline
- * extension whose handler returns the current composition from a mutable
- * holder (see session.ts); the runner updates the holder before each prompt.
- * Cheapest correct option: no resource loader reload, no session recreation.
- * The DefaultResourceLoader's `systemPromptOverride` seeds the same
- * composition at construction so pi's default coding prompt is never active.
+ * Per-turn system prompt: persona + turn `system` block + AGENTS.md last,
+ * since the model weighs the prompt's end most. Direct assignment does NOT
+ * survive `prompt()`; a `before_agent_start` handler returns it from a holder instead.
  */
 
 export type SystemPromptParts = {

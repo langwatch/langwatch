@@ -1,10 +1,7 @@
 /**
  * Maps pi's native session events onto the wire protocol, tagged with the
- * turn's id. Payload shapes pass through pi's documented fields verbatim
- * (`toolCallId` -> `id`, `toolName` -> `name`, `args` -> `input`), bounded per
- * PROTOCOL.md. One mapper instance lives per turn; it also replays the
- * recorded `tool_start` input on `tool_end` (pi's end event does not carry
- * args) and mirrors successful `todowrite` calls as `plan` snapshots.
+ * turn's id, bounded per PROTOCOL.md. Replays `tool_start` input on
+ * `tool_end` (pi's end event omits it); mirrors `todowrite` as `plan`.
  */
 
 import { closeSync, fstatSync, openSync, readSync } from "node:fs";
@@ -38,13 +35,9 @@ export function contentText(result: unknown): string {
 const MAX_RECOVERED_OUTPUT_BYTES = 1024 * 1024;
 
 /**
- * The frame's output for a settled tool: pi's bash tool truncates big output
- * to its TAIL and saves the full text to a file named in the result's
- * details. A tail cut removes the head of a JSON document, which is where its
- * structure lives, so the manager's structural reduction (built to keep ids,
- * counts and pagination under its own budget) would be left reducing a
- * fragment. Recover the saved file for the frame; the model's own context
- * keeps pi's truncated view.
+ * pi's bash tool truncates big output to its TAIL and saves the full text to
+ * a file. A tail cut removes a JSON document's head, so the frame recovers
+ * the saved file instead; the model's own context keeps pi's truncated view.
  */
 export function settledToolOutput(result: unknown): string {
   const text = contentText(result);

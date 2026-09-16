@@ -1,9 +1,7 @@
 /**
  * The one place a URL-addressed drawer is mounted, resolved through the
- * host's registry with the drawer's props (query params, in-memory complex
- * props, flow callbacks). The reader's restriction check collapses into one
- * optional `restriction` prop from the host — neither policy module has a
- * package export, and both are the HOST's policy, not the framework's.
+ * host's registry with its props (query params, complex props, flow
+ * callbacks). Restriction collapses into one `restriction` prop from the host.
  */
 
 import { Center, Spinner } from "@chakra-ui/react";
@@ -23,10 +21,9 @@ import type { UiDrawerRegistry } from "../../model/drawer-registry.ts";
 import { URL_QS_PARSE_OPTIONS } from "../../model/qs-parse-options.ts";
 
 /**
- * The host's rule about who may open what.
- *
- * `blocks` answers with the restricted RESOURCE — the word the host's own
- * upsell names — or `undefined` when the drawer is open to this reader.
+ * The host's rule about who may open what. `blocks` answers with the
+ * restricted RESOURCE — the host's own upsell word — or `undefined` when
+ * the drawer is open to this reader.
  */
 export type CurrentDrawerRestriction = {
   blocks: (drawer: string) => string | undefined;
@@ -43,10 +40,9 @@ export type CurrentDrawerProps = {
   marginTop?: number;
   restriction?: CurrentDrawerRestriction;
   /**
-   * Whether this is a development build, as the host's injected page config
-   * reads it — this package cannot ask (`ui-host` depends on it), so the
-   * shell that mounts the drawer answers. Absent means production: the
-   * duplicate-drawer warning stays off.
+   * Whether this is a development build - this package cannot ask
+   * (`ui-host` depends on it), so the mounting shell answers. Absent means
+   * production: the duplicate-drawer warning stays off.
    */
   isDevelopment?: boolean;
 };
@@ -59,12 +55,9 @@ export function CurrentDrawer({
 }: CurrentDrawerProps) {
   const router = useDrawerRouter();
   // Re-render when complexProps changes without a URL change (e.g. reload
-  // re-hydration of a comparison editor's context) so the getComplexProps()
-  // read below picks the new value up. Only setComplexProps notifies this
-  // subscription — setFlowCallbacks deliberately does not (see its own
-  // comment) — but callers pair a setFlowCallbacks with a following
-  // setComplexProps on the same re-hydration path, so the getFlowCallbacks()
-  // read below still picks up fresh callbacks on the render that triggers.
+  // re-hydration) so getComplexProps() below picks up the new value. Only
+  // setComplexProps notifies this subscription; callers pair it with a
+  // setFlowCallbacks so getFlowCallbacks() also sees fresh values.
   useSyncExternalStore(subscribeDrawerProps, getDrawerPropsVersion, getDrawerPropsVersion);
   const queryString = router.asPath.split("?")[1] ?? "";
   // qs.parse + the `drawer.*` slice is recomputed on every render otherwise,

@@ -3,9 +3,8 @@ import type { MigrationLock } from "./migration-lock.port.ts";
 
 /**
  * The tasks that change a schema, and so must not run beside a copy of
- * themselves. Everything else in the catalogue is a backfill or a report: it
- * takes its own locks if it needs one, and waiting on the migration mutex
- * would only make a long job block a deploy.
+ * themselves. Everything else takes its own locks if it needs one - waiting
+ * on the migration mutex would only make a long job block a deploy.
  */
 export const MIGRATION_TASK_NAMES: readonly string[] = [
   "prisma-migrate",
@@ -18,10 +17,9 @@ export function isMigrationTask(name: string): boolean {
 }
 
 /**
- * Runs the migration step with the lock held, and says one thing about it:
- * that it is waiting, and only when it actually had to wait. A run that takes
- * the lock straight away is silent, because "took a lock nobody wanted" is
- * not news.
+ * Runs the migration step with the lock held, and says one thing: that it is
+ * waiting, only when it actually had to. Taking the lock straight away is
+ * silent - "took a lock nobody wanted" is not news.
  */
 export class MigrationLockService {
   private constructor(

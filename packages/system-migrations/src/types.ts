@@ -6,10 +6,9 @@
 export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolled_back";
 
 /**
- * The two terminal states the runner never re-runs: `finalized` is the
- * one-way latch and `rolled_back` is the operator's pin. One predicate, so
- * the runner and any harness composing a pass around the same state table
- * can never drift onto different skip rules.
+ * The two terminal states the runner never re-runs: `finalized`, the one-way
+ * latch, and `rolled_back`, the operator's pin. One predicate so no harness
+ * composing a pass drifts onto a different skip rule.
  */
 export function isTerminalTenantStatus(status: TenantMigrationStatus | undefined): boolean {
   return status === "finalized" || status === "rolled_back";

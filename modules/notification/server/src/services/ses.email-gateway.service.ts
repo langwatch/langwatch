@@ -15,11 +15,9 @@ import { EmailMimeService } from "./email-mime.service.ts";
 const logger = createLogger("langwatch:mailer:ses");
 
 /**
- * The process-owned AWS transport, as this gateway needs to see it.
- *
- * Not a `*Port` abstract class on purpose: what a composition root already
- * holds is `AwsClientProcessRuntime`, whose `build` returns exactly this, so
- * demanding a subclass here would make every root wrap the object it has.
+ * The process-owned AWS transport, as this gateway needs to see it. Not a
+ * `*Port` abstract class: a composition root already holds
+ * `AwsClientProcessRuntime`, whose `build` returns exactly this.
  */
 export interface SesAwsClientConfiguration {
   build(input: { region?: string; targetHost: string; endpoint?: string }): SESClientConfig;

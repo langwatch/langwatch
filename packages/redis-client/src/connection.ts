@@ -1,9 +1,7 @@
 /**
- * Building Redis connections — the only place in the platform that constructs
- * an ioredis client. `RedisConnectionService` composes a `RedisConfigService`
- * and holds the logger for the connections it builds. Importing this module
- * creates nothing: a connection exists only because a method was called
- * (ADR-093).
+ * The only place in the platform that constructs an ioredis client. Importing
+ * this module creates nothing: a connection exists only because a method was
+ * called (ADR-093).
  */
 import IORedis, { Cluster, type Redis } from "ioredis";
 import {
@@ -22,12 +20,9 @@ export interface RedisConnectionServiceOptions {
 }
 
 /**
- * ioredis options shared by both modes. `maxRetriesPerRequest: null` is
- * required by BullMQ-style blocking commands and the GroupQueue dispatcher: a
- * blocking read must not be failed by a retry budget. Deliberately no
- * offline-queue option: `offlineQueue: false` from the callers this package
- * replaces never worked (the real option is `enableOfflineQueue`), and turning
- * it off for real is a behaviour change that needs its own sequenced work.
+ * `maxRetriesPerRequest: null` is required by BullMQ-style blocking commands and
+ * the GroupQueue dispatcher. `offlineQueue: false` never worked (real option is
+ * `enableOfflineQueue`); turning it off for real needs its own sequenced work.
  */
 const SHARED_OPTIONS = {
   maxRetriesPerRequest: null,
@@ -43,23 +38,16 @@ export class RedisConnectionService {
   }
 
   /**
-   * Creates the connection this environment asks for, or `null` when it asks
-   * for none.
-   *
    * `null` is a supported, first-class outcome: deployments and test runs
-   * without Redis are normal, and consumers branch on it to take a documented
-   * fallback.
+   * without Redis are normal, and consumers branch on it for a fallback.
    */
   connect(env: RedisEnvironment): RedisConnection | null {
     return this.connectResolved({ config: this.config.resolve(env) });
   }
 
   /**
-   * Builds a connection from an already-resolved configuration.
-   *
-   * Separate from {@link connect} so a caller that has resolved config for its
-   * own reasons — to log the mode, or to decide a code path — does not resolve
-   * it twice.
+   * Separate from {@link connect} so a caller that resolved config for its own
+   * reasons — to log the mode, or decide a code path — does not resolve twice.
    */
   connectResolved({ config }: { config: RedisConfigResolution }): RedisConnection | null {
     for (const warning of config.warnings) this.logger?.warn({}, warning);
@@ -83,11 +71,9 @@ export class RedisConnectionService {
   }
 
   /**
-   * Creates a standalone connection from a URL, typed as one. `null` when no
-   * URL is supplied. Some callers need a standalone client specifically —
-   * replay and the Redis-cached fold store run multi-key operations that Redis
-   * Cluster rejects with CROSSSLOT — which is what makes the return type
-   * `Redis` rather than `RedisConnection`.
+   * `null` when no URL is supplied. Typed `Redis`, not `RedisConnection`,
+   * because replay and the Redis-cached fold store run multi-key operations
+   * that Redis Cluster rejects with CROSSSLOT.
    */
   connectStandalone({
     url,

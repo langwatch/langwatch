@@ -1,10 +1,7 @@
 /**
- * The members a process hands its modules, and the one function that builds
- * them from the config that process parsed.
- *
- * There is no pool noun here on purpose. A module names the members it reads
- * with {@link reads} and is handed exactly those; that a record of them exists
- * at all is this package's business and no module's.
+ * The members a process hands its modules, and the function that builds them
+ * from parsed config. No pool noun on purpose: a module names the members it
+ * reads with {@link reads} and is handed exactly those.
  */
 export {
   MEMBER_NAMES,

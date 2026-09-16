@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Single shared duration for the transient "copied ✓" confirmation across
- * every copy button in traces-v2. Previously each site hard-coded its own
- * value (1200 / 1500 / 2000ms), so the feedback flickered for a different
- * length depending on which button you clicked. Consolidated to 1500ms.
+ * Single shared duration for the "copied ✓" confirmation across every copy
+ * button in traces-v2. Each site previously hard-coded its own value
+ * (1200/1500/2000ms), flickering differently per button. Consolidated.
  */
 export const COPY_FEEDBACK_MS = 1500;
 

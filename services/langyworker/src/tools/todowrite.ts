@@ -1,10 +1,7 @@
 /**
- * The `todowrite` tool: the plan channel. It takes the wrapper shape
- * ({ todos: [{content, status}] }; a bare array is tolerated)
- * because the panel checklist and the X/Y progress protocol depend
- * on that shape, but built on pi's official extension pattern
- * (pi.registerTool + session-entry state reconstruction, adapted from
- * examples/extensions/todo.ts).
+ * The `todowrite` tool: the plan channel. Takes the wrapper shape
+ * (`{ todos: [{content, status}] }`, a bare array tolerated) - built on pi's
+ * official extension pattern (examples/extensions/todo.ts).
  */
 
 import { Type } from "typebox";
@@ -34,18 +31,9 @@ const todowriteParams = Type.Object({
 });
 
 /**
- * Every status word that means one of the four this tool promised.
- *
- * The status is a free string, so a model that writes "done", "Completed" or
- * "in-progress" instead used to have every one of its steps recorded as
- * `pending`, and the panel's checklist then read "0 of 5 done" for a turn in
- * which all five steps had finished. The word is lower-cased, and spaces and
- * dashes fold to `_`, before the lookup.
- *
- * Kept identical to `normalisePlanStatus` in the panel
- * (platform/app/src/features/langy/logic/langyPlan.ts). This package compiles
- * to its own binary and does not depend on the app's workspace packages, so
- * the two copies are pinned by tests on both sides rather than shared.
+ * Every status word meaning one of the four this tool promised - free
+ * strings like "Completed" used to silently record as `pending`. Kept
+ * identical to `normalisePlanStatus` in the panel; pinned by tests, not shared.
  */
 const TODO_STATUS_BY_WORD: Record<string, TodoStatus> = {
   pending: "pending",

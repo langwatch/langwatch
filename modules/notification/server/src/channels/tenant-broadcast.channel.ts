@@ -5,12 +5,9 @@
  */
 
 /**
- * Every channel a tenant subscription listens on.
- *
- * The list is the application's `BroadcastEventType`, member for member. A
- * member that exists here and not there publishes into a channel with no
- * subscriber; one that exists there and not here is simply unreachable from a
- * background process.
+ * Every channel a tenant subscription listens on - the application's
+ * `BroadcastEventType`, member for member. A member here and not there
+ * publishes with no subscriber; there and not here is unreachable.
  */
 export const TENANT_BROADCAST_EVENT_TYPES = [
   "trace_updated",
@@ -36,11 +33,9 @@ export type TenantBroadcastMessage = {
 };
 
 /**
- * The one Redis operation this capability performs.
- *
- * Structural rather than an ioredis import: a `Redis` and a `Cluster` both
- * satisfy it, and so does a fake, which is what lets the twin test read the
- * exact bytes that would have gone on the wire.
+ * The one Redis operation this capability performs. Structural, not an
+ * ioredis import: a `Redis`, a `Cluster` and a fake all satisfy it, which is
+ * what lets the twin test read the exact bytes that would hit the wire.
  */
 export abstract class TenantBroadcastPublisher {
   abstract publish(channel: string, message: string): Promise<number>;
@@ -48,11 +43,8 @@ export abstract class TenantBroadcastPublisher {
 
 /**
  * What a feature asks for when it wants a tenant's open tabs to refetch.
- *
- * Features declare their own narrow port and receive an implementation from
- * the composition root; they never import this package, because a feature
- * server package may only be consumed by an application root. That is the cost
- * of sharing one publisher, and it is the same cost the mail capability pays.
+ * Declares its own narrow port and receives an implementation from the
+ * composition root - the same cost the mail capability pays for sharing one publisher.
  */
 export abstract class TenantBroadcast {
   /** The channel a given event type is published on: `broadcast:<eventType>`. */

@@ -39,9 +39,8 @@ const isProxyBypassed = (noProxy: string | undefined, targetHost: string): boole
 
 /**
  * The dispatcher is process-owned: building one per send would accumulate
- * pools and file descriptors under a burst of alerts.
- *
- * `HTTPS_PROXY` wins over `HTTP_PROXY` because this gateway uses TLS.
+ * pools and file descriptors under a burst of alerts. `HTTPS_PROXY` wins
+ * over `HTTP_PROXY` because this gateway uses TLS.
  */
 const proxyDispatcher = (proxyConfig: EmailOutboundProxyConfig): EnvHttpProxyAgent | undefined => {
   const proxy = proxyConfig.httpsProxy ?? proxyConfig.httpProxy;

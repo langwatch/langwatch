@@ -1,16 +1,7 @@
 /**
- * pi AgentSession wiring for the langy worker.
- *
- * - The model comes from a generated models.json (see models.ts): the ONLY
- *   provider is the mediated gateway, keyed by env reference.
- * - Everything pi persists lives under the worker home: agentDir at
- *   `$HOME/.langy-pi`, the session JSONL under config.sessionDir.
- * - Auto-compaction ON, pi's own transient retry OFF (the manager and the
- *   product's self-retry own retries).
- * - The resource loader discovers nothing (noExtensions/noSkills/
- *   noContextFiles): the system prompt is wholly owned by the wrapper, and
- *   the only extensions are the inline factories: `todowrite`, `skill`,
- *   `question` and the local workspace tools.
+ * pi AgentSession wiring. The model comes from generated models.json - the
+ * ONLY provider is the mediated gateway. The resource loader discovers
+ * nothing: the wrapper owns the system prompt, with only inline factories as extensions.
  */
 
 import { mkdirSync } from "node:fs";
@@ -54,10 +45,8 @@ export const ENABLED_TOOLS = [
 
 /**
  * The one channel through which the per-turn system prompt reaches pi:
- * `AgentSession.prompt()` resets `agent.state.systemPrompt` to the base
- * prompt on every call, and the documented way to replace it per turn is a
- * `before_agent_start` extension result. The holder is mutated by the turn
- * runner before each prompt; the extension reads it on every agent start.
+ * `AgentSession.prompt()` resets it to the base on every call, so the holder
+ * is mutated by the turn runner before each prompt via a `before_agent_start` result.
  */
 export type SystemPromptHolder = { current: string };
 
@@ -83,22 +72,16 @@ export type LangySessionHandle = {
   session: AgentSession;
   /**
    * Whether the session continues a persisted transcript this home already
-   * held. The worker home outlives the process on an idle reap or a crash, so
-   * a respawn finds the previous session file and resumes it: the session's
-   * own history is then the single copy of the conversation, the manager
-   * skips the transcript seed, and the prompt prefix stays byte-stable for
-   * provider caching. False means a genuinely fresh session (new
-   * conversation, or the home was lost) and the seed path applies.
+   * held: the manager skips the transcript seed and the prompt prefix stays
+   * byte-stable for provider caching. False means genuinely fresh.
    */
   resumed: boolean;
 };
 
 /**
- * Resume the newest persisted session when the home still holds one, so a
- * respawned worker keeps the conversation's own context instead of being
- * re-seeded a transcript (which would also break the byte-stable prompt
- * prefix provider caching reads). A failed listing or a corrupt file degrades
- * to a fresh session rather than failing the spawn.
+ * Resume the newest persisted session when the home still holds one, keeping
+ * its own context instead of a re-seeded transcript. A failed listing or a
+ * corrupt file degrades to a fresh session rather than failing the spawn.
  */
 export function openSessionManager({ home, sessionDir }: { home: string; sessionDir: string }): {
   sessionManager: SessionManager;

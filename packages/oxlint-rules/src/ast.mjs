@@ -37,10 +37,7 @@ export function* childNodes(node) {
 }
 
 /**
- * Depth-first walk of `node` and its descendants. A visitor that returns
- * `false` keeps its subtree unvisited, which is how a rule stops at a nested
- * function without walking into it.
- *
+ * Depth-first walk. A visitor returning `false` skips its own subtree.
  * @param {object | null | undefined} node
  * @param {(node: object) => boolean | void} visitor
  */

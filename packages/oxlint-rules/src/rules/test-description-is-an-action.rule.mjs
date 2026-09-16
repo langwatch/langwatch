@@ -2,12 +2,9 @@ import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A title states what the test does ("checks local first"), not a prediction
-// about what it should do ("should check local first") — the "should" is
-// silent noise repeated on every line. Nested `describe` blocks read as BDD
-// structure instead of a flat list: the outer block names the given
-// precondition, the inner block names the when-action, so a nested block
-// with neither prefix has lost that structure. A top-level `describe` names
-// the unit under test and is exempt from the given/when requirement.
+// ("should check local first") - noise repeated on every line. Nested
+// `describe` blocks read as BDD: outer names the given, inner the when-action;
+// a top-level `describe` names the unit under test and is exempt.
 
 const TEST_FILE = /\.test\.tsx?$/;
 const GIVEN_WHEN_AND = /^(?:given|when|and)\s/;

@@ -1,14 +1,7 @@
 /**
- * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`.
- *
- * Langy's AGENTS.md names a callable tool: "The `skill` tool lists every skill
- * installed, including ones with no row here, so check it when a request
- * matches none of them." pi's native skill loading (skills injected into the
- * system prompt) cannot satisfy that sentence because the wrapper owns the
- * system prompt outright (persona + AGENTS.md + turn system), so this compat
- * tool exists: its description carries the installed inventory, calling it
- * with a name returns that skill's SKILL.md, and calling it with an unknown
- * or missing name returns the inventory.
+ * The `skill` tool: a thin loader over `<skillsDir>/<name>/SKILL.md`. pi's
+ * native loading can't satisfy Langy's AGENTS.md contract since the wrapper
+ * owns the system prompt outright - a name returns SKILL.md, else the inventory.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

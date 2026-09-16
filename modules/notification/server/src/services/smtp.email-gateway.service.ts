@@ -29,12 +29,9 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
   }
 
   /**
-   * Transport options from either a single connection URL or the discrete
-   * host/port/credential settings. A URL wins when both are present.
-   *
-   * No proxy is applied here on purpose. An SMTP relay is typically an
-   * internal host reachable directly, so honouring a globally-set HTTPS_PROXY
-   * would break deployments that set it for vendor API egress only.
+   * Transport options from a connection URL or discrete host/port/credential
+   * settings - a URL wins when both are present. No proxy applied: an SMTP
+   * relay is reachable directly, so honouring HTTPS_PROXY would break it.
    */
   static buildTransportOptions(configuration: MailerConfiguration["smtp"]): SMTPTransport.Options {
     if (configuration.url) {
@@ -99,11 +96,9 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
 
     try {
       // Blind addresses go only into the SMTP envelope. nodemailer would also
-      // keep them off the wire if passed as a `bcc` field (mail-composer drops
-      // the header unless keepBcc is set), but that is a library default rather
-      // than a property of this code. Stating the envelope explicitly makes the
-      // guarantee ours: the rendered headers carry only the public To list,
-      // matching SES `SendRawEmail` and SendGrid.
+      // drop a `bcc` field header (mail-composer's keepBcc default), but that
+      // is the library's choice, not this code's - stating the envelope
+      // explicitly makes it ours, matching SES `SendRawEmail` and SendGrid.
       const info = await transporter.sendMail({
         from,
         to: toAddresses,

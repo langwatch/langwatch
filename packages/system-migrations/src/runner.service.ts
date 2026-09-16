@@ -14,19 +14,15 @@ const TENANT_CLAIM_PREFIX = "tenant:";
 const DEFAULT_LEASE_TTL_MS = 60_000;
 /** Renew well inside the TTL so one slow round trip cannot drop the claim. */
 const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
-/** How many organizations one pass works at once. Each is its own claim,
- *  its own migrations, its own convergence waits - so one large
- *  organization's import never holds the rest of the fleet behind it. The
- *  per-tenant work is light (the fold queue does the heavy lifting), so
- *  the bound exists to cap claim heartbeats and convergence polls, not
- *  throughput. */
+/** How many organizations one pass works at once: caps claim heartbeats and
+ *  convergence polls, not throughput - each tenant's own claim keeps one
+ *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
 
 /**
  * Which (tenant, migration) pairs a pass may touch, read fresh each pass. A
- * pair outside the cohort is skipped without even a state record — "not
- * started" and "not in the cohort yet" are the same pending state, which is
- * what lets a rollout widen later and each migration pace independently.
+ * pair outside the cohort gets no state record - "not started" and "not in
+ * the cohort yet" are the same pending state, so a rollout can widen later.
  */
 export type MigrationCohort = (args: {
   tenantId: string;
@@ -48,11 +44,9 @@ export type SystemMigrationRunnerDeps = {
 };
 
 /**
- * Drives every registered migration over every cohort tenant. Coordination
- * is per organization, not per process: each tenant is claimed under its
- * own lease, so any number of processes share the fleet instead of standing
- * down behind one driver. Level-triggered — every pass re-attempts held and
- * parked tenants, so the caller drives passes until `MigrationPassSummary.advanced` stops.
+ * Drives every registered migration over every cohort tenant, each claimed
+ * under its own lease so any number of processes share the fleet.
+ * Level-triggered: passes run until `MigrationPassSummary.advanced` stops.
  */
 export class SystemMigrationRunnerService {
   constructor(private readonly deps: SystemMigrationRunnerDeps) {}
@@ -149,10 +143,9 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * One tenant, under its own claim. A tenant claimed by another process is
-   * left to that process - its pass is running the very same migrations -
-   * and one this pass claims runs its migrations in registration order,
-   * heartbeat-renewed for as long as they take.
+   * One tenant, under its own claim. A tenant claimed elsewhere is left to
+   * that process; one this pass claims runs its migrations in registration
+   * order, heartbeat-renewed for as long as they take.
    */
   private async driveTenant({
     tenantId,
@@ -206,11 +199,9 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * Keeps one tenant's claim alive while its migrations run. A renewal that
-   * comes back false means another driver has legitimately taken the tenant
-   * over, which this pass reads as "stop at this tenant's next migration" -
-   * never as corruption, since every migration is idempotent. Other tenants
-   * are unaffected: each holds its own claim.
+   * A renewal that comes back false means another driver has legitimately
+   * taken the tenant over - read as "stop at this tenant's next migration",
+   * never as corruption, since every migration is idempotent.
    */
   private startClaimHeartbeat(claimName: string): {
     claimLost: () => boolean;

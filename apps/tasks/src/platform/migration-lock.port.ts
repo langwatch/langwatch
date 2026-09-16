@@ -1,10 +1,7 @@
 /**
- * The mutex a migration run holds for as long as it is migrating.
- *
- * Two runners are normal — a rolling deploy starts several pods, and a
- * developer's stack and a stray `pnpm -s task prisma-migrate` overlap all the
- * time — but two runners rebuilding the same schema at once is not. The
- * second one waits here, and then finds nothing pending.
+ * The mutex a migration run holds while migrating. Two runners are normal -
+ * a rolling deploy starts several pods - but two rebuilding the same schema
+ * at once is not; the second one waits here, then finds nothing pending.
  */
 export abstract class MigrationLock {
   /** Takes the lock if it is free right now; never blocks. */

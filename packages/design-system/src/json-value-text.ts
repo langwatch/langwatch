@@ -87,11 +87,9 @@ export function serializeOptionalTypedScalarValue({
 }
 
 /**
- * Render an optional stored value as editable text, given its declared type.
- *
- * A string parameter shows its value bare, "007" rather than "\"007\"": the
- * type already says it is text, so nothing has to be quoted to keep it so.
- * Every other case reads as {@link displayOptionalValue}.
+ * Renders an optional stored value as editable text, given its type. A string
+ * shows bare, "007" not "\"007\"" — already text, nothing to quote. Other
+ * cases read as {@link displayOptionalValue}.
  */
 export function displayTypedValue({
   value,

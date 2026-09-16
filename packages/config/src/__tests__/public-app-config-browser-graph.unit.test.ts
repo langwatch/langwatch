@@ -11,10 +11,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const readSource = (relative: string) => readFileSync(resolve(here, "..", relative), "utf8");
 
 /**
- * The application's reader, which is the browser entry point to all of this.
- * Read across the workspace on purpose: the contract moved here and the reader
- * did not, so the edge that has to stay absent now spans two packages and a
- * guard that only looked at one of them would pass over the half it cannot see.
+ * The application's reader, the browser entry point to all of this. Read
+ * across the workspace on purpose: the contract moved here and the reader
+ * did not, so the edge now spans two packages a guard must check both of.
  */
 const readApplicationReader = () =>
   readFileSync(

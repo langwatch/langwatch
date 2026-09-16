@@ -6,18 +6,12 @@ import { classify } from "./classify.mjs";
 // is deliberately not part of what the linter prints.
 
 /**
- * @typedef {object} MessageDefinition
- * @property {string} what The offence, naming the symbol or path via `{{placeholder}}`.
- * @property {string} [why] One clause of justification. Rendered in the docs, never in the message.
- * @property {string} fix One imperative sentence.
+ * @typedef {{ what: string, why?: string, fix: string }} MessageDefinition
  */
 
 /**
- * @typedef {object} OptionDefinition
- * @property {"integer" | "number" | "string" | "boolean"} type
- * @property {number} [minimum]
- * @property {unknown} [default]
- * @property {string} [description]
+ * @typedef {{ type: "integer"|"number"|"string"|"boolean", minimum?: number,
+ *   default?: unknown, description?: string }} OptionDefinition
  */
 
 /** `what` and `fix` joined; `why` stays out of the printed message on purpose. */

@@ -24,10 +24,9 @@ export class EmailProviderService {
   }
 
   /**
-   * Default sender address. The derivation itself lives in
-   * `channels/email-delivery.channel.ts`, where a configuration parser can reach it without
-   * naming a service; this static stands only until the two config parsers call
-   * it there.
+   * Default sender address. The derivation lives in
+   * `channels/email-delivery.channel.ts`; this static stands only until the
+   * two config parsers call it there directly.
    */
   static resolveDefaultFrom(input: { emailDefaultFrom?: string; baseHost: string }): string {
     return resolveDefaultFrom(input);

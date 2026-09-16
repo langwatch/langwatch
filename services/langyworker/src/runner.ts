@@ -1,19 +1,7 @@
 /**
- * Per-turn orchestration over one pi AgentSession: system-prompt
- * recomposition, event fan-out, abort, preemption, and the terminal-last
- * invariant.
- *
- * Prior-art notes (agentic-pi, @ai-sdk/harness-pi):
- * - session event listeners run synchronously inside `session.prompt()`; a
- *   throw there would reject the prompt, so every listener body is contained.
- * - `session.abort()` from inside a listener or a command handler is
- *   fire-and-forget (`void ... .catch()`): awaiting its `waitForIdle` from a
- *   listener deadlocks.
- * - `prompt()` resolving is decoupled from a clean finish: the terminal
- *   outcome is derived from OUR abort/shutdown flags first, then the last
- *   assistant message's `stopReason`/`errorMessage` (the harness-pi rule:
- *   `stopReason === "error" | "aborted"` is terminal), so a provider error is
- *   never reported as ok.
+ * Per-turn orchestration over one pi AgentSession. Listeners run
+ * synchronously inside `session.prompt()` (a throw there is contained);
+ * `session.abort()` from one stays fire-and-forget - awaiting it deadlocks.
  */
 
 import { buildHandoffDigest } from "./digest.js";
@@ -62,9 +50,8 @@ export type TurnRunnerOptions = {
   turnContext?: TurnContext;
   /**
    * True when the session continued a persisted transcript at boot. A turn's
-   * `resumeToken` (the shutdown-handoff digest) is then skipped: the session's
-   * own history is the single copy of the conversation, and prepending a
-   * digest of it would re-tell the story and break the byte-stable prefix.
+   * `resumeToken` digest is then skipped: the session's own history is the
+   * single copy, and prepending a digest would re-tell it and break the prefix.
    */
   sessionResumed?: boolean;
 };

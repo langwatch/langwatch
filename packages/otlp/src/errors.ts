@@ -54,10 +54,8 @@ export class OtlpBodyUnreadableError extends HandledError {
 
 /**
  * The body arrived under a `Content-Encoding` the receiver does not implement.
- *
- * Named rather than left as a bare Error so it is answered 400 like the other
- * sender mistakes on this path, instead of reaching the boundary unclassified
- * and being counted as a server fault.
+ * Named so it answers 400 like other sender mistakes, rather than reaching
+ * the boundary unclassified and counting as a server fault.
  */
 export class OtlpUnsupportedEncodingError extends HandledError {
   declare readonly code: "ERR_UNSUPPORTED_ENCODING";

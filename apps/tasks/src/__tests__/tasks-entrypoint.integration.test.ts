@@ -7,9 +7,8 @@ const execFileAsync = promisify(execFile);
 
 /**
  * Runs the built entrypoint two ways: a bare `pnpm -s task <name>` (the
- * container CMD's own invocation), and the filtered form a laptop uses from
- * the repo root. Both must resolve the same catalogue entry and run the same
- * task — there is exactly one command line, not one per environment.
+ * container CMD's invocation) and the filtered laptop form. Both must
+ * resolve the same catalogue entry - one command line, not one per environment.
  */
 describe("apps/tasks entrypoint", () => {
   describe("given the webhook-signature-vectors task, which needs no infrastructure", () => {

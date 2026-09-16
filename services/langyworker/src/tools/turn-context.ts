@@ -1,12 +1,7 @@
 /**
- * The ids every call to the app carries.
- *
- * The routes under `/api/langy/local` and `/api/langy/waits` take the
- * conversation and the turn in each request: the session key proves who the
- * caller is, the ids say where the card belongs. The conversation is fixed for
- * the life of the worker and arrives in the environment; the turn changes with
- * each turn command, so the runner writes it into a holder the tools read when
- * they call.
+ * The ids every call to the app carries: the session key proves the caller,
+ * the ids say where the card belongs. The conversation is fixed for the
+ * worker's life; the turn changes per command via a holder the tools read.
  */
 
 export type TurnContext = {

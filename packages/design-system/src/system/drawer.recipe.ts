@@ -6,11 +6,9 @@
 import { defineSlotRecipe } from "@chakra-ui/react";
 
 /**
- * The scenario editor of Agent Testing.
- *
- * It sits between Chakra's `md` (32rem) and `lg` (42rem). The editor asks four
- * questions and holds a criteria list beside them, which `md` cut short, while
- * `lg` made a form of four fields read as half a page.
+ * The scenario editor of Agent Testing. Sits between Chakra's `md` (32rem)
+ * and `lg` (42rem): `md` cut its four-question form with a criteria list
+ * short, `lg` made that same form read as half a page.
  */
 export const DRAWER_SIZE_2XL_MAX_WIDTH = "38.5rem";
 

@@ -1,8 +1,7 @@
 /**
  * One shared INFRASTRUCTURE block per concern that `apps/api`, `apps/worker`
- * and (where its shape matches) `apps/tasks` all spread into their own
- * definitions. A block a single feature owns lives in that feature's contract
- * instead, beside the rules that read it.
+ * and `apps/tasks` spread into their own definitions. A block a single
+ * feature owns lives in that feature's contract instead.
  */
 import { describe, expect, it } from "vitest";
 

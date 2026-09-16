@@ -47,10 +47,9 @@ function clickhousePackageOf(workspacePath) {
 }
 
 /**
- * A composition seam. This tree spells composition roots two ways -
- * `*.composition.ts` in the applications and `*-composition.build.ts` inside a
- * module - and both build the connection a process holds, from the settings
- * `platform/config/` reads.
+ * A composition seam: `*.composition.ts` in the applications and
+ * `*-composition.build.ts` inside a module, both building the connection a
+ * process holds from the settings `platform/config/` reads.
  */
 function isCompositionClickhouseSeam(relativePath) {
   if (relativePath.endsWith(".composition.ts")) return true;

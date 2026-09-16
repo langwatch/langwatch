@@ -1,10 +1,7 @@
 /**
- * Where a docs link points, driven by explicit inputs rather than by a runtime.
- *
- * The five family-local copies this replaces each read `import.meta.env.DEV`,
- * so their tests could only pin a branch by passing an override that shadowed
- * the read. The branch is now the argument, which is why every case below is a
- * plain function call with no environment arranged around it.
+ * Where a docs link points, driven by explicit inputs, not a runtime. The
+ * five family-local copies this replaces each read `import.meta.env.DEV`, so
+ * only an override that shadowed the read could pin a branch under test.
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -73,9 +70,8 @@ describe("resolveDocsBaseUrl", () => {
 
   /**
    * A suite is not a deployment anybody opens links from. Were `test` local,
-   * every jsdom suite served from `localhost` would silently admit
-   * `http://localhost:3000` to the docs-origin allowlist that
-   * `read-handled-error` derives from this module.
+   * every jsdom suite on `localhost` would silently admit it to the
+   * docs-origin allowlist `read-handled-error` derives from this module.
    */
   it("returns production docs for a test runtime on a local host", () => {
     expect(resolveDocsBaseUrl({ mode: "test", hostname: "localhost" })).toBe(

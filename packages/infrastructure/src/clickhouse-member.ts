@@ -38,9 +38,8 @@ class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseCl
 }
 
 /**
- * The routed client, and the close that shuts every endpoint it opened.
- *
- * The tenant guard is outermost, so a statement that cannot name its tenant is
+ * The routed client, and the close that shuts every endpoint it opened. The
+ * tenant guard is outermost, so a statement that cannot name its tenant is
  * refused before it costs a route lookup, a slot or a socket.
  */
 export function buildClickHouse(options: {

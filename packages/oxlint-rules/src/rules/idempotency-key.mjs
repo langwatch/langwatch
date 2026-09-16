@@ -77,10 +77,8 @@ function bindsIdempotencyKey(id) {
 }
 
 /**
- * The value written to an `idempotencyKey`, for the three ways to write one:
- * an object property, a variable of that name, and an assignment to a field of
- * that name.
- *
+ * The value written to an `idempotencyKey`: an object property, a variable
+ * of that name, or an assignment to a field of that name.
  * @returns {{ value: object | undefined } | undefined}
  */
 export function idempotencyKeyTargetOf(node) {
@@ -133,10 +131,9 @@ function mintedCallSource(expression) {
 }
 
 /**
- * The mint inside an expression, as the reader sees it written, or nothing when
- * the expression names a value bound elsewhere. A `??` fallback is nothing on
- * purpose: the caller supplies the key and the fallback is the unkeyed path.
- *
+ * The mint inside an expression as written, or nothing when it names a value
+ * bound elsewhere. A `??` fallback is nothing on purpose - the caller
+ * supplies the key and the fallback is the unkeyed path.
  * @returns {string | undefined}
  */
 export function mintedSourceOf(expression) {

@@ -1,10 +1,7 @@
 /**
- * Runs the named tasks one after another in the order they were given and
- * returns the first non-zero exit code.
- *
- * Stopping at the first failure is the whole point of the ordering: LangWatchQL
- * provisioning reads both schemas, so running it after a failed migration
- * provisions against a schema that is not there.
+ * Runs the named tasks in order and returns the first non-zero exit code.
+ * Stopping at the first failure is the point of the ordering: LangWatchQL
+ * provisioning reads both schemas, so it must not run after a failed migration.
  */
 export async function runTasksInOrder({
   names,

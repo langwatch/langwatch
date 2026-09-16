@@ -9,15 +9,6 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 // @typedef {string} FeatureRole See grammar/feature-layout-policy for roles.
 // @typedef {string} PackageKind See grammar/feature-layout-policy for kinds.
 
-/**
- * @typedef {object} StrictFeatureSource
- * @property {string | undefined} feature
- * @property {boolean} enterprise
- * @property {FeatureRole} role
- * @property {string} sourcePath Path below `src/`, e.g. `services/agent.service.ts`.
- * @property {string} name Basename, e.g. `agent.service.ts`.
- */
-
 /** @typedef {object} FileClassification - File metadata for the feature-layout classifier. */
 
 const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/(.+)$/;

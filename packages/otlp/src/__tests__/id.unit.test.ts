@@ -44,12 +44,7 @@ describe("decodeBase64OpenTelemetryId", () => {
   });
 
   describe("given hex a sender already encoded", () => {
-    /**
-     * The case the `[+/=]` test exists for. A 32-character hex identifier is
-     * also syntactically valid base64, so decoding on "does this parse as
-     * base64" would silently return a DIFFERENT identifier for every sender
-     * that emits hex. Only a character hex cannot contain is proof.
-     */
+    /** The case the `[+/=]` test exists for: hex is also valid base64. */
     it("returns it unchanged rather than decoding it as base64", () => {
       expect(decodeBase64OpenTelemetryId(TRACE_ID_HEX)).toBe(TRACE_ID_HEX);
     });

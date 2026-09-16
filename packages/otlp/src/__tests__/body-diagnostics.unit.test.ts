@@ -12,12 +12,9 @@ function bodyOf(text: string): ArrayBuffer {
 }
 
 /**
- * Narrows the result to its failure branch and hands back the reported message.
- *
- * Deliberately not an assertion helper: what each test is actually asserting is
- * what the message may and may not contain, and that belongs in the test. A
- * body that decodes here is a broken fixture rather than a failed expectation,
- * so it throws.
+ * Narrows to the failure branch. Deliberately not an assertion helper — what
+ * each test asserts about the message belongs in the test. Throws if the body
+ * decodes, since that means a broken fixture, not a failed expectation.
  */
 function decodeFailureOf({
   body,

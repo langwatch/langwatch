@@ -82,9 +82,8 @@ export const clickhousePrivateRoutesValueSchema = clickhousePrivateRoutesSchema;
 
 /**
  * The endpoints a process that reads or writes ClickHouse binds: the shared
- * server, and the organizations that sit on their own. A caller that needs the
- * operator-only EXPLAIN identity or the restricted LangWatchQL identity
- * declares those leaves itself, beside these.
+ * server, and organizations that sit on their own. A caller needing the
+ * EXPLAIN or LangWatchQL identity declares those leaves itself, beside these.
  */
 export const clickhouseConfigDefinition = RuntimeConfig.define({
   url: Config.value(z.string().optional(), { env: "CLICKHOUSE_URL" }),

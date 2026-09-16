@@ -1,9 +1,7 @@
 /**
- * The boot-time readiness probe.
- *
- * `RedisReadinessService` holds the logger and nothing else — it owns no
- * connection, so a caller constructs one wherever it makes sense (module scope
- * included) and passes the connection it wants probed (ADR-093).
+ * The boot-time readiness probe. Holds the logger and nothing else — it owns
+ * no connection, so a caller constructs one wherever it makes sense and
+ * passes the connection it wants probed (ADR-093).
  */
 import type { RedisConnection, RedisLogger } from "./types.ts";
 
@@ -25,11 +23,9 @@ export interface RedisPingOptions {
 }
 
 /**
- * Drops the credentials from a Redis target, logged at error level on boot failure so it must
- * not carry a password. Redacts both the userinfo (greedy to the last `@`, since a password
- * may itself contain one) and the query string (ioredis also accepts `password` there) —
- * dropping only one leaves a redaction that reads as complete. Never splits on commas: a
- * password may contain one, so splitting first left both halves of a credential in the log.
+ * Logged at error level on boot failure, so must not carry a password. Redacts
+ * the userinfo (to the last `@`) and query string (`password` too) — never
+ * splits on commas, since a password may contain one and leak both halves.
  */
 function withoutCredentials(target: string): string {
   if (!target.includes("://")) return target;
@@ -47,11 +43,9 @@ export class RedisReadinessService {
   }
 
   /**
-   * Probes Redis with a timeout, rejecting — never exiting — on failure. Callers that own
-   * the process lifecycle decide what to do: `start.ts` exits since a server that can't
-   * reach Redis has nothing to serve, while `startWorkers()` lets it propagate so a
-   * worker-boot failure doesn't take a serving web process down with it. Keeping
-   * `process.exit` out of here is what makes that the caller's choice.
+   * Rejects — never exits — on failure. `start.ts` exits since a server with
+   * no Redis has nothing to serve; `startWorkers()` lets it propagate so a
+   * worker-boot failure doesn't take a serving web process down too.
    */
   async ping({
     connection,

@@ -11,12 +11,9 @@ type FieldInfoTooltipProps = {
   /** Distinguishes one (i) from the next when a form has several. */
   testId?: string;
   /**
-   * "click" (default) matches every existing caller's original behavior —
-   * plain click-to-toggle, no hover handling. Only opt into "hover" where a
-   * caller actually needs it (the Comparison form, where several (i)s sit
-   * close together and a click-only affordance felt slow to scan). Defaulting
-   * to "click" means this component's interaction model can't silently change
-   * for every other form just because one caller needed hover.
+   * "click" (default) matches every existing caller's original behavior.
+   * Opt into "hover" only where needed (the Comparison form, where several
+   * (i)s sit close together and click-only felt slow to scan).
    */
   trigger?: "click" | "hover";
 };

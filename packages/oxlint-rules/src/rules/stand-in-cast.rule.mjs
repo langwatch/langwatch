@@ -1,14 +1,11 @@
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// `x as unknown as T` and `x as any` are the two ways to tell the compiler to
-// stop asking. Both are a type hole with a comment attached: the value is
-// whatever it was at runtime and the reader is told otherwise. In production,
-// fix the type, or parse the value at the seam where it arrives. In a test,
-// there is no trust boundary to parse at — the fix is a typed stub: build the
-// mock to the real shape (a factory/builder) or check it with `satisfies`
-// instead of forcing it past the compiler. `as const`, a widening `as T` on a
-// literal, and `satisfies` all keep the check and are untouched in both.
+// `x as unknown as T` and `x as any` are a type hole with a comment attached.
+// In production, fix the type or parse at the seam it arrives. In a test,
+// there is no trust boundary to parse at - build a typed stub instead
+// (a factory/builder, or `satisfies`). `as const` and a narrowing `as T` on
+// a literal are untouched in both.
 
 const GOVERNED = /^(?:enterprise\/modules|modules|apps|packages)\//;
 

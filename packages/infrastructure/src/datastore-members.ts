@@ -1,9 +1,7 @@
 /**
  * Postgres, Redis and the event-sourcing runtime, each built from the config
- * slice that names it and closed by the handle it hands back. A slice this
- * process was not given is a refusal by name, never a quieter member: an API
- * answering from an empty memory store looks healthy and is the worst failure
- * this design can have.
+ * slice that names it. A slice not given is a refusal by name, never a
+ * quieter member answering from an empty store as if healthy.
  */
 import { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
@@ -30,11 +28,9 @@ export interface BuiltMember<Value> {
 }
 
 /**
- * One guarded Prisma client. There is no unguarded path: the connection service
- * wraps {@link PrismaTenancyGuardService} around every operation, and the only
- * argument this function takes is a connection string, so a caller cannot ask
- * for a client that skips the multitenancy, organization and mass-delete
- * guards.
+ * One guarded Prisma client. No unguarded path: the connection service wraps
+ * {@link PrismaTenancyGuardService} around every operation, and the only
+ * argument here is a connection string, so no caller can skip the guards.
  */
 export function buildPrisma(options: {
   config: DatabaseConfig;
@@ -85,10 +81,9 @@ export function buildRedis(config: RedisConfig): BuiltMember<RedisConnection> {
 }
 
 /**
- * The event-sourcing runtime this role holds. The store and the queue factory
- * are the process's, because which log a role appends to and whether it claims
- * the queue are role decisions; everything else about the runtime is the same
- * everywhere and is settled here.
+ * The store and queue factory are the process's - which log a role appends to
+ * and whether it claims the queue are role decisions; everything else about
+ * the runtime is the same everywhere and is settled here.
  */
 export function buildEventing(config: EventingConfig): BuiltMember<EventSourcing> {
   const eventing = new EventSourcing({

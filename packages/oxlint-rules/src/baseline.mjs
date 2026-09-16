@@ -1,12 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Debt for the rules oxlint cannot express as a per-file numeric tier lives
-// here instead of in the config: one `rule|file` key per exempted file, with
-// a `measured` date. A rule that can read this file (a JS `defineRule`, not a
-// native oxlint rule) consults it directly and reports nothing for a
-// baselined file; a native rule (`max-depth`, `complexity`) still needs a
-// generated config override, produced from this same file by
+// Debt for rules oxlint cannot express as a per-file numeric tier lives here:
+// one `rule|file` key per exempted file with a `measured` date. A JS
+// `defineRule` reads it directly; a native rule (`max-depth`, `complexity`)
+// needs a generated config override, produced from this file by
 // `generate-native-baseline-overrides.mjs`.
 
 const BASELINE_PATH = "packages/architecture-enforcer/src/oxlint-baseline.json";
@@ -19,10 +17,8 @@ export function baselineKey({ file, rule }) {
 }
 
 /**
- * Checks the baseline document's shape. Every entry needs a non-empty
- * `measured` date; an entry missing one is refused rather than silently
- * treated as baselined forever.
- *
+ * Checks the baseline document's shape: every entry needs a non-empty
+ * `measured` date, refused rather than silently treated as baselined forever.
  * @returns {string[]} One message per problem found; empty when valid.
  */
 export function validateBaseline(data) {

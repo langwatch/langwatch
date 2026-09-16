@@ -3,12 +3,9 @@ import { z } from "zod";
 import { Config, environmentBooleanSchema, RuntimeConfig } from "./runtime-config.ts";
 
 /**
- * The logging knobs every process folds through
- * `@langwatch/observability`'s `loggerConfigurationFrom`, at the deployment's
- * own spelling.
- *
- * All four optional: a process given none logs at the library's own default
- * level and format rather than refusing to start over a logging preference.
+ * The logging knobs every process folds through `loggerConfigurationFrom` in
+ * `@langwatch/observability`. All four optional: given none, a process logs
+ * at the library's own default rather than refusing to start.
  */
 export const loggerConfigDefinition = RuntimeConfig.define({
   format: Config.value(z.enum(["pretty", "json"]).optional(), { env: "LOG_FORMAT" }),

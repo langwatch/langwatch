@@ -11,12 +11,9 @@
 export const DEFAULT_LANGWATCH_ENDPOINT = "https://app.langwatch.ai";
 
 /**
- * The names one host answers to when a deployment addresses itself.
- *
- * `0.0.0.0` and `::` are bind addresses rather than destinations, and they are
- * in the set for exactly that reason: a listener bound to every interface is
- * reachable at `localhost`, so an endpoint written that way is the same
- * process.
+ * The names one host answers to when a deployment addresses itself. `0.0.0.0`
+ * and `::` are bind addresses, not destinations, but a listener bound to
+ * every interface is also reachable at `localhost` - the same process.
  */
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "::"]);
 const LOOPBACK_HOST = "localhost";
@@ -29,9 +26,8 @@ const WORKTREE_STACK_LABELS = 1;
 
 /**
  * One address this deployment answers on, and the variable that stated it.
- *
- * `port` is separate because a listener states its port apart from its bind
- * address; when the value carries its own port, that one is used.
+ * `port` is separate since a listener's port is apart from its bind address;
+ * when the value carries its own port, that one is used.
  */
 export type DeploymentAddress = Readonly<{
   /** The environment variable an operator set, named verbatim in a refusal. */
@@ -55,12 +51,9 @@ export type SelfIngestGuardInput = Readonly<{
 }>;
 
 /**
- * The boot refusal, written for the operator who has to resolve it.
- *
- * It carries the two variables and the address that collided as fields as well
- * as prose, so a caller can act on the refusal without parsing the sentence.
- * There is no field for the key, because the key's value is not part of the
- * finding.
+ * The boot refusal, written for the operator who has to resolve it. Carries
+ * the two variables and the collided address as fields, not just prose, so a
+ * caller can act without parsing the sentence. No field for the key itself.
  */
 export class SelfIngestingObservabilityError extends Error {
   override readonly name = "SelfIngestingObservabilityError";
@@ -144,11 +137,9 @@ function addressesOneDeployment(endpoint: NetworkAddress, own: NetworkAddress): 
 }
 
 /**
- * Whether two hostnames belong to one worktree's haven stack.
- *
  * A stack serves `app`, `gateway` and `nlp` under one `<slug>` — different
- * hostnames, one deployment — so the host comparison above cannot see it. Two
- * different worktrees are two different deployments and stay distinct.
+ * hostnames, one deployment — so the plain host comparison above cannot see
+ * it. Two different worktrees stay two different deployments.
  */
 function sameWorktreeStack(endpointHost: string, ownHost: string): boolean {
   const endpointStack = worktreeStack(endpointHost);

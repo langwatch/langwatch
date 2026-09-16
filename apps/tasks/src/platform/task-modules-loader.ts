@@ -1,9 +1,8 @@
 import { Task, TaskHost } from "@langwatch/task";
 
 /**
- * What a saas (or other private) plugin module exports: exactly one of a
- * ready-made array, or a factory over this process's own `TaskHost` —
- * the same host the built-in catalogue's tasks get. Contract:
+ * What a saas (or other private) plugin module exports: a ready-made array,
+ * or a factory over this process's own `TaskHost`. Contract:
  * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
  */
 export type TaskModuleExports = {
@@ -12,11 +11,9 @@ export type TaskModuleExports = {
 };
 
 /**
- * Loads every module `LANGWATCH_TASK_MODULES` names and returns their
- * combined tasks, for the catalogue to merge with the built-in ones
- * (`TaskCatalogue.create` refuses a name collision on its own). The only
- * place in `apps/tasks` an inline `import()` is allowed: a specifier named
- * by an environment variable cannot be a static `import`.
+ * Loads every module `LANGWATCH_TASK_MODULES` names, for the catalogue to
+ * merge with the built-in ones. The only place in `apps/tasks` an inline
+ * `import()` is allowed: an env-named specifier cannot be a static `import`.
  */
 export async function loadTaskModules({
   specifiers,

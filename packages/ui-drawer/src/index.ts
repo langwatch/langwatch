@@ -1,9 +1,7 @@
 /**
- * URL-routed singleton drawers, as a framework rather than as one
- * application's folder. `?drawer.open=<name>` names the open drawer,
- * `drawer.<key>` carries each serialisable prop, and a stack makes the back
- * button mean something. The registry is INSTALLED: a feature package
- * publishes `{ key: lazyDrawer(...) }` and the application composes them.
+ * URL-routed singleton drawers, as a framework. `?drawer.open=<name>` names
+ * the open drawer, `drawer.<key>` carries each serialisable prop. INSTALLED:
+ * a feature package publishes `{ key: lazyDrawer(...) }`, the app composes them.
  */
 
 export {

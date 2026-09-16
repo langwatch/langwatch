@@ -6,11 +6,9 @@ import { Task } from "@langwatch/task";
 const logger = createLogger("langwatch:tasks:prisma-migrate");
 
 /**
- * Applies pending Postgres migrations — `pnpm --filter @langwatch/tasks task
- * prisma-migrate`. Lifted from apps/api's `task:prisma-migrate` script: spawns
- * the Prisma CLI against `@langwatch/prisma-client`'s own migration history,
- * honouring `SKIP_PRISMA_MIGRATE` so a deploy that already applied migrations
- * elsewhere (or a laptop pointed at a shared dev database) can opt out.
+ * Applies pending Postgres migrations. Lifted from apps/api's
+ * `task:prisma-migrate` script: spawns the Prisma CLI against
+ * `@langwatch/prisma-client`'s history, honouring `SKIP_PRISMA_MIGRATE` to opt out.
  */
 export class PrismaMigrateTask extends Task {
   readonly name = "prisma-migrate";

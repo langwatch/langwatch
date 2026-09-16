@@ -18,11 +18,9 @@ export type DrawerRouter = {
 };
 
 /**
- * The router the last mounted `useDrawer` was inside.
- *
- * `platform/app` kept a module-scope `Router` singleton so code that is not a
- * component could push an address; `navigateToDrawer` is the one caller that
- * needs it. Answered by whichever navigator is currently mounted.
+ * The router the last mounted `useDrawer` was inside. `platform/app` kept a
+ * module-scope `Router` singleton so non-component code could push an
+ * address; `navigateToDrawer` is the one caller that still needs it.
  */
 export const drawerRouterRef: { current: DrawerRouter | undefined } = { current: void 0 };
 
@@ -34,11 +32,9 @@ export function readFlatQuery(search: string): Record<string, string | undefined
 }
 
 /**
- * Make a query-only or hash-only address absolute.
- *
- * `openDrawer` and friends build `"?" + qs.stringify(...)`. React Router
- * resolves a bare search string against the current route rather than the
- * current URL, which drops the path on a splat route, so the path is stated.
+ * Make a query-only or hash-only address absolute. `openDrawer` and friends
+ * build `"?" + qs.stringify(...)`; React Router resolves a bare search
+ * string against the route, not the URL, dropping the path on a splat route.
  */
 export function absoluteDrawerAddress(url: string, pathname: string): string {
   if (url.startsWith("?") || url.startsWith("#")) return `${pathname}${url}`;
@@ -57,13 +53,11 @@ export function useDrawerRouter(): DrawerRouter {
       asPath: `${pathname}${location.search}${location.hash}`,
       pathname,
       push: (url, options) => {
-        // The Next shim's `flushSync` is gone with the shim, and what it was
-        // for is not: drawers are `lazy()`, so this update mounts one for the
-        // first time more often than not, and under a transition a first-time
-        // Suspense keeps the previously committed UI on screen instead of the
-        // fallback. React Router 8 wraps navigations in `startTransition` only
-        // when its own future flag asks for it, and this application does not,
-        // so a plain navigate commits synchronously and the fallback paints.
+        // Drawers are `lazy()`, so this often mounts one for the first time.
+        // Under a transition, first-time Suspense keeps the old UI on screen
+        // instead of the fallback. React Router 8 only wraps navigation in
+        // `startTransition` behind its own flag, unset here, so this commits
+        // synchronously and the fallback paints.
         void navigate(absoluteDrawerAddress(url, pathname), {
           replace: options?.replace ?? false,
         });

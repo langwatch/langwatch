@@ -4,12 +4,9 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 /**
- * A trace or span identifier, in hex, from whichever encoding it arrived in:
- * bytes, base64 (protobuf-JSON), or already hex — told apart by shape, not a
- * flag. Checks for base64's *distinctive* characters (`+`, `/`, `=`) rather
- * than valid base64, since a 32-char hex id is ALSO valid base64 and
- * decoding it would silently corrupt it; an ambiguous string is left as-is,
- * so the failure mode is a passthrough, never a corrupted id.
+ * Distinguishes base64 (protobuf-JSON) from hex by base64's distinctive
+ * characters, not validity — a hex id is also valid base64, so decoding it
+ * would corrupt it. An ambiguous string passes through unchanged.
  */
 export function decodeBase64OpenTelemetryId(value: unknown): string | null {
   if (value instanceof Uint8Array) return bytesToHex(value);

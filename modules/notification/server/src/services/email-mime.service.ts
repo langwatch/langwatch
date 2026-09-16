@@ -1,24 +1,18 @@
 import type { EmailAttachment } from "../channels/email-delivery.channel.ts";
 import { nowInstant } from "@langwatch/time";
 
-/** Maximum bytes one RFC 2047 encoded-word can carry.
- *
- *  `=?UTF-8?B?<base64>?=` — the wrapper is 12 characters, an encoded-word is
- *  at most 75 (RFC 2047 §2), so the base64 payload is at most 63; base64 pads
- *  to a multiple of four, so the usable maximum is 60 characters, which
- *  encodes exactly 45 input bytes. */
+/** Maximum bytes one RFC 2047 encoded-word can carry: wrapper is 12 chars,
+ *  word max is 75 (RFC 2047 §2) leaving 63 for base64, padded to a multiple
+ *  of four gives 60 usable chars, which encodes 45 input bytes. */
 const MAX_ENCODED_WORD_INPUT_BYTES = 45;
 
 /** RFC 2045 §6.8: base64 body lines are at most 76 characters. */
 const BASE64_LINE_LENGTH = 76;
 
 /**
- * How an email becomes bytes on the wire.
- *
- * Two jobs, and both are security-shaped rather than cosmetic: cleaning
- * caller-supplied headers so a crafted name cannot close a field and inject
- * another one, and building the raw multipart message SES needs whenever a
- * send carries attachments or custom headers.
+ * How an email becomes bytes on the wire. Two jobs, both security-shaped:
+ * cleaning caller-supplied headers so a crafted name cannot inject another
+ * field, and building the raw multipart message SES needs for attachments.
  */
 export class EmailMimeService {
   static create(): EmailMimeService {
@@ -32,10 +26,9 @@ export class EmailMimeService {
   }
 
   /**
-   * A header name is a token: no colon, whitespace or control characters (RFC
-   * 5322 §3.6.8). Stripping them stops a crafted name from closing the field
-   * and injecting another one, which sanitizing the value alone would not
-   * prevent.
+   * A header name is a token: no colon, whitespace or control characters
+   * (RFC 5322 §3.6.8) - stripping them stops a crafted name from injecting
+   * another field, which sanitizing the value alone would not prevent.
    */
   sanitizeHeaderName(name: string): string {
     return name.replace(/[^\x21-\x39\x3B-\x7E]/g, "").trim();
