@@ -115,7 +115,7 @@ describe("<AiToolEntryDrawer /> CLI paths", () => {
       expect(input).not.toBeChecked();
       expect(
         screen.getByText(
-          "pi always calls its model provider directly, so the gateway route never applies.",
+          "pi takes its endpoint from its own model settings, which the LangWatch launcher does not change, so the gateway route never applies.",
         ),
       ).toBeInTheDocument();
     });

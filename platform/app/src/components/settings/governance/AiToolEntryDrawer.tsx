@@ -841,11 +841,18 @@ function CliPathsSection({
   setForm: (f: FormState) => void;
 }) {
   const cursorOnly = form.assistantKind === "cursor";
-  // pi always calls its model provider directly and ignores the endpoint
-  // setting the gateway route depends on, so the server forces this off
-  // whatever the tile stores (resolveToolPolicyOverrides). Show that rather
-  // than a switch an admin can turn on to no effect. Same shape as the
-  // cursor case on the direct-ingestion row below.
+  // pi reads each model's endpoint from its own model settings and ignores
+  // OPENAI_BASE_URL / ANTHROPIC_BASE_URL, which is the only lever the
+  // launcher has, so the server forces this off whatever the tile stores
+  // (resolveToolPolicyOverrides). Show that rather than a switch an admin can
+  // turn on to no effect. Same shape as the cursor case on the
+  // direct-ingestion row below.
+  //
+  // Not a claim that pi CANNOT be routed: langy points pi at the gateway
+  // today by generating a models.json for it
+  // (services/langyworker/src/models.ts). That path writes a file to the
+  // machine pi runs on, which the launcher deliberately does not do — see
+  // ADR-132 §7 and its open question on a generated models.json.
   const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
@@ -858,7 +865,7 @@ function CliPathsSection({
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
               {isIngestionOnly
-                ? "pi always calls its model provider directly, so the gateway route never applies."
+                ? "pi takes its endpoint from its own model settings, which the LangWatch launcher does not change, so the gateway route never applies."
                 : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
