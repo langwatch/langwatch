@@ -73,3 +73,40 @@ describe("given a source file", () => {
     });
   });
 });
+
+describe("given the rule tells the reader to re-point a specifier", () => {
+  describe("when the string is not a module specifier", () => {
+    /** @scenario "A home-directory string is not a monolith path" */
+    it("leaves a home-directory path alone but still reports the alias in an import", () => {
+      expect(report('const p = "~/.codex/hooks.json";')).toEqual([]);
+      expect(report('import { a } from "~/server/db";').map((e) => e.messageId)).toEqual([
+        "legacyMonolithPath",
+      ]);
+    });
+
+    /** @scenario "A test may name a platform path in a plain string" */
+    it("leaves a platform path in a test's data alone, and reports it in production", () => {
+      const data = 'const wasFiles = ["platform/app/src/server/db.ts"];';
+
+      expect(report(data, "modules/agent/server/src/__tests__/paths.unit.test.ts")).toEqual([]);
+      expect(report(data).map((e) => e.messageId)).toEqual(["legacyMonolithPath"]);
+    });
+
+    /** @scenario "A test may name a platform path in a plain string" */
+    it("still reports an import naming platform/app from inside a test", () => {
+      const found = report(
+        'import { a } from "../../platform/app/src/db.ts";',
+        "modules/agent/server/src/__tests__/paths.unit.test.ts",
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["legacyMonolithPath"]);
+    });
+  });
+
+  describe("when one import is visited by both the parent and the literal", () => {
+    /** @scenario "A stale import is reported once, not twice" */
+    it("reports it exactly once", () => {
+      expect(report('import { a } from "~/server/db";')).toHaveLength(1);
+    });
+  });
+});

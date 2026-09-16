@@ -537,6 +537,29 @@
         "complexity": "off",
         "max-depth": "off"
       }
+    },
+
+    // ------------------------------------------------------------------
+    // JSX IS WHERE no-nested-ternary MAKES CODE WORSE.
+    //
+    // A chain of ternaries returning elements is how React expresses a
+    // conditional render, and it reads down the page in the same order the
+    // markup does. The rule's only remedy in that position is to hoist the
+    // chain into an imperative `let cell: React.ReactNode = null;` followed by
+    // if / else-if / else and then interpolate the variable — which splits one
+    // readable expression into a declaration far from its use, and was measured
+    // on 2026-09-17 to turn a 29-line render into 45 lines plus a helper.
+    //
+    // It stays ON for `.ts` and `.mjs`, where a nested ternary really is a
+    // decision tree hidden in an expression and extracting it is an
+    // improvement. `langwatch/condition-shape` still governs complex
+    // conditions in both.
+    // ------------------------------------------------------------------
+    {
+      "files": ["**/*.tsx"],
+      "rules": {
+        "no-nested-ternary": "off"
+      }
     }
   ]
 }

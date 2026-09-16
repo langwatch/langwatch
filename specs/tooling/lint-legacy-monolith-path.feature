@@ -44,3 +44,32 @@ Feature: The legacy-monolith-path lint rule
     Given a source file that names a path whose segment merely ends in "platform"
     When the legacy-monolith-path rule runs over it
     Then it reports nothing
+
+  # `~/` only means the monolith's alias where a module specifier is expected.
+  # A bare string starting `~/` is a home directory, and the CLI is full of
+  # them: `~/.codex/hooks.json` is not a stale import, and telling its author
+  # to re-point a specifier asks for something that does not exist.
+  @unit
+  Scenario: A home-directory string is not a monolith path
+    Given a source file with a plain string beginning "~/" that is not an import
+    When the legacy-monolith-path rule runs over it
+    Then it reports nothing
+    But an import through the same "~/" alias is still reported
+
+  # A test is the one place the old paths must be written down. The CI
+  # path-filter suites keep them under `wasFiles` precisely to prove the
+  # monolith is gone, so reporting them asks the author to re-point a specifier
+  # that is deliberately historical.
+  @unit
+  Scenario: A test may name a platform path in a plain string
+    Given a test file with a plain string naming a `platform/app` path
+    When the legacy-monolith-path rule runs over it
+    Then it reports nothing
+    But the same string in a production file is still reported
+    And an import naming `platform/app` is still reported, test file or not
+
+  @unit
+  Scenario: A stale import is reported once, not twice
+    Given a source file importing through the monolith alias
+    When the legacy-monolith-path rule runs over it
+    Then it reports exactly one finding for that import
