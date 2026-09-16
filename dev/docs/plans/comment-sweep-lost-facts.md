@@ -758,3 +758,33 @@ keep.
     behaviour is what keeps it reachable by pointer *and* keyboard. That is an
     accessibility requirement, and an accessibility requirement with no
     surviving statement is one that gets "simplified" away.
+
+## Wave 6 — `modules/evaluator`, `apps/server`, `mcp/`
+
+This slice was cleared twice: once by a lane that split blocks instead of
+shortening them, and once properly after the splits were merged back. The three
+facts below were cut by the *correction*, which is the honest cost of meeting
+the budget rather than evading it.
+
+36. **Why scanning source text is a safe substitute for constructing the server.**
+    `mcp/typescript/src/__tests__/feature-map-tool-drift.unit.test.ts`,
+    `registeredToolNames`. Gone: "the registration is always a string literal in
+    every case." That single sentence is the entire warrant for the test's
+    approach — a regex over source text finds every registered tool only because
+    no registration is computed. If someone later registers a tool under a
+    built name, this test silently stops seeing it, and the comment that would
+    have warned them is gone.
+
+37. **Only one of the three consumers actually renders.**
+    `modules/evaluator/web/src/model/evaluation-status.ts`. The merged block
+    still names all three consumers — the count, the trace tag, the status icon
+    — but no longer says that **only the status icon renders visually**. That
+    distinction is what tells a reader which consumer a visual change affects.
+
+38. **The page is split across packages.**
+    `modules/evaluator/web/src/behavior/evaluator-api.ts`, the `checkLimit` doc.
+    The reason two separate calls exist was softened away. The calls are not
+    redundant; they exist because the page spans more than one package, which is
+    precisely the condition this whole web-boundaries migration is changing.
+    Worth re-checking after that migration lands — it may become genuinely
+    redundant, and nothing in the file will say so.
