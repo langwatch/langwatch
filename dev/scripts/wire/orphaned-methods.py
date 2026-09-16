@@ -30,6 +30,9 @@ SOURCE_GLOBS = ["*.ts", "*.tsx"]
 NAME_SHAPE = re.compile(r"\b((?:try|find|get|list|read|load|fetch|resolve)[A-Z][A-Za-z0-9]{3,})\b")
 MIN_NAME_LENGTH = 8
 
+# Above this the input is not a rename wave and the alternation regex degrades.
+NAME_BUDGET = 300
+
 
 def removed_identifiers(rev_range):
     """Every method-shaped identifier the range deleted from a line."""
@@ -69,6 +72,11 @@ def index_tree(names):
     call_re = re.compile(rf"\.({alternation})\s*\(")
     decl_re = re.compile(rf"(?:^|[^.A-Za-z0-9_])(?:async\s+)?({alternation})\s*[(<:]")
     string_re = re.compile(rf"[\"']({alternation})[\"']")
+    # One compiled scan decides whether a file is worth reading line by line.
+    # The obvious guard - `any(n in text for n in names)` - is a substring
+    # search per name per file, which at branch scale is millions of them and
+    # turns a one-second check back into one that never finishes.
+    any_name = re.compile(alternation)
 
     found = {n: {"calls": [], "declarations": [], "strings": []} for n in names}
 
@@ -77,7 +85,7 @@ def index_tree(names):
             text = open(path, encoding="utf-8", errors="ignore").read()
         except OSError:
             continue
-        if not any(n in text for n in names):
+        if not any_name.search(text):
             continue
 
         for lineno, line in enumerate(text.splitlines(), 1):
@@ -107,6 +115,18 @@ def main():
         names = removed_identifiers(args.rev_range)
     else:
         parser.error("give a rev range or --names")
+
+    # A wave renames tens of symbols. A long-lived branch's whole diff yields
+    # thousands, and an alternation that size is pathological - the run stops
+    # looking finished and starts looking hung. Say so rather than hang.
+    if len(names) > NAME_BUDGET:
+        print(
+            f"{len(names)} candidate names from that range - too many to be a "
+            f"rename wave.\nThis check reads one wave's renames, not a whole "
+            f"branch. Narrow the range (a commit or two), or pass --names.",
+            file=sys.stderr,
+        )
+        return 2
 
     print(f"checking {len(names)} renamed-away name(s)\n")
 
