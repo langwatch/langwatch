@@ -265,3 +265,77 @@ Two smaller losses the second lane named: two files had a spec-file pointer
 dropped to fit the budget (recoverable from the routes under test), and two
 trailing comments were relocated to their own line — semantically identical
 after comment-stripping, and verified as such at collection.
+
+## Wave 2
+
+### modules/ops — `1a6a4457fd`
+
+1. **The quantile overflow bucket reports the largest finite bound.**
+   `modules/ops/contract/src/ops-latency.ts`. Values past the last real bucket
+   are reported at that bucket's bound rather than as unbounded, so a latency
+   headline silently understates a tail that ran off the end of the histogram.
+   Nothing else in the file restates it and rediscovering it means reading the
+   bucket arithmetic. The surviving three sentences keep the overestimate
+   direction and the null-versus-zero semantics.
+
+Recoverable, noted only: `latency-windows-card.tsx` dropped that "All time"
+means since latency history began recording (the UI label carries it);
+`ops-dashboard-content.tsx` dropped the layout rule that anything explaining a
+headline number sits above the detail tables (the JSX order carries it);
+`ops.api.ts` dropped that a project credential only enriches the report with a
+project link (the optional `apiToken` carries it).
+
+### modules/identity — `0c42fbd825`
+
+2. **Why `ON CONFLICT DO UPDATE ... RETURNING` is the only safe shape for the
+   address claim.** `prisma.identity-reservations.repository.ts`, 25 lines cut
+   to one sentence. Gone: why `DO NOTHING ... RETURNING` is unsafe against a
+   concurrent `release()` or `reapOrphans()` racing an insert-then-read; why
+   the `SET` is a deliberate self-assignment no-op that exists purely to make
+   the row visible to `RETURNING`; and why running without an outer transaction
+   is what keeps the row lock out of a lock-ordering cycle. The last two are
+   the kind of thing a later editor "tidies up" and breaks.
+
+3. **The pipeline registration that killed the combined backend boot.**
+   `identity-composition.build.ts` and its registration test. Registering a
+   producer-only pipeline definition beside the process owning the full one
+   raised `Pipeline "identity" is already registered`. Both files now say only
+   that resolution is lazy; the mechanism — refused outright versus silently
+   winning the name with a refusing stand-in — is gone from the tree.
+
+4. **The folded-vocabulary account detachment.** `identity-heads.repository.ts`,
+   `tryFindIdentifierIdForAccount`. The mechanism survives (folded vocabulary
+   collapses distinct OIDC connections); the incident it caused — keying on the
+   folded vocabulary once matched and detached the wrong enterprise account —
+   does not.
+
+5. **The approval-inside-the-expiry-window race, worked through.**
+   `join-request-lifecycle-dispatcher.service.ts`. The invariant survives
+   (announce RECORDED state, require the PENDING to EXPIRED transition); the
+   before/after guard-read sequence that shows why it is needed does not.
+
+### modules/model-provider — `76226983f3`
+
+6. **Cells show the final resolved state, never pinned versus inherited.**
+   `default-model-cascade.ts`. Pinned and inherited are only distinguished in
+   the edit drawer. A design decision invisible from the pure functions — a
+   reader has to already know to look in the drawer.
+
+7. **The exact headers redirect-refusal protects.** `ssrf.model-provider-egress.service.ts`.
+   The general reason survives ("could leak an API key"); the enumeration
+   `x-api-key` / `x-goog-api-key` / `xi-api-key`, which is the security-relevant
+   part, appears nowhere else in the file.
+
+8. **The copy-consistency pointer.** `connection-verdict-copy.ts` was kept in
+   step with the `platform/app` presentation registry by
+   `provider-refusal-copy.unit.test.ts`. Neither side now points at the other.
+
+### packages/eventing — `498a39009b`
+
+None parked. Blocks that read as narrative (the ATOMIC LEASE comment in
+`scheduler.service.ts`, "DECLARED, not incidental" in `redisCachedFoldStore.ts`,
+the V8-quoting incident in `foldCacheEntry.ts`) were compressed to their
+load-bearing sentence rather than cut.
+
+Unrelated, flagged so it is not mistaken for residue: a `no-port-vocabulary`
+finding at `server/maintenance/process-retention-sweep.intent.ts:14`.
