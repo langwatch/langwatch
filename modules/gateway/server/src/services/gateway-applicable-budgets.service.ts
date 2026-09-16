@@ -3,7 +3,7 @@
  * the same call the gateway bundle and the request-time check make, so the list cannot promise a
  * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
  */
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectApi, TraceDestinationProject } from "@langwatch/project-contract";
 import type { ScopeInput } from "@langwatch/gateway-contract";
 
 import {
@@ -90,7 +90,7 @@ export class GatewayApplicableBudgetsService {
       ? draft.traceProjectId
         ? await projects.findTraceDestination(draft.traceProjectId)
         : null
-      : await decidedTraceProject({ projects, draft });
+      : await findTraceDestinationForDraft({ projects, draft });
 
     return this.resolveApplicableBudgetsForTarget(
       {
@@ -163,13 +163,13 @@ export class GatewayApplicableBudgetsService {
  * save will make, so the list cannot preview a destination the key will not
  * get. A draft the save would refuse has none yet.
  */
-async function decidedTraceProject({
+async function findTraceDestinationForDraft({
   projects,
   draft,
 }: {
   projects: ProjectApi;
   draft: DraftVirtualKey;
-}) {
+}): Promise<TraceDestinationProject | null> {
   const decision = await projects.resolveTraceDestination({
     organizationId: draft.organizationId,
     projectScopeIds: draft.scopes

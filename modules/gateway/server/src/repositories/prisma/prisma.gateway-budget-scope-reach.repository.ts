@@ -14,7 +14,7 @@ export class PrismaGatewayBudgetScopeReachRepository {
     return new PrismaGatewayBudgetScopeReachRepository(database);
   }
 
-  async list(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
+  async findAll(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
     const keys = await this.database.virtualKey.findMany({
       where: { organizationId, status: "ACTIVE" },
       include: { scopes: true },

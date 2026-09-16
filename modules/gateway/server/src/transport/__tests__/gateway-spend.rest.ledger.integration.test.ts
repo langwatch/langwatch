@@ -111,7 +111,7 @@ function buildApp(): void {
   const spend: GatewaySpendApp = {
     spendEvents: () => GatewaySpendEventsService.create(repo),
     budgetSpend: () => budgets,
-    webhookEndpoints: () => ({ tryGetDeliverable: refuse }),
+    webhookEndpoints: () => ({ findDeliverable: refuse }),
     webhookEvents: () => undefined,
     webhookDelivery: () => undefined,
     spendEventEnvelope: testEnvelope,

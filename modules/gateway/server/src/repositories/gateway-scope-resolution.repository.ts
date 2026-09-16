@@ -34,7 +34,7 @@ export abstract class GatewayScopeResolutionRepository {
     projectIds: string[];
     transaction?: GatewayPersistenceTransaction;
   }): Promise<EligibleModelProvider[]>;
-  abstract tryFindRoutingPolicyOrder(input: {
+  abstract findRoutingPolicyOrder(input: {
     routingPolicyId: string;
     transaction?: GatewayPersistenceTransaction;
   }): Promise<GatewayRoutingPolicyOrder | null>;

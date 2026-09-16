@@ -144,7 +144,7 @@ export class GatewayRealtimeSessionService {
    * the conversation id recorded at mint, the LangWatch session id echoed back, then the single
    * session open for this credential in the window — stopping at exactly one candidate.
    */
-  async tryMatchRealtimeSession(params: {
+  async findMatchingRealtimeSession(params: {
     vendor: string;
     organizationId: string;
     modelProviderId: string;
@@ -163,7 +163,7 @@ export class GatewayRealtimeSessionService {
     };
 
     if (params.vendorConversationId) {
-      const exact = await sessions.tryFindByVendorConversationId({
+      const exact = await sessions.findByVendorConversationId({
         ...tenancy,
         vendorConversationId: params.vendorConversationId,
       });
@@ -173,7 +173,7 @@ export class GatewayRealtimeSessionService {
     }
 
     if (params.echoedSessionId) {
-      const echoed = await sessions.tryFindById({ ...tenancy, id: params.echoedSessionId });
+      const echoed = await sessions.findById({ ...tenancy, id: params.echoedSessionId });
       if (echoed) {
         return echoed;
       }
@@ -305,7 +305,7 @@ export class GatewayRealtimeSessionService {
     // holder of one key close a session another key opened and write arbitrary
     // usage onto that key's admitted spend record. A session id is a
     // gateway request id, which the other key's own response header carries.
-    const session = await params.collaborators.sessions.tryFindForReport({
+    const session = await params.collaborators.sessions.findForReport({
       sessionId: params.sessionId,
       projectId: params.projectId,
       virtualKeyId: params.virtualKeyId,
@@ -369,7 +369,12 @@ function settlementSpanId(sessionId: string): string {
   return createHash("sha256").update(`realtime-settlement:${sessionId}`).digest("hex").slice(0, 16);
 }
 
-function attr(key: string, value: string | number) {
+function attr(
+  key: string,
+  value: string | number,
+):
+  | { key: string; value: { doubleValue: number } }
+  | { key: string; value: { stringValue: string } } {
   return typeof value === "number"
     ? { key, value: { doubleValue: value } }
     : { key, value: { stringValue: value } };

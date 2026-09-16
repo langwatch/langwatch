@@ -93,7 +93,7 @@ async function assertAllResolve(
 }
 
 /** A virtual-key loader. Structurally satisfied by {@link VirtualKeyService}. */
-export type VirtualKeyReader = Pick<VirtualKeyService, "tryGetById">;
+export type VirtualKeyReader = Pick<VirtualKeyService, "findById">;
 
 /**
  * Scope-aware authorization for the virtual-key write paths. Every call names
@@ -171,7 +171,7 @@ export class VirtualKeyAuthorizationService {
       return { type: "team", id: scope.scopeId };
     }
 
-    const project = await this.directory.tryFindProjectTeam({ projectId: scope.scopeId });
+    const project = await this.directory.findProjectTeam({ projectId: scope.scopeId });
     // Fail closed on a dangling project reference.
     if (!project) {
       return null;
@@ -264,7 +264,7 @@ export class VirtualKeyAuthorizationService {
     userId: string;
   }): Promise<MembershipSet> {
     const [organizationRole, memberTeamIds] = await Promise.all([
-      this.directory.tryFindOrganizationRole(input),
+      this.directory.findOrganizationRole(input),
       this.directory.findMemberTeamIds(input),
     ]);
     const teamIds = new Set(memberTeamIds);
@@ -328,7 +328,7 @@ export class VirtualKeyAuthorizationService {
     let scopes = inputScopes;
     let storedTraceProjectId: string | null = null;
     if (!scopes && vkId) {
-      const vk = await this.directory.tryFindVirtualKeyScopes({
+      const vk = await this.directory.findVirtualKeyScopes({
         virtualKeyId: vkId,
         organizationId,
       });
@@ -448,7 +448,7 @@ export class VirtualKeyAuthorizationService {
     id: string,
     organizationId: string,
   ): Promise<VirtualKeyWithScopes> {
-    const vk = await reader.tryGetById(id, organizationId);
+    const vk = await reader.findById(id, organizationId);
     if (!vk) {
       throw new VirtualKeyNotFoundError();
     }

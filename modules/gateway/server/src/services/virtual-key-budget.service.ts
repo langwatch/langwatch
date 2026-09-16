@@ -53,7 +53,7 @@ export class VirtualKeyBudgetService {
     // linkage rather than by shape: matching on target/window would also
     // catch caps created independently on the Budgets page, whose
     // lifecycle (and delete permission) is not the drawer's to touch.
-    const existing = await this.keyBudgets.tryFindDrawerManaged(
+    const existing = await this.keyBudgets.findDrawerManaged(
       { organizationId: vk.organizationId, virtualKeyId: vk.id },
       tx,
     );

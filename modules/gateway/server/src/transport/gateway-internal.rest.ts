@@ -385,7 +385,7 @@ async function bucketSpentMicroUsd(params: {
   bucketScopeId: string;
   periodFloorMs: number | undefined;
 }): Promise<number> {
-  const projectIds = await params.store.listProjectIdsForOrganization(params.budget.organizationId);
+  const projectIds = await params.store.findProjectIdsForOrganization(params.budget.organizationId);
   if (projectIds.length === 0) return 0;
 
   const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(projectIds, [
@@ -756,7 +756,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
       return refuse(parseRejection.status, parseRejection);
     }
 
-    const vk = await app.virtualKeys.tryGetBySecretInternal(presented.data.key_presented);
+    const vk = await app.virtualKeys.findBySecretInternal(presented.data.key_presented);
     if (!vk) {
       logAuthDecision(request, "virtual_key_not_found", 401);
 
@@ -869,7 +869,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
   .handle(async ({ app, input, request }) => {
-    const vk = await app.store.tryFindVirtualKeyForConfig(input.vk_id);
+    const vk = await app.store.findVirtualKeyForConfig(input.vk_id);
     if (!vk) {
       return refuse(404, {
         type: "invalid_api_key",
@@ -1042,7 +1042,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
     }
 
     const store = app.store;
-    const budget = await store.tryFindBudget(budgetId);
+    const budget = await store.findBudget(budgetId);
     if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
       return refuse(404, {
         type: "not_found",
@@ -1062,7 +1062,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
       budget,
       attributedUserBucketScopeId(budget.scopeId, endUserId),
     );
-    const boundary = await store.tryFindBucketBoundary({ budgetId: budget.id, bucketScopeId });
+    const boundary = await store.findBucketBoundary({ budgetId: budget.id, bucketScopeId });
     const spentMicroUsd = await bucketSpentMicroUsd({
       store,
       budgetRepository,

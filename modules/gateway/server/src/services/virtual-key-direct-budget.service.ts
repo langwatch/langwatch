@@ -33,7 +33,7 @@ function chooseOnePerKey(
 ): Map<string, GatewayBudget> {
   const chosen = new Map<string, GatewayBudget>();
   for (const budget of budgets) {
-    const keyId = keyThisBudgetBelongsTo(budget, visibleKeyIds);
+    const keyId = findVisibleKeyForBudget(budget, visibleKeyIds);
     if (!keyId) {
       continue;
     }
@@ -51,7 +51,7 @@ function chooseOnePerKey(
  * the caller can see it; a drawer-managed row whose target is outside the visible set still
  * belongs to the key managing it, so that key is the fallback rather than dropping the row.
  */
-function keyThisBudgetBelongsTo(budget: GatewayBudget, visibleKeyIds: Set<string>): string | null {
+function findVisibleKeyForBudget(budget: GatewayBudget, visibleKeyIds: Set<string>): string | null {
   const scoped = budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
   if (scoped && visibleKeyIds.has(scoped)) {
     return scoped;

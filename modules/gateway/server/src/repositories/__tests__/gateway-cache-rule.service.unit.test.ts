@@ -36,19 +36,19 @@ class MemoryCacheRuleRepository extends GatewayCacheRuleRepository {
     super();
   }
 
-  list(): Promise<GatewayCacheRuleResource[]> {
+  findAll(): Promise<GatewayCacheRuleResource[]> {
     return Promise.resolve(this.rule ? [this.rule] : []);
   }
 
-  listPage(_: {
+  findPage(_: {
     organizationId: string;
     limit: number;
     cursor: GatewayCacheRuleCursor | null;
   }): Promise<GatewayCacheRuleResource[]> {
-    return this.list();
+    return this.findAll();
   }
 
-  tryGet({
+  findById({
     id,
     organizationId,
   }: {
@@ -98,7 +98,7 @@ class MemoryCacheRuleRepository extends GatewayCacheRuleRepository {
     return Promise.resolve(this.rule);
   }
 
-  listEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {
+  findEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {
     if (
       this.rule?.organizationId === organizationId &&
       this.rule.enabled &&

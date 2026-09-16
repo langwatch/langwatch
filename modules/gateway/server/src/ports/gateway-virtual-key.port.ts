@@ -64,15 +64,15 @@ export type SetGatewayVirtualKeyDisabledInput = {
 };
 
 export abstract class GatewayVirtualKeys {
-  abstract tryFindById(
+  abstract findById(
     input: { id: string; organizationId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord | null>;
-  abstract tryFindByIdGlobal(
+  abstract findByIdGlobal(
     id: string,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord | null>;
-  abstract tryFindByHashedSecret(
+  abstract findByHashedSecret(
     hashedSecret: string,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord | null>;
@@ -112,7 +112,7 @@ export abstract class GatewayVirtualKeys {
    * The organization a routing policy belongs to, for the check that a key
    * may only name one of its own. Null when no such policy exists.
    */
-  abstract tryFindRoutingPolicyOwner(input: {
+  abstract findRoutingPolicyOwner(input: {
     routingPolicyId: string;
   }): Promise<{ organizationId: string } | null>;
   abstract replaceScopes(

@@ -27,7 +27,7 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
     return Promise.reject(producerOnly(this.processName, "write a spend row from the fold"));
   }
 
-  tryReadForFold(): Promise<never> {
+  findForFold(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "read a spend row for the fold"));
   }
 
@@ -60,7 +60,9 @@ export class GatewaySpendProducerAdapter {
    * processName names the refusal, so a stand-in reached by accident says
    * which process reached it, not an anonymous failure.
    */
-  createGatewaySpendProducerPipeline(input: { processName: string }) {
+  createGatewaySpendProducerPipeline(input: {
+    processName: string;
+  }): ReturnType<EventingGatewaySpendAdapter["buildProcessing"]> {
     return EventingGatewaySpendAdapter.create({
       spendEvents: new ProducerOnlyGatewaySpendEvents(input.processName),
       // No process managers and no settlement sweeper: all three are the

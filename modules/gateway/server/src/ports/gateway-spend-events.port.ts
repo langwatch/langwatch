@@ -64,7 +64,7 @@ export abstract class GatewaySpendEvents {
     }[],
   ): Promise<void>;
 
-  abstract tryReadForFold(input: {
+  abstract findForFold(input: {
     tenantId: string;
     gatewayRequestId: string;
   }): Promise<GatewaySpendState | null>;

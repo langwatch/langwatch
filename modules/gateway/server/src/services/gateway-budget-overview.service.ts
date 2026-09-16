@@ -246,11 +246,11 @@ export class BudgetOverviewService {
    * person. There is no user in context, so a group budget reports the whole group's spend and
    * person-relative labels fall back to absolute phrases.
    */
-  async tryOverviewForBudget(input: {
+  async findBudgetOverview(input: {
     organizationId: string;
     budgetId: string;
   }): Promise<BudgetOverviewItem | null> {
-    const budget = await this.repository.tryFindBudget({
+    const budget = await this.repository.findBudget({
       organizationId: input.organizationId,
       budgetId: input.budgetId,
     });

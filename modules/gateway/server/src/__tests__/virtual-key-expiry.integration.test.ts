@@ -135,7 +135,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
       const expiresAt = nowInstant().add({ milliseconds: DAY_MS });
       const vk = await mintKey("published", expiresAt);
       const dto = virtualKeyDtos.toVirtualKeySnakeDto({
-        virtualKey: await service.tryGetById(vk.id, ORG_ID).then((k) => k!),
+        virtualKey: await service.findById(vk.id, ORG_ID).then((k) => k!),
         facts: await virtualKeyDtos.loadTraceDestinationFacts({
           projects: new NoTraceDestinationsProjectService(),
           virtualKeys: [vk],

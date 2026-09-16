@@ -5,14 +5,14 @@
  */
 export abstract class VirtualKeyAuthorizationRepository {
   /** The team a project hangs off, or null for a dangling reference. */
-  abstract tryFindProjectTeam(input: {
+  abstract findProjectTeam(input: {
     projectId: string;
   }): Promise<{ id: string; teamId: string } | null>;
   /**
    * The role a person holds in an organization, or null. A membership an
    * admin disabled to reclaim its seat reads as no membership.
    */
-  abstract tryFindOrganizationRole(input: {
+  abstract findOrganizationRole(input: {
     userId: string;
     organizationId: string;
   }): Promise<{ role: string } | null>;
@@ -28,7 +28,7 @@ export abstract class VirtualKeyAuthorizationRepository {
     organizationId: string;
     projectIds: string[];
   }): Promise<string[]>;
-  abstract tryFindVirtualKeyScopes(input: {
+  abstract findVirtualKeyScopes(input: {
     virtualKeyId: string;
     organizationId: string;
   }): Promise<{

@@ -19,7 +19,7 @@ export interface TwilioCredential {
 }
 
 /** The decrypted custom keys of a Twilio row, or null for anything else. */
-async function twilioKeys(
+async function findTwilioKeys(
   modelProviderId: string,
 ): Promise<Record<string, unknown> | null> {
   const provider = await prisma.modelProvider.findUnique({
@@ -33,7 +33,7 @@ async function twilioKeys(
 /**
  * The id of the enabled Twilio provider row a project can reach, or null.
  * A run resolves credentials in two steps: this finds the row,
- * {@link getTwilioCredential} reads its keys, same scope chain as any provider.
+ * {@link findTwilioCredential} reads its keys, same scope chain as any provider.
  */
 export async function findTwilioProviderForProject({
   projectId,
@@ -51,12 +51,12 @@ export async function findTwilioProviderForProject({
  * a Twilio row or any of the three is missing. All three are required, so a
  * half-configured row resolves to null rather than an empty field to Twilio.
  */
-export async function getTwilioCredential({
+export async function findTwilioCredential({
   modelProviderId,
 }: {
   modelProviderId: string;
 }): Promise<TwilioCredential | null> {
-  const keys = await twilioKeys(modelProviderId);
+  const keys = await findTwilioKeys(modelProviderId);
   if (!keys) return null;
   const accountSid = keys.TWILIO_ACCOUNT_SID;
   const authToken = keys.TWILIO_AUTH_TOKEN;

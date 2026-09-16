@@ -45,7 +45,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
     });
   }
 
-  async list(projectId: string): Promise<GatewayGuardrailResource[]> {
+  async findAll(projectId: string): Promise<GatewayGuardrailResource[]> {
     const rows = await this.database.gatewayGuardrail.findMany({
       where: { projectId, archivedAt: null },
       orderBy: [{ direction: "asc" }, { name: "asc" }],
@@ -53,7 +53,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
     return rows.map(toResource);
   }
 
-  async listBundleEntries(projectId: string): Promise<GatewayGuardrailBundleEntry[]> {
+  async findBundleEntries(projectId: string): Promise<GatewayGuardrailBundleEntry[]> {
     const rows = await this.database.gatewayGuardrail.findMany({
       where: { projectId, archivedAt: null },
       include: { evaluator: { select: { slug: true } } },
@@ -72,7 +72,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
     );
   }
 
-  async tryGet({
+  async findById({
     id,
     projectId,
   }: {

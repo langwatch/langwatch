@@ -8,9 +8,9 @@ import type {
 } from "@langwatch/gateway-contract";
 
 export abstract class GatewayGuardrailRepository {
-  abstract list(projectId: string): Promise<GatewayGuardrailResource[]>;
-  abstract listBundleEntries(projectId: string): Promise<GatewayGuardrailBundleEntry[]>;
-  abstract tryGet(input: {
+  abstract findAll(projectId: string): Promise<GatewayGuardrailResource[]>;
+  abstract findBundleEntries(projectId: string): Promise<GatewayGuardrailBundleEntry[]>;
+  abstract findById(input: {
     id: string;
     projectId: string;
   }): Promise<GatewayGuardrailResource | null>;

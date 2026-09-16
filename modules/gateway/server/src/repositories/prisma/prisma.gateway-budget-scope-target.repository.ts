@@ -297,7 +297,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
     return out;
   }
 
-  async listVirtualKeyProjectScopes(
+  async findVirtualKeyProjectScopes(
     prisma: GatewayBudgetScopeTargetDatabase,
     organizationId: string | null,
     virtualKeyIds: string[],

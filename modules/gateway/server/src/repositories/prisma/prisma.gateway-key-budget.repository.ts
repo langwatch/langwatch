@@ -22,7 +22,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     super();
   }
 
-  async tryFindDrawerManaged(
+  async findDrawerManaged(
     { organizationId, virtualKeyId }: { organizationId: string; virtualKeyId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget | null> {

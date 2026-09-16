@@ -9,10 +9,13 @@ import {
   gatewayUsageTrpc,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-import { Temporal, toEpochMs } from "@langwatch/time";
+import { type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
 /** The window a caller asked for, as the usage reader takes it. */
-function usageWindow(input: { fromDate: string; toDate: string }) {
+function usageWindow(input: { fromDate: string; toDate: string }): {
+  fromDate: Instant;
+  toDate: Instant;
+} {
   return {
     fromDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.fromDate)),
     toDate: Temporal.Instant.fromEpochMilliseconds(toEpochMs(input.toDate)),

@@ -52,10 +52,10 @@ const mutationInput = {
 
 describe("VirtualKeyService product-managed guard", () => {
   describe("given a product-managed key", () => {
-    it("reports it as absent on tryGetById", async () => {
+    it("reports it as absent on findById", async () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
-      await expect(sut.tryGetById("vk_1", "org_1")).resolves.toBeNull();
+      await expect(sut.findById("vk_1", "org_1")).resolves.toBeNull();
     });
 
     /** @scenario "Product-managed virtual keys refuse customer mutations" */
@@ -85,10 +85,10 @@ describe("VirtualKeyService product-managed guard", () => {
   });
 
   describe("given a customer-owned key", () => {
-    it("returns it from tryGetById", async () => {
+    it("returns it from findById", async () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("USER")), new TestProjectApi());
 
-      await expect(sut.tryGetById("vk_1", "org_1")).resolves.toMatchObject({
+      await expect(sut.findById("vk_1", "org_1")).resolves.toMatchObject({
         id: "vk_1",
         purpose: "USER",
       });

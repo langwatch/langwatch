@@ -99,7 +99,7 @@ describe("PrismaGatewayCacheRuleRepository", () => {
         audit: ports.auditPort,
       });
 
-      await repository.listEnabledForOrganization("org_01");
+      await repository.findEnabledForOrganization("org_01");
 
       expect(calls.findMany![0]!.args).toEqual({
         where: { organizationId: "org_01", archivedAt: null, enabled: true },

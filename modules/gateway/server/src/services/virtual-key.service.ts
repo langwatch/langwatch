@@ -134,8 +134,8 @@ export class VirtualKeyService {
    * rather than forbidden — the caller has no legitimate use for one, and a
    * distinct error would confirm the id exists.
    */
-  async tryGetById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
-    const vk = await this.repository.tryFindById({ id, organizationId });
+  async findById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
+    const vk = await this.repository.findById({ id, organizationId });
     if (!vk || VirtualKeyValidationService.isProductManaged(vk)) {
       return null;
     }
@@ -144,13 +144,13 @@ export class VirtualKeyService {
   }
 
   /** Used by the `/resolve-key` hot path — do not expose on public tRPC. */
-  async tryGetByHashedSecretInternal(hashedSecret: string): Promise<VirtualKeyWithScopes | null> {
-    return this.repository.tryFindByHashedSecret(hashedSecret);
+  async findByHashedSecretInternal(hashedSecret: string): Promise<VirtualKeyWithScopes | null> {
+    return this.repository.findByHashedSecret(hashedSecret);
   }
 
   /** Used by internal Gateway transports after their format check succeeds. */
-  async tryGetBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
-    return this.tryGetByHashedSecretInternal(this.crypto.hashSecret(secret));
+  async findBySecretInternal(secret: string): Promise<VirtualKeyWithScopes | null> {
+    return this.findByHashedSecretInternal(this.crypto.hashSecret(secret));
   }
 
   /** Mints a key, its scopes and its optional cap in one transaction. */

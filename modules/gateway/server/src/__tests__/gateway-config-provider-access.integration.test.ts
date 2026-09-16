@@ -121,7 +121,7 @@ const materialiser = () =>
   });
 
 async function bundleFor(keyId: string) {
-  const vk = await PrismaGatewayVirtualKeyRepository.create(prisma).tryFindById({
+  const vk = await PrismaGatewayVirtualKeyRepository.create(prisma).findById({
     id: keyId,
     organizationId: ORG_ID,
   });

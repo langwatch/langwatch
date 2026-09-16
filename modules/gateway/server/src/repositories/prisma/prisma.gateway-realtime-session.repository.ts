@@ -119,7 +119,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return updated.count > 0;
   }
 
-  async tryFindByVendorConversationId({
+  async findByVendorConversationId({
     organizationId,
     vendor,
     vendorConversationId,
@@ -135,7 +135,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return row ? toRealtimeSessionRow(row) : null;
   }
 
-  async tryFindById({
+  async findById({
     organizationId,
     vendor,
     id,
@@ -201,7 +201,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return rows.map(toRealtimeSessionRow);
   }
 
-  async tryFindForReport({
+  async findForReport({
     sessionId,
     projectId,
     virtualKeyId,

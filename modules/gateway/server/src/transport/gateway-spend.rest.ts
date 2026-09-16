@@ -74,7 +74,7 @@ export type GatewaySpendWebhookEndpoint = {
 
 /** The endpoint registry a replay names its destination in. */
 export type GatewaySpendWebhookEndpoints = {
-  tryGetDeliverable(input: {
+  findDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<GatewaySpendWebhookEndpoint | null>;
@@ -802,7 +802,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     responses: spendResponses,
   })
   .handle(async ({ app, input, scope }) => {
-    const endpoint = await app.webhookEndpoints().tryGetDeliverable({
+    const endpoint = await app.webhookEndpoints().findDeliverable({
       organizationId: scope.id,
       endpointId: input.endpoint_id,
     });

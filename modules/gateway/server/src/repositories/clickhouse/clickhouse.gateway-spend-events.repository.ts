@@ -142,7 +142,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
    * stamped with the CURRENT projection version decode; an older stamp reports a miss so the
    * projection refolds that aggregate from the log instead of trusting an undecodable shape.
    */
-  async tryReadForFold({
+  async findForFold({
     tenantId,
     gatewayRequestId,
   }: {

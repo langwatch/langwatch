@@ -35,31 +35,31 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
     return Promise.resolve(this.result);
   }
 
-  list(): never {
+  findAll(): never {
     throw new Error("not used");
   }
-  listForProject(): never {
+  findForProject(): never {
     throw new Error("not used");
   }
-  listWithHealth(): never {
+  findWithHealth(): never {
     throw new Error("not used");
   }
-  listPageWithHealth(): never {
+  findPageWithHealth(): never {
     throw new Error("not used");
   }
-  listForProjectWithHealth(): never {
+  findForProjectWithHealth(): never {
     throw new Error("not used");
   }
-  tryGet(): never {
+  findById(): never {
     throw new Error("not used");
   }
-  tryGetWithHealth(): never {
+  findHealthById(): never {
     throw new Error("not used");
   }
-  tryGetDetail(): never {
+  findDetailById(): never {
     throw new Error("not used");
   }
-  listScopeReachCandidates(): never {
+  findScopeReachCandidates(): never {
     throw new Error("not used");
   }
   create(): never {
@@ -80,19 +80,19 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
   resolveScopeTargets(): never {
     throw new Error("not used");
   }
-  listVirtualKeyProjectScopes(): never {
+  findVirtualKeyProjectScopes(): never {
     throw new Error("not used");
   }
 }
 
 class EmptyCacheRuleRepository extends GatewayCacheRuleRepository {
-  list(): never {
+  findAll(): never {
     throw new Error("not used");
   }
-  listPage(): never {
+  findPage(): never {
     throw new Error("not used");
   }
-  tryGet(): never {
+  findById(): never {
     throw new Error("not used");
   }
   create(): never {
@@ -104,19 +104,19 @@ class EmptyCacheRuleRepository extends GatewayCacheRuleRepository {
   archive(): never {
     throw new Error("not used");
   }
-  listEnabledForOrganization(): never {
+  findEnabledForOrganization(): never {
     throw new Error("not used");
   }
 }
 
 class EmptyGuardrailRepository extends GatewayGuardrailRepository {
-  list(): never {
+  findAll(): never {
     throw new Error("not used");
   }
-  listBundleEntries(): never {
+  findBundleEntries(): never {
     throw new Error("not used");
   }
-  tryGet(): never {
+  findById(): never {
     throw new Error("not used");
   }
   create(): never {
@@ -182,8 +182,8 @@ function serviceOverCatalogues({
   const projects = new TestProjectApi();
   const cacheRuleRepository = new EmptyCacheRuleRepository();
   const guardrailRepository = new EmptyGuardrailRepository();
-  cacheRuleRepository.listEnabledForOrganization = (async () => cacheRules) as never;
-  guardrailRepository.listBundleEntries = (async () => guardrails) as never;
+  cacheRuleRepository.findEnabledForOrganization = (async () => cacheRules) as never;
+  guardrailRepository.findBundleEntries = (async () => guardrails) as never;
 
   return GatewayService.create({
     repository: new FakeBudgetRepository({

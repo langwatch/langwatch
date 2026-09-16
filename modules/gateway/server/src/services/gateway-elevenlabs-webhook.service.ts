@@ -88,7 +88,7 @@ export class GatewayElevenLabsWebhookService {
     rawBody: string;
     signature: string | undefined;
   }): Promise<GatewayElevenLabsWebhookAnswer> {
-    const configured = await this.#credentials.tryGetWebhookSecret({
+    const configured = await this.#credentials.findWebhookSecret({
       modelProviderId: input.modelProviderId,
     });
     if (!configured) return { status: 404, body: { error: "Webhook not configured" } };
@@ -138,7 +138,7 @@ export class GatewayElevenLabsWebhookService {
     }
 
     const startedAtSeconds = payload.data?.metadata?.start_time_unix_secs;
-    const session = await this.#sessions.tryMatchRealtimeSession({
+    const session = await this.#sessions.findMatchingRealtimeSession({
       vendor: "elevenlabs",
       organizationId,
       modelProviderId,

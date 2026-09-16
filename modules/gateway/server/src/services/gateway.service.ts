@@ -85,7 +85,7 @@ export class GatewayService {
   async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
 
-    return this.repository.list({ organizationId, tenantIds });
+    return this.repository.findAll({ organizationId, tenantIds });
   }
 
   async listForProject(projectId: string): Promise<GatewayBudgetWithSeats[]> {
@@ -96,7 +96,7 @@ export class GatewayService {
 
     const tenantIds = await this.listSpendTenantIds(project.team.organizationId);
 
-    return this.repository.listForProject({
+    return this.repository.findForProject({
       organizationId: project.team.organizationId,
       teamId: project.teamId,
       projectId: project.id,
@@ -106,14 +106,14 @@ export class GatewayService {
 
   async listWithHealth(organizationId: string): Promise<BudgetListWithHealth> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
-    const result = await this.repository.listWithHealth({ organizationId, tenantIds });
+    const result = await this.repository.findWithHealth({ organizationId, tenantIds });
 
     return this.withScopeReach(result, organizationId);
   }
 
   async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetListWithHealth> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
-    const result = await this.repository.listPageWithHealth({ ...input, tenantIds });
+    const result = await this.repository.findPageWithHealth({ ...input, tenantIds });
 
     return this.withScopeReach(result, input.organizationId);
   }
@@ -130,7 +130,7 @@ export class GatewayService {
     }
 
     const tenantIds = await this.listSpendTenantIds(project.team.organizationId);
-    const result = await this.repository.listForProjectWithHealth({
+    const result = await this.repository.findForProjectWithHealth({
       organizationId: project.team.organizationId,
       teamId: project.teamId,
       projectId: project.id,
@@ -140,7 +140,7 @@ export class GatewayService {
     return this.withScopeReach(result, project.team.organizationId);
   }
 
-  async tryGet({
+  async findById({
     id,
     organizationId,
   }: {
@@ -149,10 +149,10 @@ export class GatewayService {
   }): Promise<GatewayBudgetWithSeats | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
 
-    return this.repository.tryGet({ id, organizationId, tenantIds });
+    return this.repository.findById({ id, organizationId, tenantIds });
   }
 
-  async tryGetWithHealth({
+  async findHealthById({
     id,
     organizationId,
   }: {
@@ -160,7 +160,7 @@ export class GatewayService {
     organizationId: string;
   }): Promise<GatewayBudgetHealth | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
-    const result = await this.repository.tryGetWithHealth({
+    const result = await this.repository.findHealthById({
       id,
       organizationId,
       tenantIds,
@@ -177,7 +177,7 @@ export class GatewayService {
     return { ...result, unreachableByAnyKey: !scopeReach.reachable };
   }
 
-  async tryGetDetail({
+  async findDetailById({
     id,
     organizationId,
   }: {
@@ -185,7 +185,7 @@ export class GatewayService {
     organizationId: string;
   }): Promise<GatewayBudgetDetail | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
-    const detail = await this.repository.tryGetDetail({ id, organizationId, tenantIds });
+    const detail = await this.repository.findDetailById({ id, organizationId, tenantIds });
     if (!detail) {
       return null;
     }
@@ -197,7 +197,7 @@ export class GatewayService {
   }
 
   async scopeReach(input: GatewayBudgetScopeReachInput): Promise<GatewayBudgetScopeReachResult> {
-    const candidates = await this.repository.listScopeReachCandidates(input.organizationId);
+    const candidates = await this.repository.findScopeReachCandidates(input.organizationId);
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );
@@ -244,7 +244,7 @@ export class GatewayService {
     const virtualKeyIds = budgets
       .filter((budget) => budget.scopeType === "VIRTUAL_KEY")
       .map((budget) => budget.scopeId);
-    const virtualKeyProjectScopes = await this.repository.listVirtualKeyProjectScopes({
+    const virtualKeyProjectScopes = await this.repository.findVirtualKeyProjectScopes({
       organizationId,
       virtualKeyIds,
     });
@@ -278,11 +278,11 @@ export class GatewayService {
     return this.cacheRules.listPage(input);
   }
 
-  tryCacheRuleGet(input: {
+  findCacheRule(input: {
     id: string;
     organizationId: string;
   }): Promise<GatewayCacheRuleResource | null> {
-    return this.cacheRules.tryGet(input);
+    return this.cacheRules.findById(input);
   }
 
   cacheRuleCreate(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
@@ -301,11 +301,11 @@ export class GatewayService {
     return this.guardrails.list(projectId);
   }
 
-  tryGuardrailGet(input: {
+  findGuardrail(input: {
     id: string;
     projectId: string;
   }): Promise<GatewayGuardrailResource | null> {
-    return this.guardrails.tryGet(input);
+    return this.guardrails.findById(input);
   }
 
   guardrailCreate(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
@@ -346,7 +346,7 @@ export class GatewayService {
     result: BudgetListWithHealth,
     organizationId: string,
   ): Promise<BudgetListWithHealth> {
-    const candidates = await this.repository.listScopeReachCandidates(organizationId);
+    const candidates = await this.repository.findScopeReachCandidates(organizationId);
     const projectIds = candidates.flatMap((candidate) =>
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );

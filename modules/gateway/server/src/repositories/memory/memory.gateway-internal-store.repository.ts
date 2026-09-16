@@ -37,15 +37,15 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
     this.#projects = [...(seed.projects ?? [])];
   }
 
-  async tryFindVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
+  async findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
     return this.#virtualKeys.find((key) => key.id === virtualKeyId) ?? null;
   }
 
-  async tryFindBudget(budgetId: string): Promise<GatewayBudget | null> {
+  async findBudget(budgetId: string): Promise<GatewayBudget | null> {
     return this.#budgets.find((budget) => budget.id === budgetId) ?? null;
   }
 
-  async tryFindBucketBoundary({
+  async findBucketBoundary({
     budgetId,
     bucketScopeId,
   }: {
@@ -58,7 +58,7 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
     return boundary ? { periodStartedAt: boundary.periodStartedAt } : null;
   }
 
-  async listProjectIdsForOrganization(organizationId: string): Promise<string[]> {
+  async findProjectIdsForOrganization(organizationId: string): Promise<string[]> {
     return this.#projects
       .filter((project) => project.organizationId === organizationId)
       .map((project) => project.id);

@@ -106,7 +106,7 @@ export type GatewayVirtualKeyBudgetInput = Readonly<{
  */
 export type GatewayVirtualKeyOperations = Readonly<{
   getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
-  tryGetById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
+  findById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
   getPage(input: {
     organizationId: string;
     limit: number;
@@ -583,14 +583,14 @@ export class GatewayApp implements GatewayApi {
 
   /** The endpoint registry a replay names its destination in. */
   webhookEndpoints(): {
-    tryGetDeliverable(input: {
+    findDeliverable(input: {
       organizationId: string;
       endpointId: string;
     }): Promise<{ id: string; enabledEvents: readonly string[] } | null>;
   } {
     const webhooks = this.#spendCollaborators.webhooks;
 
-    return { tryGetDeliverable: (input) => webhooks.findDeliverable(input) };
+    return { findDeliverable: (input) => webhooks.findDeliverable(input) };
   }
 
   /** The emitted-envelope log a replay walks, one page at a time. */
@@ -708,7 +708,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   tryGetBudgetWithHealth(input: { id: string; organizationId: string }) {
-    return this.#dependencies.budgetDecisions.tryGetWithHealth(input);
+    return this.#dependencies.budgetDecisions.findHealthById(input);
   }
 
   budgetScopeReach(input: GatewayBudgetScopeReachInput) {
@@ -731,7 +731,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   findBudgetDetail(input: { id: string; organizationId: string }) {
-    return this.#dependencies.budgetDecisions.tryGetDetail(input);
+    return this.#dependencies.budgetDecisions.findDetailById(input);
   }
 
   createBudget(input: CreateGatewayBudgetInput) {
@@ -755,7 +755,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   findGuardrail(input: { id: string; projectId: string }) {
-    return this.#dependencies.budgetDecisions.tryGuardrailGet(input);
+    return this.#dependencies.budgetDecisions.findGuardrail(input);
   }
 
   createGuardrail(input: CreateGatewayGuardrailInput) {
@@ -775,7 +775,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   findCacheRule(input: { id: string; organizationId: string }) {
-    return this.#dependencies.budgetDecisions.tryCacheRuleGet(input);
+    return this.#dependencies.budgetDecisions.findCacheRule(input);
   }
 
   createCacheRule(input: CreateGatewayCacheRuleInput) {
@@ -846,7 +846,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   findVirtualKeyById(id: string, organizationId: string) {
-    return this.#dependencies.virtualKeys.tryGetById(id, organizationId);
+    return this.#dependencies.virtualKeys.findById(id, organizationId);
   }
 
   createVirtualKey(input: GatewayVirtualKeyCreateInput) {

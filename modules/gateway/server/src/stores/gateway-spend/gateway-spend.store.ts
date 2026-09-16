@@ -18,7 +18,7 @@ export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState>
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<GatewaySpendState | null> {
-    return this.repo.tryReadForFold({
+    return this.repo.findForFold({
       tenantId: String(context.tenantId),
       gatewayRequestId: aggregateId,
     });

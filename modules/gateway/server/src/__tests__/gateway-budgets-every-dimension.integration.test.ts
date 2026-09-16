@@ -174,7 +174,7 @@ const materialiser = (spend: GatewayBudgetClickHouseRepository | null) =>
   });
 
 async function bundleFor(keyId: string, spend: GatewayBudgetClickHouseRepository | null = null) {
-  const vk = await keysPort().tryFindById({ id: keyId, organizationId: ORG_ID });
+  const vk = await keysPort().findById({ id: keyId, organizationId: ORG_ID });
   return materialiser(spend).materialise(vk!);
 }
 

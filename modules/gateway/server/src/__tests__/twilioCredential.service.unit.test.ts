@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see specs/features/agents/voice-phone.feature
  * `findTwilioProviderForProject` resolves the enabled Twilio provider a key
- * needs; `getTwilioCredential` reads its three keys. Repository/Prisma mocked.
+ * needs; `findTwilioCredential` reads its three keys. Repository/Prisma mocked.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -28,7 +28,7 @@ vi.mock("~/server/modelProviders/customKeys", () => ({
 
 import {
   findTwilioProviderForProject,
-  getTwilioCredential,
+  findTwilioCredential,
 } from "../twilioCredential.service";
 
 beforeEach(() => vi.clearAllMocks());
@@ -57,7 +57,7 @@ describe("findTwilioProviderForProject", () => {
   });
 });
 
-describe("getTwilioCredential", () => {
+describe("findTwilioCredential", () => {
   describe("when the row is a Twilio row with all three keys", () => {
     it("returns the account SID, auth token and from-number", async () => {
       findUnique.mockResolvedValue({
@@ -72,7 +72,7 @@ describe("getTwilioCredential", () => {
           TWILIO_FROM_NUMBER: "+14155550000",
         },
       });
-      const result = await getTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
       expect(result).toEqual({
         accountSid: "AC123",
         authToken: "tok-secret",
@@ -91,7 +91,7 @@ describe("getTwilioCredential", () => {
         state: "read",
         keys: { TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok-secret" },
       });
-      const result = await getTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
       expect(result).toBeNull();
     });
   });
@@ -102,7 +102,7 @@ describe("getTwilioCredential", () => {
         provider: "openai",
         customKeys: "cipher",
       });
-      const result = await getTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
       expect(result).toBeNull();
       expect(readCustomKeys).not.toHaveBeenCalled();
     });

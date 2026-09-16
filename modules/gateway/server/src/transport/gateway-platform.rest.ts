@@ -110,7 +110,20 @@ function scopesFromWire(
   return scopes.map((s) => ({ scopeType: toStoredEnum(s.scope_type), scopeId: s.scope_id }));
 }
 
-function toCacheRuleDto(r: GatewayCacheRuleResource) {
+function toCacheRuleDto(r: GatewayCacheRuleResource): {
+  id: GatewayCacheRuleResource["id"];
+  organization_id: GatewayCacheRuleResource["organizationId"];
+  name: GatewayCacheRuleResource["name"];
+  description: GatewayCacheRuleResource["description"];
+  priority: GatewayCacheRuleResource["priority"];
+  enabled: GatewayCacheRuleResource["enabled"];
+  matchers: GatewayCacheRuleResource["matchers"];
+  action: GatewayCacheRuleResource["action"];
+  mode_enum: Lowercase<GatewayCacheRuleResource["mode"]>;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+} {
   return {
     id: r.id,
     organization_id: r.organizationId,

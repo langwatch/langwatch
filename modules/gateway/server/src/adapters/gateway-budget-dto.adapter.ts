@@ -13,6 +13,7 @@ import {
   toWireEnum,
   usdDisplayString,
   metadataFromRow,
+  type ResourceMetadata,
 } from "@langwatch/gateway-contract";
 
 /**
@@ -20,7 +21,10 @@ import {
  * spendAvailable=false and per-person templates (a distribution, not one
  * total) both answer null, never a figure mistaken for real money.
  */
-function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
+function spendFields(
+  b: GatewayBudgetWithSeats,
+  spendAvailable: boolean,
+): { spent_usd: string | null; spent_nano_usd: number | null } {
   if (!spendAvailable || b.scopeType === "ATTRIBUTED_USER") {
     return { spent_usd: null, spent_nano_usd: null };
   }
@@ -61,7 +65,34 @@ export class GatewayBudgetDtoAdapter {
      * than publishing a guess as an answer.
      */
     reachable?: boolean;
-  }) {
+  }): {
+    id: GatewayBudgetWithSeats["id"];
+    organization_id: GatewayBudgetWithSeats["organizationId"];
+    scope_type: Lowercase<GatewayBudgetWithSeats["scopeType"]>;
+    scope_id: GatewayBudgetWithSeats["scopeId"];
+    name: GatewayBudgetWithSeats["name"];
+    description: GatewayBudgetWithSeats["description"];
+    window: Lowercase<GatewayBudgetWithSeats["window"]>;
+    on_breach: Lowercase<GatewayBudgetWithSeats["onBreach"]>;
+    limit_usd: string;
+    limit_nano_usd: number | null;
+    spent_usd: string | null;
+    spent_nano_usd: number | null;
+    timezone: GatewayBudgetWithSeats["timezone"];
+    provider_key: GatewayBudgetWithSeats["providerKey"];
+    external_id: string | null;
+    metadata: ResourceMetadata;
+    current_period_started_at: string;
+    resets_at: string;
+    cycle_anchor_at: string | null;
+    last_reset_at: string | null;
+    archived_at: string | null;
+    created_at: string;
+    member_count?: number;
+    end_users_seen?: number;
+    end_users_over?: number;
+    scope_reach?: "reachable" | "unreachable";
+  } {
     // The period is computed here rather than read off the row. The stored
     // columns move only at create and at an explicit reset, so a budget past
     // its first boundary carries a start from months ago and a reset instant

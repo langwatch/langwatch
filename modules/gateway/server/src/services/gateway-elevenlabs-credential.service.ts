@@ -51,7 +51,7 @@ export class GatewayElevenLabsCredentialService {
     organizationId: string;
   } | null> {
     const collaborators = this.collaborators;
-    const provider = await collaborators.providers.tryFindProviderRow({ modelProviderId });
+    const provider = await collaborators.providers.findProviderRow({ modelProviderId });
     if (provider?.provider !== "elevenlabs") {
       return null;
     }
@@ -67,7 +67,7 @@ export class GatewayElevenLabsCredentialService {
    * since the webhook has no other way to know whose session a delivery may close: the tenant is a
    * path parameter, so the match scopes to the org owning the secret the delivery was signed with.
    */
-  async tryGetWebhookSecret({
+  async findWebhookSecret({
     modelProviderId,
   }: {
     modelProviderId: string;

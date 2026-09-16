@@ -44,7 +44,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
     return transaction ? (transaction as Prisma.TransactionClient) : this.prisma;
   }
 
-  async tryFindById(
+  async findById(
     { id, organizationId }: { id: string; organizationId: string },
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
@@ -78,7 +78,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
     });
   }
 
-  async tryFindByIdGlobal(
+  async findByIdGlobal(
     id: string,
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
@@ -97,7 +97,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
     );
   }
 
-  async tryFindByHashedSecret(
+  async findByHashedSecret(
     hashedSecret: string,
     tx?: GatewayPersistenceTransaction,
   ): Promise<VirtualKeyWithScopes | null> {
@@ -298,7 +298,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
     );
   }
 
-  async tryFindRoutingPolicyOwner({
+  async findRoutingPolicyOwner({
     routingPolicyId,
   }: {
     routingPolicyId: string;

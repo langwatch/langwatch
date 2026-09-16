@@ -19,7 +19,28 @@ import { GatewayProviderLabelAdapter } from "../adapters/gateway-provider-label.
 /** One stateless label resolver for every budget row this door renders. */
 const providerLabelAdapter = GatewayProviderLabelAdapter.create();
 
-function toDto(b: GatewayBudgetWithSeats) {
+function toDto(b: GatewayBudgetWithSeats): {
+  id: GatewayBudgetWithSeats["id"];
+  organizationId: GatewayBudgetWithSeats["organizationId"];
+  scopeType: GatewayBudgetWithSeats["scopeType"];
+  scopeId: GatewayBudgetWithSeats["scopeId"];
+  name: GatewayBudgetWithSeats["name"];
+  description: GatewayBudgetWithSeats["description"];
+  window: GatewayBudgetWithSeats["window"];
+  onBreach: GatewayBudgetWithSeats["onBreach"];
+  limitUsd: string;
+  spentUsd: string;
+  timezone: GatewayBudgetWithSeats["timezone"];
+  providerKey: GatewayBudgetWithSeats["providerKey"];
+  currentPeriodStartedAt: string;
+  resetsAt: string;
+  cycleAnchorAt: string | null;
+  lastResetAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  endUsersSeen: number | null;
+  endUsersOver: number | null;
+} {
   // Computed, not read off the row: the stored columns only move at create
   // and at an explicit reset, so a budget past its first boundary would
   // otherwise report a period that closed months ago next to this period's

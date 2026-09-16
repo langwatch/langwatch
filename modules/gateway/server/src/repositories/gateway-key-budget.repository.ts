@@ -26,7 +26,7 @@ export type GatewayKeyBudgetScope = "drawerManaged" | "scopedToKey";
  */
 export abstract class GatewayKeyBudgetRepository {
   /** The one live row this key's drawer manages, if it has one. */
-  abstract tryFindDrawerManaged(
+  abstract findDrawerManaged(
     input: { organizationId: string; virtualKeyId: string },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget | null>;

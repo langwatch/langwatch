@@ -46,12 +46,12 @@ export abstract class GatewayRealtimeSessionRepository {
     status: GatewayRealtimeSessionStatus;
     closeReason: string;
   }): Promise<boolean>;
-  abstract tryFindByVendorConversationId(input: {
+  abstract findByVendorConversationId(input: {
     organizationId: string;
     vendor: string;
     vendorConversationId: string;
   }): Promise<GatewayRealtimeSession | null>;
-  abstract tryFindById(input: {
+  abstract findById(input: {
     organizationId: string;
     vendor: string;
     id: string;
@@ -73,7 +73,7 @@ export abstract class GatewayRealtimeSessionRepository {
     mintedBefore: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]>;
-  abstract tryFindForReport(input: {
+  abstract findForReport(input: {
     sessionId: string;
     projectId: string;
     virtualKeyId: string;

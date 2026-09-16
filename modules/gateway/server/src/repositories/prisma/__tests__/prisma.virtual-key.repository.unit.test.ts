@@ -1,5 +1,5 @@
 /**
- * `tryFindByIdGlobal`/`tryFindByHashedSecret` scope across every tenant on
+ * `findByIdGlobal`/`findByHashedSecret` scope across every tenant on
  * purpose — a request arrives bearing only a secret. A recording fake stands
  * in for Prisma: the claim is about the statement issued, not what a database does with it.
  */
@@ -43,7 +43,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("scopes the read to it, so another tenant's key cannot be read", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.tryFindById({ id: "key-1", organizationId: "organization-1" });
+        await repository.findById({ id: "key-1", organizationId: "organization-1" });
 
         expect(calls[0]?.args.where).toEqual({ id: "key-1", organizationId: "organization-1" });
       });
@@ -53,7 +53,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("reads on id alone, which is what the name promises", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.tryFindByIdGlobal("key-1");
+        await repository.findByIdGlobal("key-1");
 
         expect(calls[0]?.args.where).toEqual({ id: "key-1" });
       });
@@ -65,7 +65,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("accepts the current secret", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.tryFindByHashedSecret("hash-current");
+        await repository.findByHashedSecret("hash-current");
 
         const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
         expect(or[0]).toEqual({ hashedSecret: "hash-current" });
@@ -74,7 +74,7 @@ describe("PrismaGatewayVirtualKeyRepository", () => {
       it("also accepts the previous secret, but only while its window is open", async () => {
         const { repository, calls } = repositoryWith();
 
-        await repository.tryFindByHashedSecret("hash-previous");
+        await repository.findByHashedSecret("hash-previous");
 
         const or = (calls[0]?.args.where as { OR: Record<string, unknown>[] }).OR;
         const previous = or[1] as {

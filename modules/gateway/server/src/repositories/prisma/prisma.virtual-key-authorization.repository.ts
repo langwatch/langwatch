@@ -19,7 +19,7 @@ export class PrismaVirtualKeyAuthorizationRepository extends VirtualKeyAuthoriza
     super();
   }
 
-  tryFindProjectTeam({
+  findProjectTeam({
     projectId,
   }: {
     projectId: string;
@@ -30,7 +30,7 @@ export class PrismaVirtualKeyAuthorizationRepository extends VirtualKeyAuthoriza
     });
   }
 
-  tryFindOrganizationRole({
+  findOrganizationRole({
     userId,
     organizationId,
   }: {
@@ -97,7 +97,7 @@ export class PrismaVirtualKeyAuthorizationRepository extends VirtualKeyAuthoriza
     return projects.map((project) => project.id);
   }
 
-  tryFindVirtualKeyScopes({
+  findVirtualKeyScopes({
     virtualKeyId,
     organizationId,
   }: {

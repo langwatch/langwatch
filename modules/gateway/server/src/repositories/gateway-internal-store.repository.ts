@@ -5,7 +5,7 @@ import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 /**
  * One repository, not four, because these are one caller (the internal family).
- * Shapes are the original reads, not narrowed — `tryFindVirtualKeyForConfig` keeps
+ * Shapes are the original reads, not narrowed — `findVirtualKeyForConfig` keeps
  * the routing policy's aliases, or the gateway silently stops enforcing them.
  */
 export abstract class GatewayInternalStore {
@@ -14,17 +14,17 @@ export abstract class GatewayInternalStore {
    *
    * `null` when no key has that id, which the route answers 404 for.
    */
-  abstract tryFindVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null>;
+  abstract findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null>;
 
   /** One budget by id, whatever its state; the route decides what it may serve. */
-  abstract tryFindBudget(budgetId: string): Promise<GatewayBudget | null>;
+  abstract findBudget(budgetId: string): Promise<GatewayBudget | null>;
 
   /**
    * The per-user reset boundary for one bucket of an attributed-user budget.
    * `null` means never reset — the template's own period boundary is the
    * only one bounding the sum.
    */
-  abstract tryFindBucketBoundary(input: {
+  abstract findBucketBoundary(input: {
     budgetId: string;
     bucketScopeId: string;
   }): Promise<Pick<GatewayBudgetBucketBoundary, "periodStartedAt"> | null>;
@@ -33,7 +33,7 @@ export abstract class GatewayInternalStore {
    * Every project in an organization, which is the tenant list a ClickHouse
    * spend read is scoped by. An organization with no projects has no spend.
    */
-  abstract listProjectIdsForOrganization(organizationId: string): Promise<string[]>;
+  abstract findProjectIdsForOrganization(organizationId: string): Promise<string[]>;
 
   /**
    * The key rows a batch of spend admissions is attributed against. One

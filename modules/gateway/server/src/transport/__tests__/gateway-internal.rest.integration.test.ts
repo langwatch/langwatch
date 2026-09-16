@@ -73,13 +73,13 @@ class TestGuardrailRepository extends GatewayGuardrailRepository {
     return Promise.resolve(this.runnable);
   }
 
-  override list(): Promise<GatewayGuardrailResource[]> {
+  override findAll(): Promise<GatewayGuardrailResource[]> {
     return Promise.reject(new Error("not used by this test"));
   }
-  override listBundleEntries(): Promise<GatewayGuardrailBundleEntry[]> {
+  override findBundleEntries(): Promise<GatewayGuardrailBundleEntry[]> {
     return Promise.reject(new Error("not used by this test"));
   }
-  override tryGet(): Promise<GatewayGuardrailResource | null> {
+  override findById(): Promise<GatewayGuardrailResource | null> {
     return Promise.reject(new Error("not used by this test"));
   }
   override create(): Promise<GatewayGuardrailResource> {

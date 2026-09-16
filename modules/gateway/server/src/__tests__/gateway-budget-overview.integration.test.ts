@@ -272,7 +272,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       const onOverview = overview.budgets.find((b) => b.id === BUDGET_ARCHIVED_ID);
       expect(onOverview).toBeDefined();
 
-      const detail = await service.tryOverviewForBudget({
+      const detail = await service.findBudgetOverview({
         organizationId: ORG_ID,
         budgetId: BUDGET_ARCHIVED_ID,
       });
@@ -298,13 +298,13 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
       const onOverview = overview.budgets.find((b) => b.id === BUDGET_ORG_ID);
       expect(onOverview).toBeDefined();
 
-      const perBudget = await service.tryOverviewForBudget({
+      const perBudget = await service.findBudgetOverview({
         organizationId: ORG_ID,
         budgetId: BUDGET_ORG_ID,
       });
       expect(perBudget).not.toBeNull();
 
-      const detail = await budgetDecisions.tryGetDetail({
+      const detail = await budgetDecisions.findDetailById({
         id: BUDGET_ORG_ID,
         organizationId: ORG_ID,
       });
@@ -312,7 +312,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
 
       // The property the initiative exists for: one number, everywhere. /me
       // and the CLI endpoint are transports over `overviewForUser`; the
-      // budgets settings read is a transport over `tryGetDetail`, a different
+      // budgets settings read is a transport over `findDetailById`, a different
       // query against the same ledger.
       expect(Number(onOverview!.spentUsd)).toBeCloseTo(2.43, 6);
       expect(Number(perBudget!.spentUsd)).toBeCloseTo(Number(onOverview!.spentUsd), 6);
@@ -324,7 +324,7 @@ describe.skipIf(!databaseUrl || !chUrl)("budget overview (real PG + real CH)", (
   describe("given an organization budget with debits in two projects", () => {
     /** @scenario "An organization budget's recent activity lists debits from every project it spans" */
     it("lists the org budget's debits from both projects", async () => {
-      const detail = await budgetDecisions.tryGetDetail({
+      const detail = await budgetDecisions.findDetailById({
         id: BUDGET_ORG_ID,
         organizationId: ORG_ID,
       });

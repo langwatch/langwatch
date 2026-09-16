@@ -25,7 +25,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
     super();
   }
 
-  async tryFindVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
+  async findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
     const found = await this.database.virtualKey.findUnique({
       where: { id: virtualKeyId },
       include: {
@@ -43,13 +43,13 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
     return (found as VirtualKeyWithScopes | null) ?? null;
   }
 
-  async tryFindBudget(budgetId: string): Promise<GatewayBudget | null> {
+  async findBudget(budgetId: string): Promise<GatewayBudget | null> {
     const row = await this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
 
     return row ? toGatewayBudgetRow(row) : null;
   }
 
-  async tryFindBucketBoundary(input: {
+  async findBucketBoundary(input: {
     budgetId: string;
     bucketScopeId: string;
   }): Promise<{ periodStartedAt: GatewayBudgetBucketBoundary["periodStartedAt"] } | null> {
@@ -66,7 +66,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
     return row ? { periodStartedAt: fromDate(row.periodStartedAt) } : null;
   }
 
-  async listProjectIdsForOrganization(organizationId: string): Promise<string[]> {
+  async findProjectIdsForOrganization(organizationId: string): Promise<string[]> {
     const projects = await this.database.project.findMany({
       where: { team: { organizationId } },
       select: { id: true },

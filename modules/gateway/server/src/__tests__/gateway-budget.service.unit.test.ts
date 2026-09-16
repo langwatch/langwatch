@@ -351,7 +351,7 @@ describe("GatewayService.check", () => {
  * virtualKey/user) hits a different table and must resolve the right
  * shape and human-friendly name — all seven under one describe.
  */
-describe("GatewayService.tryGetDetail", () => {
+describe("GatewayService.findDetailById", () => {
   type Findable = {
     findFirst: unknown;
     findUnique: unknown;
@@ -419,7 +419,7 @@ describe("GatewayService.tryGetDetail", () => {
   describe("when the budget does not exist", () => {
     it("returns null", async () => {
       const sut = serviceOver(mockPrismaWithDetail(null, null));
-      const detail = await sut.tryGetDetail({ id: "b_missing", organizationId: "org_01" });
+      const detail = await sut.findDetailById({ id: "b_missing", organizationId: "org_01" });
       expect(detail).toBeNull();
     });
   });
@@ -432,7 +432,7 @@ describe("GatewayService.tryGetDetail", () => {
           slug: "acme",
         }),
       );
-      const detail = await sut.tryGetDetail({ id: "b_01", organizationId: "org_01" });
+      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget).toEqual({
         kind: "ORGANIZATION",
         id: "org_01",
@@ -452,7 +452,7 @@ describe("GatewayService.tryGetDetail", () => {
           displayPrefix: "lw_live_abc",
         }),
       );
-      const detail = await sut.tryGetDetail({ id: "b_01", organizationId: "org_01" });
+      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget).toEqual({
         kind: "VIRTUAL_KEY",
         id: "vk_01",
@@ -472,7 +472,7 @@ describe("GatewayService.tryGetDetail", () => {
         }),
       );
       expect(
-        (await sut1.tryGetDetail({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
+        (await sut1.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
       ).toBe("Alex Chen");
 
       const sut2 = serviceOver(
@@ -482,14 +482,14 @@ describe("GatewayService.tryGetDetail", () => {
         }),
       );
       expect(
-        (await sut2.tryGetDetail({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
+        (await sut2.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
       ).toBe("alex@example.com");
 
       const sut3 = serviceOver(
         mockPrismaWithDetail(stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }), null),
       );
       expect(
-        (await sut3.tryGetDetail({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
+        (await sut3.findDetailById({ id: "b_01", organizationId: "org_01" }))?.scopeTarget.name,
       ).toBe("user_42");
     });
   });
@@ -502,7 +502,7 @@ describe("GatewayService.tryGetDetail", () => {
       const sut = serviceOver(
         mockPrismaWithDetail(stubBudget({ scopeType: "TEAM", scopeId: "team_01" }), null),
       );
-      const detail = await sut.tryGetDetail({ id: "b_01", organizationId: "org_01" });
+      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.scopeTarget.name).toBe("team_01");
       expect(detail?.scopeTarget.secondary).toBeNull();
     });
@@ -514,7 +514,7 @@ describe("GatewayService.tryGetDetail", () => {
         mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),
         mockChRepoWithEvents([{ id: "l_01" }]),
       );
-      const detail = await sut.tryGetDetail({ id: "b_01", organizationId: "org_01" });
+      const detail = await sut.findDetailById({ id: "b_01", organizationId: "org_01" });
       expect(detail?.recentLedger).toHaveLength(1);
     });
   });

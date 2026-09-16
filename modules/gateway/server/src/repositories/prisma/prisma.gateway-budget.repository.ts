@@ -339,18 +339,18 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return new Map(targets);
   }
 
-  listVirtualKeyProjectScopes(input: {
+  findVirtualKeyProjectScopes(input: {
     organizationId: string | null;
     virtualKeyIds: string[];
   }): Promise<GatewayVirtualKeyProjectScope[]> {
-    return PrismaGatewayBudgetScopeTargetRepository.create().listVirtualKeyProjectScopes(
+    return PrismaGatewayBudgetScopeTargetRepository.create().findVirtualKeyProjectScopes(
       this.prisma,
       input.organizationId,
       input.virtualKeyIds,
     );
   }
 
-  async list(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
+  async findAll(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
     const budgets = await this.prisma.gatewayBudget.findMany({
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
@@ -358,7 +358,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
   }
 
-  async listForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
+  async findForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
     const budgets = await this.prisma.gatewayBudget.findMany({
       where: {
         organizationId: input.organizationId,
@@ -579,7 +579,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * the view cannot render honestly without: whether spend could be totalled
    * at all, and which budgets no active key can ever spend against.
    */
-  async listWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth> {
+  async findWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth> {
     const rows = await this.prisma.gatewayBudget.findMany({
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
@@ -592,7 +592,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * scope-type filter is pushed into the query, not applied after the page —
    * that would make limit mean "rows examined", silently shorting a caller.
    */
-  async listPageWithHealth(
+  async findPageWithHealth(
     args: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
   ): Promise<BudgetListWithHealth> {
     const rows = await this.prisma.gatewayBudget.findMany({
@@ -620,8 +620,8 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return this.decorateWithHealth(rows.map(toGatewayBudgetResource), args);
   }
 
-  /** As listWithHealth, for the budgets that apply to one project. */
-  async listForProjectWithHealth(
+  /** As findWithHealth, for the budgets that apply to one project. */
+  async findForProjectWithHealth(
     input: GatewayProjectBudgetReadInput,
   ): Promise<BudgetListWithHealth> {
     const rows = await this.prisma.gatewayBudget.findMany({
@@ -651,11 +651,11 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * One budget in exactly the shape listWithHealth returns rows in, including whether the
+   * One budget in exactly the shape findWithHealth returns rows in, including whether the
    * spend figure is real. Dropping spendAvailable here would render an untotalled spentUsd
    * as real spend — the same confusion the list already refuses to create.
    */
-  async tryGetWithHealth(input: GatewayBudgetReadInput): Promise<BudgetHealth | null> {
+  async findHealthById(input: GatewayBudgetReadInput): Promise<BudgetHealth | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id: input.id, organizationId: input.organizationId, archivedAt: null },
     });
@@ -673,7 +673,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     };
   }
 
-  async tryGet(input: GatewayBudgetReadInput): Promise<GatewayBudgetWithSeats | null> {
+  async findById(input: GatewayBudgetReadInput): Promise<GatewayBudgetWithSeats | null> {
     const stored = await this.tryGetStored(input.id, input.organizationId);
     if (!stored) return null;
 
@@ -692,7 +692,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * last 20 ledger entries, for the detail page — one round-trip per scope kind so the UI
    * doesn't chain queries.
    */
-  async tryGetDetail(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
+  async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
       where: { id: input.id, organizationId: input.organizationId },
     });
@@ -776,8 +776,8 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
    * from the create guard (which only refuses three scopes), since omitting
    * it from create's response would disagree with the very next read.
    */
-  listScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
-    return this.scopeReach.list(organizationId);
+  findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
+    return this.scopeReach.findAll(organizationId);
   }
 
   async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
@@ -1297,7 +1297,12 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
 }
 
 /** The temporal half of a stored row, as instants, for the window math. */
-function budgetPeriodOf(budget: GatewayBudget) {
+function budgetPeriodOf(budget: GatewayBudget): {
+  window: GatewayBudget["window"];
+  currentPeriodStartedAt: Instant;
+  lastResetAt: Instant | null;
+  cycleAnchorAt: Instant | null;
+} {
   return {
     window: budget.window,
     currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),

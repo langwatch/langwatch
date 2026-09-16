@@ -18,7 +18,7 @@ export class PrismaGatewayBudgetOverviewRepository extends GatewayBudgetOverview
     super();
   }
 
-  async tryFindBudget({
+  async findBudget({
     organizationId,
     budgetId,
   }: {

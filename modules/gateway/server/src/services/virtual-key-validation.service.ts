@@ -282,10 +282,10 @@ export class VirtualKeyValidationService {
   /**
    * Loads a key for mutation. Product-managed keys are rejected here rather
    * than in each caller, so `update` / `rotate` / `revoke` cannot drift apart
-   * — NOT_FOUND for the same reason `tryGetById` returns null.
+   * — NOT_FOUND for the same reason `findById` returns null.
    */
   async ownedForMutation(id: string, organizationId: string): Promise<VirtualKeyWithScopes> {
-    const existing = await this.repository.tryFindById({ id, organizationId });
+    const existing = await this.repository.findById({ id, organizationId });
     if (!existing || VirtualKeyValidationService.isProductManaged(existing)) {
       throw new TRPCError({
         code: "NOT_FOUND",
@@ -375,7 +375,7 @@ export class VirtualKeyValidationService {
     routingPolicyId: string,
     organizationId: string,
   ): Promise<void> {
-    const policy = await this.repository.tryFindRoutingPolicyOwner({ routingPolicyId });
+    const policy = await this.repository.findRoutingPolicyOwner({ routingPolicyId });
     if (!policy) {
       throw new TRPCError({
         code: "NOT_FOUND",

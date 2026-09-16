@@ -15,7 +15,20 @@ import {
  * The wire row, unchanged: `modeEnum` keeps its name because the browser and
  * the CLI read it, even though the canonical resource calls the field `mode`.
  */
-function toDto(r: GatewayCacheRuleResource) {
+function toDto(r: GatewayCacheRuleResource): {
+  id: GatewayCacheRuleResource["id"];
+  organizationId: GatewayCacheRuleResource["organizationId"];
+  name: GatewayCacheRuleResource["name"];
+  description: GatewayCacheRuleResource["description"];
+  priority: GatewayCacheRuleResource["priority"];
+  enabled: GatewayCacheRuleResource["enabled"];
+  matchers: GatewayCacheRuleResource["matchers"];
+  action: GatewayCacheRuleResource["action"];
+  modeEnum: GatewayCacheRuleResource["mode"];
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+} {
   return {
     id: r.id,
     organizationId: r.organizationId,

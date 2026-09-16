@@ -20,7 +20,7 @@ export class GatewayCacheRuleService {
   private constructor(private readonly repository: GatewayCacheRuleRepository) {}
 
   list(organizationId: string): Promise<GatewayCacheRuleResource[]> {
-    return this.repository.list(organizationId);
+    return this.repository.findAll(organizationId);
   }
 
   listPage(input: {
@@ -28,11 +28,11 @@ export class GatewayCacheRuleService {
     limit: number;
     cursor: GatewayCacheRuleCursor | null;
   }): Promise<GatewayCacheRuleResource[]> {
-    return this.repository.listPage(input);
+    return this.repository.findPage(input);
   }
 
-  tryGet(input: { id: string; organizationId: string }): Promise<GatewayCacheRuleResource | null> {
-    return this.repository.tryGet(input);
+  findById(input: { id: string; organizationId: string }): Promise<GatewayCacheRuleResource | null> {
+    return this.repository.findById(input);
   }
 
   create(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
@@ -41,7 +41,7 @@ export class GatewayCacheRuleService {
 
   async update(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     const parsed = updateGatewayCacheRuleInputSchema.parse(input);
-    const existing = await this.repository.tryGet({
+    const existing = await this.repository.findById({
       id: parsed.id,
       organizationId: parsed.organizationId,
     });
@@ -54,7 +54,7 @@ export class GatewayCacheRuleService {
 
   async archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     const parsed = archiveGatewayCacheRuleInputSchema.parse(input);
-    const existing = await this.repository.tryGet({
+    const existing = await this.repository.findById({
       id: parsed.id,
       organizationId: parsed.organizationId,
     });
@@ -66,6 +66,6 @@ export class GatewayCacheRuleService {
   }
 
   listEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {
-    return this.repository.listEnabledForOrganization(organizationId);
+    return this.repository.findEnabledForOrganization(organizationId);
   }
 }

@@ -208,7 +208,7 @@ describe.skipIf(!databaseUrl)(
           allowUnreachable: true,
         });
 
-        const found = await service.tryGetWithHealth({ id: budget.id, organizationId: ORG_ID });
+        const found = await service.findHealthById({ id: budget.id, organizationId: ORG_ID });
         expect(found?.unreachableByAnyKey).toBe(true);
         expect(
           budgetDtos.toBudgetDto({

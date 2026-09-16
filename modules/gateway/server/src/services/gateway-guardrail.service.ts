@@ -45,15 +45,15 @@ export class GatewayGuardrailService {
   ) {}
 
   list(projectId: string): Promise<GatewayGuardrailResource[]> {
-    return this.repository.list(projectId);
+    return this.repository.findAll(projectId);
   }
 
   listBundleEntries(projectId: string): Promise<GatewayGuardrailBundleEntry[]> {
-    return this.repository.listBundleEntries(projectId);
+    return this.repository.findBundleEntries(projectId);
   }
 
-  tryGet(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null> {
-    return this.repository.tryGet(input);
+  findById(input: { id: string; projectId: string }): Promise<GatewayGuardrailResource | null> {
+    return this.repository.findById(input);
   }
 
   async create(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
@@ -75,7 +75,7 @@ export class GatewayGuardrailService {
 
   async update(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
     const parsed = updateGatewayGuardrailInputSchema.parse(input);
-    const existing = await this.repository.tryGet({
+    const existing = await this.repository.findById({
       id: parsed.id,
       projectId: parsed.projectId,
     });
@@ -104,7 +104,7 @@ export class GatewayGuardrailService {
 
   async archive(input: ArchiveGatewayGuardrailInput): Promise<void> {
     const parsed = archiveGatewayGuardrailInputSchema.parse(input);
-    const existing = await this.repository.tryGet({
+    const existing = await this.repository.findById({
       id: parsed.id,
       projectId: parsed.projectId,
     });

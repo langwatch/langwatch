@@ -64,7 +64,9 @@ export interface SpendSettlementProcessDeps {
  * failed send must not cost the rest of the sweep. A row that fails stays
  * open and is retried on the next sweep, which is what the sweep is for.
  */
-export function runSpendSettlementSweep(deps: SpendSettlementProcessDeps) {
+export function runSpendSettlementSweep(
+  deps: SpendSettlementProcessDeps,
+): (payload: { scheduledFor: number }, context: IntentContext) => Promise<void> {
   return async (_payload: { scheduledFor: number }, context: IntentContext): Promise<void> => {
     const now = (deps.now ?? Date.now)();
     const graceMs = deps.graceMs ?? SETTLEMENT_GRACE_MS_DEFAULT;

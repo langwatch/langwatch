@@ -48,7 +48,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     super();
   }
 
-  async list(organizationId: string): Promise<GatewayCacheRuleResource[]> {
+  async findAll(organizationId: string): Promise<GatewayCacheRuleResource[]> {
     const rows = await this.database.gatewayCacheRule.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
@@ -56,7 +56,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     return rows.map(toResource);
   }
 
-  async listPage(input: {
+  async findPage(input: {
     organizationId: string;
     limit: number;
     cursor: GatewayCacheRuleCursor | null;
@@ -81,7 +81,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     return rows.map(toResource);
   }
 
-  async tryGet({
+  async findById({
     id,
     organizationId,
   }: {
@@ -214,7 +214,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     });
   }
 
-  async listEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {
+  async findEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {
     const rows = await this.database.gatewayCacheRule.findMany({
       where: { organizationId, archivedAt: null, enabled: true },
       orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
