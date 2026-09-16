@@ -6,6 +6,15 @@ nothing is in flight.
 
 Two drives ran in parallel here. They are independent; pick either.
 
+## Exact next action
+
+Take the studio-column-vocabulary decision (section B) before spawning any more
+web wave-2 lanes — it blocks web-12's dependency deletion and may block lanes 8,
+10 and 11. Everything else is unblocked: either slice the next comment tranche
+from a fresh measurement (three lanes, sonnet, ~150-200 findings each), or spawn
+web lanes 7, 8, 9, 10, 11, 14, 15, whose paths are now all free.
+
+
 ---
 
 ## A. Lint to zero — the comment sweep
