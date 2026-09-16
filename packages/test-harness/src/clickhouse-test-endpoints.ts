@@ -53,12 +53,9 @@ export const TEST_CLICKHOUSE_TUNING = {
 } as const;
 
 /**
- * Label stamped on every tuned test container. Reuse (`withReuse`) matches an
- * existing container by hashing its create options, and copied file content is
- * applied after create — outside the hash — so without a discriminator a
- * pre-tuning container would be reused as-is and silently never get the
- * tuning. Labels are part of the create options, so bumping this value forces
- * new containers whenever the tuning content changes.
+ * Label stamped on every tuned test container. `withReuse` matches by hashing
+ * create options, but copied file content is applied after create — outside
+ * the hash — so bumping this value is what forces new containers when tuning changes.
  */
 export const TEST_CLICKHOUSE_TUNING_LABEL = {
   "langwatch.test.clickhouse-tuning": "v1",
@@ -87,12 +84,9 @@ export function privateRouteOrgId(name: string): string {
 }
 
 /**
- * The always-on local ClickHouse that the docker-free test mode runs against,
- * or null when the caller should fall back to containers.
- *
- * The single place that decides whether the native mode is on: globalSetup.ts
- * reads it too, so the two can never disagree about which backend a run uses.
- * Never active in CI, where the service containers are the point.
+ * The always-on local ClickHouse the docker-free test mode runs against, or
+ * null to fall back to containers. The single place that decides whether
+ * native mode is on — globalSetup.ts reads it too — and never active in CI.
  */
 export function nativeClickHouseBaseUrl(): string | null {
   if (process.env.CI) return null;
@@ -100,11 +94,9 @@ export function nativeClickHouseBaseUrl(): string | null {
 }
 
 /**
- * URLs whose schema this process has already migrated.
- *
- * goose is blocking and applies the whole set; every file in a shard that
- * asked for the same endpoint would otherwise re-run it against a database
- * that already carries it.
+ * URLs whose schema this process has already migrated: goose is blocking
+ * and applies the whole set, so without this a shard's files sharing an
+ * endpoint would each re-run migration against an already-migrated database.
  */
 const migratedUrls = new Set<string>();
 
@@ -126,10 +118,9 @@ export async function migrateTestClickHouseOnce({
 }
 
 /**
- * Provisions one isolated endpoint per entry in `names`.
- *
- * `suite` and the names together form each database name, so two suites asking
- * for a "shared" endpoint get different databases and cannot collide.
+ * Provisions one isolated endpoint per entry in `names`. `suite` and the
+ * name together form each database name, so two suites asking for a
+ * "shared" endpoint get different databases and cannot collide.
  */
 export async function startTestClickHouseEndpoints({
   suite,
@@ -167,10 +158,9 @@ async function startNativeEndpoints({
 }
 
 /**
- * One reusable container per endpoint, each labelled so `docker ps` and the
- * cleanup command in globalSetup.ts can find them. Reuse is keyed on the
- * container's own configuration, so the distinct labels are what keep the
- * endpoints on separate servers rather than collapsing into one.
+ * One reusable container per endpoint, labelled so `docker ps` and
+ * globalSetup.ts's cleanup can find them. Reuse keys on configuration, so
+ * the distinct labels are what keep endpoints from collapsing into one.
  */
 async function startContainerEndpoints({
   suite,
@@ -209,10 +199,8 @@ async function startContainerEndpoints({
 
 /**
  * Creates the endpoint's database and returns the URL that selects it.
- *
- * `CREATE DATABASE` goes to the server root rather than the endpoint URL: the
- * database does not exist yet, and connecting to a missing one fails before the
- * statement is ever sent.
+ * `CREATE DATABASE` goes to the server root, not the endpoint URL — the
+ * database doesn't exist yet, so connecting to it first would fail.
  */
 async function ensureEndpoint({
   baseUrl,

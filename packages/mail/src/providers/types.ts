@@ -53,10 +53,9 @@ export type MailerConfiguration = Readonly<{
 }>;
 
 /**
- * One outbound email gateway. Implementations receive the already-normalized
- * `EmailContent` plus the resolved default `from`, and are responsible for
- * mapping the shared surface (bcc, reply-to, custom headers, attachments) onto
- * whatever their transport expects.
+ * One outbound email gateway. Implementations receive the normalized
+ * `EmailContent` plus the resolved default `from`, and map the shared
+ * surface (bcc, reply-to, headers, attachments) onto their own transport.
  */
 export interface EmailProvider {
   name: EmailProviderName;

@@ -42,10 +42,9 @@ export function getProcessOutboundProxyConfig(): Readonly<OutboundProxyConfig> {
 }
 
 /**
- * The proxy that applies to `targetHost`, or undefined when none is configured
- * or the host is excluded via `NO_PROXY`.
- *
- * `HTTPS_PROXY` wins over `HTTP_PROXY` because every gateway here uses TLS.
+ * The proxy that applies to `targetHost`, or undefined when none is
+ * configured or the host is excluded via `NO_PROXY`. `HTTPS_PROXY` wins
+ * over `HTTP_PROXY` because every gateway here uses TLS.
  */
 export const resolveProxyForHost = (
   config: OutboundProxyConfig,
@@ -80,10 +79,9 @@ export const isProxyBypassed = (config: OutboundProxyConfig, targetHost: string)
 };
 
 /**
- * Hostname of a URL, or the input unchanged when it is already a bare host.
- *
- * A scheme-less `host:port` parses as a URL whose scheme is `host:` and whose
- * hostname is empty, so the parsed result is only trusted when it is non-empty.
+ * Hostname of a URL, or the input unchanged if already a bare host. A
+ * scheme-less `host:port` parses with scheme `host:` and empty hostname,
+ * so the parsed result is only trusted when non-empty.
  */
 export const hostnameOf = (urlOrHost: string): string => {
   const parsed = findUrlHostname(urlOrHost);

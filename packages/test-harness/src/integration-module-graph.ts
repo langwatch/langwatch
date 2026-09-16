@@ -14,11 +14,9 @@ const MODULE_MOCK_PATTERN = /\bvi\s*\.\s*(mock|doMock|hoisted)\s*\(/;
 export type GraphLane = "mocking" | "shared";
 
 /**
- * Which graph lane a single file belongs to, given its source.
- *
- * Exported for the guard test: the decision has to be inspectable on a string
- * without a filesystem behind it, or it cannot be tested at the level it is
- * made.
+ * Which graph lane a single file belongs to, given its source. Exported for
+ * the guard test: the decision must be inspectable on a string without a
+ * filesystem behind it, or it can't be tested at the level it is made.
  */
 export function graphLaneForSource(source: string): GraphLane {
   return MODULE_MOCK_PATTERN.test(source) ? "mocking" : "shared";
@@ -32,11 +30,9 @@ export interface GraphPartition {
 }
 
 /**
- * Partition already-selected datastore files by graph lane.
- *
- * Takes the file list rather than walking the tree, so this composes with
- * partitionIntegrationFiles instead of duplicating its walk — and so the two
- * partitions cannot disagree about which files exist.
+ * Partition already-selected datastore files by graph lane. Takes the file
+ * list, not a tree walk, so this composes with partitionIntegrationFiles —
+ * the two partitions can never disagree about which files exist.
  */
 export function partitionByModuleGraph({
   root,
@@ -65,12 +61,9 @@ export function partitionByModuleGraph({
 }
 
 /**
- * The lane this process was asked to run, or null for "both".
- *
- * Null is the local default and runs every datastore file with a fresh
- * registry — identical to the behaviour before this split, so a plain
- * `pnpm test:integration <path>` on a laptop is unchanged and no one has to
- * know the lane exists. CI sets the variable and gets the two lanes.
+ * The lane this process was asked to run, or null for "both". Null is the
+ * local default (every file with a fresh registry, identical to before this
+ * split), so a plain `pnpm test:integration <path>` is unchanged; CI sets it.
  */
 export function selectedGraphLane(env: NodeJS.ProcessEnv): GraphLane | null {
   const value = env.INTEGRATION_GRAPH_LANE;
@@ -79,11 +72,9 @@ export function selectedGraphLane(env: NodeJS.ProcessEnv): GraphLane | null {
 }
 
 /**
- * The files to run, and whether they may share a registry.
- *
- * One function so `include` and `isolate` are derived from the same decision.
- * Splitting them is how a lane ends up running the mocking files with a shared
- * graph, which is the failure this whole file exists to prevent.
+ * The files to run, and whether they may share a registry — one function so
+ * `include` and `isolate` derive from the same decision. Splitting them is
+ * how mocking files end up sharing a graph, the failure this file prevents.
  */
 export function graphLaneSelection({
   root,

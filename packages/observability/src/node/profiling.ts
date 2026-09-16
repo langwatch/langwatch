@@ -14,10 +14,9 @@ export const normaliseTagKey = (key: string): string =>
     .replace(/^[0-9]/, "_");
 
 /**
- * Reads OTEL_RESOURCE_ATTRIBUTES so a profile carries the identity the traces,
- * logs and metrics from this process already carry. In local development that is
- * langwatch.worktree, which is what lets a developer filter a flame graph down
- * to their own worktree while a dozen share one Pyroscope.
+ * Reads OTEL_RESOURCE_ATTRIBUTES so a profile carries the identity traces,
+ * logs and metrics already carry. Locally that's langwatch.worktree, letting
+ * a developer filter a flame graph to their own worktree in a shared Pyroscope.
  */
 export const tagsFromResourceAttributes = (raw: string | undefined): Record<string, string> => {
   const tags: Record<string, string> = {};
@@ -59,11 +58,9 @@ export interface StartedProfiler {
 }
 
 /**
- * Starts continuous profiling, or does nothing when no endpoint is configured.
- *
- * Never throws. A process that cannot profile itself has one fewer debugging
- * signal; a process that refuses to boot because it could not profile itself is
- * an outage.
+ * Starts continuous profiling, or does nothing with no endpoint configured.
+ * Never throws: a process that can't profile itself has one fewer debugging
+ * signal, but refusing to boot over it would be an outage.
  */
 export const startProfiling = ({
   serverAddress,

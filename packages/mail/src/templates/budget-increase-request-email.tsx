@@ -18,10 +18,9 @@ export const budgetIncreaseRequestEmailProps = z.object({
   requesterName: z.string().min(1).optional(),
   organizationName: z.string().min(1),
   /**
-   * Where the recipient goes to act on it.
-   *
-   * The deployment's public base URL is the deployment's, so it arrives with
-   * the message rather than being read out of this package's environment.
+   * Where the recipient goes to act on it. The deployment's public base URL
+   * is the deployment's, so it arrives with the message rather than being
+   * read out of this package's environment.
    */
   budgetsUrl: z.url(),
   scope: z.string().min(1),
@@ -43,12 +42,9 @@ export const budgetIncreaseRequestEmailSubject = ({
 }: BudgetIncreaseRequestEmailProps): string => `Budget increase requested by ${requesterEmail}`;
 
 /**
- * Where the spend stands against the limit, as a share.
- *
- * The two numbers are already in the table; what the decision needs is the
- * relation between them, which is the one thing a reader has to work out for
- * themselves otherwise. Nothing is said when no limit is set, because a share
- * of nothing is not a fact.
+ * Where the spend stands against the limit, as a share — the one relation
+ * a reader would otherwise have to work out from the table's two numbers.
+ * Nothing is said with no limit set: a share of nothing is not a fact.
  */
 const trySpendShare = ({
   limitUsd,

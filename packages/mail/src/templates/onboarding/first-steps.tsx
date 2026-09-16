@@ -19,12 +19,9 @@ export const firstStepsSchema = z.object({
 export type FirstSteps = z.infer<typeof firstStepsSchema>;
 
 /**
- * The documentation addresses these steps point at.
- *
- * Constants rather than props, and the exception is narrow: a template never
- * builds a link to a DEPLOYMENT, because the deployment's own origin is the
- * deployment's. `docs.langwatch.ai` is the same address for every install, the
- * way the footer's documentation link already is.
+ * The documentation addresses these steps point at — constants, not props:
+ * a template never links to a DEPLOYMENT (its own origin is its own), while
+ * `docs.langwatch.ai` is the same address for every install, like the footer's.
  */
 export const FIRST_STEPS_LINKS = {
   typescript: "https://docs.langwatch.ai/integration/typescript/guide",
@@ -47,12 +44,9 @@ claude`,
 export const SKILLS_INSTALL_COMMAND = "npx skills add langwatch/skills";
 
 /**
- * What to paste into a coding agent, in the words the tracing skill uses.
- *
- * "Instrument my code with LangWatch" is the skill's own user prompt, so the
- * agent that reads this reaches for the skill this sentence names rather than
- * improvising an integration. The key is named and never carried: a secret in
- * an email is a secret in an inbox.
+ * What to paste into a coding agent, in the tracing skill's own words —
+ * "instrument my code with LangWatch" — so the agent reaches for that skill
+ * rather than improvising. The key is named, never carried: no secret in an email.
  */
 export const AGENT_PROMPT = `Install the LangWatch skills with ${SKILLS_INSTALL_COMMAND}, then instrument my code with LangWatch following the tracing skill. My API key is in LANGWATCH_API_KEY.`;
 
@@ -77,10 +71,9 @@ export const FirstSteps = ({ intent }: FirstSteps) => (
 );
 
 /**
- * The command line first, because this reader has no code to change.
- *
- * They came to see what their agents are doing, and the shortest path to that
- * is the agent they already run, in the project they already have.
+ * The command line first, because this reader has no code to change — they
+ * came to see what their agents are doing, and the shortest path is the
+ * agent they already run, in the project they already have.
  */
 const AgentGovernanceSteps = () => (
   <>
@@ -94,11 +87,9 @@ const AgentGovernanceSteps = () => (
 );
 
 /**
- * TypeScript in the block, Python and Go as links.
- *
- * A mail cannot switch a tab, so a three-tab control in one is three snippets
- * stacked and two of them wrong for any given reader. One snippet and two links
- * is the same choice a tab strip offers, made in the medium that arrived.
+ * TypeScript in the block, Python and Go as links: a mail can't switch a
+ * tab, so a three-tab control here is three stacked snippets, two wrong for
+ * any given reader. One snippet and two links makes the same choice instead.
  */
 const SoftwareKitSteps = () => (
   <>

@@ -189,12 +189,9 @@ export interface SSEFrame {
 }
 
 /**
- * Consumes an SSE response body from nlpgo's /go/studio/execute and
- * returns every parsed `data:` frame. nlpgo writes `data: {json}\n\n`
- * frames (handlers.go writeSSE); frames are blank-line separated.
- *
- * Stops when a frame whose `type` is in `terminalTypes` arrives
- * (default: "done" / "error"), the stream ends, or `timeoutMs` elapses.
+ * Consumes an SSE response body from nlpgo's /go/studio/execute, returning
+ * every `data:` frame (nlpgo's writeSSE writes `data: {json}\n\n`, blank-line
+ * separated). Stops on a `terminalTypes` frame, stream end, or `timeoutMs`.
  */
 export async function collectSSE(
   body: ReadableStream<Uint8Array> | null,

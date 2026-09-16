@@ -9,11 +9,8 @@ import { sendHttpDestination } from "../http-destination.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature
- *
- * What the sender does with the ANSWER: the response caps, the teardown, and
- * which failures are worth a retry. The fence itself is stubbed here so the
- * caps can be driven exactly; the real fence, against a real socket, is the
- * sibling `http-destination.network.unit.test.ts`.
+ * What the sender does with the ANSWER: response caps, teardown, and
+ * retry-worthy failures. Fence stubbed; real fence: network unit test.
  */
 
 type FenceResponse = Awaited<ReturnType<typeof fetchValidatedDestination>>;

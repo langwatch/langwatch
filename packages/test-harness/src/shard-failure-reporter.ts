@@ -43,12 +43,9 @@ export function recordShardSelection(count: number): void {
 }
 
 /**
- * Drops both carriers, for a test driving the reporter directly.
- *
- * It lives beside the keys rather than beside the tests so that renaming one
- * cannot quietly turn the reset into a no-op, which would leave each test
- * inheriting the previous one's tally and make the suite pass or fail on
- * ordering.
+ * Drops both carriers, for a test driving the reporter directly. Lives
+ * beside the keys, not the tests, so renaming one can't quietly turn the
+ * reset into a no-op — which would leave tests inheriting a prior tally.
  */
 export function resetShardState(): void {
   const carrier = globalThis as StateCarrier;

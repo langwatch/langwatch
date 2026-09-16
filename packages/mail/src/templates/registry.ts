@@ -26,12 +26,9 @@ export interface MailFixture {
 }
 
 /**
- * Declares a template and erases its props type in the same step.
- *
- * The erasure is what lets one array hold every message. It costs nothing and
- * casts nothing: the erased `subject` and `element` take `unknown` honestly,
- * because they parse before they use, so props typed by hand in the studio go
- * through the same gate a fixture does.
+ * Declares a template and erases its props type in the same step — what
+ * lets one array hold every message. Costs no cast: `subject`/`element`
+ * take `unknown` honestly, parsed before use — same gate as hand-typed studio props.
  */
 export const defineTemplate = <Schema extends z.ZodType>(spec: {
   id: string;

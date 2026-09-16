@@ -4,12 +4,9 @@
  */
 
 /**
- * How an egress boundary must treat an address.
- * - `global`   — routable public address; the only class safe to dial.
- * - `metadata` — cloud instance-metadata endpoint; ALWAYS refused.
- * - `special`  — any other non-routable address (loopback, RFC1918, CGNAT,
- *   benchmarking, documentation, reserved, NAT64, 6to4, …); refused when
- *   local/private egress is disallowed (always on hosted SaaS).
+ * How an egress boundary treats an address: `global` (public, safe to
+ * dial), `metadata` (cloud instance-metadata, ALWAYS refused), `special`
+ * (any other non-routable range; refused unless local/private egress is allowed).
  */
 export type Category = "global" | "metadata" | "special";
 
@@ -162,10 +159,9 @@ function prefixContains({ prefix, addr }: { prefix: Prefix; addr: Uint8Array }):
 // ---------------------------------------------------------------------------
 
 /**
- * Cloud instance-metadata endpoints — never a legitimate egress destination,
- * refused regardless of whether private egress is otherwise permitted.
- * 168.63.129.16 (Azure WireServer) is why this list is load-bearing: it is a
- * globally-routable-looking address in no special range at all.
+ * Cloud instance-metadata endpoints — never legitimate, refused regardless
+ * of private-egress permission. 168.63.129.16 (Azure WireServer) is why this
+ * list matters: it looks globally-routable, in no special range at all.
  */
 const METADATA_ADDRESSES = [
   "169.254.169.254", // AWS/GCP/Azure/Oracle IMDS
@@ -178,11 +174,9 @@ const METADATA_ADDRESSES = [
 });
 
 /**
- * Non-globally-routable ranges. Loopback / RFC1918 / link-local / multicast are
- * expressed as prefixes here (rather than relying on host predicates) so the
- * whole rule set reads as one table. NAT64 and 6to4 are refused wholesale
- * rather than decoded to their embedded IPv4 — no legitimate egress targets a
- * translated address.
+ * Non-globally-routable ranges, expressed as prefixes (not host predicates)
+ * so the whole rule set reads as one table. NAT64 and 6to4 are refused
+ * wholesale, not decoded to their embedded IPv4 — no legitimate target is translated.
  */
 const SPECIAL_PREFIXES: Prefix[] = [
   // IPv4

@@ -17,10 +17,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "../cleanup-test-rows.ts";
 
 /**
- * The tenancy guard names a project/organization on every query. This suite
- * writes and deletes rows across organizations that do not otherwise relate
- * to one another, so it composes the client without a guard rather than
- * teaching one about a scope that does not apply here.
+ * The tenancy guard names a project/organization on every query. This
+ * suite writes and deletes rows across unrelated organizations, so it
+ * composes the client without a guard rather than teaching one an inapplicable scope.
  */
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

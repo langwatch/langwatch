@@ -77,11 +77,9 @@ export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
 }
 
 /**
- * The pg Pool configuration a Prisma-style DATABASE_URL asks for. An empty or
- * malformed URL must not throw HERE: the plain connectionString pass-through
- * never parsed it, so construction stayed lazy and unit suites that import
- * the client without a database (env validation skipped) only fail if they
- * actually connect. Parsing failure = no overrides.
+ * The pg Pool configuration a Prisma-style DATABASE_URL asks for. Must not
+ * throw on an empty or malformed URL, so import-only suites (no database,
+ * env validation skipped) stay lazy and pass; parsing failure means no overrides.
  */
 function urlParams(databaseUrl: string): URLSearchParams {
   try {

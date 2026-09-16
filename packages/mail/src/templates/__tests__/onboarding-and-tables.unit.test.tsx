@@ -16,11 +16,9 @@ const html = async (template: MailTemplate, props: unknown): Promise<string> =>
   (await renderMailTemplate(template, props)).html;
 
 /**
- * The rendered message with its markup taken off.
- *
- * A highlighted line is a run of `<span>`s, so a command a reader sees as one
- * string is several nodes in the HTML. What is asserted here is what the reader
- * reads, which means reading past the tags.
+ * The rendered message with its markup taken off. A highlighted line is a
+ * run of `<span>`s, so a command the reader sees as one string is several
+ * HTML nodes — this asserts what the reader reads, not the markup.
  */
 const visibleText = (rendered: string): string =>
   rendered
@@ -31,12 +29,9 @@ const visibleText = (rendered: string): string =>
     .replace(/\s+/g, " ");
 
 /**
- * The skill this mail tells a coding agent to follow, read from the skill.
- *
- * Pinned rather than copied: the prompt in the mail exists to make an agent
- * reach for a skill that actually exists, so if the skill is renamed or its own
- * prompt is rewritten, the mail that names it has to be wrong out loud rather
- * than quietly pointing at nothing.
+ * The skill this mail tells a coding agent to follow, read from the skill
+ * itself, not copied: if it's renamed or its prompt rewritten, the mail
+ * that names it fails loudly here rather than quietly pointing at nothing.
  */
 const tracingSkillPath = resolve(
   dirname(fileURLToPath(import.meta.url)),

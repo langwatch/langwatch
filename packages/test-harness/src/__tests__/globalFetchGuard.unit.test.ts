@@ -8,14 +8,10 @@ import { guardAgainstGlobalFetch } from "../globalFetchGuard.ts";
 
 const realFetch = globalThis.fetch;
 
-// A global that belongs to another suite sharing this worker. The guard's
-// cleanup must leave it alone: the unit config runs with `isolate: false`, so
-// a cleanup that dropped every global stub would take this one with it.
-//
-// `vi.stubGlobal` is what such a suite would use, and it is what puts the
-// probe in the registry that `vi.unstubAllGlobals` empties. Installing it any
-// other way would hide it from that call, and the test below could no longer
-// tell a targeted cleanup from a wholesale one.
+// A global belonging to another suite sharing this worker — the guard's
+// cleanup must leave it alone, since `isolate: false` means a wholesale
+// clear would take it too. `vi.stubGlobal` puts it in the registry
+// `vi.unstubAllGlobals` empties, so the test below can tell targeted cleanup from wholesale.
 const probe = Symbol("langwatch-guard-probe");
 vi.stubGlobal("langwatchGuardProbe", probe);
 

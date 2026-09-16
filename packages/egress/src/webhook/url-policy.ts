@@ -8,12 +8,9 @@ import {
 } from "../ssrf/url-validator.ts";
 
 /**
- * The one admission policy for a customer-supplied webhook destination,
- * shared by automations and the endpoints platform: https-only on the
- * default port, no credentials ever, and private/loopback/link-local hosts
- * blocked regardless of any local-address toggle. `allowInsecureLocal` is the
- * one escape hatch (local dev / self-hosted): it relaxes only origin and the
- * local-address block — never redirects, size, timeout, or credentials.
+ * The one admission policy for a customer-supplied webhook destination:
+ * https-only, default port, no credentials, and private/loopback/link-local
+ * blocked — `allowInsecureLocal` relaxes only origin and that block, nothing else.
  */
 
 const strictValidator = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
@@ -60,11 +57,9 @@ function privateIpLiteral(url: string): string | null {
 }
 
 /**
- * Terminally blocks the destinations the webhook channels refuse before they
- * open a connection: a URL that fails the shape check, and a host that is a
- * private / loopback IP literal, including bracketed IPv6. The address
- * validator on the send itself fails both closed as well, but as a retryable
- * "unresolvable host" instead of the permanent block they are.
+ * Terminally blocks what the webhook channels refuse pre-connection: a
+ * failed shape check, or a private/loopback IP literal (bracketed IPv6
+ * included). The send's own validator blocks the same host, but retryably.
  */
 export function assertWebhookUrlAllowed({
   url,

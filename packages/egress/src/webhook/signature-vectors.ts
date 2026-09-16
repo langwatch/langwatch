@@ -7,21 +7,17 @@ import {
 
 /**
  * Emits cross-language signature test vectors from the sender's own
- * implementation, so this server and both SDKs verify against one committed
- * file instead of three separate ideas of the algorithm. A companion test
- * fails when the file drifts from what the generator would write.
+ * implementation, so this server and both SDKs verify one committed file
+ * instead of three separate ideas of the algorithm. A companion test fails on drift.
  */
 
 /** Where the SDK suites read from, repo-root relative. */
 export const VECTORS_RELATIVE_PATH = "specs/webhooks/signature-vectors.json";
 
 /**
- * What a receiver should conclude. The sender's reference verifier answers a
- * plain boolean, but a receiver-facing helper owes the caller the reason: a
- * stale timestamp is a clock or a replay, a bad digest is a wrong secret or a
- * tampered body, and a header that never parsed is a misrouted request. The
- * order below is the order the checks run in, so a case that is both
- * malformed and stale is reported as malformed.
+ * What a receiver should conclude, with the reason a boolean can't give:
+ * stale timestamp (clock or replay), bad digest (wrong secret or tampered
+ * body), unparsed header (misrouted) — checked in that order, so malformed wins over stale.
  */
 export type VectorOutcome = "valid" | "malformed_header" | "stale_timestamp" | "invalid_signature";
 
@@ -54,10 +50,9 @@ export interface SignatureVectorFile {
   generated_by: string;
   generated_from: string;
   /**
-   * The header NAMES a receiver reads off a delivery, emitted here for the
-   * same reason the signatures are: an SDK that hand-copies a header name has
-   * no way to notice when the sender renames it, and a receiver keying
-   * idempotency off the wrong header silently processes every retry twice.
+   * The header names a receiver reads off a delivery, emitted for the same
+   * reason as the signatures: a hand-copied name can't notice a rename, and
+   * keying idempotency off the wrong header silently processes every retry twice.
    */
   headers: {
     signature: string;
@@ -99,9 +94,8 @@ const sign = (secrets: string[], body: string, timestampSeconds = T): string =>
 
 /**
  * The three headers every case below is built from or checked against.
- *
- * Computed once at module load: signing is pure, so the vectors are constant
- * data rather than something a build step has to recompute.
+ * Computed once at module load: signing is pure, so these are constant
+ * data, not something a build step has to recompute.
  */
 const SINGLE = sign([NEW_SECRET], BATCH_BODY);
 const ROTATION = sign([NEW_SECRET, OLD_SECRET], BATCH_BODY);

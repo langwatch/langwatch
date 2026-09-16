@@ -115,9 +115,8 @@ export function scanSourceForMockSpecifiers({
 
 /**
  * Whether one alias entry claims a specifier, on vite's rule: an exact hit,
- * or a prefix that ends at a path boundary. The boundary is what keeps
- * `"@"` (the SDK's alias for its own `src`) from claiming
- * `@opentelemetry/api`.
+ * or a prefix ending at a path boundary — what keeps `"@"` (the SDK's alias
+ * for its own `src`) from claiming `@opentelemetry/api`.
  */
 function aliasMatches({
   find,
@@ -136,11 +135,9 @@ function aliasMatches({
 }
 
 /**
- * Apply the alias table in declaration order, first match winning, which is
- * what vite does. Not the longest or most specific match: with
- * `[{ find: "@/" }, { find: "@/generated/" }]` vite resolves
- * `@/generated/x` through `@/`, and a resolver that preferred the longer
- * entry would look for the file somewhere the runner never would.
+ * Apply the alias table in declaration order, first match winning — vite's
+ * rule, not longest-match: with `[{ find: "@/" }, { find: "@/generated/" }]`
+ * vite resolves `@/generated/x` via `@/`, not the more specific entry.
  */
 function applyAliases({
   specifier,

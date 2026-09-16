@@ -31,11 +31,9 @@ const PROJECT_ID = "project_staging_roundtrip";
 const TRACE_ID = "stage0123456789abstage0123456789";
 
 /**
- * The parked bodies, served over loopback.
- *
- * The in-memory driver the staging port writes through: bytes under a key,
- * served at a URL, which is all the engine needs from an object store. The
- * presign is not modelled — the engine never checks one.
+ * The parked bodies, served over loopback. The in-memory driver the
+ * staging port writes through: bytes under a key, served at a URL — all
+ * the engine needs from an object store. Presign isn't modelled; it's never checked.
  */
 class FakeObjectStore {
   private readonly objects = new Map<string, Buffer>();

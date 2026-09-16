@@ -62,10 +62,9 @@ export function traced<T extends object>(instance: T, className: string): T {
 }
 
 /**
- * True for `async function*` declarations.
- *
- * Checked by constructor name rather than `instanceof` because the
- * AsyncGeneratorFunction constructor is not a global binding.
+ * True for `async function*` declarations. Checked by constructor name,
+ * not `instanceof`, because the AsyncGeneratorFunction constructor is not
+ * a global binding.
  */
 function isAsyncGeneratorFunction(value: unknown): boolean {
   return typeof value === "function" && value.constructor?.name === "AsyncGeneratorFunction";

@@ -32,11 +32,9 @@ const JSDOM_PATTERN = /@vitest-environment\s+jsdom/;
 export type Lane = "component" | "datastore";
 
 /**
- * Which lane a single file belongs to, given its source.
- *
- * Exported for the guard test: the decision has to be inspectable on a string
- * without a filesystem behind it, or it cannot be tested at the level it is
- * made.
+ * Which lane a single file belongs to, given its source. Exported for the
+ * guard test: the decision must be inspectable on a string without a
+ * filesystem behind it, or it can't be tested at the level it is made.
  */
 export function laneForSource(source: string): Lane {
   if (!JSDOM_PATTERN.test(source)) return "datastore";
@@ -106,10 +104,8 @@ export interface LanePartition {
 
 /**
  * Partition every integration test file under `root` into the two lanes.
- *
- * Reads each file once. That is ~1024 small reads and lands well under a second
- * — a rounding error against the ~145s of container setup the component lane no
- * longer pays for, let alone the compile it skips.
+ * Reads each file once (~1024 small reads, well under a second) — a
+ * rounding error against the ~145s of container setup the component lane skips.
  */
 export function partitionIntegrationFiles({
   root,
@@ -149,10 +145,9 @@ export function escapeGlob(path: string): string {
 }
 
 /**
- * A lane's file list as vitest `include` patterns.
- *
- * Vitest has no "exactly these files" option — `include` is globs — so the
- * exact list has to survive being read as one.
+ * A lane's file list as vitest `include` patterns. Vitest has no "exactly
+ * these files" option — `include` is globs — so the exact list must survive
+ * being read as one.
  */
 export function toIncludePatterns(files: string[]): string[] {
   return files.map(escapeGlob);

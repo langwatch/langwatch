@@ -70,13 +70,10 @@ function sanitizeValue(value: unknown, path: string, collectors: SanitizeCollect
 }
 
 function sanitizeList(value: unknown[], path: string, collectors: SanitizeCollectors): unknown {
-  // A list that ARRIVES empty is the accumulator pattern: `let ids = []`
-  // filled as tests create rows, legitimately empty when they created
-  // none. Prisma's `in: []` matches nothing, so a silent skip preserves
-  // the raw form's behavior exactly, and match-none is not the hazard
-  // this guard exists for; match-all is. A list that BECOMES empty
-  // because its members were dropped below is different: real ids were
-  // intended and lost, so that stays a refusal.
+  // A list that ARRIVES empty is the accumulator pattern (`let ids = []`
+  // filled as rows are created, legitimately empty if none were) — Prisma's
+  // `in: []` matches nothing, so a silent skip is safe. A list that BECOMES
+  // empty from dropped members is different: real ids were lost, so that stays a refusal.
   if (value.length === 0) {
     collectors.emptyAtArrival.push(path);
     return undefined;
@@ -174,9 +171,8 @@ export function requireAssigned<T>({
 
 /**
  * Delete this suite's rows, refusing any entry whose filter can no longer
- * identify them. Throws after cleaning everything cleanable if anything
- * was refused, narrowed, or failed, so a broken setup fails loudly
- * instead of sweeping the table.
+ * identify them. Throws after cleaning everything cleanable if anything was
+ * refused, narrowed or failed — a broken setup fails loudly, not by sweeping the table.
  */
 export async function cleanupTestRows(
   prisma: PrismaClient,

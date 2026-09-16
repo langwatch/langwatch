@@ -195,11 +195,9 @@ function filledButtonSpans(
 }
 
 /**
- * Every place this file fills a button with the brand accent.
- *
- * A colour site counts against a button when it falls inside that button's
- * OPENING tag. An opening tag's span stops before the element's children, so a
- * badge nested in a button's label is judged on its own and not on its host.
+ * Every place this file fills a button with the brand accent. A colour
+ * site counts against a button when it falls inside that button's OPENING
+ * tag, which stops before its children — a nested badge is judged on its own, not its host.
  */
 export function solidOrangeButtonSites(source: SourceFile): ButtonWeightSite[] {
   const spans = filledButtonSpans(source);

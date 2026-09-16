@@ -1,10 +1,9 @@
 import { DispatchError } from "@langwatch/eventing";
 
 /**
- * What a receiver's answer means, and the headers a delivery is identified by. FROZEN TWIN
- * of the classification half of `platform/app/src/server/webhooks/sendWebhook.ts`: both
- * header names are wire format, and a rename is invisible until every consumer starts
- * processing retries twice.
+ * What a receiver's answer means, and the headers a delivery is identified
+ * by. FROZEN TWIN of `platform/app/src/server/webhooks/sendWebhook.ts`'s
+ * classification half — a header rename is invisible until retries double.
  */
 
 /**
@@ -15,11 +14,9 @@ import { DispatchError } from "@langwatch/eventing";
 export const WEBHOOK_EVENT_ID_HEADER = "X-LangWatch-Event-Id";
 
 /**
- * The webhook platform's dispatch-identity header. A platform delivery carries a BATCH of
- * envelopes, each with its own `id`, so calling the batch identity an event id is a lie a
- * consumer can act on: it reads like the thing to dedup by, and deduping by it drops every
- * envelope in the batch but one. Dedup belongs on the envelope `id` inside the body; this
- * header only groups the retries of one POST.
+ * The webhook platform's dispatch-identity header. A delivery carries a
+ * BATCH of envelopes, each with its own `id` — dedup on that envelope id,
+ * never this header, which only groups retries of one POST.
  */
 export const WEBHOOK_DELIVERY_ID_HEADER = "X-LangWatch-Delivery-Id";
 
@@ -45,11 +42,9 @@ export interface WebhookSendResult {
 const ERROR_SNIPPET_CHARS = 300;
 
 /**
- * The retry-vs-terminal classification, as a value rather than a throw. 2xx is success; 5xx /
- * 429 / 408 are retryable (the outbox backs off and re-attempts); any other status — including
- * 3xx, which the strict sender refuses to follow — is terminal, since retrying a misconfigured
- * endpoint just spams it. The rule lives here once so a transport can never drift from it by
- * restating it.
+ * The retry-vs-terminal classification, as a value, not a throw: 2xx is
+ * success; 5xx/429/408 retry; everything else (including 3xx, which the
+ * strict sender refuses) is terminal — lives here once so no transport drifts.
  */
 export function classifyWebhookStatus(status: number): "success" | "retryable" | "terminal" {
   if (status >= 200 && status < 300) return "success";

@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 import { MAX_VALIDATION_ISSUES, validationMeta } from "../validation/validationMeta.ts";
 
 /**
- * The issues are hand-built rather than produced by zod on purpose: this
- * package does not depend on zod, and the contract under test is the duck-typed
- * shape, not one zod version's rendering of it. Each fixture mirrors a real
- * `ZodIssue` for the code it names.
+ * Issues are hand-built, not produced by zod: this package doesn't depend
+ * on zod, and the contract under test is the duck-typed shape, not one
+ * zod version's rendering. Each fixture mirrors a real `ZodIssue`.
  */
 
 describe("validationMeta", () => {

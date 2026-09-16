@@ -11,12 +11,9 @@ import {
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
- * How many matches one digest lists.
- *
- * A settlement window can flush hundreds of matches at a cap breach, and a mail
- * with hundreds of links is neither readable nor deliverable. The remaining
- * matches are still claimed, still counted and still visible in the product;
- * only the mail is truncated.
+ * How many matches one digest lists. A settlement window can flush hundreds
+ * at a cap breach, and a mail with hundreds of links is neither readable nor
+ * deliverable — the rest stay claimed, counted and visible in the product.
  */
 const DIGEST_ROW_LIMIT = 10;
 
@@ -51,11 +48,9 @@ export const triggerDigestMail = z.object({
   baseHost: z.url(),
   entries: z.array(triggerDigestEntry),
   /**
-   * The automation these matches came from, when the sender names it.
-   *
-   * This digest is only ever the one nobody wrote a message for, so its reader
-   * is exactly the person who does not know they can write their own. With the
-   * id the mail can offer that; without it, it says nothing.
+   * The automation these matches came from, when the sender names it. This
+   * digest is always the one nobody wrote a message for, so with the id the
+   * mail can offer to write one; without it, it says nothing.
    */
   triggerId: z.string().min(1).optional(),
 });
@@ -63,12 +58,9 @@ export const triggerDigestMail = z.object({
 export type TriggerDigestMail = z.infer<typeof triggerDigestMail>;
 
 /**
- * Where a row points.
- *
- * A graph automation's match is a threshold on a chart rather than one trace,
- * so it links to the chart. `#` is the deliberate ending for a match that
- * carries neither: a link that goes nowhere is better than one that resolves to
- * a trace page for an id the project does not hold.
+ * Where a row points: a graph automation's match is a chart threshold, not
+ * one trace, so it links to the chart. `#` is deliberate for neither case —
+ * a dead link beats one resolving to a trace id the project doesn't hold.
  */
 const linkFor = (
   entry: TriggerDigestEntry,
@@ -101,11 +93,9 @@ const truncate = (value: string): string =>
   value.length > PREVIEW_LIMIT ? `${value.slice(0, PREVIEW_LIMIT - 1)}…` : value;
 
 /**
- * The subject the worker puts on the digest.
- *
- * The worker owns the envelope — the no-reply `To`, the BCC fan-out, the
- * unsubscribe footer — and assembles this line itself. It is repeated here so
- * the studio shows the real subject beside the real body rather than a guess.
+ * The subject the worker puts on the digest. The worker owns the envelope
+ * (no-reply `To`, BCC fan-out, unsubscribe footer) and assembles this line
+ * itself — repeated here so the studio shows the real subject, not a guess.
  */
 export const triggerDigestSubject = ({ triggerType, triggerName }: TriggerDigestMail): string =>
   `${triggerType ? `(${triggerType}) ` : ""}Trigger - ${triggerName}`;

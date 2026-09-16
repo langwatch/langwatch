@@ -27,12 +27,9 @@ const SMTP_TIMEOUTS = {
 } as const;
 
 /**
- * Transport options from either a single connection URL or the discrete
- * host/port/credential settings. A URL wins when both are present.
- *
- * No proxy is applied here on purpose. An SMTP relay is typically an internal
- * host reachable directly, so honouring a globally-set HTTPS_PROXY would break
- * deployments that set it for vendor API egress only.
+ * Transport options from a single connection URL or discrete host/port/
+ * credential settings (URL wins if both present). No proxy on purpose: an
+ * internal relay honouring a global HTTPS_PROXY would break vendor-egress-only setups.
  */
 export const buildSmtpTransportOptions = (
   configuration: MailerConfiguration["smtp"],
@@ -99,12 +96,10 @@ export class SmtpEmailProvider implements EmailProvider {
     const toAddresses = toArray(content.to);
 
     try {
-      // Blind addresses go only into the SMTP envelope. nodemailer would also
-      // keep them off the wire if passed as a `bcc` field (mail-composer drops
-      // the header unless keepBcc is set), but that is a library default rather
-      // than a property of this code. Stating the envelope explicitly makes the
-      // guarantee ours: the rendered headers carry only the public To list,
-      // matching SES `SendRawEmail` and SendGrid.
+      // Blind addresses go only into the SMTP envelope, stated explicitly
+      // rather than relied on as nodemailer's `bcc`-field default (which
+      // depends on `keepBcc`) — the rendered headers carry only the public
+      // To list, matching SES `SendRawEmail` and SendGrid.
       const info = await transporter.sendMail({
         from,
         to: toAddresses,

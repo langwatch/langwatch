@@ -1,7 +1,6 @@
 /**
  * The refusal rules of the guarded teardown, on a recording fake so each
  * case can assert the exact deletes that were (not) issued.
- *
  * Spec: specs/setup/test-teardown-safety.feature
  */
 

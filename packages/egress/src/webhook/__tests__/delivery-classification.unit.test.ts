@@ -4,11 +4,8 @@ import { assertWebhookDelivered, classifyWebhookStatus } from "../delivery-class
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature
- *
- * What a status means, as a table. The queue reads this verdict and nothing
- * else: a status misread as retryable re-sends a dead payload until it
- * dead-letters, and one misread as terminal drops a delivery the receiver was
- * only briefly unable to take.
+ * What a status means, as a table: misreading retryable re-sends a dead
+ * payload till it dead-letters; misreading terminal drops a briefly-down delivery.
  */
 
 const capture = (fn: () => void): DispatchError => {

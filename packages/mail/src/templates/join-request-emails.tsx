@@ -28,11 +28,9 @@ export const joinRequestArrivedProps = z.object({
   domain: z.string().min(1),
   membersSettingsUrl: z.url(),
   /**
-   * How many requests from this domain have already been approved.
-   *
-   * An admin approving a third colleague from one address domain is doing by
-   * hand what one setting does for them. Saying so on the first request is
-   * noise, so the line waits until the pattern is real.
+   * How many requests from this domain have already been approved. Approving
+   * a third colleague by hand is what one setting would do automatically, so
+   * this note waits until the pattern is real rather than firing on the first.
    */
   approvedFromDomainCount: z.number().int().nonnegative().optional(),
 });
@@ -168,11 +166,9 @@ export const joinRequestReminderTemplate = defineTemplate({
 });
 
 /**
- * Rendered only, and separated from the send because a process that owns its
- * own envelope still has to send exactly these words. The worker holds the mail
- * gateway and the deployment's host; what it must not hold is a second copy of
- * the message, which is what put react-email on its boot graph and let two
- * admins on one organization receive two differently-worded reminders.
+ * Rendered only, separate from the send: a process with its own envelope
+ * still sends exactly these words, without pulling react-email onto its own
+ * boot graph — the split that once stopped two admins getting differently-worded reminders.
  */
 export const renderJoinRequestReminderEmail = async (
   props: JoinRequestReminderProps,
@@ -194,19 +190,15 @@ export const joinRequestApprovedProps = z.object({
   organizationName: z.string().min(1),
   organizationUrl: z.url(),
   /**
-   * The checklist of first steps, when the sender knows where it lives.
-   *
-   * This reader arrives to a workspace that already has work in it, so the
-   * checklist has real items rather than an empty shell. It sits beside the
-   * button and never in place of it: the thing they asked for is the door.
+   * The checklist of first steps, when the sender knows where it lives. This
+   * reader's workspace already has work in it, so the checklist has real items
+   * rather than an empty shell — it sits beside the button, never in place of it.
    */
   onboardingUrl: z.url().optional(),
   /**
-   * What to do first, in the language of why the organization came.
-   *
-   * The organization exists by the time this is sent — somebody in it approved
-   * the request — so unlike the sign-up confirmation this message can know the
-   * intent and show the steps that match it.
+   * What to do first, in the language of why the organization came. It exists
+   * by the time this sends — somebody in it approved the request — so unlike
+   * the sign-up confirmation, this message can know intent and show matching steps.
    */
   firstSteps: firstStepsSchema.optional(),
 });
@@ -335,11 +327,9 @@ export const sendJoinRequestRejectedEmail = async ({
 export const joinRequestExpiredProps = z.object({
   organizationName: z.string().min(1),
   /**
-   * A project of their own to work in meanwhile, when they have none.
-   *
-   * A second line and never the action: the thing this reader came for is the
-   * organization, and asking again is what they do next. Suppressed when they
-   * already have somewhere to work, where it would only be noise.
+   * A project of their own to work in meanwhile, when they have none. A
+   * second line, never the action: the organization is what they came for,
+   * and asking again is next. Suppressed when they already have somewhere to work.
    */
   personalProjectUrl: z.url().optional(),
 });

@@ -1,8 +1,7 @@
 /**
- * Injects W3C trace context headers into outbound HTTP requests.
- *
- * Uses @opentelemetry/api propagation to inject `traceparent` from the
- * active OTEL context. Silently no-ops when no active OTEL context exists.
+ * Injects W3C trace context headers into outbound HTTP requests, using
+ * @opentelemetry/api propagation to inject `traceparent` from the active
+ * OTEL context. Silently no-ops when no active OTEL context exists.
  */
 
 import { context as otelContext, propagation, trace } from "@opentelemetry/api";
@@ -14,11 +13,9 @@ interface InjectResult {
 }
 
 /**
- * Injects trace context headers into the given headers record.
- * Mutates the headers object in place and returns it along with the captured trace ID.
- *
- * - Injects `traceparent` (and optionally `tracestate`) via W3C propagation
- * - Captures the active trace ID for explicit propagation to the judge
+ * Injects trace context headers into the given record, mutating it in
+ * place, and returns it with the captured trace ID — `traceparent`
+ * (optionally `tracestate`) via W3C propagation, for explicit propagation to the judge.
  */
 export function injectTraceContextHeaders({
   headers,

@@ -14,9 +14,8 @@ type ScriptFailureRecord = {
 
 /**
  * Runs `main`, and turns any failure into one structured line plus exit
- * code 1. The stack is left off unless LOG_LEVEL=debug asked for it — it is
- * the part that costs a terminal twenty lines and answers nothing a developer
- * did not already know from the message and the code.
+ * code 1. The stack is left off unless LOG_LEVEL=debug asked for it — it
+ * costs a terminal twenty lines and tells a developer nothing new.
  */
 export async function runScript({
   name,
@@ -97,10 +96,8 @@ export function scriptFailureRecord({
 
 /**
  * The one line a long-running process writes when it cannot boot or is
- * crashing: level fatal, the event and the error's message as `msg`, and the
- * trace as one `stack` string, so a supervisor renders it as one record with
- * the trace indented under it rather than as a stack frame per line with no
- * level at all. Written by the caller, synchronously, on its way out.
+ * crashing: fatal level, the error's message as `msg`, trace as one `stack`
+ * string — one record a supervisor renders indented, not a level-less frame per line.
  */
 export function processFailureLine({
   service,

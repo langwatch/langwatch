@@ -39,10 +39,8 @@ export const usageLimitEmailProps = z.object({
   severity: z.string().min(1).optional().describe("How the sender graded this crossing"),
   /**
    * What this organization is metered in, as its own meter reports it.
-   *
-   * Absent, the message keeps the word it has always used. A sender that knows
-   * the meter passes it, and the numbers in the mail then carry the noun the
-   * organization is actually billed on rather than a house word for both.
+   * Absent, the message keeps the word it always used; when known, the
+   * numbers carry the noun the organization is actually billed on.
    */
   usageUnit: usageUnitSchema.optional(),
   /**
@@ -74,11 +72,9 @@ export const usageLimitEmailSubject = ({
 };
 
 /**
- * How far along the bar reads.
- *
- * Green while there is room, amber once the end is in sight, red at the point
- * where messages start being dropped. Three stops rather than five: the two
- * extra cuts the old ladder had resolved to the same colour anyway.
+ * How far along the bar reads: green with room, amber as the end nears, red
+ * once messages start dropping. Three stops, not five — the old ladder's two
+ * extra cuts resolved to the same colour anyway.
  */
 const barColour = (usagePercentage: number): string => {
   if (usagePercentage >= 95) return "#c53030";
@@ -87,11 +83,9 @@ const barColour = (usagePercentage: number): string => {
 };
 
 /**
- * A meter built from nested table cells.
- *
- * No flexbox, no `div` with a percentage width: Outlook's engine renders
- * neither, and a progress bar that collapses to nothing is worse than no bar.
- * Two cells in one row, sized in percent, is the shape every client draws.
+ * A meter built from nested table cells — no flexbox, no `div` with a
+ * percentage width, since Outlook's engine renders neither and a collapsed
+ * bar is worse than none. Two cells in one row, sized in percent, work everywhere.
  */
 const UsageBar = ({ usagePercentage, filled }: { usagePercentage: number; filled: number }) => (
   <table
@@ -135,10 +129,8 @@ const UsageBar = ({ usagePercentage, filled }: { usagePercentage: number; filled
 
 /**
  * The project to look at first, when one project is actually the answer.
- *
- * With a single project the table already says it, and with an even spread
- * naming the largest sends somebody to the wrong place, so the line waits for
- * a project carrying most of the month.
+ * With a single project the table already says it, and an even spread would
+ * send the reader to the wrong one, so this waits for one carrying most of the month.
  */
 const HEAVIEST_PROJECT_SHARE = 0.4;
 

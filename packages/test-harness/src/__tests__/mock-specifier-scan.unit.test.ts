@@ -22,12 +22,9 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * A synthetic base directory for the resolver's unit fixtures below.
- *
- * The whole-tree scan does not use it — that walks `git ls-files` from the
- * workspace root and reads each config's own alias table. This is only a stable
- * absolute prefix for the `resolveMockSpecifier` cases, which supply their own
- * `fileExists` and never touch the disk, so it need not name a real directory.
+ * A synthetic base directory for the resolver's unit fixtures below — not
+ * used by the whole-tree scan, which walks `git ls-files` instead. Just a
+ * stable prefix for `resolveMockSpecifier` cases, which never touch disk.
  */
 const APP_ROOT = resolve(REPO_ROOT, "apps/ui");
 

@@ -1046,12 +1046,9 @@ describe("project-tenancy regime partition", () => {
 });
 
 /**
- * ShareLink query shapes (ADR-057). Anonymous share resolution presents only a
- * secret token — the row is what teaches the caller its projectId — so the
- * token/id lookups are exempt, and NOTHING else is. Every *write* must still
- * be project-scoped. `consumeView` (né `incrementViewCount`) originally used
- * `update({ where: { id } })` and blew up at runtime on the first share
- * resolve; these lock the real repository's query shapes in.
+ * ShareLink query shapes (ADR-057): anonymous resolution presents only a
+ * secret token (the row teaches projectId), so token/id lookups are exempt —
+ * NOTHING else is. Every write stays project-scoped; these lock the real shapes in.
  */
 describe("guardProjectId — ShareLink", () => {
   describe("findUnique by token (the anonymous capability lookup)", () => {

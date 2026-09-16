@@ -24,12 +24,9 @@ import { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
 const EXPORT_INTERVAL_MS = 15_000;
 
 /**
- * What a process must have decided before its metrics can be exported.
- *
- * All of it is semantic: the process parsed its own environment once and hands
- * over the result. Nothing here reads `process.env`, which is what stops a
- * second destination or a stale service name from arriving through the OTel
- * SDK's own ambient variable reading.
+ * What a process must have decided before its metrics can be exported —
+ * all semantic, parsed from environment once. Nothing here reads
+ * `process.env`, which stops a stale value arriving via the OTel SDK's own ambient reading.
  */
 export type OtlpMetricsExportOptions = Readonly<{
   /** The collector's base URL; absent means this process exports no metrics. */
@@ -67,12 +64,10 @@ export function startOtlpMetricsExport(
 
   const meterProvider = new MeterProvider({
     resource: resourceFromAttributes(attributes),
-    // Bucket boundaries are a property of the provider in OpenTelemetry, not
-    // of the instrument the way prom-client's `buckets` were. Without these
-    // views every histogram takes the SDK's generic 0…10000 boundaries, and
-    // `histogram_quantile` over payload sizes, span counts or multi-minute
-    // jobs returns plausible nonsense. The boundaries live beside the
-    // instruments that record into them, so the two cannot drift.
+    // Bucket boundaries are a property of the provider here, not the
+    // instrument. Without these views, every histogram takes the SDK's
+    // generic 0…10000 boundaries and `histogram_quantile` returns nonsense.
+    // They live beside the recording instruments in metrics/index.ts, so the two can't drift.
     views: metricHistogramViews().map(({ instrumentName, boundaries }) => ({
       instrumentName,
       aggregation: {

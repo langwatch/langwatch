@@ -16,12 +16,9 @@ export interface ValidationIssueMeta {
   /** Type name that arrived. Only ever set for `invalid_type`. */
   received?: string;
   /**
-   * Keys the schema refused.
-   *
-   * These are field NAMES, chosen by the sender's instrumentation rather than
-   * carried as content, and they are the single most useful signal here: the
-   * same key refused across many projects means an SDK emits something we have
-   * not modelled, and the fix is ours.
+   * Keys the schema refused — field NAMES chosen by the sender's
+   * instrumentation, not content, and the single most useful signal here:
+   * the same key across many projects means an unmodelled SDK field we must fix.
    */
   keys?: string[];
   /** Values the schema allows. Ours, from the schema definition. */
@@ -119,12 +116,10 @@ function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta
       meta.options = stringList(issue.options);
       break;
 
-    // Zod 4 folds an enum mismatch and a literal mismatch into one code and
-    // carries the permitted set as `values`, so both older cases above stop
-    // matching and the set they exist to record is dropped. Zod 4 also routes
-    // a discriminator mismatch through `invalid_union`, where it is the arm
-    // that carries `options`; a plain union failure carries none and is left
-    // to `collectIssues`, which follows its branches.
+    // Zod 4 folds enum and literal mismatches into one code carrying the
+    // permitted set as `values`, so the older cases above stop matching.
+    // A discriminator mismatch instead routes through `invalid_union`'s
+    // `options`-carrying arm; a plain union failure carries none, left to `collectIssues`.
     case "invalid_value":
       meta.options = stringList(issue.values);
       break;

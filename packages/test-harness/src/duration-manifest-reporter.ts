@@ -23,10 +23,8 @@ const DEFAULT_DELTA = "vitest.durations.delta.json";
 
 /**
  * Fold this run's timings into whatever the manifest already holds.
- *
- * Exported separately from the reporter so the merge is testable without
- * driving a vitest run: the merge is where the interesting decisions are, and
- * a reporter lifecycle is not the place to discover them.
+ * Exported separately from the reporter so the merge — where the
+ * interesting decisions are — is testable without driving a vitest run.
  */
 export function mergeDurations({
   existing,

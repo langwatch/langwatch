@@ -36,11 +36,8 @@ export function getStatusCodeFromError(error: unknown): number {
 }
 
 /**
- * Determines log level based on HTTP status code.
- * - 404: 'info' (not found is a normal response, not a warning)
- * - 4xx: 'warn' (client errors - expected, handled)
- * - 5xx: 'error' (server errors - unexpected, needs attention)
- * - Others: 'info' (success or redirects)
+ * Log level by HTTP status: 404 is `info` (a normal response, not a
+ * warning), other 4xx are `warn`, 5xx `error`, everything else `info`.
  */
 export function getLogLevelFromStatusCode(statusCode: number): "info" | "warn" | "error" {
   if (statusCode >= 500) return "error";
@@ -65,10 +62,9 @@ export function handledFaultOf(error: unknown): "customer" | "platform" | "provi
 }
 
 /**
- * Request log level, fault-aware: a handled error logs by fault attribution —
- * `customer` → warn (expected; spike-watched), `platform`/`provider` → error
- * (incident). Unhandled errors stay status-based. This is the same rule the
- * tRPC logger applies, so all boundaries agree.
+ * Request log level, fault-aware: a handled error logs by fault —
+ * `customer` warns (expected, spike-watched), `platform`/`provider` errors
+ * (incident); unhandled stays status-based. Same rule the tRPC logger applies.
  */
 export function getLogLevelForRequest(
   error: unknown,

@@ -3,11 +3,9 @@ import { DEFAULT_SERVICE_NAME } from "./constants.ts";
 export type LoggerFormat = "pretty" | "json";
 
 /**
- * Process configuration for logger construction.
- *
- * Composition parses deployment environment variables into these semantic
- * values before any process creates a logger. The package deliberately has no
- * environment access of its own.
+ * Process configuration for logger construction. Composition parses
+ * deployment environment variables into these semantic values before any
+ * process creates a logger — the package itself has no environment access.
  */
 export interface LoggerConfiguration {
   /** Runtime mode controls defaults such as test-level logging and pretty output. */
@@ -71,12 +69,10 @@ export function resolveLoggerConfiguration(
 ): ResolvedLoggerConfiguration {
   const environment = configuration.environment ?? DEFAULT_LOGGER_CONFIGURATION.environment;
   const isTest = environment === "test";
-  // JSON in every environment (dev/docs/best_practices/dev-log-format.md).
-  // The terminal never reads this: haven and `pnpm dev` render it through
-  // their own shared renderer, so the process emits one shape everywhere and
-  // a dev line and a production line are the same record. `LOG_FORMAT=pretty`
-  // remains the explicit opt-out for a lane run bare with no renderer in
-  // front of it.
+  // JSON in every environment (dev/docs/best_practices/dev-log-format.md):
+  // haven and `pnpm dev` render it through their own shared renderer, so
+  // dev and production emit the same record shape. `LOG_FORMAT=pretty` is
+  // the explicit opt-out for a lane run bare with no renderer in front of it.
   const format = configuration.format ?? "json";
   const defaultLevel = isTest ? "error" : DEFAULT_LOGGER_CONFIGURATION.level;
 
@@ -100,10 +96,9 @@ export function resolveLoggerConfiguration(
 }
 
 /**
- * The process-config shape both API and worker (and any future process) hand
- * this package to produce their `LoggerConfiguration`. Kept structural on
- * purpose: every process defines its own `Config` type, and this port takes
- * the slice of it a logger reads — never the whole thing.
+ * The process-config shape API, worker (and any future process) hand this
+ * package to produce a `LoggerConfiguration`. Kept structural on purpose:
+ * this port takes only the slice of each process's own `Config` a logger reads.
  */
 export interface ProcessLoggerInputs {
   nodeEnvironment?: string;
@@ -119,10 +114,9 @@ export interface ProcessLoggerInputs {
 }
 
 /**
- * Map a process configuration into the `LoggerConfiguration` the package
- * builds a logger from. One place: every process (api, worker, and any future
- * one) hands its parsed config here, so a new logger field lands in exactly
- * one map instead of drifting across N copies.
+ * Maps a process configuration into the `LoggerConfiguration` a logger is
+ * built from. One place every process hands its parsed config to, so a new
+ * logger field lands in exactly one map instead of drifting across N copies.
  */
 export function loggerConfigurationFrom(inputs: ProcessLoggerInputs): LoggerConfiguration {
   return {

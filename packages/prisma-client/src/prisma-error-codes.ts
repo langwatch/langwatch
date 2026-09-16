@@ -1,9 +1,7 @@
 /**
- * Duck-type check for Prisma P2002 unique constraint violations.
- *
- * Uses duck-typing instead of `instanceof PrismaClientKnownRequestError`
- * because turbopack/bundlers can create duplicate class copies, causing
- * `instanceof` to return false even for the correct type.
+ * Duck-type check for Prisma P2002 unique constraint violations. Avoids
+ * `instanceof PrismaClientKnownRequestError` because turbopack/bundlers can
+ * create duplicate class copies, making `instanceof` false for the right type.
  */
 export function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -15,11 +13,9 @@ export function isUniqueConstraintError(error: unknown): boolean {
 }
 
 /**
- * Duck-type check for Prisma P2025 "record to update not found".
- *
- * A compare-and-set update carries the expected version in its WHERE, so a
- * racing writer turns the update into a zero-row match and this is how it
- * arrives. Duck-typed for the same reason as P2002 above.
+ * Duck-type check for Prisma P2025 "record to update not found" — how a
+ * compare-and-set update (expected version in its WHERE) arrives when a
+ * racing writer turns it into a zero-row match. Duck-typed for the same reason as P2002.
  */
 export function isRecordNotFoundError(error: unknown): boolean {
   return (
@@ -31,11 +27,9 @@ export function isRecordNotFoundError(error: unknown): boolean {
 }
 
 /**
- * The constraint a P2002 names, across both error shapes: the classic engine
- * put field names (or the index name) on `meta.target`; the Prisma 7 driver
- * adapters put them on `meta.driverAdapterError.cause.constraint` as
- * `{ fields }` or `{ index }`. Returns an empty array when the error is not a
- * P2002 or names nothing.
+ * The constraint a P2002 names, across both shapes: the classic engine puts
+ * field/index names on `meta.target`; Prisma 7 driver adapters put them on
+ * `meta.driverAdapterError.cause.constraint`. Empty array if not P2002 or unnamed.
  */
 export function uniqueConstraintTargets(error: unknown): string[] {
   if (!isUniqueConstraintError(error)) return [];

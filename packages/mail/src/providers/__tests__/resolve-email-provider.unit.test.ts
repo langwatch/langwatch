@@ -7,10 +7,9 @@ import {
 import type { MailerConfiguration } from "../types.ts";
 
 /**
- * Builds a configuration the way the process would resolve it from the
+ * Builds a configuration the way the process resolves it from the
  * environment at boot — the shape `resolveEmailProviderName` is tested
- * against directly now that credentials arrive as an explicit parameter
- * rather than a live `env.mjs` read.
+ * against directly, since credentials now arrive as an explicit parameter.
  */
 const configWith = (overrides: {
   provider?: string;

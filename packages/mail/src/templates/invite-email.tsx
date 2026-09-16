@@ -8,12 +8,9 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 export const inviteEmailProps = z.object({
   email: z.email().describe("The address the invitation was addressed to"),
   /**
-   * The name, and how much is already there.
-   *
-   * `projectCount` is what tells an invitee the workspace is live rather than
-   * empty, which is the thing they cannot otherwise know before accepting. A
-   * count of zero reads as an empty room, so the line is suppressed there
-   * rather than arguing against itself.
+   * The name, and how much is already there. `projectCount` tells an invitee
+   * the workspace is live, not empty — something they can't otherwise know
+   * before accepting. Zero reads as an empty room, so the line is suppressed.
    */
   organization: z.object({
     name: z.string().min(1),
@@ -22,19 +19,15 @@ export const inviteEmailProps = z.object({
   /** Who sent it, when the sender knows their name. Nothing is looked up here. */
   inviter: z.object({ name: z.string().min(1) }).optional(),
   /**
-   * The link the invitation carries, already built.
-   *
-   * Passed in rather than derived from an invite code here: the same URL is
-   * returned by the invitation listing so a deployment with no mail gateway can
-   * hand the invitation over some other way, and one builder is what keeps the
-   * two from drifting.
+   * The link the invitation carries, already built — passed in, not derived
+   * from a code here, since the invitation listing returns the same URL for a
+   * deployment with no mail gateway; one builder keeps the two from drifting.
    */
   acceptInviteUrl: z.url(),
   /**
-   * What to do first, in the language of why this organization came.
-   *
-   * The organization exists — somebody in it sent this — so the steps can
-   * match what it uses LangWatch for rather than guessing.
+   * What to do first, in the language of why this organization came. It
+   * exists — somebody in it sent this — so the steps match what it uses
+   * LangWatch for, rather than guessing.
    */
   firstSteps: firstStepsSchema.optional(),
 });

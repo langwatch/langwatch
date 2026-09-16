@@ -14,11 +14,8 @@ import { WebhookEgressService } from "../webhook-egress.service.ts";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature
- *
- * The envelope and the cap. The transport is stubbed so the exact bytes and
- * headers of one dispatch can be read off; the executed address blocks live in
- * `webhook/__tests__/url-policy.unit.test.ts` and the executed fence in
- * `webhook/__tests__/http-destination.network.unit.test.ts`.
+ * The envelope and the cap: transport stubbed to read exact bytes/headers;
+ * address blocks and the fence are covered in url-policy and http-destination tests.
  */
 
 const mockedSend = vi.mocked(sendHttpDestination);

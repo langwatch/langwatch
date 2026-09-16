@@ -20,10 +20,9 @@ import { HISTOGRAM_BOUNDARIES } from "./histogram-boundaries.ts";
 export const METRICS_SCOPE_NAME = "langwatch";
 
 /**
- * Bumped by `activateMetrics` and `resetMetricsForTests`. Every cached meter
- * and instrument records the generation it was built in and rebuilds when it
- * falls behind, which is what lets an instrument created before the provider
- * was registered start reporting once it is.
+ * Bumped by `activateMetrics` and `resetMetricsForTests`. Every cached
+ * meter/instrument records its build generation and rebuilds when it falls
+ * behind — letting one created before the provider registers start reporting once it does.
  */
 let generation = 0;
 let meter: { value: Meter; generation: number } | undefined;

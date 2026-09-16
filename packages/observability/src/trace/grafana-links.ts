@@ -96,10 +96,9 @@ export function grafanaLogsUrlByTrace(
 }
 
 /**
- * Both links for an error that carries a trace id — trace-first (the usual
- * "what happened"), logs as the companion. Returns null when there is no base
- * URL configured (no observability stack / no Grafana) or when it is malformed,
- * so callers can fall back to plain ids without special-casing.
+ * Both links for an error with a trace id — trace-first, logs as companion.
+ * Returns null with no base URL configured or a malformed one, so callers
+ * fall back to plain ids without special-casing.
  */
 export function grafanaLinksForTrace(
   traceId: string | undefined,
@@ -120,9 +119,8 @@ function escapeQueryString(value: string): string {
 
 /**
  * A Grafana Explore link to every span the queue executed for one group.
- * GroupQueue stamps `queue.group_id` on each consumer span, so the TraceQL
- * attribute match is exact — no substring false positives across groups that
- * share a prefix. Returns null when the base URL is malformed.
+ * GroupQueue stamps `queue.group_id` on each consumer span, so the match is
+ * exact — no false positives across groups sharing a prefix. Null if malformed.
  */
 export function grafanaGroupTracesUrl(
   groupId: string,
@@ -144,10 +142,9 @@ export function grafanaGroupTracesUrl(
 }
 
 /**
- * A Grafana Explore link to the log lines mentioning one group. A line-contains
- * filter rather than a label matcher: the group id is logged as an ordinary
- * field by whichever worker touches the group, not indexed as a stream label.
- * Returns null when the base URL is malformed.
+ * A Grafana Explore link to log lines mentioning one group — a line-contains
+ * filter, not a label matcher, since the group id is an ordinary logged
+ * field, not indexed as a stream label. Null when the base URL is malformed.
  */
 export function grafanaGroupLogsUrl(groupId: string, config: GrafanaDeepLinkConfig): string | null {
   const uid = config.lokiDatasourceUid ?? DEFAULT_LOKI_DATASOURCE_UID;
@@ -167,12 +164,9 @@ export function grafanaGroupLogsUrl(groupId: string, config: GrafanaDeepLinkConf
 }
 
 /**
- * Resolve the deep-link config from the environment (server-side). GRAFANA_BASE_URL
- * is set by haven when the local observability stack is up, or by ops in
- * production; the datasource uids default to the LGTM bundle's and only need
- * overriding for a Grafana whose uids differ. On the client these read as
- * undefined, so the builders return null and callers fall back to plain ids —
- * which is why the href is built on the server and passed down.
+ * Resolves the deep-link config server-side: `GRAFANA_BASE_URL` comes from
+ * haven locally or ops in production, and datasource uids default to the
+ * LGTM bundle's. Undefined on the client, so the href is built server-side and passed down.
  */
 export function grafanaConfigFromEnv(): {
   baseUrl?: string;

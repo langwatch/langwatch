@@ -1,10 +1,7 @@
 /**
- * The facade's own contract: late meter resolution, boundary enforcement, and
- * observable gauges that survive being declared before boot.
- *
- * A hand-written meter stands in for the SDK rather than a real
- * MeterProvider — the SDK's aggregation is not ours to test, and the three
- * behaviours below are exactly the ones that fail silently in production.
+ * The facade's own contract: late meter resolution, boundary enforcement,
+ * and gauges that survive being declared before boot. A hand-written meter
+ * stands in for the SDK, since its aggregation isn't ours to test.
  */
 import { metrics, type Attributes } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

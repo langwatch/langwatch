@@ -20,9 +20,8 @@ const guardDisabled = process.env.LANGWATCH_TEST_LOGS === "1";
 
 /**
  * Fails a test with a clear message when test code (not the logger, which
- * pino writes through directly) calls console.log/info/warn/error during it.
- * Loaded as a `setupFiles` entry for `kind: "unit"` suites only - it runs its
- * hooks the moment this module is imported.
+ * pino writes through directly) calls console.log/info/warn/error during
+ * it. A `setupFiles` entry for `kind: "unit"` suites, running on import.
  */
 if (!guardDisabled) {
   const originals = new Map<ConsoleMethod, (...args: unknown[]) => void>();

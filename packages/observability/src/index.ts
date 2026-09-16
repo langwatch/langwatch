@@ -1,9 +1,7 @@
 /**
- * Browser-safe public API for @langwatch/observability.
- *
- * Node context and OpenTelemetry helpers intentionally live behind the
- * `@langwatch/observability/context` and `@langwatch/observability/tracing` subpaths so
- * importing the logger in client code never evaluates those dependencies.
+ * Browser-safe public API for @langwatch/observability. Node context and
+ * OpenTelemetry helpers deliberately live behind the `/context` and
+ * `/tracing` subpaths, so importing the logger in client code never evaluates them.
  */
 
 export {

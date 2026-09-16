@@ -75,12 +75,9 @@ function captureResponseHeaders(
 }
 
 /**
- * Reads at most `maxBytes` off the response stream, then cancels it.
- *
- * The cap bounds ALLOCATION, not just retention: bytes past the cap are never
- * pulled, and the remainder of the transfer is torn down rather than drained.
- * Decoding is incremental, so a cap landing mid-codepoint yields a replacement
- * character rather than throwing.
+ * Reads at most `maxBytes` off the response stream, then cancels it. The
+ * cap bounds ALLOCATION: bytes past it are never pulled and the remainder
+ * is torn down, not drained; a mid-codepoint cut decodes to a replacement char.
  */
 async function readCappedBody({
   body,

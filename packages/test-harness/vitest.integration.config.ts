@@ -1,10 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: `*.integration.test.ts` under `src/`, excluded from the
- * unit lane. `cleanup-test-rows` needs Postgres, at
- * `LANGWATCH_TEST_DATABASE_URL`; the nlpgo roundtrip suite needs a `go`
- * toolchain instead and self-skips without either.
+ * Integration lane: `*.integration.test.ts` under `src/`, excluded from
+ * the unit lane. `cleanup-test-rows` needs Postgres
+ * (`LANGWATCH_TEST_DATABASE_URL`); nlpgo roundtrip needs `go`, self-skipping without either.
  */
 export default defineConfig({
   test: {

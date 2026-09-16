@@ -11,11 +11,9 @@ import {
 } from "../nlpgo-binary-stamp.ts";
 
 /**
- * Binds specs/ci/nlpgo-test-binary-reuse.feature.
- *
- * Uses a real temp tree rather than a mocked fs: the bug being guarded against
- * was a filesystem-semantics bug (git does not restore mtimes), so a test that
- * mocks the filesystem away cannot observe the thing that broke.
+ * Binds specs/ci/nlpgo-test-binary-reuse.feature. Uses a real temp tree,
+ * not a mocked fs: the bug guarded against was filesystem-semantics (git
+ * doesn't restore mtimes), unobservable through a mocked filesystem.
  */
 describe("nlpgo test binary stamp", () => {
   let root: string;

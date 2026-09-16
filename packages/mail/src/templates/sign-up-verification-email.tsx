@@ -6,10 +6,9 @@ import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
- * The email that carries a sign-up address's confirmation link (D13,
- * ADR-117 §6: sign-up verifies the address before any sign-in method is
- * chosen, so this send is the first thing sign-up does and nothing exists for
- * the address until the link comes back).
+ * The email carrying a sign-up address's confirmation link (D13, ADR-117
+ * §6): the address is verified before any sign-in method is chosen, so
+ * this send is the first thing sign-up does and nothing exists until it returns.
  */
 export const signUpVerificationEmailProps = z.object({
   email: z.email(),

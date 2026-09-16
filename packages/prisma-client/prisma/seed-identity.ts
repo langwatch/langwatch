@@ -1,9 +1,7 @@
 /**
- * Pure address-resolution helpers for the local-dev seed (seed.ts), split out
- * so the rules are testable without booting Prisma. SEED_EMAIL_DOMAIN is a
- * purely opt-in per-stack override; unset, every seeded account uses
- * DEFAULT_SEED_EMAIL_DOMAIN, one stable global address that keeps a saved
- * password-manager login working across worktrees and reseeds.
+ * Pure address-resolution helpers for the local-dev seed (seed.ts), split
+ * out for testability without booting Prisma. Unset SEED_EMAIL_DOMAIN
+ * keeps one stable address, so a saved password-manager login persists across worktrees.
  */
 
 /** The domain every seeded account uses unless SEED_EMAIL_DOMAIN overrides it. */
@@ -32,11 +30,8 @@ export function seedEmailAddress({
 
 /**
  * The admin User upsert's where/create/update payload. Keyed on the fixed
- * `adminUserId`, never on email, so a reseed always finds THIS account —
- * whatever address it was seeded under before (including the retired
- * admin@haven.localhost default) — and rewrites its email in place. Because
- * the lookup never goes through email, a domain change (or the one-time
- * rename) can never produce a second admin account.
+ * `adminUserId`, never on email, so a reseed always finds and rewrites THIS
+ * account in place — a domain change can never produce a second admin account.
  */
 export function buildAdminUserUpsertArgs({
   adminUserId,

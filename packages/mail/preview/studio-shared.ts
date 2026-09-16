@@ -24,12 +24,9 @@ export interface GalleryEntry {
 export const WIDTHS = { desktop: 680, mobile: 375 } as const;
 
 /**
- * Shows the dark half of an email without asking the operating system to change.
- *
- * Nothing lets a page force `prefers-color-scheme` on a frame, so the studio
- * promotes the dark rules the email already carries to unconditional ones. It
- * reads the real stylesheet the message ships, so what appears is what a client
- * in dark mode composes — not a second theme written for the preview.
+ * Shows the dark half of an email without asking the OS to change — nothing
+ * lets a page force `prefers-color-scheme` on a frame. Promotes the
+ * email's own dark rules, so it renders what a client composes, not a second preview theme.
  */
 export const promoteDarkRules = (html: string): string => {
   const marker = "@media (prefers-color-scheme: dark)";

@@ -9,10 +9,9 @@ const packageRoot = resolve(here, "..");
 const registryModule = resolve(packageRoot, "src/templates/index.ts");
 
 /**
- * The studio renders every message in Node, through the same `@react-email` call
- * the product sends with — a browser bundle would be a second rendering path
- * that could disagree with the mail that actually arrives. `ssrLoadModule` runs
- * the real modules in this process and re-runs them the moment a template changes.
+ * The studio renders every message in Node, through the same `@react-email`
+ * call the product sends with — a browser bundle would be a second path
+ * that could disagree. `ssrLoadModule` re-runs the real modules on change.
  */
 const templateRenderer = (): Plugin => {
   const load = (server: ViteDevServer) =>

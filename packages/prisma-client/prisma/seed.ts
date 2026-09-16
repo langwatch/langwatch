@@ -1,9 +1,7 @@
 /**
- * Idempotent local-dev / CI seed: upserts one Organization, Team, Project,
- * admin User and API tokens under fixed, hardcoded IDs (never random), so
- * re-running never duplicates them. The admin User is upserted by ID, not
- * email, so a changed SEED_EMAIL_DOMAIN updates the same account. Plaintext
- * tokens are identical on every machine; only the stored hash differs.
+ * Idempotent local-dev / CI seed: fixed, hardcoded ids (never random) for
+ * Organization, Team, Project, admin User (upserted by ID, not email) and
+ * API tokens — plaintext identical everywhere, only the bcrypt hash differs.
  */
 
 import { hash as hashPassword } from "bcrypt";
@@ -103,12 +101,10 @@ async function main() {
   // Redact — in non-haven flows apiKey may be a real credential, and logs get shipped.
   console.log(`🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`);
 
-  // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding
-  // (firstMessage/integrated set), so the UI opens on the real product instead
-  // of the "waiting for your first message" journey. `haven seed --preset demo`
-  // sets this and then ingests sample traces through the collector.
-  // HAVEN_SEED_FIRST_MESSAGE=1|0 overrides that flag independently of the
-  // preset (`haven seed --first-message` sets it).
+  // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding, so
+  // the UI opens on the real product instead of the "waiting for your first
+  // message" journey (`haven seed --preset demo` sets this and ingests sample
+  // traces). HAVEN_SEED_FIRST_MESSAGE=1|0 overrides the flag independently.
   const firstMessageOverride = process.env.HAVEN_SEED_FIRST_MESSAGE;
   const hasFirstMessageOverride = firstMessageOverride !== undefined;
   const isPastOnboarding = hasFirstMessageOverride
@@ -459,20 +455,17 @@ const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 
 /**
  * The at-rest format for ModelProvider.customKeys: AES-256-GCM under the
- * deployment's own 32-byte hex pepper, written `iv:ciphertext:authTag`.
- * `@langwatch/secret-server` owns that format; the key is the one the boot
- * seam resolved.
+ * deployment's own 32-byte hex pepper, written `iv:ciphertext:authTag` —
+ * `@langwatch/secret-server` owns the format; the key comes from the boot seam.
  */
 function encryptCredentials(value: string, key: string): string {
   return AesGcmSecretEncryptionAdapter.create({ key }).encrypt(value);
 }
 
-// loadSeedEnv merges the dotenv layers under the child's real precedence:
-// process env wins over the repository-root .env. The path is resolved from
-// this file rather than from process.cwd(): the seed is invoked as a prisma
-// `migrations.seed` command (cwd = packages/prisma-client), as a package
-// script, and by haven from the repository root, and all three must read the
-// same repository-root .env.
+// loadSeedEnv merges dotenv layers with process env winning over the
+// repository-root .env, resolving the path from this file rather than
+// process.cwd(): the seed runs as a prisma `migrations.seed` command, a
+// package script, and via haven from the repo root — all three read the same file.
 function loadSeedEnv(): Record<string, string> {
   const merged: Record<string, string> = {};
   const rootEnv = fileURLToPath(new URL("../../../.env", import.meta.url));

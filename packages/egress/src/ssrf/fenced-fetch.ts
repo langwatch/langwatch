@@ -4,26 +4,21 @@ import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "und
 import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator.ts";
 
 /**
- * The fetch a validated destination is actually reached through. FROZEN TWIN
- * of the fetch half of `platform/app/src/utils/ssrfProtection.ts`. Pins the
- * connection to the IP the policy judged (via an undici Agent's `lookup`) so
- * the hostname cannot be re-resolved between decision and socket, while the
- * `Host` header and TLS servername still carry the original hostname.
+ * FROZEN TWIN of the fetch half of `platform/app/src/utils/ssrfProtection.ts`.
+ * Pins the connection to the policy-judged IP so the hostname cannot be
+ * re-resolved after the decision, while `Host`/TLS servername keep the original.
  */
 
 /**
- * Redirects are `manual`, always: `followRedirects: false` refuses every hop
- * (a customer-supplied destination), otherwise each hop is re-validated
- * through `revalidate` (a parameter, since a package has no environment to
- * build one from — an admission this module cannot evaluate refuses) up to
- * `MAX_REDIRECTS` times under one shared deadline.
+ * Redirects are `manual`, always: `followRedirects: false` refuses every
+ * hop; each hop is otherwise re-validated through `revalidate` (a caller
+ * parameter, since this module has no environment) up to `MAX_REDIRECTS`.
  */
 
 /**
  * Two independent timeout bounds, both opt-in: `init.signal` carries across
- * every hop, and `headersTimeoutMs` / `bodyTimeoutMs` ride on the Agent as a
- * socket-level backstop if the signal is ever dropped. Omitted leaves
- * undici's 300s defaults.
+ * every hop; `headersTimeoutMs` / `bodyTimeoutMs` back it as a socket-level
+ * backstop if the signal drops. Omitted, undici's 300s defaults apply.
  */
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -32,12 +27,9 @@ const logger = createLogger("langwatch:ssrfProtection");
 const MAX_REDIRECTS = 10;
 
 /**
- * Whether TLS certificates are verified on this deployment.
- *
- * Separate from the address policy on purpose, and injected for the same reason
- * the address policy is: the application ties it to `IS_SAAS` because an on-prem
- * operator frequently calls services with self-signed certificates, which has
- * nothing to do with whether private addresses are reachable.
+ * Whether TLS certificates are verified on this deployment. Tied to
+ * `IS_SAAS`, separately from the address policy, because on-prem operators
+ * often use self-signed certificates — unrelated to private-address reachability.
  */
 export interface EgressTlsPolicy {
   rejectUnauthorized: boolean;
@@ -65,10 +57,9 @@ function formatConnectionError(err: Error, hostname: string, port: number): Erro
 }
 
 /**
- * The receiver redirected and this caller declined the hop. A class rather
- * than a message, because the catch below funnels every plain `Error`
- * through `formatConnectionError`, rewriting it as "Connection failed" —
- * this type passes through that catch untouched.
+ * The receiver redirected and this caller declined the hop. A class, not a
+ * message, so it passes untouched through the catch below that rewrites
+ * every plain `Error` as "Connection failed" via `formatConnectionError`.
  */
 export class RedirectRefusedError extends Error {
   constructor(
@@ -142,12 +133,9 @@ function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
 }
 
 /**
- * Fetches an already-validated destination at the address it was validated at.
- *
- * The TLS policy is a required argument rather than a module default: a package
- * has no deployment to read it from, and a wrong default either breaks every
- * on-prem receiver with a self-signed certificate or silently stops verifying
- * certificates in production.
+ * Fetches an already-validated destination at its validated address. TLS
+ * policy is a required argument, not a default: a package has no deployment
+ * to read one from, and a wrong default breaks receivers or stops verifying.
  */
 export async function fetchValidatedDestination(
   validated: SsrfValidationResult,
@@ -176,13 +164,10 @@ export async function fetchValidatedDestination(
   try {
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
-      // Entries rather than the `Headers` instance itself. Two copies of the
-      // undici types are reachable in this repository — the one this package
-      // resolves, and the one `@types/node` carries — and a consumer that has
-      // both in scope cannot assign one library's `Headers` to the other's
-      // parameter even though they are the same object at runtime. The pair
-      // list is the shape both accept, and it is what undici builds from a
-      // `Headers` anyway.
+      // Entries, not the `Headers` instance: two copies of the undici types
+      // are reachable here (this package's, and `@types/node`'s), and a
+      // consumer with both in scope cannot assign one's `Headers` to the
+      // other's parameter even though they're the same object at runtime.
       headers: [...headers],
       body: init?.body as string | undefined,
       // Without this the caller's AbortSignal.timeout(...) is silently dropped

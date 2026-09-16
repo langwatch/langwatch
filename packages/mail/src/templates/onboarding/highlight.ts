@@ -15,11 +15,9 @@ export interface Token {
 }
 
 /**
- * The words each language sets apart.
- *
- * Shell has no keywords, so the set is the commands these snippets run: in a
- * one-line install the command IS the thing worth seeing, and colouring
- * `install` the same as `npm` tells the reader nothing.
+ * The words each language sets apart. Shell has no keywords, so its set is
+ * the commands these snippets run: in a one-line install, the command IS
+ * the thing worth seeing — colouring `install` the same as `npm` tells nothing.
  */
 const KEYWORDS: Record<HighlightLanguage, readonly string[]> = {
   bash: ["npm", "npx", "pip", "go", "export", "langwatch", "claude", "curl"],
@@ -29,11 +27,9 @@ const KEYWORDS: Record<HighlightLanguage, readonly string[]> = {
 };
 
 /**
- * One pass, longest-lived thing first.
- *
- * Comments and strings are matched before identifiers because a keyword inside
- * either is not a keyword, and matching identifiers first is exactly how a
- * highlighter starts colouring the inside of a string.
+ * One pass, longest-lived thing first: comments and strings match before
+ * identifiers, since a keyword inside either isn't one — matching
+ * identifiers first is how a highlighter starts colouring inside a string.
  */
 const SCANNER =
   /(#[^\n]*|\/\/[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_]*)/g;

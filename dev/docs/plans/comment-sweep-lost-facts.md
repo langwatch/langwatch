@@ -848,3 +848,25 @@ the budget rather than evading it.
     One refactor note, not a lost fact: `billing-host.ts`, `licensing-host.ts`,
     `data-privacy-host.ts` and `topic-host.ts` carry four near-identical
     `useXHost()` guard blocks. A shared helper would carry one.
+
+42. **The webhook signature header's wire format and rotation rule - checked,
+    not assumed.** `packages/egress/src/webhook/signature.ts`, a 26-line file
+    header cut hard. Gone from that file: the literal
+    `X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256>` examples, the
+    two-`v1` rotation example, and the framing sentence "four implementations
+    agreeing pairwise is agreement only until one is edited".
+
+    This is external contract - a receiver whose verifier reads only the first
+    `v1` breaks during a secret roll - so it was verified to survive elsewhere
+    before the slice was collected, and it does, in three committed places:
+    `docs/features/webhooks.mdx:309` states the accept-any-match rule to
+    customers directly, `docs/ai-gateway/billing-events.mdx:79` carries the
+    header format, and the TypeScript SDK's verifier keeps every `v1` with the
+    comment "Keeping only one is the rotation bug this helper exists to make
+    impossible", pinned by `specs/webhooks/signature-vectors.json`.
+
+    What is genuinely thinner is only the *rationale* for the vector-file
+    pattern. Also cut, and likewise recoverable: the `SsoConnection` exemption's
+    addressing mechanism in `packages/prisma-client/src/organization-guard.ts`,
+    whose exemption reason - two legitimately cross-organization reads - is
+    fully preserved.

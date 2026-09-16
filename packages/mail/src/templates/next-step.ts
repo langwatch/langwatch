@@ -48,12 +48,9 @@ export const usageUnitSchema = z.enum(["traces", "events"]);
 export type UsageUnit = z.infer<typeof usageUnitSchema>;
 
 /**
- * The noun a reader is metered in.
- *
- * "Messages" is what every one of these mails said before the meter had two
- * settings, and it stays the answer for a sender that does not report one:
- * inventing a unit for an organization whose meter we did not ask about would
- * put a number next to the wrong word.
+ * The noun a reader is metered in. "Messages" is what every one of these
+ * mails said before the meter had two settings, and stays the default when
+ * a sender reports none — inventing a unit we never asked about risks the wrong word.
  */
 export const meteredNoun = (usageUnit: UsageUnit | undefined): string => usageUnit ?? "messages";
 

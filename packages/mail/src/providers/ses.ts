@@ -42,10 +42,9 @@ export const buildSesClientConfig = ({
 };
 
 /**
- * SES reached directly, on the deployment's own credential chain and its own
- * network path. A deployment that must egress through a proxy supplies its own
- * builder instead, because the agent that carries the proxy is the process's
- * and not this package's.
+ * SES reached directly, on the deployment's own credential chain and
+ * network path. A deployment needing a proxy supplies its own builder
+ * instead — the proxy agent belongs to the process, not this package.
  */
 export const directSesClientConfiguration = (): SesAwsClientConfiguration => ({
   build: ({ region, endpoint }) => ({

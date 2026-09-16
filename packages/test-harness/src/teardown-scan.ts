@@ -239,12 +239,9 @@ function checkDeleteManyArgument({
 }
 
 /**
- * Scan one parsed test file for unsafe deleteMany calls. Pure: takes a syntax
- * tree, returns violations, so the rule itself is unit-testable.
- *
- * Parsing belongs to the caller because TypeScript 7 parses in the compiler
- * process, so a scan that parsed per file paid a round trip per file. The
- * tree-wide caller parses everything in one exchange (`parseSourceTexts`).
+ * Scan one parsed test file for unsafe deleteMany calls — pure, taking a
+ * syntax tree, so it's unit-testable. Parsing is the caller's job: TS7
+ * parses in the compiler process, so `parseSourceTexts` batches every file into one exchange.
  */
 export function scanTestSourceForUnsafeDeleteMany(source: SourceFile): TeardownViolation[] {
   const reassignable = collectReassignableNames(source);

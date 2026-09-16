@@ -2,12 +2,9 @@ import { Box, chakra, Checkbox, Fieldset, Stack, Text, Textarea } from "@chakra-
 import type { JSX } from "react";
 
 /**
- * A form drawn from the props schema.
- *
- * It walks JSON Schema rather than zod's internals so it keeps working across
- * a zod upgrade, and it stops at the first shape it cannot draw honestly: an
- * unrecognised node becomes a JSON box rather than a control that quietly
- * edits the wrong thing.
+ * A form drawn from the props schema. Walks JSON Schema, not zod's
+ * internals, to keep working across a zod upgrade, and stops honestly at
+ * the first unrecognised shape — a JSON box, not a control editing the wrong thing.
  */
 
 type Node = Record<string, unknown>;

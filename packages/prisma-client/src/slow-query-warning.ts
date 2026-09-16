@@ -30,11 +30,9 @@ export function resolveSlowQueryBudgetMs(env: {
 }
 
 /**
- * The argument keys say what shape the query was without saying what was in
- * it. The values hold customer data (identifiers, names, message bodies), and
- * a raw operation's arguments hold the SQL text and its parameters, so raw
- * operations report no keys at all. Same rule the ClickHouse client follows
- * with `paramKeys`.
+ * The argument keys say the query's shape without its content — values hold
+ * customer data, and a raw operation's arguments hold SQL text and params,
+ * so raw operations report no keys. Same rule the ClickHouse client's `paramKeys` follows.
  */
 export function safeArgKeys({
   action,
@@ -101,11 +99,9 @@ export function reportQueryDuration({
 }
 
 /**
- * Times one Postgres operation and reports it.
- *
- * A rejection is re-raised untimed and unreported: it reaches the caller,
- * which logs it with the cause attached, and a slow warning on top would
- * describe the same event a second time under a level that disagrees.
+ * Times one Postgres operation and reports it. A rejection is re-raised
+ * untimed and unreported: the caller logs it with the cause attached, and a
+ * slow warning on top would describe the same event twice, at a disagreeing level.
  */
 export async function withQueryTiming<T>({
   params,

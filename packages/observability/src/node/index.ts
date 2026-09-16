@@ -23,10 +23,8 @@ export {
   type OtlpMetricsTelemetryInputs,
 } from "./otlp-metrics.ts";
 
-// Every method of a service, wrapped in a span named `ClassName.methodName`.
-// Applied once at factory time, so the service's own methods stay clean.
-//
-// On the NODE entry rather than the package root: it evaluates OpenTelemetry at
-// import, and the root is asserted to load in a browser bundle without doing
-// that.
+// Every method of a service, wrapped in a span named `ClassName.methodName`,
+// applied once at factory time so the service's own methods stay clean.
+// Lives on the NODE entry, not the package root: it evaluates OpenTelemetry
+// at import, and the root is asserted to load in a browser bundle without it.
 export { traced } from "../trace/traced.ts";

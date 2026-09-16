@@ -17,12 +17,9 @@ interface SdkLogger {
 }
 
 /**
- * The process-owned observability graph.
- *
- * A process constructs this once during boot and injects its logger/tracer
- * into adapters that need them. HTTP and queue spans still come from the
- * existing API/Eventing instrumentation; this object owns their provider and
- * the one shutdown boundary that flushes it.
+ * The process-owned observability graph, constructed once at boot and
+ * injected into adapters that need its logger/tracer. HTTP and queue spans
+ * still come from API/Eventing instrumentation; this owns their provider and shutdown boundary.
  */
 export interface ProcessObservability {
   readonly logger: Logger;
@@ -62,12 +59,9 @@ export interface ProcessObservabilityOptions {
 }
 
 /**
- * Creates the one Node logger/tracer graph for an application process.
- *
- * `setupObservability` is given the Pino logger through its diagnostic port,
- * and automatic SDK signal handlers are disabled so API/worker lifecycles can
- * drain their own work before calling `shutdown`. The setup options are passed
- * in by the composition root; this module deliberately does not read env.
+ * Creates the one Node logger/tracer graph for a process. `setupObservability`
+ * gets the Pino logger via its diagnostic port, with automatic SDK signal
+ * handlers disabled so lifecycles can drain their own work before `shutdown`.
  */
 export function createProcessObservability(
   options: ProcessObservabilityOptions,

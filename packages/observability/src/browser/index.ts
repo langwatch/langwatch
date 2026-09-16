@@ -1,10 +1,7 @@
 /**
- * Browser-legal public API for `@langwatch/observability/browser`.
- *
- * The one export map entry web code should reach for a logger: it never
- * evaluates `node:async_hooks`, `node:process` or `@opentelemetry/*`, because
- * nothing in its own graph imports them. See `runtimeSafety.unit.test.ts`,
- * which pins that graph shape.
+ * Browser-legal public API for `@langwatch/observability/browser` — the
+ * one entry web code should use for a logger. Never evaluates
+ * `node:async_hooks`, `node:process` or `@opentelemetry/*`; pinned by `runtimeSafety.unit.test.ts`.
  */
 export {
   createLogger,

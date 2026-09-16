@@ -176,11 +176,9 @@ export function resetLoggerCache(): void {
 }
 
 /**
- * Under vitest, every expected error path in every module would otherwise
- * log into the test run. `LANGWATCH_TEST_LOGS=1` restores today's behaviour
- * (a suite that asserts on log output opts back in); a level name
- * (`LANGWATCH_TEST_LOGS=debug`) restores it at that level instead. Returns
- * `undefined` outside vitest, or once a suite has opted back in.
+ * Under vitest, every expected error path would otherwise log into the
+ * test run. `LANGWATCH_TEST_LOGS=1` (or a level, e.g. `=debug`) restores
+ * that output for a suite that opts back in; undefined outside vitest.
  */
 function testLoggerLevel(): string | undefined {
   if (!isNodeRuntime || !process.env.VITEST) return undefined;

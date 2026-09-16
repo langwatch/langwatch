@@ -113,10 +113,9 @@ export interface ObjectStorage {
 }
 
 /**
- * Blobs in a Map, keyed by project and key together - so a test that reads one
- * project's object back under another project's id fails here as it would
- * against the real member, which routes on the project and cannot be handed an
- * unscoped client at all.
+ * Blobs in a Map, keyed by project and key together, so a test reading one
+ * project's object under another project's id fails here exactly as it
+ * would against the real member, which cannot be handed an unscoped client.
  */
 export function memoryObjectStorage(): ObjectStorage {
   const stored = new Map<string, StoredObject>();

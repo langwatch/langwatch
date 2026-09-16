@@ -4,9 +4,8 @@ import { createLogger } from "../logger.ts";
 
 /**
  * `createLogger` is silenced under vitest by default (LANGWATCH_TEST_LOGS
- * unset), and this package's own vitest.config.ts sets LANGWATCH_TEST_LOGS=1
- * so its other suites see real levels. These tests exercise the override
- * directly by toggling the env var around each case.
+ * unset); this package's own vitest.config.ts sets it to 1 so other suites
+ * see real levels. These tests toggle the env var directly, around each case.
  */
 describe("createLogger under vitest", () => {
   const original = process.env.LANGWATCH_TEST_LOGS;

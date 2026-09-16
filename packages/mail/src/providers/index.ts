@@ -28,10 +28,9 @@ const isKnownProvider = (value: string): value is EmailProviderName =>
   (EMAIL_PROVIDER_NAMES as readonly string[]).includes(value);
 
 /**
- * When the named gateway is unusable but another one is fully configured, the
- * likely cause is a name that disagrees with the settings actually supplied,
- * which reads as a missing credential and is really a wrong gateway. Naming
- * the alternative lets that shape diagnose itself.
+ * When the named gateway is unusable but another is fully configured, the
+ * likely cause is a name disagreeing with the settings supplied — reading
+ * as a missing credential when it's really the wrong gateway. Naming the alternative diagnoses it.
  */
 const inferredProviderHint = ({
   configured,

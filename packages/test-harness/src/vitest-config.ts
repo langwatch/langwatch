@@ -5,17 +5,15 @@ import { defineConfig, type ViteUserConfig } from "vitest/config";
 const CONSOLE_GUARD_SETUP = fileURLToPath(new URL("./console-guard.ts", import.meta.url));
 
 /**
- * The one vitest shape every package in the workspace declares. It carries the
- * speed options vitest 5 exposes - a forks pool, the on-disk transform cache,
- * and isolation off wherever the package's tests never touch the module
- * registry - so a package's own config says only what is different about it.
+ * The one vitest shape every package declares — vitest 5's speed options
+ * (forks pool, on-disk transform cache, isolation off where a package's
+ * tests never touch the module registry) — so a config says only what differs.
  */
 export interface ModuleVitestConfigOptions {
   /**
-   * Chooses the environment, and for `unit` the console-output guard. It does
-   * not change isolation: every kind runs with isolation off by default,
-   * `jsdom` included. `unit` is `node` plus the guard (piloted here first,
-   * before it rolls out to every unit suite).
+   * Chooses the environment, and for `unit` the console-output guard —
+   * isolation stays off by default for every kind, `jsdom` included. `unit`
+   * is `node` plus the guard, piloted here before rolling out repo-wide.
    */
   kind: "node" | "jsdom" | "unit";
   include?: string[];
@@ -36,10 +34,8 @@ const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/dist/**"];
 
 // LANGWATCH_VITEST_FAST=1 (default) turns on every perf option vitest 5
 // supports that is safe repo-wide; =0 restores the pre-fast-mode config
-// exactly, so a package with an isolate-sensitive suite can opt a single CI
-// run out without touching this file or its own vitest.config.ts.
-// See dev/docs/plans (vitest perf lane report) for the option-by-option
-// rationale and doc links.
+// exactly, so an isolate-sensitive suite can opt one CI run out without
+// touching this file. See dev/docs/plans (vitest perf lane report) for the rationale.
 const FAST_MODE = process.env.LANGWATCH_VITEST_FAST !== "0";
 
 export function moduleVitestTestOptions(

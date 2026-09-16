@@ -20,10 +20,8 @@ type OrgScopedModelConfig = {
 };
 
 /**
- * Prisma's read actions. A token/id hatch that resolves one organization is
- * safe for a READ, but a write keyed on the same token would still be a
- * cross-tenant write; scoping a hatch to these keeps a future
- * `updateMany`/`deleteMany` on that shape from riding through it.
+ * Prisma's read actions — scoping a hatch to these keeps a future write
+ * from riding through it, since a read-only hatch safely resolves one org.
  */
 const READ_ACTIONS = new Set([
   "findUnique",
@@ -45,21 +43,17 @@ const clauseField = (clause: unknown, key: string): unknown =>
   clause && typeof clause === "object" ? (clause as Record<string, unknown>)[key] : undefined;
 
 /**
- * A reserved, system-managed API-key name. Only the platform can create or
- * rename a key into one (`ApiKeyService.create` refuses otherwise), so a query
- * bounded by such a name reaches platform-owned rows only — never a customer's.
- * Matched exactly: no `contains`/`startsWith`, which would widen the reach.
+ * A reserved, system-managed key name. `ApiKeyService.create` refuses any
+ * customer key into one, so an exact match here reaches platform rows only —
+ * never `contains`/`startsWith`, which would widen the reach.
  */
 const isSystemManagedKeyName = (value: unknown): boolean =>
   typeof value === "string" && HIDDEN_SYSTEM_KEY_NAMES.includes(value);
 
 /**
- * The elapsed-expiry half of the sweep's predicate:
- * `expiresAt: { not: null, lte: <Date> }` — "has an expiry, and it has already
- * passed". Matched as exactly that pair, for the same reason `revokedAt` is
- * matched as a literal below: any looser check (merely having an `expiresAt`
- * key, or an unbounded matcher) readmits the live, un-expired keys this clause
- * exists to exclude.
+ * Matches exactly `expiresAt: { not: null, lte: <Date> }` — an expiry that
+ * has passed. A looser check (merely having the key, or an unbounded
+ * matcher) would readmit still-live keys this clause exists to exclude.
  */
 const isElapsedExpiryBound = (value: unknown): boolean => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -82,12 +76,9 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
 };
 
 /**
- * Hourly reap sweep for elapsed CLI login keys: matches the reserved name
- * prefix (exactly one matcher key, `startsWith`), revokedAt: null, and the
- * elapsed-expiry bound — the exact shape `findElapsedLoginKeys` sends and
- * nothing looser. `startsWith` is safe here where `isSystemManagedKeyName`
- * refuses it, because the prefix names platform-minted login keys only
- * (`ApiKeyService.create` refuses customer keys that would collide).
+ * Hourly reap sweep for CLI login keys: matches the reserved prefix via
+ * `startsWith` — safe because `ApiKeyService.create` refuses a customer
+ * key that would collide — revokedAt: null, and the elapsed-expiry bound.
  */
 const isCliLoginKeyExpirySweep = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
@@ -171,11 +162,9 @@ const boundsToSingleOrg = (clause: any): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
 
 /**
- * The org-tenancy regime: models whose every query is required to carry a
- * single-organization predicate. This set is the organization-level analogue
- * of guardProjectId's project-scoped default, and grows as org-scoped models
- * are audited (each call site verified to already carry a bounded predicate)
- * and moved out of the no-enforcement bucket. See ADR-021.
+ * The org-tenancy regime: models whose every query must carry a
+ * single-organization predicate — the org-level analogue of
+ * guardProjectId's default. Grows as models are audited. See ADR-021.
  */
 const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Original three guarded models, preserved (organizationId / row id /
@@ -258,12 +247,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // the authz_grants fold (plus revocation enforcement); read by the engine
   // per organization. Row id / organizationId cover every access pattern.
   Grant: {
-    // The resource tier's possession path presents only the share token —
-    // globally unique, resolving to exactly one organization (ADR-057's
-    // ShareLink lookup, inherited when share links become RESOURCE grants).
-    // READ actions only: the possession path is a read, and a write keyed on
-    // a bare token would still cross tenants (the ApiKey hatch above scopes
-    // its own widening the same way).
+    // Share token — globally unique (ADR-057), resolving to exactly one org.
+    // READ actions only: a write keyed on a bare token would still cross
+    // tenants, as the ApiKey hatch above scopes the same way.
     extraBound: ({ clause, action }) =>
       READ_ACTIONS.has(action) && typeof clauseField(clause, "token") === "string",
   },
@@ -337,12 +323,10 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "DataPrivacyPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
-  // Webhook platform: enforced by guardProjectId's SCOPED_MODELS (org id,
-  // row id, endpoint FK, or project FK required on every query; creates must
-  // carry one channel's complete tenancy pair); the delivery sweep and
-  // retention prune use the raw-SQL opt-out. The delivery log is shared with
-  // the automations channel, whose rows are project-scoped and carry no
-  // organizationId at all, so a mandatory-organizationId guard cannot apply.
+  // Enforced by guardProjectId's SCOPED_MODELS instead (org id, row id, or
+  // project FK on every query); sweep/prune use the raw-SQL opt-out. The
+  // delivery log is shared with the project-scoped automations channel,
+  // which carries no organizationId, so a mandatory guard here cannot apply.
   "WebhookEndpoint",
   "WebhookEndpointDelivery",
   // organizationId is NULLABLE here (NULL = platform-published default), so a
@@ -382,14 +366,11 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
-  // The D04 SSO connection projection (ADR-117 §5). Org-bearing, and
-  // deliberately not org-CONSTRAINED: it is addressed by connection id (the
-  // fold's load and store), and two of its reads are cross-organization on
-  // purpose — "who already verified this domain", which is what makes first
-  // verifier own globally on SaaS, and the self-hosted sole-connection list.
-  // A guard demanding organizationId would refuse exactly the queries the
-  // ownership rule is made of. It holds no customer content: ids, domains,
-  // enums and credential references.
+  // D04 SSO connection projection (ADR-117 §5): deliberately not
+  // org-constrained. Addressed by connection id; two reads are legitimately
+  // cross-organization — "who already verified this domain" (first verifier
+  // owns globally on SaaS) and the self-hosted sole-connection list. Holds
+  // no customer content: only ids, domains, enums and credential references.
   "SsoConnection",
   "Subscription",
 ];
@@ -397,12 +378,9 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
 export const ORG_SCOPED_MODEL_NAMES: readonly string[] = Object.keys(ORG_SCOPED_MODELS);
 
 /**
- * Every model that carries an organizationId column: the union of the guarded
- * regime and the deliberately-deferred exemptions. The partition test below
- * proves this equals exactly the org-bearing set from the Prisma datamodel, so
- * it is the single source of truth guardProjectId derives its org-scoped
- * exemptions from - an org-scoped model is, by definition, not project-scoped,
- * so it must never be hand-listed in the projectId guard's exempt buckets.
+ * Every model with an organizationId column: guarded regime plus deferred
+ * exemptions. This is the source of truth guardProjectId derives its
+ * org-scoped exemptions from — never hand-list an org-scoped model there.
  */
 export const ORG_BEARING_MODEL_NAMES: readonly string[] = [
   ...ORG_SCOPED_MODEL_NAMES,

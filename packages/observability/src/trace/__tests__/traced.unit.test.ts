@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Runs `traced()` against a REAL TracerProvider rather than a stubbed tracer,
- * so what these tests assert is the span the proxy actually produces and the
- * value it actually hands back. A stub can be made to agree with a wrapper that
- * is wrong.
+ * Runs `traced()` against a REAL TracerProvider, not a stubbed one, so
+ * these tests assert the span and value the proxy actually produces —
+ * a stub can agree with a wrapper that is wrong.
  */
 import { context, propagation, SpanStatusCode, trace } from "@opentelemetry/api";
 import {
@@ -154,10 +152,8 @@ describe("traced()", () => {
 
   /**
    * The bug class this guards: every internal call goes through the proxy,
-   * because the proxy is what `this` is bound to. A helper that answers with a
-   * promise where the caller reads a value fails silently: arithmetic goes NaN,
-   * interpolation writes "[object Promise]", comparisons go false, and it only
-   * surfaces as wrong behavior somewhere else entirely.
+   * since that's what `this` is bound to. A helper returning a promise where
+   * the caller reads a value fails silently (NaN, "[object Promise]", false) elsewhere entirely.
    */
   describe("when a traced method reaches a synchronous helper through this", () => {
     /** @scenario A service reading its own helper sees real values */

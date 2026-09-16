@@ -18,12 +18,9 @@ function isBuildInput(name: string): boolean {
 }
 
 /**
- * Every build-input file under `dir`, as paths relative to `root`.
- *
- * Relative rather than absolute so the digest is a property of the tree and not
- * of where it happens to be checked out: the same sources in a worktree, a
- * runner and a developer's clone must agree, or the stamp never matches and we
- * are back to rebuilding every time.
+ * Every build-input file under `dir`, as paths relative to `root` — a
+ * property of the tree, not of where it's checked out, so a worktree, a
+ * runner and a developer's clone reach the same digest for the same sources.
  */
 function collectBuildInputs(dir: string, root: string): string[] {
   const found: string[] = [];
@@ -52,12 +49,9 @@ function collectBuildInputs(dir: string, root: string): string[] {
 }
 
 /**
- * A digest of every Go build input under `watchDirs`.
- *
- * Both the path and the content of each file go into the hash, so adding,
- * removing or renaming a file moves the digest even when the surviving bytes
- * are identical. Sorted first because directory iteration order is a filesystem
- * detail and two machines must reach the same digest for the same tree.
+ * A digest of every Go build input under `watchDirs`. Both path and content
+ * go into the hash, so adding, removing or renaming a file moves it even
+ * when the surviving bytes match. Sorted first, since iteration order varies.
  */
 export function digestGoSources({
   watchDirs,
@@ -66,10 +60,9 @@ export function digestGoSources({
 }: {
   watchDirs: string[];
   /**
-   * Individual files outside any watched tree — the module and workspace files
-   * at the repo root. They are build inputs every bit as much as the sources: a
-   * dependency bump, a `replace` retarget or a `go.work` edit changes what
-   * compiles without touching a single .go file under the trees below.
+   * Individual files outside any watched tree — module/workspace files at
+   * the repo root. Just as much a build input: a dependency bump, `replace`
+   * retarget or `go.work` edit changes what compiles with no .go file touched.
    */
   watchFiles?: string[];
   root: string;
@@ -114,12 +107,9 @@ export function writeStamp(stampPath: string, digest: string): void {
 }
 
 /**
- * Whether the cached binary can be used as-is.
- *
- * Both halves have to be present and agree. A stamp without its binary is a
- * half-restored cache, and a binary without a stamp is one built before this
- * mechanism existed; neither is evidence the artifact matches the sources, so
- * both rebuild.
+ * Whether the cached binary can be used as-is. Both halves must be present
+ * and agree — a stamp with no binary is a half-restored cache, a binary
+ * with no stamp predates this mechanism; neither proves a source match.
  */
 export function cachedBinaryIsUsable({
   binaryPath,

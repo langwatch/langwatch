@@ -1,30 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * Stripe-style webhook signing: the header carries the signing timestamp and an
- * HMAC over `"<t>.<raw body>"`, so a receiver can verify both authenticity and
- * freshness. Verification recomputes the HMAC from the RAW request bytes (any
- * re-serialization breaks it) and rejects timestamps outside the tolerance
- * window to blunt replay.
- *
- *   X-LangWatch-Signature: t=<unix seconds>,v1=<hex hmac-sha256>
- *
- * `v1` MAY REPEAT. During a secret rotation the header carries one `v1` per
- * secret currently valid, newest first:
- *
- *   X-LangWatch-Signature: t=<unix seconds>,v1=<new>,v1=<old>
- *
- * A receiver must therefore accept the delivery when ANY `v1` matches, which is
- * what lets it swap secrets on its own schedule instead of dropping deliveries
- * during the swap.
- *
- * THE implementation, since 2026-09-02: the platform copy it was frozen
- * against was deleted with the OTLP/webhook lane. It stays pinned not by
- * reading any file but against
- * `specs/webhooks/signature-vectors.json` — the vectors the TypeScript SDK and
- * the Python SDK also verify against, generated from the application's signer.
- * Four implementations agreeing pairwise is agreement only until one is edited;
- * agreeing against one committed file is agreement.
+ * Stripe-style signing: `t=<unix seconds>,v1=<hex hmac-sha256>`, repeatable
+ * during rotation (newest first, any match accepted). THE implementation,
+ * synced via `specs/webhooks/signature-vectors.json` (also verified by the TS/Python SDKs).
  */
 export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 
@@ -32,10 +11,9 @@ export const WEBHOOK_SIGNATURE_HEADER = "X-LangWatch-Signature";
 export const WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 5 * 60;
 
 /**
- * How long a rolled-off secret keeps signing and verifying.
- *
- * Long enough for a receiver to notice the roll and deploy the new value, short
- * enough that a leaked secret's usefulness ends on a known clock.
+ * How long a rolled-off secret keeps signing and verifying — long enough for
+ * a receiver to notice the roll and deploy the new value, short enough that
+ * a leaked secret's usefulness ends on a known clock.
  */
 export const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -45,12 +23,8 @@ function hmacHex(secret: string, signedPayload: string): string {
 
 /**
  * The signature header for a body, signed with every currently valid secret.
- *
- * Takes a list rather than one secret because a rotation window has two: the new
- * one a receiver may already have swapped to, and the old one it may not have.
- * Order is newest first, so a receiver that reads only the first `v1` follows
- * the roll rather than lagging it. An empty secret signs nothing rather than
- * signing with an empty key.
+ * Takes a list, not one, because a rotation window has two (new and old);
+ * order is newest first, so a reader of only the first `v1` follows the roll.
  */
 export function signWebhookPayload({
   secrets,
@@ -94,13 +68,9 @@ function parseSignatureHeader(header: string): {
 }
 
 /**
- * Reference verifier: the exact check receivers should implement, used by our
- * own tests and the endpoint test-send round trip.
- *
- * Every `v1` in the header is checked, because a rotation window carries more
- * than one and only one of them is computed from the secret this receiver holds.
- * Every candidate is compared even after a match, so the work does not depend on
- * WHICH signature matched.
+ * Reference verifier receivers should implement. Every `v1` is checked,
+ * since only one candidate matches this receiver's secret during a
+ * rotation; every candidate is still compared after a match, so timing can't leak which.
  */
 export function verifyWebhookSignature({
   secret,

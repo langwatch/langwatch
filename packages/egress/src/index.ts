@@ -62,10 +62,9 @@ export type { WebhookSendInput } from "./services/webhook-egress.service.ts";
 export { WebhookSignatureVectorsTask } from "./tasks/webhook-signature-vectors.task.ts";
 
 /**
- * The corporate proxy a self-hosted deployment's outbound vendor calls leave
- * through — the egress fence's other half: the SSRF policy decides which
- * addresses we may reach, this decides how. Every HTTPS caller resolves it
- * the same way, so a second `no_proxy` copy can't bypass what others honour.
+ * The corporate proxy self-hosted outbound calls leave through — the
+ * egress fence's other half (SSRF decides which addresses, this decides
+ * how). Every HTTPS caller resolves it the same way, so no bypass via a second `no_proxy` copy.
  */
 export {
   configureProcessOutboundProxy,

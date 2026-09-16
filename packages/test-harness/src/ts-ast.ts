@@ -8,10 +8,9 @@ import { API } from "typescript/unstable/sync";
 // directory to avoid loading the full project, and each parse uses a unique name.
 
 /**
- * Text for the files this module invents, keyed by the path it invented. The
- * session reads it through virtual-filesystem callbacks, which are closures
- * over this map — that is what lets one session serve text it had never heard
- * of when it started.
+ * Text for the files this module invents, keyed by the invented path. The
+ * session reads it through virtual-filesystem callbacks closing over this
+ * map — how one session serves text it had never heard of when it started.
  */
 const overlay = new Map<string, string>();
 
@@ -20,12 +19,9 @@ let scratch: string | undefined;
 let counter = 0;
 
 /**
- * The one API session, started on first use. The channel unrefs its child, so
- * an open session does not by itself keep a process alive; `closeTsAstSession`
- * is for suites that want the `tsgo` child gone before they finish.
- *
- * `readFile` returning undefined means "not mine" and falls through to the real
- * filesystem, which is how the session still finds the default library.
+ * The one API session, started on first use. `closeTsAstSession` ends the
+ * `tsgo` child (the channel unrefs it, so it won't otherwise keep a process
+ * alive); `readFile` returning undefined falls through to the real filesystem.
  */
 function apiSession(): API {
   session ??= new API({
@@ -45,11 +41,9 @@ function scratchDir(): string {
 }
 
 /**
- * Ends the session, and with it the compiler child process. Also drops what
- * the session was holding on this side: every staged file's text, and the
- * temporary directory they were staged in. Without that a process that opens
- * and closes sessions keeps both, and neither is small — the overlay holds a
- * copy of every file the scans parsed.
+ * Ends the session and its compiler child, and drops what it held on this
+ * side — every staged file's text and its temp directory — since neither is
+ * small and a process opening and closing sessions would otherwise keep both.
  */
 export function closeTsAstSession(): void {
   session?.close();
@@ -106,10 +100,9 @@ export function parseSourceText({
 }
 
 /**
- * The parsed form of many sources, in one exchange with the compiler, keyed by
- * the file name each was given. Names may repeat: each entry is staged under a
- * path of its own, so a caller scanning two files that happen to share a
- * basename gets two answers.
+ * The parsed form of many sources, in one exchange with the compiler, keyed
+ * by the file name each was given. Names may repeat: each is staged under
+ * its own path, so two files sharing a basename still get two answers.
  */
 export function parseSourceTexts({
   sources,

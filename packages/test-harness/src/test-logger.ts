@@ -23,9 +23,8 @@ const LEVEL_NUMBERS: Record<string, number> = {
 
 /**
  * A real pino logger that writes synchronously into an in-memory array
- * instead of stdout, for the tests that assert on logging rather than
- * silencing it. `lines.find` reads back one record by level name and a
- * substring of its message.
+ * instead of stdout, for tests that assert on logging. `lines.find` reads
+ * back one record by level name and a substring of its message.
  */
 export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } {
   const backing: TestLogLine[] = [];

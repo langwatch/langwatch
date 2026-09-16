@@ -2,10 +2,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { isSpanContextValid, context as otelContext, trace } from "@opentelemetry/api";
 
 /**
- * Business context that can be propagated across async boundaries.
- * Used for logging correlation (org/project/user).
- *
- * Note: Trace/span IDs come directly from OTel context, not stored here.
+ * Business context propagated across async boundaries, for logging
+ * correlation (org/project/user). Trace/span IDs come directly from OTel
+ * context, not stored here.
  */
 export interface RequestContext {
   organizationId?: string;
