@@ -61,15 +61,15 @@ Walk `server/src` against `.claude/skills/architecture-guide/references/server.m
   input parsed with the contract schema. A service taking a peer API, another service or
   a Prisma client is a finding.
 - **Repositories**: an interface per entity; a `<f>.repositories.ts` bundle; a registry
-  `defineRepositories({ postgres, memory })`; every Prisma repository with a memory twin of
+  `defineRepositories({ live, memory })`; every Prisma repository with a memory twin of
   the same behaviour. `PrismaClient` named outside `repositories/prisma/**`, any
   `as PrismaClient`, `database: object`, a repository exported from `index.ts`.
 - **Channels**: messages to or from something the module does not own, in either
   direction, with no owned state - the event bus, Redis pub/sub, HTTP to a vendor, a
   queue, email, Slack, a browser over SSE. An interface at `channels/<x>.channel.ts`,
   implementations at `channels/<tier>/<tier>.<x>.channel.ts` (`eventing`, `redis`, `http`,
-  `sqs`, `ses`, `slack`), a memory twin, and `defineChannels({ live, memory })` in
-  `channels/<f>-channels.registry.ts`. A file under `services/` importing
+  `sqs`, `ses`, `slack`), a memory twin, and `{ live, memory }`, each a class with
+  `static create`, in `channels/<f>-channels.registry.ts`. A file under `services/` importing
   `@langwatch/eventing`, `ioredis` pub/sub, `undici`/`fetch`/`axios`/`got`, `@aws-sdk/*`,
   `resend`, `@slack/*` or `nodemailer` is a finding
   (`service-does-not-open-a-channel`); a live channel with no twin or no registry entry is

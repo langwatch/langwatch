@@ -565,6 +565,22 @@ module's App exists, over the same repositories, and calls `.connect()` with
 the pipeline's own registered command senders where the declaration asked for
 one.
 
+### Amendment: the registry a channel actually got (2026-09-16)
+
+`defineChannels` was specified above and never built: no such export exists
+anywhere in the tree. Three modules grew `channels/` folders in the meantime —
+`enterprise/modules/governance`, `enterprise/modules/billing` (three
+registries) and `enterprise/modules/managed-provider` — and each wrote the
+same plain object rather than wait for the helper.
+
+The registry shape in force is `{ live, memory }` (or `{ memory }` alone,
+where a live tier does not exist yet), each value a class with
+`static readonly requires` and `static create`, exactly as
+`defineRepositories`'s own providers are shaped. The grammar block's third
+line above (`channels/<f>-channels.registry.ts   defineChannels({ live,
+memory })`) is superseded by that plain object; `unregistered-channels`
+checks for the object, not for a call to a function nobody can import.
+
 ## Consequences
 
 **Good.**

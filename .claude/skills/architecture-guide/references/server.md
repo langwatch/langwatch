@@ -31,14 +31,14 @@ services/<name>.service.ts                            REQUIRED: at least one; on
 rules/<name>.rules.ts                                 pure functions and constants, no clock, no I/O
 repositories/<name>.repository.ts                     an interface per entity
 repositories/<f>.repositories.ts                      the bundle interface { annotations, scores, queues, … }
-repositories/<f>-repositories.registry.ts             defineRepositories({ postgres, memory })
+repositories/<f>-repositories.registry.ts             defineRepositories({ live, memory })
 repositories/prisma/prisma.<name>.repository.ts       the only Prisma imports
 repositories/prisma/prisma.<f>.repositories.ts        prismaRepositories({ … })
 repositories/memory/memory.<name>.repository.ts       the memory twin of every Prisma repository
 repositories/memory/memory.<f>.repositories.ts        the memory bundle (static requires = [], static create())
 repositories/memory/memory.<name>.database.ts         shared in-memory tables, when several twins share rows
 channels/<name>.channel.ts                             an interface per subject the module does not own
-channels/<f>-channels.registry.ts                     defineChannels({ live, memory })
+channels/<f>-channels.registry.ts                     { live, memory }, each a class with static create
 channels/eventing/eventing.<name>.channel.ts          the event bus; redis/, http/, sqs/, ses/, slack/ likewise
 channels/memory/memory.<name>.channel.ts              the memory twin of every live channel
 transport/<f>.rest.ts                                 defineRestRouter(<F>Api).withNamespace("<f>s").withVersion(…).get(…)….build()
@@ -209,7 +209,7 @@ export interface AnnotationRepositories {
 
 // repositories/annotation-repositories.registry.ts
 export const annotationRepositories = defineRepositories({
-  postgres: PostgresAnnotationRepositories,   // repositories/prisma/prisma.annotation.repositories.ts
+  live: PostgresAnnotationRepositories,       // repositories/prisma/prisma.annotation.repositories.ts
   memory: MemoryAnnotationRepositories,       // repositories/memory/memory.annotation.repositories.ts
 });
 
@@ -279,16 +279,16 @@ one implementation per tier at `channels/<tier>/<tier>.<name>.channel.ts` for `e
 offered through `channels/<f>-channels.registry.ts`:
 
 ```ts
-export const webhookChannels = defineChannels({
+export const webhookChannels = {
   live: HttpWebhookChannels,
   memory: MemoryWebhookChannels,
-});
+};
 ```
 
 A channel may import `@langwatch/eventing`, `ioredis`, `undici`, `fetch`, `axios`,
 `got`, `@aws-sdk/*`, `resend`, `@slack/*` or `nodemailer`; a service may not
 (`service-does-not-open-a-channel`), and takes the channel interface instead. A live
-channel with no memory twin, or one missing from `defineChannels`, is
+channel with no memory twin, or one missing from the registry, is
 `feature-shape: unregistered-channels`. The distinction against the neighbouring layers:
 a repository is state the module owns, a service is behaviour over repositories and
 channels, and a pool member (`needs`) is the raw client a channel wraps with the

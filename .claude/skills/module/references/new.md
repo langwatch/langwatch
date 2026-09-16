@@ -100,13 +100,13 @@ src/services/<name>.service.ts                        one class per entity; stat
 src/rules/<name>.rules.ts                             pure helpers, if any
 src/repositories/<name>.repository.ts                 the interface: findAll / findById / create / update / delete …
 src/repositories/<name>.repositories.ts               interface <Name>Repositories { <entity>: <Entity>Repository; … }
-src/repositories/<name>-repositories.registry.ts      defineRepositories({ postgres: Postgres<Name>Repositories, memory: Memory<Name>Repositories })
+src/repositories/<name>-repositories.registry.ts      defineRepositories({ live: Postgres<Name>Repositories, memory: Memory<Name>Repositories })
 src/repositories/prisma/prisma.<name>.repository.ts   extends PrismaRepository.for("<Model>"); the only Prisma import; projectId on every query
 src/repositories/prisma/prisma.<name>.repositories.ts prismaRepositories({ <entity>: Prisma<Entity>Repository })
 src/repositories/memory/memory.<name>.repository.ts   the memory twin, same observable behaviour
 src/repositories/memory/memory.<name>.repositories.ts static requires = [] as const; static create(): <Name>Repositories
 src/channels/<subject>.channel.ts                     an interface per subject the module does not own the state of
-src/channels/<name>-channels.registry.ts              defineChannels({ live: Http<Name>Channels, memory: Memory<Name>Channels })
+src/channels/<name>-channels.registry.ts              { live: Http<Name>Channels, memory: Memory<Name>Channels }, each a class with static create
 src/channels/<tier>/<tier>.<subject>.channel.ts       one live implementation per tier: eventing, redis, http, sqs, ses, slack
 src/channels/memory/memory.<subject>.channel.ts       the twin every test asserts against
 src/transport/<name>.rest.ts                          defineRestRouter(<Name>Api).withNamespace("<name>s").withVersion(MANAGEMENT_API_VERSION)….build()   (public REST, optional)
@@ -126,8 +126,8 @@ in `packages/prisma-client/prisma/schema.prisma` with a migration under
 Messages to or from something the module does not own - the event bus, Redis pub/sub, a
 vendor over HTTP, a queue, email, Slack, a browser over SSE - are a channel, not a
 service member: declare the interface in `channels/`, put the conduit in
-`channels/<tier>/` beside its memory twin, and register both with `defineChannels`. A
-service that imports the bus, pub/sub or an HTTP client is refused by
+`channels/<tier>/` beside its memory twin, and register both as `{ live, memory }` in the
+registry. A service that imports the bus, pub/sub or an HTTP client is refused by
 `service-does-not-open-a-channel`.
 
 Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer with

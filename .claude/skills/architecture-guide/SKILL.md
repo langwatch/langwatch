@@ -124,7 +124,7 @@ Read the one that matches the layer you are about to touch. Each is short.
 - Persistence is chosen once, at boot. Repository interfaces sit in `repositories/`, the
   Prisma implementations in `repositories/prisma/`, their memory twins in
   `repositories/memory/`, and `repositories/<f>-repositories.registry.ts` offers both
-  through `defineRepositories({ postgres, memory })`. No `adapters/postgres.*.adapter.ts`
+  through `defineRepositories({ live, memory })`. No `adapters/postgres.*.adapter.ts`
   (`feature-shape: persistence-adapter`, `postgres-without-memory`,
   `unregistered-repositories`).
 - A collaborator the module does not own is a channel, not a service. Messages to or
@@ -132,7 +132,8 @@ Read the one that matches the layer you are about to touch. Each is short.
   browser over SSE go through `channels/<subject>.channel.ts` with implementations in
   `channels/<tier>/<tier>.<subject>.channel.ts` (`eventing`, `redis`, `http`, `sqs`,
   `ses`, `slack`), a memory twin beside them, and both offered through
-  `channels/<f>-channels.registry.ts` with `defineChannels({ live, memory })`. A file
+  `channels/<f>-channels.registry.ts` exporting `{ live, memory }`, each a class with
+  `static readonly requires` and `static create`. A file
   under `services/` that imports the bus, pub/sub or an HTTP client is refused
   (`service-does-not-open-a-channel`); a live channel with no twin or no registry entry
   is `feature-shape: unregistered-channels`. Repository is state the module owns,

@@ -89,7 +89,7 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    `repositories/prisma/prisma.<f>.repositories.ts` (`prismaRepositories({...})`),
    `repositories/memory/memory.<f>.repositories.ts` (`static readonly requires = [] as const`,
    `static create(): <F>Repositories`) and
-   `repositories/<f>-repositories.registry.ts` (`defineRepositories({ postgres, memory })`).
+   `repositories/<f>-repositories.registry.ts` (`defineRepositories({ live, memory })`).
 5. Delete the adapter and the `ports/` file it implemented. A Redis, eventing or
    object-storage client is not persistence: it is either a channel (step 2b) or, when the
    module wants the raw client itself, a member of
@@ -118,11 +118,12 @@ The shape mirrors step 2 exactly:
    `sqs`, `ses` or `slack`.
 3. `channels/memory/memory.<x>.channel.ts`: the twin every test asserts against - it
    records what was sent and replays what is received.
-4. `channels/<f>-channels.registry.ts`: `defineChannels({ live, memory })`.
+4. `channels/<f>-channels.registry.ts`: exports `{ live, memory }`, each a class with
+   `static readonly requires` and `static create`.
 
 The service then takes the channel interface and imports no bus, no pub/sub and no HTTP
 client (`service-does-not-open-a-channel`). A live channel with no twin, or one missing
-from `defineChannels`, is `feature-shape: unregistered-channels`.
+from the registry, is `feature-shape: unregistered-channels`.
 
 ## 3. Services: one class per entity
 
