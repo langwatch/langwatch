@@ -505,11 +505,38 @@
         // Biome turned noEmptyBlockStatements off for test files.
         "no-empty": "off"
       }
-    }
+    },
 
     // The debt register that used to close this file is GONE. Every entry in
     // it named a file in the deleted platform application, so it pinned
     // nothing; a register that names no existing file reads as coverage and
     // is only noise. The rules above stand unconditionally.
+
+    // ------------------------------------------------------------------
+    // TEST FILES, NATIVE RULES. The twin of the langwatch test tier in
+    // packages/architecture-enforcer/oxlint.architecture.jsonc - same
+    // reasoning, same globs, kept here because these are stock oxlint
+    // rules and that file holds the plugin's.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "**/__tests__/**",
+        "**/__fixtures__/**",
+        "**/test-utils/**",
+        "**/tests/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.fixture.ts",
+        "**/*.fixtures.ts",
+        "**/*.bench.ts"
+      ],
+      "rules": {
+        "no-nested-ternary": "off",
+        "complexity": "off",
+        "max-depth": "off"
+      }
+    }
   ]
 }

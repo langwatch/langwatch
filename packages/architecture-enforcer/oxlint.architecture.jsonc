@@ -255,6 +255,58 @@
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 40 }]
       }
+    },
+
+    // ------------------------------------------------------------------
+    // TEST FILES GET A LOOSER TIER, DELIBERATELY.
+    //
+    // A test is not production code and does not need to read like it. It
+    // has no trust boundary to parse at, no caller to protect, and its
+    // whole job is to be blunt about setting up a situation. Enforcing the
+    // production readability and type-ergonomics tier over test files buys
+    // nothing and costs a great deal of churn: of the 16,186 findings after
+    // the suppression ledger was deleted, 6,210 were in test files.
+    //
+    // What stays ON for tests is everything written FOR tests -
+    // test-description-is-an-action, shared-setup-is-a-hook,
+    // banned-test-model-names, unit-test-does-not-render and the vitest
+    // plugin. Relaxing those would not be leniency, it would be deleting
+    // the rule, since tests are the only place they ever fire.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "**/__tests__/**",
+        "**/__fixtures__/**",
+        "**/test-utils/**",
+        "**/tests/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.fixture.ts",
+        "**/*.fixtures.ts",
+        "**/*.bench.ts"
+      ],
+      "rules": {
+        // A test double is a stand-in by definition; `as` is how you build
+        // one without a factory for every shape a test touches.
+        "langwatch/stand-in-cast": "off",
+
+        // Lazy `import()` in a test is how a module is loaded after its
+        // mocks are registered. The production ban exists to keep boot
+        // graphs small, which is not a property of a test file.
+        "langwatch/no-inline-dynamic-import": "off",
+
+        // Readability tier: a test may spell out a condition, nest, repeat
+        // itself and carry a long comment. These say "this is hard to
+        // read", and a test being blunt is not the same defect.
+        "langwatch/condition-shape": "off",
+        "langwatch/comment-block-size": "off",
+        "langwatch/cognitive-complexity": "off",
+
+        // A swallowed catch in a test is usually the assertion itself.
+        "langwatch/empty-catch": "off"
+      }
     }
   ]
 }

@@ -57,3 +57,24 @@ Feature: There is no lint suppression list
       When it is turned off
       Then it is turned off by name in the oxlint configuration
       And it is not turned off for a list of individual files
+
+  Rule: Test files get a looser tier, by category and never by filename
+
+    # A test has no trust boundary to parse at and no caller to protect, and its
+    # job is to be blunt about setting up a situation. 6,210 of the 16,186
+    # findings left after the ledger went were in test files. This is leniency
+    # chosen once, in the open, for a category - not a list of paths.
+    @unit
+    Scenario: The readability and stand-in tiers are relaxed for tests
+      Given a test file that fails stand-in-cast, condition-shape, comment-block-size, cognitive-complexity, empty-catch, no-inline-dynamic-import or no-nested-ternary
+      When those rules run over it
+      Then they report nothing
+      But the same code in a production file is still reported
+
+    # Relaxing a rule that only ever fires in tests is not leniency, it is
+    # deleting the rule. These stay on.
+    @unit
+    Scenario: The rules written for tests stay enforced in tests
+      Given a test file that fails test-description-is-an-action, shared-setup-is-a-hook, banned-test-model-names or unit-test-does-not-render
+      When those rules run over it
+      Then each one still reports
