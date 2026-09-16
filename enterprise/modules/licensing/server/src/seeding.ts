@@ -27,7 +27,7 @@ export function resolveSeedLicense({
   // candidate, because it canonicalises the PEM on construction.
   const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey });
   const signedForBootKey = (licenseKey: string): boolean => {
-    const parsed = cryptography.tryParseLicenseKey(licenseKey);
+    const parsed = cryptography.parseLicenseKey(licenseKey);
     return parsed !== null && cryptography.verifySignature(parsed, publicKey);
   };
 

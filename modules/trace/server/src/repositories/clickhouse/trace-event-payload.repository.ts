@@ -118,28 +118,24 @@ export class ClickHouseTraceEventPayloadRepository {
 
   private constructor(private readonly clickhouse: TraceClickHouse) {}
 
-/**
- * The event_log claim-check read behind the narrow port Trace declares.
- * Absence is the contract: `tryRead` answers null for a missing row, field,
- * corrupt payload or unreachable cluster alike — serve the preview instead.
- */
-  async tryRead(input: {
+  /**
+   * The event_log claim-check read behind the narrow port Trace declares.
+   * Raises for a missing row, a missing field, a corrupt payload or an
+   * unreachable cluster alike; the caller serves the preview instead.
+   */
+  async read(input: {
     tenantId: string;
     traceId: string;
     eventId: string;
     field: string;
-  }): Promise<string | null> {
-    try {
-      return await this.getField({
-        eventId: input.eventId,
-        field: input.field,
-        tenantId: input.tenantId,
-        aggregateType: TRACE_PAYLOAD_AGGREGATE_TYPE,
-        aggregateId: input.traceId,
-      });
-    } catch {
-      return null;
-    }
+  }): Promise<string> {
+    return await this.getField({
+      eventId: input.eventId,
+      field: input.field,
+      tenantId: input.tenantId,
+      aggregateType: TRACE_PAYLOAD_AGGREGATE_TYPE,
+      aggregateId: input.traceId,
+    });
   }
 
   /**

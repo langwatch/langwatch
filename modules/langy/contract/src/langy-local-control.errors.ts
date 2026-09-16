@@ -50,6 +50,28 @@ export class LangyLocalRequestInvalidError extends HandledError {
   }
 }
 
+/**
+ * A record local control wrote — a call, a card, a request, a key binding —
+ * that no longer decodes. Ours, not the customer's, so `fault` is platform;
+ * named rather than unknown, because starting it again gets a working one.
+ */
+export class LangyLocalRecordUnreadableError extends HandledError {
+  declare readonly code: "langy_local_record_unreadable";
+
+  constructor({ reasons }: { reasons?: readonly Error[] } = {}) {
+    super(
+      "langy_local_record_unreadable",
+      "Langy's record of this local request can no longer be read. Ask Langy for the code change again to start a new one.",
+      {
+        httpStatus: 500,
+        fault: "platform",
+        ...(reasons ? { reasons } : {}),
+      },
+    );
+    this.name = "LangyLocalRecordUnreadableError";
+  }
+}
+
 /** The request was real, and its fifteen minutes are over. */
 export class LangyLocalRequestExpiredError extends HandledError {
   declare readonly code: "langy_local_request_expired";

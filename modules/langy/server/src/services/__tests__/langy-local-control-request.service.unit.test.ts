@@ -12,6 +12,7 @@ import {
   ControlRequestService,
   type StoredControlRequest,
 } from "../langy-local-control-request.service.ts";
+import { controlRequestKey } from "../../rules/langy-local-control-keys.rules.ts";
 
 const projectId = "proj_1";
 const userId = "user_1";
@@ -82,7 +83,7 @@ describe("given a code access card that asked for a folder", () => {
 
       const open = await service.listOpen({ projectId, userId });
       expect(open.map((row) => row.id).sort()).toEqual([second.id, other.id].sort());
-      expect(await service.tryRead(first.id)).toBeNull();
+      expect(await service.read(first.id)).toBeNull();
       await expect(
         service.approve({ requestId: first.id, userId, projectId }),
       ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
@@ -119,7 +120,7 @@ describe("given a code access card that asked for a folder", () => {
         projectId,
         organizationId: "org_1",
       });
-      const binding = await service.tryReadKeyBinding(approved.apiKeyId);
+      const binding = await service.readKeyBinding(approved.apiKeyId);
       expect(binding).toMatchObject({ conversationId, projectId, userId });
 
       await expect(
@@ -167,7 +168,7 @@ describe("given a code access card that asked for a folder", () => {
 
       await service.revokeKeyBinding(approved.apiKeyId);
 
-      expect(await service.tryReadKeyBinding(approved.apiKeyId)).toBeNull();
+      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
     });
 
     /** @scenario "Disconnecting revokes the key even when the command line cannot be reached" */
@@ -184,7 +185,7 @@ describe("given a code access card that asked for a folder", () => {
       const revoked = await service.revokeConversationBindings(conversationId);
 
       expect(revoked).toEqual([approved.apiKeyId]);
-      expect(await service.tryReadKeyBinding(approved.apiKeyId)).toBeNull();
+      expect(await service.readKeyBinding(approved.apiKeyId)).toBeNull();
       expect(await service.revokeConversationBindings(conversationId)).toEqual([]);
     });
   });
@@ -202,5 +203,40 @@ describe("given a code access card that asked for a folder", () => {
 
       expect(found?.id).toBe(mine.id);
     });
+  });
+});
+
+describe("given a request in the caller's index that cannot be read", () => {
+  it("skips the corrupt member and lists the rest", async () => {
+    const readable = await create();
+    const corrupt = await create({ conversationId: "conv_2" });
+    await store.set(controlRequestKey(corrupt.id), "not json", 60);
+
+    const open = await service.listOpen({ projectId, userId });
+
+    expect(open.map((row) => row.id)).toEqual([readable.id]);
+  });
+
+  it("still throws when the failure is not the record's own corruption", async () => {
+    const request = await create();
+    const outage = new Error("redis connection reset");
+    const brokenStore: SessionStateStore = {
+      ...store,
+      async tryGet(key: string) {
+        if (key === controlRequestKey(request.id)) {
+          throw outage;
+        }
+
+        return store.tryGet(key);
+      },
+    };
+    const brokenService = ControlRequestService.create({
+      store: brokenStore,
+      projects,
+      now: () => now,
+      mintSessionKey: mint as never,
+    });
+
+    await expect(brokenService.listOpen({ projectId, userId })).rejects.toThrow(outage);
   });
 });

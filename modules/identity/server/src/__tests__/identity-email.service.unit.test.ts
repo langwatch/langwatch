@@ -87,7 +87,7 @@ describe("the verified emails a user can accept an invitation through", () => {
         },
       });
 
-      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toEqual([
+      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual([
         {
           identifierId: "idf_google",
           value: "sam@home.net",
@@ -106,7 +106,7 @@ describe("the verified emails a user can accept an invitation through", () => {
     it("answers null so the caller keeps the legacy comparison", async () => {
       const { service } = harness({ onIdentity: false });
 
-      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
     });
   });
 
@@ -115,7 +115,7 @@ describe("the verified emails a user can accept an invitation through", () => {
       const { service, heads } = harness();
       vi.spyOn(heads, "findHeads").mockRejectedValue(new Error("postgres unavailable"));
 
-      expect(await service.tryVerifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
     });
   });
 });

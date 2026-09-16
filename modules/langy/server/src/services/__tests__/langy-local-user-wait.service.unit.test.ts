@@ -16,6 +16,7 @@ import type {
   UserWaitBuffer,
   UserWaitEvents,
 } from "../../rules/langy-local-user-wait-record.rules.ts";
+import { waitKey } from "../../rules/langy-local-control-keys.rules.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";
@@ -191,7 +192,7 @@ describe("given a command that is not on the read-only list", () => {
         decision: "allow_once",
       });
 
-      expect((await service.tryRead(wait.waitId))?.state).toBe("answered");
+      expect((await service.read(wait.waitId))?.state).toBe("answered");
       expect(buffer.permissions.at(-1)).toMatchObject({
         status: "answered",
         decision: "allow_once",
@@ -230,7 +231,7 @@ describe("given a command that is not on the read-only list", () => {
         patterns: ["uv"],
       });
 
-      expect(await service.tryRead(wait.waitId)).toMatchObject({
+      expect(await service.read(wait.waitId)).toMatchObject({
         state: "answered",
         decision: "allow_pattern",
         source: "terminal",
@@ -302,7 +303,7 @@ describe("given a command that is not on the read-only list", () => {
           source: "terminal",
         }),
       ).rejects.toMatchObject({ code: "langy_wait_expired" });
-      expect(await service.tryRead(wait.waitId)).toMatchObject({
+      expect(await service.read(wait.waitId)).toMatchObject({
         decision: "allow_once",
         source: "panel",
       });
@@ -499,5 +500,41 @@ describe("given a question Langy asked mid-task", () => {
       expect(await service.cancelTurn({ conversationId, turnId })).toEqual([]);
       expect(events.ended).toHaveLength(2);
     });
+  });
+});
+
+describe("given a card in the turn's pending set that cannot be read", () => {
+  it("skips the corrupt member and lists the rest", async () => {
+    const permission = await startPermission();
+    const question = await startQuestion();
+    await store.set(waitKey(question.waitId), "not json", 60);
+
+    const pending = await service.listPending({ conversationId, turnId });
+    expect(pending.map((wait) => wait.waitId)).toEqual([permission.waitId]);
+  });
+
+  it("still throws when the failure is not the record's own corruption", async () => {
+    const permission = await startPermission();
+    const outage = new Error("redis connection reset");
+    const brokenStore: SessionStateStore = {
+      ...store,
+      async tryGet(key: string) {
+        if (key === waitKey(permission.waitId)) {
+          throw outage;
+        }
+
+        return store.tryGet(key);
+      },
+    };
+    const brokenService = UserWaitService.create({
+      store: brokenStore,
+      events,
+      buffer,
+      sendPermission: sendPermission as never,
+      now: () => now,
+      pollIntervalMs: 1,
+    });
+
+    await expect(brokenService.listPending({ conversationId, turnId })).rejects.toThrow(outage);
   });
 });

@@ -174,7 +174,7 @@ export class IdentityApp implements IdentityApi {
   }
 
   verifiedEmailsOf(input: { userId: string }) {
-    return this.parts.emails.tryVerifiedEmailsOf(input);
+    return this.parts.emails.verifiedEmailsOf(input);
   }
 
   guards(): IdentityGuardsService {

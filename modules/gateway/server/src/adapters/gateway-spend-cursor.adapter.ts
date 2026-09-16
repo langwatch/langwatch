@@ -3,14 +3,17 @@ export type GatewaySpendEventsCursor = {
   gatewayRequestId: string;
 };
 
-function tryParseGroupKeyParts(raw: string): string[] | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return null;
-    return parsed.every((part) => typeof part === "string") ? parsed : null;
-  } catch {
-    return null;
+/** Throws when `raw` is not the JSON array of parts this service mints. */
+function parseGroupKeyParts(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("summaries cursor payload is not a non-empty array");
   }
+  if (!parsed.every((part) => typeof part === "string")) {
+    throw new Error("summaries cursor payload holds a non-string part");
+  }
+
+  return parsed;
 }
 
 /** Opaque page cursors for the spend reads. */
@@ -43,14 +46,14 @@ export class GatewaySpendCursorAdapter {
    * caller data and may legitimately open with `[`.
    */
   decodeSpendSummariesCursor(encoded: string): string[] | null {
-    try {
-      const raw = Buffer.from(encoded, "base64url").toString("utf8");
-      if (raw.length === 0) return null;
+    const raw = Buffer.from(encoded, "base64url").toString("utf8");
+    if (raw.length === 0) return null;
 
-      const parts = tryParseGroupKeyParts(raw);
-      return parts ?? [raw];
+    try {
+      return parseGroupKeyParts(raw);
     } catch {
-      return null;
+      // Not the minted array: the cursor is one group key that was never JSON.
+      return [raw];
     }
   }
 

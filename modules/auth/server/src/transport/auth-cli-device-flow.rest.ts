@@ -616,7 +616,7 @@ async function refresh({
   if (!parsed.success) return refuse("invalid_request", "refresh_token is required", 400);
 
   const { refresh_token } = parsed.data;
-  const record = await app.sessions.tryFindRefreshToken(refresh_token);
+  const record = await app.sessions.findRefreshToken(refresh_token);
 
   // Unknown or revoked. The CLI wipes local state on 401.
   if (!record) {

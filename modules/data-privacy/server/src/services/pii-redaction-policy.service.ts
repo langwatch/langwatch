@@ -144,7 +144,7 @@ export class PiiRedactionPolicyService {
    * Resolve the native-redaction context for a tenant: the effective policy (PII level
    * reconciled with the per-request level) and that level.
    */
-  async tryResolveNativeContext(
+  async resolveNativeContext(
     tenantId: TenantId | undefined,
     requestLevel: PIIRedactionLevel,
   ): Promise<{ policy: ResolvedDataPrivacy; level: PiiLevel } | null> {

@@ -167,7 +167,7 @@ export class LocalControlLifecycleService {
     }
 
     if ("call" in parsed) {
-      const call = await this.deps.dispatcher.tryRead(parsed.call);
+      const call = await this.deps.dispatcher.read(parsed.call);
       if (!call || call.conversationId !== session.conversationId) {
         return;
       }

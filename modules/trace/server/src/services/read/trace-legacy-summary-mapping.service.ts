@@ -7,7 +7,7 @@ import {
   parseComputedOutput,
   RESERVED_ATTRIBUTE_MAPPINGS,
   tokenMetricsFromAttributes,
-  tryParseJsonArray,
+  parseJsonArray,
 } from "../../rules/legacy-summary-attributes.rules.ts";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { Event, Span, Trace, TraceMetadata } from "@langwatch/trace-contract";
@@ -81,16 +81,16 @@ export class TraceLegacySummaryMappingService {
     const parsedArrayKeys = new Set<string>();
     const labelsStr = attributes["langwatch.labels"] ?? attributes.labels;
     if (labelsStr) {
-      const labels = tryParseJsonArray(labelsStr);
+      const labels = parseJsonArray(labelsStr);
       metadata.labels = labels ?? [labelsStr];
     }
 
-    const promptIds = tryParseJsonArray(attributes["langwatch.prompt_ids"]);
+    const promptIds = parseJsonArray(attributes["langwatch.prompt_ids"]);
     if (promptIds) {
       metadata.prompt_ids = promptIds;
     }
 
-    const models = tryParseJsonArray(attributes["metadata.models"]);
+    const models = parseJsonArray(attributes["metadata.models"]);
     if (models) {
       metadata.models = models;
       parsedArrayKeys.add("metadata.models");

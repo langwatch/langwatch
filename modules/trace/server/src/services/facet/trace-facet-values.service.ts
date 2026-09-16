@@ -64,7 +64,7 @@ export class TraceFacetValuesService {
 
   async getFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     const cacheKey = facetValuesCacheKey(params);
-    const cached = await FACET_VALUES_CACHE.tryGet(cacheKey);
+    const cached = await FACET_VALUES_CACHE.get(cacheKey);
 
     if (cached) {
       // Always serve the cached value immediately. If it's older than the

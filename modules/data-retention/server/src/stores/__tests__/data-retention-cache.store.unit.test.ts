@@ -21,7 +21,7 @@ describe("RedisDataRetentionCacheStore", () => {
 
     await cache.set("project", retention);
 
-    await expect(cache.tryGet("project")).resolves.toEqual(retention);
+    await expect(cache.get("project")).resolves.toEqual(retention);
     expect(redis.setex).toHaveBeenCalledWith(
       "retention-policy:project",
       60,
@@ -29,7 +29,7 @@ describe("RedisDataRetentionCacheStore", () => {
     );
 
     await cache.delete("project");
-    await expect(cache.tryGet("project")).resolves.toBeUndefined();
+    await expect(cache.get("project")).resolves.toBeUndefined();
     expect(redis.del).toHaveBeenCalledWith("retention-policy:project");
   });
 
@@ -41,9 +41,9 @@ describe("RedisDataRetentionCacheStore", () => {
     });
 
     await cache.set("project", retention);
-    await expect(cache.tryGet("project")).resolves.toEqual(retention);
+    await expect(cache.get("project")).resolves.toEqual(retention);
 
     now = 1_051;
-    await expect(cache.tryGet("project")).resolves.toBeUndefined();
+    await expect(cache.get("project")).resolves.toBeUndefined();
   });
 });

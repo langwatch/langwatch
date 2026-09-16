@@ -1214,7 +1214,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       // registration is gone that its *code* was bad sends it round the
       // authorize loop forever; `invalid_client` is the code that makes it
       // register again (RFC 6749 §5.2).
-      const registeredClient = await McpOAuthClientRegistryService.tryGet({
+      const registeredClient = await McpOAuthClientRegistryService.get({
         redis,
         clientId: clientIdParam,
       }).catch(() => null);

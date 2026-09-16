@@ -54,7 +54,7 @@ class FakeRepository extends EvaluationRunRepository {
   async findTraceEvaluations(): Promise<Record<string, TraceEvaluationData[]>> {
     return {};
   }
-  async tryFindInputs(): Promise<Record<string, unknown> | null> {
+  async findInputs(): Promise<Record<string, unknown> | null> {
     return null;
   }
 }
@@ -288,7 +288,7 @@ describe("EvaluationService", () => {
   /** @scenario "Per-trace evaluation reads use the same capability" */
   it("resolves durable input markers inside the canonical service", async () => {
     const repository = new FakeRepository();
-    repository.tryFindInputs = vi.fn(async () => ({ marker: "object_1" }));
+    repository.findInputs = vi.fn(async () => ({ marker: "object_1" }));
     const inputResolution = new FakeInputsResolution();
     inputResolution.tryResolve.mockResolvedValue({ question: "whole input" });
     const evaluation = EvaluationService.create({

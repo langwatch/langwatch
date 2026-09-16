@@ -18,7 +18,10 @@ import {
   PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
 } from "@langwatch/langy-contract";
-import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
+import {
+  LangyLocalRecordUnreadableError,
+  LangyLocalWorkspaceOfflineError,
+} from "@langwatch/langy-contract";
 import { type CallState, type PollCallResponse } from "@langwatch/langy-contract";
 import {
   callKeepaliveKey,
@@ -123,7 +126,7 @@ export class LocalCallDispatcherService {
     const until = this.now() + holdMs;
     const beat = this.beater();
     for (;;) {
-      const call = await this.tryRead(callId);
+      const call = await this.read(callId);
       if (!call) {
         return null;
       }
@@ -202,7 +205,7 @@ export class LocalCallDispatcherService {
 
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
-    const call = await this.tryRead(callId);
+    const call = await this.read(callId);
     if (call?.state !== "pending") {
       return;
     }
@@ -222,7 +225,7 @@ export class LocalCallDispatcherService {
     callId: string;
     waitId: string;
   }): Promise<StoredLocalCall | null> {
-    const call = await this.tryRead(callId);
+    const call = await this.read(callId);
     if (!call || call.state === "done") {
       return null;
     }
@@ -248,7 +251,7 @@ export class LocalCallDispatcherService {
     callId: string;
     decision: "allow_once" | "allow_pattern" | "deny" | "expired";
   }): Promise<void> {
-    const call = await this.tryRead(callId);
+    const call = await this.read(callId);
     if (call && call.state === "awaiting_permission") {
       // The command starts now, so its time limit starts now. Counting the
       // minutes the developer spent reading the card against the command left
@@ -278,7 +281,7 @@ export class LocalCallDispatcherService {
     callId: string;
     frame: Pick<ResultFrame, "ok" | "text" | "output" | "error">;
   }): Promise<void> {
-    const call = await this.tryRead(callId);
+    const call = await this.read(callId);
     if (!call || call.state === "done") {
       return;
     }
@@ -306,7 +309,7 @@ export class LocalCallDispatcherService {
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";
     message?: string;
   }): Promise<StoredLocalCall | null> {
-    const call = await this.tryRead(callId);
+    const call = await this.read(callId);
     if (!call || call.state === "done") {
       return null;
     }
@@ -337,7 +340,7 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), 0);
     const calls: StoredLocalCall[] = [];
     for (const id of ids) {
-      const call = await this.tryRead(id);
+      const call = await this.readSkippingUnreadable(id);
       if (call && call.state !== "done") {
         calls.push(call);
       }
@@ -356,7 +359,7 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), now);
     const envelopes: CallEnvelope[] = [];
     for (const id of ids) {
-      const call = await this.tryRead(id);
+      const call = await this.readSkippingUnreadable(id);
       if (call && call.state !== "done") {
         envelopes.push(toEnvelope(call));
       }
@@ -365,24 +368,47 @@ export class LocalCallDispatcherService {
     return envelopes;
   }
 
-  async tryRead(callId: string): Promise<StoredLocalCall | null> {
+  /**
+   * The stored call, or null once its key has expired. A blob we wrote that no
+   * longer decodes is corruption rather than absence, so it raises under a code
+   * that tells the person at the command line to ask for the change again.
+   */
+  async read(callId: string): Promise<StoredLocalCall | null> {
     const raw = await this.store.tryGet(callKey(callId));
     if (!raw) {
       return null;
     }
 
     try {
-      const parsed = storedLocalCallSchema.safeParse(JSON.parse(raw));
-
-      return parsed.success ? parsed.data : null;
-    } catch {
-      return null;
+      return storedLocalCallSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      throw new LangyLocalRecordUnreadableError({
+        reasons: error instanceof Error ? [error] : [],
+      });
     }
   }
 
   /** The call as the command line receives it. */
   envelopeOf(call: StoredLocalCall): CallEnvelope {
     return toEnvelope(call);
+  }
+
+  /**
+   * A list loop's read: skips only the named unreadable error so one corrupt
+   * call cannot take the whole listing down; anything else still propagates.
+   */
+  private async readSkippingUnreadable(callId: string): Promise<StoredLocalCall | null> {
+    try {
+      return await this.read(callId);
+    } catch (error) {
+      if (!(error instanceof LangyLocalRecordUnreadableError)) {
+        throw error;
+      }
+
+      logger.warn({ callId }, "skipping unreadable local call");
+
+      return null;
+    }
   }
 
   /**

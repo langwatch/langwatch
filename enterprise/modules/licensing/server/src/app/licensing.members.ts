@@ -12,7 +12,7 @@ export interface LicensingInfrastructure {
 
 
 export interface LicenseCryptography {
-  tryParseLicenseKey(licenseKey: string): SignedLicense | null;
+  parseLicenseKey(licenseKey: string): SignedLicense | null;
   verifySignature(signedLicense: SignedLicense, publicKey?: string): boolean;
   isExpired(expiresAt: string, now?: Instant): boolean;
   validateLicense(input: {

@@ -69,7 +69,7 @@ describe("given a call waiting on a permission card", () => {
 
       clock.now += ANSWER_DELAY_MS;
 
-      const waiting = await dispatcher.tryRead(callId);
+      const waiting = await dispatcher.read(callId);
       expect(waiting?.state).toBe("awaiting_permission");
       const polled = await dispatcher.tryPoll({ callId, holdMs: 0 });
       expect(polled).not.toBeNull();
@@ -81,7 +81,7 @@ describe("given a call waiting on a permission card", () => {
         decision: "allow_once",
       });
 
-      const running = await dispatcher.tryRead(callId);
+      const running = await dispatcher.read(callId);
       expect(running?.state).toBe("running");
       expect(running?.deadlineAt).toBe(clock.now + COMMAND_TIMEOUT_MS);
     });

@@ -27,7 +27,7 @@ export interface StorageMeterRedis {
 }
 
 export abstract class StorageMeterCacheStore {
-  abstract tryGet(key: string): Promise<CachedStorageBytes | undefined>;
+  abstract get(key: string): Promise<CachedStorageBytes | undefined>;
   abstract set(key: string, value: CachedStorageBytes): Promise<void>;
   abstract claim(key: string, value: number): Promise<boolean>;
 }
@@ -64,7 +64,7 @@ export class RedisStorageMeterCacheStore extends StorageMeterCacheStore {
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 
-  async tryGet(key: string): Promise<CachedStorageBytes | undefined> {
+  async get(key: string): Promise<CachedStorageBytes | undefined> {
     if (this.redis) {
       try {
         const encoded = await this.redis.get(this.redisKey(key));

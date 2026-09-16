@@ -4,7 +4,10 @@
  * share one terminal.
  */
 
-import type { LangyPermissionAnswerSource } from "@langwatch/langy-contract";
+import {
+  LangyLocalRecordUnreadableError,
+  type LangyPermissionAnswerSource,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
@@ -292,7 +295,18 @@ export class UserWaitService {
     const ids = await this.store.zrangebyscore(turnWaitsKey(conversationId, turnId), 0);
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
-      const wait = await this.tryRead(id);
+      let wait: StoredUserWait | null;
+      try {
+        wait = await this.read(id);
+      } catch (error) {
+        if (!(error instanceof LangyLocalRecordUnreadableError)) {
+          throw error;
+        }
+
+        logger.warn({ waitId: id }, "skipping unreadable user wait");
+        continue;
+      }
+
       if (wait?.state === "pending") {
         pending.push(wait);
       }
@@ -301,24 +315,29 @@ export class UserWaitService {
     return pending;
   }
 
-  async tryRead(waitId: string): Promise<StoredUserWait | null> {
+  /**
+   * The stored wait, or null once its key has expired. A blob we wrote that no
+   * longer decodes is corruption rather than absence, so it raises under a code
+   * that tells the person at the command line to ask for the change again.
+   */
+  async read(waitId: string): Promise<StoredUserWait | null> {
     const raw = await this.store.tryGet(waitKey(waitId));
     if (!raw) {
       return null;
     }
 
     try {
-      const parsed = storedUserWaitSchema.safeParse(JSON.parse(raw));
-
-      return parsed.success ? parsed.data : null;
-    } catch {
-      return null;
+      return storedUserWaitSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      throw new LangyLocalRecordUnreadableError({
+        reasons: error instanceof Error ? [error] : [],
+      });
     }
   }
 
   /** The wait, with its budget applied: a card past its time reads expired. */
   private async readSettlingExpiry(waitId: string): Promise<StoredUserWait | null> {
-    const wait = await this.tryRead(waitId);
+    const wait = await this.read(waitId);
     if (!wait) {
       return null;
     }

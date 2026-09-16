@@ -326,7 +326,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input, request, signal }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
-    const call = await runtime.dispatcher.tryRead(input.id);
+    const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
     await requireConversation({
       app,
@@ -353,7 +353,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input, request }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
-    const call = await runtime.dispatcher.tryRead(input.id);
+    const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
     await requireConversation({
       app,
@@ -409,7 +409,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input, request, signal }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const runtime = members.runtime();
-    const wait = await runtime.waits.tryRead(input.id);
+    const wait = await runtime.waits.read(input.id);
     if (!wait || wait.projectId !== auth.projectId) return notFoundAnswer();
     await requireConversation({
       app,

@@ -136,7 +136,7 @@ export class ModelCostPreviewService {
     spans: ModelCostPreviewSpanReader;
     input: CostRulePreviewInput;
   }): Promise<CostRuleMatchingSpansPreview> {
-    if (!this.regexSafety.tryCompileSafeRegex(input.regex)) {
+    if (!this.regexSafety.isSafeRegex(input.regex)) {
       throw new ValidationError("Invalid or unsafe regular expression");
     }
 

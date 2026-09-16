@@ -289,6 +289,7 @@ export const APP_ERROR_CODES = [
   "langy_idempotency_mismatch",
   "langy_insufficient_scope",
   "langy_local_permission_timeout",
+  "langy_local_record_unreadable",
   "langy_local_request_expired",
   "langy_local_request_invalid",
   "langy_local_skip_model_not_allowed",

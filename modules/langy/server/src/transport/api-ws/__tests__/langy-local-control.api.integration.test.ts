@@ -722,7 +722,7 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect((await podA.runtime.dispatcher.tryRead(call.callId))?.state).toBe(
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe(
         "awaiting_permission",
       );
     });
@@ -898,7 +898,7 @@ describe("given a folder shared with the conversation", () => {
       });
 
       await expect
-        .poll(() => podA.runtime.waits.tryRead(waitId), { timeout: 5_000 })
+        .poll(() => podA.runtime.waits.read(waitId), { timeout: 5_000 })
         .toMatchObject({
           state: "answered",
           decision: "allow_pattern",
@@ -933,7 +933,7 @@ describe("given a folder shared with the conversation", () => {
       // Nothing to poll for on a frame that changes nothing, so the assertion
       // waits out the round trip the frame would have needed.
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(await podA.runtime.waits.tryRead(waitId)).toMatchObject({
+      expect(await podA.runtime.waits.read(waitId)).toMatchObject({
         state: "answered",
         decision: "allow_once",
         source: "panel",
@@ -1175,7 +1175,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "4 migrations applied",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.tryRead(call.callId))?.state, {
+        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
           timeout: 5_000,
         })
         .toBe("done");
@@ -1188,7 +1188,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "sent again after the reconnect",
       });
       await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(await podA.runtime.dispatcher.tryRead(call.callId)).toMatchObject({
+      expect(await podA.runtime.dispatcher.read(call.callId)).toMatchObject({
         state: "done",
         ok: true,
         text: "4 migrations applied",
@@ -1252,7 +1252,7 @@ describe("given a folder replaced by a newer one", () => {
           text: "written on the machine that was replaced",
         },
       );
-      expect((await podA.runtime.dispatcher.tryRead(call.callId))?.state).not.toBe("done");
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe("done");
 
       // The folder the panel shows still answers it.
       fresh.cli.send({
@@ -1262,7 +1262,7 @@ describe("given a folder replaced by a newer one", () => {
         text: "written",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.tryRead(call.callId))?.state, {
+        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
           timeout: 5_000,
         })
         .toBe("done");

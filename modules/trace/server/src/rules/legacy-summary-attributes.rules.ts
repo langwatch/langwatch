@@ -338,7 +338,7 @@ export function createError(
 }
 
 /** A stamped JSON array, or null when the attribute is absent, unparseable, or not an array. */
-export function tryParseJsonArray(value: string | undefined): string[] | null {
+export function parseJsonArray(value: string | undefined): string[] | null {
   if (!value) {
     return null;
   }

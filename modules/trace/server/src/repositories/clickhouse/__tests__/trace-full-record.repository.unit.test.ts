@@ -26,11 +26,11 @@ class TenantClickHouseResolver extends TraceClickHouse {
 class Payloads extends TracePayloadReaderRepository {
   readonly calls: { tenantId: string; traceId: string }[] = [];
 
-  constructor(private readonly value: string | null) {
+  constructor(private readonly value: string) {
     super();
   }
 
-  async tryRead(input: { tenantId: string; traceId: string }): Promise<string | null> {
+  async read(input: { tenantId: string; traceId: string }): Promise<string> {
     this.calls.push(input);
     return this.value;
   }

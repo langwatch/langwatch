@@ -198,7 +198,7 @@ export class CopilotTurnAssemblyService {
       return null;
     }
 
-    const value = (CopilotTranscriptGroupingService.tryAsObject(activity.value) ??
+    const value = (CopilotTranscriptGroupingService.asObject(activity.value) ??
       {}) as ToolCallValue;
 
     return {

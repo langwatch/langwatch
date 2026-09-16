@@ -294,15 +294,18 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
-  async tryFindInputs(input: {
+  async findInputs(input: {
     tenantId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.tryFindInputs");
+    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.findInputs");
     let client: EvaluationClickHouseClient;
     try {
       client = await this.options.resolveClient(input.tenantId);
     } catch (error) {
+      // Kept deliberately: `clickhouse.evaluation.repository.unit.test.ts`
+      // pins "degrades unavailable reads" against a bound scenario, so an
+      // unreachable cluster answering with no inputs is specified behaviour.
       logger.warn(
         { tenantId: input.tenantId, evaluationId: input.evaluationId, error },
         "ClickHouse client unavailable for evaluation inputs",

@@ -54,7 +54,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
    * (D11): an invite targets an address, and any VERIFIED identifier holding it vouches for the
    * person.
    */
-  async tryVerifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
+  async verifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
     try {
       if (!(await this.isOnIdentity({ userId }))) {
         return null;

@@ -126,7 +126,7 @@ export class EvaluationService {
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
-    const inputs = await this.options.repository.tryFindInputs(query);
+    const inputs = await this.options.repository.findInputs(query);
 
     return this.options.inputResolution.tryResolve({
       tenantId: query.tenantId,

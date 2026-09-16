@@ -161,7 +161,7 @@ export class TraceContentArrayService {
    * content as a stringified Python repr of a list rather than JSON; newer ones emit JSON, and
    * this keeps the repr fallback for clients still in flight. Returns null when neither decodes.
    */
-  static tryCoerceContentToArray(content: unknown): unknown[] | null {
+  static coerceContentToArray(content: unknown): unknown[] | null {
     if (Array.isArray(content)) {
       return content;
     }

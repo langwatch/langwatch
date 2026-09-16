@@ -334,7 +334,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
         url: "https://app.langwatch.test/p/simulations/s/batch-1",
       });
 
-      await expect(scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey })).resolves.toBe(
+      await expect(scenarioTabRegistry.takePendingNavigate({ projectId, tabKey })).resolves.toBe(
         "https://app.langwatch.test/p/simulations/s/batch-1",
       );
     });
@@ -348,10 +348,10 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
         tabKey,
         url: "https://app.langwatch.test/p/simulations/s/batch-1",
       });
-      await scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey });
+      await scenarioTabRegistry.takePendingNavigate({ projectId, tabKey });
 
       await expect(
-        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
       ).resolves.toBeNull();
     });
 
@@ -373,7 +373,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
 
       await connection!.del(key);
       await expect(
-        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey }),
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
       ).resolves.toBeNull();
     });
 
@@ -389,7 +389,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       });
 
       await expect(
-        scenarioTabRegistry.tryTakePendingNavigate({ projectId, tabKey: theirs }),
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey: theirs }),
       ).resolves.toBeNull();
     });
   });

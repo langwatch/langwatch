@@ -830,7 +830,7 @@ describe("TraceIOExtractionService", () => {
       { role: "user", content: [{ type: "input_text", text: "hi" }] },
     ]);
     // Exactly what ingest stores inline after leanForProjection (ADR-022).
-    const leanedInput = TraceProjectionLeanService.tryStructuredIoPreview(
+    const leanedInput = TraceProjectionLeanService.structuredIoPreview(
       fullInput,
       IO_PREVIEW_BYTES,
     )!;

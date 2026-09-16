@@ -20,6 +20,7 @@ import {
   type ControlRequest,
 } from "@langwatch/langy-contract";
 import {
+  LangyLocalRecordUnreadableError,
   LangyLocalRequestExpiredError,
   LangyLocalRequestInvalidError,
 } from "@langwatch/langy-contract";
@@ -204,7 +205,18 @@ export class ControlRequestService {
     const ids = await this.store.zrangebyscore(key, now);
     const requests: StoredControlRequest[] = [];
     for (const id of ids) {
-      const request = await this.tryRead(id);
+      let request: StoredControlRequest | null;
+      try {
+        request = await this.read(id);
+      } catch (error) {
+        if (!(error instanceof LangyLocalRecordUnreadableError)) {
+          throw error;
+        }
+
+        logger.warn({ requestId: id }, "skipping unreadable control request");
+        continue;
+      }
+
       if (!request) {
         continue;
       }
@@ -234,25 +246,29 @@ export class ControlRequestService {
     return open.find((row) => row.conversationId === conversationId) ?? null;
   }
 
-  /** The conversation one minted key controls, or nothing when it controls none. */
-  async tryReadKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
+  /**
+   * The conversation one minted key controls, or nothing when it controls none.
+   * A binding we wrote that no longer decodes is corruption, so it raises under
+   * a code rather than reading back as a key that controls nothing.
+   */
+  async readKeyBinding(apiKeyId: string): Promise<SessionKeyBinding | null> {
     const raw = await this.store.tryGet(sessionKeyBindingKey(apiKeyId));
     if (!raw) {
       return null;
     }
 
     try {
-      const parsed = sessionKeyBindingSchema.safeParse(JSON.parse(raw));
-
-      return parsed.success ? parsed.data : null;
-    } catch {
-      return null;
+      return sessionKeyBindingSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      throw new LangyLocalRecordUnreadableError({
+        reasons: error instanceof Error ? [error] : [],
+      });
     }
   }
 
   /** Drops the binding, so the key stops answering for the conversation. */
   async revokeKeyBinding(apiKeyId: string): Promise<void> {
-    const binding = await this.tryReadKeyBinding(apiKeyId);
+    const binding = await this.readKeyBinding(apiKeyId);
     await this.store.del(sessionKeyBindingKey(apiKeyId));
     if (binding) {
       await this.store.zrem(conversationKeyBindingsKey(binding.conversationId), apiKeyId);
@@ -275,18 +291,23 @@ export class ControlRequestService {
     return apiKeyIds;
   }
 
-  async tryRead(requestId: string): Promise<StoredControlRequest | null> {
+  /**
+   * The stored request, or null once its key has expired. A blob we wrote that
+   * no longer decodes is corruption rather than absence, so it raises under a
+   * code that tells the person to ask for the code change again.
+   */
+  async read(requestId: string): Promise<StoredControlRequest | null> {
     const raw = await this.store.tryGet(controlRequestKey(requestId));
     if (!raw) {
       return null;
     }
 
     try {
-      const parsed = storedControlRequestSchema.safeParse(JSON.parse(raw));
-
-      return parsed.success ? parsed.data : null;
-    } catch {
-      return null;
+      return storedControlRequestSchema.parse(JSON.parse(raw));
+    } catch (error) {
+      throw new LangyLocalRecordUnreadableError({
+        reasons: error instanceof Error ? [error] : [],
+      });
     }
   }
 
@@ -373,7 +394,7 @@ export class ControlRequestService {
     userId: string;
     projectId: string;
   }): Promise<StoredControlRequest> {
-    const request = await this.tryRead(requestId);
+    const request = await this.read(requestId);
     // A request that belongs to somebody else answers exactly like one that
     // never existed, so the id cannot be used to probe another person's chat.
     if (!request || request.userId !== userId || request.projectId !== projectId) {

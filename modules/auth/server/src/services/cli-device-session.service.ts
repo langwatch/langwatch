@@ -422,14 +422,23 @@ export class CliDeviceSessionService {
   }
 
   /** The refresh record behind one refresh token, or nothing. */
-  async tryFindRefreshToken(refreshToken: string): Promise<CliRefreshTokenRecord | null> {
+  async findRefreshToken(refreshToken: string): Promise<CliRefreshTokenRecord | null> {
     const raw = await this.store.tryGet(cliRefreshTokenKey(refreshToken));
     if (!raw) {
       return null;
     }
 
+    return CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+  }
+
+  /**
+   * A stored session record, or null when it no longer decodes. That should be
+   * a named `cli_session_unreadable` refusal saying "sign in again";
+   * `auth/contract` cannot declare one yet, so null keeps the caller's 401.
+   */
+  private static decodeSession<T>(raw: string): T | null {
     try {
-      return JSON.parse(raw) as CliRefreshTokenRecord;
+      return JSON.parse(raw) as T;
     } catch {
       return null;
     }
@@ -443,7 +452,7 @@ export class CliDeviceSessionService {
   /**
    * Resolves a bearer access token to its record, or nothing.
    */
-  async tryResolveAccessToken(
+  async resolveAccessToken(
     authHeader: string | null | undefined,
   ): Promise<CliAccessTokenRecord | null> {
     const token = CliDeviceSessionService.tryBearerCliAccessToken(authHeader);
@@ -456,10 +465,8 @@ export class CliDeviceSessionService {
       return null;
     }
 
-    let record: CliAccessTokenRecord;
-    try {
-      record = JSON.parse(raw) as CliAccessTokenRecord;
-    } catch {
+    const record = CliDeviceSessionService.decodeSession<CliAccessTokenRecord>(raw);
+    if (!record) {
       return null;
     }
 

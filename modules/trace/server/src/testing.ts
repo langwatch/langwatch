@@ -40,7 +40,7 @@ export class EmptyTraceQueryClassification implements TraceQueryClassifier {
 }
 
 export class EmptyTracePayloadReaderRepository extends TracePayloadReaderRepository {
-  async tryRead(): Promise<null> {
-    return null;
+  async read(): Promise<string> {
+    throw new Error("this test double holds no offloaded payloads");
   }
 }

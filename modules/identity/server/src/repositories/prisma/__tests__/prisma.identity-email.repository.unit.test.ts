@@ -130,7 +130,7 @@ describe("PostgresIdentityEmailAdapter", () => {
         ],
       });
 
-      await expect(emails.tryVerifiedEmailsOf({ userId: "user-1" })).resolves.toEqual([
+      await expect(emails.verifiedEmailsOf({ userId: "user-1" })).resolves.toEqual([
         { identifierId: "identifier_1", value: "alex@example.test", provider: "email" },
         { identifierId: "identifier_2", value: "alex@work.test", provider: "email" },
       ]);

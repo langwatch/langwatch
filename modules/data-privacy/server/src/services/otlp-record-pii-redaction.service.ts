@@ -136,7 +136,7 @@ export class OtlpRecordPiiRedactionService {
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
   ): Promise<void> {
-    const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
+    const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
       await this.lambdaRedactLog(log, piiRedactionLevel);
 
@@ -203,7 +203,7 @@ export class OtlpRecordPiiRedactionService {
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
   ): Promise<void> {
-    const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
+    const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
       await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel);
 

@@ -189,7 +189,7 @@ export class TraceDiscoverService {
       timeRange: { from: snapped.from, to: snapped.to },
     };
     const cacheKey = discoverCacheKey(params.tenantId, snapped);
-    const cached = await DISCOVER_CACHE.tryGet(cacheKey);
+    const cached = await DISCOVER_CACHE.get(cacheKey);
 
     if (cached) {
       // Stale-while-revalidate: hand back the cached payload and kick

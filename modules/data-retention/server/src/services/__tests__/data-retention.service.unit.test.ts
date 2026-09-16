@@ -34,7 +34,7 @@ class RecordingCache extends DataRetentionCacheStore {
   readonly values = new Map<string, ResolvedRetention>();
   readonly deleted: string[] = [];
 
-  async tryGet(key: string): Promise<ResolvedRetention | undefined> {
+  async get(key: string): Promise<ResolvedRetention | undefined> {
     return this.values.get(key);
   }
 

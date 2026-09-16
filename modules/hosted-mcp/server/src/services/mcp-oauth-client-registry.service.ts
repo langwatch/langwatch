@@ -51,7 +51,7 @@ export class McpOAuthClientRegistryService {
     );
   }
 
-  static async tryGet({
+  static async get({
     redis,
     clientId,
   }: {
@@ -68,6 +68,11 @@ export class McpOAuthClientRegistryService {
       return null;
     }
 
+    // A registration we wrote that no longer decodes should be named, not
+    // swallowed — but this package has no handled-error dependency to name it
+    // with, and a bare SyntaxError would reach the client as an unknown 500.
+    // Until it does, the caller's own "unregistered client" refusal is the
+    // actionable answer, in the protocol the client already speaks.
     try {
       const parsed = JSON.parse(raw) as RegisteredOAuthClient;
 

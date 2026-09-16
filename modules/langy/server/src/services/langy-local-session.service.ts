@@ -226,7 +226,7 @@ export class LocalControlSessionCoreService {
       };
     }
 
-    const binding = await this.requests.tryReadKeyBinding(resolved.apiKeyId);
+    const binding = await this.requests.readKeyBinding(resolved.apiKeyId);
     if (!binding || binding.projectId !== resolved.project.id) {
       return {
         ok: false,

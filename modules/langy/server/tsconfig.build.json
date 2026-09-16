@@ -25,7 +25,7 @@
     "./src/services/langy-rest-caller.service.ts",
     "./src/services/langy-turn.service.ts",
     "./src/transport/langy-turns.rest.ts",
-    "./src/subscribers/langy-conversation.subscriber.ts"
+    "./src/eventing/langy-conversation.subscriber.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

@@ -17,14 +17,6 @@ function isDigit(char: string | undefined): boolean {
   return char !== undefined && char >= "0" && char <= "9";
 }
 
-function tryParse(candidate: string): { value: unknown } | null {
-  try {
-    return { value: JSON.parse(candidate) as unknown };
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Index of the bracket that closes the one at `start`, or -1. String-aware, so
  * a `}` inside a JSON string value does not close the document early.
@@ -158,8 +150,11 @@ export function parseCliJson(output: string): unknown | null {
   const trimmed = output.trim();
   if (!trimmed) return null;
 
-  const whole = tryParse(trimmed);
-  if (whole) return whole.value;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    // Not one whole document: scan the output for one printed inside it.
+  }
 
   let candidates = 0;
   for (let i = 0; i < output.length; i++) {
@@ -179,8 +174,11 @@ export function parseCliJson(output: string): unknown | null {
       if (opensJsonContent({ text: output, start: i })) return null;
       continue;
     }
-    const parsed = tryParse(output.slice(i, end + 1));
-    if (parsed) return parsed.value;
+    try {
+      return JSON.parse(output.slice(i, end + 1)) as unknown;
+    } catch {
+      // A balanced bracket pair that is not JSON: keep scanning.
+    }
   }
   return null;
 }

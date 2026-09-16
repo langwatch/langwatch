@@ -37,7 +37,7 @@ export abstract class ScenarioTabRegistry {
     now?: number;
   }): Promise<void>;
 
-  abstract tryTakePendingNavigate(input: {
+  abstract takePendingNavigate(input: {
     projectId: string;
     tabKey: string;
     now?: number;
@@ -64,7 +64,7 @@ export async function startScenarioTabPresence({
 
   // A handoff broadcast while this tab was reloading would have been lost,
   // even though the SDK was told it was delivered. Claim it now.
-  const pending = await registry.tryTakePendingNavigate({
+  const pending = await registry.takePendingNavigate({
     projectId: registration.projectId,
     tabKey: registration.tabKey,
   });

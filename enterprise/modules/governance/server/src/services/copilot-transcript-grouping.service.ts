@@ -77,7 +77,7 @@ export class CopilotTranscriptGroupingService {
     return null;
   }
 
-  static tryAsObject(value: unknown): Record<string, unknown> | null {
+  static asObject(value: unknown): Record<string, unknown> | null {
     if (typeof value === "string") {
       try {
         const parsed: unknown = JSON.parse(value);
@@ -92,7 +92,7 @@ export class CopilotTranscriptGroupingService {
   }
 
   static tryParseRow(event: NormalizedPullEvent): TranscriptRow | null {
-    const row = CopilotTranscriptGroupingService.tryAsObject(event.raw_payload);
+    const row = CopilotTranscriptGroupingService.asObject(event.raw_payload);
 
     return row ? (row as TranscriptRow) : null;
   }
@@ -107,7 +107,7 @@ export class CopilotTranscriptGroupingService {
    * reorders a conversation.
    */
   static tryBatchIdOf(row: TranscriptRow): number | null {
-    const metadata = CopilotTranscriptGroupingService.tryAsObject(row.metadata);
+    const metadata = CopilotTranscriptGroupingService.asObject(row.metadata);
     const raw = metadata?.BatchId;
     if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0) {
       return raw;
@@ -244,7 +244,7 @@ export class CopilotTranscriptGroupingService {
   static activitiesOf(rows: IndexedRow[]): Activity[] {
     const activities: Activity[] = [];
     for (const { row } of rows) {
-      const list = CopilotTranscriptGroupingService.tryAsObject(row.content)?.activities;
+      const list = CopilotTranscriptGroupingService.asObject(row.content)?.activities;
       if (!Array.isArray(list)) {
         continue;
       }
@@ -297,7 +297,7 @@ export class CopilotTranscriptGroupingService {
     return activities.some(
       (a) =>
         a.valueType === "ConversationInfo" &&
-        CopilotTranscriptGroupingService.tryAsObject(a.value)?.isDesignMode === true,
+        CopilotTranscriptGroupingService.asObject(a.value)?.isDesignMode === true,
     );
   }
 

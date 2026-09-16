@@ -77,7 +77,7 @@ export class StorageMeterService {
 
   async getTotalStorageBytes(input: { tenantId: string }): Promise<number> {
     const { tenantId } = storageMeterTenantInputSchema.parse(input);
-    const entry = await this.cache.tryGet(tenantId);
+    const entry = await this.cache.get(tenantId);
     if (entry !== void 0) {
       if (this.now() - entry.computedAt >= STORAGE_FRESH_MS) {
         void this.refreshInBackground(tenantId);

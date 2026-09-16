@@ -13,7 +13,7 @@ export class MemoryTracePayloadReaderRepository extends TracePayloadReaderReposi
     super();
   }
 
-  async tryRead(): Promise<string | null> {
-    return null;
+  async read(): Promise<string> {
+    throw new Error("the memory trace repositories hold no offloaded payloads");
   }
 }

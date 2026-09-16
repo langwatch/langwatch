@@ -5,7 +5,7 @@ import {
 
 /** Internal cache port; cache implementation and wiring stay server-owned. */
 export abstract class DataRetentionCacheStore {
-  abstract tryGet(key: string): Promise<ResolvedRetention | undefined>;
+  abstract get(key: string): Promise<ResolvedRetention | undefined>;
   abstract set(key: string, value: ResolvedRetention): Promise<void>;
   abstract delete(key: string): Promise<void>;
 }
@@ -53,7 +53,7 @@ export class RedisDataRetentionCacheStore extends DataRetentionCacheStore {
     this.ttlSeconds = Math.ceil(ttlMs / 1_000);
   }
 
-  async tryGet(key: string): Promise<ResolvedRetention | undefined> {
+  async get(key: string): Promise<ResolvedRetention | undefined> {
     if (this.redis) {
       try {
         const encoded = await this.redis.get(this.redisKey(key));

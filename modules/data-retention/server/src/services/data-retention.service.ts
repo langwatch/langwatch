@@ -60,7 +60,7 @@ export class DataRetentionService {
   private constructor(private readonly options: DataRetentionServiceOptions) {}
 
   async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
-    const cached = await this.options.cache.tryGet(input.projectId);
+    const cached = await this.options.cache.get(input.projectId);
     if (cached !== void 0) {
       return cached;
     }

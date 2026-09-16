@@ -99,7 +99,7 @@ export class McpAuthorizationService {
    * rather than the approving user, and would otherwise be handed the code.
    */
   async approve(request: McpApprovalRequest): Promise<McpApprovalOutcome> {
-    const registered = await McpOAuthClientRegistryService.tryGet({
+    const registered = await McpOAuthClientRegistryService.get({
       redis: this.#collaborators.redis,
       clientId: request.clientId,
     });

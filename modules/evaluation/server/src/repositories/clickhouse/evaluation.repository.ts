@@ -73,7 +73,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     return this.reader.findTraceEvaluations(input);
   }
 
-  tryFindInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null> {
-    return this.reader.tryFindInputs(input);
+  findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null> {
+    return this.reader.findInputs(input);
   }
 }

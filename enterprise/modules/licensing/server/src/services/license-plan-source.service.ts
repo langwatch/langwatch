@@ -46,7 +46,7 @@ export class LicensePlanSourceService {
       return UNLIMITED_PLAN;
     }
 
-    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
     if (!signedLicense || !this.cryptography.verifySignature(signedLicense)) {
       return UNLIMITED_PLAN;
     }

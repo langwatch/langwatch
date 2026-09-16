@@ -9,7 +9,7 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 import type { WorkspaceNudge } from "../../rules/langy-local-call-record.rules.ts";
-import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
+import { callKey, workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 
 const projectId = "proj_1";
@@ -86,7 +86,7 @@ describe("given a folder connected to the conversation", () => {
       expect(nudges).toContainEqual({ call: call.callId });
 
       await dispatcher.ack(call.callId);
-      expect((await dispatcher.tryRead(call.callId))?.state).toBe("running");
+      expect((await dispatcher.read(call.callId))?.state).toBe("running");
 
       await dispatcher.result({
         callId: call.callId,
@@ -148,7 +148,7 @@ describe("given a folder connected to the conversation", () => {
         callId: call.callId,
         waitId: "lwait_1",
       });
-      expect((await dispatcher.tryRead(call.callId))?.state).toBe("awaiting_permission");
+      expect((await dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
 
       await dispatcher.sendPermission({
         conversationId,
@@ -157,7 +157,7 @@ describe("given a folder connected to the conversation", () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect((await dispatcher.tryRead(call.callId))?.state).toBe("running");
+      expect((await dispatcher.read(call.callId))?.state).toBe("running");
       expect(nudges).toContainEqual({
         permission: { callId: call.callId, decision: "allow_once" },
       });
@@ -227,6 +227,64 @@ describe("given a folder connected to the conversation", () => {
           turnId: "turn_2",
         }),
       ).toEqual([]);
+    });
+  });
+
+  describe("when one call in the conversation's pending set cannot be read", () => {
+    it("skips the corrupt member and lists the rest", async () => {
+      const readable = await dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: listCall(),
+        timeoutMs: 60_000,
+      });
+      const corrupt = await dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: listCall(),
+        timeoutMs: 60_000,
+      });
+      await store.set(callKey(corrupt.callId), "not json", 60);
+
+      const calls = await dispatcher.listPendingForConversation(conversationId);
+      expect(calls.map((call) => call.callId)).toEqual([readable.callId]);
+
+      const envelopes = await dispatcher.pendingEnvelopes(conversationId);
+      expect(envelopes.map((envelope) => envelope.callId)).toEqual([readable.callId]);
+    });
+
+    it("still throws when the failure is not the record's own corruption", async () => {
+      const call = await dispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: listCall(),
+        timeoutMs: 60_000,
+      });
+      const outage = new Error("redis connection reset");
+      const brokenStore: SessionStateStore = {
+        ...store,
+        async tryGet(key: string) {
+          if (key === callKey(call.callId)) {
+            throw outage;
+          }
+
+          return store.tryGet(key);
+        },
+      };
+      const brokenDispatcher = LocalCallDispatcherService.create({
+        store: brokenStore,
+        presence,
+        now: () => now,
+        offlineWaitMs: 0,
+        pollIntervalMs: 1,
+      });
+
+      await expect(brokenDispatcher.listPendingForConversation(conversationId)).rejects.toThrow(
+        outage,
+      );
     });
   });
 });

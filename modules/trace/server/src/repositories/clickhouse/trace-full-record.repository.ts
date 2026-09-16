@@ -242,7 +242,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       PAYLOAD_READ_CONCURRENCY,
       async ([key, reference]) => {
         try {
-          values.set(key, await this.payloads.tryRead({ tenantId, ...reference }));
+          values.set(key, await this.payloads.read({ tenantId, ...reference }));
         } catch {
           values.set(key, null);
         }

@@ -128,7 +128,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     );
   }
 
-  async tryTakePendingNavigate(input: {
+  async takePendingNavigate(input: {
     projectId: string;
     tabKey: string;
     now?: number;

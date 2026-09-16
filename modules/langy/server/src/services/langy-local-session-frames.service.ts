@@ -39,7 +39,7 @@ export class LocalControlFramesService {
 
   /** The command line started the call. */
   async ack(session: ControlSession, callId: string): Promise<void> {
-    const call = await this.deps.dispatcher.tryRead(callId);
+    const call = await this.deps.dispatcher.read(callId);
     if (call?.conversationId !== session.conversationId) {
       return;
     }
@@ -56,7 +56,7 @@ export class LocalControlFramesService {
    * ended is a quiet no-op, not an error — a resend after a dropped socket.
    */
   async result(session: ControlSession, frame: ResultFrame): Promise<void> {
-    const call = await this.deps.dispatcher.tryRead(frame.callId);
+    const call = await this.deps.dispatcher.read(frame.callId);
     if (call?.conversationId !== session.conversationId) {
       return;
     }
@@ -76,7 +76,7 @@ export class LocalControlFramesService {
 
   /** The command line needs the developer's answer before it runs the call. */
   async permissionRequired(session: ControlSession, frame: PermissionRequiredFrame): Promise<void> {
-    const call = await this.deps.dispatcher.tryRead(frame.callId);
+    const call = await this.deps.dispatcher.read(frame.callId);
     if (!call || call.conversationId !== session.conversationId) {
       return;
     }
@@ -110,7 +110,7 @@ export class LocalControlFramesService {
    * answer wins; an already-settled wait ignores this frame.
    */
   async permissionAnswered(session: ControlSession, frame: PermissionAnsweredFrame): Promise<void> {
-    const call = await this.deps.dispatcher.tryRead(frame.callId);
+    const call = await this.deps.dispatcher.read(frame.callId);
     if (!call || call.conversationId !== session.conversationId) {
       return;
     }

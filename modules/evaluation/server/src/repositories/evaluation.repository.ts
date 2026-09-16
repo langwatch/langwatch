@@ -27,5 +27,5 @@ export abstract class EvaluationRunRepository {
   abstract findTraceEvaluations(
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
-  abstract tryFindInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
+  abstract findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
 }

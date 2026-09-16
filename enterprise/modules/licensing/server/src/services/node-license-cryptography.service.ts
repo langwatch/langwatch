@@ -91,7 +91,7 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
       .trim();
   }
 
-  tryParseLicenseKey(licenseKey: string): SignedLicense | null {
+  parseLicenseKey(licenseKey: string): SignedLicense | null {
     if (!licenseKey || licenseKey.trim() === "") return null;
 
     try {
@@ -137,7 +137,7 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
     publicKey?: string;
     now?: Instant;
   }): ValidationResult {
-    const signedLicense = this.tryParseLicenseKey(licenseKey);
+    const signedLicense = this.parseLicenseKey(licenseKey);
     if (!signedLicense) {
       return { valid: false, error: LICENSE_ERRORS.INVALID_FORMAT };
     }

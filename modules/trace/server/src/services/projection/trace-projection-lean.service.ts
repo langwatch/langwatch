@@ -156,7 +156,7 @@ function leanIoAttributes({
 
     const value = attr.value.stringValue as string;
     const preview =
-      TraceProjectionLeanService.tryStructuredIoPreview(value, IO_PREVIEW_BYTES) ??
+      TraceProjectionLeanService.structuredIoPreview(value, IO_PREVIEW_BYTES) ??
       TraceProjectionLeanService.utf8Preview(value, IO_PREVIEW_BYTES);
     leaned.push({ key: attr.key, value: { stringValue: preview } });
     // ADR-022: the eventref carries the field and the event id, which is what the read path joins
@@ -229,7 +229,7 @@ export class TraceProjectionLeanService {
    * cut turns a chat-messages array into unparseable JSON. Long string leaves are clamped, then
    * middle array items dropped; anything still too big reports null and the caller byte-cuts.
    */
-  static tryStructuredIoPreview(value: string, maxBytes: number): string | null {
+  static structuredIoPreview(value: string, maxBytes: number): string | null {
     if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
       return null;
     }

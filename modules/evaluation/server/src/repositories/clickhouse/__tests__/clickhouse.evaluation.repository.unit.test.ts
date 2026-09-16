@@ -276,7 +276,7 @@ describe("ClickHouseEvaluationRepository", () => {
     const { client, repository } = harness([[{ Inputs: '{"input":"hello","output":"world"}' }]]);
 
     await expect(
-      repository.tryFindInputs({
+      repository.findInputs({
         tenantId: "org_1",
         evaluationId: "evaluation_1",
       }),
@@ -293,7 +293,7 @@ describe("ClickHouseEvaluationRepository", () => {
       },
     });
     await expect(
-      unavailable.tryFindInputs({
+      unavailable.findInputs({
         tenantId: "org_1",
         evaluationId: "evaluation_1",
       }),

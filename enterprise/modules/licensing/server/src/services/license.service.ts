@@ -190,7 +190,7 @@ export class LicenseService extends LicensingServiceContract {
       };
     }
 
-    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
     if (!signedLicense) {
       return { hasLicense: true, valid: false, corrupted: true };
     }
@@ -248,7 +248,7 @@ export class LicenseService extends LicensingServiceContract {
     licenseKey: string,
     source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
   ): PlatformLicenseInspection {
-    const signedLicense = this.cryptography.tryParseLicenseKey(licenseKey);
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
     if (!signedLicense) {
       return { ...source, valid: false, reason: "invalid_format" };
     }

@@ -133,7 +133,7 @@ export class OtlpSpanPiiRedactionService {
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
   ): Promise<void> {
-    const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
+    const native = await this.policy.resolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
       await this.lambdaRedactSpan(span, resource, piiRedactionLevel);
 
