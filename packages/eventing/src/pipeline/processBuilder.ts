@@ -219,9 +219,8 @@ class ProcessManagerBuilder<E extends Event> {
 
   /**
    * The content boundary (ADR-052): narrows a committed event to the payload
-   * the process may see. The payload is persisted verbatim into process
-   * state and outbox rows, so any domain whose events carry customer
-   * content MUST declare one.
+   * the process may see, persisted verbatim into process state and outbox
+   * rows — any domain whose events carry customer content MUST declare one.
    */
   toPayload(map: (event: E) => ProcessEventEnvelope["payload"]): this {
     if (this.payloadMapper) {

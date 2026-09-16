@@ -4,10 +4,9 @@ import type { IntentSpec, WakeHandler } from "../../pipeline/processManagerDefin
 export const PROCESS_RETENTION_SWEEP_PROCESS_NAME = "processRetentionSweep" as const;
 
 /**
- * Hourly. The tables this reaps grow with traffic, so the interval only has to
- * be short enough that one wake's bounded budget keeps up with an hour of
- * inserts, which at the observed peak (roughly 360k outbox rows in a day) it
- * comfortably does.
+ * Hourly. The interval only has to be short enough that one wake's bounded
+ * budget keeps up with an hour of inserts — comfortably true even at the
+ * observed peak (~360k outbox rows/day).
  */
 export const PROCESS_RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -25,11 +24,8 @@ export const DEAD_OUTBOX_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Inbox rows are idempotency markers, so the window only has to outlive the
- * horizon in which the same source event can be redelivered. Origin guards
- * reject events older than 1h and traces older than 24h, and the longest
- * debounce bucket is 600s, which puts that horizon around 25h. Seven days is a
- * wide margin over it, and the `TriggerSent` claim is a second layer against a
- * double side effect regardless.
+ * redelivery horizon (~25h: 24h trace guard + 600s debounce). Seven days is a
+ * wide margin, and the `TriggerSent` claim is a second layer regardless.
  */
 export const CONSUMED_INBOX_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -38,9 +34,8 @@ export const RETENTION_SWEEP_BATCH_SIZE = 5_000;
 
 /**
  * The ceiling on batches per family per wake, reached by the ramp below rather
- * than on the first tick. It degrades a huge backlog into "drains a million
- * rows an hour" rather than "holds the database for as long as it takes",
- * which is the failure mode an unbounded catch-up delete has.
+ * than on the first tick — it degrades a huge backlog into "drains a million
+ * rows an hour" rather than an unbounded catch-up delete holding the database.
  */
 export const RETENTION_SWEEP_MAX_BATCHES_PER_WAKE = 200;
 
@@ -52,9 +47,8 @@ export const RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE = 5;
 
 /**
  * Pause between delete statements, so a wake leaves the instance room to serve
- * the pipeline that is still writing to these tables. The one-time backlog
- * purge paces itself the same way, and this worker has more reason to rather
- * than less: it runs hourly with nobody watching the database while it works.
+ * the pipeline still writing to these tables — it runs hourly with nobody
+ * watching the database while it works.
  */
 export const RETENTION_SWEEP_BATCH_PAUSE_MS = 200;
 
@@ -112,8 +106,7 @@ export type ProcessRetentionSweepIntents = {
 /**
  * Wake handlers must be pure and synchronous — no I/O, no clock reads —
  * because the commit that persists this evolution is what fences racing
- * workers. The deletes themselves are an intent, so they run behind the outbox
- * lease instead, and exactly one worker per tick does the work.
+ * workers. The deletes run behind the outbox lease as an intent instead.
  */
 export const processRetentionSweepWake: WakeHandler<
   ProcessRetentionSweepState,

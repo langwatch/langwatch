@@ -58,8 +58,7 @@ function planFamilies(deps: ProcessRetentionSweepDeps, startedAt: number): Famil
 /**
  * Drains one family in bounded batches until it runs dry, the wake's batch
  * budget is spent, or the deadline passes. A short batch means the family is
- * drained, which is what ends the loop without issuing a delete that would
- * match nothing.
+ * drained, ending the loop before a delete that would match nothing.
  */
 async function drainFamily({
   deleteBatch,
@@ -91,9 +90,8 @@ async function drainFamily({
 }
 
 /**
- * Drains one family and reports it. Never throws: one family's failure must not
- * cost the others their sweep. The whole point of this process manager is that
- * the tables cannot grow unbounded, and a shared try/catch would let one bad
+ * Drains one family and reports it. Never throws: one family's failure must
+ * not cost the others their sweep, since a shared try/catch would let one bad
  * statement stop the other two indefinitely.
  */
 async function sweepFamily(
@@ -133,24 +131,19 @@ async function sweepFamily(
 }
 
 /**
- * The sweep's external work, kept out of the process definition so the
- * definition stays pure and synchronous. Redelivery is safe: every delete is
- * bounded by an absolute cutoff computed from the wake it runs for, so a
- * second run of the same intent deletes rows the first one did not reach and
- * nothing else.
+ * The sweep's external work, kept out of the process definition so it stays
+ * pure and synchronous. Redelivery is safe: every delete is bounded by an
+ * absolute cutoff, so a second run only reaches rows the first one did not.
  */
 export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
   return async (payload: ProcessRetentionSweepPayload): Promise<void> => {
     const now = deps.now ?? Date.now;
     const sleep =
       deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-    // Clamped here rather than bounded in the schema. The only writer is the
-    // wake handler, which already caps the budget, so a larger value could
-    // only arrive on a payload this code did not write. Rejecting one would
-    // fail the intent, exhaust its retries and dead-letter the sweep, which
-    // stops retention altogether and regrows the tables this exists to bound.
-    // Clamping holds the delete loop to the same ceiling and keeps the sweep
-    // running.
+    // Clamped here rather than bounded in the schema. Rejecting an out-of-range
+    // payload would exhaust its retries and dead-letter the sweep instead,
+    // stopping retention altogether and regrowing the tables this exists to
+    // bound.
     const maxBatches = Math.min(
       payload.maxBatchesPerFamily ?? RETENTION_SWEEP_INITIAL_BATCHES_PER_WAKE,
       RETENTION_SWEEP_MAX_BATCHES_PER_WAKE,
@@ -165,13 +158,10 @@ export function runProcessRetentionSweep(deps: ProcessRetentionSweepDeps) {
     };
     const plans = planFamilies(deps, startedAt);
     for (const [index, plan] of plans.entries()) {
-      // Each family's window ends at its share of the wake, measured from the
-      // start: family i may not run past (i+1)/N of the budget. A family that
-      // finishes early donates its leftover to the ones after it, but a
-      // backlogged first family can never spend the whole wake and leave the
-      // families behind it starved on every single run — with inbox last and
-      // biggest, that shape would quietly regrow the incident this sweep
-      // exists to prevent.
+      // Each family's window ends at its share of the wake: family i may not
+      // run past (i+1)/N of the budget, so a backlogged first family can never
+      // starve the families after it on every run — with inbox last and
+      // biggest, that shape would quietly regrow the incident this sweep prevents.
       const familyDeadline = Math.min(
         deadline,
         startedAt + Math.floor(((index + 1) * RETENTION_SWEEP_DEADLINE_MS) / plans.length),

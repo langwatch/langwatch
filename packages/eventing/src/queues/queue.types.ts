@@ -80,19 +80,16 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
   process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
 
   /**
-   * Optional batch processor. When set together with `coalesceMaxBatch`, the
-   * GroupQueue may fold several queued jobs of the same group into a single
-   * invocation (the dispatched job plus drained siblings), in occurredAt order.
-   * Used by fold projections to collapse a backed-up group's events into one
-   * load/apply/store cycle. The first payload is always the dispatched job.
+   * Optional batch processor. When set with `coalesceMaxBatch`, the
+   * GroupQueue may fold several queued jobs of the same group into one
+   * invocation, in occurredAt order — the first payload is the dispatched job.
    */
   processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
 
   /**
-   * Optional per-payload resolver for the maximum number of same-group jobs to
-   * coalesce into one `processBatch` call (including the dispatched job).
-   * Returns 1 (or undefined) to disable coalescing for that payload — the
-   * default, which leaves the per-job path byte-for-byte unchanged.
+   * Optional per-payload resolver for the max same-group jobs to coalesce
+   * into one `processBatch` call. Returns 1 (or undefined, the default) to
+   * disable coalescing, leaving the per-job path unchanged.
    */
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
 

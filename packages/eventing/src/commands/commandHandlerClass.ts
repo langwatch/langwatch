@@ -4,12 +4,9 @@ import type { Command, CommandHandler } from "./command.ts";
 import type { CommandSchema } from "./commandSchema.ts";
 
 /**
- * Static properties and methods that must be defined on a CommandHandlerClass.
- * These are accessed via the constructor (class) rather than instances.
- *
- * Note: Configuration options like delay, concurrency, and deduplication should be
- * provided via registration options (e.g., `.withCommand("name", Handler, { delay: 1000 })`),
- * not as static class properties.
+ * Static properties and methods that must be defined on a CommandHandlerClass,
+ * accessed via the constructor rather than instances. Options like delay and
+ * deduplication belong in registration (`.withCommand`), not static properties.
  */
 export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
   /**

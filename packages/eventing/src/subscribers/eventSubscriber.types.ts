@@ -6,11 +6,8 @@ import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * A staged queue payload (ADR-069): a plain versioned job DTO a `stage` hook
- * may return in the committed event's place. It mirrors the event envelope's
- * scheduling identity so the queue orders, groups and dedups it identically,
- * but it is NOT an event — its `type` is a plain wire string outside the
- * event-type registry, it is never appended to the event log, and only the
- * subscriber that staged it reads it.
+ * may return in the committed event's place. Mirrors the event envelope's
+ * scheduling identity but is NOT an event — never appended to the event log.
  */
 export interface StagedJobPayload {
   id: string;
@@ -64,20 +61,16 @@ export interface EventSubscriberOptions<E extends Event = Event> {
   groupKeyFn?: (event: E) => string;
   /**
    * Enqueue-time filter (ADR-069): declined events never mint a job. During a
-   * rolling deploy, jobs staged by a build without the filter can still be in
-   * the queue — a handler must stay correct for events its filter would have
-   * declined.
+   * rolling deploy, older jobs staged without the filter may still be queued —
+   * a handler must stay correct for events its filter would have declined.
    */
   enqueue?: EnqueueDispatchOptions<E>;
 }
 
 /**
- * A live consumer of an event that has already been stored in the canonical
- * event log. The same event is carried through GroupQueue; subscribers do not
- * load it back from the event store and are not invoked by projection replay.
- *
- * Durable subscribers must make their own handling idempotent. Process
- * managers do that with their transactional inbox.
+ * A live consumer of an event already stored in the canonical event log,
+ * carried through GroupQueue — never loaded back from the store, never
+ * invoked by replay. Durable subscribers must make their own handling idempotent.
  */
 export interface EventSubscriberDefinition<E extends Event = Event> {
   name: string;

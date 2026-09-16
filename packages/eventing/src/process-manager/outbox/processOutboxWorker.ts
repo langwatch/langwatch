@@ -8,11 +8,8 @@ const DEFAULT_BATCH_SIZE = 10;
 const DEFAULT_STUCK_DRAIN_TIMEOUT_MS = 300_000;
 /**
  * How many abandoned drains may still be pending before the worker stops
- * starting new ones. Abandonment frees the polling loop but cannot cancel the
- * drain: `runOnce` has no abort path, so a permanently hung delivery keeps its
- * leased batch and its promise chain alive for the life of the pod. Past this
- * many, every drain this worker starts is hanging, and starting more only
- * retains more batches while the same handler hangs again.
+ * starting new ones. `runOnce` has no abort path, so a hung delivery keeps
+ * its batch alive for the pod's life, and starting more only piles up more.
  */
 const MAX_ABANDONED_DRAINS = 5;
 
@@ -32,10 +29,8 @@ export interface ProcessOutboxWorkerOptions {
   stuckDrainTimeoutMs?: number;
   /**
    * Fraction of one interval, in [0, 1), by which this worker's recovery poll
-   * is phase-shifted. Every process manager registers its worker in the same
-   * tick, so an unphased fleet leases in lockstep once per interval and
-   * contends for the same few Postgres connections forever; the default draws
-   * a phase per worker so the polls spread across the interval instead.
+   * is phase-shifted — an unphased fleet leases in lockstep and contends for
+   * the same Postgres connections forever; the default spreads polls instead.
    */
   jitter?: () => number;
   now?: () => number;
@@ -44,8 +39,7 @@ export interface ProcessOutboxWorkerOptions {
 /**
  * Polling loop for the transactional process outbox. Postgres leasing in the
  * dispatcher coordinates multiple instances; this class only owns local
- * lifecycle, recovery polling, and single-flight execution. Composition owns
- * deciding which process roles call start().
+ * lifecycle, recovery polling, and single-flight execution.
  */
 export class ProcessOutboxWorker {
   private readonly dispatcher: Pick<OutboxDispatcherService, "runOnce">;

@@ -17,9 +17,8 @@ function repositoryFor(client: EventingClickHouseClient): EventingClickHouseEven
 
 /**
  * A client that answers with the stored row projected through the query's own
- * SELECT list, the way ClickHouse does. A mock that returns every column
- * whatever was asked for cannot fail when a read forgets to project one, which
- * is how `getEventRecords` shipped without `EventVersion`.
+ * SELECT list, the way ClickHouse does — a mock returning every column
+ * regardless can't catch a read that forgets to project one.
  */
 function createMockClient(payload: unknown) {
   const storedRow: Record<string, unknown> = {
@@ -163,10 +162,8 @@ describe("EventRepositoryClickHouse.getEventRecord", () => {
 
 /**
  * The three reads answer the same record through the same mapping, so a
- * column one of them forgets to project decodes as `undefined` rather than
- * failing. `getEventRecords` shipped without `EventVersion` for exactly that
- * reason, and a version-gated fold reading a rehydrated event saw no version
- * at all.
+ * forgotten column decodes as `undefined` rather than failing —
+ * `getEventRecords` shipped without `EventVersion` for exactly that reason.
  */
 describe("EventRepositoryClickHouse read projections", () => {
   const upToRequest = {

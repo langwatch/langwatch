@@ -13,22 +13,16 @@ export interface FoldCacheEntry<State> {
 }
 
 /**
- * How many event ids an entry carries.
- *
- * Redelivery re-dispatches the events of a single failed batch, so the set only
- * has to cover one batch to catch every duplicate. Sized to the fold coalesce
- * ceiling (`DEFAULT_FOLD_COALESCE_MAX_BATCH`) with headroom, and capped so a
- * long-lived aggregate cannot grow its entry without bound.
+ * How many event ids an entry carries. Redelivery re-dispatches a single
+ * failed batch, so the set only needs to cover one batch; sized to the fold
+ * coalesce ceiling with headroom, capped so a long-lived aggregate can't grow it unbounded.
  */
 export const MAX_APPLIED_EVENT_IDS = 1_000;
 
 /**
  * Reads an entry written by `encodeFoldCacheEntry`, or a bare state written
- * before durability gating existed.
- *
- * Legacy entries yield a null `updatedAt` and an empty applied-set, so a
- * redelivery against one is not suppressed — the same behaviour as before the
- * set existed. They age out with the cache TTL.
+ * before durability gating existed. Legacy entries yield a null `updatedAt`
+ * and an empty applied-set, so a redelivery against one is not suppressed.
  */
 export class FoldCacheEntryUnreadableError extends Error {
   override readonly name = "FoldCacheEntryUnreadableError";
@@ -44,12 +38,10 @@ export function decodeFoldCacheEntry<State>(raw: string): {
     parsed = JSON.parse(raw);
   } catch (err) {
     // V8 quotes the offending input back in the message, and a cached fold
-    // state is tenant data — trace IO, span attributes, computed input and
-    // output. That message would reach the queue's job-failure log AND the
-    // error span attribute, so it exports to the observability backend rather
-    // than merely sitting in a log file. `safeParseErrText` keeps the
-    // diagnosis and drops the echo; it exists because the envelope decode path
-    // leaked exactly this and took three attempts to close.
+    // state is tenant data that would reach the job-failure log and the error
+    // span attribute — exported to the observability backend, not just a log
+    // file. `safeParseErrText` keeps the diagnosis and drops the echo (the
+    // envelope decode path leaked exactly this, three attempts to close).
     throw new FoldCacheEntryUnreadableError(
       `Fold cache entry failed to parse: ${safeParseErrText(err)}`,
     );

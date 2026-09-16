@@ -46,8 +46,6 @@ let ttlFloorClampWarned = false;
 /**
  * Resolves the process-injected cache TTL, clamped up to the replication-lag
  * floor so an override can never silently drop below the correctness invariant.
- * An absent or invalid value falls back to the default (which already sits at
- * the floor).
  */
 function resolveFoldCacheTtlSeconds(configuredSeconds: number | undefined): number {
   const configured = configuredSeconds ?? DEFAULT_FOLD_CACHE_TTL_SECONDS;
@@ -102,9 +100,8 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
 
   /**
    * The state together with the ids already folded into it. A cache hit serves
-   * both from the entry. On a miss the read falls through to the durable store,
-   * which carries the applied-set too when it implements `getWithApplied` (so a
-   * cold-cache retry can still dedup) and an empty set otherwise.
+   * both; a miss falls through to the durable store, which carries the
+   * applied-set too when it implements `getWithApplied`.
    */
   async getWithApplied(
     aggregateId: string,
@@ -114,21 +111,15 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     appliedEventIds: string[];
     /**
      * Forwarded verbatim from the durable tier. DECLARED, not incidental: every
-     * ADR-066 adopter is wrapped by this store, so the executor's decision to
-     * skip a pointless unwindowed re-read on an `undecodable` row reaches it
-     * only through here. Left undeclared it survived purely because
-     * `readDurable` happens to return the inner object unchanged, and a routine
-     * refactor to `{ state, appliedEventIds }` would have silently disabled it.
+     * ADR-066 adopter depends on this field reaching the executor, and leaving
+     * it undeclared would silently disable that on a routine field refactor.
      */
     miss?: "absent" | "undecodable";
   }> {
     // The executor's read-window fallback re-reads moments after its windowed
     // attempt already consulted the cache — a second Redis read is a
-    // guaranteed miss that would double-count the cache and dedup metrics, so
-    // the retry goes straight to the durable tier. Deliberately NO
-    // dedup-unavailable accounting here: the windowed attempt already ran the
-    // full miss path (including that accounting) for this same delivery —
-    // counting again on the retry would double-count one logical read.
+    // guaranteed miss, so the retry goes straight to the durable tier without
+    // re-counting dedup-unavailable (the windowed attempt already did).
     if (context.bypassReadCache) {
       return this.readDurable(aggregateId, context);
     }
@@ -226,10 +217,9 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   }
 
   /**
-   * The durable read behind a cache miss. When the inner store persists the
-   * applied-event-id set next to its row (`getWithApplied`), that set comes back
-   * too, so a retry with a cold cache can still recognise a batch it committed;
-   * otherwise the set is empty and dedup falls back to blind re-apply.
+   * The durable read behind a cache miss. A store that persists the
+   * applied-event-id set (`getWithApplied`) lets a cold-cache retry still
+   * recognise a committed batch; otherwise dedup falls back to blind re-apply.
    */
   private async readDurable(
     aggregateId: string,
@@ -261,10 +251,9 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   }
 
   /**
-   * A cache write failure is logged, not thrown: the durable write above
-   * already succeeded, so the next read falls through to state that is
-   * genuinely there. What is lost is the read-your-writes window and the
-   * applied-set, so it is counted rather than swallowed silently.
+   * A cache write failure is logged, not thrown: the durable write already
+   * succeeded, so the next read falls through to state that is genuinely
+   * there. The loss (read-your-writes window, applied-set) is counted.
    */
   private async cache(
     state: State,

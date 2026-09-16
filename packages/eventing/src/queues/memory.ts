@@ -139,9 +139,8 @@ export class EventSourcedQueueProcessorMemory<
 
   /**
    * Squashes a send onto an existing pending job with the same deduplication
-   * ID, or clears a lapsed suppression/expired job so the send stages as
-   * genuinely new. Returns whether the send was squashed (the caller must
-   * not queue a new job).
+   * ID, or clears a lapsed suppression/expired job so the send stages as new.
+   * Returns whether the send was squashed (caller must not queue a new job).
    */
   private applyDeduplication({
     deduplicationId,
@@ -242,12 +241,9 @@ export class EventSourcedQueueProcessorMemory<
   }
 
   /**
-   * First job whose deadline has passed, keeping FIFO among the ready ones,
-   * plus when the earliest not-yet-due job becomes eligible.
-   *
-   * A job that is not due yet stays in the queue: waiting inside a worker slot
-   * would hold the slot for the whole delay and, on a queue shared by every
-   * handler in memory mode, starve everything behind it.
+   * First job whose deadline has passed, keeping FIFO among ready ones, plus
+   * when the earliest not-yet-due job becomes eligible. A not-yet-due job
+   * stays queued — holding a worker slot for the delay would starve everything behind it.
    */
   private findDueJob(now: number): {
     readyIndex: number;

@@ -29,11 +29,9 @@ type FleetReader = () => Promise<ProcessFleetMetricsRow[]>;
 let readFleet: FleetReader | null = null;
 
 /**
- * Collection-time cache: six gauges are observed within milliseconds of each
- * other on every export, and each must see the same read rather than issuing
- * six aggregate queries. In-flight reads are shared, and one read serves ten
- * seconds — including a failed attempt, so a database that is down is not
- * re-queried once per gauge. Freshness advances only after a successful read.
+ * Collection-time cache: six gauges observed within milliseconds of each
+ * other must see the same read rather than six aggregate queries. In-flight
+ * reads are shared; one read serves ten seconds, even a failed one.
  */
 let cached: {
   at: number;

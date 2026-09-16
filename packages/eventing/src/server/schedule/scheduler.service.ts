@@ -7,19 +7,14 @@ import type { ScheduledJobRecord, ScheduledJobStore } from "./scheduler.types.ts
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Best-effort cross-pod wake (ADR-044, user decision 2026-07-10). Postgres is
- * the sole correctness/locking layer; Redis pub/sub is a pure optimization so a
- * job created on one pod fires on every pod's loop *now* instead of within one
- * poll backstop. Fire-and-forget: a dropped publish or a down Redis costs only
- * latency (the poll still fires the job), never correctness.
+ * Best-effort cross-pod wake (ADR-044). Postgres is the correctness/locking
+ * layer; Redis pub/sub is a fire-and-forget latency optimization only.
  */
 const WAKE_CHANNEL = "scheduler:wake";
 
 /**
- * Safety-net backstop for the intelligent sleep: even when the next job is far
- * away, the loop re-polls at least this often so a job created on another pod
- * (which this loop's in-process `wake()` can't reach) is still picked up within
- * one backstop. ADR-044 §4: "60 s granularity is ample for calendar reports."
+ * Safety-net backstop: caps how long the loop sleeps even when idle, so a job
+ * created on another pod is still picked up. ADR-044 §4.
  */
 const DEFAULT_MAX_SLEEP_MS = 60_000;
 
@@ -42,11 +37,9 @@ const LOOP_ERROR_BACKOFF_MS = 1_000;
 const LEASE_MS = 10 * 60_000;
 
 /**
- * How many times a single slot is attempted before it is abandoned to the next
- * cron instant. Small so a persistently-broken target (dead Slack webhook,
- * deleted report) can't retry forever, but enough headroom to ride out a
- * transient provider/ClickHouse blip. The Nth failure abandons; the first N−1
- * retry.
+ * Attempts before a slot is abandoned to the next cron instant — small enough
+ * that a persistently-broken target can't retry forever, large enough to ride
+ * out a transient blip.
  */
 const MAX_ATTEMPTS = 5;
 
@@ -67,11 +60,9 @@ export interface SchedulerServiceDeps {
   /** Intelligent-sleep backstop (default 60s). */
   maxSleepMs?: number;
   /**
-   * Optional Redis for the best-effort cross-pod wake. When present, the loop
-   * subscribes to `scheduler:wake` and re-scans immediately on any published
-   * signal; producers call `SchedulerService.publishWake(redis)` on job
-   * create/edit. Omit it and the scheduler is 100% Postgres — correctness is
-   * identical, only cross-pod reaction latency changes (poll backstop).
+   * Optional Redis for the best-effort cross-pod wake. Omit it and the
+   * scheduler is 100% Postgres — correctness is identical, only cross-pod
+   * reaction latency changes.
    */
   redis?: SchedulerWakeRedis | null;
 }
@@ -108,10 +99,9 @@ export class SchedulerService {
   }
 
   /**
-   * Best-effort cross-pod wake producer: signal every pod's scheduler loop to
-   * re-scan now. Call after creating/editing a `ScheduledJob` (e.g. a report
-   * upsert). Fire-and-forget — a publish failure is swallowed because the poll
-   * backstop still fires the job.
+   * Best-effort cross-pod wake producer: signal every pod to re-scan now.
+   * Fire-and-forget — a publish failure is swallowed since the poll backstop
+   * still fires the job.
    */
   static publishWake(redis: SchedulerWakeRedis | null | undefined): void {
     if (!redis) return;
@@ -121,11 +111,9 @@ export class SchedulerService {
   }
 
   /**
-   * Producer wake: interrupt the current sleep so the loop re-scans NOW. In
-   * this Postgres-only phase it only reaches a loop in the SAME process (the
-   * dev single-process / undefined-role case); cross-process producers rely on
-   * the poll backstop until a Postgres LISTEN/NOTIFY wake lands. Safe to call
-   * whether or not the loop is currently sleeping.
+   * Producer wake: interrupt the current sleep so the loop re-scans NOW.
+   * Cross-process producers rely on the poll backstop until a Postgres
+   * LISTEN/NOTIFY wake lands. Safe to call whether or not sleeping.
    */
   wake(): void {
     this.wakeCurrentSleep?.();
@@ -154,11 +142,9 @@ export class SchedulerService {
   }
 
   /**
-   * Best-effort cross-pod wake consumer. A dedicated subscriber connection
-   * (subscriber mode blocks a connection, so it must be its own) pokes the
-   * in-process sleep whenever any pod publishes. All failures are swallowed —
-   * the poll backstop is the correctness floor, so Redis can be absent or flaky
-   * without affecting exactly-once firing.
+   * Best-effort cross-pod wake consumer on its own dedicated subscriber
+   * connection. All failures are swallowed — the poll backstop is the
+   * correctness floor regardless of Redis.
    */
   private subscribeToWake(): void {
     if (!this.redis) return;
@@ -338,12 +324,10 @@ export class SchedulerService {
       return;
     }
 
-    // ATOMIC LEASE. Only one worker's conditional UPDATE wins; every other
-    // worker sees a lost claim and skips. The winner pushes `nextRunAt` a lease
-    // window into the future WITHOUT advancing the calendar or `lastSlot`, so
-    // the slot is hidden from `findDue` for the handler run but is NOT yet
-    // marked delivered — a failure retries it, a crash re-fires it on lease
-    // expiry. This is the exactly-once guarantee for concurrent workers.
+    // ATOMIC LEASE: the conditional UPDATE only one worker's claim wins. The
+    // winner pushes `nextRunAt` past the lease window without marking
+    // delivered, so a failure retries and a crash re-fires on lease expiry —
+    // the exactly-once guarantee for concurrent workers.
     const leaseUntil = new Date(now.getTime() + LEASE_MS);
     const won = await this.repo.claim({
       id: job.id,
@@ -413,11 +397,9 @@ export class SchedulerService {
   }
 
   /**
-   * Retry policy for a thrown handler (ADR-044 "fire into a retrying path").
-   * Under the cap the SAME slot is retried after a bounded backoff (`lastSlot`
-   * left untouched, so it is not counted delivered). At the cap the slot is
-   * abandoned to the next cron instant so the schedule can't wedge — loud +
-   * captured so an abandoned slot is OBSERVABLE, never a silent zero-delivery.
+   * Retry policy for a thrown handler (ADR-044). Under the cap the same slot
+   * retries after a bounded backoff; at the cap it is abandoned to the next
+   * cron instant, logged loudly so it is observable rather than silent.
    */
   private async handleFireFailure({
     job,
@@ -496,11 +478,9 @@ export class SchedulerService {
   }
 
   /**
-   * Settle the lease this worker holds via the repo's conditional writer. A
-   * `false` return means the lease expired and another worker re-claimed the
-   * slot (handler outran LEASE_MS) — log it, since that worker will re-fire and
-   * our settle is void; correctness holds (at-least-once) but it is worth
-   * seeing.
+   * Settle the lease via the repo's conditional writer. A `false` return means
+   * the lease expired and another worker re-claimed the slot — correctness
+   * still holds (at-least-once), but it is worth logging.
    */
   private async settle({
     job,

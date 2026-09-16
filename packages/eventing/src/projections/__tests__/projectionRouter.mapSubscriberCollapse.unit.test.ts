@@ -58,9 +58,8 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
 
   /**
    * Drives one coalesced batch through the map queue's batch callback and
-   * returns the payloads the subscriber's queue received. Each event maps to a
-   * record naming it, so a payload's record identifies the event it was
-   * paired with.
+   * returns the payloads the subscriber's queue received. Each event maps to
+   * a record naming it, identifying which event it was paired with.
    */
   async function dispatchMapBatch(
     subscriber: SubscriberDispatchDefinition<Event>,

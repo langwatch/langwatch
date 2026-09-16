@@ -34,9 +34,7 @@ import type {
 
 /**
  * Emit replay-phase progress once per this many applied events (plus once at
- * each phase transition). Every emit fans out to the progress callback — which
- * the ops layer persists to Redis in multiple round trips — so per-event (or
- * per-aggregate) emits hammered Redis for no operator benefit.
+ * each phase transition), so per-event emits don't hammer Redis for no benefit.
  */
 const PROGRESS_EMIT_EVERY_EVENTS = 5000;
 
@@ -170,9 +168,8 @@ async function discoverTenantAggregates({
 
 /**
  * One discovery pass over the union of all selected event types, attaching to
- * each aggregate only the projections whose event types actually occur on it.
- * Without that filter, every aggregate would get cutoff/pending markers (and
- * completion requirements) for unrelated projections sharing no event types.
+ * each aggregate only the projections whose event types actually occur on it —
+ * otherwise every aggregate gets cutoff/pending markers for unrelated ones.
  */
 async function discoverAggregateProjections({
   ctx,
@@ -637,9 +634,8 @@ async function markPauseAndDrain({
 
 /**
  * Compute each tenant's occurred-at bounds and cutoffs (in parallel), record
- * cutoff markers for aggregates with events, and unmark the rest. Bounds
- * first so the cutoff and load queries prune event_log's weekly partitions;
- * see getAggregateOccurredAtBounds for the safety argument.
+ * cutoff markers for aggregates with events, and unmark the rest. Bounds first
+ * so the cutoff and load queries prune event_log's weekly partitions.
  */
 async function computeAndRecordCutoffs({
   ctx,
@@ -742,9 +738,8 @@ async function unpauseAll({
 
 /**
  * The paused section of a batch: mark → pause → drain → cutoff, unpausing in
- * a finally either way. This is the ONLY window in which the projections'
- * live queues are frozen — once the cutoff markers are recorded, the live
- * checker skips/defers the batch's aggregates on its own (ADR-015, amended).
+ * a finally either way. This is the ONLY window the projections' live queues
+ * are frozen (ADR-015, amended) — cutoff markers cover them afterward.
  */
 async function markDrainAndCutoff({
   ctx,
@@ -886,9 +881,8 @@ function makeOnEvent({
 
 /**
  * The unpaused replay section: stream every tenant's events (in parallel,
- * union-typed, cutoff-filtered) straight into one accumulator per projection,
- * then flush. The batch's aggregates stay protected by their cutoff markers,
- * not the pause.
+ * cutoff-filtered) into one accumulator per projection, then flush. The
+ * batch's aggregates stay protected by their cutoff markers, not the pause.
  */
 async function streamApplyAndWrite({
   ctx,
@@ -950,9 +944,8 @@ async function streamApplyAndWrite({
 
 /**
  * Terminal transition for a replayed batch: `done:` markers per projection
- * (not HDEL), each preserving its aggregate's cutoff boundary so a job staged
- * but never active during the pause is still skipped for events at/before the
- * cutoff, instead of double-writing. One pipeline for all projections.
+ * (not HDEL), each preserving its cutoff boundary so a job staged but never
+ * active during the pause is skipped rather than double-written.
  */
 async function recordBatchCompletion({
   ctx,

@@ -4,9 +4,8 @@ import { toEpochMs } from "@langwatch/time";
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must
- * cover — every aggregate with at least one of the given event types since
- * `since`, grouped per tenant. Takes the projection's `eventTypes` directly so
- * fold and map projections share it without casts.
+ * cover, grouped per tenant. Takes `eventTypes` directly so fold and map
+ * projections share it without casts.
  */
 export async function discoverProjectionAggregates({
   eventSource,
@@ -45,10 +44,8 @@ export async function discoverProjectionAggregates({
 
 /**
  * Restrict discovered aggregates to a caller-supplied `aggregateIds` allow-list
- * (single-/scoped-aggregate replay). Mutates `byTenant` in place to stay in
- * sync and returns the filtered `allAggregates`. A no-op when the list is
- * empty/absent (full replay). The optimized path applies the same filter
- * against its aggregate→projection map.
+ * (scoped replay). Mutates `byTenant` in place to stay in sync; a no-op when
+ * the list is empty/absent (full replay).
  */
 export function filterDiscoveredByAggregateIds({
   allAggregates,

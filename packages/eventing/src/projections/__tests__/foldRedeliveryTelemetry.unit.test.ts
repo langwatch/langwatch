@@ -57,9 +57,8 @@ describe("fold redelivery telemetry", () => {
   describe("given a retry whose applied-event-id set did not survive", () => {
     /**
      * getWithApplied answers with state but an empty applied-set — the cache
-     * entry was evicted between attempts. The executor cannot tell a redelivery
-     * from a fresh event, so it folds everything on top of state that already
-     * contains it.
+     * entry was evicted between attempts, so the executor can't tell a
+     * redelivery from a fresh event and folds on top of state that has it.
      */
     async function foldBlindRetry({
       batch,

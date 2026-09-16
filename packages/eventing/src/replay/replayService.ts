@@ -45,10 +45,9 @@ export class ReplayService {
     eventSource: ReplayEventSource;
     redis: ReplayRedis;
     /**
-     * Resolves per-tenant retention so replay-rebuilt rows honour the tenant's
-     * policy instead of the platform default. Optional — when absent, stores
-     * fall back to PLATFORM_DEFAULT_RETENTION_DAYS, matching pre-existing
-     * behaviour (and the NullReplayAdapter test path).
+     * Resolves per-tenant retention so replay-rebuilt rows honour the
+     * tenant's policy. Optional — absent, stores fall back to the platform
+     * default, matching pre-existing behaviour.
      */
     retentionPolicyResolver?: RetentionPolicyResolver;
   }) {
@@ -165,11 +164,9 @@ export class ReplayService {
   }
 
   /**
-   * Drop the projection's replay markers: the completed set and the in-flight
-   * cutoff hash. Every replay path already does this when it finishes cleanly;
-   * calling it before a run turns that run into a rebuild from scratch, since
-   * the completed set is what makes discovery skip aggregates an earlier
-   * (possibly aborted) run had finished.
+   * Drop the projection's replay markers: the completed set and in-flight
+   * cutoff hash. Calling it before a run forces a rebuild from scratch, since
+   * the completed set is what makes discovery skip already-finished aggregates.
    */
   async cleanup(projectionName: string): Promise<void> {
     await cleanupAll({ redis: this.ctx.redis, projectionName });

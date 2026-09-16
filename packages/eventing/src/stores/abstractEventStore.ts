@@ -31,12 +31,9 @@ export abstract class AbstractEventStore<
   // ---------------------------------------------------------------------------
 
   /**
-   * Transforms events before deduplication.
-   * Called after recordToEvent mapping, before deduplicateEvents.
-   * Default: identity (returns events as-is).
-   * Memory override: sort by timestamp + deep clone.
-   *
-   * Sorting before dedup ensures the earliest event is kept when duplicates exist.
+   * Transforms events before deduplication (after recordToEvent mapping).
+   * Default: identity. Memory override sorts by timestamp + deep clones, so
+   * dedup keeps the earliest of any duplicates.
    */
   protected postProcessEvents(events: EventType[]): EventType[] {
     return events;
@@ -277,11 +274,9 @@ export abstract class AbstractEventStore<
             upToTimestamp: upToEvent.createdAt,
             upToEventId: upToEvent.id,
             // Anchor on the triggering event's own occurred time. For a
-            // time-local aggregate every sibling event falls inside the
-            // aggregate's lifetime — seconds to hours — so a 45-day window
-            // around the anchor cannot exclude one. `rehydrationLowerBoundMs`
-            // returns undefined for long-lived types and for a missing anchor,
-            // leaving those reads unbounded exactly as before.
+            // time-local aggregate every sibling event falls inside its
+            // lifetime, so a 45-day window can't exclude one.
+            // `rehydrationLowerBoundMs` returns undefined for long-lived types.
             occurredAtFromMs: rehydrationLowerBoundMs(aggregateType, upToEvent.occurredAt),
           });
 
@@ -382,13 +377,10 @@ export abstract class AbstractEventStore<
           const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
 
           // Do NOT dedup here: `deduplicateEvents` can drop the raw page's
-          // last row (a retry sharing an idempotencyKey with an earlier row
-          // in the same page), which would both feed a stale cursor to the
-          // caller (re-reading the same range forever) and make a full page
-          // look short, i.e. mistaken for exhaustion, silently truncating the
-          // re-fold. The caller's cross-page `seen` set (idempotencyKey ??
-          // id) reproduces the same dedup effect without touching the raw
-          // page length or its last row.
+          // last row (a retry sharing an idempotencyKey with an earlier row),
+          // which would feed a stale cursor (re-reading forever) and make a
+          // full page look short — mistaken for exhaustion. The caller's
+          // cross-page `seen` set reproduces the same effect safely.
           return this.postProcessEvents(events);
         } catch (error) {
           this.logError(

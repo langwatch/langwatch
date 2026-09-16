@@ -105,10 +105,9 @@ function mapEventLogRows({
 }
 
 /**
- * ClickHouse implementation of EventRepository.
- * Handles raw data access to ClickHouse without business logic.
- *
- * Schema in /server/clickhouse/migrations/00002_create_event_log.sql
+ * ClickHouse implementation of EventRepository: raw data access without
+ * business logic. Schema in
+ * /server/clickhouse/migrations/00002_create_event_log.sql.
  */
 export class EventingClickHouseEventRepository implements EventRepository {
   private readonly logger = createLogger("langwatch:trace-processing:event-repository:clickhouse");
@@ -177,12 +176,10 @@ export class EventingClickHouseEventRepository implements EventRepository {
     try {
       const client = await this.getClient(tenantId);
       // When a lower bound is supplied, add a predicate on EventOccurredAt so
-      // ClickHouse can prune the weekly partitions older than the bound instead
-      // of cold-scanning every partition on S3. Rows with an unknown occurred
-      // time (EventOccurredAt = 0) are always kept so the bound can never drop
-      // an event. EventOccurredAt is UInt64 milliseconds; the table is
-      // PARTITION BY toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)), which
-      // is monotonic in EventOccurredAt so the predicate prunes partitions.
+      // ClickHouse can prune weekly partitions older than the bound instead of
+      // cold-scanning S3. Rows with unknown occurred time (0) are always kept
+      // so the bound can never drop an event; the partition key is monotonic
+      // in EventOccurredAt so the predicate actually prunes.
       const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
       const occurredAtFilter = hasLowerBound
         ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
@@ -294,11 +291,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }
 
   /**
-   * Cursor-paginated `getEventRecordsUpTo`. Same (upToTimestamp, upToEventId)
-   * upper bound and (EventTimestamp ASC, EventId ASC) order, plus a strict
-   * `after` cursor and a `LIMIT`, so a re-fold of a huge aggregate streams the
-   * history a page at a time instead of materialising every EventPayload blob
-   * at once (which would exceed max_memory_usage_per_query and OOM the server).
+   * Cursor-paginated `getEventRecordsUpTo`. Same upper bound and order, plus a
+   * strict `after` cursor and `LIMIT`, so a re-fold of a huge aggregate streams
+   * history a page at a time instead of OOMing on every EventPayload blob at once.
    */
   async getEventRecordsUpToPaged(request: {
     tenantId: string;

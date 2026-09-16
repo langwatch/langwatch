@@ -90,12 +90,9 @@ export interface MapProjectionOptions<E extends Event = Event> {
 }
 
 /**
- * Tenant-scoped context for bulk appends.
- *
- * Unlike the per-event {@link ProjectionStoreContext}, a bulk write batches
- * records from MANY aggregates of one tenant into a single insert, so there is
- * deliberately no `aggregateId` here — anything a store needs per row must be
- * carried on the record itself.
+ * Tenant-scoped context for bulk appends. Unlike the per-event
+ * {@link ProjectionStoreContext}, a bulk write batches MANY aggregates into
+ * one insert, so there is deliberately no `aggregateId` — carry it on the record.
  */
 export interface BulkAppendContext {
   /** Tenant identifier for multi-tenant isolation (e.g. CH client routing). */
@@ -103,9 +100,8 @@ export interface BulkAppendContext {
 
   /**
    * Resolved retention policy for the tenant. Absent/null means the resolver
-   * could not produce a value; the write path then stamps
-   * PLATFORM_DEFAULT_RETENTION_DAYS, never indefinite — see
-   * {@link ProjectionStoreContext.retentionPolicy}.
+   * could not produce a value; the write path then stamps the platform
+   * default, never indefinite.
    */
   retentionPolicy?: RetentionPolicy | null;
 }

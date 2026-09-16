@@ -10,10 +10,9 @@ export interface ProjectionCursor {
 }
 
 /**
- * A rebuildable operational projection row and its event cursor.
- *
- * These timestamps describe the projected entity, not when Postgres happened
- * to execute the write. That keeps a replay deterministic.
+ * A rebuildable operational projection row and its event cursor. These
+ * timestamps describe the projected entity, not when Postgres executed the
+ * write — that keeps a replay deterministic.
  */
 export interface StoredProjection<State> {
   state: State;
@@ -46,10 +45,8 @@ export interface StateProjectionOptions {
 
 /**
  * The operational projection registered by `.withPostgresProjection()`.
- *
- * It is mechanically a fold, but deliberately has a narrower contract than a
- * ClickHouse fold: direct store load/apply/store, no event-log recovery read,
- * no Redis cache hook, and no projection-attached subscriber or outbox.
+ * Mechanically a fold, but with a narrower contract than a ClickHouse fold:
+ * direct store load/apply/store, no event-log recovery, no Redis cache hook.
  */
 export interface StateProjectionDefinition<State, E extends Event = Event> {
   name: string;

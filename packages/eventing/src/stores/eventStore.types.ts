@@ -47,10 +47,9 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    */
   deliveryAttempt?: number;
   /**
-   * True when this call is a later sub-batch of the same locked dispatch and an
-   * earlier sub-batch already committed (GroupQueue batch bisection). A fold
-   * commit must EXTEND the applied-event-id set rather than replace it, or the
-   * earlier sub-batches' ids are erased and a retry re-applies them (#6578).
+   * True when this is a later sub-batch of the same locked dispatch, an
+   * earlier one already committed (GroupQueue bisection). A fold commit must
+   * EXTEND the applied-event-id set, not replace it, or a retry re-applies ids (#6578).
    */
   isDeliveryContinuation?: boolean;
 }
@@ -68,12 +67,9 @@ export interface EventStoreEventReadInput {
  */
 export interface ReadOnlyEventStore<EventType extends Event = Event> {
   /**
-   * Reads one immutable event inside a tenant-bound aggregate stream.
-   *
-   * The stream boundary is mandatory even though event identifiers are
-   * immutable. A missing event and a mismatched tenant or stream both fail as
-   * not found, so this method cannot be used to enumerate another tenant's
-   * event log.
+   * Reads one immutable event inside a tenant-bound aggregate stream. The
+   * stream boundary is mandatory: a missing event and a mismatched tenant or
+   * stream both fail as not found, so this can't enumerate another tenant's log.
    */
   getEvent(input: EventStoreEventReadInput): Promise<EventType>;
 

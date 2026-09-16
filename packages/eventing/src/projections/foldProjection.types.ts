@@ -43,12 +43,9 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   LastEventOccurredAtKey: string;
 
   /**
-   * Loads all events for an aggregate, sorted by occurredAt ASC.
-   * Used by the executor to re-fold from scratch when out-of-order events are detected.
-   *
-   * Auto-wired by EventSourcingService at registration time — projections don't
-   * need to provide this themselves. Optional at the type level because it's set
-   * after construction, but always present at runtime.
+   * Loads all events for an aggregate, sorted by occurredAt ASC, to re-fold
+   * from scratch on out-of-order events. Auto-wired by EventSourcingService;
+   * optional at the type level only because it's set after construction.
    */
   eventLoader?: (context: {
     tenantId: string;

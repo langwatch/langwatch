@@ -13,19 +13,15 @@ import type { EventingRetentionConfiguration } from "../../retention.ts";
 
 /**
  * The sentinel {@link EventLogRetentionClassifier} returns for a row that must
- * never expire (durable identity/authorization/SSO/SCIM history, virtual-key
- * lifecycle events). Any other return value is read as a key into the
- * tenant's resolved {@link RetentionPolicyResolver} policy.
+ * never expire (durable identity/auth/SSO/SCIM history, virtual-key lifecycle
+ * events). Any other value is a key into the tenant's resolved policy.
  */
 export const EVENT_LOG_INDEFINITE_RETENTION_CLASS = "indefinite";
 
 /**
  * Classifies one `event_log` row for retention: a key into the tenant's
- * resolved policy, or {@link EVENT_LOG_INDEFINITE_RETENTION_CLASS}. A plain
- * function type, not an import of the concrete classifier: this package may
- * not name a product-feature module (`eventing-boundary.unit.test.ts`), so
- * the host composition root supplies the real implementation when it wires
- * this store. Omitted, every row is stamped from `"traces"`, unchanged.
+ * policy, or {@link EVENT_LOG_INDEFINITE_RETENTION_CLASS}. Kept as a plain
+ * function type since this package may not import a product-feature module.
  */
 export type EventLogRetentionClassifier = (row: {
   AggregateType: string;
@@ -33,12 +29,9 @@ export type EventLogRetentionClassifier = (row: {
 }) => string;
 
 /**
- * ClickHouse-backed EventStore with OpenTelemetry instrumentation and structured logging.
- *
- * Extends {@link AbstractEventStore} with:
- * - `instrument()`: wraps operations in OpenTelemetry spans
- * - `logError()`: structured error logging via pino
- * - `onStoreSuccess()`: logs successful writes with tenant/count details
+ * ClickHouse-backed EventStore with OpenTelemetry instrumentation and
+ * structured logging: wraps operations in spans, logs errors via pino, and
+ * logs successful writes with tenant/count details.
  */
 export class EventingClickHouseEventStore<
   EventType extends Event = Event,
@@ -116,14 +109,11 @@ export class EventingClickHouseEventStore<
     // no-op: removed verbose per-store logging
   }
 
-  // event_log is not one category: when a classifier is wired, durable
-  // authentication, authorization, SSO and SCIM history (and virtual-key
-  // lifecycle events) never expire, and everything else ages with the
-  // customer category its own aggregate belongs to. Without one, every row
-  // is stamped from "traces", same as before this seam existed. Resolved
-  // once per batch from the tenant policy and stamped per record. Retention
-  // is default-on: a tenant with no override uses the process-injected
-  // default, rather than the column migration default.
+  // event_log is not one category: with a classifier wired, durable auth/SSO/
+  // SCIM/virtual-key history never expires; everything else ages with its
+  // aggregate's customer category. Without one, every row stamps "traces" as
+  // before. Retention is default-on: no override uses the process-injected
+  // default, not the column migration default.
   protected override async enrichRecordsForStorage(
     records: EventRecord[],
     context: EventStoreReadContext<EventType>,

@@ -58,10 +58,9 @@ export interface EventSourcingOptions {
   warnWhenProjectionsRunInline?: boolean;
   configureGlobalProjections?: (registry: ProjectionRegistry<Event>) => void;
   /**
-   * Durable persistence for `withProcess` declarations (inbox, state,
-   * outbox, leases, and wakes. Required when registering a pipeline with a
-   * process manager. Tests and local tools may explicitly inject an
-   * InMemoryProcessStore.
+   * Durable persistence for `withProcess` declarations (inbox, state, outbox,
+   * leases, wakes). Required when registering a pipeline with a process
+   * manager; tests/local tools may inject an InMemoryProcessStore.
    */
   processStore?: ProcessStore;
   /**
@@ -238,8 +237,7 @@ export class EventSourcing {
 
   /**
    * Both sides of a same-name collision, described well enough to say which
-   * composition to delete. The two definitions differ - if they did not there
-   * would be no second registrant - and the difference is precisely the
+   * composition to delete — the difference between them is precisely the
    * capability whichever one lost would have taken with it.
    */
   private describeDuplicateRegistration(incoming: StaticPipelineDefinition<any, any, any>): string {
@@ -474,12 +472,9 @@ export class EventSourcing {
   }
 
   /**
-   * Strips routing metadata and looks up the registry entry for a job payload.
-   * Returns null when this worker has no handler for the job's routing key.
-   *
-   * Resolution runs several times per job (group key, score, span attributes,
-   * then processing), so a miss logs at debug here and the processing path
-   * raises it once, loudly, through `rejectUnroutableJob`.
+   * Strips routing metadata and looks up the registry entry for a job payload,
+   * returning null on no handler. Resolution runs several times per job, so a
+   * miss logs at debug here; the processing path raises it once, loudly.
    */
   private lookupEntry(
     payload: Record<string, unknown>,
@@ -504,11 +499,9 @@ export class EventSourcing {
   }
 
   /**
-   * The identifying fields of a job payload, for a log line that has to name
-   * WHICH record is at risk. Commands carry their aggregate id under the
-   * pipeline's own key, events carry the framework's. Take whichever is
-   * present and nothing else, because the rest of the payload is business
-   * data and can hold an end user's identity.
+   * The identifying fields of a job payload, for a log line naming WHICH
+   * record is at risk. Take whichever key is present (command or event) and
+   * nothing else — the rest of the payload is business data.
    */
   private static jobIdentity(payload: Record<string, unknown>): {
     pipelineName: string | null;

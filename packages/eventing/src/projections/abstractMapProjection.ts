@@ -18,12 +18,9 @@ type MapHandlerName<EventTypeStr extends string> =
   `map${DotSnakeToPascal<StripPrefix<EventTypeStr>>}`;
 
 /**
- * Derives required map handler methods from an array of Zod event schemas.
- *
- * Given a schema for event type `"lw.obs.trace.log_record_received"`, produces:
- * ```
- * { mapObsTraceLogRecordReceived(event: LogRecordReceivedEvent): Record | null }
- * ```
+ * Derives required map handler methods from an array of Zod event schemas,
+ * e.g. `"lw.obs.trace.log_record_received"` produces
+ * `mapObsTraceLogRecordReceived(event): Record | null`.
  */
 export type MapEventHandlers<
   Schemas extends readonly AnyEventSchema[],

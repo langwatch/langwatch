@@ -43,11 +43,9 @@ export interface ProcessCommandParams<EventType extends Event> {
 }
 
 /**
- * Validates that a command handler returned a defined array of well-formed
- * events, throwing a {@link ValidationError} otherwise.
- *
- * Extracted so {@link processCommand} and {@link processCommandBatch} reject
- * identical malformed handler output rather than each carrying its own copy.
+ * Validates a command handler's events are a well-formed array, throwing
+ * {@link ValidationError} otherwise. Shared by {@link processCommand} and
+ * {@link processCommandBatch} so they reject malformed output identically.
  */
 function validateHandlerEvents(events: unknown, commandType: CommandType): void {
   if (!events) {
@@ -104,10 +102,9 @@ function validateHandlerEvents(events: unknown, commandType: CommandType): void 
 }
 
 /**
- * Processes a command: validates the payload, invokes the handler,
- * validates resulting events, and stores them.
- *
- * Extracted from createCommandDispatcher to allow reuse in shared command queues.
+ * Processes a command: validates the payload, invokes the handler, validates
+ * resulting events, and stores them. Extracted for reuse in shared command
+ * queues.
  */
 export async function processCommand<EventType extends Event>(
   params: ProcessCommandParams<EventType>,
@@ -248,10 +245,9 @@ function validateBatchPayloads<EventType extends Event>(
 }
 
 /**
- * Resolve the single tenant for the batch, enforcing the defensive invariant
- * that a coalesced batch comes from ONE tenant-scoped group. A mismatch is an
- * upstream routing bug — fail loudly rather than write cross-tenant events
- * under one tenant's insert.
+ * Resolve the single tenant for the batch, enforcing that a coalesced batch
+ * comes from ONE tenant-scoped group. A mismatch is an upstream routing bug —
+ * fail loudly rather than write cross-tenant events under one insert.
  */
 function resolveBatchTenantId(args: {
   validatedPayloads: any[];
@@ -311,11 +307,9 @@ async function handleBatchCommands<EventType extends Event>(args: {
     const command = createCommand(payloadTenantId, aggregateId, commandType, validated);
     const events = await handler.handle(command);
     validateHandlerEvents(events, commandType);
-    // Only a command that contributed events is "handled" for cleanup
-    // purposes, mirroring the single path's `if (events.length > 0)` gate. A
-    // handler may legitimately return nothing — RecordMetricCorrelationCommand
-    // drops a malformed exemplar that way — and running its post-store cleanup
-    // off the back of some OTHER payload's successful append would release a
+    // Only a command that contributed events is "handled" for cleanup,
+    // mirroring the single path's `if (events.length > 0)` gate — running
+    // cleanup off some OTHER payload's successful append would release a
     // resource for a command that never became durable.
     if (events.length === 0) {
       continue;
@@ -331,9 +325,8 @@ async function handleBatchCommands<EventType extends Event>(args: {
 
 /**
  * Persist the batch in ONE multi-row append, then run each handled command's
- * best-effort post-store cleanup (ADR-022). An empty event set skips the store.
- * A cleanup failure is logged and swallowed — it must never roll back durable
- * events.
+ * best-effort post-store cleanup (ADR-022). A cleanup failure is logged and
+ * swallowed — it must never roll back durable events.
  */
 async function persistBatch<EventType extends Event>(args: {
   params: ProcessCommandBatchParams<EventType>;
@@ -367,10 +360,9 @@ async function persistBatch<EventType extends Event>(args: {
 }
 
 /**
- * Emit one counter increment and one duration sample per attempted command,
- * keeping counter and histogram 1:1 with the single path. The whole-batch time
- * is amortised across attempts so each sample carries a per-command time rather
- * than N-commands of it.
+ * Emit one counter increment and one duration sample per attempted command.
+ * The whole-batch time is amortised across attempts so each sample carries a
+ * per-command time rather than N-commands of it.
  */
 function emitBatchMetrics<EventType extends Event>(args: {
   params: ProcessCommandBatchParams<EventType>;

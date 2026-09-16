@@ -27,9 +27,7 @@ import { ProjectionRouter } from "../projectionRouter.ts";
 /**
  * A subscriber's `makeJobId` is its collapse key: the queue dedups on it, so N
  * sends carrying one job id leave exactly one job behind. These pin the router
- * to reaching that same queue state without paying N serialize+gzip+blob
- * round-trips per drained batch (2026-07-09 incident; see
- * specs/trace-processing/hot-trace-fold-amplification.feature).
+ * to that queue state (2026-07-09 incident; see hot-trace-fold-amplification.feature).
  */
 describe("ProjectionRouter subscriber dispatch over a coalesced batch", () => {
   const tenantId = createTestTenantId();

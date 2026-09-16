@@ -1,11 +1,8 @@
 import { z } from "zod";
 
 /**
- * Command type format: `<provenance>.<domain>.<aggregate-type>.<command-name>`
- * Example: "lw.obs.trace.record_span"
- */
-/**
- * Wire boundary schema for command types.
+ * Command type format: `<provenance>.<domain>.<aggregate-type>.<command-name>`,
+ * e.g. "lw.obs.trace.record_span". Wire boundary schema for command types.
  */
 export const CommandTypeSchema = z.string().trim().min(1);
 

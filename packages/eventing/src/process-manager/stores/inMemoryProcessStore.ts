@@ -21,10 +21,8 @@ interface StoredMessage extends OutboxMessageRecord {
   dispatchedAt: number | null;
   /**
    * Epoch ms of the last write to this row, mirroring the durable store's
-   * `updatedAt` column. The dead-row sweep reaps by this and not by
-   * `nextAttemptAt`: that one is retry scheduling and on a dead row still
-   * carries the backoff the last attempt computed, which can sit arbitrarily
-   * far from the moment the row was actually retired.
+   * `updatedAt` column. The dead-row sweep reaps by this, not `nextAttemptAt`
+   * — that one still carries retry backoff, unrelated to when it was retired.
    */
   updatedAt: number;
 }
@@ -63,10 +61,9 @@ function isRequeueTarget(
 }
 
 /**
- * In-memory ProcessStore for unit tests. Each call is
- * synchronous under the hood, so every `commit` is trivially atomic — the
- * same all-or-nothing contract the Postgres implementation must provide in
- * one transaction.
+ * In-memory ProcessStore for unit tests. Each call is synchronous under the
+ * hood, so every `commit` is trivially atomic — the same all-or-nothing
+ * contract the Postgres implementation must provide in one transaction.
  */
 export class InMemoryProcessStore implements ProcessStore {
   private readonly instances = new Map<string, PersistedProcessInstance>();
@@ -334,10 +331,9 @@ export class InMemoryProcessStore implements ProcessStore {
   }
 
   /**
-   * Every outbox deletion goes through here, so the attempt rows leave with
-   * their message on all of them — the durable store cascades, and a fake
-   * that shed them on only one path would model a leak the real one does not
-   * have.
+   * Every outbox deletion goes through here, so attempt rows leave with their
+   * message on every path — the durable store cascades, and a fake that shed
+   * them on only one path would model a leak the real one does not have.
    */
   private deleteMessage(key: string): void {
     this.messages.delete(key);

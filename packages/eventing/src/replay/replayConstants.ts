@@ -15,10 +15,9 @@ export const MARKER_TTL_SECONDS = 7 * 24 * 3600;
 export const DONE_KEY_PREFIX = "projection-replay:done:";
 
 /**
- * TTL for terminal done markers. Long enough to cover a job that was staged
- * (queued but never active) during a batch's replay pause and only drains after
- * unpause; short enough that done-marker memory stays bounded to roughly
- * (replay throughput × this window) rather than the whole run's aggregate count.
+ * TTL for terminal done markers. Long enough to cover a job staged (queued but
+ * never active) during a batch's pause; short enough that memory stays
+ * bounded to roughly (replay throughput × this window).
  */
 export const DONE_MARKER_TTL_SECONDS = 15 * 60;
 
@@ -28,10 +27,9 @@ export function doneMarkerKey(projectionName: string, aggregateKey: string): str
 }
 
 /**
- * Compares an event against a cutoff using the same ordering as ClickHouse:
- * `EventTimestamp ASC, EventId ASC`.
- *
- * Returns true if the event is at or before the cutoff (replay handles it).
+ * Compares an event against a cutoff using the same ordering as ClickHouse
+ * (`EventTimestamp ASC, EventId ASC`). Returns true when the event is at or
+ * before the cutoff (replay handles it).
  */
 export function isAtOrBeforeCutoff(
   eventTimestamp: number,
@@ -46,9 +44,8 @@ export function isAtOrBeforeCutoff(
 
 /**
  * Parses a cutoff marker string (`{timestamp}:{eventId}`) and compares
- * against an event. Returns true if the event is at or before the cutoff.
- *
- * Returns false for malformed markers (missing colon).
+ * against an event, returning true if at or before the cutoff, false for a
+ * malformed marker.
  */
 export function isAtOrBeforeCutoffMarker(
   eventTimestamp: number,

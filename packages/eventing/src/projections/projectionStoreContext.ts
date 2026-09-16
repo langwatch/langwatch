@@ -37,10 +37,9 @@ export interface ProjectionStoreContext {
   key?: string;
 
   /**
-   * occurredAt (ms) of the event currently being processed, when known. It is
-   * purely informational — a store that wants its backing read time-bounded
-   * should rely on `readWindow` (declared on the fold definition) rather than
-   * deriving a window of its own from this value.
+   * occurredAt (ms) of the event currently being processed, when known —
+   * purely informational. A store wanting its read time-bounded should rely
+   * on `readWindow` instead of deriving one from this value.
    */
   occurredAtMs?: number;
 
@@ -58,10 +57,8 @@ export interface ProjectionStoreContext {
 
   /**
    * Resolved retention policy for the tenant. Absent/null means the resolver
-   * could not produce a value (no resolver wired, or project unresolvable); the
-   * write path then stamps PLATFORM_DEFAULT_RETENTION_DAYS, NOT indefinite —
-   * retention is default-on, so a missing policy must never leave rows
-   * unbounded.
+   * could not produce a value; the write path then stamps the platform
+   * default, NOT indefinite — retention is default-on, never unbounded.
    */
   retentionPolicy?: RetentionPolicy | null;
 

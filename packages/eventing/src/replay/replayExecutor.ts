@@ -22,11 +22,8 @@ export type ReplayRetentionResolver = (tenantId: string) => Promise<RetentionPol
 
 /**
  * Wrap a {@link RetentionPolicyResolver} in a per-instance, promise-caching
- * lookup so each tenant is resolved at most once per accumulator — deduping
- * concurrent `apply` calls (optimized replay runs aggregates in parallel) and
- * avoiding a resolver round-trip per event. Returns `null` when no resolver is
- * wired; the store then stamps PLATFORM_DEFAULT_RETENTION_DAYS (never
- * indefinite), matching the live dispatch fallback.
+ * lookup so each tenant resolves at most once per accumulator. Returns `null`
+ * absent a resolver; the store then stamps the platform default, never indefinite.
  */
 function makeRetentionResolver(resolver?: RetentionPolicyResolver): ReplayRetentionResolver {
   const cache = new Map<string, Promise<RetentionPolicy | null>>();
@@ -51,11 +48,8 @@ function tenantScopedKey(tenantId: string, projectionKey: string): string {
 
 /**
  * Accumulates fold state incrementally as events are fed in one at a time.
- *
- * Memory is bounded by the number of unique (tenantId, projectionKey) pairs
- * (i.e. the aggregateBatchSize), NOT by the total number of events.
- * Events are applied immediately and can be GC'd — only the fold states
- * remain in memory.
+ * Memory is bounded by the number of unique (tenantId, projectionKey) pairs,
+ * NOT by the total number of events — events are applied and GC'd immediately.
  */
 export class FoldAccumulator {
   private keyStates = new Map<string, any>();
@@ -80,11 +74,9 @@ export class FoldAccumulator {
 
   apply(event: ReplayEvent): void {
     // The replay engine loads events for the union of all selected
-    // projections' event types (one CH query per tenant per batch), so each
-    // accumulator must drop events its projection doesn't accept. Without
-    // this guard, a fold projection co-discovered with another projection
-    // through a different event type would be fed events of types it never
-    // declared and `apply()` would corrupt or crash.
+    // projections' event types, so each accumulator must drop events its own
+    // projection doesn't accept — otherwise apply() gets fed types it never
+    // declared and corrupts or crashes.
     if (!this.eventTypeSet.has(event.type)) return;
 
     const projectionKey = this.projection.key?.(event) ?? event.aggregateId;
@@ -213,9 +205,8 @@ export class MapAccumulator {
 
   /**
    * Drain when the buffer has reached `writeBatchSize`; a no-op (returning
-   * undefined, never a promise) otherwise. The streaming driver calls this
-   * after each `apply` so the hot loop only awaits when a write is actually
-   * due.
+   * undefined, never a promise) otherwise, so the hot loop only awaits when a
+   * write is actually due.
    */
   drainIfNeeded(): Promise<void> | undefined {
     if (this.bufferedCount < this.writeBatchSize) return undefined;
@@ -244,12 +235,10 @@ export class MapAccumulator {
       const retentionPolicy = await this.resolveRetention(tenantId);
 
       if (store.bulkAppend) {
-        // One bulk write per TENANT chunk — never per aggregate. For
-        // spanStorage-style projections the aggregate is a single trace, so
-        // per-aggregate grouping degenerated into one awaited ClickHouse
-        // INSERT per trace (~200ms each, sequential) and dominated replay
-        // time. `bulkAppend` takes a tenant-scoped BulkAppendContext; records
-        // carry everything stores need per row.
+        // One bulk write per TENANT chunk — never per aggregate. Per-aggregate
+        // grouping degenerated into one awaited ClickHouse INSERT per trace
+        // (~200ms each, sequential) for spanStorage-style projections and
+        // dominated replay time.
         const context: BulkAppendContext = {
           tenantId: tenantId as TenantId,
           retentionPolicy,

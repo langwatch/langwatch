@@ -18,20 +18,15 @@ export interface EventRecord {
 }
 
 /**
- * Repository interface for event data access.
- * Handles raw CRUD operations without business logic.
- *
- * **Pure Data Access**: This interface only handles raw read/write operations.
- * All business logic (validation, transformation, deduplication) must be
- * handled by the store layer that uses this repository.
+ * Repository interface for event data access: raw CRUD operations without
+ * business logic. Validation, transformation and deduplication belong to the
+ * store layer that uses this repository.
  */
 export interface EventRepository {
   /**
    * Reads one durable event inside its tenant-bound aggregate stream.
-   *
-   * `event_log` event identifiers are immutable, but the complete stream key
-   * is still required: callers must never turn an event id into a cross-tenant
-   * lookup or an unbounded scan.
+   * `event_log` event ids are immutable, but the full stream key is still
+   * required — never turn an event id into a cross-tenant lookup or an unbounded scan.
    */
   getEventRecord(request: {
     tenantId: string;

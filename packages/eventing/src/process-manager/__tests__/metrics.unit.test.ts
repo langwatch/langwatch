@@ -50,9 +50,8 @@ describe("process-manager fleet gauges", () => {
 
     /**
      * Every one of these is a GLOBAL count observed by each pod, so an alert
-     * that sums across pods reads the fleet as many times over. The warning
-     * rides the metric's own description, where whoever writes the alert will
-     * be looking.
+     * that sums across pods reads the fleet many times over — the warning
+     * rides the metric's own description, where an alert author will look.
      */
     it("carries the max()-not-sum() warning on the metric itself", () => {
       expect(metrics.descriptionOf("pm_outbox_dead")).toMatch(

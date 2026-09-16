@@ -109,11 +109,9 @@ export interface TestEvent extends Event<{ result: string }> {
 }
 
 /**
- * Creates a test command handler class with configurable properties.
- *
- * Note: Configuration options like delay, concurrency, and deduplication should be
- * provided via registration options (e.g., `.withCommand("name", Handler, { delay: 1000 })`),
- * not as static class properties.
+ * Creates a test command handler class with configurable properties. Options
+ * like delay and deduplication belong in registration (`.withCommand`), not
+ * static class properties.
  */
 export function createTestCommandHandlerClass<
   Payload extends TestCommandPayload = TestCommandPayload,

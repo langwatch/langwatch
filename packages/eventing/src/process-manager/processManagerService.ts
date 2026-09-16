@@ -38,10 +38,9 @@ export type HandleResult =
   | { outcome: "revisionConflict"; actualRevision: number };
 
 /**
- * Result of a synchronous external signal. Both successful variants include
- * a durable state: `committed` is the revision this call wrote, while
- * `duplicateSignal` is the state observed after an earlier call with the same
- * signal identity committed.
+ * Result of a synchronous external signal. Both successful variants include a
+ * durable state: `committed` is the revision this call wrote, `duplicateSignal`
+ * the state observed after an earlier call with the same identity committed.
  */
 export type SignalHandleResult<State> =
   | {
@@ -271,8 +270,6 @@ export class ProcessManagerService<State> {
   /**
    * The body of `handleSignal`'s evolve span: retries a signal against the
    * winning revision on CAS loss, up to `signalRevisionRetries` times.
-   * Extracted so its branching is counted on its own rather than folded into
-   * `handleSignal`'s complexity.
    */
   private async runSignalRetryLoop({
     ref,
@@ -309,9 +306,8 @@ export class ProcessManagerService<State> {
 
   /**
    * One iteration of `runSignalRetryLoop`: read, evolve, commit, and resolve
-   * the outcome — or signal that the caller should retry against the
-   * revision that won. Extracted so its branching is counted on its own
-   * rather than folded into the loop's complexity.
+   * the outcome — or signal that the caller should retry against the revision
+   * that won.
    */
   private async attemptSignalCommit({
     ref,
@@ -396,9 +392,8 @@ export class ProcessManagerService<State> {
 
   /**
    * Whether this evolution left nothing behind worth reading back: still the
-   * initial state, and no wake armed. Such an evolution's only output is its
-   * intents, so it needs neither an instance row nor the transaction that
-   * would keep one consistent with an inbox marker.
+   * initial state, and no wake armed — its only output is its intents, needing
+   * neither an instance row nor the transaction that would keep one consistent.
    */
   private isTransientEvolution(evolution: ReturnType<ProcessDefinition<State>["evolve"]>): boolean {
     return (
@@ -530,10 +525,8 @@ export class ProcessManagerService<State> {
 
   /**
    * The outbox rows one evolution's intents become, for either commit path.
-   *
-   * Shared rather than written twice: the transient append and the durable
-   * commit build the same row, so a field added to one and not the other is
-   * a message that behaves differently depending on which path minted it.
+   * Shared rather than written twice, so a field added to one path and not
+   * the other can't make a message behave differently depending on which minted it.
    */
   private outboxMessagesFor({
     intents,

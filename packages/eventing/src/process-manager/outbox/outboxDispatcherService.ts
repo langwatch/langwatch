@@ -57,18 +57,16 @@ export interface OutboxDispatcherServiceOptions {
   leaseDurationMs?: number;
   /**
    * Which processNames this dispatcher serves. The outbox table is shared
-   * across domains, so every domain-scoped dispatcher must set this — an
-   * unfiltered dispatcher leases other domains' intents and retry-churns
-   * them for lack of a handler. Omitted means unfiltered.
+   * across domains, so an unfiltered dispatcher leases other domains' intents
+   * and retry-churns them for lack of a handler. Omitted means unfiltered.
    */
   processNames?: readonly string[];
   /** Max in-flight leased messages; default 1 (sequential), else serialize by key. */
   concurrency?: number;
   /**
-   * Wall clock for measuring elapsed time inside one drain (the lease
-   * budget check). Distinct from runOnce's `now`, which is the batch's
-   * logical time for lease and lag math. Injectable so fake-timer tests
-   * control both.
+   * Wall clock for measuring elapsed time inside one drain (the lease budget
+   * check) — distinct from runOnce's `now`, the batch's logical time for lease
+   * and lag math. Injectable so fake-timer tests control both.
    */
   clock?: () => number;
   tracer?: Tracer;
@@ -89,11 +87,9 @@ const DEFAULT_MAX_ATTEMPTS = 10;
 export const DEFAULT_LEASE_DURATION_MS = 30_000;
 const SLOW_OUTBOX_DELIVERY_MS = 10_000;
 /**
- * Fraction of the lease held back as the budget a delivery needs to fit
- * before it may start. A domain sizes its lease to its slowest expected
- * delivery, so the reserve must scale with the lease: a flat cap ceilinged
- * the reserve of a 300s lease at 10s, which let a tail delivery start with
- * 10s of budget against a 30s expected duration and fence anyway.
+ * Fraction of the lease held back as the budget a delivery needs before it
+ * may start, scaled to the lease rather than a flat cap that let tail
+ * deliveries start on too little budget and fence anyway.
  */
 const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
 
@@ -119,10 +115,8 @@ function retryAfterMsOf(error: unknown): number | undefined {
 
 /**
  * A handler can mark an error as not worth retrying by throwing with
- * `retryable: false` (DispatchError's shape, same classification the queue
- * path honors): the message retires as dead on this attempt instead of
- * burning the remaining ladder against a permanent failure, e.g. a webhook
- * receiver answering 404.
+ * `retryable: false` (DispatchError's shape) — the message retires as dead
+ * immediately instead of burning the retry ladder on a permanent failure.
  */
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -147,8 +141,7 @@ function toAttemptDiagnostic(error: unknown): {
 /**
  * Leases due process-outbox messages and dispatches each inside a CONSUMER
  * span whose remote parent is restored from the message's persisted W3C
- * carrier. This keeps the effect on the trace that committed its intent,
- * including across process restarts and retries.
+ * carrier, keeping the effect on the trace that committed its intent.
  */
 export class OutboxDispatcherService {
   private readonly store: ProcessStore;

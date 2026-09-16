@@ -28,10 +28,9 @@ export interface ScheduledJobRecord {
    */
   lastSlot: Date | null;
   /**
-   * The calendar instant of the slot currently in flight; null when no slot
-   * is being worked. `nextRunAt` mutates into a lease/backoff instant the
-   * moment a slot is claimed, so THIS is the slot identity a retry or a
-   * crash-refire must hand the handler (see `fireJob`'s slot derivation).
+   * The calendar instant of the slot currently in flight; null when idle.
+   * `nextRunAt` mutates into a lease/backoff instant once claimed, so THIS is
+   * the slot identity a retry or crash-refire must hand the handler.
    */
   currentSlot: Date | null;
   /**
@@ -85,12 +84,9 @@ export interface ScheduledJobStore {
     projectId: string;
     expectedNextRunAt: Date;
     /**
-     * The calendar instant this claim pins as the in-flight slot (COALESCE'd
-     * into `currentSlot`). Distinct from `expectedNextRunAt` (the WHERE guard,
-     * = the row's current wake instant): on a `runLatest` catch-up the guard is
-     * the OLDEST missed slot the row still carries, but the slot we actually
-     * fire — and must pin so retries re-fire it — is the newest missed slot.
-     * On an on-time fire the two coincide.
+     * The calendar instant this claim pins as the in-flight slot, distinct
+     * from `expectedNextRunAt` (the WHERE guard): on a catch-up the guard is
+     * the OLDEST missed slot, but this is the NEWEST — the one retries re-fire.
      */
     slot: Date;
     leaseUntil: Date;
@@ -136,11 +132,9 @@ export interface ScheduledJobStore {
   }): Promise<void>;
 
   /**
-   * Every schedule a project owns for one consumer — the read that lets a
-   * product surface answer "when does this next run, and when did it last
-   * run?" without sending the customer to the cross-tenant ops dashboard.
-   * Project-scoped (unlike `findDue` / `listForOps`), so it is safe to expose
-   * under a customer-facing permission.
+   * Every schedule a project owns for one consumer, so a product surface can
+   * answer "when does this run next/last?" Project-scoped (unlike `findDue` /
+   * `listForOps`), so it is safe under a customer-facing permission.
    */
   findAllForProject(params: {
     projectId: string;
@@ -157,12 +151,9 @@ export interface ScheduledJobStore {
   setActiveForOps(params: { id: string; projectId: string; active: boolean }): Promise<boolean>;
 
   /**
-   * Release a slot whose worker never settled it, and make the schedule
-   * claimable again.
-   *
-   * Clears `currentSlot` and the retry bookkeeping, and pulls `nextRunAt` to
-   * now so the next due-scan picks the row up. Guarded on the lease instant the
-   * operator was looking at.
+   * Release a slot whose worker never settled it, making the schedule
+   * claimable again: clears `currentSlot` and retry bookkeeping, and pulls
+   * `nextRunAt` to now. Guarded on the lease instant the operator saw.
    */
   releaseSlotForOps(params: {
     id: string;

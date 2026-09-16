@@ -177,9 +177,8 @@ export class PrismaProcessStore implements ProcessStore {
 
   /**
    * The body of `commit`'s transaction: advisory lock, inbox dedup, CAS'd
-   * instance upsert, and outbox inserts. Extracted to a named method so its
-   * branching is counted on its own rather than folded into `commit`'s
-   * complexity.
+   * instance upsert, and outbox inserts. Named so its branching counts on its
+   * own rather than folding into `commit`'s complexity.
    */
   private async commitWithinTransaction<State = unknown>(
     tx: Prisma.TransactionClient,
@@ -276,8 +275,7 @@ export class PrismaProcessStore implements ProcessStore {
   /**
    * Inserts or updates the instance row for the CAS'd revision. Returns a
    * `revisionConflict` result if another commit won the race, or `null` on
-   * success. Extracted so its branching is counted on its own rather than
-   * folded into `commitWithinTransaction`'s complexity.
+   * success.
    */
   private async upsertInstanceRow<State>(
     tx: Prisma.TransactionClient,

@@ -41,10 +41,8 @@ const { createEventingGroupQueueFactory } = await import("../../queues/groupQueu
 
 /**
  * The shared queue is built for a process by its composition root, which
- * decides whether that process consumes or only produces. `consumersEnabled`
- * is where a process role lands in this package — there is no `ProcessRole`
- * here, because Redis and the deployment shape live outside the event-sourcing
- * runtime and reach it through this factory.
+ * decides whether it consumes or only produces. `consumersEnabled` is where a
+ * process role lands here — Redis and deployment shape live outside this package.
  */
 function buildSharedQueue({ consumersEnabled }: { consumersEnabled: boolean }): void {
   const factory = createEventingGroupQueueFactory({

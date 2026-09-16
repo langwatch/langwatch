@@ -91,10 +91,9 @@ export function createMockAppendStore<Record>(): AppendStore<Record> {
 }
 
 /**
- * Creates a mock FoldProjectionDefinition for testing.
- *
- * The apply function acts as a pass-through by default: it returns the state unchanged.
- * Tests can override apply behavior by mocking the returned definition's apply function.
+ * Creates a mock FoldProjectionDefinition for testing. `apply` is a
+ * pass-through by default (returns state unchanged); override it on the
+ * returned definition to test other behavior.
  */
 export function createMockFoldProjectionDefinition<TEvent extends Event = Event>(
   name: string,
@@ -121,10 +120,9 @@ export function createMockFoldProjectionDefinition<TEvent extends Event = Event>
 }
 
 /**
- * Creates a mock MapProjectionDefinition for testing.
- *
- * The map function returns the event by default (pass-through).
- * Tests can override map behavior by mocking the returned definition's map function.
+ * Creates a mock MapProjectionDefinition for testing. `map` returns the event
+ * by default (pass-through); override it on the returned definition to test
+ * other behavior.
  */
 export function createMockMapProjectionDefinition<TEvent extends Event = Event>(
   name: string,

@@ -19,9 +19,7 @@ export interface ProcessWakeWorkerOptions {
   /**
    * One handler per processName. A due wake whose processName has no
    * registered handler is logged and skipped — its nextWakeAt stays put, so
-   * it surfaces on every scan until the owning process is composed in (the
-   * same log-and-skip posture the calendar scheduler takes for orphan
-   * targetTypes).
+   * it surfaces on every scan until the owning process is composed in.
    */
   managers: Record<string, ProcessWakeHandler>;
   logger: Logger;

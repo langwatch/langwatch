@@ -24,10 +24,9 @@ interface ProbeState {
 const INITIAL: ProbeState = { remembered: null };
 
 /**
- * A process with both shapes on purpose: a `note` emits an intent and keeps
- * the initial state (transient), a `remember` stores something (durable).
- * That is exactly webhookDelivery's shape — per-request keys that hold
- * nothing, per-endpoint keys that hold a buffer.
+ * A process with both shapes on purpose: `note` emits an intent and keeps
+ * initial state (transient), `remember` stores something (durable) — exactly
+ * webhookDelivery's shape.
  */
 function buildProbe(
   handle: (

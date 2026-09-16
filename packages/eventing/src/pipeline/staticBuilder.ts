@@ -219,11 +219,9 @@ export class PipelineBuilder<
   }
 
   /**
-   * Register the default operational state projection.
-   *
-   * It runs as one direct repository load/apply/store cycle under the queue's
-   * per-key lock. It is intentionally not a valid parent for
-   * `.withProjectionSubscriber()`.
+   * Register the default operational state projection: one direct
+   * repository load/apply/store cycle under the queue's per-key lock,
+   * intentionally not a valid parent for `.withProjectionSubscriber()`.
    */
   private registerStateProjection(definition: StateProjectionDefinition<any, EventType>): this {
     const name = definition.name;
@@ -569,10 +567,9 @@ function toTriggerContext(subscriberDispatchContext: {
 }
 
 /**
- * Dedup only when the spec asks for it (dedup / dedupId / ttl). A spec
- * without any of those means EVERY event must dispatch its own job —
- * e.g. a lifecycle sync where a coalesced batch carrying both `started`
- * and `finished` must deliver both, not collapse to the newest.
+ * Dedup only when the spec asks for it (dedup / dedupId / ttl); otherwise
+ * EVERY event must dispatch its own job — e.g. a lifecycle sync where a
+ * coalesced batch carrying both `started` and `finished` must deliver both.
  */
 function buildProjectionSubscriberDedup<E extends Event>(
   subscriberName: string,

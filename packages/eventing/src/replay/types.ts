@@ -39,11 +39,9 @@ export interface RegisteredMapProjection {
 }
 
 /**
- * A Postgres operational state projection registered for a canonical
- * rebuild. Unlike fold/map, replay of a state projection rebuilds its
- * `StateProjectionStore` from `init()` (never `store.load`). The normal replay
- * path pauses and drains the live projection queue before replacing rows;
- * re-running is idempotent because the output is deterministic.
+ * A Postgres operational state projection registered for a canonical rebuild.
+ * Unlike fold/map, replay rebuilds its `StateProjectionStore` from `init()`
+ * (never `store.load`); re-running is idempotent since the output is deterministic.
  */
 export interface RegisteredStateProjection {
   projectionName: string;
@@ -108,9 +106,8 @@ export interface ReplayConfig {
   mapProjections?: RegisteredMapProjection[];
   /**
    * Operational state projections to rebuild into their stores. Only
-   * `ReplayService.replay` routes these (through the state lane); the
-   * fold/map engine rejects a config carrying them rather than silently
-   * skipping them.
+   * `ReplayService.replay` routes these; the fold/map engine rejects a config
+   * carrying them rather than silently skipping them.
    */
   stateProjections?: RegisteredStateProjection[];
   tenantIds: string[];

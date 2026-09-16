@@ -9,10 +9,9 @@ import { EventTypeSchema } from "./eventType.ts";
 import { TenantIdSchema } from "./tenantId.ts";
 
 /**
- * Zod schema for event metadata base.
- * W3C traceparent header value capturing the originating OTel trace context
- * of the processing pipeline (ingestion, reprocessing jobs, etc.).
- * Example: "00-<trace-id>-<span-id>-01"
+ * Zod schema for event metadata base: `processingTraceparent` is the W3C
+ * traceparent capturing the originating OTel trace context, e.g.
+ * "00-<trace-id>-<span-id>-01".
  */
 export const EventMetadataBaseSchema = z
   .object({
@@ -27,11 +26,9 @@ export const EventMetadataBaseSchema = z
 export type EventMetadataBase = z.infer<typeof EventMetadataBaseSchema>;
 
 /**
- * Zod schema for Event objects.
- * Enhanced with proper validation for timestamp and tenantId.
- *
- * Event types follow the taxonomy system: `<provenance>.<domain>.<aggregate-type>.<identifier>`
- * For LangWatch Observability events, this would be: `lw.obs.<aggregate-type>.<event-name>`
+ * Zod schema for Event objects. Types follow the taxonomy system
+ * `<provenance>.<domain>.<aggregate-type>.<identifier>`, e.g.
+ * `lw.obs.<aggregate-type>.<event-name>` for Observability events.
  */
 export const EventSchema = z.object({
   /** Unique identifier for the event (pure KSUID). */
@@ -105,10 +102,9 @@ export const ProjectionSchema = z.object({
 export type ProjectionType = z.infer<typeof ProjectionSchema>;
 
 /**
- * Generic projection type with type-safe data.
- *
- * Projections represent the current state of an aggregate, computed from events.
- * They are queryable views optimized for read operations.
+ * Generic projection type with type-safe data: the current state of an
+ * aggregate, computed from events, as a queryable view optimized for read
+ * operations.
  */
 export type Projection<Data = unknown> = Omit<ProjectionType, "data"> & {
   /** The projection data */

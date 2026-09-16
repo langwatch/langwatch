@@ -400,10 +400,8 @@ export function handleError(
 }
 
 /**
- * Determines the error category for an error.
- * If the error is a BaseEventSourcingError, uses its category.
- * Otherwise, attempts to infer the category from the error type.
- *
+ * Determines the error category, using its own category for a
+ * {@link BaseEventSourcingError} and inferring one otherwise.
  * @param error - The error to categorize
  * @returns The error category
  */
@@ -439,20 +437,16 @@ const CLICKHOUSE_TRANSIENT_CODES = new Set([
 ]);
 
 /**
- * Handled error codes that are themselves a transient verdict.
- *
- * Kept separate from {@link CLICKHOUSE_TRANSIENT_CODES}, which holds ClickHouse
- * server codes read off the CAUSE. These are ours, read off the handled shell,
- * and matching them by message or by wrapped reason is not possible — the
- * shed signal underneath carries neither.
+ * Handled error codes that are themselves a transient verdict. Kept separate
+ * from {@link CLICKHOUSE_TRANSIENT_CODES} (ClickHouse server codes read off the
+ * CAUSE) since these are read off the handled shell and can't be matched by message.
  */
 const TRANSIENT_HANDLED_CODES = new Set<string>(["clickhouse_overloaded"]);
 
 /**
  * Message-fragment matchers for the same conditions as
- * CLICKHOUSE_TRANSIENT_CODES, used when the error object surfaced from
- * `@clickhouse/client` embeds the code inside `error.message` rather than
- * as a separate `code` property (typical for HTTP responses).
+ * CLICKHOUSE_TRANSIENT_CODES, used when the code is embedded in
+ * `error.message` rather than a separate `code` property (HTTP responses).
  */
 export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
   "Too many simultaneous queries",
@@ -483,10 +477,8 @@ export const CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS = [
 
 /**
  * Classifies a ClickHouse error as RECOVERABLE (transient) or CRITICAL.
- *
  * Transient errors (overload, timeouts, connection issues, ZK / cluster
- * recovery) should be retried by the group queue. Only true data-integrity
- * errors are CRITICAL.
+ * recovery) should be retried by the group queue; only data-integrity errors are CRITICAL.
  */
 export function classifyClickHouseError(error: unknown): ErrorCategory {
   // Handled codes like clickhouse_overloaded ARE the verdict; classifying only
@@ -513,13 +505,11 @@ export function classifyClickHouseError(error: unknown): ErrorCategory {
 function isTransientClickHouseError(error: unknown): boolean {
   if (error != null && typeof error === "object" && "code" in error) {
     const code = String((error as { code: unknown }).code);
-    // Two disjoint namespaces share the one `code` field. ClickHouse's own
-    // numeric codes arrive on server-side exceptions; Node's socket errnos
-    // arrive when the request never got an answer at all. Checking only the
-    // former made `socket hang up` (code ECONNRESET) CRITICAL, so a worker
-    // rollout that aborted an in-flight insert dead-lettered the job instead
-    // of re-staging it. These socket codes live alongside the framework
-    // classifier so callers receive one consistent decision.
+    // Two disjoint namespaces share the one `code` field: ClickHouse's own
+    // numeric codes on server-side exceptions, Node's socket errnos when the
+    // request never got an answer. Checking only the former made `socket hang
+    // up` (ECONNRESET) CRITICAL, dead-lettering jobs a worker rollout aborted
+    // instead of re-staging them.
     if (CLICKHOUSE_TRANSIENT_CODES.has(code)) return true;
     if (TRANSIENT_NETWORK_CODES.has(code)) return true;
   }

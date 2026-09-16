@@ -172,10 +172,8 @@ export abstract class AbstractFoldProjection<
 
   /**
    * Dispatches the event to the appropriate typed handler method and
-   * auto-sets a monotonic updatedAt on the resulting state.
-   *
-   * Monotonic: `Math.max(Date.now(), previous + 1)` ensures strictly
-   * increasing values even when events process within the same millisecond.
+   * auto-sets a monotonic updatedAt (`Math.max(Date.now(), previous + 1)`),
+   * strictly increasing even within the same millisecond.
    */
   apply(state: State, event: { type: string }): State {
     const handlerName = this.dispatchMap[event.type];

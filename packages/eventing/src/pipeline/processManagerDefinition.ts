@@ -29,12 +29,9 @@ export interface TriggerOptions<E extends Event = Event> {
       });
   dedupId?: (event: E) => string;
   /**
-   * Pure, synchronous relevance guard, evaluated before enqueue (an
-   * irrelevant event never pays serialization) and again in the handler.
-   * Fold/map-bound subscribers receive the committed projection state in
-   * `context.state`; raw subscribers receive `undefined` there. A throwing
-   * guard is logged and treated as relevant — fail open, never drop a side
-   * effect.
+   * Pure, synchronous relevance guard, evaluated before enqueue and again in
+   * the handler. Fold/map-bound subscribers see committed state in
+   * `context.state`; a throwing guard fails open (treated as relevant).
    */
   when?: (event: E, context: TriggerContext<any>) => boolean;
   /** Process roles where this subscriber runs. Omit to run everywhere. */
@@ -139,10 +136,9 @@ export interface ProcessManagerConfig<
   handlers: Record<string, EventHandler<State, unknown, Intents>>;
   eventTypes: readonly string[];
   /**
-   * Derives the durable process identity from a committed event. Defaults to
-   * the event aggregate ID. Deriving it from the event alone is what lets the
-   * generated subscriber reuse it as its `groupKeyFn`, so every event landing
-   * on one instance drains in one FIFO lane instead of racing its revision.
+   * Derives the durable process identity from a committed event (default: the
+   * aggregate ID). Deriving it from the event alone lets the generated
+   * subscriber reuse it as `groupKeyFn`, draining one instance in one FIFO lane.
    */
   keyBy?: (event: E) => string;
   /** Named, schema-validated synchronous signals accepted by this process. */

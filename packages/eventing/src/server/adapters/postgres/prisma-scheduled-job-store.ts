@@ -13,13 +13,10 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findDue({ now, limit }: { now: Date; limit: number }): Promise<ScheduledJobRecord[]> {
-    // Cross-tenant due-scan, indexed by (active, nextRunAt), soonest first so
-    // a bounded scan drains the backlog in calendar order. The `-- @tenancy:`
-    // marker is the guard's explicit opt-out for a genuinely cross-tenant
-    // system query (the per-row conditional claim is the tenancy-safe write).
-    // `now` is a naive-UTC `::timestamp` so the `<=` comparison is
-    // timezone-independent (a raw JS Date binds as timestamptz and would shift
-    // the boundary by the session offset — firing future jobs hours early).
+    // Cross-tenant due-scan (`-- @tenancy:` opt-out — the per-row conditional
+    // claim is the tenancy-safe write), indexed by (active, nextRunAt) soonest
+    // first. `now` binds as naive-UTC `::timestamp`; a raw JS Date binds as
+    // timestamptz and would shift the boundary, firing future jobs hours early.
     const rows = await this.prisma.$queryRaw<ScheduledJobRecord[]>`
       SELECT "id", "projectId", "targetType", "targetId", "cron", "timezone",
              "nextRunAt", "lastSlot", "currentSlot", "attempts", "lastError",
@@ -93,14 +90,10 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     attempts: number;
     lastError: string | null;
   }): Promise<boolean> {
-    // Settle a lease this worker owns: a CONDITIONAL update guarded on the exact
-    // `leaseUntil` value `claim` set. Only the lease-holder matches; a lease
-    // that expired and was re-claimed by another worker → 0 rows → `false`.
-    // Single raw UPDATE for the same two reasons as `claim` (atomic guard +
-    // naive-UTC `::timestamp` comparison). `lastSlot` is nullable: binding a JS
-    // `null` yields `NULL::timestamp` (SQL NULL), so "leave unchanged" is
-    // expressed by passing the row's existing value back. `lastError` is a text
-    // column — binds directly, `null` → SQL NULL. `attempts` binds as int.
+    // Settle a lease this worker owns: a CONDITIONAL update guarded on the
+    // exact `leaseUntil` value `claim` set — a lease re-claimed by another
+    // worker matches 0 rows → `false`. `lastSlot` binds a JS `null` as SQL
+    // NULL, so "leave unchanged" means passing the row's existing value back.
     const affected = await this.prisma.$executeRaw`
       UPDATE "ScheduledJob"
       SET "nextRunAt" = ${toPgTimestampUtc(nextRunAt)}::timestamp,
@@ -131,14 +124,11 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
     timezone: string;
     nextRunAt: Date;
   }): Promise<void> {
-    // Guard-safe upsert: update-first (projectId-scoped WHERE), create if the
-    // row is absent. A plain `prisma.upsert` can't be used — its WHERE is the
-    // (targetType, targetId) unique, which carries no projectId and the
-    // multitenancy guard would reject it. An edit re-marks the row active and
-    // refreshes the calendar; `lastSlot` (fire history) is left untouched.
-    // (Model-layer write, so Prisma handles the naive-UTC timestamp binding.)
-    // `currentSlot` resets on edit: the calendar changed, so any in-flight
-    // retry belongs to the OLD schedule and must not misattribute the next fire.
+    // Guard-safe upsert: update-first (projectId-scoped WHERE), create if
+    // absent. A plain `prisma.upsert` can't be used — its WHERE is the
+    // (targetType, targetId) unique, carrying no projectId, which the
+    // multitenancy guard would reject. `currentSlot` resets: the calendar
+    // changed, so an in-flight retry must not misattribute to the OLD schedule.
     const { count } = await this.prisma.scheduledJob.updateMany({
       where: { projectId, targetType, targetId },
       data: { cron, timezone, nextRunAt, active: true, currentSlot: null },
@@ -158,11 +148,9 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
         });
       } catch (error) {
         // The (targetType, targetId) unique makes create-if-absent race-safe:
-        // when two callers see the row missing at once (e.g. the boot-time
-        // report-schedule reconciliation runs on every worker, ADR-044), one
-        // create wins and the other hits P2002. Both wanted the same row to
-        // exist, so treat the loser as a success rather than surfacing a spurious
-        // boot error. Any other failure still throws.
+        // when two callers see the row missing at once (boot-time reconciliation
+        // runs on every worker, ADR-044), one create wins and the other hits
+        // P2002 — treat the loser as a success rather than a spurious boot error.
         if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) {
           throw error;
         }
@@ -338,9 +326,8 @@ export class PrismaScheduledJobStore implements ScheduledJobStore {
 
 /**
  * No-op `ScheduledJob` repository for the null preset (web boot / tests) where
- * no scheduler runs and there is no `prisma` in scope. Reads return empty,
- * writes are no-ops, and `claim` never wins — nothing fires. Mirrors the
- * sibling `Null*` ops repositories so the null preset never touches Postgres.
+ * no scheduler runs and there is no `prisma` in scope. Mirrors the sibling
+ * `Null*` ops repositories so the null preset never touches Postgres.
  */
 export class NullScheduledJobStore implements ScheduledJobStore {
   async findDue(): Promise<ScheduledJobRecord[]> {

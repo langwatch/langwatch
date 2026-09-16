@@ -32,10 +32,9 @@ function makeFold({
 }: {
   readWindow?: { widthMs: number };
   /**
-   * Pair `refoldOnStoreMiss` with a wired `eventLoaderUpTo`, which is the only
-   * shape that may answer `undecodable`: rejecting a row is safe solely
-   * because the history can rebuild it. The executor refuses to fold onto an
-   * empty state otherwise.
+   * Pair `refoldOnStoreMiss` with a wired `eventLoaderUpTo`, the only shape
+   * that may answer `undecodable` — rejecting a row is safe only because the
+   * history can rebuild it.
    */
   refoldable?: boolean;
 } = {}) {

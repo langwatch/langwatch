@@ -43,10 +43,8 @@ export type ProcessInput =
 
 /**
  * An effect the process intends to cause. `messageKey` is the deterministic
- * idempotency identity within (processName, projectId) — e.g.
- * `dispatch:<turnId>:<generation>`, `fail:<turnId>`, `title:<turnId>`.
- * Payloads must be JSON-safe. Application adapters own the stricter domain
- * schema and decide which data may cross this boundary.
+ * idempotency identity within (processName, projectId), e.g.
+ * `dispatch:<turnId>:<generation>`. Payloads must be JSON-safe.
  */
 export interface ProcessIntent {
   messageKey: string;

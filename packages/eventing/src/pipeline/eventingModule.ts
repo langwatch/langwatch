@@ -1,8 +1,7 @@
 /**
  * A module's event sourcing, as one declaration (ADR-144). `definePipeline`
  * already states the aggregate, events, projections, subscribers, process
- * managers and commands; this adds only the seam into a module. It is what
- * `server/src/eventing/<m>.pipeline.ts` exports and `.withEventing(...)` takes.
+ * managers and commands; this adds only the seam a module plugs into.
  */
 import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/runtime-composition";
 import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
@@ -62,10 +61,8 @@ export interface EventingModule<Repositories, App, Definition> extends FeatureEv
 
 /**
  * Names one module's event sourcing. `Repositories` and `App` are read off the
- * annotated `build` parameter and the pipeline's types off its return, so
- * `connect` is typed in the command names the pipeline registered and a
- * declaration written for another module's app fails to compile where
- * `.withEventing` takes it. See `modules/api-key/server/src/eventing`.
+ * annotated `build` parameter, so a declaration written for another module's
+ * app fails to compile where `.withEventing` takes it.
  */
 export function defineEventingModule<
   Repositories,

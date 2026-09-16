@@ -12,10 +12,9 @@ import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 /**
- * `options.refoldOnStoreMiss` — the continuity mechanism for folds whose
- * persisted row cannot be read back into fold state (lossy analytics rows,
- * ADR-034). On a store miss the executor rebuilds state from the event log
- * up to the delivered event instead of folding only the delivered batch.
+ * `options.refoldOnStoreMiss` — continuity for folds whose persisted row
+ * can't read back into fold state (lossy analytics rows, ADR-034): on a miss
+ * the executor rebuilds state from the event log up to the delivered event.
  */
 describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   const tenantId = createTestTenantId();

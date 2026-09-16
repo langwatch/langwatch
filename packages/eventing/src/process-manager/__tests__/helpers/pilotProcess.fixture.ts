@@ -5,10 +5,9 @@ import type {
 } from "../../processManager.types.ts";
 
 /**
- * Test-only miniature of the Langy conversation process from ADR-049 §4:
- * a started turn dispatches a worker and schedules a liveness wake-up,
- * durable activity moves the wake-up, wakes retry within a deadline and
- * fail once past it, and a manual rename suppresses automatic titles.
+ * Test-only miniature of the Langy conversation process (ADR-049 §4): a
+ * started turn dispatches a worker and schedules a wake-up that durable
+ * activity moves, retries within a deadline, and fails once past it.
  */
 export interface PilotState {
   turnId: string | null;

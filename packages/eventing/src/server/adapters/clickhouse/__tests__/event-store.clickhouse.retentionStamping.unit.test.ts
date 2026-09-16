@@ -8,11 +8,9 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Stands in for whatever default the composing process injects. A literal
- * rather than the platform constant on purpose: the platform's value is
- * environment-dependent and lives in the app, and the behaviour under test is
- * "the INJECTED default is what gets stamped", which a shared constant on both
- * sides of the assertion cannot actually distinguish.
+ * Stands in for whatever default the composing process injects. A literal on
+ * purpose: the platform constant would make both sides of the assertion the
+ * same value, unable to distinguish "the INJECTED default" from a shared one.
  */
 const INJECTED_DEFAULT_RETENTION_DAYS = 49;
 
@@ -116,11 +114,8 @@ describe("EventStoreClickHouse retention stamping", () => {
 
   /**
    * event_log does not share one category with the rest of a trace pipeline's
-   * tables: a row's own aggregate/event type decides it. This package may not
-   * name the product-feature module that owns that decision (the eventing
-   * package boundary), so the classifier is injected as a plain function —
-   * these cases stand in for the real one
-   * (`@langwatch/data-retention-contract`'s `classifyEventLogRowRetention`).
+   * tables: a row's own aggregate/event type decides it. The classifier is
+   * injected as a plain function; these cases stand in for the real one.
    */
   describe("when an event-log retention classifier is wired", () => {
     it("stamps a row the classifier calls indefinite with _retention_days = 0, ignoring policy", async () => {

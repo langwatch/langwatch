@@ -11,11 +11,9 @@ import { MapProjectionExecutor } from "../mapProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
 /**
- * `options.dedupeByIdempotencyKey` — guards additive map sinks (the eval
- * rollup) against duplicate deliveries: the event log is append-only and
- * at-least-once, so a client re-report appends a SECOND event with the same
- * idempotency key, and without this option each append lands another
- * increment.
+ * `options.dedupeByIdempotencyKey` — guards additive map sinks against
+ * duplicate deliveries: the event log is at-least-once, so a client
+ * re-report's second event would otherwise land another increment.
  */
 describe("MapProjectionExecutor dedupeByIdempotencyKey", () => {
   const tenantId = createTestTenantId();

@@ -78,9 +78,8 @@ function walk({ value, path, seen }: { value: unknown; path: string; seen: Set<o
 
 /**
  * Validates that `value` is exactly JSON-representable — no values
- * `JSON.stringify` would throw on (bigint, circular), drop (function,
- * symbol), or silently mangle (undefined, NaN/Infinity, Date and other
- * non-plain objects). Returns the same reference, narrowed to JsonValue.
+ * `JSON.stringify` would throw on, drop, or silently mangle. Returns the
+ * same reference, narrowed to JsonValue.
  */
 export function ensureJsonSafe(value: unknown): JsonValue {
   walk({ value, path: "$", seen: new Set() });

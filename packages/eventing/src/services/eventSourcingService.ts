@@ -27,10 +27,9 @@ function extractSubErrors(error: unknown): ({ message: string; stack?: string } 
 }
 
 /**
- * Main service that orchestrates event sourcing.
- * Coordinates between event stores, projection stores, and event handlers.
- *
- * Uses ProjectionRouter for unified dispatch to both FoldProjections and MapProjections.
+ * Main service that orchestrates event sourcing: coordinates event stores,
+ * projection stores, and event handlers, using ProjectionRouter for unified
+ * dispatch to both FoldProjections and MapProjections.
  */
 export class EventSourcingService<
   EventType extends Event = Event,
@@ -378,11 +377,9 @@ export class EventSourcingService<
   }
 
   /**
-   * Stores events using the pipeline's aggregate type.
-   *
-   * **Execution Flow:**
-   * 1. Events are stored in the event store (must succeed)
-   * 2. Events are dispatched to projections; errors logged but don't fail.
+   * Stores events using the pipeline's aggregate type. Events are stored in
+   * the event store first (must succeed), then dispatched to projections —
+   * projection errors are logged but don't fail the store.
    */
   async storeEvents(
     events: readonly EventType[],

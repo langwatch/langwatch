@@ -80,9 +80,8 @@ export function buildIntentHandlers(
 
 /**
  * `evolve` for a config-built ProcessDefinition: clamping, schedule arming,
- * and the undeclared-event guard. Extracted to a module-level function so
- * its branching is counted on its own rather than folded into
- * `buildProcessDefinition`'s complexity.
+ * and the undeclared-event guard. Module-level so its branching counts on its
+ * own rather than folding into `buildProcessDefinition`'s complexity.
  */
 function evolveProcessInstance(
   config: ProcessManagerDefinition["config"],
@@ -182,9 +181,8 @@ function evolveProcessSignal(
 
 /**
  * The runtime-facing ProcessDefinition a builder config generates. Exported
- * so tests (and future domains' harnesses) can drive the EXACT evolve the
- * runtime runs — clamping, schedule arming, undeclared-event guard and all —
- * instead of re-implementing it around the raw handlers.
+ * so tests can drive the EXACT evolve the runtime runs, instead of
+ * re-implementing it around the raw handlers.
  */
 export function buildProcessDefinition(
   config: ProcessManagerDefinition["config"],

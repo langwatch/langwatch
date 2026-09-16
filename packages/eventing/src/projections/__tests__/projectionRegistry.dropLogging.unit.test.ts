@@ -24,10 +24,9 @@ function registryWithAProjection() {
 }
 
 /**
- * A registry that had a router and then lost it to `close()` — the prod case,
- * and the one the bound scenario names. Reaching in to seed the router keeps
- * this a unit test: `initialize()` wants a live queue processor and a job
- * registry, none of which decide what `close()` does to the router.
+ * A registry that had a router and then lost it to `close()` — the prod case
+ * the bound scenario names. Seeding the router directly keeps this a unit
+ * test, since `initialize()` needs a live queue processor and job registry.
  */
 async function registryClosedAfterRouting() {
   const registry = registryWithAProjection();
