@@ -3,12 +3,9 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guard: every column of an AggregatingMergeTree table declares how it merges. A column that is
- * neither part of the sorting key nor an aggregate state has no merge rule, so the surviving row
- * silently keeps whichever input the merge read last. ClickHouse 26.0 turns this into a
- * create-time error, and since migrations replay from scratch on install, one bad column stops a
- * fresh install dead on 26+ (external/Cloud ClickHouse; Chart-managed is pinned). Fix:
- * `SimpleAggregateFunction(max, T)`. MATERIALIZED/ALIAS columns are exempt (computed on read).
+ * Guard: every AggregatingMergeTree column declares how it merges. One
+ * outside the sorting key/aggregate state silently keeps a stale merge
+ * input — ClickHouse 26 makes that a create-time error. Fix: SimpleAggregateFunction.
  */
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, "../../../migrations");
@@ -19,12 +16,9 @@ const CONVERGE_MIGRATION = "00088_aggregating_rollup_dimension_columns.sql";
 const NON_COLUMN_PREFIXES = ["INDEX", "CONSTRAINT", "PROJECTION", "PRIMARY"];
 
 /**
- * The columns that were declared without a merge rule before 00088, and the merged migrations
- * that still create them that way. These files have already run and cannot change
- * (`migration-order` forbids editing a migration on main), so a new install replays them with
- * `allow_dimensions_outside_sorting_key` relaxed, and 00088 converts the tables right after.
- * DO NOT add entries: a new migration has no such relaxation, so a column without a merge rule
- * fails on ClickHouse 26 at deploy time, and fails here on every version.
+ * Columns declared without a merge rule before 00088, in migrations that
+ * already ran and can't change. DO NOT add entries: a new migration has no
+ * such relaxation and fails on ClickHouse 26 at deploy time.
  */
 const HISTORICAL_DIMENSIONS: {
   file: string;

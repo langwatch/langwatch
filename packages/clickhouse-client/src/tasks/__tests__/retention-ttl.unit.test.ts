@@ -29,12 +29,10 @@ const migrationEndingIn = (suffix: string): string => {
 };
 
 describe("buildRetentionTTLExpression", () => {
-  // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
-  // every row carries a finite retention (308 migration default for pre-column
-  // rows, 49+ for new inserts), so 0 should never occur. But the guard MUST
-  // stay — without it a stray 0 evaluates to anchor + toIntervalDay(0) = the
-  // anchor date (in the past) and the row is deleted on the next merge. The
-  // guard maps 0 to the far-future 2106-01-01 sentinel instead.
+  // The IF(_retention_days > 0, ...) guard is a safety net: every row has a
+  // finite retention, so 0 should never occur, but without the guard a stray
+  // 0 evaluates to the anchor date and the row is deleted on the next merge.
+  // The guard maps 0 to the far-future 2106-01-01 sentinel instead.
   describe("when retentionTTLColumn is set", () => {
     it("builds correct IF expression for DateTime columns", () => {
       const config = TABLE_TTL_CONFIG.find((c) => c.table === "stored_spans")!;
@@ -163,13 +161,10 @@ describe("gateway_spend retention exemption", () => {
 });
 
 describe("governance cost tables keep data indefinitely by default", () => {
-  // Zero (`_retention_days`'s default) is the indefinite sentinel: a row is
-  // deleted only if a day count is deliberately stamped on it. These tables
-  // stay OUT of RETENTION_TABLE_CATEGORY_MAP (so no customer policy or the
-  // storage meter it drives can reach them) and IN the separate
-  // INDEFINITE_DEFAULT_RETENTION_TABLES list; the reconciler gates on the
-  // union of both. If the assertions below fail, someone has wired money
-  // records into the customer retention cascade.
+  // Zero (`_retention_days`'s default) is the indefinite sentinel — deleted
+  // only if a day count is deliberately stamped. These tables stay OUT of
+  // RETENTION_TABLE_CATEGORY_MAP and IN INDEFINITE_DEFAULT_RETENTION_TABLES;
+  // the reconciler gates on the union of both.
   const GOVERNANCE_COST_TABLES = [
     "governance_cost_rollup_1d",
     "governance_cost_rollup_restatement_index",
@@ -223,12 +218,9 @@ describe("governance cost tables keep data indefinitely by default", () => {
 
   describe("when the migration that installs the column is read", () => {
     /**
-     * Only the statements the migration actually RUNS. Every comment line —
-     * including the house-style commented-out `down` block, which still names
-     * the old 13-month timer — starts with `--`, and so do goose's own
-     * directives, so dropping them leaves the executed SQL alone. If this
-     * filter ever emptied, the `MODIFY TTL` count below would read 0 and fail
-     * rather than pass vacuously.
+     * Only the statements the migration actually RUNS. Every comment line,
+     * including the commented-out `down` block, starts with `--`, so
+     * dropping them leaves executed SQL alone — an emptied filter fails loudly, not vacuously.
      */
     const executedSql = (): string =>
       readFileSync(migrationEndingIn("_governance_cost_rollup_retention_days.sql"), "utf8")

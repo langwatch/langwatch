@@ -1,9 +1,7 @@
 /**
  * A paused tenant's groups are held OUT of the dispatch scan rather than
- * skipped where they lie: the scan has a bounded budget, so a large paused
- * backlog sitting at the front of ready would exhaust it and starve every
- * other tenant.
- *
+ * skipped in place: the scan has a bounded budget, and a paused backlog at
+ * the front of ready would exhaust it and starve every other tenant.
  * @see specs/queue-pausing/queue-pausing.feature
  */
 import IORedis, { type Redis } from "ioredis";

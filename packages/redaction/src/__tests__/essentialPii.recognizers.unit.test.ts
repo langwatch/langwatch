@@ -1,8 +1,7 @@
 /**
  * The recognizers themselves, one pattern at a time — beside (not folded
- * into) `essentialPii.unit.test.ts`, which is bound to the spec's scenarios;
- * this is the mechanical sweep of every entity, its checksums, and the
- * near-misses each pattern must NOT claim.
+ * into) `essentialPii.unit.test.ts` (bound to the spec's scenarios). The
+ * mechanical sweep of every entity, its checksums, and its must-NOT-claim near-misses.
  */
 import { describe, expect, it } from "vitest";
 

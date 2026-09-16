@@ -1,10 +1,7 @@
 /**
- * The NATIVE (in-process) redaction passes for one resolved policy — now the
- * only declaration of them, so every scrubbing process imports this one.
- * The policy is read structurally via {@link RedactionPolicy}, not
- * `ResolvedDataPrivacy`, since importing it would close a dependency cycle
- * through `@langwatch/data-privacy-contract`; and nothing here names
- * `PROVENANCE_ATTR_API_KEY_ID`, which would drag in an ingest route.
+ * The NATIVE (in-process) redaction passes for one resolved policy — the
+ * only declaration, so every scrubber imports this one. Reads the policy
+ * structurally to dodge a `@langwatch/data-privacy-contract` import cycle.
  */
 
 import {
@@ -22,11 +19,9 @@ import {
 import { reservesTraceAddress } from "./identifierHoldout.ts";
 
 /**
- * The resolved data-privacy policy, as the native passes read it.
- *
- * Structural on purpose: `ResolvedDataPrivacy` from
- * `@langwatch/data-privacy-contract` satisfies this, and so does the
- * application's own copy, without either package importing the other.
+ * The resolved data-privacy policy, as the native passes read it. Structural
+ * on purpose: `ResolvedDataPrivacy` from `@langwatch/data-privacy-contract`
+ * satisfies this, and so does the app's own copy, without either importing the other.
  */
 export type RedactionPolicy = Readonly<{
   pii: Readonly<{
@@ -40,11 +35,9 @@ export type RedactionPolicy = Readonly<{
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(ESSENTIAL_PII_ENTITIES);
 
 /**
- * The native essential identifiers a resolved policy redacts in-process:
- * `"all"` for the essential and strict levels (the full floor), the selected
- * native subset for custom, or `null` when PII is disabled. Identifiers the
- * native engine cannot detect (names, locations) are not returned here; the
- * caller routes those to the analysis service.
+ * Native essential identifiers a resolved policy redacts in-process: `"all"`
+ * for essential/strict, the selected subset for custom, `null` when
+ * disabled. Names/locations aren't returned — the caller routes those to the analysis service.
  */
 export function nativePiiEntitiesForPolicy(policy: RedactionPolicy): "all" | string[] | null {
   switch (policy.pii.level) {
@@ -59,12 +52,9 @@ export function nativePiiEntitiesForPolicy(policy: RedactionPolicy): "all" | str
 }
 
 /**
- * Runs the secrets scrubber then essential PII, which is the floor even at
- * `strict` — scrubbed here before the external service handles names/locations,
- * so nothing leaks while unreachable. `shouldTreatAsIdentifier` marks a value
- * (e.g. a decimal trace id) as an identifier despite its shape, the same
- * exemption a hex id gets, since a reserved name is only a claim the sender
- * made and joins depend on it surviving redaction.
+ * Runs secrets then essential PII, the floor even at `strict` — scrubbed
+ * here so nothing leaks while the external names/locations service is
+ * unreachable. `shouldTreatAsIdentifier` exempts values that joins rely on.
  */
 export function redactStringNative({
   text,
@@ -113,12 +103,9 @@ export function redactStringNative({
 }
 
 /**
- * True for a key that is `id`/ends `_id`/`.id` (any case). The NAME decides,
- * not the value: a record id (`prefix_<random body>`) is as random as a key,
- * so shape rules would otherwise redact it. Only turns off
- * {@link SHAPE_ONLY_SECRET_RULE_IDS} (2 rules) and the sensitive-name
- * deny-list — every other rule and the whole PII pass still run. Deliberately
- * not widened to a namespace: `langwatch.input`/`.output` carry chat content.
+ * True for a key that is `id`/ends `_id`/`.id` (any case) — the NAME decides,
+ * since a record id is as random as a key and shape rules would redact it.
+ * Only turns off {@link SHAPE_ONLY_SECRET_RULE_IDS} and the sensitive-name deny-list.
  */
 export function isIdentifierAttributeName(key: string): boolean {
   const lower = key.toLowerCase();

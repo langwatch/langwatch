@@ -1,8 +1,7 @@
 /**
  * Bounded concurrency, with shedding. A slot is held across retries, not
- * taken per attempt — otherwise a retrying statement escapes the bound
- * entirely. The wait queue sheds when full, since an unbounded queue hides
- * overload instead of preventing it.
+ * per attempt — else a retrying statement escapes the bound. The wait
+ * queue sheds when full, since unbounded hides overload instead of preventing it.
  */
 
 import type { AbortSignalLike } from "./query.ts";
@@ -40,12 +39,9 @@ export interface LimiterStats {
 const DEFAULT_MAX_QUEUED = 1_000;
 
 /**
- * Bounded concurrency with a bounded wait queue.
- *
- * A class rather than a closure because it is the one thing in this package
- * that holds mutable state — how many statements are in flight, and who is
- * waiting — and that state is worth naming. It also makes the state readable
- * from a test through {@link stats} without the test having to run a statement.
+ * Bounded concurrency with a bounded wait queue. A class rather than a
+ * closure since it holds this package's one piece of mutable state —
+ * in-flight count and waiters — readable from a test via {@link stats}.
  */
 export class ConcurrencyLimiter {
   private readonly maxConcurrent: number;

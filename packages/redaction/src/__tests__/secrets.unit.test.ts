@@ -15,17 +15,15 @@ const redact = (text: string, customPatterns?: readonly RegExp[]) =>
 
 /**
  * Fixture bodies, assembled into tokens at runtime so no complete
- * credential-shaped literal ever exists in this file. The shapes have to stay
- * realistic to be worth testing, and a literal one trips every secret scanner
- * that reads the repository, GitHub push protection included.
+ * credential-shaped literal exists in this file — a literal one trips every
+ * secret scanner that reads the repo, GitHub push protection included.
  */
 const BODY = "aB3dEf7gHi2jKlMnOpQrStUvWx0123456789xYzAbCdEfGh";
 const HEX = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 /**
- * Mirrors MAX_SCAN_LENGTH in the module under test, which is not exported.
- * Derived rather than written inline at each use so a change to the budget
- * moves every boundary case with it, instead of leaving them passing while
- * testing nothing near the boundary.
+ * Mirrors MAX_SCAN_LENGTH in the module under test (not exported). Derived
+ * rather than inlined at each use, so a budget change moves every boundary
+ * case with it instead of leaving them passing while testing nothing near it.
  */
 const SCAN_BUDGET = 250_000;
 
@@ -415,10 +413,9 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
 });
 
 /**
- * The limit on all of the above. Over-redaction is a bug of the same severity
- * as a leak: a terminal replay full of `[SECRET]` where the commit hashes and
- * file paths used to be is not a usable trace. Every string here is the kind of
- * thing that genuinely shows up in a coding-agent transcript.
+ * The limit on all of the above: over-redaction is a bug of the same
+ * severity as a leak — a replay full of `[SECRET]` where commit hashes and
+ * file paths used to be is not a usable trace. All strings genuinely occur.
  */
 describe("redactSecretsInText, given text that only looks like secrets", () => {
   const leaveAlone: Array<[string, string]> = [
@@ -631,10 +628,9 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
 });
 
 /**
- * A customer wrote `sk-.*` because the built-in rules did not cover their
- * provider, and it shredded their own transcripts: it fired inside "task-" and
- * then ran to the end of the line. These pin both halves of the fix, and the
- * last one pins that the pattern still does the job it was written for.
+ * A customer's `sk-.*` (their provider wasn't covered by built-ins) shredded
+ * their own transcripts: it fired inside "task-" and ran to the end of the
+ * line. These pin both halves of the fix and that the pattern still works.
  */
 describe("redactSecretsInText, given a hand-written custom pattern", () => {
   const userPattern = () => compileSecretPatterns(["sk-.*"]);

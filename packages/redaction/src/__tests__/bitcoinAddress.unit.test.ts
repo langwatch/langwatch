@@ -7,10 +7,9 @@ import {
 } from "../bitcoinAddress.ts";
 
 /**
- * The whole point of these validators is that they can tell a real address from
- * a hex string of the same shape, so the vectors are real mainnet addresses and
- * the negatives are single-character mutations of them. A validator that
- * accepted its own mutations would be no better than the pattern it replaced.
+ * The whole point is telling a real address from a same-shaped hex string,
+ * so vectors are real mainnet addresses and negatives are single-character
+ * mutations of them. Accepting a mutation would be no better than the old pattern.
  */
 const P2PKH = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
 const P2SH = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
@@ -19,19 +18,16 @@ const TAPROOT =
   "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
 
 /**
- * The hex identifier the shape-only pattern used to call an address. Generated,
- * not observed: the first draw from the corpus tests' `seededRandom(20260912)`
- * over the hex alphabet that leads with "1" or "3" and carries no "0", so it
- * sits inside the base58 alphabet. Both properties are what make it a negative
- * worth asserting rather than a string the pattern would never have reached.
+ * The hex identifier the shape-only pattern used to call an address.
+ * Generated from `seededRandom(20260912)`: leads with "1"/"3", no "0" — so
+ * it sits inside the base58 alphabet, the negative worth asserting.
  */
 const HEX_ID_SHAPED_LIKE_AN_ADDRESS = "13f895f8877e4bc5edc85c397fbd3668";
 
 /**
- * One constructed payload at three version bytes, so the checksums are built the same way and
- * only the version differs — the hash160 is a fixed-phrase digest, not an observed address.
- * Version six is what matters: base58 renders it with a leading "3", so it satisfies the legacy
- * pattern with a checksum as valid as the other two, yet Bitcoin mints no such address.
+ * One payload at three version bytes, so checksums are built the same way
+ * and only the version differs. Version six is what matters: it renders
+ * with a leading "3" and a valid checksum, yet Bitcoin mints no such address.
  */
 const PAYLOAD_AT_V0 = "1F6gFLr6VjazEQvMSV5prBd3agThutz9S8";
 const PAYLOAD_AT_V5 = "3FnhAtLY3duNKacnZakRGoyyjCkRWLW4rY";
@@ -63,10 +59,9 @@ describe("given a base58check address", () => {
   });
 
   /**
-   * A checksum says the payload is intact, not that bitcoin would ever mint it.
-   * The version byte is the rest of the grammar: mainnet spends exactly two of
-   * the 256 values, and a token carrying any of the other 254 is not an address
-   * whatever its checksum does.
+   * A checksum says the payload is intact, not that bitcoin would mint it.
+   * The version byte is the rest of the grammar: mainnet spends exactly two
+   * of 256 values, and any other is not an address whatever its checksum does.
    */
   describe("when the version byte is not one bitcoin mints", () => {
     it.each([
@@ -131,10 +126,9 @@ describe("given a bech32 address", () => {
   });
 
   /**
-   * A checksum is only as narrow as the grammar behind it. The witness version is read from a
-   * 32-character alphabet, and BIP-141 defines sixteen of those values — the other fifteen decode
-   * to no segwit program at all. The pair below is one payload at two versions, so the version-one
-   * member validating is what proves the version-seventeen member is rejected for its version.
+   * A checksum is only as narrow as the grammar behind it: the witness
+   * version reads from a 32-character alphabet, but BIP-141 defines only
+   * sixteen. One payload at two versions isolates the rejection to the version.
    */
   describe("when the witness version is one bitcoin does not define", () => {
     const PAYLOAD_AT_V1 = "bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8";
@@ -150,10 +144,9 @@ describe("given a bech32 address", () => {
   });
 
   /**
-   * The checksum covers the characters, not what they mean, so a string can clear it and still
-   * encode no output anyone could pay to. Controls use the same construction at an allowed length,
-   * so each rejection is attributable to the program rule, not the checksum. The version
-   * zero/sixteen-byte case is BIP-173's own invalid vector; the rest are constructed.
+   * The checksum covers the characters, not what they mean, so a string can
+   * clear it and still encode no output anyone could pay to. Controls use
+   * the same construction at an allowed length, isolating each rejection to the program rule.
    */
   describe("when the witness program is not one bitcoin allows", () => {
     it.each([
@@ -217,11 +210,9 @@ describe("given either address form", () => {
   });
 
   /**
-   * BIP-173 defines an address as case-insensitive and QR encoders emit the
-   * uppercase form, because uppercase packs into an alphanumeric QR segment.
-   * The bech32 validator already reads it; only the prefix this function routes
-   * on was lowercase, which sent the uppercase form to the base58 decoder and
-   * got a rejection that looked like a verdict.
+   * BIP-173 allows uppercase (QR encoders emit it, packing into an
+   * alphanumeric segment); the bech32 validator already reads it. Only the
+   * routing prefix was lowercase, sending uppercase to base58 for a false rejection.
    */
   it("routes an uppercase segwit address to the bech32 validator", () => {
     expect(isBitcoinAddress(SEGWIT_V0.toUpperCase())).toBe(true);

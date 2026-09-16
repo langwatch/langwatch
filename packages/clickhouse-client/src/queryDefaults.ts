@@ -1,8 +1,7 @@
 /**
  * Default ClickHouse query settings, capping memory so one query can't OOM
- * the server and impact other tenants. `max_memory_usage` is intentionally
- * omitted — the server's Terraform profile already caps it per-query, and
- * setting it client-side would only override that cap upward.
+ * the server. `max_memory_usage` is omitted on purpose — the server's
+ * Terraform profile already caps it per-query; client-side would only raise it.
  */
 export const DEFAULT_CLICKHOUSE_SETTINGS: Record<string, number> = {
   max_bytes_before_external_group_by: 500_000_000,

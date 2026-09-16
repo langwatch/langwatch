@@ -26,12 +26,9 @@ import { nowInstant } from "@langwatch/time";
 const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
 /**
- * Groups whose staging depth one collect cycle reads.
- *
- * A cap, not a sample. The cursor below survives across cycles, so successive
- * cycles read the next page instead of the same head, and every group is
- * reached within one rotation whatever the group count. Paged at the same
- * width the ops repository already pages the ready set at.
+ * Groups whose staging depth one collect cycle reads. A cap, not a sample:
+ * the cursor survives across cycles, so successive cycles read the next
+ * page and every group is reached within one rotation, whatever the count.
  */
 const STAGING_DEPTH_GROUPS_PER_CYCLE = 1000;
 

@@ -1,9 +1,7 @@
 /**
- * The verdicts {@link BLOB_OPERATOR_DELETE_LUA} can return.
- *
- * `missing` is not an error: the operator asked for a blob that had already
- * expired or been reclaimed, and the stale lease and holder keys were dropped
- * anyway. Only `leased` is a refusal.
+ * The verdicts {@link BLOB_OPERATOR_DELETE_LUA} can return. `missing` is not
+ * an error: the blob had already expired or been reclaimed, and the stale
+ * lease/holder keys were dropped anyway. Only `leased` is a refusal.
  */
 export const BLOB_DELETE_OUTCOMES = ["leased", "deleted", "missing"] as const;
 

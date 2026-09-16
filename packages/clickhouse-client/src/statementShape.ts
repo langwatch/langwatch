@@ -1,8 +1,7 @@
 /**
- * Reading shape out of the vendor's untyped statement values. The resilience
- * layer in ./vendorClient.ts never imports `@clickhouse/client`, so these
- * total, defensive readers turn `unknown` params/rows into the few facts the
- * policy needs, answering for a value of the wrong shape rather than throwing.
+ * Reading shape out of the vendor's untyped statement values, so
+ * ./vendorClient.ts never imports `@clickhouse/client`. These total,
+ * defensive readers answer for a wrong-shaped value rather than throwing.
  */
 
 /** The statement categories the outcome metric is labelled by. */
@@ -60,22 +59,16 @@ export function extractRawQuery(params: unknown): string {
 }
 
 /**
- * The server-side exception prefix, e.g.
- * `Code: 241. DB::Exception: Memory limit ... (MEMORY_LIMIT_EXCEEDED)`.
- * The class name is deliberately loose: the thrown type prints its own name
- * (`DB::NetException`, `DB::ErrnoException`, `Coordination::Exception`) and
- * every one of them means the query died. Missing one is the expensive
- * direction — it puts an error row back in front of a decoder.
+ * The server-side exception prefix (`Code: 241. DB::Exception: ...`). The
+ * class name is deliberately loose — every `*Exception` thrown means the
+ * query died, and missing one is the expensive direction: an error row hits the decoder.
  */
 const CLICKHOUSE_EXCEPTION_SIGNATURE = /^Code: \d+\. (\w+::)?\w*Exception:/;
 
 /**
- * A row is the server's exception line only when both hold: `exception` is
- * its sole key, and the value carries the ClickHouse error signature. The
- * sole-key test alone would reject a legitimate one-column result such as
- * `SELECT status AS exception`. A value that reproduces the full signature is
- * an accepted residual false positive — the stream offers nothing else to
- * tell it apart from the real thing.
+ * A row is the server's exception line only when `exception` is its sole
+ * key AND the value carries the ClickHouse error signature — the sole-key
+ * test alone would reject `SELECT status AS exception` legitimately.
  */
 export function inbandExceptionOf(row: unknown): string | undefined {
   if (row === null || typeof row !== "object" || Array.isArray(row)) {

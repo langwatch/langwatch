@@ -48,12 +48,9 @@ const REAL_TAPROOT_ADDRESS =
   "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
 
 /**
- * A 32-hex OTel trace id that the shape-only bitcoin pattern matches.
- *
- * Generated, not observed: the first draw from `seededRandom(20260912)` over
- * the hex alphabet that leads with "1" or "3" and carries no "0", which is what
- * puts it inside the base58 alphabet and so inside the pattern the defect fired
- * on. Without those two properties the fixture would pass vacuously.
+ * A 32-hex OTel trace id the shape-only bitcoin pattern matches. Generated
+ * from `seededRandom(20260912)`: leads with "1"/"3", carries no "0" — inside
+ * the base58 alphabet, so inside the pattern the defect fired on.
  */
 const HEX_TRACE_ID_SHAPED_LIKE_AN_ADDRESS = "13f895f8877e4bc5edc85c397fbd3668";
 

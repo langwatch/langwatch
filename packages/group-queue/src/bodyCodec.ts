@@ -19,12 +19,9 @@ const GUNZIP_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
 const ZSTD_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
 
 /**
- * msgpackr's record extension rewrites repeated object shapes into a shared
- * structure table. That table is stateful across packs, which would make the
- * bytes for a given payload depend on what the encoder packed *before* it —
- * fatal for content-addressed dedup, where identical payloads must produce
- * identical bytes on every pod. `useRecords: false` keeps each pack
- * self-contained and deterministic.
+ * msgpackr's record extension shares a stateful structure table across
+ * packs, making bytes depend on what was packed before — fatal for
+ * content-addressed dedup. `useRecords: false` keeps each pack self-contained.
  */
 const packr = new Packr({ useRecords: false, structuredClone: false });
 
@@ -89,9 +86,8 @@ export async function decompress(buf: Buffer): Promise<Buffer> {
 
 /**
  * Serializes a payload, choosing msgpack only above {@link MSGPACK_MIN_BYTES}.
- *
- * Returns the codec alongside the bytes because the caller must fold it into the
- * content hash — see {@link contentHashSource}.
+ * Returns the codec alongside the bytes since the caller must fold it into
+ * the content hash, see {@link contentHashSource}.
  */
 export function encodePayload(
   payload: Record<string, unknown>,
@@ -108,12 +104,9 @@ export function encodePayload(
 }
 
 /**
- * Deserializes a payload by sniffing the leading byte.
- *
- * JSON object/array bodies begin with `{` (0x7b) or `[` (0x5b); msgpack encodes a
- * top-level map as fixmap (0x80-0x8f), map16 (0xde) or map32 (0xdf). The ranges
- * are disjoint, so this is unambiguous for the shapes we actually store — and
- * sniffing means we never trust a header that could disagree with the bytes.
+ * Deserializes a payload by sniffing the leading byte: JSON bodies begin
+ * `{`/`[`; msgpack a top-level map is fixmap/map16/map32. The ranges are
+ * disjoint, so sniffing never trusts a header that could disagree with the bytes.
  */
 export function decodePayload(buf: Buffer): Record<string, unknown> {
   const first = buf[0];

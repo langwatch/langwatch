@@ -1,10 +1,9 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Integration lane: `*.integration.test.ts` under `src/`, excluded from the
- * unit lane. The schema-lock file spawns its contenders as real processes and
- * the aggregating-dimension file reads a migrated ClickHouse back from
- * `system.columns`, so neither may share a worker with anything else.
+ * Integration lane: `*.integration.test.ts` under `src/`. The schema-lock
+ * file spawns real processes and the aggregating-dimension file reads a
+ * migrated ClickHouse back, so neither may share a worker with anything else.
  */
 export default defineConfig({
   test: {

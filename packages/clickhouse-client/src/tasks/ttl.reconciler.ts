@@ -43,12 +43,10 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "evaluation_runs",
     ttlColumn: "UpdatedAt",
-    // Retention anchors on UpdatedAt (= partition key `toYearWeek(UpdatedAt)`),
-    // not ScheduledAt/StartedAt. Both of those are Nullable(DateTime64) on this
-    // table and ClickHouse rejects Nullable in TTL expressions with
-    // BAD_TTL_EXPRESSION (code 450). UpdatedAt is non-null and partition-aligned,
-    // so TTL drops whole weekly partitions at the part level instead of running
-    // row-level mutations across still-warm parts.
+    // Anchors on UpdatedAt, not ScheduledAt/StartedAt: those are
+    // Nullable(DateTime64), and ClickHouse rejects Nullable in TTL
+    // expressions (BAD_TTL_EXPRESSION). UpdatedAt is partition-aligned, so
+    // TTL drops whole weekly partitions instead of row-level mutations.
     retentionTTLColumn: "UpdatedAt",
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
@@ -188,12 +186,10 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_ROLLUP_TTL_DAYS",
     hardcodedDefault: 49,
   },
-  // ADR-128: governance cost tables reach the reconciler via
-  // INDEFINITE_DEFAULT_RETENTION_TABLES, not the customer retention cascade, so
-  // `_retention_days` defaults to 0 and nothing expires unless a day count is
-  // deliberately stamped. Despite migration 00095's header saying nothing else
-  // moves these tables, the entries below still render the 49-day cold-storage
-  // `MOVE` clause — safe, since MOVE only relocates parts and deletes nothing.
+  // ADR-128: reaches the reconciler via INDEFINITE_DEFAULT_RETENTION_TABLES,
+  // not the customer retention cascade, so `_retention_days` defaults to 0
+  // and nothing expires unless deliberately stamped. The 49-day cold-storage
+  // `MOVE` clause below is still safe — MOVE relocates parts, deletes nothing.
   {
     table: "governance_cost_rollup_1d",
     ttlColumn: "Day",
@@ -223,12 +219,9 @@ function parseNonNegativeInt(value: string, label: string): number {
 }
 
 /**
- * Resolves the desired hot-storage days for a table.
- *
- * Priority:
- * 1. Per-table env var (e.g. CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS)
- * 2. Global default env var (CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS)
- * 3. Hardcoded default from TABLE_TTL_CONFIG
+ * Resolves hot-storage days for a table: per-table env var, then the global
+ * default env var (`CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS`), then the
+ * hardcoded default in `TABLE_TTL_CONFIG`.
  */
 export function resolveHotDays(config: TableTTLEntry): number {
   const perTable = process.env[config.envVar];
@@ -245,11 +238,9 @@ export function resolveHotDays(config: TableTTLEntry): number {
 }
 
 /**
- * Parses the TTL interval days from ClickHouse's engine_full metadata string.
+ * Parses the TTL interval days from ClickHouse's engine_full metadata string
+ * (e.g. `TTL toDateTime(CreatedAt) + toIntervalDay(2) TO VOLUME 'cold'`).
  * Returns null if no TTL is set.
- *
- * Example engine_full containing TTL:
- *   "... TTL toDateTime(CreatedAt) + toIntervalDay(2) TO VOLUME 'cold' ..."
  */
 export function parseTTLDaysFromEngineMetadata(engineFull: string): number | null {
   const match = engineFull.match(/toIntervalDay\((\d+)\)/);
@@ -259,9 +250,8 @@ export function parseTTLDaysFromEngineMetadata(engineFull: string): number | nul
 
 /**
  * Detects a legacy per-origin retention TTL clause (the removed
- * `RetentionClass`-based DELETE policy). The cold-storage day count alone can
- * match the desired value while these DELETE clauses still linger, so any table
- * carrying them must be rewritten to the clean MOVE-only expression regardless.
+ * `RetentionClass`-based DELETE policy). The day count can already match the
+ * desired value while these linger, so such a table is rewritten regardless.
  */
 export function hasLegacyRetentionTTL(engineFull: string): boolean {
   return /RetentionClass/i.test(engineFull);
@@ -307,12 +297,9 @@ export function buildRetentionTTLExpression(config: TableTTLEntry): string | nul
 
 export function hasRetentionTTL(engineFull: string): boolean {
   // ClickHouse normalizes a bare-DateTime TTL to an implicit DELETE and drops
-  // the keyword from stored metadata, so engine_full reads e.g.
-  //   TTL if(_retention_days > 0, toDateTime(StartTime) + toIntervalDay(_retention_days), ...)
-  // with no "DELETE". Matching on "DELETE" therefore gives a permanent
-  // false-negative, making the reconciler re-issue ALTER MODIFY TTL on every
-  // run. The `_retention_days` reference is the unique, reliable marker — it
-  // only appears inside the TTL expression (engine_full never lists columns).
+  // the keyword from stored metadata, so matching on "DELETE" gives a
+  // permanent false-negative. `_retention_days` is the reliable marker — it
+  // only appears inside the TTL expression.
   return engineFull.includes("_retention_days");
 }
 
@@ -336,10 +323,9 @@ interface TableEngineInfo {
 export const TIERED_STORAGE_POLICY = "local_primary";
 
 /**
- * Reconciles TTL settings for all managed ClickHouse tables: compares current TTL
- * (system.tables metadata) against desired values (env vars / defaults) and issues
- * `ALTER TABLE MODIFY TTL` only when they differ, using
- * `SET materialize_ttl_after_modify = 0` to keep changes metadata-only (cheap).
+ * Reconciles TTL for all managed tables: compares current TTL (system.tables)
+ * against desired values and issues `ALTER TABLE MODIFY TTL` only when they
+ * differ, with `materialize_ttl_after_modify = 0` to keep it metadata-only.
  */
 export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void> {
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;

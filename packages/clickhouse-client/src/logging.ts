@@ -1,22 +1,7 @@
 /**
- * What to do with the vendor client's own log records.
- *
- * `@clickhouse/client` logs an error for every failed HTTP attempt and cannot
- * know whether the caller then retried and succeeded, so those records carry no
- * verdict. Routed to our error level they made recovered work indistinguishable
- * from real failure and were roughly half of one service's error volume.
- *
- * Two rules come out of that, and they are the whole of this module:
- *
- *  1. Drop the vendor's `error`. A call under the retry wrapper is reported by
- *     the wrapper, which knows the outcome, and an unwrapped call throws, which
- *     surfaces at the request boundary with a stack. The exception is the
- *     signal; the vendor record is an echo with the verdict missing.
- *
- *  2. Never attach the cause under a field named `error`. Loki derives
- *     `detected_level` from the presence of that field, so an `error` key
- *     promotes a record to error regardless of the level chosen here - which is
- *     how successful retries came to be counted as failures.
+ * Two rules for the vendor client's log records: drop its `error` (the retry
+ * wrapper or an unwrapped throw already carries the real verdict); never key
+ * the cause `error` (Loki promotes on that key, once miscounting retries as failures).
  */
 
 export type VendorLogLevel = "trace" | "debug" | "info" | "warn" | "error";
@@ -46,10 +31,9 @@ export interface DecideVendorLogInput {
 }
 
 /**
- * Decide how a vendor record should be emitted, or `null` to drop it.
- *
- * Pure, so the policy is testable without a logger and identical in every
- * process that adopts it.
+ * Decides how a vendor record is emitted, or `null` to drop it. Pure, so
+ * the policy is testable without a logger and identical in every process
+ * that adopts it.
  */
 export function decideVendorLog({ level, record }: DecideVendorLogInput): VendorLogDecision | null {
   if (level === "error") return null;
@@ -103,18 +87,9 @@ export interface VendorLogger {
 }
 
 /**
- * The class `@clickhouse/client` is handed as its `log.LoggerClass`.
- *
- * Without one the driver writes its own console lines —
- * `[2026-09-03T10:58:28.487Z][ERROR][@clickhouse/client][Connection] ...` — a
- * shape nothing else in the process prints, in a lane whose every other line
- * is a time, a level and a scope. The policy above already decided what a
- * vendor record means; this is what finally routes one through the process's
- * own logger so it looks like everything else that process says.
- *
- * The driver asks for a zero-argument constructor, which is why this is a
- * factory: the sink is closed over rather than passed in, and this package
- * still names no logger of its own.
+ * The class `@clickhouse/client` is handed as its `log.LoggerClass`, so its
+ * records route through the process's own structured logger instead of raw
+ * console lines. A factory because the driver wants a zero-arg constructor.
  */
 export function vendorLoggerClassFor(sink: VendorLogSink): new () => VendorLogger {
   return class ClickHouseVendorLogger implements VendorLogger {

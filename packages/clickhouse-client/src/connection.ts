@@ -136,10 +136,9 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
   }
 
   /**
-   * Drops materialised private endpoint clients while keeping this process
-   * connection graph usable. This is the compatibility lifecycle for callers
-   * that historically cleared only the private-client cache; it is not process
-   * shutdown and therefore must not close a shared endpoint.
+   * Drops materialised private endpoint clients while keeping the process's
+   * connection graph usable — the compatibility lifecycle for callers that
+   * historically cleared only that cache. Not shutdown; never closes a shared endpoint.
    */
   async clearPrivateClients(): Promise<void> {
     this.assertOpen();

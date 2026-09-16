@@ -4,12 +4,9 @@ import { compilePiiExceptPatterns, redactEssentialPiiInText } from "../essential
 import { subtractProtectedRanges } from "../essentialPii.ts";
 
 /**
- * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * The native floor, exercised through its own entry point rather than through
- * the span service, because every sabotage that matters to a customer lands
- * here: a recognizer that stops firing, a checksum that stops rejecting, a
- * marker written without the original being removed.
+ * Spec: span-pii-redaction.feature. The native floor, exercised through its
+ * own entry point: every sabotage that matters lands here — a recognizer
+ * that stops firing, a checksum that stops rejecting, a marker left unremoved.
  */
 
 const redact = (text: string, options: Parameters<typeof redactEssentialPiiInText>[0] = { text }) =>

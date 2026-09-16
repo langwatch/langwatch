@@ -5,10 +5,9 @@ import { gqJobsDispatchedOverrideTotal } from "../metrics.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
 /**
- * The dispatch script returns `[flatResults, overrideDispatched]`. These tests
- * drive that contract through a fake Redis, because the number only earns its
- * keep if it survives the boundary: a parked backlog and a starved backlog are
- * indistinguishable without it.
+ * The dispatch script returns `[flatResults, overrideDispatched]`. Driven
+ * through a fake Redis because the number only earns its keep if it
+ * survives that boundary — a parked and a starved backlog look alike without it.
  */
 
 const QUEUE_NAME = "{pipeline/handler/spanStorage}";

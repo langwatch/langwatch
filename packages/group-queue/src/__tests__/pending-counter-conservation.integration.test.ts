@@ -5,10 +5,9 @@ import { GroupQueueProcessor } from "../groupQueue.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
 /**
- * The total-pending counter must stay consistent across every lifecycle path.
- * Post-2026-05-21 Redis saturation incident: an active key that expired before
- * COMPLETE used to leave the counter high for ever (826K phantom pending in
- * production), because the DECR lived in COMPLETE rather than in DISPATCH.
+ * The total-pending counter must stay consistent across every lifecycle
+ * path. Post-2026-05-21 incident: an active key expiring before COMPLETE
+ * left the counter high forever (826K phantom pending) — DECR moved to DISPATCH.
  */
 let redis: Redis;
 let scripts: GroupStagingScripts;

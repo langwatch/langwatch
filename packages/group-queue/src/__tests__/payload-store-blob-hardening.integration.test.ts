@@ -8,9 +8,8 @@ import { createTenantId } from "../storage.ts";
 
 /**
  * GQ2 blob leases move INSIDE the stage eval, atomic with the squash that
- * displaces the value they guard. The old post-eval fire-and-forget transfer
- * could reorder against a concurrent squash of the same dedup id and leave a
- * phantom lifecycle entry pinning the blob until its TTL — the 2026-07-09 leak.
+ * displaces the value they guard — the old post-eval fire-and-forget
+ * transfer could reorder against it, pinning a phantom blob (2026-07-09 leak).
  */
 let redis: Redis;
 let scripts: GroupStagingScripts;

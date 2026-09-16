@@ -11,12 +11,9 @@ import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
 export type GroupQueueRedis = IORedis | Cluster;
 
 /**
- * Storage capabilities borrowed by a process-owned queue graph.
- *
- * This is intentionally a port rather than a resource owner: the caller that
- * constructs a storage client remains responsible for closing it. That keeps
- * a shared Redis connection from being disconnected while Eventing or another
- * feature is still draining work.
+ * Storage capabilities borrowed by a process-owned queue graph. A port, not
+ * a resource owner: the caller that constructs a storage client stays
+ * responsible for closing it, so a shared connection isn't dropped mid-drain.
  */
 export interface GroupQueueStorage {
   objectStoreFor(projectId: string): ObjectStore;

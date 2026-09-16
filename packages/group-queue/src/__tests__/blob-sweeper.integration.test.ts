@@ -192,11 +192,9 @@ describe("BlobSweeper", () => {
 
   describe("given more unreferenced blobs than one sweep's ceiling", () => {
     /**
-     * The ceiling only bounds a tick if the walk resumes where it stopped. When
-     * it restarts at the beginning every tick it re-judges the same leading
-     * slice forever, and every blob past that slice is left to the 4-day
-     * backstop no matter how often the sweep runs — which reads as a healthy
-     * sweep in the totals while the bytes accumulate.
+     * The ceiling only bounds a tick if the walk resumes where it stopped —
+     * restarting at the beginning re-judges the same leading slice forever,
+     * leaving everything past it to the 4-day backstop while totals read healthy.
      */
     describe("when the runner sweeps repeatedly", () => {
       /** @scenario "Successive sweeps reach the blobs the previous ones stopped short of" */

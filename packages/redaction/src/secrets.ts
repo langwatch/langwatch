@@ -65,10 +65,9 @@ const TOKEN_START = String.raw`(?<![A-Za-z0-9_-])`;
 const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
 
 /**
- * Prefixes minted by developer services, compiled as one alternation matched in a single pass.
- * Two deliberate omissions: Twilio's auth token is bare 32-hex (indistinguishable from an MD5
- * digest, so it's caught via `TWILIO_AUTH_TOKEN=` context instead), and PostHog's public `phc_`
- * project key ships in web bundles by design, so only the personal `phx_` key is matched.
+ * Prefixes minted by developer services, alternated into one pass. Twilio's
+ * bare 32-hex token matches via `TWILIO_AUTH_TOKEN=` context instead;
+ * PostHog's public `phc_` key ships in bundles by design, so only `phx_` matches.
  */
 const VENDOR_KEY_PATTERNS = [
   // LangWatch's own token prefixes, minted by modules/api-key/contract/src/api-key.tokens.ts.
@@ -134,10 +133,9 @@ const SHAPED_TOKEN_MAX_BODY = 120;
 const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
 
 /**
- * Does this token body look like key material? Two chars of each class (upper/lower/digit)
- * separates random bytes from git SHAs, screaming-snake constants and camelCase identifiers.
- * Standard base64 (`+`/`/`) is accepted too: excluding it missed AWS secret keys outright and
- * roughly halved recall on base64 bodies versus base64url alone.
+ * Two chars of each class (upper/lower/digit) separates random bytes from
+ * SHAs and camelCase identifiers. Base64's `+`/`/` are included too: excluding
+ * them missed AWS secret keys and halved recall on base64 bodies.
  */
 function isKeyShapedBody(body: string): boolean {
   if (body.length < SHAPED_TOKEN_MIN_BODY || body.length > SHAPED_TOKEN_MAX_BODY) {
@@ -149,11 +147,9 @@ function isKeyShapedBody(body: string): boolean {
 }
 
 /**
- * Prefixes that announce a digest or an encoding rather than a vendor. A
- * content hash has exactly the entropy of key material and none of the
- * sensitivity, and it is written in the same `prefix-body` form: `sha512-…` in
- * a lockfile, `blake3-…` in a build manifest. Redacting those would turn a
- * dependency diff into placeholders for no gain.
+ * Digest/encoding prefixes, not vendors. A content hash has key-material
+ * entropy but none of the sensitivity, so redacting `sha512-…`/`blake3-…`
+ * would turn a lockfile or build-manifest diff into placeholders for no gain.
  */
 const DIGEST_PREFIXES = new Set([
   "sha1",
@@ -185,10 +181,9 @@ const DIGEST_PREFIXES = new Set([
 ]);
 
 /**
- * The middle segment that turns a prefixed hex string into a credential. An all-hex body is
- * far more likely to be a commit, a trace id or a digest than a key, so the shape rule alone
- * rejects it; this middle word (`live`, `key`, `secret`, …) is what separates `acme_live_<hex>`
- * from `commit_<hex>`, the way Stripe's own `sk_live_…` names itself.
+ * The middle word that turns a prefixed hex string into a credential — an
+ * all-hex body is more often a commit or trace id than a key, so `live`/`key`/
+ * `secret` is what separates `acme_live_<hex>` from `commit_<hex>`.
  */
 const HEX_BODY_CREDENTIAL_SEGMENTS = [
   "live",
@@ -226,10 +221,9 @@ const IDENTIFIER_PREFIXES = new Set([
 ]);
 
 /**
- * Prefixes that name a RECORD (`project_…`, `card_…`, `scenario_…`, `chatcmpl-…`), not a key.
- * `prefix_<random body>` is the same shape and entropy a key is minted in, so the difference is
- * not measurable from the string and has to be named — redaction is irreversible at ingestion,
- * so eating an id is worse than missing a key.
+ * Prefixes that name a RECORD, not a key — same shape/entropy as one, so it
+ * must be named explicitly. Redaction is irreversible at ingestion, so eating
+ * an id is worse than missing a key.
  */
 const RECORD_ID_PREFIXES = new Set([
   "project",
@@ -270,10 +264,8 @@ const RECORD_ID_PREFIXES = new Set([
 ]);
 
 /**
- * Keys that are published on purpose. PostHog's `phc_` is a client-side project
- * key that ships inside web bundles by design, so blanking it hides legitimate
- * telemetry configuration and protects nothing. The vendor-list comment has
- * always said so; the shape rule was catching it anyway, which is the same
+ * Keys published on purpose. PostHog's `phc_` ships in bundles by design, so
+ * blanking it protects nothing — the shape rule caught it anyway, the same
  * over-redaction as eating a record id.
  */
 const PUBLIC_KEY_PREFIXES = new Set(["phc"]);
@@ -321,10 +313,9 @@ const CONTEXT_VALUE_MIN_LENGTH = 16;
 const CONTEXT_VALUE_MIN_ENTROPY = 2.9;
 
 /**
- * Does this value, already introduced by a word like "api key" or "password", carry an actual
- * credential? Looser than the shape-only rule (accepts bare hex/base32), but rejects the three
- * things that commonly follow a credential keyword and aren't one: a placeholder, an
- * environment-variable reference, and a URL.
+ * Does a value already introduced by a keyword carry a credential? Looser
+ * than the shape-only rule, but rejects what commonly follows a keyword and
+ * isn't one: a placeholder, an env-var reference, a URL.
  */
 function isCredentialValue(value: string): boolean {
   if (value.length < CONTEXT_VALUE_MIN_LENGTH) return false;
@@ -344,10 +335,9 @@ const LOOSE_VALUE_MIN_LENGTH = 20;
 const LOOSE_VALUE_MIN_ENTROPY = 3.4;
 
 /**
- * The bar a value has to clear when the separator was only whitespace (`key <value>`, usually
- * prose, vs `key: <value>`). Requiring the value to look like key material — a long hex/base32
- * run, or digits mixed with same-case letters — cut a real-corpus false-positive rate from 5,816
- * spans to 338, at roughly 87% precision.
+ * The bar when the separator was only whitespace (`key <value>` vs `key:
+ * <value>`): must look like key material, which cut false positives from
+ * 5,816 spans to 338, ~87% precision.
  */
 function isKeyMaterial(value: string): boolean {
   if (value.length < LOOSE_VALUE_MIN_LENGTH) return false;
@@ -389,10 +379,9 @@ const CREDENTIAL_QUALIFIERS = new Set([
 const QUALIFIER_ALTERNATION = [...CREDENTIAL_QUALIFIERS].join("|");
 
 /**
- * Words that introduce a credential, including compound spellings (`api key`, `API_KEY`,
- * `x-api-key`, `client_secret`). `key` alone needs a qualifier in front of it — every other noun
- * here names a credential on its own, but bare `key` names a map entry at least as often as a
- * secret, and JSON/OTLP/config dictionaries are full of `key` fields holding ids and hashes.
+ * Words that introduce a credential, incl. compound spellings (`api key`,
+ * `x-api-key`). `key` alone needs a qualifier — unqualified, it names an
+ * ordinary map entry in JSON/OTLP/config dictionaries at least as often.
  */
 const CREDENTIAL_KEYWORD =
   String.raw`(?:x[_.\- ]?)?(?:` +
@@ -412,10 +401,9 @@ function isBasicAuthPayload(value: string): boolean {
 }
 
 /**
- * Built-in value patterns, each carrying the global flag and matched only through
- * `String.prototype.replace` (never `.test`/`.exec`, which carry `lastIndex` state on a global
- * regex). Order matters: precise vendor rules run before the broad shape/context ones, so a
- * recognised credential is reported under the vendor that minted it, not as a generic match.
+ * Built-in value patterns, matched only via `.replace` (never `.test`/`.exec`,
+ * which carry `lastIndex` on a global regex). Order matters: precise vendor
+ * rules run before the broad shape/context ones, so a match reports under its vendor.
  */
 const VALUE_RULES: ValueRule[] = [
   {
@@ -597,11 +585,9 @@ export const BUILTIN_SECRET_RULES: readonly {
 }[] = VALUE_RULES.map(({ id, description }) => ({ id, description }));
 
 /**
- * The rules that judge a token by its own SHAPE — the only ones that read the token and nothing
- * else, so the only ones that can take an identifier, and the only ones a caller has cause to
- * turn off. `shaped_api_key` asks only whether the body looks random enough (this is what took
- * `scenario.run_id` in production); `prefixed_hex_api_key` asks for an all-hex body behind an
- * ordinary English middle word (`live`, `test`, `key`, `secret`) rather than a vendor namespace.
+ * Rules that judge a token by SHAPE alone — the only ones that can take an
+ * identifier (this took `scenario.run_id` in production) and the only ones a
+ * caller has cause to turn off.
  */
 export const SHAPE_ONLY_SECRET_RULE_IDS: readonly string[] = [
   "prefixed_hex_api_key",
@@ -664,18 +650,16 @@ export function isSensitiveAttributeKey(key: string): boolean {
 }
 
 /**
- * A pattern that already states where it may start is compiled as written. The lookbehind arm
- * is `(?<=` or `(?<!` specifically, never a bare `(?<`: a named capture group opens the same way,
- * so a looser test read `(?<key>sk-.*)` as an anchor and let it shred `task-notification` exactly
- * like the unguarded `sk-.*` it exists to tame.
+ * A pattern that states where it may start is compiled as-is. The lookbehind
+ * arm must be `(?<=`/`(?<!`, never bare `(?<` — a named capture group opens
+ * the same way, and a looser test once shredded `task-notification`.
  */
 const SELF_ANCHORED_PATTERN = /^(?:\^|\\b|\\B|\(\?<[=!])/;
 
 /**
- * Give a hand-written pattern the word boundary it almost certainly meant: `sk-.*` reads as "a
- * key starting with sk-" but as a regex also matches the `sk-` inside `task-notification`.
- * The alternation is wrapped too, so `a|b` gets the guard on both branches, and the wrapping
- * group is non-capturing so the author's own groups keep their numbers.
+ * Gives a hand-written pattern the word boundary it almost certainly meant:
+ * `sk-.*` also matches the `sk-` inside `task-notification`. The wrapping
+ * group is non-capturing, so the author's own groups keep their numbers.
  */
 function guardCustomPattern(pattern: string): string {
   if (SELF_ANCHORED_PATTERN.test(pattern)) return pattern;
@@ -703,10 +687,9 @@ const ORDINARY_TEXT_PROBES = [
 ] as const;
 
 /**
- * The first piece of ordinary text a custom secret pattern would eat, or `null` when it only
- * matches credential-shaped strings — lets a caller warn about a pattern when it's written
- * rather than discovering it from a corrupted transcript weeks later. Compiled through the exact
- * guard the ingestion path applies, so this reports what would really happen at runtime.
+ * The first ordinary-text probe a custom pattern would eat, or `null` if it
+ * only matches credential-shaped strings — warns when the pattern is written,
+ * not weeks later from a corrupted transcript. Uses the exact ingestion guard.
  */
 export function overBroadSecretPatternProbe(pattern: string): string | null {
   // A blank pattern is an empty row the customer has not finished typing, not a
@@ -728,10 +711,9 @@ export function overBroadSecretPatternProbe(pattern: string): string | null {
 }
 
 /**
- * Compile user-supplied pattern strings into case-insensitive global regexes,
- * silently dropping any that fail to compile (the service validates them with
- * `isSafeRegex` before they are ever stored, so this is a last-resort guard).
- * Each is given a leading word boundary unless it already carries one.
+ * Compiles user pattern strings into case-insensitive global regexes, silently
+ * dropping any that fail (a last-resort guard; the service already validates
+ * with `isSafeRegex`). Each gets a leading word boundary unless it has one.
  */
 export function compileSecretPatterns(patterns: readonly string[]): RegExp[] {
   const compiled: RegExp[] = [];
@@ -756,10 +738,9 @@ function findGuardedPattern(pattern: string): RegExp | undefined {
 }
 
 /**
- * A secret value lives inside a single quoted string, so it can never legitimately contain a
- * quote or backtick. Clamping every match at the first such character keeps a greedy custom
- * pattern like `sk-.*` from swallowing the rest of the line. Newlines are excluded from the
- * clamp: `.*` already stops at them, and the multi-line PEM rule must keep spanning them.
+ * A secret value can never contain a quote or backtick, so clamping at the
+ * first one stops a greedy pattern like `sk-.*` from eating the rest of the
+ * line. Newlines are excluded — the multi-line PEM rule must keep spanning them.
  */
 const VALUE_BOUNDARY = /["'`]/;
 
@@ -770,12 +751,9 @@ function keptLengthAtBoundary(match: string): number {
 }
 
 /**
- * The same clamp for a hand-written pattern, widened to whitespace and angle
- * brackets. A trailing `.*` is the commonest thing in a custom pattern and it
- * runs to the end of the line, so without this a single credential match takes
- * the rest of the log line, the rest of the XML tag, and the sentence after it
- * with it. A credential never contains a space or a bracket, so stopping there
- * costs nothing and bounds the blast radius of a pattern written in haste.
+ * The same clamp, widened to whitespace and angle brackets: a trailing `.*`
+ * in a custom pattern otherwise runs to the end of the line, taking the rest
+ * of the log line or XML tag with it. A credential never contains either.
  */
 const CUSTOM_VALUE_BOUNDARY = /[\s"'`<>]/;
 
@@ -804,10 +782,9 @@ function replacementFor(rule: ValueRule, args: string[]): string | null {
 }
 
 /**
- * Cut oversized text into scannable pieces, preferring a newline boundary so a credential is
- * not split down the middle. Returning long text untouched (the prior behaviour) was a hard
- * bypass, not a budget: an 885 KB input carrying a live provider key went through ingestion
- * completely unscanned. Slicing bounds the per-pass cost while leaving no unscanned region.
+ * Cuts oversized text into pieces on a newline boundary, so a credential isn't
+ * split mid-token. Returning long text untouched was a hard bypass, not a
+ * budget: an 885 KB input carrying a live key once went through unscanned.
  */
 function sliceForScan(text: string): string[] {
   if (text.length <= MAX_SCAN_LENGTH) return [text];
@@ -822,11 +799,9 @@ function sliceForScan(text: string): string[] {
 }
 
 /**
- * Where the slice starting at `start` may end WITHOUT splitting a credential. A boundary that
- * lands mid-token is the leak this slicing exists to close — neither half matches any rule — so
- * every cut lands on whitespace, which no single-line credential contains. A PEM block is the
- * exception (it spans newlines by design), so an unterminated `-----BEGIN` pulls its `-----END`
- * into the same slice.
+ * Where a slice may end WITHOUT splitting a credential — every cut lands on
+ * whitespace, since a mid-token split matches no rule on either half. A PEM
+ * block is the exception: an unterminated `-----BEGIN` pulls its `-----END` in.
  */
 function sliceEndAfter(text: string, start: number): number {
   const target = Math.min(start + MAX_SCAN_LENGTH, text.length);
@@ -837,12 +812,9 @@ function sliceEndAfter(text: string, start: number): number {
   if (lastSpace > 0) {
     end = start + lastSpace;
   } else {
-    // The whole window is one unbroken run, so cutting at `target` would land
-    // mid-token. Look ahead for the whitespace that ends the run, but only so
-    // far: past this much the run is an order of magnitude longer than any
-    // credential, and cutting inside it cannot split one. Without the cap a
-    // payload carrying no whitespace at all would come back as a single slice,
-    // which is the unbounded scan the budget exists to prevent.
+    // The whole window is one unbroken run; look ahead for whitespace but cap
+    // it — past this the run is far longer than any credential, so cutting
+    // inside it cannot split one, and an unbounded payload can't skip scanning.
     const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
     const next = lookahead.search(/\s/);
     end = next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
@@ -870,10 +842,9 @@ const PEM_BEGIN = "-----BEGIN";
 const PEM_END = "-----END";
 
 /**
- * Redact secrets from one string: runs every built-in value rule, then any caller-supplied
- * custom patterns, and returns the scrubbed text plus how many secrets were replaced.
- * `skipRuleIds` reaches the built-in rules only — a custom pattern is the customer's own
- * decision and always runs. See {@link SHAPE_ONLY_SECRET_RULE_IDS} for the list to pass.
+ * Redacts secrets from one string: built-in rules, then any custom patterns.
+ * `skipRuleIds` reaches only the built-ins — a custom pattern is the
+ * customer's own decision and always runs. See {@link SHAPE_ONLY_SECRET_RULE_IDS}.
  */
 export function redactSecretsInText({
   text,
@@ -952,11 +923,9 @@ export interface SecretMatch {
 }
 
 /**
- * Detect secrets in one string WITHOUT redacting it: returns which rule matched and where, so
- * the evaluator can report a leak while leaving the text alone. Shares the exact rule set (and
- * `skipRuleIds`) with `redactSecretsInText`. Uses `matchAll`, which clones the regex internally
- * so global rules keep `lastIndex === 0`; matches covering the same credential are collapsed so
- * one leak counts once.
+ * Detects secrets WITHOUT redacting: returns which rule matched and where, so
+ * an evaluator can report a leak. Shares the exact rule set with
+ * `redactSecretsInText`; overlapping matches for one credential collapse to one.
  */
 export function detectSecretsInText({
   text,
@@ -1047,12 +1016,9 @@ function matchesOfCustomPattern(pattern: RegExp, text: string): SecretMatch[] {
 }
 
 /**
- * Collapse matches covering the same credential. The layers overlap by design:
- * `api_key: sk-proj-...` is at once a provider key, a vendor-shaped token and a
- * named assignment. The evaluator scores by match count, so reporting one
- * credential three times would claim three leaks. Rules are visited
- * most-specific first, so the vendor that minted the key wins over the generic
- * shape and the surrounding context.
+ * Collapses matches covering the same credential — layers overlap by design,
+ * so the evaluator would triple-count one leak without this. Most-specific
+ * rule wins over the generic shape and surrounding context.
  */
 function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
   const kept: SecretMatch[] = [];

@@ -20,12 +20,9 @@ const SCORE_BASE_MS = Date.now() - 60 * 60 * 1000;
 const orderedScore = (n: number): number => SCORE_BASE_MS + n * 1000;
 
 /**
- * The batch sizes a bisection produces for one dispatch of `root` payloads,
- * against a handler that accepts at most `maxWorkable` of them per call.
- *
- * The rules, which are the bisector's contract: a batch the handler refuses is
- * split into its ceiling and floor halves, a batch it accepts is a leaf, and
- * the walk is depth-first with the left half before the right.
+ * Batch sizes a bisection produces for `root` payloads against a handler
+ * accepting at most `maxWorkable` per call. Contract: a refused batch splits
+ * into ceiling/floor halves; an accepted batch is a leaf; depth-first, left before right.
  */
 function bisectionDescent({ root, maxWorkable }: { root: number; maxWorkable: number }): number[] {
   if (root <= maxWorkable) return [root];
@@ -38,10 +35,9 @@ function bisectionDescent({ root, maxWorkable }: { root: number; maxWorkable: nu
 }
 
 /**
- * Reads a recorded sequence of handler batch sizes as the dispatches it is made
- * of: `roots` is the size each dispatch started from, and `expected` is the
- * sequence those roots should have produced. Two values rather than one verdict
- * keeps a coalescing change from reading as a bisection bug.
+ * Reads a recorded sequence of handler batch sizes as its dispatches:
+ * `roots` is each dispatch's starting size, `expected` the sequence it
+ * should produce. Two values, not one verdict, so coalescing isn't misread as a bisection bug.
  */
 function readDispatchRoots({ sizes, maxWorkable }: { sizes: number[]; maxWorkable: number }): {
   roots: number[];
@@ -119,11 +115,9 @@ describe("GroupQueueProcessor — batch bisection", () => {
   }
 
   /**
-   * Stages a whole group through a producer-only processor, then starts the
-   * consumer that dispatches it. Every payload is therefore staged AND past due
-   * before a dispatcher exists to look at the group — otherwise a consumer that
-   * wakes inside the millisecond spread coalesces a PREFIX of the group, and a
-   * test about ONE coalesced batch gets two smaller ones instead.
+   * Stages a whole group via a producer-only processor, then starts the
+   * consumer. Every payload is staged AND past due first — else a consumer
+   * waking mid-spread coalesces a PREFIX, splitting one batch into two.
    */
   async function stageThenConsume({
     processFn,

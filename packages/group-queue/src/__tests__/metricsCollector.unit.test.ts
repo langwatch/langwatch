@@ -19,11 +19,9 @@ const PREFIX = "gq:test:";
 type ReadyEntry = { member: string; score: number };
 
 /**
- * Real zrangebyscore semantics over an in-memory ready zset: exclusive "(x"
- * lower bound, a numeric or "+inf" upper bound, LIMIT offset/count, ascending
- * by score, and WITHSCORES flattening. The collector issues two shapes of
- * this call per collect (the eligible probe and the deferred-backlog sample),
- * so one model backs both instead of a bespoke per-test stub.
+ * Real zrangebyscore semantics over an in-memory ready zset (exclusive
+ * bounds, LIMIT offset/count, WITHSCORES). Backs both shapes the collector
+ * issues per collect (eligible probe, deferred-backlog sample) with one model.
  */
 function zrangebyscoreModel({
   entries,
@@ -61,9 +59,8 @@ function zrangebyscoreModel({
 
 /**
  * Minimal Redis stub exposing only the reads collect() performs. `readyZset`
- * backs both zrangebyscore calls (the eligible probe and the deferred-backlog
- * sample) through the real model above; `headJobScores` maps a group's jobs
- * key to the [member, score] pair its pipelined zrange returns.
+ * backs both zrangebyscore calls through the model above; `headJobScores`
+ * maps a group's jobs key to the [member, score] pair its zrange returns.
  */
 function makeRedis(
   opts: {
@@ -406,12 +403,10 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
   describe("given 50 long-delayed groups and a single day-old retry-backoff group", () => {
     describe("when metrics are collected", () => {
       it("still surfaces the retry-backoff group's age (regression: nearest-first sampling)", async () => {
-        // Regression for the 2026-08-05 incident this gauge exists to catch:
-        // fifty monitor-timer groups scored hours out must NOT displace a
-        // retry-backoff group (scored only seconds out) from the sample. Under
-        // the old zrevrange(0, 49) sampling — largest scores first — the 50
-        // far-future groups would fill the sample and this test fails; the
-        // nearest-first zrangebyscore sampling ranks the backoff group first.
+        // Regression for 2026-08-05: fifty monitor-timer groups scored hours
+        // out must NOT displace a retry-backoff group (seconds out) from the
+        // sample. The old zrevrange(0, 49) (largest-first) would let them;
+        // nearest-first zrangebyscore ranks the backoff group first.
         const now = Date.now();
         const readyZset: ReadyEntry[] = [];
         const headJobScores: Record<string, string[]> = {};
@@ -441,10 +436,8 @@ describe("GroupQueueMetricsCollector — oldest backlog age", () => {
 
 /**
  * The aggregate gauges above are blind to one group holding an enormous
- * staging hash: the group count is unremarkable and the head job's age says
- * nothing about how many jobs sit behind it. These cover the sweep that closes
- * that gap, and in particular that it is a rotation and not a sample, because
- * a sample of the head of ready is exactly where the outlier is not.
+ * staging hash. These cover the sweep that closes that gap — and that it's
+ * a rotation, not a sample, since a sample of ready's head misses the outlier.
  */
 describe("GroupQueueMetricsCollector, per-group staging depth", () => {
   beforeEach(() => {

@@ -1,8 +1,7 @@
 /**
- * Policy layer over the vendor client's `query`/`insert`, for the statements
- * that still go through `@clickhouse/client` directly rather than the
- * {@link ClickHouseQueryClient} port: retry, outcome logging/metrics, and an
- * in-band exception guard for streamed results.
+ * Policy layer over the vendor client's `query`/`insert`, for statements
+ * still going through `@clickhouse/client` directly rather than
+ * {@link ClickHouseQueryClient}: retry, outcome metrics, in-band exceptions.
  */
 
 import { runWithRetry } from "./retry.ts";
@@ -55,11 +54,9 @@ export interface VendorClientResilienceOptions {
   /** Per-statement outcome lines: failures, cold scans, debug successes. */
   outcomeLogger?: StatementLogSink | undefined;
   /**
-   * Translates a raised read error into what the host's callers should see —
-   * typically a typed error with remediation. Applied after retries are
-   * exhausted and to in-band exceptions; never to insert failures, whose
-   * callers are queue jobs that classify the raw error themselves. Omit to
-   * raise errors untranslated.
+   * Translates a raised read error into what callers should see, applied
+   * after retries exhaust and to in-band exceptions — never to insert
+   * failures, whose callers classify the raw error themselves.
    */
   translateQueryError?: ((input: { error: unknown; durationMs: number }) => unknown) | undefined;
   /**

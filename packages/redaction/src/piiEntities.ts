@@ -1,8 +1,7 @@
 /**
  * The PII vocabulary: which identifiers each redaction level covers.
- * Dependency-free and pinned by literal, not derived, so the settings
- * screen can list them without a browser bundle pulling in the recognizer
- * tables, and a dropped identifier can't silently stop being detected.
+ * Dependency-free and pinned by literal so the settings screen lists them
+ * without a browser bundle pulling in the recognizer tables.
  */
 
 /** Identifiers the native, in-process engine detects (pattern + checksum based). */
@@ -62,9 +61,8 @@ export const PRESIDIO_STRICT_ENTITIES = [
 
 /**
  * Identifiers the strict analyzer detects that the native engine cannot
- * (names, locations, and a few national IDs). For the custom level these are
- * the only selections that still require the analysis service; everything else
- * is redacted natively.
+ * (names, locations, a few national IDs). For custom, these are the only
+ * selections still requiring the analysis service; everything else is native.
  */
 export const STRICT_ONLY_PII_ENTITIES: readonly string[] = PRESIDIO_STRICT_ENTITIES.filter(
   (entity) => !new Set<string>(ESSENTIAL_PII_ENTITIES).has(entity),

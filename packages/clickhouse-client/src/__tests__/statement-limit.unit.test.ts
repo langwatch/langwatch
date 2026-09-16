@@ -1,10 +1,7 @@
 /**
- * The client-side statement bound: how many statements this process lets reach
- * ClickHouse at once, what happens to the surplus, and who is allowed to stop
- * waiting.
- *
- * A deferrable driver stands in for the vendor client, because with instant
- * statements nothing ever waits and a bound is unobservable.
+ * The client-side statement bound: how many statements reach ClickHouse at
+ * once, what happens to the surplus, and who may stop waiting. A deferrable
+ * driver stands in for the vendor client, since instant statements never wait.
  */
 import { describe, expect, it, vi } from "vitest";
 

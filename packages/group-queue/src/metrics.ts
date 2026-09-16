@@ -95,10 +95,9 @@ export const gqJobsDispatchedTotal = new Counter({
 });
 
 /**
- * Jobs admitted past a tenant's fair share because slots would otherwise sit
- * idle. Distinguishes why `gq_parked_groups` is high: a non-zero rate here
- * means the override is working; a flat zero with a full fleet means parked
- * work is waiting on capacity, not fairness.
+ * Jobs admitted past a tenant's fair share so slots don't sit idle.
+ * Distinguishes why `gq_parked_groups` is high: non-zero here means the
+ * override is working; zero with a full fleet means it's waiting on capacity.
  */
 export const gqJobsDispatchedOverrideTotal = new Counter({
   name: "gq_jobs_dispatched_override_total",
@@ -205,10 +204,9 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 });
 
 /**
- * Backlog age the eligible-waiting gauge is structurally blind to: a group
- * pinned in retry backoff has its ready score rewritten to now+backoff on every
- * failed attempt, so this gauge clocks off the per-group jobs zset instead,
- * whose scores survive retries/blocks/parks.
+ * Backlog age the eligible-waiting gauge is blind to: a group in retry
+ * backoff has its ready score rewritten to now+backoff each attempt, so this
+ * clocks the per-group jobs zset instead, whose scores survive retries/parks.
  */
 export const gqOldestBacklogAgeMilliseconds = new Gauge({
   name: "gq_oldest_backlog_age_milliseconds",
@@ -217,11 +215,9 @@ export const gqOldestBacklogAgeMilliseconds = new Gauge({
 });
 
 /**
- * Deepest single group's staging hash, in staged jobs. The aggregate gauges
- * are blind to this: one group holding hundreds of thousands of fields looks
- * unremarkable to both of them (2026-06 incident: ~290k fields, ~2.9 GB).
- * Published from a rotating sweep — "deepest seen since this rotation began",
- * not "right now"; see `sweepStagingDepth` in metricsCollector.ts.
+ * Deepest single group's staging hash. Aggregate gauges miss this — one group
+ * with hundreds of thousands of fields looks unremarkable (2026-06 incident:
+ * ~290k fields, ~2.9 GB). "Deepest seen this sweep rotation," not "right now."
  */
 export const gqGroupStagingDepthMax = new Gauge({
   name: "gq_group_staging_depth_max",
@@ -230,11 +226,9 @@ export const gqGroupStagingDepthMax = new Gauge({
 });
 
 /**
- * How many groups are at or above {@link STAGING_DEPTH_REPORT_FLOOR}.
- *
- * Separate from the max because they answer different questions under alarm.
- * One deep group is a hot key; a thousand is the drainer having stopped. The
- * max alone cannot tell those apart, and they want different responses.
+ * Groups at or above {@link STAGING_DEPTH_REPORT_FLOOR} — separate from the
+ * max because they answer different alarms: one deep group is a hot key,
+ * a thousand is the drainer having stopped, and each wants a different response.
  */
 export const gqGroupsOverStagingDepth = new Gauge({
   name: "gq_groups_over_staging_depth",
@@ -243,19 +237,16 @@ export const gqGroupsOverStagingDepth = new Gauge({
 });
 
 /**
- * Depth at which a group starts being counted as accumulating. Inclusive — a
- * group at exactly this depth is counted, since a round number is the one most
- * likely to be chosen deliberately. A reporting floor only: nothing in the
- * queue changes behaviour when a group crosses it.
+ * Depth at which a group counts as accumulating. Inclusive, since a round
+ * number is the one most likely chosen deliberately. Reporting only — nothing
+ * in the queue changes behaviour when a group crosses it.
  */
 export const STAGING_DEPTH_REPORT_FLOOR = 10_000;
 
 /**
- * Jobs whose producer supplied a ready score the queue refused. Raised at the
- * staging fallback the moment the value is rejected, before the bad score is
- * written — a post-hoc scan of the ready set would find nothing and report
- * zero forever. Excludes payloads scored at staging time by design (no
- * occurrence time supplied at all).
+ * Jobs whose producer-supplied ready score the queue refused. Raised the
+ * moment it's rejected, before the bad score is written — a post-hoc ready-set
+ * scan would find nothing and report zero forever.
  */
 export const gqReadyScoreImplausibleTotal = new Counter({
   name: "gq_ready_score_implausible_total",
@@ -283,9 +274,8 @@ export const gqPayloadTooLargeTotal = new Counter({
 });
 
 /**
- * Claim-side poison guard parked a group into the blocked set
- * (specs/poison-group-park-guard.feature). reason:
- * "claim_strikes" = consecutive worker deaths while the group was in flight;
+ * Claim-side poison guard parked a group into the blocked set. reason:
+ * "claim_strikes" = consecutive worker deaths while in flight;
  * "oversized_payload" = staged value over the decode cap.
  */
 export const gqGroupsPoisonParkedTotal = new Counter({
@@ -295,11 +285,9 @@ export const gqGroupsPoisonParkedTotal = new Counter({
 });
 
 /**
- * Retry re-encode failed (transient blob-store 5xx, payload-too-large from a
- * state-bloat regression) — the retry never re-staged and the slot dropped to
- * the fail-safe. Distinct from `gqJobsNonRetryableTotal` (which is for genuine
- * non-retryable process() errors) so oncall can disambiguate "gave up on a
- * bad payload" from "gave up because encode blipped mid-retry".
+ * Retry re-encode failed, so the slot dropped to the fail-safe without
+ * re-staging. Distinct from `gqJobsNonRetryableTotal` (genuine process()
+ * errors), so oncall can tell "bad payload" from "encode blipped mid-retry".
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
@@ -308,11 +296,9 @@ export const gqRetryEncodeFailuresTotal = new Counter({
 });
 
 /**
- * A staged job we could not decode and therefore discarded (#5538): the drop
- * path used to call `scripts.complete()`, incrementing the same counter a
- * genuine success takes, so a discard read as a win. See `DecodeFailureReason`
- * for what each `reason` label means; a non-zero rate is permanent work loss
- * unless the owning application replays.
+ * A staged job that couldn't be decoded and was discarded (#5538: the drop
+ * path used to call `scripts.complete()`, so a discard read as a success).
+ * A non-zero rate is permanent work loss unless the owning app replays.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
@@ -344,11 +330,9 @@ export function recordDroppedJob(labels: {
 }
 
 /**
- * A dispatched job whose routing metadata names a pipeline this worker has not
- * registered. Normal cause is a rolling deploy: old workers still poll the
- * queue and reject jobs for a pipeline they don't know, so a new-build worker
- * can take them. A burst ending with the deploy is expected; a rate that
- * outlives it means a pipeline was removed without a tombstone.
+ * A dispatched job whose pipeline this worker hasn't registered — normal
+ * during a rolling deploy, as old workers reject it for a new build to take.
+ * A rate outliving the deploy means a pipeline was removed without a tombstone.
  */
 export const gqJobsUnroutableTotal = new Counter({
   name: "gq_jobs_unroutable_total",
@@ -358,10 +342,8 @@ export const gqJobsUnroutableTotal = new Counter({
 
 /**
  * A release retired a blob's LAST lease, dropping its expiry from the 4-day
- * backstop to the release grace window. Liveness signal for reclaim: a rate
- * near zero while jobs complete means reclaim isn't happening — read beside
- * `gq_jobs_completed_total`. Scope: terminal retirement only, not the
- * dedup-squash release in `STAGE_LUA` — treat this count as a floor.
+ * backstop to the grace window. Near-zero while jobs complete means reclaim
+ * isn't happening. Terminal retirement only — a floor, not a total.
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
@@ -370,11 +352,9 @@ export const gqBlobReleaseGraceTotal = new Counter({
 });
 
 /**
- * Every blob the reclaim runner examined, by outcome. Unlike
- * `gq_blob_release_grace_total`, outcomes partition the WHOLE keyspace, so
- * `sum by (outcome)` is a full picture, not a floor — the signal to read when
- * retention climbs anyway. `repaired` rising means releases are being missed;
- * `reclaimed` is the only outcome that frees bytes.
+ * Every blob the reclaim runner examined, by outcome — outcomes partition the
+ * WHOLE keyspace, so `sum by (outcome)` is a total, not a floor. `repaired`
+ * rising means releases are missed; only `reclaimed` frees bytes.
  */
 export const gqBlobSweepTotal = new Counter({
   name: "gq_blob_sweep_total",
@@ -383,11 +363,9 @@ export const gqBlobSweepTotal = new Counter({
 });
 
 /**
- * Drained siblings restaged because their `__jobName` differed from the
- * dispatched job's (ADR-066 mixed-command isolation) — distinct from the
- * batch-failure restage paths, which restage the whole batch. A steady rate
- * means genuinely mixed command traffic; a spike flags a group-key collision
- * or a misrouted producer.
+ * Drained siblings restaged because `__jobName` differed from the dispatched
+ * job's (ADR-066). Distinct from batch-failure restage, which restages the
+ * whole batch. Steady means mixed traffic; a spike flags a key collision.
  */
 export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
@@ -396,11 +374,9 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
 });
 
 /**
- * A coalesced batch failed retryably and was split in half to isolate the
- * cause. Increments ONCE PER SPLIT, not once per batch, so read it as a rate: a
- * steady non-zero rate means either the batch bound is too generous or a
- * payload in this pipeline is persistently unprocessable. Zero means batches
- * succeed whole or fail non-retryably.
+ * A coalesced batch failed retryably and split in half to isolate the cause.
+ * Increments ONCE PER SPLIT, not once per batch. Steady non-zero means the
+ * batch bound is too generous, or a payload is persistently unprocessable.
  */
 export const gqBatchBisectionsTotal = new Counter({
   name: "gq_batch_bisections_total",

@@ -1,9 +1,7 @@
 /**
- * Whether a key (or key prefix) carries a Redis Cluster hash tag — a non-empty
- * `{…}` whose content alone decides the slot. The GroupQueue's multi-key Lua
- * (and the holder release/transfer evals) require their keys in one slot, so a
- * tag is mandatory in cluster mode. Mirrors Redis's rule: the first `{`, the
- * first `}` after it, and at least one character between them.
+ * Whether a key carries a Redis Cluster hash tag — a non-empty `{…}` whose
+ * content alone decides the slot. Mandatory in cluster mode, since the
+ * GroupQueue's multi-key Lua requires its keys in one slot.
  */
 export function hasRedisHashTag(name: string): boolean {
   const open = name.indexOf("{");

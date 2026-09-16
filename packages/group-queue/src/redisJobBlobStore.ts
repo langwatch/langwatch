@@ -43,10 +43,9 @@ export class RedisJobBlobStore implements JobBlobStore {
   }
 
   /**
-   * Reads the blob WITHOUT refreshing its TTL. Use from the ops dashboard and
-   * any other non-worker inspection path so a repeatedly-viewed blocked group
-   * doesn't keep its orphan blobs alive indefinitely (2026-06-24 review).
-   * A missing key returns null.
+   * Reads the blob WITHOUT refreshing its TTL — for the ops dashboard and
+   * other non-worker inspection, so a repeatedly-viewed blocked group can't
+   * keep its orphan blobs alive indefinitely (2026-06-24). Missing key returns null.
    */
   async peek({ id }: { id: string }): Promise<Buffer | null> {
     return this.redis.getBuffer(this.keyPrefix + id);

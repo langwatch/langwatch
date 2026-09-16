@@ -181,11 +181,9 @@ describe("GroupQueueProcessor — GQ2 offload", () => {
   });
 
   // The fan-out content-sharing invariant is proven at the encode level in
-  // job-envelope.unit.test.ts ("when two envelopes have identical user payloads
-  // but different queue machinery → ONE stored blob"). A queue-level end-to-end
-  // proof requires multi-subscriber wiring (multiple subscriber definitions over one
-  // event) — out of scope for this single-subscriber harness. Lease expiry and
-  // idempotency are proven in blob-leases.integration.test.ts.
+  // job-envelope.unit.test.ts. A queue-level end-to-end proof needs
+  // multi-subscriber wiring — out of scope for this single-subscriber
+  // harness. Lease expiry/idempotency are proven in blob-leases.integration.test.ts.
   describe("given an offloaded job", () => {
     describe("when it is staged", () => {
       it("keys the blob by tenant namespace and content hash", async () => {

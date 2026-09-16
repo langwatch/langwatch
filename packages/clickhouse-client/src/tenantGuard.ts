@@ -278,12 +278,9 @@ export class TenantGuard {
   }
 
   /**
-   * Throws {@link TenantScopeError} unless every row of the batch names the
-   * tenant the batch is written for.
-   *
-   * A write has no predicate to read, so the batch itself is the evidence.
-   * Checking each row rather than the first is what stops one mixed batch
-   * writing rows a tenant-scoped read will never find again.
+   * Throws {@link TenantScopeError} unless every row names the tenant the
+   * batch is written for — the batch is its own evidence, since a write has
+   * no predicate. Every row is checked, not just the first, to catch a mixed batch.
    */
   assertInsert(request: InsertRequest): void {
     const violation = checkInsertTenantScope(request);

@@ -39,10 +39,9 @@ describe("jobEnvelope decode failures", () => {
   }
 
   /**
-   * Over BOTH offload thresholds — GQ2's 4KB inline ceiling and GQ1's 32KB blob
-   * threshold — so each format actually puts the body in a blob rather than
-   * inlining it as gz. An inlined body has no blob to lose, which is not the
-   * case under test.
+   * Over BOTH offload thresholds (GQ2's 4KB inline ceiling, GQ1's 32KB blob
+   * threshold), so each format puts the body in a blob rather than inlining
+   * it — an inlined body has no blob to lose, which isn't the case under test.
    */
   const offloadable = () => ({
     __pipelineName: "traces",
@@ -209,13 +208,10 @@ describe("jobEnvelope decode failures", () => {
 
     describe("when the failure text carries no input echo at all", () => {
       it("keeps the whole diagnosis rather than amputating it", async () => {
-        // zlib never echoes input ("incorrect header check"), so the allowlist
-        // must leave an already-safe message intact.
-        //
-        // Reaching zlib at all takes care: `decompress` SNIFFS (detectCompression)
-        // and passes unrecognised bytes straight through as "none", so random
-        // garbage fails later at the parse, not in zlib. Keep the gzip magic and
-        // corrupt the deflate stream behind it.
+        // zlib never echoes input ("incorrect header check"), so the
+        // allowlist must leave it intact. Reaching zlib takes care:
+        // `decompress` sniffs and passes unrecognised bytes through as
+        // "none", so keep the gzip magic and corrupt the deflate behind it.
         const { tieredBlobs, redisBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({
           jobData: offloadable(),

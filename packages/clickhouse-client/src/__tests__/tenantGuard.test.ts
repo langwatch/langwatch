@@ -227,10 +227,9 @@ describe("checkTenantScope", () => {
 });
 
 /**
- * The guard as the client actually runs it: outermost, in front of a driver.
- * Asserting through the client rather than on `assert()` alone is what keeps
- * "refuses BEFORE the statement runs" a real claim — the driver spy is the
- * only thing that can witness it.
+ * The guard as the client actually runs it: outermost, in front of a
+ * driver. Asserting through the client, not `assert()` alone, keeps
+ * "refuses BEFORE the statement runs" a real claim the driver spy can witness.
  */
 function guardedBy(execute: QueryDriver["execute"], options: TenantGuardOptions = {}) {
   const client = new ClickHouseQueryClient({

@@ -37,13 +37,10 @@ const smallPayload = () => ({
 });
 
 describe("jobEnvelope body codecs", () => {
-  // The compression/payloadCodec choice is no longer read from
-  // GROUP_QUEUE_ZSTD_WRITES_ENABLED / GROUP_QUEUE_MSGPACK_WRITES_ENABLED env
-  // vars inside jobEnvelope.ts (there is no process.env read left in that
-  // file at all): encodeJobEnvelope now takes `compression` and
-  // `payloadCodec` as explicit params, resolved once by the caller via
-  // resolveGroupQueuePolicyFromEnv (see policy-env.ts) and passed through.
-  // These tests pass the resolved codec explicitly instead of stubbing env.
+  // compression/payloadCodec is no longer read from env inside
+  // jobEnvelope.ts — encodeJobEnvelope takes them as explicit params,
+  // resolved once by the caller via resolveGroupQueuePolicyFromEnv. These
+  // tests pass the resolved codec explicitly instead of stubbing env.
 
   /** @scenario Provider migration does not change the durable queue reference format */
   it("Provider migration does not change the durable queue reference format", async () => {
@@ -159,12 +156,10 @@ describe("jobEnvelope body codecs", () => {
       });
 
       it("stores it under a different content-addressed key than the JSON encoding", async () => {
-        // The codec is folded into the content hash. Without that, a JSON-encoded
-        // and a msgpack-encoded copy of the same payload would collide on one
-        // content-addressed key with DIFFERENT bytes, and whichever landed second
-        // would silently dedup onto the first — handing a reader a codec it was
-        // not expecting. Both encodings go into the SAME store here, so a
-        // collision would show up as a single key.
+        // The codec is folded into the content hash — without it, a JSON
+        // and a msgpack encoding of the same payload would collide on one
+        // key with DIFFERENT bytes, and whichever landed second would
+        // silently dedup onto the first, handing a reader the wrong codec.
         const jobData = bigPayload();
         const { tieredBlobs, redisBlobs, objectStore } = makeTiered();
 

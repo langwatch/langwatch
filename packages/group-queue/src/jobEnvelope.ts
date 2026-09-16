@@ -535,10 +535,9 @@ export function readEnvelopeLeaseFromHeader(
 }
 
 /**
- * The tenant guard MUST key off this, not {@link readEnvelopeLeaseFromHeader}:
- * that also requires `header.h`, so a cross-tenant `ref` with no holder id
- * skips the guard yet is still fetched. Validate the ref; lease is for
- * renewal only (ADR-029).
+ * The tenant guard MUST key off this, not {@link readEnvelopeLeaseFromHeader}
+ * — that also requires `header.h`, so a cross-tenant `ref` with no holder id
+ * would skip the guard yet still be fetched. Lease is for renewal only (ADR-029).
  */
 export function readEnvelopeTieredRefFromHeader(header: EnvelopeHeader): BlobRef | null {
   if ((header.e === "redis" || header.e === "s3") && header.ref) {
@@ -611,12 +610,10 @@ export function splitEnvelope(value: string): {
   // and code units; the header itself must be sliced as bytes to match Lua.
   const buf = Buffer.from(value, "utf8");
   const headerJson = buf.subarray(lenEnd + 1, lenEnd + 1 + headerLen).toString("utf8");
-  // Guarded for the same reason the body parses are: a corrupt header segment
-  // makes V8 echo it back ("Unexpected token 's', \"serId\":\"us\"..."), and the
-  // header carries `m.__context` (traceId / userId / projectId). That message
-  // would otherwise reach the drop log via the raw-Error path, which only strips
-  // storage URIs. Naming it also makes a corrupt header a `malformed_envelope`
-  // rather than an `unknown` (#5538).
+  // Guarded like the body parses: a corrupt header makes V8 echo raw bytes
+  // back, and the header carries `m.__context` (traceId/userId/projectId)
+  // that would reach the drop log via the raw-Error path (strips only
+  // storage URIs). Also makes this `malformed_envelope`, not `unknown` (#5538).
   let header: EnvelopeHeader;
   try {
     header = JSON.parse(headerJson) as EnvelopeHeader;

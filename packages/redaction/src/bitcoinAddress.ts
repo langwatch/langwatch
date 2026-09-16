@@ -1,12 +1,9 @@
 import { createHash } from "node:crypto";
 
 /**
- * Checksum validation for the two bitcoin address forms the CRYPTO recognizer matches:
- * base58check (`1…`/`3…` legacy) and bech32/bech32m (`bc1…` segwit). The recognizer's pattern
- * is a SHAPE that ~1 in 60 random 32-character hex strings satisfies by accident — and every
- * OTel trace id is one, so unchecked it was redacting trace ids permanently. A checksum
- * proves the finding instead of guessing: the odds of clearing one by accident are ~1 in 4
- * billion, turning a measured 1.75% false-positive rate into one nobody will ever meet.
+ * Checksum validation for base58check and bech32/bech32m addresses. The
+ * recognizer's SHAPE pattern matches ~1 in 60 random hex strings by accident
+ * — every OTel trace id is one — so a checksum cuts that to ~1 in 4 billion.
  */
 
 const BASE58_ALPHABET =
@@ -21,19 +18,16 @@ const BASE58_ADDRESS_BYTES = 25;
 const BASE58_CHECKSUM_BYTES = 4;
 
 /**
- * The two version bytes bitcoin mainnet mints: 0x00 (pay-to-public-key-hash) and 0x05
- * (pay-to-script-hash). The checksum alone proves the payload intact, not that this is really
- * a mainnet address: several of the other 254 values — 0x06 among them — also render with a
- * leading `3`, so without checking the version byte they'd pass as legacy addresses too.
- * Reading the byte confirms independently, rather than trusting the text just decoded.
+ * The two version bytes bitcoin mainnet mints (0x00, 0x05). A checksum alone
+ * proves the payload intact, not that it's mainnet — other values (0x06
+ * among them) also render with a leading `3`, so this is checked separately.
  */
 const BASE58_MAINNET_VERSIONS: ReadonlySet<number> = new Set([0x00, 0x05]);
 
 /**
- * Decode base58 into bytes, or null when the text holds a character the
- * alphabet does not define. Long multiplication over a byte array rather than
- * BigInt: the input is at most 35 characters, so this is a handful of
- * iterations and keeps the hot ingestion path free of BigInt allocation.
+ * Decodes base58 into bytes, or null on a character outside the alphabet.
+ * Long multiplication over a byte array rather than BigInt: at most 35
+ * input characters keeps the hot ingestion path free of BigInt allocation.
  */
 function base58Decode(value: string): Uint8Array | null {
   const bytes: number[] = [0];
@@ -62,10 +56,9 @@ function sha256(data: Uint8Array): Buffer {
 }
 
 /**
- * Whether a legacy address carries its own base58check checksum: the first four
- * bytes of the double SHA-256 of the payload must equal the trailing four bytes.
- * The decoded version byte must also be one bitcoin mainnet mints, see
- * {@link BASE58_MAINNET_VERSIONS}.
+ * Whether a legacy address carries a valid base58check checksum: the first
+ * four bytes of the double SHA-256 must equal the trailing four. The decoded
+ * version byte must be mainnet, see {@link BASE58_MAINNET_VERSIONS}.
  */
 export function isBase58CheckAddress(value: string): boolean {
   const decoded = base58Decode(value);
@@ -107,12 +100,9 @@ function bech32Polymod(values: readonly number[]): number {
 }
 
 /**
- * The highest witness version BIP-141 defines. The first data character is read
- * from a 32-character alphabet, so it can carry 17 through 31 as easily as a
- * real version — and those decode to no segwit program at all. Without this
- * bound a `bc13…` string that happens to carry a valid bech32m checksum is
- * classified as an address and replaced with a marker, which is the data loss
- * this whole recognizer was rewritten to stop.
+ * The highest witness version BIP-141 defines. Without this bound, a `bc13…`
+ * with a valid bech32m checksum decodes to no real program yet still gets
+ * classified as an address — the data loss this recognizer was rewritten to stop.
  */
 const MAX_WITNESS_VERSION = 16;
 
@@ -136,11 +126,9 @@ const BC_HRP_EXPANDED = [
 ];
 
 /**
- * Whether a `bc1…` address carries a valid checksum. Only the mainnet human-readable part is
- * checked, since that's the only prefix the recognizer's pattern matches. BIP-350 pairs the
- * witness version with one specific constant — bech32 for version 0, bech32m for 1 to 16 —
- * rather than accepting either for either, which would accept BIP-350's own invalid test
- * vectors; a version above 16 is rejected outright ({@link MAX_WITNESS_VERSION}).
+ * Whether a `bc1…` address carries a valid checksum. Only the mainnet HRP is
+ * checked. BIP-350 pairs each witness version with its own constant (bech32
+ * for 0, bech32m for 1-16) rather than accepting either for either.
  */
 export function isBech32Address(value: string): boolean {
   if (/[a-z]/.test(value) && /[A-Z]/.test(value)) return false;
@@ -167,11 +155,9 @@ export function isBech32Address(value: string): boolean {
 }
 
 /**
- * Whether the data groups after the witness version encode a witness program BIP-141 allows.
- * `program` arrives as five-bit groups; repacking them into bytes catches the two ways a
- * checksum-valid string can still encode nothing — leftover bits that don't fall away
- * cleanly, and non-zero padding bits. BIP-173 requires both checks, and a decoder that skips
- * them accepts strings no wallet will spend to.
+ * Whether the data groups encode a witness program BIP-141 allows. Repacking
+ * five-bit groups into bytes catches two ways a checksum-valid string encodes
+ * nothing: leftover bits, and non-zero padding — both required by BIP-173.
  */
 function isValidWitnessProgram({
   witnessVersion,
@@ -205,12 +191,9 @@ function isValidWitnessProgram({
 }
 
 /**
- * Whether a CRYPTO match is a bitcoin address in either of its two forms. The prefix is read
- * case-insensitively because BIP-173 defines segwit addresses as case-insensitive and QR
- * encoders emit the uppercase form — routing on the lowercase spelling alone sent that form
- * to the base58 decoder, which rejects it on the first out-of-alphabet character, a rejection
- * that reads like a verdict and isn't one. {@link isBech32Address} still refuses the mixed
- * case BIP-173 forbids.
+ * Whether a CRYPTO match is a bitcoin address, either form. Read case-
+ * insensitively: BIP-173 allows uppercase and QR encoders emit it — routing
+ * on lowercase alone once sent that form to the base58 decoder, a false miss.
  */
 export function isBitcoinAddress(raw: string): boolean {
   return raw.toLowerCase().startsWith("bc1")

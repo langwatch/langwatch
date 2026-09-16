@@ -6,10 +6,9 @@ import type { EnvelopeHeader } from "../jobEnvelope.ts";
 import type { BlobRef } from "../tieredBlobStore.ts";
 
 /**
- * The decode tenant guard refuses BEFORE any store is touched, so it is
- * exercisable without Redis or an object store. The stub exists only to satisfy
- * construction — any call on it is a test failure by definition, because
- * reaching a store means the guard let a cross-tenant ref through.
+ * The decode tenant guard refuses BEFORE any store is touched, so it's
+ * exercisable without Redis or an object store. The stub only satisfies
+ * construction — any call on it is a test failure: the guard let a ref through.
  */
 const unreachableRedis = new Proxy(
   {},

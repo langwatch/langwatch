@@ -17,11 +17,9 @@ import {
 export type { ObjectStore } from "./storage.ts";
 
 /**
- * Above this serialized size a blob lives in the durable object store; at or
- * below it, in Redis. Derived from `COMMAND_INLINE_THRESHOLD` (ADR-022's
- * edge-spool boundary) so a retune on that constant moves both sides in
- * lockstep. The inline tier (≤ a few KiB) is handled by the envelope, not
- * this store.
+ * Above this size a blob lives in the durable object store; at or below, in
+ * Redis. Derived from `COMMAND_INLINE_THRESHOLD` (ADR-022) so retuning that
+ * constant moves both sides in lockstep. The inline tier is the envelope's, not this store's.
  */
 export const S3_TIER_THRESHOLD_BYTES = 256 * 1024;
 
@@ -34,11 +32,9 @@ export type BlobRef =
   | { tier: "s3"; projectId: TenantId; hash: string };
 
 /**
- * A blob fetch failed for a reason that is NOT "the object is gone" — a network
- * blip, a 5xx, a destination-resolve failure. The job must retry (the body is
- * only temporarily unreachable), never drop to replay as if the blob were
- * missing; that distinction is what stops a transient store outage from
- * mass-dropping every in-flight offloaded job (ADR-029).
+ * A blob fetch failed for a reason that is NOT "the object is gone" (network
+ * blip, 5xx, destination-resolve failure). The job must retry, never drop to
+ * replay as missing — that's what stops an outage mass-dropping in-flight jobs (ADR-029).
  */
 export class TransientBlobStoreError extends Error {
   readonly projectId: TenantId;
@@ -192,9 +188,8 @@ export class TieredBlobStore {
     hashSource?: Buffer | string;
     /**
      * Media type stored alongside the s3-tier object. Defaults to the
-     * historical `application/gzip` for callers that don't compress with
-     * anything else; a caller writing zstd (or another codec) must pass the
-     * matching media type so durable storage isn't mislabeled.
+     * historical `application/gzip`; a caller writing zstd (or another codec)
+     * must pass the matching type so durable storage isn't mislabeled.
      */
     mediaType?: string;
   }): Promise<BlobRef> {
@@ -217,21 +212,18 @@ export class TieredBlobStore {
   }
 
   /**
-   * Returns null when a blob is genuinely gone (key absent, or a durable-store
-   * "not found"). A client-side failure on either tier (connection drop,
-   * timeout, OOM rejection, network 5xx) throws {@link TransientBlobStoreError}
-   * instead, so the caller retries rather than treating a blip as "missing".
+   * Returns null when a blob is genuinely gone (key absent, or a durable-
+   * store "not found"). Any client-side failure instead throws
+   * {@link TransientBlobStoreError}, so the caller retries rather than treating a blip as missing.
    */
   async get(ref: BlobRef): Promise<Buffer | null> {
     return this.fetch(ref, /* refresh */ true);
   }
 
   /**
-   * Reads a blob WITHOUT refreshing its backstop TTL — the non-worker /
-   * ops-dashboard inspection path. Symmetric with {@link RedisJobBlobStore.peek}
-   * so a repeatedly-viewed blocked group can't extend the lifetime of its
-   * orphan blobs indefinitely by triggering GETEX on every render.
-   * S3-tier objects have no TTL; peek and get are functionally identical there.
+   * Reads a blob WITHOUT refreshing its backstop TTL — the inspection path,
+   * so a repeatedly-viewed blocked group can't extend orphan blobs' lifetime
+   * via GETEX on every render. S3 objects have no TTL, so peek equals get there.
    */
   async peek(ref: BlobRef): Promise<Buffer | null> {
     return this.fetch(ref, /* refresh */ false);
@@ -240,14 +232,10 @@ export class TieredBlobStore {
   private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
     if (ref.tier === "redis") {
       const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
-      // A redis-tier miss is represented by a null return (GETEX/GET on an
-      // absent key), never an exception — so any exception here is the
-      // client itself (connection drop, command timeout, OOM-from-noeviction
-      // rejection), not "the blob is gone". Treat it as transient (retry),
-      // mirroring the s3 branch below, instead of letting it fall through to
-      // the decode fail-safe and permanently drop a job over a blip
-      // (2026-07-11 incident: uncaught ioredis errors here were indistinguishable
-      // from a genuinely missing blob).
+      // A redis-tier miss is a null return (GETEX/GET), never an exception —
+      // any exception here is the client itself (drop, timeout, OOM), not
+      // "gone". Treat it as transient like the s3 branch (2026-07-11: uncaught
+      // ioredis errors here were indistinguishable from a genuinely missing blob).
       try {
         return await (refresh
           ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
@@ -278,14 +266,10 @@ export class TieredBlobStore {
         MAX_BLOB_BYTES,
       );
     } catch (err) {
-      // A genuinely-absent or oversized/corrupt object is a missing blob → null
-      // → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
-      // projections and never re-invokes subscribers, so for a subscriber-bearing fold
-      // this is permanent loss, not "recover via replay" as this once claimed —
-      // see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
-      // transient and must retry, not drop the job (ADR-029). Oversize is
-      // an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
-      // real tamper / zip-bomb event distinct from "TTL reclaimed the blob".
+      // A genuinely-absent or oversized/corrupt object → null → decode
+      // fail-safe, which DISCARDS the job permanently (#5538: replay never
+      // re-invokes subscribers). Anything else (network/5xx) is transient and
+      // must retry, not drop (ADR-029). Oversize stays observable, distinct from "just missing".
       if (err instanceof BlobTooLargeError) {
         if (this.queueName) {
           gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });

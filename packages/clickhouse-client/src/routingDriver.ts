@@ -1,8 +1,7 @@
 /**
- * The routing {@link QueryDriver}: one statement, sent to the server the
- * tenant belongs on. A statement naming a tenant is routed by it regardless
- * of an unscoped declaration; only a statement with no tenant at all (a
- * migration, a `system.*` read) goes to the shared server.
+ * The routing {@link QueryDriver}: sends one statement to the server its
+ * tenant belongs on, regardless of an unscoped declaration. Only a
+ * statement naming no tenant (a migration, a `system.*` read) goes shared.
  */
 import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";

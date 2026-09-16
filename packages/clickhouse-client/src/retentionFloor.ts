@@ -1,22 +1,16 @@
 import { nowInstant } from "@langwatch/time";
 /**
- * How far back a read of a time-partitioned table has to look. Every retention-managed table is
- * partitioned on its time column, so an unbounded query scans every partition, including cold
- * ones on object storage — the single largest source of production cold-scan queries. A floor is
- * safe here because rows older than retention are TTL'd away, so a bounded query can never miss
- * a row the unbounded one would have found. The retention POLICY lives with whoever owns it —
- * this package only knows that some provider can answer "how many days for this tenant/table".
+ * How far back a read of a time-partitioned table has to look. Unbounded
+ * scans every partition including cold object storage — the largest source
+ * of cold-scan queries — but a floor is safe since TTL'd rows can't be missed.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Default slack added below the retention horizon.
- *
- * TTL deletion is asynchronous — a row past its retention is eligible for
- * removal, not already gone — and the floor is compared against a column whose
- * clock is the producer's, not ours. Two days covers both without meaningfully
- * widening the partition range.
+ * Default slack below the retention horizon. TTL deletion is asynchronous —
+ * a row past retention is eligible for removal, not already gone — and the
+ * floor compares against the producer's clock, not ours. Two days covers both.
  */
 export const DEFAULT_RETENTION_FLOOR_MARGIN_MS = 2 * DAY_MS;
 
@@ -41,10 +35,9 @@ export interface RetentionFloorServiceOptions {
   logger?: RetentionFloorLogger;
   marginMs?: number;
   /**
-   * How long a resolved retention is reused for. The provider walks a policy cascade, so an
-   * uncached lookup would put a database round trip in front of every read this bounds — the
-   * opposite of the point. Retention changes on human timescales, so minutes of staleness only
-   * ever shifts a partition bound slightly, never below `minLookbackMs`.
+   * How long a resolved retention is reused. Uncached, every bounded read
+   * would cost a policy-cascade round trip — the opposite of the point.
+   * Retention changes on human timescales, so staleness never drops below `minLookbackMs`.
    */
   cacheTtlMs?: number;
   /**
@@ -62,11 +55,9 @@ export interface RetentionFloorQuery {
   tenantId: string;
   table: string;
   /**
-   * A reach the result is never tighter than.
-   *
-   * For callers replacing an existing hand-picked floor: keeps their previous
-   * reach as a guarantee while letting a longer tenant policy widen it, so
-   * adopting this can never make a read miss rows it used to find.
+   * A reach the result is never tighter than. For callers replacing a
+   * hand-picked floor: keeps that reach as a guarantee while letting a
+   * longer tenant policy widen it, so adopting this can't make a read miss rows.
    */
   minLookbackMs?: number;
 }
@@ -83,11 +74,9 @@ export class RetentionFloorService {
   private readonly cache = new Map<string, { days: number; expiresAtMs: number }>();
 
   /**
-   * One provider call per key at a time; later arrivals await the first. The resolved-value
-   * cache is only written once the provider answers, so a cold key does nothing for reads that
-   * arrive while that lookup is in flight — each would otherwise issue its own cascade query.
-   * That's the exact failure this file bounds: a worker fleet running the same sweep at the same
-   * moment fans out to one cascade query per read instead of one in total.
+   * One provider call per key at a time; later arrivals await the first,
+   * since the cache writes only once the provider answers. Otherwise a
+   * worker fleet sweeping at the same moment fans out to one cascade query per read.
    */
   private readonly inFlight = new Map<string, Promise<number>>();
 
@@ -166,12 +155,9 @@ export class RetentionFloorService {
   }
 
   /**
-   * Resolves one key and writes the answer to the cache. Never rejects: the
-   * provider's failure is already absorbed into the default below, so every
-   * waiter sharing an in-flight promise gets an answer rather than an error.
-   *
-   * The provider is passed in rather than read off `this` because the caller
-   * is where it was proven present.
+   * Resolves one key and writes it to the cache. Never rejects — the
+   * provider's failure is absorbed into the default below, so every waiter
+   * sharing an in-flight promise gets an answer, not an error.
    */
   private async resolveAndRemember({
     key,

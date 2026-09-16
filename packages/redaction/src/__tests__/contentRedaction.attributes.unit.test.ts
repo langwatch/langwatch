@@ -1,10 +1,7 @@
 /**
- * The two native passes over one attribute, name by name.
- *
- * Beside `contentRedaction.unit.test.ts` rather than folded into it: that
- * suite is bound to the span-PII spec's scenarios, and this one is the
- * mechanical sweep of `redactAttributeNative` over identifier-shaped values
- * and the policy's do-not-redact exceptions.
+ * The two native passes over one attribute, name by name. Beside
+ * `contentRedaction.unit.test.ts` (bound to the span-PII spec) rather than
+ * folded in — this is the mechanical sweep over identifier-shaped values.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -464,10 +461,9 @@ describe("redactAttributeNative on identifier-shaped values", () => {
 });
 
 /**
- * Reserved trace/span names buy an exemption the `_id` suffix rule can't give
- * them (no underscore), but since OTLP forwards caller-written names verbatim,
- * that exemption must still check the VALUE looks like the address it claims.
- * The `_id` cases below are the control: exempt by suffix, predating this rule.
+ * Reserved trace/span names buy an exemption the `_id` suffix rule can't
+ * (no underscore), but since OTLP forwards caller-written names verbatim,
+ * the exemption must still check the VALUE looks like the claimed address.
  */
 describe("redacting an attribute under a reserved trace identifier name", () => {
   const DECIMAL_TRACE_ADDRESS = "1757500123454000091";
@@ -518,10 +514,9 @@ describe("redacting an attribute under a reserved trace identifier name", () => 
   });
 
   /**
-   * The one thing the reserved list does that nothing else does: this value is
-   * short enough for the shape rule to reject and a phone recognizer to claim,
-   * and the name has no `_id` suffix, so neither older exemption could be what
-   * keeps it. The unreserved control below is redacted, isolating the name.
+   * The one thing the reserved list does that nothing else does: short
+   * enough for the shape rule to reject, claimable by a phone recognizer,
+   * and no `_id` suffix — neither older exemption could be what keeps it.
    */
   describe("given a short decimal address no shape rule would hold back", () => {
     const PHONE_SHAPED_ADDRESS = "12515420585";

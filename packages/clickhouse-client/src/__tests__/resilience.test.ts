@@ -87,11 +87,9 @@ describe("isTransientClickHouseError", () => {
     });
 
     /**
-     * ClickHouse echoes the failing statement back inside its error text. A
-     * message-anywhere match on "timeout" therefore made permanent failures —
-     * a syntax error, a missing table — look transient whenever the QUERY
-     * happened to mention the word, and each one burned the full retry budget
-     * against a server that could never succeed.
+     * ClickHouse echoes the failing statement in its error text, so a
+     * message-anywhere "timeout" match made permanent failures (a syntax
+     * error, missing table) look transient, burning the full retry budget.
      */
     describe("when a permanent failure merely quotes a query mentioning timeout", () => {
       it("does not retry a syntax error", () => {

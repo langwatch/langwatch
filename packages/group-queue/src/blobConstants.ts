@@ -3,11 +3,9 @@
  */
 
 /**
- * Backstop TTL for a content-addressed blob, refreshed on access.
- * Redis expiry is the lazy reclaim mechanism, so a crashed holder that stops
- * renewing cannot leak the blob beyond this window. Four days is the 3-day
- * lease plus a 1-day lazy-reclaim interval, and preserves the existing
- * Friday-to-Monday incident buffer plus a day of catch-up.
+ * Backstop TTL for a content-addressed blob, refreshed on access — a
+ * crashed holder that stops renewing can't leak the blob past this window.
+ * Four days = 3-day lease + 1-day lazy-reclaim, preserving the Friday-to-Monday buffer.
  */
 export const BLOB_BACKSTOP_TTL_SECONDS = 4 * 24 * 60 * 60;
 
@@ -44,12 +42,9 @@ export const BLOB_RECLAIM_TTL_THRESHOLD_SECONDS =
   BLOB_RELEASE_GRACE_TTL_SECONDS - BLOB_RECLAIM_SAFETY_MARGIN_SECONDS;
 
 /**
- * How often the reclaim runner sweeps the blob keyspace.
- *
- * Sized against the grace window rather than against traffic: a sweep that lands
- * well inside the window means an unreferenced blob is found, graced, and then
- * destroyed within roughly the window itself, so the practical retention bound
- * for anything nothing references becomes ~1 hour instead of the 4-day backstop.
+ * How often the reclaim runner sweeps the blob keyspace. Sized against the
+ * grace window, not traffic: landing well inside it means an unreferenced
+ * blob is graced and destroyed within it — ~1 hour, not the 4-day backstop.
  */
 export const BLOB_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -57,9 +52,8 @@ export const BLOB_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__";
 
 /**
- * Hard ceiling on a single job's serialized payload. A payload over this is
- * rejected at encode rather than risking an OOM from gzipping + buffering it,
- * and bounds worst-case memory at roughly ceiling × worker concurrency
- * (ADR-026).
+ * Hard ceiling on a single job's serialized payload — rejected at encode
+ * rather than risking an OOM from gzipping/buffering it, bounding worst-case
+ * memory at roughly ceiling × worker concurrency (ADR-026).
  */
 export const MAX_BLOB_BYTES = 50 * 1024 * 1024;

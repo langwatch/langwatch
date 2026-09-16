@@ -252,12 +252,10 @@ describe("retry", () => {
   describe("given a caller-supplied transient fragment", () => {
     describe("when a ClickHouse overload is returned", () => {
       it("retries an overload the classifier would otherwise reject", async () => {
-        // Retrying this is only safe because the caller opts in per pipeline
-        // and composes `rateLimit` outside `retry`: the slot is held across
-        // attempts, so a retried overload waits in the limiter rather than
-        // going straight back at the server. That ordering is what stops this
-        // becoming the 2026-07-31 loop, where rejections were classified as
-        // transient and the retries went back into the same wall.
+        // Safe because the caller composes `rateLimit` outside `retry`: the
+        // slot is held across attempts, so a retried overload waits in the
+        // limiter instead of hitting the server again — what stops the
+        // 2026-07-31 loop where rejections classified as transient looped back.
         const { sleep } = fakeSleep();
         const next = vi
           .fn()

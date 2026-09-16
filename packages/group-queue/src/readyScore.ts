@@ -40,12 +40,9 @@ export function isPlausibleReadyScore(value: unknown): value is number {
 }
 
 /**
- * True when `score` can be used as a dispatch-eligibility time against the
- * clock reading `nowMs`: a real timestamp, not implausibly stale, and not far
- * enough ahead to hide the group from dispatch.
- *
- * `nowMs` is injected rather than read here so callers can validate a batch
- * against one shared reading, and so the bounds stay testable.
+ * True when `score` is usable as a dispatch-eligibility time against
+ * `nowMs`: real, not implausibly stale, not far enough ahead to hide the
+ * group. `nowMs` is injected so callers share one reading and bounds stay testable.
  */
 export function isUsableReadyScore(score: unknown, nowMs: number): score is number {
   return (

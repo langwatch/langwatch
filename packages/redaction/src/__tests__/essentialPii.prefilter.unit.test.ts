@@ -1,8 +1,7 @@
 /**
- * Some recognizers are skipped on text that cannot contain their pattern (the
- * email pattern never runs without an "@"). The saving is real, and so is the
- * failure mode: a literal wrongly exempted stops redacting real personal data,
- * silently, forever — these cases exist to make that failure loud.
+ * Some recognizers are skipped on text that can't contain their pattern
+ * (email never runs without "@"). A wrongly exempted literal stops
+ * redacting real personal data, silently, forever — these cases make that loud.
  */
 
 import { findPhoneNumbersInText, getCountries, getExampleNumber } from "libphonenumber-js";
@@ -32,11 +31,9 @@ describe("given a recognizer that is skipped unless the text holds its literal",
   });
 
   /**
-   * The mis-annotation catcher. Every sample below is personal data that some
-   * OTHER recognizer must find, written so it contains none of the literals
-   * the skipped recognizers claim ("@", "0x", ":"). If a literal is ever
-   * attached to a pattern that does not truly require it, that recognizer
-   * stops running on text like this and the sample survives unredacted.
+   * The mis-annotation catcher: samples are personal data some OTHER
+   * recognizer must find, containing none of the claimed literals ("@",
+   * "0x", ":"). A wrongly-claimed literal stops that recognizer running here.
    */
   describe("when the text holds none of the claimed literals", () => {
     const withoutClaimedLiterals = (text: string) => {
@@ -72,10 +69,9 @@ describe("given a recognizer that is skipped unless the text holds its literal",
 });
 
 /**
- * The phone detector is skipped when the longest digit window is too short to
- * hold a number — the floor must stay below the shortest number the detector
- * will return, and the detector itself is the only honest reference for that.
- * These run every country's own example number through the real redaction path.
+ * The phone detector is skipped when the digit window is too short to hold a
+ * number — the floor must stay below the shortest the detector returns,
+ * which is the only honest reference. Runs every country's own example number.
  */
 describe("given the phone detector's digit gate", () => {
   const shapesOf = ({ formatted, plain }: { formatted: string; plain: string }) => [

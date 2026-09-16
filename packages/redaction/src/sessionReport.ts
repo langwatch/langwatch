@@ -1,8 +1,7 @@
 /**
- * Session-report scrubbing: strips secrets/PII from a transcript locally,
- * before it leaves the machine. Loopback/private IPs are kept (harmless);
- * IPv6 is not scanned. Mirrored byte-for-byte into the `langwatch` CLI and
- * drift-tested — a change here must land in both.
+ * Session-report scrubbing: strips secrets/PII from a transcript locally.
+ * Loopback/private IPs are kept (harmless); IPv6 isn't scanned. Mirrored
+ * byte-for-byte into the `langwatch` CLI and drift-tested — change both.
  */
 import { formatPiiMarker, SECRET_MARKER } from "./markers.ts";
 import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.ts";
@@ -13,11 +12,9 @@ const CARD_MARKER = formatPiiMarker("CREDIT_CARD");
 const IP_MARKER = formatPiiMarker("IP_ADDRESS");
 
 /**
- * Env-var NAMES that hold secrets. Broader than the platform's attribute-key
- * rule on purpose: attribute keys must not match telemetry names like
- * `gen_ai.usage.input_tokens`, but env names are short and structured, so
- * bare `KEY` and `TOKEN` segments are safe to treat as sensitive
- * (GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY, SSH_KEY, NPM_TOKEN, ...).
+ * Env-var NAMES that hold secrets — broader than the attribute-key rule,
+ * since env names are short/structured (unlike telemetry names), so bare
+ * `KEY`/`TOKEN` segments are safe (GITHUB_TOKEN, AWS_SECRET_ACCESS_KEY, ...).
  */
 const ENV_SECRET_NAME_REGEX =
   /(?:^|[._-])(?:key|token|secret|password|passwd|pwd|credentials?|auth)(?:$|[._-])/i;
@@ -104,12 +101,9 @@ function isPrivateOrLocalIp(ip: string): boolean {
 }
 
 /**
- * `redactSecretsInText` passes very long inputs through untouched (its scan
- * budget protects the ingestion hot path). Session transcripts routinely carry
- * huge single strings, so here long text is redacted in slices below that
- * budget instead of skipped. Slices prefer newline boundaries so multi-line
- * patterns (PEM blocks) stay intact; a secret sitting exactly on a hard slice
- * boundary of a 200k+ single-line string is the accepted trade-off.
+ * `redactSecretsInText` passes long inputs through untouched (protects the
+ * hot path), so here text is sliced and redacted instead. Slices prefer
+ * newlines to keep PEM blocks intact; a hard-boundary miss is the accepted trade-off.
  */
 const SLICE_TARGET = 200_000;
 
@@ -233,11 +227,9 @@ function redactJsonValue(
 }
 
 /**
- * Redact a session transcript in JSONL form (one JSON document per line, the
- * format Claude Code and Codex write). Lines that parse as JSON are walked
- * structurally: sensitive keys have their whole value scrubbed and every
- * string is pattern-redacted. Lines that do not parse are redacted as text,
- * so nothing is skipped.
+ * Redacts a session transcript in JSONL form (one JSON document per line).
+ * Lines that parse are walked structurally: sensitive keys are scrubbed
+ * whole, every string pattern-redacted. Lines that don't parse are redacted as text.
  */
 export function redactSessionJsonl({
   jsonl,

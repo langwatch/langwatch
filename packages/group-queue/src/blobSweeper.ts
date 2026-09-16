@@ -66,10 +66,9 @@ function isCluster(client: IORedis | Cluster): client is Cluster {
 }
 
 /**
- * SCAN is a keyless command, so ioredis cannot derive a slot for it and routes a
- * cluster call to an arbitrary node. The queue's hash tag co-slots the KEYS a
- * script touches but does nothing for iteration, so the fan-out over masters is
- * required for correctness, not throughput.
+ * SCAN is keyless, so ioredis can't derive a slot and routes a cluster call
+ * to an arbitrary node. The queue's hash tag co-slots script KEYS but does
+ * nothing for iteration, so fan-out over masters is for correctness, not throughput.
  */
 async function scanNode(params: {
   node: { scan: IORedis["scan"] };
@@ -136,10 +135,9 @@ export class BlobSweeper {
   }
 
   /**
-   * Matches `<queueName>:gq:blob:<projectId>/<hash>`.
-   *
-   * The slash is the tenant/hash separator. `projectId` never contains a slash
-   * and the hash is base64url, so a canonical blob key splits on exactly one.
+   * Matches `<queueName>:gq:blob:<projectId>/<hash>`. The slash is the
+   * tenant/hash separator — `projectId` never contains one and the hash is
+   * base64url, so a canonical blob key splits on exactly one.
    */
   private blobScanPattern(queueName: string): string {
     return `${redisBlobKeyPrefix(queueName)}*/*`;

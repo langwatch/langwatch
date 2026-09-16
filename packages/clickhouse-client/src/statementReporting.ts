@@ -17,8 +17,7 @@ import {
 /**
  * How a statement ended, as the metric counts it. `inband_error` is a
  * transport-level success whose streamed body carried the server's exception
- * line — a dedicated outcome so one query is never counted under two terminal
- * ones.
+ * — its own outcome so one query is never counted under two terminal ones.
  */
 export type StatementOutcome = "success" | "error" | "inband_error";
 
@@ -43,11 +42,9 @@ export interface StatementLogSink {
 }
 
 /**
- * A view of `metrics` that cannot throw.
- *
- * Written out rather than derived by walking the object's keys: a host may pass
- * a class instance whose methods live on the prototype, and reflection over own
- * properties would silently hand back a port with nothing guarded.
+ * A view of `metrics` that cannot throw. Written out rather than derived by
+ * walking keys: a host may pass a class instance whose methods live on the
+ * prototype, and reflecting over own properties would silently guard nothing.
  */
 export function guardedMetrics(metrics: StatementMetrics): StatementMetrics {
   return {
@@ -129,21 +126,18 @@ export class StatementReporter {
   }
 
   /**
-   * Count an outcome with no new duration sample.
-   *
-   * The in-band case only: the transport outcome — success plus one histogram
-   * observation — was already recorded when the query resolved. Observing a
-   * second duration for the same statement would double-count it.
+   * Count an outcome with no new duration sample. The in-band case only:
+   * transport outcome plus one histogram observation was already recorded
+   * when the query resolved, so a second duration would double-count it.
    */
   count({ queryType, outcome }: { queryType: VendorQueryType; outcome: StatementOutcome }): void {
     this.metrics.incrementCount({ queryType, outcome });
   }
 
   /**
-   * Report an attempt that failed and was raised to the caller. Warn, not
-   * error: this layer can't know the outcome (an insert is issued from a
-   * job the queue retries) — claiming a verdict here once made recovered
-   * work read as lost work, 17k records a day against zero jobs actually dropped.
+   * Report a failed attempt raised to the caller. Warn, not error: this
+   * layer can't know the outcome (a retried job may still succeed) —
+   * claiming a verdict here once read 17k recovered records/day as loss.
    */
   failure({
     operation,
@@ -162,14 +156,10 @@ export class StatementReporter {
       this.outcomeLogger.warn(
         {
           source: "clickhouse",
-          // Which ClickHouse refused it. Not every deployment has one cluster:
-          // an organization can be routed to its own, so without this field a
-          // rejection from a customer's dedicated instance is
-          // indistinguishable from one on the shared cluster. On 2026-08-13
-          // that ambiguity is what made a three-hour saturation take an
-          // afternoon to attribute — the answer had to be inferred from a
-          // concurrency limit quoted in the vendor's error text and matched
-          // against terraform.
+          // Which ClickHouse refused it — an org may be routed to its own
+          // cluster, so without this a dedicated-instance rejection reads as
+          // the shared cluster. On 2026-08-13 that ambiguity took an
+          // afternoon to attribute a 3-hour saturation.
           cluster: this.cluster,
           operation,
           durationMs: Math.round(durationMs),

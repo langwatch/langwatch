@@ -13,12 +13,9 @@ import {
 import { SECRETS_REDACTION_MARKER } from "../secrets.ts";
 
 /**
- * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * The composition of the two native passes for one resolved policy. Its
- * decisions are the ones a customer's privacy settings actually buy: which
- * level runs which recognizers, whether secrets run alongside, and which
- * attribute names are exempt from which rules.
+ * Spec: span-pii-redaction.feature. The composition of the two native
+ * passes for one resolved policy — the decisions a customer's privacy
+ * settings actually buy: recognizer level, secrets on/off, exemptions.
  */
 
 const policy = (over: Partial<RedactionPolicy> = {}): RedactionPolicy => ({

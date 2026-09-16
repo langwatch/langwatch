@@ -12,11 +12,9 @@ import {
 const DECIMAL_TRACE_ADDRESS = "17575001234540000091234567890123";
 
 /**
- * The two value rules deliberately answer different questions:
- * `isIdentifierShapedValue` can be generous (a false positive only wastes a
- * shape recognizer), while `isOpaqueIdentifierValue` must be mean — getting
- * it wrong stores a name in the clear. Every fixture below is GENERATED
- * (seeded mulberry32, seed 20260912), never an observed real identifier.
+ * Two value rules answer different questions: `isIdentifierShapedValue` can
+ * be generous, but `isOpaqueIdentifierValue` must be mean — getting it wrong
+ * stores a name in the clear. Fixtures are GENERATED (seeded mulberry32, seed 20260912).
  */
 describe("given the identifier hold-out rules", () => {
   describe("when the value is a machine identifier", () => {
@@ -159,11 +157,9 @@ describe("given the identifier hold-out rules", () => {
     });
 
     /**
-     * The namespace is matched whole, not as a bare `langwatch.` prefix over
-     * anything. `langwatch.trace_id` is a name a sender may write, but nothing
-     * folds it to `metadata.trace_id`, so reading it as reserved would hand out
-     * the exemption on a spelling the pipeline never produces. The prefixes are
-     * the canonicaliser's own list precisely so this stays in step with it.
+     * The namespace is matched whole, not as a bare `langwatch.` prefix:
+     * `langwatch.trace_id` folds to nothing, so treating it as reserved
+     * would exempt a spelling the pipeline never produces.
      */
     it.each([
       "langwatch.trace_id",
@@ -186,10 +182,9 @@ describe("given the identifier hold-out rules", () => {
     });
 
     /**
-     * Every namespace the canonicaliser folds into `metadata.<key>` has to be
-     * recognised here, because redaction runs BEFORE that fold. Looping over
-     * the shared constant rather than a literal list makes a namespace added
-     * there and not here a red test instead of a silent hole.
+     * Every namespace the canonicaliser folds into `metadata.<key>` must be
+     * recognised here, since redaction runs BEFORE that fold. Looping over
+     * the shared constant turns a namespace added there into a red test, not a silent hole.
      */
     it.each(
       METADATA_SUBKEY_PREFIXES,

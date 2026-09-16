@@ -18,13 +18,10 @@ import { TieredBlobStore } from "../tieredBlobStore.ts";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 
 describe("jobEnvelope", () => {
-  // The GROUP_QUEUE_ENVELOPE_WRITES_ENABLED flag that let encodeJobEnvelope
-  // fall back to writing un-enveloped bare JSON (and decodeJobEnvelope back to
-  // reading it) is retired: the flag is gone from jobEnvelope.ts, and
-  // decodeJobEnvelope now unconditionally requires a version-2 envelope. The
-  // "given envelope writes are not enabled" and "given a legacy bare-JSON
-  // value" describe blocks tested that retired dual-format compatibility path
-  // and are dropped rather than forced.
+  // GROUP_QUEUE_ENVELOPE_WRITES_ENABLED (bare-JSON fallback for encode/decode)
+  // is retired: decodeJobEnvelope now unconditionally requires a version-2
+  // envelope. The describe blocks testing that dual-format path are dropped,
+  // not forced.
 
   describe("given a payload over the compression threshold", () => {
     const largePayload = {
@@ -100,13 +97,10 @@ describe("jobEnvelope", () => {
     });
   });
 
-  // The GQ1-era single-tier `blobs` offload param on encodeJobEnvelope (an
-  // "e":"ref" wire header, and a blobId-keyed retirement) was retired along
-  // with GQ1: encodeJobEnvelope now requires `tieredBlobs` + `projectId` for
-  // any payload over INLINE_CEILING_BYTES and throws without them, and the
-  // lease-based retirement model those scenarios exercise lives on in the
-  // "given a tiered blob store and a projectId (GQ2)" describe block below,
-  // plus job-envelope-attempt.unit.test.ts and blobLeases.unit.test.ts.
+  // The GQ1-era single-tier `blobs` offload param was retired with GQ1:
+  // encodeJobEnvelope now requires `tieredBlobs` + `projectId` for any
+  // payload over INLINE_CEILING_BYTES and throws without them. The
+  // lease-based model lives on in "given a tiered blob store" below.
 
   describe("given an inline-body envelope", () => {
     it("carries no retirement lease", async () => {

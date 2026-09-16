@@ -8,9 +8,8 @@ const logger = createLogger("langwatch:clickhouse:migrations");
 
 /**
  * Goose migration wrapper for ClickHouse: pre-flight validates config and
- * connectivity, bootstrap creates the Replicated database and
- * `goose_db_version` table, then goose runs migrations. For a Replicated
- * database (`CLICKHOUSE_CLUSTER` set), DDL and data replicate across nodes.
+ * connectivity, bootstrap creates the Replicated database, then goose runs
+ * migrations. With `CLICKHOUSE_CLUSTER` set, DDL and data replicate across nodes.
  * @see https://github.com/pressly/goose
  */
 
@@ -19,19 +18,15 @@ const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 
 /**
  * The MergeTree setting that relaxes ClickHouse 26.0's refusal to create an
- * AggregatingMergeTree table with a column that is neither in the sorting key
- * nor an aggregate state. It does not exist before 26.0, where naming it in a
- * CREATE TABLE fails with UNKNOWN_SETTING, so it can only be applied to a
- * server that has it.
+ * AggregatingMergeTree column outside the sorting key or an aggregate state.
+ * Absent before 26.0 (`UNKNOWN_SETTING`), so only applied where it exists.
  */
 const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
 
 /**
- * The last migration that runs with the setting above relaxed (00088 is
- * where those four rollup columns gain their merge rule). Migrations up to
- * here are merged history, still creating tables the old way; everything
- * from 00087 on runs without the setting, so a new migration using such a
- * column fails on ClickHouse 26 instead of being silently accepted.
+ * The last migration that runs with the setting above relaxed (merged
+ * history; migration 00088 is where the affected columns gain their rule).
+ * From 00087 on, such a column fails loudly instead of silently accepted.
  */
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
@@ -286,14 +281,9 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
       );
     }
 
-    // Create goose_db_version table in the target database
-    // Goose creates this table in the database specified in the connection string.
-    // We pre-create it to avoid race conditions when multiple workers start simultaneously.
-    // Schema must match goose's ClickHouse table: https://github.com/pressly/goose
-    //
-    // For Replicated databases (when clusterName is set):
-    // - DDL is automatically replicated to all nodes by the database engine
-    // - Data replication requires ReplicatedMergeTree (the database provides Keeper paths)
+    // Pre-creates goose_db_version to avoid a race when workers start
+    // simultaneously; schema must match goose's own table. For Replicated
+    // databases, DDL auto-replicates but data replication needs ReplicatedMergeTree.
     const engine = config.clusterName ? "ReplicatedMergeTree()" : "MergeTree()";
     await executeBootstrapSQL(
       client,
@@ -337,13 +327,9 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
     }
   });
 
-  // ClickHouse 26.0 refuses to create an AggregatingMergeTree table with a
-  // column that is neither in the sorting key nor an aggregate state. Four
-  // rollups were created that way before 00088 converted them, and those
-  // CREATE TABLE statements are merged history that a new install still
-  // replays. The presence of the setting that relaxes the check is what says
-  // the server enforces it — read rather than inferred from a version number,
-  // so a backport or a fork answers correctly too.
+  // Four rollups were created before 00088 with a column outside the sorting
+  // key/aggregate state; a new install still replays that merged history. The
+  // setting's presence — not a version number — says whether the server enforces this.
   await withClient(config.databaseUrl, async (client) => {
     const result = await client.query({
       query: `SELECT name FROM system.merge_tree_settings WHERE name = {setting:String}`,
@@ -397,12 +383,9 @@ function buildMigrationEnvVars({
     // from a plain-engine table, whose content is per-replica when clustered).
     CLICKHOUSE_IS_REPLICATED: config.clusterName ? "1" : "0",
 
-    // The settings appended to every CREATE TABLE, after index_granularity.
-    // Storage policy: 'local_primary' if available (S3 tiering in
-    // production), otherwise the ClickHouse default. The compatibility
-    // setting rides along here too, since this substitution is the only one
-    // present in every historical CREATE TABLE's SETTINGS clause, and
-    // ClickHouse only applies it to a table that aggregates.
+    // Settings appended to every CREATE TABLE, after index_granularity:
+    // storage policy ('local_primary' if available, else default), plus the
+    // compatibility setting, riding the one substitution common to every CREATE TABLE.
     CLICKHOUSE_STORAGE_POLICY_SETTING: [
       config.hasLocalPrimaryPolicy ? ", storage_policy = 'local_primary'" : "",
       allowDimensionsOutsideSortingKey ? `, ${AGGREGATING_DIMENSION_SETTING} = 1` : "",
@@ -427,10 +410,8 @@ function logConfig(config: ClickHouseConfig): void {
 
 /**
  * The migration versions goose reports as applied, read from its own output.
- *
- * Goose prints one `OK   00042_name.sql` line per migration it ran and nothing
- * at all when there is nothing to run, so an empty answer here is the idle
- * boot: the run happened, it changed nothing, and it has nothing to say.
+ * It prints one `OK   00042_name.sql` line per migration run and nothing when
+ * there's nothing to run, so an empty answer here is a no-op boot, not an error.
  */
 export function appliedMigrationVersions(output: string): readonly string[] {
   return [...output.matchAll(/^OK\s+(\d+)[^\n]*$/gm)].map((match) => match[1]!);

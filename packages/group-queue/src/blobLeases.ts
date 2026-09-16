@@ -80,12 +80,9 @@ const transferScript = new CachedLuaScript(TRANSFER_LUA);
 const countLiveScript = new CachedLuaScript(COUNT_LIVE_LUA);
 
 /**
- * Per-holder, renewable leases for content-addressed blobs. Each sorted-set
- * member is a holder identity and its score is an absolute Redis-time deadline.
- * Releases remove only that member; blob reclamation is exclusively lazy via
- * Redis TTL or the durable-store lifecycle sweep. Retiring the last lease
- * shortens the Redis-tier blob's expiry to
- * {@link BLOB_RELEASE_GRACE_TTL_SECONDS} so lazy does not mean four days.
+ * Per-holder, renewable leases for content-addressed blobs: each sorted-set
+ * member is a holder identity, its score an absolute deadline. Releases
+ * remove only that member; reclamation is exclusively lazy (TTL or sweep).
  */
 export class BlobLeases {
   private readonly redis: IORedis | Cluster;
@@ -179,10 +176,9 @@ export class BlobLeases {
   }
 
   /**
-   * The lease set, the rolling-deploy guard set, and — for the redis tier only —
-   * the blob itself, prefixed by the key count the Lua `#KEYS` branches read.
-   * The s3 tier deliberately passes two keys so cluster mode never has to
-   * co-slot a blob key that does not exist.
+   * The lease set, the guard set, and — redis tier only — the blob itself,
+   * prefixed by the key count the Lua `#KEYS` branches read. s3 passes two
+   * keys so cluster mode never has to co-slot a blob key that doesn't exist.
    */
   private blobKeyArgs({
     projectId,

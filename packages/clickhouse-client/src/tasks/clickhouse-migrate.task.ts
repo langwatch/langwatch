@@ -15,11 +15,9 @@ export type ClickHouseMigrationEndpoint = {
 export type ClickHouseMigrationTaskConfig = {
   buildTime: boolean;
   /**
-   * The operator's own opt-out, `SKIP_CLICKHOUSE_MIGRATE=true`.
-   *
-   * Exactly `"true"`, because a half-recognised value silently skipping the
-   * schema work is the expensive direction to be wrong in: the process then
-   * serves against whatever schema happened to be there.
+   * The operator's own opt-out, `SKIP_CLICKHOUSE_MIGRATE=true` — exactly
+   * that string, since a half-recognised value silently skipping schema
+   * work is the expensive direction: the process serves whatever schema was there.
    */
   skipped: boolean;
   sharedUrl?: string;

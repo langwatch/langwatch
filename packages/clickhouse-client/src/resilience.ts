@@ -44,11 +44,9 @@ function isDriverTimeout(error: Error): boolean {
 }
 
 /**
- * Whether a failure is worth another attempt.
- *
- * Deliberately conservative: anything unrecognised is permanent. Retrying a
- * permanent failure costs the full budget and, when the failure is a server
- * overload the retries themselves caused, makes the overload worse.
+ * Whether a failure is worth another attempt. Deliberately conservative:
+ * anything unrecognised is permanent, since retrying costs the full budget
+ * and can worsen a server overload the retries themselves caused.
  */
 export function isTransientClickHouseError({
   error,
@@ -93,11 +91,9 @@ export function jitteredBackoffMs({
 }
 
 /**
- * The level a retry notice should be emitted at.
- *
- * Only the first attempt is worth a warn. A slow endpoint produces one notice
- * per retry, so a 25-attempt budget turned a single failure into 25 records
- * that each read as a separate failure.
+ * The level a retry notice is emitted at. Only the first attempt warrants a
+ * warn — a slow endpoint's 25-attempt budget once turned one failure into
+ * 25 records that each read as a separate failure.
  */
 export function retryNoticeLevel(attempt: number): "warn" | "debug" {
   return attempt === 0 ? "warn" : "debug";
@@ -108,10 +104,7 @@ export const RETRY_CAUSE_FIELD = "retryError";
 
 /**
  * Where a failed-attempt notice attaches its cause. Never `error`; see
- * ./logging.ts.
- *
- * Separate from {@link RETRY_CAUSE_FIELD} so the two are told apart on sight: a
- * retry notice says an attempt failed and another is coming, this one says the
- * failure was raised to the caller.
+ * ./logging.ts. Separate from {@link RETRY_CAUSE_FIELD}: a retry notice says
+ * an attempt failed and another is coming, this says it was raised to the caller.
  */
 export const QUERY_CAUSE_FIELD = "queryError";

@@ -26,12 +26,9 @@ function createQueueDefinition(
 }
 
 /**
- * A handler crash observed only as `error.message` is undiagnosable: the
- * message names no file and no line, and the queue is the only place that
- * ever sees the throw. These tests pin that every failure-path log record
- * carries the full Error object — the logger's `error` serializer emits
- * the stack from it — so a production crash can be traced to its call site
- * without a rollback-and-guess cycle.
+ * A handler crash seen only as `error.message` is undiagnosable — no file,
+ * no line, and the queue is the only witness. These tests pin that every
+ * failure-path log carries the full Error object, so a crash traces to its call site.
  */
 describe("GroupQueueProcessor - failure logging", () => {
   let redis: Redis;

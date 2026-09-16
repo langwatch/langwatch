@@ -2,11 +2,9 @@ import type { Cluster, Redis } from "ioredis";
 import { CLAIM_MARKER_TTL_SECONDS, DEFAULT_CONFIRMED_DEATH_THRESHOLD } from "../scripts.ts";
 
 /**
- * Shared poison-guard fixtures.
- *
- * Both integration suites drive the guard through the same Redis keys, so the
- * key layout and the seeded shape live here rather than being written twice.
- * A fixture that drifts from `CLAIM_GUARD_LUA` stops testing the thing it names.
+ * Shared poison-guard fixtures: both integration suites drive the guard
+ * through the same Redis keys, so the layout lives here once. A fixture
+ * that drifts from `CLAIM_GUARD_LUA` stops testing the thing it names.
  */
 
 export const claimKey = (queueName: string, groupId: string): string =>

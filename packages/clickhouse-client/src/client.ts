@@ -1,10 +1,7 @@
 /**
- * The composition core: one class running its policies in a fixed, load-
- * bearing order (tenant guard, tracing, concurrency limit, retry), written
- * as nesting in {@link ClickHouseQueryClient.query} rather than an array's
- * index. Concurrency sits outside retry deliberately — a slot must survive
- * a retry, or a retrying statement rejoins the queue and turns a small
- * overload into a persistent one.
+ * The composition core: one class running policies in a fixed, load-bearing
+ * order (tenant guard, tracing, concurrency limit, retry). Concurrency sits
+ * outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
 import type { ConcurrencyLimiter } from "./rateLimit.ts";
@@ -42,11 +39,9 @@ export class ClickHouseQueryClient {
   }
 
   /**
-   * Run one statement under every policy this client was given.
-   *
-   * Reads top to bottom as the order described on the class. Each step is a
-   * plain call rather than a wrap, so an absent policy is a skipped line and
-   * not a hole in a chain.
+   * Runs one statement under every policy this client was given, top to
+   * bottom per the class order. Each step is a plain call rather than a
+   * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
   async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
     this.tenantGuard?.assert(request);
@@ -84,11 +79,9 @@ export class ClickHouseQueryClient {
   }
 
   /**
-   * Write one batch under every policy this client was given.
-   *
-   * The same order as {@link query}, for the same reasons: the guard refuses a
-   * batch that is not one tenant's before it costs a slot or a socket, and a
-   * retrying insert keeps its slot rather than rejoining the queue.
+   * Writes one batch under every policy this client was given, same order as
+   * {@link query}: the guard refuses a multi-tenant batch before it costs a
+   * slot or socket, and a retrying insert keeps its slot.
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard?.assertInsert(request);

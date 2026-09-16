@@ -21,10 +21,9 @@ describe("parseRouteKey", () => {
 
   describe("given a label that itself contains the separator", () => {
     /**
-     * The org id is taken from the LAST separator, not the first. A label is
-     * free text a person wrote; splitting on the first "__" would route
-     * "acme__eu" to org "eu" and send a customer's traffic to the wrong
-     * cluster — or, more likely, to none.
+     * The org id is taken from the LAST separator, not the first — a label
+     * is free text a person wrote, and splitting on the first "__" would
+     * route "acme__eu" to org "eu", sending traffic to the wrong cluster.
      */
     it("keeps the whole label and still routes on the trailing org id", () => {
       expect(parseRouteKey({ key: `${prefix}acme__eu__org_abc123`, prefix })).toEqual({

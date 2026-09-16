@@ -2,10 +2,9 @@ import { bench, describe } from "vitest";
 import { redactSecretsInText } from "../secrets.ts";
 
 /**
- * These payloads are the three shapes that decide redaction's per-span cost:
- * a rule can be fast on one and quadratic on another (the connection-URL rule
- * was 0.1ms on URL-dense text, 2.4ms on prose with none). Run with `pnpm
- * --filter @langwatch/redaction bench`; compare ratios, not absolute numbers.
+ * These payloads are the three shapes that decide redaction's per-span cost
+ * (the connection-URL rule was 0.1ms on URL-dense text, 2.4ms on prose with
+ * none). Run with `pnpm --filter @langwatch/redaction bench`; compare ratios.
  */
 const SIZE = 200_000;
 

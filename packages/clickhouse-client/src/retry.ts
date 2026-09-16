@@ -10,10 +10,9 @@ import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from 
 
 export interface RetryNotice {
   /**
-   * Absent when the policy was run without one — `run(task)` is a supported
-   * form. Optional rather than cast away: a callback that reads tenant or table
-   * off this would otherwise throw into runWithRetry's guard, and the retry
-   * telemetry would vanish rather than fail loudly.
+   * Absent when the policy ran without one — `run(task)` is a supported form.
+   * Optional rather than cast away: a callback reading tenant/table off this
+   * would otherwise throw into the guard, silencing retry telemetry.
    */
   request?: QueryRequest | undefined;
   /** Zero-based. */
@@ -126,12 +125,9 @@ export async function runWithRetry<T>(
         maxDelayMs,
         ...(random === undefined ? {} : { random }),
       });
-      // Guarded because `onRetry` is host code - a logger, a counter - and it
-      // runs inside the catch. An exception from it would propagate in place of
-      // `error`, so the caller would be handed a logging failure and never
-      // learn which ClickHouse error actually happened, and the remaining
-      // attempts would be cancelled by the reporting of the failure rather than
-      // the failure. Observability must not change what it observes.
+      // Guarded because `onRetry` is host code running inside the catch: an
+      // exception from it would replace `error`, so the caller learns a
+      // logging failure instead of the real one. Observability must not change what it observes.
       quietly(() =>
         onRetry?.({
           attempt,
@@ -155,11 +151,9 @@ export async function runWithRetry<T>(
 }
 
 /**
- * A configured retry policy, reusable across statements.
- *
- * Holds its options once instead of threading them through every call, which
- * is what lets the client hold one policy rather than rebuilding the argument
- * object per query.
+ * A configured retry policy, reusable across statements. Holds its options
+ * once instead of threading them through every call, so the client holds
+ * one policy rather than rebuilding the argument object per query.
  */
 export class RetryPolicy {
   private readonly onRetry: ((notice: RetryNotice) => void) | undefined;
@@ -171,11 +165,9 @@ export class RetryPolicy {
   }
 
   /**
-   * Run `task`, retrying transient failures until the budget is spent.
-   *
-   * `request` is optional and only decorates the retry notice: a caller that
-   * has one gets it echoed back for logging, and a caller retrying something
-   * that is not a statement still gets the same backoff.
+   * Runs `task`, retrying transient failures until the budget is spent.
+   * `request` is optional and only decorates the retry notice — a caller
+   * retrying something that isn't a statement still gets the same backoff.
    */
   run<T>(
     task: () => Promise<T>,

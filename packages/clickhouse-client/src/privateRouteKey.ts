@@ -1,10 +1,7 @@
 /**
  * Reading a private ClickHouse route out of its environment variable name.
- *
- * Its own module, and not a helper inside `clickhouseClient.ts`, because that
- * module imports Prisma: splitting a string should not need a database client
- * to test, and a test that has to generate the Prisma client first is a test
- * nobody runs.
+ * Its own module, not a helper in `clickhouseClient.ts`, which imports
+ * Prisma — splitting a string shouldn't need a database client to test.
  */
 
 /** Env var format: `CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>`. */
@@ -14,10 +11,9 @@ export interface PrivateRoute {
   /** The organization whose traffic goes to this cluster. */
   orgId: string;
   /**
-   * The name a human calls this cluster, from the `<label>` segment. The
-   * only human-readable name the platform has for a customer's dedicated
-   * ClickHouse — discarding it means no log line can say which cluster
-   * refused a query, only a vendor error to match against terraform by hand.
+   * The name a human calls this cluster, from the `<label>` segment — the
+   * only human-readable name the platform has for a dedicated ClickHouse.
+   * Discarding it means no log line can say which cluster refused a query.
    */
   cluster: string;
 }

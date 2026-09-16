@@ -67,10 +67,9 @@ describe("reconcileTTL()", () => {
 
   describe("when a managed tiered table already has both cold-storage AND retention TTL", () => {
     /**
-     * Reconciler had a bug where it only emitted retention TTL when the table
-     * was missing it. On a hot-days bump, the cold TTL was rewritten without
-     * the retention clause — MODIFY TTL replaces the whole expression
-     * atomically, so the retention DELETE was silently dropped.
+     * Reconciler had a bug: it only emitted retention TTL when missing, so a
+     * hot-days bump rewrote the cold TTL without it — MODIFY TTL replaces
+     * the whole expression atomically, silently dropping the DELETE clause.
      */
     it("preserves the retention TTL when the cold TTL is rewritten", async () => {
       // Table already has both: cold TO VOLUME + retention DELETE on _retention_days
@@ -117,11 +116,9 @@ describe("reconcileTTL()", () => {
 
   describe("when cold storage is disabled on the deployment", () => {
     /**
-     * Regression: the reconciler used to early-return whenever
-     * CLICKHOUSE_COLD_STORAGE_ENABLED was unset, so self-hosted/default-storage
-     * installs stamped `_retention_days` but never installed the DELETE TTL,
-     * silently failing to enforce retention. Retention TTL must reconcile
-     * independently of the cold-storage flag.
+     * Regression: the reconciler used to early-return when
+     * CLICKHOUSE_COLD_STORAGE_ENABLED was unset, silently never installing
+     * the DELETE TTL. Retention must reconcile independent of that flag.
      */
     it("still installs the retention DELETE TTL even without cold-storage MOVE", async () => {
       delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
@@ -158,12 +155,9 @@ describe("reconcileTTL()", () => {
 
   describe("when a managed table already has retention TTL normalized by ClickHouse", () => {
     /**
-     * Regression: hasRetentionTTL() matched on the literal "DELETE" keyword, but
-     * ClickHouse normalizes a bare-DateTime TTL to an implicit DELETE and strips
-     * the keyword from stored metadata (engine_full). The check was a permanent
-     * false-negative, so the reconciler re-issued ALTER MODIFY TTL for every
-     * managed table on every migrate run instead of recognizing the TTL was
-     * already installed. Reconciliation must be idempotent.
+     * Regression: hasRetentionTTL() matched on literal "DELETE", but
+     * ClickHouse strips that keyword from a normalized TTL — a false
+     * negative that re-issued ALTER MODIFY TTL on every migrate run.
      */
     it("does not re-issue the ALTER (recognizes the TTL despite no DELETE keyword)", async () => {
       // engine_full exactly as ClickHouse stores it after our retention ALTER:

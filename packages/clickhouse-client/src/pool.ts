@@ -42,11 +42,9 @@ export interface PoolSizingDecision {
   size: number;
   source: PoolSizeSource;
   /**
-   * The strictest knowable ceiling: the fleet budget when the fleet size is
-   * stated, otherwise one process's share of a stated server cap. Present
-   * even for an override so the caller can report a conflict rather than
-   * discovering it as rejected queries. Null when nothing about the server's
-   * capacity was stated at all.
+   * The strictest knowable ceiling: fleet budget when fleet size is stated,
+   * else one process's share of a stated server cap. Present even for an
+   * override so a conflict is reported, not discovered as rejected queries.
    */
   derivedCeiling: number | null;
   /**
@@ -69,22 +67,18 @@ function isUsableInteger(value: number | undefined): value is number {
 }
 
 /**
- * A fractional replica or client count cannot exist, and treating it as one
- * anyway (e.g. `clientsPerProcess: 0.5`) inflates the derived ceiling instead
- * of shrinking it - the opposite of what the safety factor is for. Anything
- * that is not a positive integer falls back to the default.
+ * A fractional replica or client count can't exist, and treating it as one
+ * (e.g. `clientsPerProcess: 0.5`) inflates the ceiling instead of shrinking
+ * it — the opposite of the safety factor's job. Falls back to the default.
  */
 function positiveIntegerOr(value: number | undefined, fallback: number): number {
   return value !== undefined && Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 /**
- * The unclamped ceiling: how many connections per pod the server's budget
- * actually allows, before the "never below one usable connection" floor is
- * applied. Callers that only need the reportable ceiling want
- * {@link deriveFleetPoolCeiling}; this is for detecting the case the floor
- * would otherwise hide - a fleet so large that even a single connection per
- * pod exceeds the budget.
+ * The unclamped ceiling: connections per pod the server's budget allows,
+ * before the "never below one" floor applies. For detecting what that floor
+ * would hide — a fleet so large even one connection per pod exceeds budget.
  */
 function rawFleetPoolCeiling(input: PoolSizingInput): number | null {
   const replicas = input.replicas;

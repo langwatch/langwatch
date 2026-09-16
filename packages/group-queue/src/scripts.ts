@@ -1029,12 +1029,9 @@ return {results, overrideDispatched}
 `;
 
 /**
- * Pop up to maxJobs additional DUE jobs from a group's queue without touching
- * active/ready/blocked/signal state. Safe only while the caller holds the
- * group's active slot. Stops at whichever of two bounds binds first (ADR-066
- * pillar 2): a job-count cap, or a byte cap where an oversized job is left in
- * staging, never dropped — bytes are the envelope's recorded size, not raw
- * `#value`, since a compressed body understates what a batch holds in memory.
+ * Pops up to maxJobs additional DUE jobs without touching active/ready/
+ * blocked/signal state. Safe only while the caller holds the group's active
+ * slot. Stops at a job-count or byte cap; an oversized job stays staged, never dropped.
  */
 const DRAIN_GROUP_LUA =
   PAYLOAD_SIZE_HELPER_LUA +
@@ -1325,12 +1322,9 @@ return 1
 `;
 
 /**
- * Records a claim and returns confirmed deaths, evidence-based rather than
- * inferred: a leftover marker counts as a death only when its owner publishes
- * neither `alive` (heartbeat) nor `retired` (graceful exit) — only a beaconless
- * owner is one. A hang that is SIGTERM'd cleanly is not counted: the retirement
- * tombstone lands before the platform's SIGKILL. Requires WORKER_LIVENESS_TTL_SECONDS
- * to expire before redispatch — pinned by groupQueue.workerLiveness.unit.test.ts.
+ * Records a claim and returns confirmed deaths, evidence-based not
+ * inferred: a marker counts as dead only when its owner publishes neither
+ * `alive` nor `retired`. Requires WORKER_LIVENESS_TTL_SECONDS to expire first.
  */
 const CLAIM_GUARD_LUA = `
 local claimKey = KEYS[1]

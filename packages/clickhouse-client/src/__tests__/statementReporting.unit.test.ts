@@ -1,10 +1,7 @@
 /**
- * Structured logging for a ClickHouse statement's outcome — the fields, the
- * level, and which field carries the cause. Chart correlation reads these
- * logs by field name, so the shape is a contract: `queryError` and not
- * `error`, `warn` and not `error` (the wrapper does not know whether the
- * caller will recover), and a debug line on success carrying enough to find
- * the slow one without the noise of every field on every request.
+ * Structured logging for a ClickHouse statement's outcome. Chart correlation
+ * reads these logs by field name, so the shape is a contract: `queryError`
+ * not `error`, `warn` not `error` (the wrapper can't know if the caller recovers).
  */
 import { describe, expect, it } from "vitest";
 import { QUERY_CAUSE_FIELD } from "../resilience.ts";

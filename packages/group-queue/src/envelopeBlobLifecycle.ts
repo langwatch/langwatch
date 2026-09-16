@@ -26,10 +26,9 @@ import {
 const logger = createLogger("langwatch:group-queue:envelope-blob-lifecycle");
 
 /**
- * Owns the content-addressed blob lifecycle for a GroupQueue — the tiered
- * store, the renewable leases, and the encode / decode / take / release
- * seams — so the queue processor delegates rather than carrying it inline, and
- * the seams are exercisable without standing up the whole queue. See ADR-029.
+ * Owns the content-addressed blob lifecycle for a GroupQueue — tiered store,
+ * renewable leases, encode/decode/take/release — so the processor delegates
+ * rather than carrying it inline. See ADR-029.
  */
 export class EnvelopeBlobLifecycle {
   private readonly blobs: RedisJobBlobStore;
@@ -87,10 +86,9 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * The branded tenant id owning a group, or undefined when the groupId carries
-   * no tenant prefix. This is the validation boundary: every projectId reaching
-   * the blob store / lease set is a `TenantId` minted here, so a raw string
-   * can't be used to namespace a blob (tenant-isolation safety at the type level).
+   * The branded tenant id owning a group, or undefined with no tenant
+   * prefix. The validation boundary: every projectId reaching the blob
+   * store/lease set is a `TenantId` minted here — no raw string namespaces a blob.
    */
   private projectIdFor(groupId: string): TenantId | undefined {
     const tenantId = tenantIdFromGroupId(groupId);
@@ -302,12 +300,10 @@ export class EnvelopeBlobLifecycle {
       await this.releaseLease({ values: [oldValue], groupId });
       return;
     }
-    // Fall back to ordered take+release when either side isn't a GQ2 lease, or
-    // when the old ref isn't this group's tenant — the guarded release then
-    // skips the foreign lease, leaving it to its TTL.
-    //
-    // Take-then-release is ordered so a release-before-acquire race cannot
-    // drop the old blob before the new lease is recorded.
+    // Falls back to ordered take+release when either side isn't a GQ2 lease
+    // or the old ref isn't this group's tenant (guarded release skips the
+    // foreign lease). Ordered so a release-before-acquire race can't drop
+    // the old blob before the new lease is recorded.
     if (!newLease || !oldLease || oldLease.ref.projectId !== expected) {
       try {
         await this.takeLeaseOrThrow(newValue);
