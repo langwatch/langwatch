@@ -196,21 +196,36 @@ export class PrismaIdentityLookupRepository
     userIds: readonly string[];
   }): Promise<readonly LookupMembershipRow[]> {
     if (userIds.length === 0) return [];
-    const rows = await this.prisma.organizationUser.findMany({
-      where: { userId: { in: [...userIds] } },
+    // READ THROUGH `Organization`, NOT `OrganizationUser`. A top-level
+    // `organizationUser` read carrying only a `userId` is refused outright by
+    // the ADR-021 partition guard, and it is refused with a PLAIN `Error` —
+    // which is how the same shape became a 401 for every user on the
+    // installation (defect 2) and a 500 on every page load (defect 3).
+    //
+    // Answering "which organizations is this person in" genuinely needs to
+    // cross organizations, so the fix is not a scope to add: it is to ask the
+    // question of the model the guard governs by relation instead. The rows
+    // that come back are identical, disabled memberships included, because an
+    // operator looking somebody up has to see those too.
+    const organizations = await this.prisma.organization.findMany({
+      where: { members: { some: { userId: { in: [...userIds] } } } },
       select: {
-        userId: true,
-        organizationId: true,
-        role: true,
-        organization: { select: { name: true } },
+        id: true,
+        name: true,
+        members: {
+          where: { userId: { in: [...userIds] } },
+          select: { userId: true, role: true },
+        },
       },
     });
-    return rows.map((row) => ({
-      userId: row.userId,
-      organizationId: row.organizationId,
-      organizationName: row.organization?.name ?? null,
-      role: row.role,
-    }));
+    return organizations.flatMap((organization) =>
+      organization.members.map((member) => ({
+        userId: member.userId,
+        organizationId: organization.id,
+        organizationName: organization.name,
+        role: member.role,
+      })),
+    );
   }
 
   async findOrganizationNames({
