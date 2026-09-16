@@ -907,6 +907,42 @@ describe("resolveWrapperMode", () => {
 			);
 			expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
 		});
+
+		/**
+		 * pi gets its own message, and this pins what it may not say.
+		 *
+		 * The shipped version of this string twice claimed routing pi was
+		 * impossible. It is not: PI_CODING_AGENT_DIR relocates pi's agent
+		 * directory, and AZURE_OPENAI_BASE_URL beats a model's own baseUrl.
+		 * Both were run against pi. We decline on cost, because that variable
+		 * moves the user's sign-in and settings too.
+		 *
+		 * Nothing asserted this sentence before, which is how a false claim
+		 * reached users twice. The negative half is the point: a build that
+		 * reintroduces the impossibility wording fails here.
+		 *
+		 * Unbound: no scenario covers the 403 copy itself.
+		 */
+		it("tells a pi admin the truth about why the gateway switch is dead", async () => {
+			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+			const cfg = baseCfg({
+				tool_policies: { pi: { allowVk: false, allowOtelDirect: false } },
+			});
+
+			const message = await resolveWrapperMode(cfg, "pi", {}).then(
+				() => "resolved, but both paths were off",
+				(err: Error) => err.message,
+			);
+
+			expect(message).toContain("allow_otel_direct");
+			expect(message).toContain("enabling allow_vk would change nothing");
+			// The reason we decline, stated as a cost we chose to avoid.
+			expect(message).toMatch(/sign-in|settings/);
+			// The two shapes that were false when shipped.
+			expect(message).not.toMatch(/cannot route/i);
+			expect(message).not.toMatch(/ignores base-URL/i);
+		});
 	});
 
 	describe("given a stale claude env block persisted by a previous login (#6202)", () => {

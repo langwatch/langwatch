@@ -632,10 +632,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   program
     .command("pi", { hidden: true })
     .description(
-      // Not "routed through the gateway" — that is the one thing this command
-      // never does. pi ignores base-URL environment variables, so the gateway
-      // swap cannot reach it; capture is read from pi's own session file
-      // instead. ADR-132 revision v10.
+      // Not "routed through the gateway": that is the one thing this command
+      // never does. Not because it could not. PI_CODING_AGENT_DIR would move
+      // pi's endpoint, but it moves the user's sign-in and settings with it,
+      // so capture is read from pi's own session file instead.
+      // ADR-132 revision v10.
       "Run `pi` and capture the session from its own transcript file.",
     )
     .allowUnknownOption(true)

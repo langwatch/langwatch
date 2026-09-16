@@ -4,15 +4,14 @@
  * The "CLI paths" section of the tile drawer, for a tool whose gateway route
  * the server forces off whatever the tile stores.
  *
- * pi reads each model's endpoint from its own model settings and ignores the
- * base-URL environment variables the gateway route works by, so this CLI has
- * no lever that moves it and `resolveToolPolicyOverrides` pins its allowVk to
- * false. Not a claim that pi cannot be routed at all: langy routes it by
- * generating a models.json, which the CLI is forbidden to do. A switch an
- * admin can turn on while the server ignores it is worse than no switch: it
- * reads as a setting that took. Asserted with claude_code as the control,
- * which is governable on both routes and keeps a live switch.
- * ADR-132 §Invariants.
+ * `resolveToolPolicyOverrides` pins pi's allowVk to false, by decision rather
+ * than by impossibility. pi can be redirected, via PI_CODING_AGENT_DIR or, on
+ * the Azure lane, AZURE_OPENAI_BASE_URL. The CLI declines because
+ * PI_CODING_AGENT_DIR relocates the user's sign-in and settings along with
+ * the model list. A switch an admin can turn on while the server ignores it
+ * is worse than no switch: it reads as a setting that took. Asserted with
+ * claude_code as the control, which is governable on both routes and keeps a
+ * live switch. ADR-132 §Invariants.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -118,7 +117,7 @@ describe("<AiToolEntryDrawer /> CLI paths", () => {
       expect(input).not.toBeChecked();
       expect(
         screen.getByText(
-          "pi sets its endpoint in its own model settings, so the gateway route never applies.",
+          "Routing pi would hide your own pi sign-in, so we read its session file instead.",
         ),
       ).toBeInTheDocument();
     });

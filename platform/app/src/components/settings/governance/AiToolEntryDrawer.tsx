@@ -841,21 +841,22 @@ function CliPathsSection({
   setForm: (f: FormState) => void;
 }) {
   const cursorOnly = form.assistantKind === "cursor";
-  // pi reads each model's endpoint from its own model settings and ignores
-  // OPENAI_BASE_URL / ANTHROPIC_BASE_URL, which is the only lever the
-  // launcher has, so the server forces this off whatever the tile stores
-  // (resolveToolPolicyOverrides). Show that rather than a switch an admin can
-  // turn on to no effect. Same shape as the cursor case on the
+  // The server forces this off whatever the tile stores
+  // (resolveToolPolicyOverrides), so show that rather than a switch an admin
+  // can turn on to no effect. Same shape as the cursor case on the
   // direct-ingestion row below.
   //
-  // Not a claim that pi CANNOT be routed: langy points pi at the gateway
-  // today by generating a models.json for it
-  // (services/langyworker/src/models.ts). The launcher must not copy that,
-  // and this is the one place the distinction can mislead — a generated
-  // models.json is resolved by every pi session, so it would repoint runs
-  // the user never launched through LangWatch. ADR-132 forbids it under the
-  // "No writes to the user's machine" invariant (§Invariants), and
-  // 132-task-list.md records it as the trap to expect.
+  // Not a claim that pi CANNOT be routed. Two ways exist and both were run
+  // against pi: PI_CODING_AGENT_DIR relocates pi's whole agent directory, and
+  // AZURE_OPENAI_BASE_URL beats a model's own baseUrl on the Azure lane. What
+  // pi ignores is narrower than it looks: OPENAI_BASE_URL and
+  // ANTHROPIC_BASE_URL only, both hardcoded past in pi-ai's provider files.
+  //
+  // We decline on cost, not ability. PI_CODING_AGENT_DIR moves auth.json and
+  // settings.json with models.json, so redirecting pi would shadow the user's
+  // own sign-in. langy accepts that cost inside its own sandbox
+  // (services/langyworker/src/models.ts); the langwatch CLI runs against the
+  // user's real install and does not. ADR-132 §Invariants.
   const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
@@ -868,7 +869,7 @@ function CliPathsSection({
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
               {isIngestionOnly
-                ? "pi sets its endpoint in its own model settings, so the gateway route never applies."
+                ? "Routing pi would hide your own pi sign-in, so we read its session file instead."
                 : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>

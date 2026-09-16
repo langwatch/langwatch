@@ -5,7 +5,13 @@
  * ANTHROPIC_BASE_URL, so the gateway swap a key normally triggers cannot work
  * for it: the key would be sent to the vendor, rejected, and echoed back in the
  * 401 body, while the session-file path was skipped as the mutually-exclusive
- * other mode. Zero capture, no error, a reassuring notice. ADR-132 §7.
+ * other mode. Zero capture, no error, a reassuring notice.
+ *
+ * That is a statement about the env-var swap only. pi CAN be redirected, by
+ * PI_CODING_AGENT_DIR; the CLI declines because that relocates the whole agent
+ * directory, so pi would no longer see the user's own sign-in and settings.
+ * Nothing of theirs is written or destroyed, it is simply not consulted.
+ * ADR-132 §Invariants.
  *
  * The pair of scenarios this file binds is the two arms of that variable, and
  * the discrimination lives in the arms, not in the notice:

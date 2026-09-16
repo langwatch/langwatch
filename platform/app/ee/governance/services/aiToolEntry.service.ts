@@ -527,13 +527,17 @@ export class AiToolEntryService {
       // gateway env; and pi ignores OPENAI_BASE_URL / ANTHROPIC_BASE_URL
       // outright, hardcoding each catalog model's base URL, so the gateway
       // swap the wrapper performs is accepted and dialled past. A tile
-      // default of `true` would enable a path that cannot exist — and for pi
-      // that is not merely useless: gateway and direct capture are mutually
-      // exclusive in the launcher, so choosing the dead path also skips the
-      // live one, capturing nothing at all. Overriding the shipped default
-      // here as well as in PLATFORM_TOOL_POLICY_DEFAULTS is what keeps an org
-      // that publishes a pi tile from re-enabling it.
-      // ADR-039 §Extension #2, ADR-132 §7.
+      // default of `true` would enable a path the wrapper does not take, and
+      // for pi that is not merely useless: gateway and direct capture are
+      // mutually exclusive in the launcher, so choosing the dead path also
+      // skips the live one, capturing nothing at all. Overriding the shipped
+      // default here as well as in PLATFORM_TOOL_POLICY_DEFAULTS is what keeps
+      // an org that publishes a pi tile from re-enabling it.
+      //
+      // For pi this is a decision, not an impossibility. PI_CODING_AGENT_DIR
+      // would move pi's endpoint, and the wrapper declines it because the same
+      // variable relocates the user's sign-in and settings.
+      // ADR-039 §Extension #2, ADR-132 §Invariants.
       const allowVk =
         slug === "code" || slug === "pi"
           ? false

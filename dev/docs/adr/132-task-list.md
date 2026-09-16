@@ -19,7 +19,7 @@ leaving `@unit` or `@integration` in place.
 
 ## Rung 1 — accept pi in both launch modes
 
-- [x] 1.1 `governance/tool-env.ts` — added the `pi` case so the gateway path stops throwing 501. **Reversed by 23.6: the case is deleted and must stay deleted.** It set a base URL pi ignores and an `OPENAI_API_KEY` pi does send — to the real vendor, which echoes it back in the 401 body. The 501 this atom removed was the system refusing to do something it could not do; the atom read it as a gap and filled it. Left ticked with the reversal attached: the sequence 1.1 → 23.6 is the record of the whole misreading.
+- [x] 1.1 `governance/tool-env.ts` — added the `pi` case so the gateway path stops throwing 501. **Reversed by 23.6: the case is deleted and must stay deleted.** It set `OPENAI_BASE_URL`, which pi ignores, and an `OPENAI_API_KEY` pi does send — to the real vendor, which echoes it back in the 401 body. The 501 this atom removed was the system refusing to do something we had not set it up to do; the atom read it as a gap and filled it with the one pair of variables that cannot carry the traffic. Left ticked with the reversal attached: the sequence 1.1 → 23.6 is the record of the whole misreading.
 - [x] 1.2 `governance/otel-env-block.ts` — add `pi: "pi"` to `SOURCE_TYPE_BY_TOOL`
 - [x] 1.3 `governance/otel-env-block.ts` — **reversed by v9: the atom had it backwards.** It said to confirm the no-branch fallback gives pi endpoint and headers only, and to add no pi branch if it does. Being in the slug table must not mean pi's child gets an env block: the fallback hands a live ingest token to every process in the session, and pi cannot use it anyway - its shipped package contains no `OTEL_` string at all. The change is `case "pi": return {}`. Left ticked with the reversal attached, the same way 1.1 is - this line is where the wrong rule was written down.
 - [x] 1.4 `__tests__/wrapper-mode.unit.test.ts` — test that pi resolves in the gateway mode without throwing
@@ -58,10 +58,13 @@ join shapes, and both are outside this ADR. Filed as a follow-up.
 
 **Corrected by rung 23, and the correction is larger than the gap.** The two
 paragraphs above assume a gateway launch of pi happens at all and merely joins
-the path wrongly on one lane. It does not. Every catalog model's address is
-fixed in pi's own build, so a base-URL override is accepted and ignored on
-*every* lane, not mis-joined on one. There is no doubled segment because there
-is no swap. The anthropic-lane asymmetry described above is real in langy's own
+the path wrongly on one lane. It does not. `OPENAI_BASE_URL` and
+`ANTHROPIC_BASE_URL` are the two variables pi reads nothing from
+(`pi-ai/dist/providers/openai.js:9`, `providers/anthropic.js:43`), so on those
+lanes the override is accepted and ignored rather than mis-joined. There is no
+doubled segment because there is no swap. A route does exist, through
+`PI_CODING_AGENT_DIR`, and we decline it for the reason the ADR's revision v12
+gives. The anthropic-lane asymmetry described above is real in langy's own
 worker, which is where it was measured; reading it as pi's behavior was the
 mistake, and it is the same stale belief that had to be corrected in three other
 places today. Left standing with the correction attached rather than rewritten
@@ -82,6 +85,14 @@ part that must not be lost:
 > here, not a stylistic preference: it is what prevents that. A working gateway
 > path needs a per-lane base URL inside pi, or a gateway that accepts both join
 > shapes, and neither is negotiable around by touching the install.
+>
+> There is a third shape, and whoever picks this up will find it: relocate pi's
+> whole agent directory with `PI_CODING_AGENT_DIR`
+> (`pi-coding-agent/dist/config.js:397`, `getAgentDir()` at `:411-417`). It does
+> keep our `models.json` out of the real install, and it has been driven live.
+> Its price is that the same variable relocates `auth.json` and `settings.json`
+> too, so the run would shadow the user's own pi sign-in and settings. That is
+> the cost to weigh, and it is why ADR-132 stays on file capture.
 
 That is the trap this whole line of work walked up to and stopped at. Anyone
 picking the ticket up will reach for the generated file first, because it is the
@@ -91,7 +102,7 @@ the ones we did not. Rung 17's read-only test is what keeps that closed.
 ## Rung 2 — a governable policy entry in both copies of the tool list
 
 - [x] 2.1 `governance/platform-tool-policy.ts` — add `pi` to `PlatformToolSlug`
-- [x] 2.2 `governance/platform-tool-policy.ts` — add the pi entry to `PLATFORM_TOOL_POLICIES`. **The reason written here was false and rung 23 reversed the values.** This atom said "both paths allowed; pi honors a base-URL swap". pi does not: every catalog model's address is fixed in pi's own build, so the swap is accepted and ignored. Because the two capture paths are mutually exclusive in the launcher, allowing the dead one also skipped the live one — the result was not a degraded gateway run but total silent capture loss for exactly the customers holding keys, plus the user's virtual key sent to the real vendor endpoint. Now `{ allowVk: false, allowOtelDirect: true }`, forced at both server sites and the tile override. Left ticked with the correction attached rather than rewritten clean: this line is where the defect entered, and a record that hides its own wrong turn teaches nothing.
+- [x] 2.2 `governance/platform-tool-policy.ts` — add the pi entry to `PLATFORM_TOOL_POLICIES`. **The reason written here was false and rung 23 reversed the values.** This atom said "both paths allowed; pi honors a base-URL swap". pi does not honor the swap the gateway path would have used: `OPENAI_BASE_URL` and `ANTHROPIC_BASE_URL` are read by nothing in pi, so that override is accepted and ignored. A route that would work exists (`PI_CODING_AGENT_DIR`) and we decline it, see the ADR's revision v12. Because the two capture paths are mutually exclusive in the launcher, allowing the dead one also skipped the live one — the result was not a degraded gateway run but total silent capture loss for exactly the customers holding keys, plus the user's virtual key sent to the real vendor endpoint. Now `{ allowVk: false, allowOtelDirect: true }`, forced at both server sites and the tile override. Left ticked with the correction attached rather than rewritten clean: this line is where the defect entered, and a record that hides its own wrong turn teaches nothing.
 - [x] 2.3 new `ee/governance/services/__tests__/platformToolPolicy.drift.unit.test.ts` — read both copies from disk and assert they name the same tools
 - [x] 2.4 run the drift test and **watch it fail** — red, naming `only in the launcher: pi`
 - [x] 2.5 `ee/governance/services/platformToolPolicy.service.ts` — add pi to `PLATFORM_TOOL_SLUGS`
@@ -819,7 +830,8 @@ scenarios remain bound.
 - [ ] 15.2 **rewritten after rung 23 — the original premise is dead.** This atom
       used to read "gate it on the no-virtual-key mode only, so a gateway run
       never also posts from the file." There is no such thing as a pi gateway run:
-      pi ignores base-URL environment variables, so rung 23 forces every pi launch
+      pi reads neither `OPENAI_BASE_URL` nor `ANTHROPIC_BASE_URL`, and we do not
+      take the route that would work, so rung 23 forces every pi launch
       onto ingestion regardless of the key. Gating on the mode is therefore a
       condition that is always true — which is the danger, because it LOOKS
       protective while guarding nothing. Worse, it is a loaded gun: if the rung-23

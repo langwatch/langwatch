@@ -196,9 +196,12 @@ Feature: pi session capture
   # own start time. pi writes no marker saying who launched it, so that stamp is
   # the only identity available. This buys one honest limit: a second pi the user
   # starts by hand while this run is going has a fresh write time too, and is
-  # captured. Narrowing it needs an identity pi does not give us, and the
-  # alternative is dropping resumed sessions, which are the common case. The
-  # identity belongs to #8132.
+  # captured. Narrowing it needs an identity pi does not give us: the session
+  # header carries only id, timestamp and cwd, no process or launcher field.
+  # Issue #8132 is where that identity belongs. Tightening the
+  # stamp instead, to files created after the run started, would drop every
+  # resumed session, because a resumed file already existed. That is a whole
+  # category lost, which is why the over-capture is the side we err on.
   # Both halves are asserted, never just the absence: a run that captured
   # nothing at all would satisfy the absence on its own.
   @unit
@@ -209,15 +212,17 @@ Feature: pi session capture
     Then the session the user produced is not captured
     And the session this run launched is captured
 
-  # pi reads each model's endpoint from its own model settings and ignores
-  # base-URL environment variables, so the langwatch CLI has no lever that moves
-  # pi's endpoint and cannot route it through the gateway with a virtual key.
-  # This is not a claim that pi cannot be routed at all: the langy worker does
-  # route pi, by generating a models.json for it, and the langwatch CLI is
-  # forbidden to copy that. ADR-132 §Invariants. So pi is captured from the file
-  # whether or not a key is present. Before this was measured, the scenario here
-  # asserted the opposite, and the opposite is total silent data loss for every
-  # user who holds a key. See ADR-132 revision v10.
+  # The langwatch CLI does not route pi through the gateway. That is a decision,
+  # not a limit: PI_CODING_AGENT_DIR relocates pi's whole agent directory, and
+  # both it and AZURE_OPENAI_BASE_URL were run against pi and moved its
+  # endpoint. What pi ignores is only OPENAI_BASE_URL and ANTHROPIC_BASE_URL.
+  # The CLI declines because PI_CODING_AGENT_DIR moves the user's sign-in and
+  # settings along with the model list, and the CLI runs against the install
+  # they use for everything else. The langy worker accepts that cost inside its
+  # own sandbox. ADR-132 §Invariants. So pi is captured from the file whether or
+  # not a key is present. Before this was measured, the scenario here asserted
+  # the opposite, and the opposite is total silent data loss for every user who
+  # holds a key. See ADR-132 revision v10.
   # A key is something a person has stored on their own machine, not a setting
   # their organisation holds, and it changes nothing here, so neither of these
   # may rest only on what the launcher says: both runs print the same sentence.

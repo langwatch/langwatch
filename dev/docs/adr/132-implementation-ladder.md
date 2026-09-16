@@ -205,11 +205,14 @@ has simply never seen an agent that fills them.
 **Revised at v10 — this paragraph said the reverse.** It read: "the streamer
 must be absent when the run is not in the no-virtual-key mode", and the heading
 above said the rung was gated on that mode. Both were written when we believed
-pi honors a base-URL swap, so that a key-holder would be captured server-side
-instead. pi does not honor it, so there is no server-side capture to fall back
-to: gating on the mode would have switched capture off for exactly the customers
-who pay, silently. The no-double-trace rule still holds — it is just no longer
-reachable through pi, because pi can only ever be captured one way.
+pi honors an OpenAI-compatible base-URL swap, so that a key-holder would be
+captured server-side instead. pi honors neither `OPENAI_BASE_URL` nor
+`ANTHROPIC_BASE_URL`, and we do not take the route that would work (see the ADR's
+first Invariant, and revision v12 for the price of that route), so there is no
+server-side capture to fall back to: gating on the mode would have switched
+capture off for exactly the customers who pay, silently. The no-double-trace rule
+still holds — it is just no longer reachable through pi, because we capture pi
+one way only.
 
 What replaces it is physical rather than policy: the streamer runs when an
 endpoint and an ingestion token exist to post with, and does not when they do

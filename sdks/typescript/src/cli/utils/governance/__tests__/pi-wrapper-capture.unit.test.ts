@@ -620,11 +620,12 @@ describe("given a pi session launched through the wrapper", () => {
     /**
      * Capture off is announced, never silent.
      *
-     * pi has no second capture path — it ignores base-URL environment
-     * variables, so there is no gateway run to fall back on. A run that cannot
-     * post is therefore total data loss for that session, and total data loss
-     * that prints nothing is indistinguishable from working software. This is
-     * the "assert loudly" half of the choice not to gate capture on the mode.
+     * pi has no second capture path. The CLI does not route pi through the
+     * gateway, by decision (see wrapper-mode.ts), so there is no gateway run
+     * to fall back on. A run that cannot post is therefore total data loss for
+     * that session, and total data loss that prints nothing is
+     * indistinguishable from working software. This is the "assert loudly"
+     * half of the choice not to gate capture on the mode.
      *
      * Unbound: no scenario describes this state, which after the ingestion-only
      * policy is unreachable in production.

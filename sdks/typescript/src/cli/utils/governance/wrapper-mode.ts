@@ -249,10 +249,13 @@ export async function resolveWrapperMode(
 	if (!policy.allowVk && !policy.allowOtelDirect) {
 		// Name only the lever that can actually be pulled. For most tools both
 		// are real, so the generic message is right. For pi it is not: allowVk
-		// is clamped false because this CLI has no lever that moves pi's
-		// endpoint (pi reads it from its own model settings and ignores
-		// base-URL environment variables), so an admin who followed the
-		// generic advice would enable the gateway, see nothing change, and
+		// is clamped false by decision, not by impossibility. pi CAN be moved
+		// onto another endpoint, by pointing PI_CODING_AGENT_DIR at a config
+		// directory we generate. We decline because that variable relocates
+		// auth.json and settings.json along with models.json, so redirecting
+		// pi would silently shadow the user's own sign-in and settings.
+		// Either way the admin's gateway switch does nothing for pi, and one
+		// who followed the generic advice would enable it, see no change, and
 		// have no way to learn why. That state is reachable only because this
 		// change forces allowVk false, so the message it produces is this
 		// change's to fix. See ADR-132 §Invariants.
@@ -260,7 +263,7 @@ export async function resolveWrapperMode(
 			403,
 			"tool_disabled",
 			tool === "pi"
-				? "Tool 'pi' is disabled in the platform policy: direct OTLP ingestion is off, and the gateway path is not available for pi. pi reads each model's endpoint from its own model settings and ignores base-URL environment variables, so the langwatch CLI cannot route it through the gateway. Ask your org admin to enable allow_otel_direct; enabling allow_vk would change nothing."
+				? "Tool 'pi' is disabled in the platform policy: direct OTLP ingestion is off, and LangWatch does not route pi through the gateway, because doing so would hide your own pi sign-in and settings. LangWatch reads pi's session file instead. Ask your org admin to enable allow_otel_direct; enabling allow_vk would change nothing."
 				: `Tool '${tool}' is disabled in the platform policy (both gateway and direct OTLP paths off). Ask your org admin to enable allow_vk or allow_otel_direct.`,
 		);
 	}
