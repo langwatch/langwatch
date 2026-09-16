@@ -40,10 +40,8 @@ export type DecideContext = {
 
 /**
  * Demo project: any signed-in user gets the demo-viewer bag on the one
- * configured project. Mirrors isDemoProject(), which legacy reaches only from
- * the session-backed tRPC path (rbac.ts:1118) — so api-key and anonymous
- * principals are excluded here too, and an anonymous caller's only path stays
- * the resource tier.
+ * configured project. Mirrors isDemoProject() (session-backed tRPC only,
+ * rbac.ts:1118), so api-key and anonymous principals are excluded too.
  */
 export function findDemoProjectStep({
   grants,
@@ -82,9 +80,8 @@ export function findOrganizationMembershipGateStep({
 
 /**
  * LEGACY-QUIRK(C): every org member holds the org-member bag on
- * ORGANIZATION-scope checks regardless of bindings (the personal-context
- * floor, rbac.ts:1058). Applies to org checks only — project/team checks have
- * no floor.
+ * ORGANIZATION-scope checks regardless of bindings (personal-context floor,
+ * rbac.ts:1058). Project/team checks have no floor.
  */
 export function findOrganizationRoleFloorStep({
   grants,

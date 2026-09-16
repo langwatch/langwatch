@@ -1,10 +1,7 @@
 /**
  * The durable Stop workflow: who may stop a turn, and what stopping it
- * records regardless of what the worker does.
- *
- * Ported from platform/app/src/server/app-layer/langy/__tests__/langy-turn.service.unit.test.ts
- * (origin/main)'s `LangyTurnService.stopTurn` block, adapted to the
- * split-out `LangyTurnStopService`. See specs/langy/langy-stop-and-resume.feature.
+ * records regardless of what the worker does. Ported from origin/main's
+ * `LangyTurnService.stopTurn`. See specs/langy/langy-stop-and-resume.feature.
  */
 import { describe, expect, it, vi } from "vitest";
 import {

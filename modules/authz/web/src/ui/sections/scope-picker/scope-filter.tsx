@@ -13,11 +13,9 @@ export interface AvailableScopes {
 }
 
 /**
- * The active filter.
- *
- * `team-current` and `project-current` are deliberately not the same as a
- * `specific` pick of the same scope: they follow the reader's ambient scope, so
- * an address carrying one still means "wherever I am" after a project switch.
+ * The active filter. `team-current` and `project-current` are deliberately
+ * not the same as a `specific` pick: they follow the reader's ambient
+ * scope, so one still means "wherever I am" after a project switch.
  */
 export type ScopeFilterValue =
   | { kind: "all" }

@@ -1,9 +1,7 @@
 /**
  * Copies the repo-root `feature-map.json` into this package, so
  * `feature-map.ts` reads a local file instead of a relative import that
- * escapes the package's physical workspace boundary (package-boundaries:
- * packageEscape). Mirrors `sdks/typescript/copy-types.sh`'s embed of the same
- * source file for the CLI catalogue.
+ * escapes the package's workspace boundary (package-boundaries: packageEscape).
  */
 import fs from "node:fs";
 import path from "node:path";

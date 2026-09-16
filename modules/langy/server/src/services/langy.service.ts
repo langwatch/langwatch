@@ -47,10 +47,8 @@ export { ADOPTABLE_CONVERSATION_ID };
 
 /**
  * The Langy feature's own conversation-and-turn service: the full surface
- * `LangyApp` forwards from. Folded out of the contract package per ADR-133
- * (was the `langy.service.ts` abstract class under `contract/src`, the
- * flagged "contract-service" shape) - this class is now the sole definition
- * of the surface, server-side.
+ * `LangyApp` forwards from. Folded out of the contract package per
+ * ADR-133 (the flagged "contract-service" shape); now the sole definition.
  */
 export class LangyService {
   private constructor(

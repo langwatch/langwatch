@@ -50,10 +50,9 @@ export type LangyTurnsRestMembers = Readonly<{
 }>;
 
 /**
- * What the PROCESS supplies the turn surface beyond Langy's own application:
- * the rollout store and the user directory a key is bridged through, and this
- * process's live turn buffer. A fact rather than a member of the App because
- * none of it is Langy's to own.
+ * What the PROCESS supplies the turn surface beyond Langy's own
+ * application: the rollout store, the user directory a key bridges
+ * through, and this process's live turn buffer - none of it Langy's to own.
  */
 export const langyTurnsMembers = defineRestMiddleware(
   "langyTurnsMembers",

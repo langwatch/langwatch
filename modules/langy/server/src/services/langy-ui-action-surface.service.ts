@@ -6,10 +6,8 @@ const logger = createLogger("langwatch:langy:ui-action-surface");
 
 /**
  * Resolves the live UI-action channel through the deployment's flag store.
- *
- * Never throws: a flag-store blip must not stop the turn, and must not
- * advertise a surface the dispatch route may still answer with a dark 404 —
- * so a failed read holds the channel closed rather than open.
+ * Never throws: a flag-store blip must not stop the turn, nor advertise a
+ * surface dispatch may 404 - a failed read holds the channel closed.
  */
 export class FeatureFlagLangyUiActionSurfaceAdapter extends LangyUiActionSurface {
   static create(featureFlags: FeatureFlagApi): FeatureFlagLangyUiActionSurfaceAdapter {

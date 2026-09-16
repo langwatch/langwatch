@@ -19,9 +19,8 @@ const isSender = (value: unknown): value is LangyCommandSender =>
 
 /**
  * All twenty-two conversation writes, listed once. A list rather than a
- * trusted read of whatever the registration happened to expose, so a command
- * REMOVED from the packaged definition fails this process's boot rather than
- * one person's turn.
+ * trusted read of whatever registration exposes, so a command REMOVED
+ * from the packaged definition fails this process's boot, not one turn.
  */
 const LANGY_COMMAND_NAMES = [
   "createConversation",

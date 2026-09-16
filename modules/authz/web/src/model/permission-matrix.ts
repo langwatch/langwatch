@@ -73,10 +73,9 @@ export function permissionsAddedBy(permission: AuthzPermission): AuthzPermission
 }
 
 /**
- * The list after one click, with rule 4 already applied.
- *
- * This is the whole of what the editor does to a role's permissions, so a
- * screen calls it and holds no rule of its own.
+ * The list after one click, with rule 4 already applied. This is the whole
+ * of what the editor does to a role's permissions, so a screen calls it
+ * and holds no rule of its own.
  */
 export function togglePermission({
   selected,

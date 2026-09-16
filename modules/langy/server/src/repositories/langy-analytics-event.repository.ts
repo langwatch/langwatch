@@ -5,11 +5,9 @@ export type LangyAnalyticsEventRecord = {
 } & LangyAnalyticsEventProjectionRecord;
 
 /**
- * Where one conversation's analytics rows land. A seam because the store is a
- * deployment choice: ClickHouse holds them where the deployment has one, and
- * a process without it keeps them in memory rather than pretending to write.
- * The retention days travel with each write because the tenant's policy, not
- * the table, decides how long a row lives.
+ * Where one conversation's analytics rows land. A seam because the store
+ * is a deployment choice: ClickHouse where the deployment has one, memory
+ * otherwise. Retention days travel with each write; the tenant decides.
  */
 export abstract class LangyAnalyticsEventSink {
   /** One row, written on the tenant's retention. */

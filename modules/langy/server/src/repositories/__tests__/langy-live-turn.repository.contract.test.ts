@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The contract every langy live-turn backend answers the same way, stated once
- * and run against each backend the package can reach. The memory tier runs it
- * always; a Redis backend joins the table as a second row when this package
- * declares that datastore.
+ * The contract every langy live-turn backend answers the same way, run
+ * against each backend the package can reach. The memory tier always runs;
+ * Redis joins as a second row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
 import { instantiateRepositories } from "@langwatch/runtime-composition";

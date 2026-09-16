@@ -87,12 +87,10 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input }, metrics) => {
     const { turnId, projectId, conversationId } = input;
 
-    // Cross-check the triple before writing. `projectId`/`conversationId` are
-    // body fields the bearer alone would otherwise let through unverified — the
-    // sibling relay proves the same thing with an HMAC over the runToken, but
-    // this durable path has only the shared secret. A turn row exists only if
-    // the turn was really accepted under this conversation in this project, so
-    // this rejects a forged triple and a benign cross-tenant mix-up alike.
+    // Cross-check the triple before writing: `projectId`/`conversationId`
+    // are body fields the bearer alone would let through unverified. A turn
+    // row exists only if this triple was really accepted, so this rejects
+    // a forged triple and a benign cross-tenant mix-up alike.
     const turnExists = await app.turnExists({ projectId, conversationId, turnId });
 
     if (!turnExists) {
@@ -132,11 +130,9 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   })
 
   // ── the worker's session key, handed back for revocation ──────────────────
-  //
-  // The agent hands back a session-key handle on worker shutdown so the app can
-  // revoke it. The app can only revoke — never mint — keeping the trust
-  // boundary where it was, and `revokeWorkerSessionKey` refuses any key that is
-  // not a Langy session key.
+  // The agent hands it back on worker shutdown so the app can revoke it. The
+  // app can only revoke — never mint — and `revokeWorkerSessionKey` refuses
+  // any key that is not a Langy session key.
   .post("/api/internal/langy/credentials/revoke", "revokeWorkerSessionKey")
   .withCredential("internalSecret")
   .withAccess(anyAuthenticated({ reason: "the deployment's own Langy bearer is the whole gate" }))
@@ -175,11 +171,10 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   })
 
   // ── the worker's inbound frame stream ─────────────────────────────────────
-  //
   // A long-lived ndjson stream of authenticated worker frames. It answers once
-  // the stream ends — fire-and-forget frames need no per-frame ack, because the
-  // dedup set makes redelivery safe — with a tally. Raw on both sides: the body
-  // is consumed AS a stream by the relay itself, so nothing may parse it first.
+  // the stream ends with a tally - fire-and-forget frames need no per-frame
+  // ack, since the dedup set makes redelivery safe. Raw: the body is
+  // consumed AS a stream by the relay itself, so nothing may parse it first.
   .post("/api/internal/langy/relay/frames", "streamRelayFrames")
   .withCredential("internalSecret")
   .withAccess(anyAuthenticated({ reason: "the deployment's own Langy bearer is the whole gate" }))

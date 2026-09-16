@@ -18,12 +18,9 @@ export type BuiltinRoleCard = {
 };
 
 /**
- * The three cards, in the order the page lists them.
- *
- * The description is stated ONCE. The platform page carried it twice — on the
- * card and again in `getDefaultRoleDescription`, which the permissions dialog
- * called with the card's own name and answered from a parallel switch — so the
- * two could disagree and the dialog would win.
+ * The three cards, in the order the page lists them. The description is
+ * stated ONCE - the platform page carried it twice (card and
+ * `getDefaultRoleDescription`), so the two could disagree.
  */
 export const BUILTIN_ROLE_CARDS: readonly BuiltinRoleCard[] = [
   {

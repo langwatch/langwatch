@@ -11,10 +11,8 @@ export * from "./digest.ts";
 export * from "./tool-result.ts";
 
 /**
- * The handled-error reading is zod-free and also importable on its own
- * (`@langwatch/langy-contract/cards/handled-error`) — the CLI's hot path takes that
- * subpath so that an instrumented command does not drag zod (~28ms) into every
- * invocation. Importing it from here, alongside the schemas, is the right call
- * for the app, which has zod loaded already.
+ * The handled-error reading is zod-free and importable on its own
+ * (`@langwatch/langy-contract/cards/handled-error`), so the CLI's hot path
+ * skips zod (~28ms). This module re-exports it since the app has zod loaded already.
  */
 export * from "./handled-error.ts";

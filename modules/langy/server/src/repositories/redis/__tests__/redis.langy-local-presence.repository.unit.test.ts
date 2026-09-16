@@ -1,8 +1,7 @@
 /**
- * What one heartbeat does to the folder record: it moves it on, it writes it
- * back after the record lapsed under an open connection, and it keeps its
- * hands off a conversation a newer connection took over.
- *
+ * What one heartbeat does to the folder record: moves it on, writes it
+ * back after a lapse under an open connection, and leaves alone a
+ * conversation a newer connection took over.
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";

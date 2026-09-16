@@ -105,11 +105,9 @@ export class ControlRequestService {
   }
 
   /**
-   * The wire shape of one request, as the command line lists it.
-   *
-   * A static method (not a `rules/` function) because it reads the clock's
-   * own instant to format the stored epoch millis as ISO strings — a rules
-   * module may not do that even for a pure formatting use.
+   * The wire shape of one request, as the command line lists it. A static
+   * method, not a `rules/` function, because it reads the clock's own
+   * instant to format epoch millis as ISO strings - not a rules-module job.
    */
   static toWire(request: StoredControlRequest): ControlRequest {
     return {

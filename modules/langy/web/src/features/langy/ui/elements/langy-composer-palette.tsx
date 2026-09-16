@@ -100,14 +100,11 @@ function buildItems({
   pageTargets: LangyContextTargetDescriptor[];
 }): PaletteItem[] {
   if (mode === "skills") {
-    // TODO(merge): main gates mutually-exclusive skills (e.g. lwql-charts vs
-    // playground-widgets on `release_custom_chart_playground`) via
+    // TODO(merge): main gates mutually-exclusive skills via
     // `isSkillAvailable({ skill, isFlagEnabled })` reading `skill.featureFlag`
     // / `skill.excludedByFlag`. Neither exists yet on this branch's
-    // `LangySkill` (../../../../model/shared/langy/langy-skills.ts) — that
-    // file is outside this lane's owned paths, so the gate is not ported
-    // here. Porting it means adding those two optional fields plus the
-    // `isSkillAvailable` export there, then filtering here the way main does.
+    // `LangySkill` (langy-skills.ts, outside this lane's paths). Port by
+    // adding those two fields plus `isSkillAvailable`, then filter here.
     return LANGY_SKILLS.map((skill) => ({
       value: `skill:${skill.id}`,
       label: skill.label,

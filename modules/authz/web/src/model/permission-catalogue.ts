@@ -15,12 +15,9 @@ export const AUTHZ_ACTIONS = {
 export type AuthzAction = (typeof AUTHZ_ACTIONS)[keyof typeof AUTHZ_ACTIONS];
 
 /**
- * The resources a custom role may be written against, in the order the editor
- * lists them.
- *
- * Organization and Team authority is managed at a higher level and is not
- * offered here; the playground is hidden deliberately. Both omissions travel
- * from the platform module's own comments.
+ * The resources a custom role may be written against, in editor order.
+ * Organization and Team authority is managed at a higher level and not
+ * offered here; the playground is hidden deliberately.
  */
 export const ORDERED_RESOURCES = [
   "traces",
@@ -81,12 +78,9 @@ export function validActionsForResource(resource: AuthzResource): AuthzAction[] 
 }
 
 /**
- * One resource's offerable permissions.
- *
- * The registry is the vocabulary the engine grants from, so it is the
- * vocabulary the settings UI offers: the per-resource action table above
- * produces the full resource x action cross product, most of which no grant can
- * ever carry.
+ * One resource's offerable permissions. The registry is the vocabulary the
+ * engine grants from, so the per-resource action table above produces the
+ * full resource x action cross product, filtered to what the registry allows.
  */
 export function permissionsForResource(resource: AuthzResource): AuthzPermission[] {
   return validActionsForResource(resource)

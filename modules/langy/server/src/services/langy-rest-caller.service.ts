@@ -1,9 +1,7 @@
 /**
- * The chain both public Langy REST families run a caller through once the
- * process's project door has already resolved the credential and enforced the
- * key's ceiling. ORDER IS THE CONTRACT, and it is the same on the turn surface
- * and the UI-action surface: per-project rollout (a dark 404), then the
- * identity bridge to the owning user, then the person a turn is filed under.
+ * The chain both public Langy REST families run a caller through, after the
+ * project door resolves the credential. ORDER IS THE CONTRACT: per-project
+ * rollout (a dark 404), then the identity bridge, then the filing user.
  */
 import type { FeatureFlagApi, FeatureFlagKey } from "@langwatch/feature-flag-contract";
 import { LangyApiIdentityDeniedError } from "@langwatch/langy-contract";
@@ -40,9 +38,8 @@ export class LangyRestCallerService {
 
   /**
    * Opens the rollout flag and bridges the door's credential to the owning
-   * user. Throws on every refusal EXCEPT the dark surface, which is not a
-   * refusal at all: a project the rollout has not reached must answer exactly
-   * as an unmounted path does.
+   * user. Throws on every refusal EXCEPT the dark surface: a project the
+   * rollout has not reached must answer exactly as an unmounted path does.
    */
   async resolve(input: {
     /** The credential the process's project door already resolved. */

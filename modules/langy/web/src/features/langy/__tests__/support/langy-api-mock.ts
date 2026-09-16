@@ -39,10 +39,9 @@ export const routerProxy: unknown = new Proxy(
 );
 
 /**
- * The `modelProvider` router as a panel suite needs it, rather than as the suite's subject: a
- * resolved Langy model (without one the sidebar draws the inline model-setup screen over the
- * panel), an empty provider list, and the two default-model mutations the make-default dialog
- * holds at render.
+ * The `modelProvider` router as a panel suite needs it, not as its
+ * subject: a resolved Langy model (else the sidebar draws inline model
+ * setup over the panel), an empty provider list, and the default-model mutations.
  */
 export const modelProviderRouter = (explicit: Record<string, unknown> = {}) => ({
   getResolvedDefault: {

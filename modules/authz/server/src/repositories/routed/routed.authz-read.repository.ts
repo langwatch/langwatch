@@ -113,12 +113,10 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
       projectId: args.projectId,
     });
     if (!lineage) return this.repositories.legacy.findShareLinks(args);
-    // The organization is already known from the lineage read above - handed
-    // straight to the reader rather than left for it to resolve a second
-    // time. Without this, a cut-over organization's share-link check ran the
-    // same lineage query twice: once here to pick the head, once more inside
-    // `EventingAuthzReadRepository.findShareLinks` to
-    // learn the organization its own query needed.
+    // The organization is already known from the lineage read above and is
+    // handed straight to the reader rather than left for it to resolve
+    // again - otherwise a cut-over organization's share-link check ran the
+    // same lineage query twice.
     return (await this.readerFor(lineage.organizationId)).findShareLinks({
       ...args,
       organizationId: lineage.organizationId,

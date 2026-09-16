@@ -1,8 +1,7 @@
 /**
- * Answering a permission question for a person or an api key, and refusing when the answer is
- * no. Every method here composes the decision seams rather than reaching the collector: the
- * one place a denial becomes an error, so the error a caller sees names the permission that
- * was missing and the scope it was missing in.
+ * Answering a permission question for a person or an api key, and refusing
+ * when the answer is no. This is the one place a denial becomes an error,
+ * so the caller sees the permission and scope that were missing.
  */
 import {
   LiteMemberRestrictedError,

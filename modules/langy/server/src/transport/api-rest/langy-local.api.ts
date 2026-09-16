@@ -83,10 +83,8 @@ export type LangyGithubInstallationReader = Readonly<{
 
 /**
  * Everything the local surface reaches that neither `LangyApi` nor the
- * framework's own project door supplies: the identity bridge's flag store,
- * this process's local-control runtime, and the code-access card's own
- * sources. Credential resolution and the `langy:create` ceiling are the
- * door's job now (`.withCredential("project").withPermission(...)`).
+ * framework's project door supplies: the flag store, local-control
+ * runtime, and code-access sources. Credential and `langy:create` are the door's job now.
  */
 export type LangyLocalRestMembers = Readonly<{
   /** This deployment's flag store, for the identity bridge. */

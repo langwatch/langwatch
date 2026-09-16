@@ -1,7 +1,6 @@
 /**
- * The panel header title truncates instead of shoving the header controls off-panel, keeps
- * the full text reachable on hover, and degrades to plain static text under reduced motion —
- * still truncating.
+ * The panel header title truncates instead of shoving header controls
+ * off-panel, and degrades to plain static text under reduced motion.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-header.feature
  */

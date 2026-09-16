@@ -1,10 +1,7 @@
 /**
- * The authenticated frame contract is a SECURITY boundary and a cross-language
- * one: the Go worker signs, this TS relay code verifies. These tests pin the
- * exact MACs from specs/langy/langy-frame-auth.vectors.json — the same file a Go
- * test asserts against — so Go and TS can never silently diverge, and they lock
- * the properties the construction exists to guarantee (tamper-evidence,
- * field-boundary integrity, constant-time reject of garbage).
+ * The authenticated frame contract is a SECURITY, cross-language boundary:
+ * the Go worker signs, this TS relay verifies. Tests pin the exact MACs
+ * from langy-frame-auth.vectors.json, shared with a Go test, so the two never diverge.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

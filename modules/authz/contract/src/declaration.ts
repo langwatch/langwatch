@@ -64,9 +64,8 @@ type ValidateOne<P extends AuthzPermission, I> = [P] extends [PlatformTierPermis
 
 /**
  * What the declaration surfaces intersect with their permission parameter:
- * P when every member of the (possibly union) input validates, the branded
- * error otherwise. `P & error` is uninhabited, so the call site fails with
- * the reason in its diagnostic.
+ * P when the input validates, the branded error otherwise. `P & error` is
+ * uninhabited, so the call site fails with the reason in its diagnostic.
  */
 export type ValidatePermissionForInput<P extends AuthzPermission, I> = [I] extends [never]
   ? DeclarationError<"the procedure declares no input to read a scope id from — call .input() first">
@@ -113,11 +112,9 @@ export type NoPermissionOptions<I> = I extends unknown
   : never;
 
 /**
- * The scope argument an IMPERATIVE check takes for P: exactly one id, at a
- * tier the permission is grantable at. The `undefined` counterkeys make the
- * union exclusive, so passing two ids is a compile error, as is an id from a
- * tier the registry does not list. Platform-tier permissions collapse to
- * `never` and the call is unwritable.
+ * The scope argument an IMPERATIVE check takes for P: exactly one id, at
+ * a grantable tier. `undefined` counterkeys make the union exclusive, so
+ * two ids or an ungranted tier is a compile error; platform-tier is `never`.
  */
 export type PermissionScopeArg<P extends AuthzPermission> =
   | ("project" extends PermissionGrantTiers<P>
@@ -198,12 +195,9 @@ export function resolveDeclaredScope({
     ? [via]
     : permissionGrantTiers(permission).map((tier) => SCOPE_TIER_FIELDS[tier]);
 
-  // Normalized once, before anything reads a field off it. `namesField` below
-  // already survives a non-object input, but the walk runs first and
-  // `input[field]` throws on `null` — so the promise that docblock makes was
-  // only half kept. A bypassed type layer handing us `null` is the same class
-  // of thing as the blank id this module exists for: the types said it could
-  // not happen, and it did.
+  // Normalized once before any field read: `input[field]` throws on `null`,
+  // and a bypassed type layer can still hand us one - the same class of
+  // bug as the blank id this module exists to survive.
   const named: Partial<Record<ScopeTierField, unknown>> =
     typeof input === "object" && input !== null ? input : {};
 

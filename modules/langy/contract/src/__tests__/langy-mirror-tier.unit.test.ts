@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Pins the ADR-061 mirror-tier resolver's v1 behaviour: content by default,
- * and the mandatory self-skip so the mirror project never mirrors its own
- * turns into itself (the one genuine self-ingest loop). The per-org policy
- * store is a later seam; until it lands every customer org is `content`.
+ * Pins the ADR-061 mirror-tier resolver's v1 behaviour: content by
+ * default, with mandatory self-skip so the mirror project never mirrors
+ * its own turns. Per-org policy is a later seam; until then every org is `content`.
  */
 import { describe, expect, it } from "vitest";
 

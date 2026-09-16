@@ -101,10 +101,9 @@ export type PostgresAuthzBuild = Readonly<{
 }>;
 
 /**
- * The migration speaks the command vocabulary directly because it supplies
- * content-derived command IDs and business times. It resolves the same
- * dispatcher as live writes, so there is one producer topology and one
- * availability/error policy.
+ * The migration speaks the command vocabulary directly since it supplies
+ * content-derived command IDs and business times, resolving the same
+ * dispatcher as live writes for one producer topology and error policy.
  */
 class DispatcherAuthzEngineLedger implements AuthzEngineLedger {
   constructor(private readonly dispatcher: AuthzGrantsCommandDispatcher) {}

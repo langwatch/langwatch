@@ -43,10 +43,9 @@ type PlanNode = {
 };
 
 /**
- * Rows the executor actually touched on `Grant`, across every node that read
- * it. A node reports what it returned; what it threw away is accounted for
- * separately, and both were read. Per-loop figures are multiplied back out so
- * a parallel or repeated scan is not undercounted.
+ * Rows the executor actually touched on `Grant`, across every node that
+ * read it: what it returned plus what it threw away, both counted, with
+ * per-loop figures multiplied back out so a repeated scan isn't undercounted.
  */
 function grantRowsExamined(node: PlanNode): number {
   const loops = node["Actual Loops"] ?? 1;

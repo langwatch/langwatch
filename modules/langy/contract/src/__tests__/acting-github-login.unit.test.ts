@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- *
- * The acting user's GitHub-login-like handle for bot-authored attribution comes
- * from the LangWatch profile only (never a GitHub call), sanitised to the GitHub
- * username charset so the Co-authored-by trailer is always well-formed.
+ * The acting user's GitHub-login-like handle for bot-authored attribution
+ * comes from the LangWatch profile only (never a GitHub call), sanitised
+ * to the GitHub username charset so the Co-authored-by trailer is well-formed.
  */
 import { describe, expect, it } from "vitest";
 import { type LangyCredentialSession, resolveActingGithubLogin } from "@langwatch/langy-contract";

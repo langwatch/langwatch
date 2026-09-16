@@ -1,8 +1,7 @@
 /**
- * The decision family a caller reaches with the ids it already holds rather than a resolved
- * scope: one question, "any of these", and the two batch forms. Each resolves the scope and
- * collects the principal's grants ONCE and answers every candidate from that one snapshot —
- * asking per permission would re-query for an answer the first collection already holds.
+ * The decision family a caller reaches with ids it already holds, not a
+ * resolved scope: one question, "any of these", and two batch forms. Each
+ * collects the principal's grants ONCE and answers every candidate from it.
  */
 import {
   AuthzEngine,

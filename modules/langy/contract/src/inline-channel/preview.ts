@@ -38,8 +38,7 @@ export function feedLangyDerivedCardPreview(
 /**
  * Drop every preview whose card the relay has settled: the stamped part is
  * the record, and rendering both would draw the card twice. Binding is by
- * blockId — the block's identity from emission to durable part — never by
- * position or timing.
+ * blockId, never by position or timing.
  */
 export function reconcileLangyDerivedCardPreviews<P extends { card: LangyDerivedCard | null }>({
   previews,

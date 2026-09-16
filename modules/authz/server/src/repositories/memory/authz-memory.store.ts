@@ -14,10 +14,8 @@ export type AuthzMemoryCutoverRow = {
 
 /**
  * The one in-process table every authz memory repository reads and writes.
- *
- * Sharing it is what makes the memory tier behave like a database rather than
- * a set of unrelated doubles: a cutover written through one repository is the
- * cutover the next one reads.
+ * Sharing it makes the memory tier behave like a database, not a set of
+ * unrelated doubles: a cutover written through one repository is read by the next.
  */
 export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();

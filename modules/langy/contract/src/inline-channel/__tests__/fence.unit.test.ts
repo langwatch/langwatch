@@ -120,12 +120,9 @@ describe("splitLangyCardFences", () => {
 });
 
 /**
- * The pre-scan exists to let a fence-less stream skip the line scan, so the
- * one thing it must never do is answer false for text the splitter would
- * open a block in. A caller that guesses this with its own substring test
- * misses the loose forms above and shows the reader a card's JSON as a code
- * block, which is exactly what the gate was meant to be too cheap to get
- * wrong.
+ * The pre-scan exists to let a fence-less stream skip the line scan, so it
+ * must never answer false for text the splitter would open a block in. A
+ * hand-rolled substring test misses the loose forms and leaks JSON as code.
  */
 describe("mightContainLangyCardFence", () => {
   const opensABlock = (text: string): boolean =>

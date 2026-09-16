@@ -15,22 +15,15 @@ import { Select } from "@langwatch/design-system/select";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
 
 /**
- * Scope kinds the picker can offer. ORGANIZATION/TEAM/PROJECT mirror the
- * Prisma `ModelProviderScopeType` enum; DEPARTMENT is a picker-only
- * capability (no enum row) that consumers opt into via `allowedScopeTypes`
- * - the tile catalog offers ORGANIZATION + DEPARTMENT only, model
- * providers keep ORGANIZATION/TEAM/PROJECT. See
- * dev/docs/best_practices/scope-selector-and-badges.md.
+ * ORGANIZATION/TEAM/PROJECT mirror Prisma's `ModelProviderScopeType`.
+ * DEPARTMENT is picker-only via `allowedScopeTypes`: the tile catalog
+ * offers ORGANIZATION + DEPARTMENT, model providers keep ORGANIZATION/TEAM/PROJECT.
  */
 export type ScopeChipPickerScopeType = "ORGANIZATION" | "TEAM" | "PROJECT" | "DEPARTMENT";
 
 /**
- * The model-provider triad - the scope kinds that map 1:1 to the Prisma
- * `ModelProviderScopeType` enum. Consumers that persist to scoped-resource
- * tables (model providers, VKs, budgets, routing policies, default models,
- * retention) type their selection with this narrow union so DEPARTMENT can
- * never leak into a DB write. The generic `ScopeChipPicker` narrows back to
- * whatever element type the caller's `value` carries.
+ * The model-provider triad, mapping 1:1 to Prisma's `ModelProviderScopeType`
+ * enum, so DEPARTMENT can never leak into a scoped-resource DB write.
  */
 export type ScopeTriadType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
@@ -190,9 +183,8 @@ function ScopeSearchField({
 }
 
 /**
- * Groups the PROJECT options under their parent team so a long project
- * list stays organised. Projects whose team the caller did not list fall
- * into a flat "Projects" group, which is also what every project gets
+ * Groups PROJECT options under their parent team. A project whose team
+ * the caller did not list falls into a flat "Projects" group, same as
  * when the caller passes no team data at all.
  */
 function groupProjectOptions({
@@ -383,13 +375,9 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   label?: string;
   /** When false, hides the helper "Shared across …" line below the field. */
   showSummary?: boolean;
-  /** Single-scope mode: a row may live at exactly one scope (inline
-   *  (scopeType, scopeId) resources like model costs / budgets). Renders the
-   *  org/team/project quick-pick chips as a single-select, drops the
-   *  "Multiple" chip and the multi-select dropdown entirely. `value` is still
-   *  an array; the component collapses it to its first entry and never emits
-   *  more than one, so the single-scope contract holds even if a caller passes
-   *  a longer array. */
+  /** Single-scope mode: a row lives at exactly one (scopeType, scopeId).
+   *  Renders the quick-pick chips as single-select. `value` stays an
+   *  array; the component always collapses it to its first entry. */
   singleSelect?: boolean;
   // Variant: chips multi-select or single-select dropdown.
   variant?: "chips" | "single-select";
@@ -397,12 +385,9 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
    *  Defaults to "Select an option". Only consulted by the single-select
    *  variant. */
   placeholder?: string;
-  /** When true, render the Organization/Team/Project quick-pick chip
-   *  row above the field and collapse the multi-select dropdown by
-   *  default. Clicking the 4th "Multiple" chip (CheckCheck icon)
-   *  reveals the dropdown for fine-grained selection. The 99% case is
-   *  one scope; this keeps the picker quiet for that case and the
-   *  rare multi-scope policies stay one click away. */
+  /** When true, render Organization/Team/Project quick-pick chips above
+   *  the field, collapsed by default; the "Multiple" chip reveals the
+   *  multi-select dropdown for the rare multi-scope case. */
   showQuickPicks?: boolean;
   /** Offer the personal-projects variants in the dropdown: "All personal
    *  projects" (ORGANIZATION + personalOnly) and, when departments are
@@ -780,15 +765,11 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
               </Button>
             );
           })}
-          {/* 4th chip - collapses to the same fast path for the 99%
-              one-scope case but exposes the multi-select dropdown for
-              the long tail (one policy attached to N projects /
-              cross-team rules). Active whenever the current selection
-              doesn't reduce to a single quick-pick scope. Hidden in
-              single-scope mode, where multi-scope is not representable.
-              With ZERO scopes selected the chip is still the active one
-              (nothing else can be), so its label must say what is true:
-              "None selected", never "Multiple". */}
+          {/* 4th chip: collapses to the fast path for one scope, or
+              exposes the multi-select dropdown for the long tail. Hidden
+              in single-scope mode. With zero scopes selected it is still
+              the active chip, so its label must read "None selected",
+              never "Multiple". */}
           {!singleSelect && (
             <Button
               type="button"
@@ -840,12 +821,9 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
             <Select.ValueText placeholder="Pick one or more scopes">
               {() => {
                 if (scopes.length === 0) return "Pick one or more scopes";
-                // Hydrate the chips with names looked up from the picker's
-                // `options` so each chip reads "LangWatch" / "Acme Team" /
-                // "web-app" instead of bare "Organization" / "Team" /
-                // "Project". Without this, multiple teams render as
-                // identical "Team", "Team" pills - the bug rchaves caught
-                // in the model-provider drawer screenshot.
+                // Hydrate the chips with names from `options` so each chip
+                // reads "LangWatch" / "Acme Team" / "web-app" instead of
+                // bare "Organization" / "Team" / "Project".
                 const named = scopes.map((v) => {
                   const match = options.find((o) => o.value === entryKey(v));
                   return {

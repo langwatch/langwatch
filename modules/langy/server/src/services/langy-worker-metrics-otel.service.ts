@@ -7,11 +7,9 @@ import {
 export const LANGY_DISPATCH_METRIC_NAME = "langwatch_langy_dispatch_total";
 
 /**
- * Langy worker-dispatch outcomes, pushed over OTLP.
- *
- * The counter was declared in the platform application's `server/metrics.ts`
- * while that process composed the dispatcher. It lives beside the port now, and
- * `apps/worker` composes it for the process that dispatches turns.
+ * Langy worker-dispatch outcomes, pushed over OTLP. The counter was
+ * declared in the platform application's `server/metrics.ts`; it now
+ * lives beside the port, and `apps/worker` composes it for the dispatcher.
  */
 export class OtelLangyWorkerMetricsAdapter extends LangyWorkerMetrics {
   static create(): OtelLangyWorkerMetricsAdapter {

@@ -44,11 +44,9 @@ export interface GeneratedSkill {
    */
   featureFlag?: string;
   /**
-   * The feature flag that, when ON, excludes this skill instead — the
-   * inverse of `featureFlag` (`exclude-when-flag: <key>` in front-matter).
-   * `lwql-charts` declares this for `release_custom_chart_playground`, so
-   * the two chart skills are mutually exclusive: exactly one is ever in
-   * Langy's set, never both, never a choice for the agent to get wrong.
+   * The feature flag that, when ON, excludes this skill instead - the
+   * inverse of `featureFlag` (`exclude-when-flag:` in front-matter).
+   * `lwql-charts` uses it so the two chart skills are mutually exclusive.
    */
   excludedByFlag?: string;
 }

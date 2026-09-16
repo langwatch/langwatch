@@ -37,9 +37,8 @@ export type LangyGithubPrRedis = Readonly<{
 
 /**
  * The daily pull-request counter, on this process's own Redis. `eval` is
- * declared because the quota service releases a permit through a Lua
- * check-and-decrement; without it the release falls back to a read-then-decr
- * that can underflow the bucket and grant unlimited permits.
+ * declared for the quota service's Lua check-and-decrement release;
+ * without it a read-then-decr can underflow and grant unlimited permits.
  */
 class LangyGithubPrRedisCounter extends LangyGithubPrCounter {
   static create(redis: LangyGithubPrRedis): LangyGithubPrRedisCounter {

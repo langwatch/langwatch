@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 
 /**
- * `⌘I` / `Ctrl+I` toggles the Langy panel globally. Mirrors useGlobalAiShortcut from
- * traces-v2. preventDefault claims it for the page when keyboard focus is inside the
- * document.
+ * `⌘I` / `Ctrl+I` toggles the Langy panel globally, mirroring
+ * useGlobalAiShortcut from traces-v2. preventDefault claims it for the
+ * page when keyboard focus is inside the document.
  */
+
 /** `⌘I` / `Ctrl+I`, with no modifier riders. */
 function isShortcutKey(event: KeyboardEvent): boolean {
   const isAccel = event.metaKey || event.ctrlKey;

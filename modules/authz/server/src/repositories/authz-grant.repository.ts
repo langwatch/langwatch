@@ -1,8 +1,7 @@
 /**
- * ADR-092 — the write port. Atomicity lives in the implementation
- * (the application-owned AuthZ composition adapter)
- * while validation, failure naming, and the offboarding proof stay in
- * GrantsService.
+ * ADR-092 — the write port. Atomicity lives in the implementation (the
+ * application-owned AuthZ composition adapter); validation, failure
+ * naming, and the offboarding proof stay in GrantsService.
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
@@ -42,8 +41,7 @@ export type RoleBindingWrite = {
 /**
  * Thrown by write implementations when a binding INSERT/UPDATE collides
  * with the partial unique indexes. The adapter maps its engine's duplicate
- * signal (Prisma P2002) onto this; GrantsService turns it into the named
- * customer-facing error.
+ * signal (Prisma P2002) onto this; GrantsService names it for the customer.
  */
 export { BindingMissingError, DuplicateBindingError };
 export type { OffboardCounts };

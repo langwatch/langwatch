@@ -1,8 +1,7 @@
 /**
- * Browser's LOCAL turn projection: snapshot-then-tail in one pure module.
- * Same `foldLangyConversationTurn` reducer as server. Gapless/idempotent via
- * cursor (drop old events, advance on new). Only current turn stored. See
- * ADR-059 §2/§3.
+ * Browser's LOCAL turn projection: snapshot-then-tail, same
+ * `foldLangyConversationTurn` reducer as server. Gapless/idempotent via
+ * cursor; only the current turn is stored. See ADR-059 §2/§3.
  */
 import { compareLangyEventCursors, type LangyEventCursor } from "./contracts/cursor.ts";
 import type { LangyConversationTurnWireEvent } from "./contracts/turn-wire.ts";
@@ -52,10 +51,9 @@ export function seedLangyTurnProjection(
 }
 
 /**
- * Fold a fetched tail. Pure, idempotent, order-tolerant BETWEEN calls: events
- * at or before the cursor are dropped, so overlapping fetches and re-delivered
- * signals are harmless. Within one call events are folded in the order served
- * (the tail read orders by cursor).
+ * Fold a fetched tail. Pure, idempotent, order-tolerant BETWEEN calls:
+ * events at or before the cursor are dropped, so overlapping fetches and
+ * re-delivered signals are harmless. Within a call, order follows the cursor.
  */
 export function applyLangyTurnEvents(
   state: LangyTurnProjectionState,

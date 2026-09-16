@@ -1,7 +1,6 @@
 /**
- * The panel's picture of a conversation IS the recorded conversation (ADR-059): the refresh
- * snapshot, the optimistic overlay between Send and backend acceptance, the rollback on
- * refusal, and the ahead-only rule that keeps a stale durable read from shortening the screen.
+ * The panel's picture of a conversation IS the recorded conversation
+ * (ADR-059): snapshot, optimistic overlay, rollback, and ahead-only ordering.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */

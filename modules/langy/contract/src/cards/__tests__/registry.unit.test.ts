@@ -1,8 +1,7 @@
 /**
- * The CLI verb/resource grammar, pinned at its source. This package is the one
- * place both the CLI and the Langy panel read WHICH card a command produces and
- * WHAT TONE its verb carries, so the contract is tested here rather than only
- * through a consumer.
+ * The CLI verb/resource grammar, pinned at its source. This package is the
+ * one place both the CLI and the Langy panel read WHICH card a command
+ * produces and WHAT TONE its verb carries, tested here directly.
  */
 import { describe, expect, it } from "vitest";
 import {

@@ -16,11 +16,9 @@ type RoleScope = { roleId: string };
 export type AuthzApiMap = {
   role: {
     /**
-     * Every custom role defined in the organization.
-     *
-     * Gated at `organization:manage` rather than `organization:view`: a role
-     * definition is a privilege-escalation surface, since whoever reads the
-     * definitions learns exactly which permissions are worth acquiring.
+     * Every custom role defined in the organization. Gated at
+     * `organization:manage` rather than `organization:view`: reading role
+     * definitions is a privilege-escalation surface (they show what's worth acquiring).
      */
     getAll: { query: { input: OrganizationScope; output: Role[] } };
 
@@ -68,11 +66,8 @@ export type AuthzApiMap = {
 };
 
 /**
- * The AuthZ family's typed tRPC hooks. Same machinery, same transport and same
- * React Query cache as the application's `api` proxy — see `createModuleApi`
- * for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: the screens call it, and the process
- * shell mounts `authzApi.Provider`.
+ * The AuthZ family's typed tRPC hooks: same machinery, transport and React
+ * Query cache as the application's `api` proxy (see `createModuleApi`).
+ * INTERNAL by convention: screens call it, the shell mounts `authzApi.Provider`.
  */
 export const authzApi = createModuleApi<AuthzApiMap>();

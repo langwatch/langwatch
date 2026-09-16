@@ -2,12 +2,9 @@ import { Config, compileRuntimeConfig, type ConfigValue } from "@langwatch/confi
 import { z } from "zod";
 
 /**
- * Where the agent manager answers and the bearer a callback from it carries.
- *
- * An address without its secret would dispatch unauthenticated, so the schema
- * refuses it. A secret without an address is an ordinary deployment with no
- * agent manager: the launcher writes the secret into `.env` once, and the
- * address exists only while the manager runs.
+ * Where the agent manager answers and the bearer a callback from it
+ * carries. An address without its secret would dispatch unauthenticated,
+ * so the schema refuses it; a secret alone means no agent manager runs.
  */
 export const langyServerConfigDefinition = Config.group(
   {

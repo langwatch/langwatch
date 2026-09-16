@@ -13,10 +13,9 @@ export type AuthzAuditDatabase = {
 };
 
 /**
- * The audit fact as it is written: `AuthzAuditRow`, except that `metadata`
- * arrives as `Record<string, unknown>` and the column it lands in is `Json`.
- * Stating the written row here is what lets the seam above be narrow enough
- * to implement without the generated delegate.
+ * The audit fact as written: `AuthzAuditRow`, except `metadata` arrives as
+ * `Record<string, unknown>` for a `Json` column - narrow enough for the
+ * seam above to implement without the generated delegate.
  */
 export type AuthzAuditInsert = Omit<AuthzAuditRow, "createdAt" | "metadata"> & {
   createdAt: Date;

@@ -1,7 +1,6 @@
 /**
- * The manage-implication rule, which is the whole of the legacy
- * `hasPermissionWithHierarchy` contract: every role bag, every custom role
- * and every `useCan` call reaches a verdict through this one function.
+ * The manage-implication rule: every role bag, every custom role and every
+ * `useCan` call reaches a verdict through this one function.
  * Spec: modules/authz/specs/permission-resolution.feature
  */
 import { describe, expect, it } from "vitest";

@@ -1,8 +1,7 @@
 /**
  * The wire → CLI reading of the platform's errors, pinned against the THREE
- * dialects the REST surface actually speaks (see the module doc for what each
- * is and who emits it), plus the round-trip the JSON error document makes
- * through Langy's panel.
+ * dialects the REST surface actually speaks, plus the round-trip the JSON
+ * error document makes through Langy's panel.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -244,12 +243,9 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
 });
 
 /**
- * Dialect 4, the canonical envelope every `SecuredApp` publishing it answers
- * with (`app/api/shared/schemas.ts`). It nests the failure under `error` and
- * spells the trace ids in snake_case, and the reader knew neither: an agent got
- * `network_error` for a refusal the platform had named, and a customer's card
- * printed the whole envelope verbatim because it could not find a sentence in
- * it.
+ * Dialect 4: the canonical envelope every `SecuredApp` publishing it
+ * answers with (`app/api/shared/schemas.ts`), failure nested under `error`
+ * with snake_case trace ids - previously misread as `network_error`.
  */
 describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
   const body = {

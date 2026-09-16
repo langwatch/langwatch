@@ -1,8 +1,6 @@
 /**
  * The ADR-110 authz-engine migration: every legacy table stated as facts,
- * the deny direction reconciled, and the one-read check that decides
- * finalized against held.
- *
+ * the deny direction reconciled, and the one-read check that decides finalized.
  * @see specs/migration/authz-grants-rollout.feature
  */
 

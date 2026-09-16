@@ -1,10 +1,7 @@
 /**
- * Test builders for the AuthZ application.
- *
- * The app is still composed from the two contract services rather than from
- * repositories (`app/postgres-authz.build.ts` is what a process builds
- * them with), so a test states the slice of each it exercises and the builder
- * refuses every other member by name instead of answering undefined.
+ * Test builders for the AuthZ application, composed from the two contract
+ * services (`app/postgres-authz.build.ts` composes from repositories): a
+ * test states the slice it exercises, and the builder refuses the rest.
  */
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { AuthzApp } from "../authz.app.ts";

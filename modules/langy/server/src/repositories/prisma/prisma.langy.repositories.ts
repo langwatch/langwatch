@@ -10,9 +10,8 @@ import { LangyTurnHandoffRedisRepository } from "../redis/redis.langy-turn-hando
 
 /**
  * The live tier. Langy keeps no row of its own in Postgres outside the
- * event log its fold already owns, so the tier is named for the deployment
- * rather than the store: every row here lives in the process's Redis, and the
- * connection is the tier's one required input.
+ * event log its fold owns, so the tier is named for the deployment, not
+ * the store: every row here lives in the process's Redis.
  */
 export class PostgresLangyRepositories {
   static readonly requires = ["redis"] as const;

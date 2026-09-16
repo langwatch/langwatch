@@ -128,10 +128,9 @@ describe("given a question the browser streamed and nothing stamped", () => {
   };
 
   /**
-   * A choices card is answerable only where it was RECORDED as one: a stamped
-   * card part, or the agent's `question` tool. A fence the model happened to
-   * write in prose reads as prose, so a quoted example can never present
-   * itself as a live question.
+   * A choices card is answerable only where it was RECORDED as one: a
+   * stamped card part, or the agent's `question` tool. A fence the model
+   * wrote in prose reads as prose, never as a live question.
    */
   it("draws it, but does not offer it as a question", () => {
     const message = assistantMessage({ parts: [FENCED_QUESTION] });

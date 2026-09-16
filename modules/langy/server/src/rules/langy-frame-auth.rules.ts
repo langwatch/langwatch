@@ -60,10 +60,9 @@ export function signFrame(
 }
 
 /**
- * Verify a frame's MAC in constant time. Returns false — never throws — on a
- * mismatch, a malformed MAC, or a bad runToken, so a hostile caller learns only
- * pass/fail. This is authenticity only: `turnId`-is-in-flight and
- * `frameNonce`-unseen are the relay's checks, not this function's.
+ * Verify a frame's MAC in constant time. Returns false — never throws — on
+ * a mismatch, malformed MAC, or bad runToken, so a hostile caller learns
+ * only pass/fail. Authenticity only; in-flight/unseen checks are the relay's.
  */
 export function verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolean {
   const expected = Buffer.from(computeFrameMac(runToken, frame), "hex");
@@ -73,10 +72,9 @@ export function verifyFrame(runToken: string, frame: LangyFrameEnvelope): boolea
 }
 
 /**
- * Decode a hex MAC to bytes, rejecting anything that is not exactly a lowercase
- * (or uppercase) 64-hex-char SHA-256 digest. `Buffer.from(x, "hex")` silently
- * truncates on stray characters, so we validate the shape first rather than
- * trust a partial decode.
+ * Decode a hex MAC to bytes, rejecting anything not exactly a 64-hex-char
+ * SHA-256 digest. `Buffer.from(x, "hex")` silently truncates on stray
+ * characters, so the shape is validated first rather than trusting a partial decode.
  */
 function macBytes(mac: string): Buffer | null {
   if (typeof mac !== "string" || !/^[0-9a-fA-F]{64}$/.test(mac)) return null;

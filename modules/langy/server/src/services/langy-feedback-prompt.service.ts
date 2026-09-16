@@ -2,10 +2,9 @@ import { nowInstant } from "@langwatch/time";
 import type { LangyFeedbackPromptRedis } from "../app/langy.members.ts";
 
 /**
- * Private policy for Langy's Redis-backed feedback cadence.
- *
- * The portable contract exposes the two operations on LangyApi; Redis and
- * the cadence record do not become part of the feature boundary.
+ * Private policy for Langy's Redis-backed feedback cadence. The portable
+ * contract exposes the two operations on LangyApi; Redis and the cadence
+ * record do not become part of the feature boundary.
  */
 
 export const FEEDBACK_MIN_ANSWERS = 2;

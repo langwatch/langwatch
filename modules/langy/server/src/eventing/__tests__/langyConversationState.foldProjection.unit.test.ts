@@ -555,12 +555,10 @@ describe("LangyConversationStateFoldProjection", () => {
   });
 
   describe("given every event the conversation pipeline processes", () => {
-    // The row this projection writes carries the conversation's cursor, and
-    // the freshness signal is published only once that cursor has reached the
-    // event that raised it. An event this projection did not read was an event
-    // the cursor could never reach, so the signal for it was retried until it
-    // was dropped: a permission card raised or answered while a command ran
-    // reached no tab that was not streaming the turn itself.
+    // The row this projection writes carries the conversation's cursor,
+    // and the freshness signal is published only once that cursor reaches
+    // the event that raised it - an event this projection missed meant a
+    // permission card update reached no tab not streaming the turn.
     for (const type of LANGY_CONVERSATION_PROCESSING_EVENT_TYPES) {
       /** @scenario "Every event of the conversation moves its projection forward" */
       it(`reads ${type} and moves its cursor`, () => {

@@ -115,11 +115,8 @@ export class LangyApp implements LangyApiContract {
   static readonly configSchema = langyServerConfigSchema;
   /**
    * `eventing` is the agent-pipeline dispatcher's own producer registration
-   * (`langy-eventing.build.ts`): the twenty-two conversation writes this
-   * module now registers and dispatches itself, exactly as the deleted hand
-   * composition did (`composedAgentPipelines.langyConversations`) — only
-   * inside the module that reads it rather than a process composition root.
-   * Everything else this application needs is built from `prisma`/`redis`.
+   * (`langy-eventing.build.ts`): the twenty-two conversation writes, now
+   * registered here instead of a process composition root.
    */
   static readonly reads = reads("prisma", "redis", "eventing");
 

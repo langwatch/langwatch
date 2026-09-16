@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Where the permission cards sit in the column (ADR-129,
- * specs/langy/langy-local-permissions.feature): a settled turn's card stays inside it, above the
- * message that closed it; a still-running turn's card stays at the live edge, beside the working
- * line.
+ * Where the permission cards sit (ADR-129,
+ * specs/langy/langy-local-permissions.feature): a settled turn's card
+ * stays above the closing message; a running turn's stays at the live edge.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

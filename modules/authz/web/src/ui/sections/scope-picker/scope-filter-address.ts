@@ -104,11 +104,9 @@ export function resolveScopeFilter(
 }
 
 /**
- * Whether a row's scope sits on the same branch of the org tree as the filter.
- *
- * INCLUSIVE in both directions, which is the property that makes the filter
- * useful rather than merely narrow: picking a team keeps the organization rows
- * it inherits from as well as the projects that resolve through it.
+ * Whether a row's scope sits on the same branch of the org tree as the
+ * filter. INCLUSIVE in both directions: picking a team keeps the
+ * organization rows it inherits from and the projects that resolve through it.
  */
 export function isScopeInFilter(
   scope: { scopeType: string; scopeId: string },

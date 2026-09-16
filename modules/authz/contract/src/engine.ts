@@ -24,8 +24,7 @@ import {
 /**
  * The one resolver, as a service class (app-layer idiom). Stateless and
  * pure by construction: every method is a function of its arguments alone,
- * so one instance serves any number of callers and tests construct it
- * freely.
+ * so one instance serves any number of callers.
  */
 export class AuthzEngine {
   decide({

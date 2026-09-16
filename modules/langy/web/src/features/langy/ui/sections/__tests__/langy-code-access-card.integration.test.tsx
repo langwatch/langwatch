@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The code access card's four states (ADR-129). Fixtures are `langy.getLocalWorkspace`
- * answers, not tool payloads, since the folder can connect and the remembered choice can
- * clear elsewhere. Boundary mocks: the card's tRPC hooks and the GitHub connect popup.
+ * The code access card's four states (ADR-129): fixtures are
+ * `langy.getLocalWorkspace` answers, not tool payloads. Boundary mocks:
+ * tRPC hooks and the GitHub connect popup.
  * @see specs/langy/langy-code-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

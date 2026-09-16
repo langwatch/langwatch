@@ -1,8 +1,7 @@
 /**
  * ADR-092 §2 — where a question is asked, and who a resource grant reaches.
- * Pure geometry over a scope reference: the binding scopes that can answer at
- * it, the organization it belongs to, and whether an audience covers the
- * caller. No walk logic lives here.
+ * Pure geometry over a scope reference: the binding scopes that can answer
+ * at it, its organization, and whether an audience covers the caller.
  */
 import type { AuthzScopeRef, CollectedGrants, GrantAudience, RoleBindingScopeType } from "./authz.ts";
 
@@ -46,12 +45,9 @@ export function scopeChain(scope: AuthzScopeRef): ScopeChainLink[] {
 }
 
 /**
- * ADR-092 §8 — does a resource grant's audience include this caller? The
- * membership audiences are matched against the caller's collected grants
- * rather than enumerated members. Two v1 proxies, both documented for the
- * C5 storage pass to replace with direct membership probes: group audiences
- * are visible only through group-derived bindings, and team/project
- * audiences through a binding (or legacy row) at that scope.
+ * ADR-092 §8 — does a resource grant's audience include this caller?
+ * Matched against collected grants, not enumerated members: group via
+ * group-derived bindings, team/project via a binding at scope (v1 proxies, C5).
  */
 export function audienceMatches({
   audience,

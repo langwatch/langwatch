@@ -65,12 +65,9 @@ export function bindingGrants({
 }
 
 /**
- * LEGACY-QUIRK(B) — the TeamUser fallback step of the walk. Project/team
- * checks consult the chain's team only when the principal has ZERO bindings
- * on the chain (rbac.ts:765); organization checks union every non-personal
- * membership on ANY denial, even when org-scoped bindings exist
- * (rbac.ts:1094-1110). Both respect the ADR-021 fence via TEAM-scoped
- * evaluation.
+ * LEGACY-QUIRK(B) — the TeamUser fallback step. Project/team checks consult
+ * the team only with ZERO bindings (rbac.ts:765); org checks union every
+ * non-personal membership on ANY denial (rbac.ts:1094-1110), both TEAM-scoped.
  */
 export function legacyTeamFallbackGrants({
   grants,

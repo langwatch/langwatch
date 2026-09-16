@@ -1,10 +1,7 @@
 /**
- * The digest extractor, pinned against the CLI's REAL `--format json` output
- * shapes (grounded on the command implementations in `sdks/typescript/src/cli`):
- * trace search wraps in `{ traces, pagination.totalHits }`, dataset list in
- * `{ data, pagination.total }`, prompt/evaluator/scenario lists are bare
- * arrays, experiment status is a single run document, analytics is a
- * timeseries. One convention extractor must read them all.
+ * The digest extractor, pinned against the CLI's REAL `--format json`
+ * shapes: trace search wraps `{ traces, pagination.totalHits }`, dataset
+ * list `{ data, pagination.total }`, others are bare arrays or documents.
  */
 import { describe, expect, it } from "vitest";
 import { extractDigest, MAX_DIGEST_IDS } from "../digest.ts";

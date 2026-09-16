@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import { langyConversationUpdateSignalSchema } from "../langy.dtos.ts";
 
 /**
- * The client half of the freshness signal contract. The broadcast payload
- * carries server-side authorization fields (ownerUserId / isShared) that must
- * NEVER survive the client parse, and — since ADR-059 — the projection cursor
- * that MUST. Strip-by-parse is the mechanism, so the schema itself is the
- * security boundary this file pins.
+ * The client half of the freshness signal contract: the broadcast payload
+ * carries server-side fields (ownerUserId/isShared) that must NEVER survive
+ * the parse, and (since ADR-059) the cursor that MUST - the schema is the security boundary.
  */
 describe("langyConversationUpdateSignalSchema", () => {
   const wirePayload = {

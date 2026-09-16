@@ -19,10 +19,8 @@ const IDENTITY = { tenantId: ORGANIZATION, organizationId: ORGANIZATION, command
 
 /**
  * One valid payload per command, so every send runs the real schema the
- * consumer will run. A stubbed payload would still be enqueued and would still
- * carry the routing key, which is exactly the assertion this file makes — so
- * the payloads have to be genuine or the test would pass over a producer that
- * enqueues jobs the consumer refuses.
+ * consumer will run. A stubbed payload would still enqueue and carry the
+ * routing key, hiding a producer whose jobs the consumer would refuse.
  */
 const COMMANDS = [
   [

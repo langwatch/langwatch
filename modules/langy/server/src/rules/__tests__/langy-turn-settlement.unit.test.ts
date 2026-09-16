@@ -90,11 +90,9 @@ describe("decideSyntheticTerminal", () => {
 });
 
 /**
- * The tail used to carry an absolute two-minute deadline as well, taken from
- * the budget for one manager REQUEST. A prompt improvement loop runs for ten
- * minutes, so every one of them went deaf at the two-minute mark: the panel
- * froze on the last thing it had heard, and every agent action after that
- * found no page listening and ran on the backend.
+ * The tail used to carry an absolute two-minute deadline too, taken from
+ * a manager REQUEST budget - wrong for a ten-minute prompt-improvement
+ * loop, which went deaf at two minutes while agent actions kept running.
  */
 describe("shouldAbandonWedgedTurn", () => {
   const pollMs = 5_000;

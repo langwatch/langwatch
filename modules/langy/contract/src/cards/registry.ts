@@ -42,12 +42,9 @@ export interface CardProbe {
 }
 
 /**
- * Assert that no two probes share a specificity, at module load.
- *
- * A duplicate would resolve by array order today and by a different array order
- * after the next edit, which is exactly the class of bug this module exists to
- * prevent. Failing at load makes it a five-second fix instead of a rendering
- * mystery.
+ * Assert that no two probes share a specificity, at module load. A
+ * duplicate would resolve by array order, which shifts on the next edit -
+ * exactly the bug this module exists to prevent. Fails at load, not render.
  */
 export function assertTotalOrder(probes: readonly CardProbe[]): void {
   const seen = new Map<number, MeasuredCardKind>();
@@ -64,11 +61,9 @@ export function assertTotalOrder(probes: readonly CardProbe[]): void {
 }
 
 /**
- * The best card a payload's SHAPE earns, or null to keep the one its name did.
- *
- * Null is the overwhelmingly common answer and the safe one: an unrecognised
- * shape keeps today's card, so growing this list can add richness but cannot
- * take any away.
+ * The best card a payload's SHAPE earns, or null to keep the one its name
+ * did. Null is the common, safe answer: an unrecognised shape keeps
+ * today's card, so growing this list can add richness but never take any away.
  */
 export function promoteCard({
   nominal,
@@ -172,10 +167,9 @@ const UPDATE_VERBS = new Set([
 const REMOVE_VERBS = new Set(["delete", "remove", "revoke", "archive"]);
 
 /**
- * The tone a verb reads in: a create is `created`, a delete `removed`, a read
- * inert. This is CLI grammar, so a `sync` reads as `updated` here even though its
- * CARD is the prompt diff — tone and card answer different questions of the same
- * verb, and both stay in this one place rather than being re-derived per view.
+ * The tone a verb reads in: create → `created`, delete → `removed`, read →
+ * inert. CLI grammar, not the card: `sync` reads as `updated` here even
+ * though its CARD is the prompt diff - tone and card answer different questions.
  */
 export const cliVerbTone = (verb: string): CliVerbTone => {
   if (CREATE_VERBS.has(verb)) return "created";
@@ -276,11 +270,9 @@ export const CARDS_BY_RESOURCE: Record<string, ResourceCards> = {
 };
 
 /**
- * The card a command's result renders in.
- *
- * A verb the resource names explicitly wins; then the write grammar (a `create`
- * is a "created" card whatever it created); then the resource's default read
- * card. An unknown resource still gets the generic read card.
+ * The card a command's result renders in: a verb the resource names
+ * explicitly wins, then the write grammar (`create` is a "created" card),
+ * then the resource's default read card; an unknown resource reads generic.
  */
 export const cardKindFor = ({
   resource,

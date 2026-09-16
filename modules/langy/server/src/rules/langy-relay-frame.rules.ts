@@ -84,10 +84,9 @@ export function normalizeToolCallId(id: string): string {
 }
 
 /**
- * A tool call's id, normalised at the boundary. The length bound applies AFTER
- * stripping — a legitimate id wearing a signature must not be rejected for the
- * blob's length — and a value still over it is REJECTED as an invalid payload
- * rather than truncated, the same way plan items are below.
+ * A tool call's id, normalised at the boundary. The length bound applies
+ * AFTER stripping, so a legitimate id wearing a signature isn't rejected
+ * for the blob's length; a value still over it is REJECTED, never truncated.
  */
 export const langyToolCallIdSchema = z
   .string()
@@ -182,11 +181,9 @@ const langyRelayFrameVariants = [
     toolCalls: z.array(langyRelayToolCallSchema).optional(),
   }),
   /**
-   * Terminal failure — carries a vetted error code, never raw prose. `herr`
-   * is the failure's full typed cause chain when the manager knows it (e.g.
-   * `agent_error` with the gateway's `no_provider_configured` as a reason),
-   * already deserialized into a HandledError by the schema, letting the
-   * classifier name the REAL failure.
+   * Terminal failure — a vetted error code, never raw prose. `herr` is the
+   * full typed cause chain when known, already deserialized into a
+   * HandledError so the classifier can name the REAL failure.
    */
   z.object({
     type: z.literal("error"),
@@ -195,10 +192,9 @@ const langyRelayFrameVariants = [
     herr: receivedDomainErrorSchema.optional(),
   }),
   /**
-   * Terminal handoff (ADR-048): the worker checkpointed the in-flight turn on a
-   * shutdown-imminent notice and hands back an opaque resume token the control
-   * plane persists, so the NEXT turn resumes from it. Ends the live stream; the
-   * token is durable, never rendered.
+   * Terminal handoff (ADR-048): the worker checkpointed the in-flight turn
+   * on a shutdown-imminent notice and hands back an opaque resume token the
+   * control plane persists so the NEXT turn resumes from it. Never rendered.
    */
   z.object({
     type: z.literal("handoff"),

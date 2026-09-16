@@ -61,10 +61,9 @@ function recordingQueue() {
 }
 
 /**
- * A real, minimal producer-only `EventSourcing`: no Redis, no ClickHouse, just
- * an in-memory queue recording what the langy conversation pipeline sends.
- * `EventSourcing` holds private state, so only a real instance satisfies its
- * type — the same construction the authz producer-registration suite uses.
+ * A real, minimal producer-only `EventSourcing`: no Redis, no ClickHouse,
+ * just an in-memory queue recording what the pipeline sends. `EventSourcing`
+ * holds private state, so only a real instance satisfies its type.
  */
 function producerEventing(): EventSourcing {
   const queue = recordingQueue();

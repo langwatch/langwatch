@@ -65,12 +65,9 @@ function startsAtDocumentBoundary({ text, start }: { text: string; start: number
 }
 
 /**
- * Whether what follows the bracket at `start` can begin a JSON document: a key
- * inside `{`, any value inside `[`, or the matching close for an empty one.
- *
- * A log line can open a line with a bracket too (`[retrying request`), and a
- * bracket the rest of the output never closes is otherwise read as a truncated
- * document, which stops the scan. Reading its first token tells the two apart.
+ * Whether what follows the bracket at `start` can begin a JSON document. A
+ * log line can open with a bracket too (`[retrying request`), which would
+ * otherwise read as a truncated document and stop the scan.
  */
 function opensJsonContent({ text, start }: { text: string; start: number }): boolean {
   const opensObject = text[start] === "{";
@@ -114,10 +111,8 @@ function scalarEnd({ text, at }: { text: string; at: number }): number {
 
 /**
  * Index just past the number that starts at `at`, or -1 when none does.
- *
- * One forward pass that never reconsiders a character. A regular expression
- * reads better but backtracks over a long run of digits, and this runs on
- * whatever a tool wrote to its stdout.
+ * One forward pass, never backtracking: a regular expression reads better
+ * but backtracks over a long run of digits, and this runs on tool stdout.
  */
 function numberEnd({ text, at }: { text: string; at: number }): number {
   let i = at;
@@ -176,14 +171,11 @@ export function parseCliJson(output: string): unknown | null {
 
     const end = findBalancedEnd({ text: output, start: i });
     if (end === -1) {
-      // A JSON-looking document that opens a line but never closes is a
-      // truncated OUTER result. Do not walk into it and promote a complete
-      // nested object (for example one trace's {"output":{"value":"…"}}) into
-      // the result for the whole command. That was how an oversized trace
-      // search rendered an unrelated sentence as its card.
-      //
-      // A log line that opens with a bracket and never closes it is not that
-      // result, so it must not stop the scan before the document under it.
+      // A JSON-looking document that opens but never closes is a truncated
+      // OUTER result - don't walk into it and promote a complete nested
+      // object as the whole command's result (how an oversized trace search
+      // once rendered an unrelated sentence as its card). A log line opening
+      // a bracket without closing it is not that case, so it must not stop the scan.
       if (opensJsonContent({ text: output, start: i })) return null;
       continue;
     }

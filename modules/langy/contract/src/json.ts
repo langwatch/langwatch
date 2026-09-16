@@ -30,10 +30,9 @@ export const langyMessageRoleSchema = z.enum(["user", "assistant", "system", "to
 export type LangyMessageRole = z.infer<typeof langyMessageRoleSchema>;
 
 /**
- * A single UI-message part. Kept loose (a record of unknown) because the
- * content is opaque to the pipeline — the message projection stores it verbatim
- * as JSON, and the UI flattens the text parts on read.
- * The pipeline never interprets part internals.
+ * A single UI-message part. Kept loose (a record of unknown): content is
+ * opaque to the pipeline, stored verbatim as JSON; the UI flattens text
+ * parts on read. The pipeline never interprets part internals.
  */
 export const langyMessagePartSchema = z.record(z.string(), langyJsonValueSchema);
 export type LangyMessagePart = z.infer<typeof langyMessagePartSchema>;

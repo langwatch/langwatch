@@ -5,10 +5,9 @@
 import * as z from "zod";
 
 /**
- * The structured half of an answer. `optionIds` carries the picked option(s)
- * (plural under `multiSelect`); `otherText` carries a free-text answer when
- * the card allowed one (`allowOther`). At least one of the two must say
- * something — an empty selection answers nothing.
+ * The structured half of an answer. `optionIds` carries the picked
+ * option(s) (`multiSelect`); `otherText` carries free text (`allowOther`).
+ * At least one must say something - an empty selection answers nothing.
  */
 export const langyChoiceSelectionSchema = z
   .object({

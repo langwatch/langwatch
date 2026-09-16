@@ -1,8 +1,6 @@
 /**
- * The composer's availability is a DERIVATION of the recorded turn (ADR-059 §4): recorded
- * events fold through the shared `foldLangyConversationTurn` reducer into the store's local
- * turn projection, the projection composes with the turn-phase machine, and the composer
- * reads that one value.
+ * The composer's availability is a DERIVATION of the recorded turn
+ * (ADR-059 §4), folded into the turn-phase machine the composer reads.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */

@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
  * The panel header chip for a shared folder (ADR-129,
- * specs/langy/langy-local-control.feature). It is the standing answer to
- * "where is Langy working right now", so it says the folder, carries the
- * machine and the branch, and is the one place the share ends.
+ * specs/langy/langy-local-control.feature): says the folder, carries the
+ * machine and branch, and is the one place the share ends.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -13,10 +13,8 @@ export const AUTHZ_DECLARATION = Symbol.for("langwatch.authz.declaration");
 
 /**
  * The machine-readable claim a resolver-authorized declaration makes about
- * each scope id its resolver enforces: the field, and WHAT enforces it —
- * the assertion or filter, named so a reviewer can find and judge it. The
- * sweep counts a claimed field as covered, exactly as `.noPermission()`'s
- * `allow` names a reason per field; an unclaimed scope id still fails CI.
+ * each scope id its resolver enforces: the field, and WHAT enforces it,
+ * named so a reviewer can judge it. An unclaimed scope id fails CI.
  */
 export type EnforcedScopeFields = Partial<Record<ScopeTierField, string>>;
 
@@ -44,10 +42,9 @@ export type DeclaredAuthzMiddleware<M extends (params: never) => Promise<unknown
 };
 
 /**
- * Attach the declaration descriptor to a middleware. Exported so route-level
- * custom middlewares (provider validation, captured-data visibility, project
- * creation) can declare themselves too and be counted by the sweep instead
- * of allowlisted.
+ * Attach the declaration descriptor to a middleware. Exported so custom
+ * route-level middlewares can declare themselves and be counted by the
+ * sweep instead of allowlisted.
  */
 export function declareAuthzMiddleware<M extends (params: never) => Promise<unknown>>(
   declaration: AuthzDeclaration,

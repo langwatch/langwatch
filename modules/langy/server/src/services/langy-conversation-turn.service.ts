@@ -43,10 +43,9 @@ export class LangyConversationTurnService {
   private constructor(private readonly deps: LangyConversationTurnOptions) {}
 
   /**
-   * The turn's own account of what happened, folded off its live stream. Read
-   * here since two paths finalize a turn (relay + agent HTTP post) and
-   * whichever lands first wins. Best effort: a failed read still records what it
-   * can rather than failing an otherwise-complete finalize.
+   * The turn's own account of what happened, folded off its live stream.
+   * Read here since two paths finalize a turn (relay + agent HTTP post)
+   * and whichever lands first wins. Best effort: a failed read still records what it can.
    */
   private async readTurnOrder(at: {
     conversationId: string;

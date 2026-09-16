@@ -13,12 +13,9 @@ import { Temporal, toDate } from "@langwatch/time";
 type ClickHouseDateTime = ReturnType<typeof toDate>;
 
 /**
- * The one ClickHouse operation this sink performs, named structurally.
- *
- * A feature package may not import a vendor SDK, and it does not need to: the
- * real `ClickHouseClient`, the Eventing substrate's narrowed client and a fake
- * all satisfy this, which is what lets the twin test read the exact bytes that
- * would have gone on the wire.
+ * The one ClickHouse operation this sink performs, named structurally. A
+ * feature package may not import a vendor SDK: the real `ClickHouseClient`,
+ * the Eventing substrate's client and a fake all satisfy this instead.
  */
 export interface LangyAnalyticsClickHouseWriteClient {
   insert(input: {

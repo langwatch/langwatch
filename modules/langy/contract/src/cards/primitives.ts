@@ -32,10 +32,9 @@ export const paginationSchema = z.looseObject({
 export type Pagination = z.infer<typeof paginationSchema>;
 
 /**
- * The marker a reduction leaves behind in place of the rows it removed, read
- * back. The marker now also states the true total ("… 29 more items truncated,
- * 41 total"); recorded conversations still carry the older form without it, so
- * both parse and `statedTotal` is undefined for the older one.
+ * The marker a reduction leaves in place of the rows it removed, read back.
+ * It now also states the true total ("… 29 more items truncated, 41
+ * total"); older recorded conversations parse fine with `statedTotal` undefined.
  */
 export const parseTruncationMarker = (
   row: unknown,
@@ -51,9 +50,8 @@ export const parseTruncationMarker = (
 };
 
 /**
- * How many rows the upstream reduction took out of an array.
- *
- * Zero for every other value, so a caller can fold this over rows without first
+ * How many rows the upstream reduction took out of an array. Zero for
+ * every other value, so a caller can fold this over rows without first
  * asking which of them are markers.
  */
 export const truncatedAwayCount = (row: unknown): number =>

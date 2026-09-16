@@ -1,8 +1,7 @@
 /**
- * The control request against the in-memory store, with a minter that stands
- * in for the session key service: the flow is the same, and nothing here needs
- * a database to prove who may spend a request and how often.
- *
+ * The control request against the in-memory store, with a minter standing
+ * in for the session key service: the flow is the same, and nothing here
+ * needs a database to prove who may spend a request and how often.
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

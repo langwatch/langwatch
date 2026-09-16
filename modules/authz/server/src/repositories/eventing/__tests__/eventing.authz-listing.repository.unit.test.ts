@@ -5,10 +5,8 @@ import { PrismaAuthzListingRepository } from "../../prisma/prisma.authz-listing.
 
 /**
  * The grants head speaks the ledger's vocabulary; the Access surface renders
- * the legacy one. These tests pin the translation - the same one the fold
- * writes onto the compat rows - and the decoration fences, because a row
- * translated differently from how the compat head would have carried it is a
- * listing that changes on the day an organization cuts over.
+ * the legacy one. These tests pin that translation - the same one the fold
+ * writes onto the compat rows - so a listing cannot change on cutover day.
  */
 
 const ORG = "org-1";
@@ -341,13 +339,11 @@ describe("EventingAuthzListingRepository", () => {
 
       expect(legacyRows[0]?.id).toBe(sharedId);
       expect(grantRows[0]?.id).toBe(sharedId);
-      // Not just the id: the whole rendered row. The two heads are read by
-      // one page, so any column that differs is a cell that changes on the
-      // day the organization cuts over. `createdAt` is the one to watch -
-      // legacy reports the binding's own createdAt, the grants head reports
-      // the fact's occurredAt, and they agree only because the import
-      // backdates it. Stamped at import time instead, every "since when" on
-      // the Access page would jump to cutover day.
+      // Not just the id: the whole rendered row, since any column that
+      // differs is a cell that changes on cutover day. `createdAt` is the
+      // one to watch: legacy reports the binding's own createdAt, the
+      // grants head reports occurredAt, and they agree only because the
+      // import backdates it - stamped at import time, every "since when" would jump.
       expect(grantRows[0]).toEqual(legacyRows[0]);
     });
   });

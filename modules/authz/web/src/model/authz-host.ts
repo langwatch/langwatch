@@ -11,12 +11,9 @@ export type AuthzHostScope = {
 };
 
 /**
- * The plan tier, and whether it has answered yet.
- *
- * `isLoading` is separate from `isEnterprise` because the three states are
- * genuinely three: still asking, Enterprise, and not Enterprise. Collapsing the
- * first into the third is what would show a paying customer a sales pitch for
- * the length of one round trip.
+ * The plan tier, and whether it has answered yet. `isLoading` is separate
+ * from `isEnterprise`: collapsing "still asking" into "not Enterprise"
+ * would show a paying customer a sales pitch for one round trip.
  */
 export type AuthzPlanReading = {
   isEnterprise: boolean;
@@ -31,12 +28,9 @@ export type AuthzSuccessNotice = {
 };
 
 /**
- * A failure, as a screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as a screen knows it. The raw `error` travels and never a
+ * sentence the screen composed: a handled error's wire message is its code
+ * slug, so `fallbackTitle` names the action that failed instead.
  */
 export type AuthzFailureNotice = {
   error: unknown;
@@ -66,11 +60,9 @@ const AuthzHostContext = createContext<AuthzHostPort | undefined>(void 0);
 export const AuthzHostProvider = AuthzHostContext.Provider;
 
 /**
- * The host these screens are mounted in.
- *
- * Missing means a screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host these screens are mounted in. Missing means a screen rendered
+ * outside the frontend feature that owns it - a composition fault, not
+ * something a screen can degrade around.
  */
 export function useAuthzHost(): AuthzHostPort {
   const host = useContext(AuthzHostContext);

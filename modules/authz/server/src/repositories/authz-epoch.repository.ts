@@ -1,9 +1,7 @@
 /**
- * The per-organization epoch a cached authorization snapshot is stamped with.
- *
- * It is a repository rather than a port because the number is a stored row:
- * a deployment with Redis keeps it there, a process without one keeps it in
- * memory, and both answer the same two questions.
+ * The per-organization epoch a cached authorization snapshot is stamped
+ * with. A repository, not a port: a deployment with Redis keeps the number
+ * there, a process without one keeps it in memory - both answer the same.
  */
 export abstract class AuthzEpochRepository {
   /** Null disables snapshot caching and forces an authoritative read. */

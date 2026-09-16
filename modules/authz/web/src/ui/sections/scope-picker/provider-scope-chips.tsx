@@ -28,10 +28,9 @@ type ScopeEntry = {
   scopeType: ProviderScopeType;
   scopeId: string;
   /**
-   * Display name of the scope (organization name, team name, project
-   * name, department name, group name, person, or virtual key name).
-   * When omitted the chip falls back to the bare type label - which is
-   * what older callers without name access used to render.
+   * Display name of the scope (organization, team, project, department,
+   * group, person, or virtual key). Falls back to the bare type label when
+   * omitted - what older callers without name access used to render.
    */
   name?: string;
   /**
@@ -108,10 +107,9 @@ const CHIP_STYLES: Record<
 };
 
 /**
- * What a chip says on hover: the kind, the target's name, and whatever
- * identifying detail was moved off the visible line to keep the chip to
- * one row. Pure so the composition is assertable without driving a
- * portal-rendered tooltip open.
+ * What a chip says on hover: the kind, the target's name, and any detail
+ * moved off the visible line. Pure so the composition is assertable
+ * without driving a portal-rendered tooltip open.
  */
 export function scopeChipTooltip(entry: {
   scopeType: ProviderScopeType;
@@ -134,19 +132,15 @@ export function ProviderScopeChips({
   scopes?: ScopeEntry[];
   fallbackScopeType?: ProviderScopeType;
   /**
-   * When true and no scopes are attached, render a "System" chip
-   * instead of nothing. The caller sets this when it knows the row
-   * represents an env-var-fed / built-in provider (no DB row, no
-   * scope rows) so the Scope column never reads empty. In-progress
-   * drawer / picker states that happen to have no scopes selected
-   * yet should NOT pass this - they want the bare empty render.
+   * When true and no scopes are attached, render a "System" chip instead
+   * of nothing - for a built-in provider with no DB row. In-progress
+   * drawer/picker states with no scopes yet must NOT pass this.
    */
   system?: boolean;
   /**
    * Personal-owner marker for VKs minted via `langwatch login --device`.
-   * Renders an additional "Personal" chip after the scope chips with
-   * the owner's display name / email and a "Personal: <owner>" tooltip.
-   * Orthogonal to scope - a personal VK still has its own scope row.
+   * Renders a "Personal" chip after the scope chips with the owner's
+   * name/email. Orthogonal to scope - a personal VK still has its own scope row.
    */
   principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";

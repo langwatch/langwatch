@@ -48,10 +48,9 @@ export interface AuthzCompatibilityLedger {
 }
 
 /**
- * The whole adapter surface, as a caller composing this graph BY HAND supplies
- * it. The installed module no longer receives this: it reads the two members it
- * needs and builds the rest itself (see {@link AuthzApp.create}). Kept because
- * a hand composition is still a supported way to build AuthZ.
+ * The whole adapter surface, as a caller composing this graph BY HAND
+ * supplies it. The installed module reads the two members it needs and
+ * builds the rest itself (see {@link AuthzApp.create}); kept for hand composition.
  */
 export type AuthzInfrastructure = Omit<PostgresAuthzAdapterOptions, "repositories">;
 export type AuthzSetup = FeatureSetup<
@@ -66,12 +65,9 @@ export class AuthzApp implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   /**
-   * `redis` is read rather than optional because the epoch counter behind the
-   * permission cache lives on it. A process without one would compose the same
-   * graph with caching off, but the member system has no optional member, and
-   * every process that installs AuthZ today opens Redis for other modules
-   * anyway — so asking for it states the dependency instead of hiding a
-   * silently uncached deployment behind a null.
+   * `redis` is read rather than optional: the permission cache's epoch
+   * counter lives on it, and every process installing AuthZ opens Redis
+   * anyway - this states the dependency instead of hiding it behind a null.
    */
   static readonly reads = reads("prisma", "redis");
 
@@ -100,11 +96,9 @@ export class AuthzApp implements AuthzApi {
   }
 
   /**
-   * The definition this module's eventing declaration registers.
-   *
-   * Refuses rather than returning nothing, because the only app without one is
-   * the hand-composed app, and a hand composition that reached this would be
-   * asking the module to register a pipeline it is already registering itself.
+   * The definition this module's eventing declaration registers. Refuses
+   * rather than returning nothing: the only app without one is hand-composed,
+   * which would ask to register a pipeline it already registers itself.
    */
   eventingPipeline(): AuthzPipeline {
     if (!this.#pipeline) {

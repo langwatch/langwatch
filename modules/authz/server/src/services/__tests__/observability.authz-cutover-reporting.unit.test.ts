@@ -4,13 +4,10 @@ import { ObservabilityAuthzCutoverAdapter } from "../authz-cutover-telemetry.ser
 import { ENGINE_GATE_CACHE_TTL_MS } from "../authz-cutover-gate.service.ts";
 
 // A `vi.mock("@langwatch/observability", ...)` factory is a package-wide
-// module replacement: under this package's non-isolated vitest pool
-// (packages/test-harness/src/vitest-config.ts, `isolate: false` +
-// `singleFork: true`), several other test files replace the same module the
-// same way, and whichever file's factory the shared module registry keeps
-// wins for the rest of the run. Spying on the already-resolved namespace
-// instead mutates the one shared object every file already sees, so it
-// cannot lose that race.
+// replacement: under this package's non-isolated vitest pool (`isolate:
+// false` + `singleFork: true`), several files replace the same module and
+// whichever factory wins for the whole run. Spying on the already-resolved
+// namespace instead mutates the one shared object, so it can't lose that race.
 const warn = vi.fn();
 
 beforeEach(() => {

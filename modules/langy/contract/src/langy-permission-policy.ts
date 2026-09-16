@@ -5,10 +5,9 @@ import {
 } from "@langwatch/authz-contract";
 
 /**
- * Partition of authz permissions into three buckets: full access (ceiling),
- * auth-scope read-only, and fully excluded. `classifyForLangy` decides per
- * permission; `langy-permission-coverage` enforces totality. See ADR-092 for
- * registry, ADR-021 for scope fence.
+ * Partition of authz permissions: full access (ceiling), auth-scope
+ * read-only, and fully excluded. `classifyForLangy` decides per permission;
+ * `langy-permission-coverage` enforces totality. ADR-092, ADR-021.
  */
 
 /**
@@ -105,10 +104,9 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
 };
 
 /**
- * Full access families: CRUD + delete/manage. Enumerated to fail CI when
- * unclassified families added (fail-closed). Seven are inert at project scope
- * (governance, anomalyRules, aiTools, activityMonitor, gatewaySpend,
- * governanceCost, ingestionSources).
+ * Full access families: CRUD + delete/manage; enumerated so an unclassified
+ * family fails CI (fail-closed). Seven are inert at project scope: governance,
+ * anomalyRules, aiTools, activityMonitor, gatewaySpend, governanceCost, ingestionSources.
  */
 const FULL_ACCESS_FAMILIES = new Set([
   "analytics",
@@ -151,9 +149,8 @@ const GRAIN_EXCLUSIONS: Record<string, string> = {
 
 /**
  * The auth-scope family inventory, exported so tests assert against the
- * policy's own list instead of hand-copying it (four copies of that list
- * existed before this export; a family added above would have missed all of
- * them silently).
+ * policy's own list instead of hand-copying it — four copies existed
+ * before this export, and a family added above would miss all of them.
  */
 export const LANGY_AUTH_SCOPE_FAMILY_NAMES: readonly string[] = Object.freeze(
   Object.keys(AUTH_SCOPE_FAMILIES),
@@ -171,10 +168,9 @@ export const LANGY_CLASSIFIED_FAMILIES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The sum of the three family buckets BEFORE de-duplication. Equal to
+ * Sum of the three family buckets BEFORE de-duplication. Equal to
  * `LANGY_CLASSIFIED_FAMILIES.size` iff the buckets are disjoint — the
- * coverage test asserts exactly that, because a family in two buckets is
- * decided by `classifyForLangy`'s branch order, not by anyone's intent.
+ * coverage test asserts exactly that.
  */
 export const LANGY_FAMILY_BUCKET_TOTAL =
   Object.keys(FULLY_EXCLUDED_FAMILIES).length +
@@ -212,10 +208,9 @@ const GUARDRAIL_ONLY_ACTIONS = new Set(["attach", "detach"]);
 const GUARDRAIL_FAMILY = "gatewayGuardrails";
 
 /**
- * True when no PROJECT-scoped binding can carry the permission, because the
- * registry declares its resource organization-only. The Langy session key is
- * minted with exactly one project-scoped binding, so a grain that fails this
- * fence can never reach the door however the policy classifies it.
+ * True when the registry declares this permission's resource org-only, so
+ * no PROJECT-scoped binding can carry it. The Langy session key mints only
+ * project-scoped bindings, so this fence is final regardless of classification.
  */
 function onlyAnOrgScopedBindingCanGrant(permission: string): boolean {
   return !bindingScopeCanGrantPermission({ scopeType: "PROJECT", permission });

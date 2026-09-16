@@ -33,12 +33,9 @@ export const langyEphemeralSignalSchema = z.discriminatedUnion("type", [
 export type LangyEphemeralSignal = z.infer<typeof langyEphemeralSignalSchema>;
 
 /**
- * Publishes an ephemeral signal to the live transport (the per-turn Redis
- * buffer). The seam the pipeline declares so it never depends on the transport;
- * `RedisLangyEphemeralPublisher` (the application adapter) is the
- * implementation, and it is also the type a turn's `ephemeral` dep is
- * injected as, so a test can hand the processor a fake without reaching for
- * the concrete class.
+ * Publishes an ephemeral signal to the live transport (per-turn Redis
+ * buffer). The seam the pipeline declares so it never depends on the
+ * transport; a test can hand a turn's `ephemeral` dep a fake instead.
  */
 export interface LangyEphemeralPublisher {
   publish(tenantId: string, signal: LangyEphemeralSignal): Promise<void>;

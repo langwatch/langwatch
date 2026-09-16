@@ -1,9 +1,8 @@
 import { z } from "zod";
 /**
- * The records one live turn leaves outside Postgres: who may watch it, what a
- * worker needs to pick it up, the frame nonces already seen, and the links a
- * navigate command resolves. Every one is keyed by conversation and turn and
- * expires on its own; Redis holds them in a deployment that has one.
+ * The records one live turn leaves outside Postgres: who may watch it,
+ * what a worker needs to pick it up, seen frame nonces, and navigate
+ * links. Keyed by conversation and turn, expiring on its own via Redis.
  */
 
 /** Synchronous actor authorization record for Langy's live turn stream. */

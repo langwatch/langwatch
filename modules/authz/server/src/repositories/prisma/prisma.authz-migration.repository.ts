@@ -431,12 +431,10 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     // "field for field" needs a second read to see it. No usage row means no
     // view has been counted, which is exactly zero.
     const usages = await this.database.grantUsage.findMany({
-      //
       // Read BY ORGANIZATION, not by naming every grant: `GrantUsage` is
-      // organization-indexed and organization-scoped, so both spellings select
-      // the same budgets, but naming them binds a parameter per grant against
-      // Postgres' 65535 ceiling - which an organization with 428k share links
-      // clears on its own. The lookup below is by id, so extra rows are free.
+      // organization-indexed, so both spellings select the same budgets,
+      // but naming them binds a parameter per grant against Postgres'
+      // 65535 ceiling - which a 428k-share-link org clears on its own.
       where: { organizationId },
       select: { grantId: true, viewCount: true },
     });

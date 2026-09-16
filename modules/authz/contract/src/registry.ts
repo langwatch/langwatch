@@ -292,10 +292,8 @@ export type ShareableResourceKind = z.infer<typeof shareableResourceKindSchema>;
 
 /**
  * ADR-021 scope fence as registry data: a binding at `scopeType` may grant
- * `permission` only when the permission's resource is grantable at or below
- * that tier. Org-exclusive resources (scopes: ["organization"]) need an
- * ORGANIZATION-scoped binding; platform resources are never grantable by
- * org/team/project bindings at all.
+ * `permission` only when the permission's resource is grantable at or
+ * below that tier. Platform resources are never grantable by any binding.
  */
 export function bindingScopeCanGrantPermission({
   scopeType,

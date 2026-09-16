@@ -154,22 +154,17 @@ export const SHARE_VISIBILITY_BY_PRINCIPAL_DB: Record<
 
 /** ADR-057 visibility → the ledger principal it names, the inverse of
  *  `SHARE_VISIBILITY_BY_PRINCIPAL` above. The one seam a share link's
- *  audience translation lives at in either direction: the cutover import
- *  (`cutover.migration.ts`, reading a legacy row) and the platform's
- *  `LedgerShareRepository` (minting a new one) used to carry the same
- *  switch statement independently. */
+ *  audience translation lives at: the cutover import and the platform's
+ *  `LedgerShareRepository` used to carry the same switch independently. */
 export type ShareLinkAudience =
   | { type: "anyone"; id: null }
   | { type: "organization"; id: string }
   | { type: "project"; id: string };
 
 /**
- * Grants and roles between their fact form and the rows that store them.
- *
- * Both directions, plus the two compatibility shapes the older binding and
- * share-link readers still expect. They belong together because a fact written
- * one way and read back another is an authorisation that silently changes
- * meaning, and that is only checkable while the pair sits in one place.
+ * Grants and roles between their fact form and the rows that store them,
+ * both directions, plus the compat shapes older readers still expect. A
+ * fact written one way and read back another is a silent authorisation change.
  */
 export class AuthzGrantMapper {
   /**

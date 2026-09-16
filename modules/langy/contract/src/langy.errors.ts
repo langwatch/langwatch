@@ -100,10 +100,8 @@ export class LangyConversationIdUnadoptableError extends HandledError {
 
 /**
  * The turn asked for a skill that exists but is gated off for this caller
- * (HTTP 400) — same fate as an unknown skill id, since neither can be acted
- * on. `flag` is named in the message so the caller (Langy itself, choosing
- * from its own skill list) can self-correct to an ungated alternative
- * instead of retrying the identical request.
+ * (HTTP 400) - same fate as an unknown skill id. `flag` is named in the
+ * message so the caller can self-correct to an ungated alternative.
  */
 export class LangySkillNotAvailableError extends HandledError {
   declare readonly code: "langy_skill_not_available";

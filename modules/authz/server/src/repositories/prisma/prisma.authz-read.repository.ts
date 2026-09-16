@@ -61,11 +61,9 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
   }): Promise<CollectedBinding[]> {
     const rows = (await this.database.roleBinding.findMany({
       // Current organization membership - not the binding row - is the
-      // tenancy boundary: a binding naming a user who has left the
-      // organization, or whose seat an admin disabled, confers nothing. Same
-      // predicate the legacy resolvers carry (rbac.ts
-      // checkPermissionFromBindings, role-binding-resolver.ts
-      // collectBindingsForUser).
+      // tenancy boundary: a binding naming a user who left, or whose seat
+      // was disabled, confers nothing. Same predicate the legacy resolvers
+      // carry (rbac.ts, role-binding-resolver.ts).
       where: {
         organizationId,
         userId,
@@ -164,9 +162,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     // No per-organization switch: the rows participate for EVERY
     // organization until contract deletes them. Stage B's finalization
     // proves the promoted bindings answer identically at the scopes they
-    // replace; the org-level union quirk keeps inferring from these rows on
-    // both heads until its replacement (the genesis-minted floor grant)
-    // becomes load-bearing at contract.
+    // replace, until the genesis-minted floor grant becomes load-bearing.
     const rows = (await this.database.teamUser.findMany({
       // A stale cross-org TeamUser row must not confer access any more than a
       // stale RoleBinding: the team belongs to the organization AND the user
@@ -200,11 +196,9 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
   }
 
   /**
-   * Defense in depth on two axes, both mirroring the legacy resolvers: the
-   * lookup is fenced to the organization being checked, so a poisoned binding
-   * pointing at another organization's role reads as a missing role; and an
-   * API key's private permission role backs only that key's own bindings
-   * (see systemRoleGuard below).
+   * Defense in depth: the lookup is fenced to the organization being
+   * checked, so a poisoned binding pointing elsewhere reads as missing;
+   * an API key's private role backs only that key's own bindings.
    */
   async findCustomRolePermissions({
     organizationId,

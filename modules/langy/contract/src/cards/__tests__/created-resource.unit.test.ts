@@ -1,10 +1,7 @@
 /**
- * A create card is the one card whose copy asserts a fact about the world, so
- * the contract has to decide — once, here — when a payload can carry that
- * claim.
- *
+ * A create card is the one card whose copy asserts a fact about the
+ * world, so the contract decides once, here, when a payload can carry it.
  * @see specs/langy/langy-capability-cards.feature
- *      "A write card never claims success on a result that names nothing"
  */
 import { describe, expect, it } from "vitest";
 import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "../schemas.ts";

@@ -3,12 +3,9 @@ import { LangySessionKeyReapRepository } from "../langy-session-key-reap.reposit
 import { toDate, type Instant } from "@langwatch/time";
 
 /**
- * The one model the sweep touches, and nothing else in the client.
- *
- * `LangyDatabase` names eight models and a transaction because the Langy graph
- * needs them; the sweep needs `apiKey`. Naming only that is what lets a worker
- * that mounts the reaper compose it from the process's Prisma client without
- * also claiming to hold the conversation graph.
+ * The one model the sweep touches. `LangyDatabase` names eight models for
+ * the wider Langy graph; naming only `apiKey` lets a worker compose the
+ * reaper without also claiming the conversation graph.
  */
 export type PrismaLangySessionKeyReapDatabase = Pick<PrismaClient, "apiKey">;
 
@@ -22,11 +19,9 @@ export class PrismaLangySessionKeyReapRepository extends LangySessionKeyReapRepo
   }
 
   /**
-   * One bounded UPDATE over the (name, revokedAt, expiresAt) index added in
-   * 20260728120000. `expiresAt: { not: null }` is load-bearing: a key minted
-   * without an expiry never elapses, and a NULL compared with `lte` would be
-   * excluded by SQL anyway — stating it keeps the predicate readable as the
-   * three conditions the tenancy guard is written against.
+   * One bounded UPDATE over the (name, revokedAt, expiresAt) index. `expiresAt:
+   * { not: null }` is load-bearing: a key minted without an expiry never
+   * elapses, though SQL would exclude a NULL from `lte` anyway.
    */
   async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
     const now = toDate(input.now);

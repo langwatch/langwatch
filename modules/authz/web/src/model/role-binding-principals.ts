@@ -1,9 +1,7 @@
 /**
  * How the Role Bindings audit reads: one row per principal, every binding
- * they hold beside them — so four bindings on the wire read as one person.
- * The binding shape is `@langwatch/authz-contract`'s own
- * {@link AuthzManagedOrganizationBinding}, not a router-output inference a
- * browser package may not name.
+ * they hold beside them. The binding shape is `@langwatch/authz-contract`'s
+ * own {@link AuthzManagedOrganizationBinding}, not a browser-inferred router output.
  */
 
 import type {
@@ -32,10 +30,9 @@ export type BindingPrincipal = {
 };
 
 /**
- * The bindings this filter admits.
- *
- * `ALL` is not a tier, so it is the only value that admits every row; every
- * other value is compared to the row's own tier.
+ * The bindings this filter admits. `ALL` is not a tier, so it is the only
+ * value that admits every row; every other value is compared to the row's
+ * own tier.
  */
 export function bindingsInFilter(
   bindings: readonly RoleBinding[],
@@ -47,11 +44,9 @@ export function bindingsInFilter(
 }
 
 /**
- * One row per principal, ordered by the name a reader sees.
- *
- * A binding with neither a user nor a group is an API key's, and those collapse
- * onto one `"unknown"` row rather than being dropped — the audit's promise is
- * that every binding in the organization appears somewhere on it.
+ * One row per principal, ordered by the name a reader sees. A binding with
+ * neither a user nor a group is an API key's; those collapse onto one
+ * `"unknown"` row rather than being dropped, so every binding still appears.
  */
 export function groupBindingsByPrincipal(bindings: readonly RoleBinding[]): BindingPrincipal[] {
   const byKey = new Map<string, BindingPrincipal>();

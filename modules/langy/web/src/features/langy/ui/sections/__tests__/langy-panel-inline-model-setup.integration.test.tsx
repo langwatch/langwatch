@@ -84,10 +84,9 @@ const resolvedDefaultRef: {
 } = { current: { data: undefined, isLoading: false, isError: false } };
 
 /**
- * Saving writes the provider key and the project default; the next resolve
- * returns it. The spy mirrors that so the "save unblocks Langy" case can move
- * between the two states without remounting — which is the whole claim: no
- * page reload.
+ * Saving writes the provider key and the project default; the next
+ * resolve returns it. The spy mirrors that so "save unblocks Langy" can
+ * move between the two states without remounting - no page reload.
  */
 const refetchResolvedDefault = vi.fn(() => {
   resolvedDefaultRef.current = { data: { model: "gpt-5-mini" }, isLoading: false, isError: false };

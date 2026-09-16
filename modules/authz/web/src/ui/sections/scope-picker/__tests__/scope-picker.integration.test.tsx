@@ -50,10 +50,7 @@ describe("given a set of scope chips", () => {
 // Pins the "System" chip behaviour the model-providers settings table
 // relies on: env-var-fed providers (no DB row, no scope attachments)
 // render a "System" chip rather than an empty Scope cell.
-//
-// Specs bound here:
-//   - specs/model-providers/role-based-default-models.feature
-//     ("System chip renders for env-var-fed providers")
+// Spec: specs/model-providers/role-based-default-models.feature
 describe("ProviderScopeChips", () => {
   describe("when no scopes are attached", () => {
     /** @scenario System chip renders for env-var-fed providers */

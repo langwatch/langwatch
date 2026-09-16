@@ -201,12 +201,8 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
   ): Promise<void> {
     // UPDATE-only for migration-sourced facts (ADR-110: nothing legacy
     // changes before an organization finalizes). An adopted binding or link
-    // converges onto the very row it was read from — a byte-identical
-    // update — while a fact the legacy schema only inferred (a team
-    // membership, the org floor, a project credential) has no row here and
-    // must not be given one: its legacy representation is the membership or
-    // credential row it came from, and minting a binding for it would be
-    // exactly the visible change the migration promises not to make.
+    // converges onto its own row - a byte-identical update - while a fact the
+    // legacy schema only inferred has no row here and must not be given one.
     const migrationSourced = AuthzMigrationOwnershipMapper.includes(grant.source);
 
     const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({ grant, organizationId });
@@ -248,10 +244,9 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
   }
 
   /**
-   * The compat row carries `(role, customRoleId)`, so a roleKey change has to
-   * be translated rather than copied. Re-reading the grant and going back
-   * through the mapper keeps that translation — including the `legacyRole`
-   * rule the reassignment clears — in exactly one place.
+   * The compat row carries `(role, customRoleId)`, so a roleKey change must
+   * be translated, not copied. Re-reading the grant and going back through
+   * the mapper keeps that translation, including `legacyRole`, in one place.
    */
   private async compatForRoleChange(grantId: string): Promise<void> {
     const row = await this.prisma.grant.findUnique({

@@ -111,12 +111,10 @@ describe("the permission matrix", () => {
   describe("when a click round-trips", () => {
     /** @scenario Unticking a write leaves the view it pulled in */
     it("leaves the view a write pulled in, and clears everything else", () => {
-      // Rules 2 and 3 are deliberately not inverses. Ticking `create` adds
-      // `view` because a write nobody can read the result of is not a grant
-      // anyone wants; unticking `create` again does NOT take `view` away,
-      // because by then the reader has said they want a reader. Only unticking
-      // `view` itself withdraws the writes. This asymmetry is the platform
-      // component's, and the round trip is where it shows.
+      // Rules 2 and 3 are deliberately not inverses: ticking `create` adds
+      // `view` (a write nobody can read is not a grant anyone wants), but
+      // unticking `create` does NOT take `view` away - only unticking
+      // `view` withdraws the writes. The round trip is where this shows.
       const leftBehind: Record<string, unknown> = {};
       for (const permission of permissionsForResource("project")) {
         const on = togglePermission({ selected: [], permission });

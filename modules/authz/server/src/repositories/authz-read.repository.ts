@@ -1,9 +1,7 @@
 /**
- * ADR-092 — the read port. This package holds the authorization POLICIES
- * (what a snapshot means); concrete structural-database adapters implement
- * these queries inside this package.
- * Methods return stored facts - no policy - and follow the repository
- * naming convention (findX, never getX).
+ * ADR-092 — the read port. This package holds authorization POLICIES;
+ * adapters implement the queries. Methods return stored facts, no policy,
+ * and follow the repository naming convention (findX, never getX).
  */
 import type {
   AuthzPrincipalRef,
@@ -32,13 +30,10 @@ export type CustomRolePermissionsRow = {
   permissions: unknown;
 };
 
-/** An ADR-057 ShareLink row, exactly the fields the shim reads. Liveness
- *  (expiry, view budget) is POLICY and stays in the collector - the
- *  repository returns what is stored.
- *
- *  `resourceType` deliberately restates the Prisma enum rather than reusing
- *  ShareableResourceKind: it mirrors the stored column's spelling, and the
- *  collector is the seam that maps one onto the other. */
+/** ADR-057 ShareLink row, exactly the fields the shim reads. Liveness
+ *  (expiry, view budget) is POLICY and stays in the collector. `resourceType`
+ *  restates the Prisma enum rather than reusing ShareableResourceKind, since
+ *  it mirrors the stored column and the collector maps one onto the other. */
 export type ShareLinkRow = {
   resourceType: "TRACE" | "THREAD";
   resourceId: string;
@@ -85,10 +80,9 @@ export type AuthzDatabase = Readonly<{
 export type AuthzReadHeadSelector = (organizationId: string) => Promise<boolean>;
 
 /**
- * The lineage reads both ports need: resolving a scope reference (read side)
- * and validating a write target's tenancy (write side) ask the same two
- * questions of the same rows. Declared once here so the two ports cannot
- * drift apart.
+ * The lineage reads both ports need: resolving a scope reference (read
+ * side) and validating a write target's tenancy (write side) ask the same
+ * two questions. Declared once here so the two ports cannot drift apart.
  */
 export abstract class ScopeLineageRepository {
   /** A project's team + organization, or null when the project is unknown. */
@@ -103,12 +97,9 @@ export abstract class ScopeLineageRepository {
 
 export abstract class AuthzReadRepository extends ScopeLineageRepository {
   /**
-   * The membership row, disabled or not, or null when there is none.
-   *
-   * Named for what it returns: the previous `findOrganizationRole` reported
-   * only the role, which gave the collector no way to tell a seat-disabled
-   * membership from an absent one - so a disabled member passed the engine's
-   * membership gate and kept every permission.
+   * The membership row, disabled or not, or null when there is none. The
+   * previous `findOrganizationRole` reported only the role, so a disabled
+   * member looked like an absent one and kept every permission.
    */
   abstract findOrganizationMembership(args: {
     userId: string;
@@ -140,9 +131,8 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
   }): Promise<LegacyTeamMembership[]>;
   /**
    * The permission payloads for custom roles the principal's bindings
-   * reference. The organization and principal are passed so the query can
-   * fence the read to rows the caller could actually be bound to - a custom
-   * role id alone is not a tenancy proof.
+   * reference, fenced by organization + principal - a role id alone is
+   * not a tenancy proof.
    */
   abstract findCustomRolePermissions(args: {
     organizationId: string;

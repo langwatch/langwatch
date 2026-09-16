@@ -344,11 +344,9 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     const expectedRoleIds = new Set(expected.roles.map((role) => role.roleId));
     const staleRoles = heads.roleHeads
       // Every kind: the migration only runs before an organization
-      // finalizes, and until then every role head — `system_api_key`
-      // included — mirrors a legacy CustomRole row, so a head with no such
-      // row is stale whatever its kind. A head already buried is not: the
-      // tombstone is permanent, and the deny key carries the pass's business
-      // time, so re-deleting it would append an event on every pass forever.
+      // finalizes, so every role head mirrors a legacy CustomRole row; a
+      // head with no such row is stale. A head already buried is not:
+      // re-deleting it would append an event on every pass forever.
       .filter((head) => !head.deleted && !expectedRoleIds.has(head.id))
       .map((head) => head.id)
       .sort();

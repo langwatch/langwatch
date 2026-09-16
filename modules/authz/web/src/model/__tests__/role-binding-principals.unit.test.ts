@@ -1,9 +1,6 @@
 /**
- * How the bindings audit turns a flat list of grants into one row per person.
- *
- * The grouping was inline in `platform/app/src/pages/settings/role-bindings.tsx`
- * and untested; it is the whole reading of the page, so it is pinned here.
- *
+ * How the bindings audit turns a flat list of grants into one row per
+ * person, pinned here from an untested inline read in role-bindings.tsx.
  * Spec: specs/rbac/role-binding-audit.feature
  */
 

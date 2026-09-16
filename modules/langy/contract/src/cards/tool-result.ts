@@ -69,10 +69,9 @@ export function cliToolResultPayload(result: CliToolResult): unknown {
 }
 
 /**
- * Normalize every successful CLI JSON response. A command-specific card is the
- * rich variant; a valid JSON response which has no card yet is still a typed
- * `json` receipt. That is how adding a CLI command cannot punch a hole in the
- * transport contract.
+ * Normalize every successful CLI JSON response. A command-specific card is
+ * the rich variant; a valid response with no card yet is still a typed
+ * `json` receipt, so adding a CLI command cannot punch a hole in transport.
  */
 export function toCliToolResult({
   resource,

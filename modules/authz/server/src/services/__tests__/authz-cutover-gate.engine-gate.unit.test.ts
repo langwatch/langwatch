@@ -1,9 +1,7 @@
 /**
- * The per-organization fork between the legacy authorization tables and the
- * grants ledger. Cached, so an operator's flip lands on the next read after
- * the cache window rather than instantly — which is the behaviour a rollout
- * depends on and the reason the window is asserted here.
- *
+ * The per-organization fork between legacy authorization tables and the
+ * grants ledger. Cached, so an operator's flip lands on the next read
+ * after the window, not instantly - the behaviour this asserts.
  * @see specs/migration/authz-grants-rollout.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";

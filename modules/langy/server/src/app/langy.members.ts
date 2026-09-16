@@ -69,11 +69,9 @@ export interface LangyConversationProcessState {
   turnStatus: "idle" | "running" | "completed" | "failed";
   titleSource: LangyTitleSource;
   /**
-   * One-shot latch: the automatic title intent was already recorded. The
-   * title may only be generated at the first successful agent_responded
-   * boundary while the title is still the derived placeholder — never again
-   * from a counter or timer once this is set or titleSource leaves
-   * "derived".
+   * One-shot latch: automatic title intent already recorded. Only generated
+   * at the first successful agent_responded boundary while the title is
+   * still derived, never again once set or titleSource leaves "derived".
    */
   autoTitleRequested: boolean;
   archived: boolean;
@@ -111,10 +109,9 @@ export interface LangyEffectMembers {
 }
 
 /**
- * Generates a conversation title from the transcript so far, or null when the
- * transcript is empty or the model call failed. Declared here because the
- * effect ports are its only consumer: the process asks for a title, and where
- * the model comes from is the composition root's business.
+ * Generates a conversation title from the transcript so far, or null when
+ * the transcript is empty or the model call failed. Declared here since
+ * the effect ports are its only consumer.
  */
 export type LangyTitleGenerator = (input: {
   projectId: string;
@@ -200,12 +197,9 @@ export interface LangySessionKeyMetrics {
  * the type lives. */
 export interface LangyTitleModelResolver {
   /**
-   * The handle a title call runs on.
-   *
-   * Rejects rather than answering `null`: the generator turns any failure into
-   * "the conversation keeps the title it has", and a resolver that answered
-   * `null` would make an unconfigured deployment and a broken one look the
-   * same in the one log line that reports it.
+   * The handle a title call runs on. Rejects rather than answering `null`:
+   * the generator turns any failure into "keeps the title it has", and a
+   * `null` would make unconfigured and broken deployments look identical.
    */
   resolveTitleModel(input: {
     projectId: string;
@@ -392,11 +386,9 @@ export abstract class LangyBlockMetrics {
 /** Supplies feature-flag-derived worker-harness selection. */
 export abstract class LangyHarness {
   /**
-   * A property signature rather than a method on purpose: method parameters
-   * are bivariant, and that is exactly what let a resolver requiring an extra
-   * dependency be wired here bare — it compiled, then threw on every call and
-   * fell back to one harness for everyone. A property is contravariant, so
-   * that wiring cannot compile again.
+   * Property rather than a method on purpose: methods are bivariant in
+   * their parameters, so a resolver requiring an extra dependency could
+   * still be wired here and compile. A property is contravariant, so it cannot.
    */
   abstract resolve: (input: {
     userId: string;
@@ -457,10 +449,9 @@ export abstract class LangyModel {
 }
 
 /**
- * Private port for Langy's Redis-backed feedback cadence.
- *
- * The portable contract exposes the two operations on LangyApi; Redis and
- * the cadence record do not become part of the feature boundary.
+ * Private port for Langy's Redis-backed feedback cadence. The portable
+ * contract exposes the two operations on LangyApi; Redis and the cadence
+ * record do not become part of the feature boundary.
  */
 export abstract class LangyFeedbackPromptRedis {
   abstract get(key: string): Promise<string | null>;

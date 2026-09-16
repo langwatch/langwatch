@@ -1,10 +1,7 @@
 /**
- * The wire shapes of the `role-bindings` management REST family.
- *
- * A write's answer is the row the list reports, so the create and update
- * outputs are the same binding shape a read carries; only the create adds the
- * legacy-access notice, and only when this write switches legacy team access
- * off for that user.
+ * The wire shapes of the `role-bindings` management REST family. A write's
+ * answer is the row the list reports; only the create adds the
+ * legacy-access notice, and only when it switches legacy team access off.
  */
 import { z } from "zod";
 import { roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz.ts";

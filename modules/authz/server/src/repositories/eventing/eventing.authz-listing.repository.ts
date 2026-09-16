@@ -418,13 +418,10 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     return roles.map((role) => this.toCustomRoleShape(role));
   }
 
-  /** The principal and role decoration for `AccessListingBindingRow`s, read
-   *  from the tables those things live in. With
-   *  `shouldDropUndecoratedPrincipals` the row is dropped when its principal no
-   *  longer resolves within the organization - the equivalent of the legacy
-   *  whole-table query's relation predicates (a departed member, a foreign
-   *  group or key). Without it a missing principal decorates to null and the
-   *  row stays, exactly as the legacy per-user reads behave. */
+  /** The principal and role decoration for `AccessListingBindingRow`s.
+   *  With `shouldDropUndecoratedPrincipals`, a row whose principal no
+   *  longer resolves in the organization is dropped (departed member,
+   *  foreign group or key); without it, it decorates to null and stays. */
   private async decorate({
     organizationId,
     grants,

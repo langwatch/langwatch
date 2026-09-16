@@ -102,11 +102,9 @@ export abstract class AuthzService {
   abstract canBatchByIds(args: AuthzCanBatchByIdsInput): Promise<AuthzCanBatchByIdsOutput>;
 
   /**
-   * MANY permissions across many scopes in one organization, still off ONE
-   * grant collection. `canBatchByIds` is this with a single permission; this
-   * exists because the api-key project ceiling asks two permissions of every
-   * project, and two single-permission batches would collect the same
-   * snapshot twice.
+   * MANY permissions across many scopes in one organization, off ONE grant
+   * collection - the api-key project ceiling asks two permissions of every
+   * project, and two single-permission batches would collect it twice.
    */
   abstract canBatchPermissionsByIds(
     args: AuthzCanBatchPermissionsByIdsInput,

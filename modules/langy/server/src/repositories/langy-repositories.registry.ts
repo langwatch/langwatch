@@ -14,11 +14,9 @@ import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
 import { PostgresLangyRepositories } from "./prisma/prisma.langy.repositories.ts";
 
 /**
- * The rows the langy module keeps outside its own event log, chosen once at
- * boot: who may watch a turn, what a worker picks it up from, the frames
- * already seen, the links a navigate resolves, which folder is shared and the
- * live token edge. Redis holds every one of them in a deployment that has
- * Redis; the memory tier holds them in a process that does not.
+ * The rows the langy module keeps outside its event log, chosen once at
+ * boot: watch access, worker pickup, seen frames, navigate links, shared
+ * folder, live token edge. Redis holds them where a deployment has one.
  */
 export interface LangyRepositories {
   readonly turnAccess: LangyTurnAccessRepository;

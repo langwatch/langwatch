@@ -84,12 +84,9 @@ export const Resources = {
   ANOMALY_RULES: "anomalyRules",
   COMPLIANCE_EXPORT: "complianceExport",
   ACTIVITY_MONITOR: "activityMonitor",
-  // AI Tools Portal (Phase 7) — the customizable per-org card grid on
-  // /me. Two permissions:
-  //   - aiTools:view → ALL org roles. Portal must work for every member
-  //     so they can discover what's available + click through to setup.
-  //   - aiTools:manage → org ADMIN only. Catalog editor surface at
-  //     /governance/tool-catalog (CRUD + reorder + enable).
+  // AI Tools Portal (Phase 7) — the customizable per-org card grid on /me.
+  // aiTools:view → ALL org roles (discover + click through to setup).
+  // aiTools:manage → org ADMIN only (catalog editor at /governance/tool-catalog).
   AI_TOOLS: "aiTools",
   // Outbound webhook endpoints (the webhook platform). Org-tier only:
   // endpoints are org-anchored, carry signing secrets, and stream every

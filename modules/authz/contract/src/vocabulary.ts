@@ -49,9 +49,8 @@ export type BindingScopeTier = z.infer<typeof bindingScopeTierSchema>;
 
 /**
  * The input field naming each binding tier — the same three tiers, spelled
- * the way a procedure input spells them. Declared on the tiers above rather
- * than in a table of its own, so a tier cannot have a field here and no
- * stored spelling there.
+ * the way a procedure input spells them. Declared on the tiers above, not a
+ * separate table, so a tier cannot have a field here and no spelling there.
  */
 export const SCOPE_TIER_FIELDS = {
   project: SCOPE_TIERS.project.field,
@@ -128,11 +127,9 @@ export const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
 ) as Record<StoredPrincipalKind, PrincipalKind>;
 
 // An own-property check, not `in`: an object literal inherits from
-// Object.prototype, so `"constructor" in SCOPE_TIERS` and
-// `"toString" in SCOPE_TIERS` are both true and would narrow those untrusted
-// strings to a tier, whose table lookup then yields a function rather than a
-// member. `hasOwnProperty.call` rather than `Object.hasOwn` because this
-// package targets es2020 on purpose (it is isomorphic).
+// Object.prototype, so `"constructor" in SCOPE_TIERS` is true and would
+// narrow an untrusted string to a tier whose lookup then yields a function.
+// `hasOwnProperty.call` not `Object.hasOwn`: this package targets es2020.
 const hasOwn = (object: object, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(object, key);
 

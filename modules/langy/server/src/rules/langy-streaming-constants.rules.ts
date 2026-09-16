@@ -18,20 +18,15 @@ export const LANGY_STREAM = {
 
 export const LANGY_STREAMING = {
   /**
-   * Flush a `delta` entry to the stream once this many buffered tokens (a
-   * cheap word-count proxy — we don't tokenize here) accumulate. This is the
-   * SIZE arm of the hybrid flush: batching keeps XADD volume bounded on a
-   * fast token stream. The TIME arm (`FLUSH_AFTER_MS`) guarantees a slow
-   * stream still renders — a turn must never sit invisible waiting for a
-   * batch to fill.
+   * Flush a `delta` entry once this many buffered tokens (a cheap word-count
+   * proxy) accumulate - the SIZE arm of the hybrid flush, bounding XADD
+   * volume; the TIME arm (`FLUSH_AFTER_MS`) covers a slow stream.
    */
   CHUNK_TOKENS: 64,
   /**
-   * The TIME arm of the hybrid flush: pending tokens are flushed at most this
-   * long after the first one buffered, even if the batch has not filled.
-   * ~5 XADDs/second per turn worst case — bounded, and fast enough to read as
-   * live typing. The very FIRST delta of a turn skips even this and flushes
-   * immediately (time-to-first-token).
+   * The TIME arm of the hybrid flush: pending tokens flush at most this long
+   * after the first one buffered. ~5 XADDs/second worst case, fast enough to
+   * read as live typing. The turn's FIRST delta skips this and flushes immediately.
    */
   FLUSH_AFTER_MS: 200,
   /**

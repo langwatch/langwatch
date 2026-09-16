@@ -242,11 +242,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     awaitProjection?: boolean;
     /**
-     * Whether an unlanded projection is an error. Off by default, because for
-     * most callers the append is the write and the fold converging later is
-     * the correct outcome. A caller about to hand out access these rows decide
-     * — minting an API key — turns it on and gets an
-     * {@link AuthzGrantNotConfirmedError}. It implies the wait.
+     * Whether an unlanded projection is an error. Off by default: usually
+     * the fold converges later and that's fine. A caller minting access
+     * from these rows turns it on and gets {@link AuthzGrantNotConfirmedError}.
      */
     requireProjection?: boolean;
   }): Promise<AttachOutcome> {
@@ -1109,10 +1107,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
     /**
-     * Whether an unlanded projection is an error. Same contract as
-     * {@link EventingAuthzLedgerAdapter.attachBindings}: a caller about to bind
-     * a grant to this role and hand the credential out turns it on, so a role
-     * definition that never became readable refuses the mint.
+     * Whether an unlanded projection is an error, same contract as
+     * {@link EventingAuthzLedgerAdapter.attachBindings}: turned on before
+     * handing out the credential, so an unreadable role refuses the mint.
      */
     requireProjection?: boolean;
   }): Promise<void> {
@@ -1304,12 +1301,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 
   /**
-   * Bounded read-your-writes: poll until the projection reflects the write, and
-   * answer whether the rows landed inside the window.
-   *
-   * Timing out is not in itself a failure — the append landed and the fold will
-   * drain (Redis-down doctrine). It IS one for a caller whose next step only
-   * makes sense once the rows are readable, which `requireProjection` states.
+   * Bounded read-your-writes: poll until the projection reflects the write.
+   * Timing out is not itself a failure (append landed, fold will drain -
+   * Redis-down doctrine), but is one when `requireProjection` says so.
    */
   private async awaitProjection({
     what,

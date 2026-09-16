@@ -87,13 +87,10 @@ describe("langyDerivedCardSchema", () => {
 
   describe("given a resource-shaped kind", () => {
     // ADR-060 §3: a model that can emit a traces card can assert records
-    // that were never searched for. The allowlist is closed.
-    //
-    // Driven off the SHARED kind list rather than a hand-written sample, so a
-    // kind added to the vocabulary is covered the day it is added — that is
-    // the failure this whole merge had to not introduce. `CARD_SHAPE` decides
-    // which kinds belong here, so a re-classification (the only way to widen
-    // the allowlist past the type gates) shows up as a failure right here.
+    // never searched for. The allowlist is closed. Driven off the SHARED
+    // kind list, not a hand-written sample, so a new kind is covered the
+    // day it is added; `CARD_SHAPE` decides membership, so re-classification
+    // shows up as a failure right here.
     const resourceShaped = CARD_KINDS.filter((kind) => CARD_SHAPE[kind] === "resource");
 
     it.each(resourceShaped)("refuses kind %s", (kind) => {

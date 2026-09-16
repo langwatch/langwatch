@@ -1,8 +1,7 @@
 /**
- * The local call state machine over the in-memory store, with a stand-in for
- * the command line: it takes the nudge off the channel the gateway subscribes
- * to and writes the answers back the way a socket's pod does.
- *
+ * The local call state machine over the in-memory store, with a stand-in
+ * for the command line: it takes the nudge off the gateway's channel and
+ * writes answers back the way a socket's pod does.
  * @see specs/langy/langy-local-control.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";

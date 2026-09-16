@@ -161,12 +161,10 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "gatewaySpend:view",
   "gatewaySpend:manage",
   "featureFlags:manageExperiments",
-  // The organization's cost screen. Attached to ADMIN by default for the
-  // same reason the rest of the governance family is: an admin has to be
-  // able to open the screen before they can delegate it to anyone else.
-  // Main also kept an identical entry in an rbac.ts mirror bag; there is no
-  // mirror to keep in step here, because authz/web derives the built-in
-  // bags from this one via `builtinRolePermissions`.
+  // The organization's cost screen. Attached to ADMIN by default, same as
+  // the rest of the governance family: an admin must be able to open the
+  // screen before delegating it. authz/web derives built-in bags from this
+  // one via `builtinRolePermissions`, so there is no mirror bag to keep in step.
   "governanceCost:view",
 ];
 
@@ -201,10 +199,9 @@ export function builtinRoleGrants({
 }
 
 /**
- * Legacy TeamUserRole / OrganizationUserRole → built-in role key. The CUSTOM
- * team role's *fallback* bag equals viewer (a non-empty custom role's own
- * permission list is authoritative and handled by the engine before this
- * mapping is consulted).
+ * Legacy TeamUserRole / OrganizationUserRole → built-in role key. The
+ * CUSTOM team role's *fallback* bag equals viewer: a non-empty custom
+ * role's own permission list is authoritative, handled before this mapping.
  */
 export function roleKeyForTeamRole(role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM"): BuiltinRoleKey {
   switch (role) {

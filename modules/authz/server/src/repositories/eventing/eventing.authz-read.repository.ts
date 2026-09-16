@@ -70,13 +70,10 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<CollectedBinding[]> {
-    // Current organization membership - not the grant row - is the tenancy
-    // boundary, exactly as in the legacy repository: a grant naming a user who
-    // has left the organization confers nothing. `Grant` is a projection with
-    // no relation to `User` (plain columns by design, so the fold never
-    // presumes another row exists), so the gate the legacy query expresses as
-    // a relation filter is a membership read here. It is the same predicate,
-    // and the engine's steps assume it either way.
+    // Current organization membership, not the grant row, is the tenancy
+    // boundary: a grant naming a user who has left the organization confers
+    // nothing. `Grant` has no relation to `User` by design, so the gate the
+    // legacy query expressed as a relation filter is a membership read here.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
     const rows = (await liveGrants(this.database).findMany({
       where: {
@@ -373,11 +370,9 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /**
-   * The role ids among `roleIds` that this API key - and only this API key -
-   * holds a grant for. The `some` half of the legacy predicate matters as much
-   * as the `every` half: Prisma's `every` is vacuously true over an empty
-   * relation, so a system role with NO grants at all would otherwise be
-   * readable by every key on the platform.
+   * Role ids among `roleIds` this API key alone holds a grant for. `some`
+   * matters as much as `every`: `every` is vacuously true over an empty
+   * relation, so a system role with NO grants would be readable by any key.
    */
   private async rolesExclusiveToApiKey({
     organizationId,

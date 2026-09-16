@@ -28,10 +28,9 @@ export const LANGY_UI_ACTION_CHIP_KINDS = [
 ] as const satisfies readonly LangyResourceKind[];
 
 /**
- * The portable allow-list for skill chips which can cross a Langy turn
- * boundary. It is deliberately separate from the composer's presentation
- * catalogue: clients can add a local command, but only an installed agent skill
- * or a feature-backed CLI capability may reach the worker.
+ * The portable allow-list for skill chips crossing a Langy turn boundary,
+ * separate from the composer's presentation catalogue: only an installed
+ * agent skill or feature-backed CLI capability may reach the worker.
  */
 export const LANGY_TURN_SKILL_IDS = [
   "agent-improve",

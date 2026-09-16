@@ -1,8 +1,7 @@
 /**
  * @see specs/langy/langy-internal-control-plane.feature
- * The addresses the Go agent and the worker already dial, and the door every
- * one of them answers behind. A rename here strands a running deployment's
- * other half, so the declaration is pinned rather than described.
+ * The addresses the Go agent and worker already dial. A rename here
+ * strands a running deployment's other half, so this is pinned, not described.
  */
 // @vitest-environment node
 import { describe, expect, it } from "vitest";

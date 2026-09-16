@@ -34,9 +34,8 @@ function fenceLine(line: string): { ticks: number; tag: string } | null {
 
 /**
  * Split text into prose and langy-card fences, in document order. Text
- * segments are verbatim (including any non-langy-card code fences); the
- * langy-card fence lines themselves are consumed. Adjacent text is merged,
- * and empty text segments are dropped.
+ * segments are verbatim (including other code fences); the langy-card
+ * fence lines are consumed. Adjacent text is merged, empty segments dropped.
  */
 export function splitLangyCardFences(text: string): LangyCardFenceSegment[] {
   const segments: LangyCardFenceSegment[] = [];

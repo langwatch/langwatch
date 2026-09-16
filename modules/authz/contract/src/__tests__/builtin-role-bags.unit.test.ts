@@ -1,9 +1,7 @@
 /**
- * What each built-in role actually grants. The bags are declared as
- * differences, so a permission moved between VIEWER, MEMBER_ADDITIONS and
- * ADMIN_ADDITIONS changes several roles at once — these are the decisions
- * that must not move with it.
- * Spec: specs/rbac/fetch-org-role-permission-resolution.feature
+ * What each built-in role grants. Bags are declared as differences, so a
+ * permission moved between VIEWER, MEMBER_ADDITIONS and ADMIN_ADDITIONS
+ * changes several roles at once. Spec: specs/rbac/fetch-org-role-permission-resolution.feature
  */
 import { describe, expect, it } from "vitest";
 import { type BuiltinRoleKey, builtinRoleGrants, roleKeyForTeamRole } from "../roles.ts";
