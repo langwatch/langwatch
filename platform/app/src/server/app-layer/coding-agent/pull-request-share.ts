@@ -31,13 +31,14 @@
  *   - Unstamped (before the first declaration, history from before the
  *     record, sessions that never declared): priced ONLY in the repository
  *     the session's own row points at. Where the session has declared work,
- *     it follows the FIRST branch the session declared, the branch it was on
- *     when the declarations began; a session that never declared keeps the
- *     legacy whole-session rule and lands on the pull request it opened
- *     first. A session that declared one branch for its whole life reads the
- *     same under both. A session whose record SATURATED at
- *     `MAX_USAGE_CONTEXTS` is the exception: its gap also holds contexts the
- *     fold could not open, so no pull request takes it.
+ *     it follows the session's FIRST declared context, the repository and
+ *     branch it was on when the declarations began, and only when that
+ *     repository is this one; a session that never declared keeps the legacy
+ *     whole-session rule and lands on the pull request it opened first. A
+ *     session that declared one branch for its whole life reads the same
+ *     under both. A session whose record SATURATED at `MAX_USAGE_CONTEXTS`
+ *     is the exception: its gap also holds contexts the fold could not open,
+ *     so no pull request takes it.
  *
  * A session with no record at all keeps the legacy rule whole: its full
  * total lands on its single winner, so nothing regresses to zero.
@@ -222,10 +223,13 @@ function shareOfPullRequest({
   }
 
   const unstampedWinner = unstampedWinnerOf({
-    buckets,
+    ledger,
+    weightOf,
     declaredBranches,
     perBranch,
     legacyWinner,
+    repositoryHost,
+    repositoryFullName,
     saturated: session.usageByContext.length >= MAX_USAGE_CONTEXTS,
   });
 
@@ -270,41 +274,72 @@ function shareOfPullRequest({
  *
  * Declared work anywhere, this repository or another, is what says the
  * undeclared usage came before the session's first declaration rather than
- * being the whole of it: then it follows the first branch the session
- * declared. A session that declared nothing weighable keeps the legacy
- * whole-session winner. Undefined when neither rule names a pull request,
- * which leaves the bucket unowned.
+ * being the whole of it: it then follows the FIRST branch the session
+ * declared, the branch it was on when the declarations began. A session that
+ * declared nothing weighable keeps the legacy whole-session winner.
  *
- * A SATURATED record is the third case, and it is why `saturated` is asked
- * rather than inferred from the buckets. The fold stops opening contexts at
+ * Two sources answer this together, because neither can alone. The row's
+ * branch set is ordered first seen first and holds every branch the session
+ * declared, including ones it spent nothing weighable under, so it is what
+ * names the FIRST branch — but it is names only. The row's repository is a
+ * single field overwritten on every new declaration, so a session that moved
+ * repositories keeps the old repository's branch names beside the new one's
+ * with nothing on them to tell the two apart. Handing that bare name to
+ * `perBranch`, which answers for THIS repository, would charge this
+ * repository for work done in another one whenever the two share a branch
+ * name, and names like `main` or a repeated `fix/...` collide readily.
+ *
+ * The ledger is what supplies the missing half: its entries carry a whole
+ * context, so the branches it weighed under another repository are known. A
+ * first branch the ledger weighed only elsewhere leaves this repository's
+ * unstamped bucket unowned. A first branch the ledger never weighed at all
+ * (declared, then departed before spending anything) is not evidence of
+ * another repository, and falls through to `perBranch` — which answers
+ * undefined for a branch with no pull request here, the case that rule was
+ * written for.
+ *
+ * A SATURATED record is the last case. The fold stops opening contexts at
  * `MAX_USAGE_CONTEXTS`, so a session past that bound keeps charging calls to
  * the counters with nowhere to record where they went. Its gap is then part
  * pre-declaration usage and part dropped later contexts, and the two cannot
  * be told apart — following the first branch would charge a later branch's
  * spend to the first pull request. So nobody owns it: the weight stays in the
- * denominator, and every pull request's share shrinks by its own honest
- * amount instead of one of them absorbing the lot.
+ * denominator, and every pull request's share shrinks by its own amount
+ * instead of one of them absorbing the lot.
  */
 function unstampedWinnerOf({
-  buckets,
+  ledger,
+  weightOf,
   declaredBranches,
   perBranch,
   legacyWinner,
+  repositoryHost,
+  repositoryFullName,
   saturated,
 }: {
-  buckets: ReadonlyMap<string, number>;
+  ledger: readonly StampedUsage[];
+  weightOf: (usage: StampedUsage) => number;
   declaredBranches: readonly string[];
   perBranch: ReadonlyMap<string, number>;
   legacyWinner: number | undefined;
+  repositoryHost: string;
+  repositoryFullName: string;
   saturated: boolean;
 }): number | undefined {
-  const hasDeclaredWork = [...buckets].some(
-    ([key, weight]) => key !== UNSTAMPED_BUCKET && weight > 0,
+  const declared = ledger.filter(
+    (usage) => !isUnstamped(usage) && weightOf(usage) > 0,
   );
-  if (!hasDeclaredWork) return legacyWinner;
+  if (declared.length === 0) return legacyWinner;
   if (saturated) return undefined;
+
   const firstBranch = declaredBranches[0];
   if (firstBranch === undefined) return undefined;
+
+  const named = declared.filter((usage) => usage.branch === firstBranch);
+  const namedHere = named.some((usage) =>
+    isStampedOnRepository({ usage, repositoryHost, repositoryFullName }),
+  );
+  if (named.length > 0 && !namedHere) return undefined;
   return perBranch.get(firstBranch);
 }
 

@@ -1822,6 +1822,52 @@ describe("PullRequestUsageService with the session row's per-context record", ()
     });
   });
 
+  describe("given a session whose declarations began in another repository", () => {
+    // The row keeps one repository (the latest) beside a branch set that is
+    // never reset, so this session's branch names alone cannot say that
+    // "feat/linkage" was another repository's branch. It also happens to be
+    // the head branch of this repository's pull request 7, which is exactly
+    // the collision that must not hand 7 the undeclared usage.
+    const fixture = () => ({
+      pullRequests: twoPullRequests(),
+      sessions: [
+        sessionRow({
+          agent: "codex",
+          gitBranches: ["feat/linkage", "feat/next"],
+          inputTokens: 1_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 10,
+          usageByContext: [
+            {
+              ...recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+              repositoryOwner: "other",
+              repositoryName: "tools",
+            },
+            recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+          ],
+        }),
+      ],
+    });
+
+    /** @scenario "Undeclared usage of a session that began in another repository is priced nowhere here" */
+    it("leaves the undeclared usage unowned here and prices only this repository's declaration", async () => {
+      const first = await serviceWith(fixture()).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture()).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      expect(first.totals.sessionsCount).toBe(0);
+      expect(first.totals.inputTokens).toBe(0);
+      expect(second.totals.inputTokens).toBe(30);
+      expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+    });
+  });
+
   describe("given a session whose usage record saturated", () => {
     // The fold stops opening contexts at MAX_USAGE_CONTEXTS, so the gap
     // between the counters and the record holds both what came before the
