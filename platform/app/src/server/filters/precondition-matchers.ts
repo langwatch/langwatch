@@ -26,6 +26,12 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
+  /**
+   * Raw trace-summary attributes, unfiltered. `metadata.value` falls back to
+   * these so a bare OTEL resource attribute resolves here the same way it
+   * resolves in ClickHouse — see `clickhouse/filter-conditions.ts`.
+   */
+  attributes?: Record<string, string> | null;
   annotationIds?: string[];
   events?: Array<{
     event_type: string;
@@ -99,7 +105,16 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
       : decoded.startsWith("langwatch.metadata.")
         ? decoded.slice("langwatch.metadata.".length)
         : decoded;
-    return resolved ? (data.customMetadata?.[resolved] ?? null) : null;
+    if (!resolved) return null;
+    // Canonical `metadata.{key}` and legacy `langwatch.metadata.{key}` are
+    // already hoisted into customMetadata with their prefix stripped.
+    const hoisted = data.customMetadata?.[resolved];
+    if (hoisted != null) return hoisted;
+    // Bare OTEL attribute. extractCustomMetadata deliberately keeps standard
+    // resource prefixes (service., http., telemetry., …) out of
+    // customMetadata, so this candidate has to come from the raw attributes
+    // or the filter can never match what the ClickHouse preview counted.
+    return data.attributes?.[decoded] ?? null;
   },
 
   // Span fields
