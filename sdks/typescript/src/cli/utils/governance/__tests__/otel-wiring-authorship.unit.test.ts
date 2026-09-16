@@ -1,9 +1,7 @@
 /**
- * otelWiringLooksLangwatchAuthored — the authorship guard shared by every
- * latest-login-wins (#6202) refresh and removal path. A langwatch-shaped
- * ingest-key bearer or /api/otel endpoint marks an unmarked env block as
- * ours to refresh; anything else (a user's own OTLP collector, or no
- * identity-bearing key at all) must never be touched.
+ * otelWiringLooksLangwatchAuthored: the authorship guard shared by every
+ * latest-login-wins (#6202) refresh/removal path. A langwatch-shaped bearer
+ * or /api/otel endpoint marks a block as ours; anything else is untouched.
  */
 import { describe, expect, it } from "vitest";
 

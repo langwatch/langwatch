@@ -352,11 +352,9 @@ describe("isSocketPathUsable", () => {
 
 describe("isDaemonSocketPathUsable", () => {
   /**
-   * The band between "the shared path fits" and "a daemon can run on it". A
-   * daemon binds a pid-scoped name beside the shared one, and it is longer.
-   * Approving this band is what left the client spawning a daemon every second
-   * miss, each dying at bind(), forever — with an error naming the shared path,
-   * which anybody could measure and find to be within the limit.
+   * The band between "the shared path fits" and "a daemon can run on it": a
+   * daemon's pid-scoped name is longer. Approving this band left the client
+   * spawning (and dying at bind()) forever, with an error naming the shorter path.
    */
   describe("given a shared path that fits but leaves no room for the staging name", () => {
     // 100 bytes exactly: the widest path `isSocketPathUsable` still allows.

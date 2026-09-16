@@ -1,8 +1,7 @@
 /**
  * `langwatch logout` orchestration: scan → (confirm) → remove telemetry
- * wiring, and revoke the session unless --keep-credentials. Exercised
- * against a real temp HOME + isolated config path with --yes so no prompt
- * blocks and --keep-credentials so no network revoke is attempted.
+ * wiring, revoke unless --keep-credentials. Exercised with --yes (no
+ * prompt) and --keep-credentials (no network revoke).
  */
 
 import * as fs from "node:fs";

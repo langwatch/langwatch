@@ -1,10 +1,6 @@
 /**
- * Basic Evaluation Example
- *
- * This example demonstrates how to run a simple batch evaluation
- * with custom metrics using the LangWatch TypeScript SDK.
- *
- * Run with: npm start
+ * Basic Evaluation Example: runs a simple batch evaluation with custom
+ * metrics using the LangWatch SDK. Run with: npm start
  */
 
 import "dotenv/config";

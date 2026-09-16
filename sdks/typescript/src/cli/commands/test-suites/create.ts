@@ -18,10 +18,9 @@ export interface CreateTestSuiteOptions {
 }
 
 /**
- * Creates a test suite. It starts with no scenarios: they join it by being
- * filed into it, and the targets a run goes against travel with the run. The
- * fields and the evaluators it declares can be given on creation.
- *
+ * Creates a test suite with no scenarios -- they join by being filed into
+ * it, and a run's targets travel with the run. Fields and evaluators can be
+ * given on creation.
  * @see specs/features/test-suite-cli.feature
  */
 export const createTestSuiteCommand = async (

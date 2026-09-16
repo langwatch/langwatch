@@ -1,10 +1,7 @@
 /**
- * Spawning on the first invocation would leave a credential-holding process
- * alive for nothing on one-off commands, and pile up per-identity in CI. So it
- * spawns on evidence instead: once an identity has MISSED at least twice inside
- * a short window, tracked in a tiny 0600 JSON file beside the socket. Every
- * failure reading or writing that file is swallowed, costing a spawn, never a
- * command.
+ * Spawns on evidence, not the first invocation -- which would leave a
+ * credential-holding process alive for nothing and pile up per-identity in
+ * CI. Triggers once an identity MISSES twice in a window (0600 JSON file).
  */
 
 import * as fs from "node:fs";

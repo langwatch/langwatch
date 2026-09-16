@@ -1,19 +1,8 @@
-// Copies modules/scenario/contract/src/evaluator-attachments.ts into the SDK's
-// generated types, with its one non-relative type import replaced by local
-// declarations.
-//
-// Why a replacement rather than a plain `cp`: the contract module names types
-// that live outside it, and the CLI can resolve neither. It has no React tree,
-// and it has no workspace dependency on @langwatch/workflow-contract — the
-// published tarball and all five release binaries are built from this copy, so
-// an unresolvable import here ships broken generated code.
-//
-// Two spellings are accepted because the contract is mid-change. It used to
-// import the two picker shapes from the component that draws them; it now
-// declares them itself, in terms of the workflow contract's ComponentType and
-// Field. Whichever it carries, the unions are widened to `string` in this copy
-// — the shape it has always had. Delete the branch that stops matching once
-// the contract settles.
+// Copies evaluator-attachments.ts from the contract module, replacing its
+// one non-relative type import with local declarations -- the published
+// tarball has no workspace dependency on @langwatch/workflow-contract, so an
+// unresolvable import here ships broken code. Two spellings are supported
+// while the contract is mid-change; delete the stale branch once it settles.
 
 import fs from "node:fs";
 

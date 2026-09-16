@@ -75,12 +75,9 @@ async function readParentPid(pid: number): Promise<number | null> {
 }
 
 /**
- * Resolve a directory of symlinks, in batches, giving up when the deadline
- * passes. A process can hold thousands of descriptors, and resolving all of
- * them would blow the walk budget before the walk got the chance to check it.
- *
- * The directory is streamed rather than listed, so a huge descriptor table is
- * never materialised and the clock is checked before every batch starts.
+ * Resolves a directory of symlinks in batches, giving up at the deadline --
+ * a process can hold thousands of descriptors, blowing the walk budget
+ * before it can even check. Streamed, not listed, so nothing huge materialises.
  */
 export async function readSymlinkedPaths({
   dir,

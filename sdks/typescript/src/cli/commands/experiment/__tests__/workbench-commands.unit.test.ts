@@ -224,10 +224,9 @@ describe("the experiment workbench commands", () => {
 
   describe("given a versions call", () => {
     /**
-     * A history the seam wrote: two deliberate versions numbered without gaps,
-     * and the one autosave row a session of typing left behind. The autosave
-     * keeps a number so a script can restore it, and the table names it for
-     * what it is instead.
+     * A history the seam wrote: two deliberate versions numbered without
+     * gaps, plus one autosave row from a typing session. The autosave keeps
+     * a number so a script can restore it, but the table names it instead.
      */
     const historyWithAnAutosave = {
       versions: [

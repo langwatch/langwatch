@@ -1,9 +1,7 @@
 /**
- * The instance-provisioning family authenticates against the INSTANCE, not an
- * organization, so it takes the instance administrator credential rather than
- * the organization API key every other command resolves. Falling back to
- * `LANGWATCH_API_KEY` would send an organization key to a surface that cannot
- * accept one and read as a plain 401.
+ * Instance-provisioning commands authenticate against the INSTANCE, not an
+ * org, so they take the instance admin credential, not `LANGWATCH_API_KEY`
+ * -- an org key here would hit a surface that can't accept it and read as a 401.
  */
 import {
   INSTANCE_ADMIN_KEY_ENV,

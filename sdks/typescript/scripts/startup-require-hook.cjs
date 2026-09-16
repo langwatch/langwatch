@@ -1,15 +1,7 @@
 /**
- * Preload hook for profile-startup.mjs — times every CommonJS module load.
- *
- * Patches `Module._load` so each real (non-cached) load becomes a timed frame
- * with a parent link to the frame that triggered it. At process exit the
- * aggregated tree is written as JSON to the path in
- * `LANGWATCH_STARTUP_TREE_OUT`.
- *
- * Because the CLI ships as a single tsup bundle, this hook sees only the
- * EXTERNAL requires (node builtins and the deps tsup leaves external:
- * commander, chalk, dotenv, …). The in-bundle cost is visible in the CPU
- * profile half of the tooling, which is function-granular.
+ * Preload hook for profile-startup.mjs: times CommonJS loads into a tree
+ * written to `LANGWATCH_STARTUP_TREE_OUT` at exit. Only EXTERNAL requires are
+ * visible here (the CLI is one tsup bundle); in-bundle cost is the CPU-profile half.
  */
 "use strict";
 

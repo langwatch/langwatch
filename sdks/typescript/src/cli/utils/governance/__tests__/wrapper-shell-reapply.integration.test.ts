@@ -1,10 +1,7 @@
 /**
- * Real-shell execution test for the Path-B `unset -f` neutralization in
- * `buildShellReapply()`. Unit tests prove the prefix TEXT; this proves the
- * RUNTIME effect — spawns `$SHELL -i -c`, sources a persisted shadowing
- * function, applies the prefix, and observes the real binary (not the
- * shadow) runs. A quoting/ordering/`-i -c`-sourcing regression would pass
- * every string assertion but fail here.
+ * Real-shell test for `buildShellReapply()`'s Path-B `unset -f`. Unit tests
+ * prove the prefix TEXT; this proves the RUNTIME effect by spawning `$SHELL
+ * -i -c` and observing the real binary, not the shadow, actually runs.
  */
 
 import { execFileSync } from "node:child_process";

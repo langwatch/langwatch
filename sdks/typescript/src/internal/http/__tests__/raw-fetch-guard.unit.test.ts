@@ -1,9 +1,7 @@
 /**
- * Every request the SDK sends to the LangWatch API goes through
- * `langwatchFetch`, which is what applies the redirect rule. A raw `fetch(`
- * call, or a `fetchImpl = fetch` default, anywhere else in `src` bypasses
- * that rule, so this test walks the source and fails on any it finds outside
- * the short list of calls that talk to something other than LangWatch.
+ * Every SDK request goes through `langwatchFetch`, which applies the
+ * redirect rule -- a raw `fetch(` or `fetchImpl = fetch` default elsewhere
+ * bypasses it, so this test walks `src` and fails on any found outside the allowed list.
  */
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";

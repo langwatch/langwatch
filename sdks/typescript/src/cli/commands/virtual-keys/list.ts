@@ -8,10 +8,9 @@ import { formatScope, formatStatus } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). The list model
- * carries no secrets — only `display_prefix`, exactly what the human table
- * shows — so the raw list is safe to hand to a machine caller.
+ * Returns the listing rather than printing it (output port renders
+ * per-format). The list model carries no secrets -- only `display_prefix`,
+ * what the human table shows -- so it's safe for a machine caller.
  */
 export const listVirtualKeysCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

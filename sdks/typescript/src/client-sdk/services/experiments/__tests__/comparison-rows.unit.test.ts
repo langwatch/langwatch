@@ -1,7 +1,6 @@
 /**
  * Which row a comparison is about: the one being iterated, one named
- * explicitly, none at all outside a run, and several judged at once.
- *
+ * explicitly, none outside a run, and several judged at once.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

@@ -1,8 +1,7 @@
 /**
- * Tests for trace isolation in evaluation.withTarget()
- *
- * These tests verify that each withTarget() call creates an independent trace
- * with a unique trace_id, NOT shared across targets within the same dataset row.
+ * Trace isolation in evaluation.withTarget(): each call creates an
+ * independent trace with a unique trace_id, not shared across targets
+ * within the same dataset row.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

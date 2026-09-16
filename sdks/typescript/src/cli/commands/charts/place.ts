@@ -16,10 +16,9 @@ const parseGridFlag = (name: string, raw: string | undefined): number | undefine
 };
 
 /**
- * Returns the placed chart rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). With no grid
- * row given, the platform allocates the next free row on that dashboard,
- * counting charts of every kind.
+ * Returns the placed chart rather than printing it (output port renders
+ * per-format). With no grid row given, the platform allocates the next free
+ * row on that dashboard, counting charts of every kind.
  */
 export const placeChartCommand = async (
   id: string,

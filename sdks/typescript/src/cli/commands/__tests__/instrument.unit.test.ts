@@ -1,8 +1,7 @@
 /**
- * `langwatch instrument <tool>` - scope selection and wiring dispatch.
- * The wiring writers and the credential resolver carry their own suites
- * (instrument-wiring, resolve-ingestion-credential); here they are
- * mocked so each scope rule is pinned at the command level.
+ * `langwatch instrument <tool>`: scope selection and wiring dispatch. The
+ * wiring writers and credential resolver are mocked here so each scope rule
+ * is pinned at the command level.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

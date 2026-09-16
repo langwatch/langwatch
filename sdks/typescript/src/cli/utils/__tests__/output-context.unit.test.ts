@@ -1,8 +1,7 @@
 /**
- * The output contract's RESOLUTION half, pinned: flag normalisation (legacy
- * `-f/--format`, bare `--json` → new `-o/--output`, `--json <fields>`, `--jq`,
- * `--agent`), agent-mode detection, and `applyOutputContext` pushing the
- * resolved context into the error/colour machinery.
+ * The output contract's RESOLUTION half: flag normalisation (legacy
+ * `-f/--format`, `--json`, `--jq`, `--agent`), agent-mode detection, and
+ * `applyOutputContext` pushing the resolved context into error/colour.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import chalk from "chalk";

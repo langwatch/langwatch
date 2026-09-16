@@ -50,10 +50,9 @@ function platformKeys({ source, schema }: { source: string; schema: string }): s
 }
 
 /**
- * The top-level keys of one TypeScript interface in the SDK source, by name.
- * The body is read by matching braces, so an inline object type such as
- * `meta?: { projects: unknown[] }` neither cuts the list short nor adds the
- * keys nested inside it.
+ * The top-level keys of one interface in the SDK source, read by matching
+ * braces -- an inline object type like `meta?: { projects: unknown[] }`
+ * neither cuts the list short nor adds its nested keys.
  */
 function sdkKeys({ source, name }: { source: string; name: string }): string[] {
   const start = new RegExp(`export interface ${name}\\s*\\{`).exec(source);

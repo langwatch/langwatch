@@ -1,8 +1,7 @@
 /**
- * The spawned daemon's boot environment becomes the BASELINE every request
- * resets to (execution.ts applyWindow), so it must be a known-safe set — never
- * the spawner's full shell env, which would leak one project's variables into
- * every other caller's requests.
+ * The spawned daemon's boot env becomes the BASELINE every request resets
+ * to (execution.ts applyWindow) -- never the spawner's full shell env, which
+ * would leak one project's variables into every other caller's requests.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 

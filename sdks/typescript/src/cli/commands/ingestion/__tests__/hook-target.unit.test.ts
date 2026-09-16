@@ -1,9 +1,7 @@
 /**
- * Where the session context hook posts, and what authenticates it. The
- * environment comes first (OTel exporter spec) but can't be the only
- * source — Claude Code strips every `OTEL_*` var from spawned processes,
- * so the CLI's device config is the fallback (no key = no-op). A pinned
- * tool (`--key`/`--project`) uses that pin; otherwise the personal key.
+ * Where the session context hook posts, and what authenticates it: env
+ * first (OTel exporter spec), then the CLI's device config -- Claude Code
+ * strips `OTEL_*` from spawned processes, so a pinned tool uses its pin.
  */
 
 import { describe, expect, it } from "vitest";

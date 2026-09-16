@@ -8,10 +8,8 @@ import type { CommandResult } from "../../utils/output";
 
 /**
  * The most recent delivery attempts for one endpoint, one page at a time.
- *
- * The log grows with every send and has no bound worth printing to a
- * terminal, so `--limit` is the page size and `--cursor` walks backwards
- * through the history rather than the command collecting all of it.
+ * The log has no bound worth printing, so `--limit` is the page size and
+ * `--cursor` walks backwards instead of the command collecting it all.
  */
 export const webhookDeliveriesCommand = async (
   id: string,

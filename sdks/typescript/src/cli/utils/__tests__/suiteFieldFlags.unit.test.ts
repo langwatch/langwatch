@@ -1,8 +1,7 @@
 /**
- * The `--field` flag: a field definition on the suite commands, a field value
- * on the scenario commands.
- *
- * Spec: specs/features/test-suite-cli.feature, specs/features/scenario-cli.feature
+ * The `--field` flag: a field definition on the suite commands, a field
+ * value on the scenario commands.
+ * Spec: specs/features/{test-suite-cli,scenario-cli}.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {

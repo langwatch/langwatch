@@ -1,9 +1,7 @@
 /**
- * The claude project-level pin at $CWD/.claude/settings.local.json. Claude
- * Code applies project settings ABOVE user-level ~/.claude/settings.json, so
- * this pin guarantees an ingestion-mode run can't be rerouted by user-level
- * config; gateway-mode runs remove it instead so capture + a live exporter
- * never double-trace.
+ * The claude project-level pin at $CWD/.claude/settings.local.json, which
+ * Claude Code applies ABOVE user-level settings -- guarantees an ingestion
+ * run can't be rerouted. Gateway-mode runs remove it to avoid double-tracing.
  */
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";

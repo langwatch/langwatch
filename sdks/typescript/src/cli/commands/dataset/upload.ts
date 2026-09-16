@@ -8,12 +8,8 @@ import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
 /**
- * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
- *
- * Usage:
- * - Append (default):  `langwatch dataset upload <slug> <file>`
- * - Replace:           `langwatch dataset upload <slug> <file> --if-exists replace`
- * - Error if exists:   `langwatch dataset upload <slug> <file> --if-exists error`
+ * Uploads a file to a dataset. `--if-exists` controls collision handling:
+ * append (default), replace, or error.
  */
 export const uploadCommand = async (
   slugOrId: string,

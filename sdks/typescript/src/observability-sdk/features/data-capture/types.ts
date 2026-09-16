@@ -32,12 +32,7 @@ export interface DataCaptureContext {
  */
 export type DataCapturePredicate = (context: DataCaptureContext) => DataCaptureMode;
 
-/**
- * Configuration for what data should be captured in spans.
- *
- * This provides simple control over input/output data capture
- * by LangWatch instrumentations.
- */
+/** Configuration for what data (input/output) LangWatch instrumentations capture in spans. */
 export interface DataCaptureConfig {
   /**
    * Controls data capture behavior.

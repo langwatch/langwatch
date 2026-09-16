@@ -1,9 +1,7 @@
 /**
- * `assertFormatIsSupported`: the gate deciding whether a command may answer in the format it was
- * asked for. Prevents a command that cannot serialize anything from quietly rendering a chalk
- * table at exit 0 for a caller who asked for JSON, so the interesting cases are where refusing
- * would be WRONG: the legacy `-f json` spelling, a command owning its own `--json`, and agent
- * mode detected from the environment rather than demanded on the command line.
+ * `assertFormatIsSupported`: the gate deciding whether a command may answer
+ * in the format it was asked for -- refusing must not fire for the legacy
+ * `-f json` spelling, a command's own `--json`, or env-detected agent mode.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";

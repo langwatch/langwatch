@@ -3,10 +3,9 @@ import type { TestSuite, TestSuitesApiService } from "@/client-sdk/services/test
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 
 /**
- * A test suite reference that names nothing, or more than one thing.
- *
- * Both readings are refusals the caller can fix from the message alone, so
- * they carry the offered ids rather than a generic failure.
+ * A test suite reference that names nothing, or more than one thing. Both
+ * readings are refusals the caller can fix from the message alone, so they
+ * carry the offered ids rather than a generic failure.
  */
 export class SuiteReferenceError extends Error {
   constructor(message: string) {

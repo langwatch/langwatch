@@ -1,7 +1,6 @@
 /**
- * The coercion rule is the interesting part: a run parameter that LOOKS
- * numeric is not always a number, and turning an order id like `007` into `7`
- * hands the target under test a different value than the caller typed.
+ * The coercion rule: a run parameter that LOOKS numeric isn't always a
+ * number -- turning `007` into `7` hands the target a different value.
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

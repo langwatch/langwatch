@@ -2,10 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LangWatch, ProjectsApiService, TeamsApiService } from "../index";
 
 /**
- * Teams and projects are how an integration provisions the tenant it is
- * about to write to, so they belong on the client the same way every other
- * service does. Both are built on first use: the management families resolve
- * their credential when constructed and refuse an empty one.
+ * Teams and projects are how an integration provisions the tenant it's
+ * about to write to, so they belong on the client like every other service.
+ * Both build on first use, resolving their credential and refusing an empty one.
  */
 describe("management services on the client SDK entry point", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;

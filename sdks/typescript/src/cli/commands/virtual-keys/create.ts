@@ -31,11 +31,9 @@ export interface CreateVirtualKeyOptions {
 }
 
 /**
- * Returns the created key rather than printing it; the output port renders it
- * per the caller's format (utils/output.ts). `data` deliberately includes
- * `secret` — this is the ONE moment it exists, since the server stores only its
- * hash and never returns it again, so withholding it here would produce a key
- * nobody could ever use.
+ * Returns the created key rather than printing it (output port renders
+ * per-format). `data` deliberately includes `secret` -- the ONE moment it
+ * exists, since the server stores only its hash and never returns it again.
  */
 export const createVirtualKeyCommand = async (
   options: CreateVirtualKeyOptions,

@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import { summaryCountNoun } from "../summary";
 
 /**
- * The line printed after a summaries walk states how many of something the
- * window held. On a reconciliation surface that sentence is a claim about the
- * data, so it has to name what was actually counted: with two dimensions or a
- * time bucket, a row is a combination and no single dimension's noun is true
- * of it.
+ * The line after a summaries walk states how many of something the window
+ * held -- with two dimensions or a time bucket, a row is a combination, so
+ * no single dimension's noun is true of it.
  */
 describe("given the count printed after a summaries walk", () => {
   describe("when one dimension is grouped and no bucket is set", () => {

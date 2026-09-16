@@ -70,11 +70,9 @@ PIPING RULES
 };
 
 /**
- * The help topics, keyed by the word the user types after `help`.
- *
- * Every name here MUST NOT match a registered command name or alias — a topic
- * that collides is unreachable-by-design for the command it shadows. The unit
- * test walks `buildProgram()` and fails on any overlap.
+ * The help topics, keyed by the word after `help`. Every name here MUST NOT
+ * match a registered command/alias -- a collision is unreachable-by-design.
+ * The unit test walks `buildProgram()` and fails on any overlap.
  */
 export const HELP_TOPICS: Record<string, () => string> = {
   "agent-mode": renderAgentHelpTopic,

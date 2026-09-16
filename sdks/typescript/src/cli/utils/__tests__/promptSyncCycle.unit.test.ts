@@ -5,11 +5,9 @@ import { PromptConverter } from "../promptConverter";
 import type { PromptResponse } from "@/client-sdk/services/prompts/types";
 
 /**
- * End-to-end of the sync data path (no network): a prompt created from the
- * CLI default template, given a response_format, pushed (response_format →
- * outputs), the server dropping a model-rejected sampling param, then pulled
- * back (outputs → response_format). The user must get back exactly what they
- * had, on a model that still runs.
+ * End-to-end sync (no network): a prompt with a response_format is pushed
+ * (→ outputs, server drops any model-rejected sampling param), then pulled
+ * back (→ response_format). The user gets back what they had, on a working model.
  */
 describe("prompt sync fidelity — full create→push→pull cycle", () => {
   /** @scenario A new structured-output prompt survives a full create, push and pull cycle */

@@ -1,9 +1,4 @@
-/**
- * End-to-end tests for content parsing and message extraction
- *
- * Basic sanity checks that LangWatch correctly parses content from different input types.
- * Focused on essential message and content format validation.
- */
+/** E2E sanity checks that LangWatch correctly parses content from different input types. */
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";

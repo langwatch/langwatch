@@ -1,12 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
- * How `langwatch gateway-budgets list` renders a per-person template.
- *
- * The template's limit belongs to each end user separately, so the
- * spent-over-limit percentage every other scope shows is meaningless here:
- * it would divide a per-person cap into one bucket's spend and report a
- * confident number about nobody. The row reports a headcount instead.
+ * How `gateway-budgets list` renders a per-person template: the per-user
+ * limit makes other scopes' spent-over-limit percentage meaningless here,
+ * so the row reports a headcount instead.
  */
 const mockList = vi.fn();
 

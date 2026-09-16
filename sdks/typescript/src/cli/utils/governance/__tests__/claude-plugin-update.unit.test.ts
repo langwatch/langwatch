@@ -41,10 +41,9 @@ const HOUR_MS = 60 * 60 * 1000;
 const secondsAgo = (ms: number): number => Math.floor((Date.now() - ms) / 1000);
 
 /**
- * A `claude` whose `plugin update` does what a real one does: moves the version
- * in the install record. Nothing else about the outcome is observable, and a
- * mock that only reported success would let a no-op update pass as an applied
- * one.
+ * A `claude` whose `plugin update` does what a real one does: moves the
+ * version in the install record. Nothing else is observable, so a mock that
+ * only reported success would let a no-op update pass as applied.
  */
 const claudeThatUpdatesTo = (version: string): void => {
   spawnSyncMock.mockImplementation((_bin: string, args: string[]) => {

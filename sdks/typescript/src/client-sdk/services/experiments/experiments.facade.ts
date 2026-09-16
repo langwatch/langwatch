@@ -33,11 +33,9 @@ const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes
 
 /**
- * Asserts the shape of a raw endpoint's body. `data` types as `undefined` on
- * a `withRawResponse` operation (the document cannot describe it), so a
- * direct `as` cast has no overlap to check against; the type comes in
- * through this generic instead, the same trust boundary
- * `ExperimentsApiService`'s undeclared-endpoint helpers use.
+ * Asserts the shape of a raw endpoint's body. `data` types `undefined` on a
+ * `withRawResponse` op (undescribable), so an `as` cast has no overlap; the
+ * type comes in through this generic, the same trust boundary the API service's helpers use.
  */
 function rawResponseData<T>(data: unknown): T {
   return data as T;

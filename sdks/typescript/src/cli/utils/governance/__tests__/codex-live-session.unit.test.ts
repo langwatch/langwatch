@@ -1,8 +1,6 @@
 /**
- * Which codex session is live: the one hot rollout inside the window, because
- * codex exports nothing about itself into the processes a session spawns.
- * Two hot rollouts mean two sessions asking at once and resolve to nothing.
- *
+ * Which codex session is live: the one hot rollout inside the window --
+ * codex exports nothing about itself into spawned processes.
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 

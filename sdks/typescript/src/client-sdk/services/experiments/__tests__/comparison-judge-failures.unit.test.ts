@@ -1,7 +1,6 @@
 /**
- * What a row reports when the judge call fails or the judge itself reports a
- * failure, and how that stays distinct from a judge that reached no verdict.
- *
+ * What a row reports when the judge call fails or the judge itself reports
+ * a failure, distinct from a judge that reached no verdict.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

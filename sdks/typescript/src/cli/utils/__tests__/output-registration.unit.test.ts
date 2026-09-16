@@ -1,8 +1,7 @@
 /**
- * The output contract's COMMANDER half, pinned: `registerOutputOptions`
- * adding the global flags to every command without stealing a command's own,
- * and `resolveActionOutputOptions` reading the running command's resolved
- * context in the preAction hook.
+ * The output contract's COMMANDER half: `registerOutputOptions` adds global
+ * flags without stealing a command's own, and `resolveActionOutputOptions`
+ * reads the resolved context in the preAction hook.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";

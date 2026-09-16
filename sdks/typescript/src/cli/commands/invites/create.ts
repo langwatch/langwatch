@@ -28,12 +28,9 @@ const readStdin = (): Promise<string> =>
   });
 
 /**
- * The batch the caller described, whichever way they described it.
- *
- * Repeated flags are the ergonomic form for the common case (a few people onto
- * the same teams); the JSON forms carry per-person team assignments and custom
- * roles. Both produce the same request, so a run that started as flags can be
- * captured as JSON without changing what happens.
+ * The batch the caller described, whichever way they described it. Repeated
+ * flags suit the common case; JSON carries per-person teams and custom
+ * roles. Both produce the same request, so flags and JSON are interchangeable.
  */
 const resolveInvites = async (options: CreateInvitesOptions): Promise<InviteInput[]> => {
   const jsonSources = [options.json, options.file, options.readFromStdin].filter(

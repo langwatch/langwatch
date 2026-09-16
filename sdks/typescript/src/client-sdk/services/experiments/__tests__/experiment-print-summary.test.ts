@@ -1,10 +1,7 @@
 /**
- * Unit tests for Experiment.printSummary() — parity with ExperimentRunResult.printSummary.
- *
- * We don't construct a full Experiment (private constructor); instead we exercise the
- * formatter by invoking printSummary on a subclass-bridge that bypasses init. We use
- * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
- * the cumulative arrays without going through the network.
+ * Unit tests for Experiment.printSummary(), parity with
+ * ExperimentRunResult.printSummary. Private constructor, so a subclass-
+ * bridge + `Object.assign` populates state without touching the network.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { Experiment } from "../experiment";

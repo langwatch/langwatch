@@ -1,8 +1,7 @@
 /**
- * refreshTelemetryWiringForLogin — the login-time half of latest-login-wins
- * (#6202). Walks every tool's persisted wiring and re-points any
- * langwatch-authored block whose endpoint differs from the login that just
- * completed, minting (or reusing) a live ingest key on the new instance.
+ * refreshTelemetryWiringForLogin: the login-time half of latest-login-wins
+ * (#6202). Walks persisted wiring and re-points any langwatch-authored
+ * block whose endpoint differs, minting/reusing a live key on the new instance.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

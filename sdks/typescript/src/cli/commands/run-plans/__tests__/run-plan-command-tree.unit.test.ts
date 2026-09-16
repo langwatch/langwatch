@@ -1,9 +1,7 @@
 /**
- * Where the run plan and test suite commands sit in the command tree, and the
- * surface header every one of their requests carries.
- *
- * Spec: specs/features/run-plan-cli.feature
- * Spec: specs/features/test-suite-cli.feature
+ * Where the run plan and test suite commands sit in the command tree, and
+ * the surface header every one of their requests carries.
+ * Specs: specs/features/{run-plan-cli,test-suite-cli}.feature
  */
 import { describe, expect, it, vi } from "vitest";
 

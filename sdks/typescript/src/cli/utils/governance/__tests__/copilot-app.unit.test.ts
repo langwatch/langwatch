@@ -1,9 +1,7 @@
 /**
- * Unit tests for the GitHub Copilot app capture core (ADR-039
- * §Extension): the OTLP env block the login agent injects, app-executable
- * detection per platform, and the per-OS login-agent descriptors. All
- * pure — no disk, no OS registration (that lives in the imperative
- * installer, tested separately).
+ * Unit tests for the Copilot app capture core (ADR-039 §Extension): the
+ * OTLP env block, app-executable detection per platform, and per-OS
+ * login-agent descriptors. All pure -- no disk, no OS registration.
  */
 
 import { describe, expect, it } from "vitest";

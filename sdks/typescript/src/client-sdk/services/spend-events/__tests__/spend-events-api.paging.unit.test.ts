@@ -7,10 +7,9 @@ import {
 } from "../spend-events-api.service";
 
 /**
- * The spend ledger is an unbounded ranged read, so this service offers pages
- * and a lazy walk and deliberately no eager whole-collection method: a
- * reconciler that stops on the first page under-counts the window, and one
- * that materialises the window runs out of memory instead.
+ * The spend ledger is unbounded, so this service offers pages and a lazy
+ * walk, deliberately no eager whole-collection method -- stopping at the
+ * first page under-counts, and materialising the window runs out of memory.
  */
 
 const mockFetch = vi.fn();

@@ -8,11 +8,9 @@ import {
 } from "../webhooks-api.service";
 
 /**
- * The webhook surface's request bodies are the wire's own shape, and both of
- * its logs are cursor-paged. Two things this pins down: a create body that
- * says `enabled_events` (a camelCase key would be dropped by the server's
- * validator), and a delivery read that carries the cursor instead of
- * truncating the log at the first page.
+ * The webhook surface's request bodies are the wire's own shape, and both
+ * logs are cursor-paged: a create body says `enabled_events` (camelCase
+ * would be dropped), and a delivery read carries the cursor, not a truncated page.
  */
 
 const mockFetch = vi.fn();

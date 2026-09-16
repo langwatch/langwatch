@@ -231,10 +231,9 @@ const readCall = (frame: Record<string, unknown>): CallFrame | null => {
 };
 
 /**
- * Reads one text message from the platform into a typed frame, or null when
- * the message is not a frame this protocol version knows. Unknown types and
- * malformed frames are dropped rather than thrown, so a newer platform never
- * crashes an older SDK.
+ * Reads one text message into a typed frame, or null when this protocol
+ * version doesn't know it. Unknown/malformed frames are dropped, not thrown,
+ * so a newer platform never crashes an older SDK.
  */
 export function parseServerFrame(raw: string): ServerFrame | null {
   let parsed: unknown;

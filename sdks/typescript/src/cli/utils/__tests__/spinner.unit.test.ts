@@ -1,10 +1,7 @@
 /**
- * The spinner must never write when the command's output is a machine contract.
- *
- * Under `--format json` stdout carries exactly one JSON document, and callers
- * routinely merge stderr into stdout — so even the spinner's stderr "✔ Found N"
- * lines corrupt what a parser reads. `createSpinner` silences the spinner at
- * the source whenever the running command was invoked with JSON output.
+ * The spinner must never write when output is a machine contract. Under
+ * `--format json` callers merge stderr into stdout, so even a stderr spinner
+ * line corrupts the parse. `createSpinner` silences itself for JSON output.
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { createSpinner } from "../spinner";

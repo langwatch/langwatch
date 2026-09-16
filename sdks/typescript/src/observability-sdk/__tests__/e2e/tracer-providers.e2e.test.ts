@@ -1,9 +1,4 @@
-/**
- * End-to-end tests for different tracer provider configurations
- *
- * Basic sanity checks that LangWatch works with various OpenTelemetry setups.
- * Focused on essential provider configuration validation.
- */
+/** E2E sanity checks that LangWatch works with various OpenTelemetry tracer provider setups. */
 
 import { describe, it, expect } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";

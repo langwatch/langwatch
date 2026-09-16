@@ -1,10 +1,8 @@
 /**
  * @see sdks/typescript/specs/cli/daemon.feature - A daemon that stops answering
- *
- * The client reports a wedged daemon and marks the outcome for eviction, but
- * the eviction itself happens here in the dispatcher. Asserting the flag alone
- * would pass with the `requestStop` call deleted, and the next command would
- * then wedge on the same daemon.
+ * The client reports a wedged daemon and marks it for eviction, but eviction
+ * happens here in the dispatcher -- asserting the flag alone would pass with
+ * `requestStop` deleted, wedging the next command on the same daemon.
  */
 (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 

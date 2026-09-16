@@ -1,7 +1,6 @@
 /**
  * The LangWatch guidance block in codex's global AGENTS.md: installed
- * idempotently, removed exactly, and never touching a byte the user wrote.
- *
+ * idempotently, removed exactly, never touching a byte the user wrote.
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 

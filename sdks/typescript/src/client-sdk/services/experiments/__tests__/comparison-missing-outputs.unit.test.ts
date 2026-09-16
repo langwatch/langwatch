@@ -1,7 +1,6 @@
 /**
- * Rows where a target produced nothing: who still becomes a candidate, when
- * the row is skipped, and when naming an empty target is an error.
- *
+ * Rows where a target produced nothing: who still becomes a candidate,
+ * when the row is skipped, and when naming an empty target is an error.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

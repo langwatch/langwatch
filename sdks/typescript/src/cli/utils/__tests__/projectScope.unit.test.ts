@@ -1,8 +1,6 @@
 /**
  * How a `--project <idOrSlug>` value becomes a project id: what answers
- * without a round trip, which match wins when an id and a slug could both
- * apply, and which failure the user is told about.
- *
+ * without a round trip, and which match wins when an id and slug both apply.
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { describe, expect, it, vi } from "vitest";

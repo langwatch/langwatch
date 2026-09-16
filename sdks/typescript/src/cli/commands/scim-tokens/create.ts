@@ -4,12 +4,9 @@ import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 
 /**
- * Mint a SCIM bearer token for the identity provider.
- *
- * `data` deliberately includes the token: this is the ONE moment it exists,
- * the platform never returns it again, and a provisioning script reading
- * `-o json` needs it. The human rendering says so in as many words, the same
- * warning `api-keys create` prints for the same reason.
+ * Mints a SCIM bearer token. `data` deliberately includes it -- this is the
+ * ONE moment it exists, the platform never returns it again, and a
+ * provisioning script reading `-o json` needs it (same as `api-keys create`).
  */
 export const createScimTokenCommand = async (
   options: { description?: string } = {},

@@ -40,12 +40,9 @@ export const createCommand = async (name: string): Promise<CommandResult | void>
       fs.mkdirSync(promptsDir, { recursive: true });
     }
 
-    // Default prompt content.
-    //
-    // No `modelParameters.temperature`: the latest model families (gpt-5+)
-    // reject a custom temperature, so injecting one by default breaks the
-    // very models a new prompt should be using. Add it back only for a model
-    // that supports it.
+    // Default prompt content. No `modelParameters.temperature`: gpt-5+
+    // rejects a custom temperature, so a default would break the very
+    // models a new prompt should target.
     const defaultContent = `model: ${DEFAULT_PROMPT_MODEL}
 messages:
   - role: system

@@ -1,9 +1,7 @@
 /**
- * refreshScopedShellFunctions — re-syncs the gemini/opencode scoped shell
- * wrapper functions to the current run's endpoint + key (latest login
- * wins, #6202). A marker pair is explicit langwatch authorship, so any
- * present block whose body doesn't carry the current values is rewritten
- * in place across every rc file that has one.
+ * refreshScopedShellFunctions: re-syncs the gemini/opencode wrapper
+ * functions to the run's endpoint+key (latest login wins, #6202). Any
+ * marker-paired block with stale values is rewritten in place in every rc file.
  */
 import * as fs from "node:fs";
 

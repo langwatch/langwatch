@@ -104,10 +104,9 @@ export const fallbackSuggestionsFor = (code: string): ErrorExplanation | undefin
   FALLBACK_BY_CODE[code];
 
 /**
- * Fill `suggestions`/`docUrl` from the fallback table — ONLY when the platform
- * did not send them. Server-sent advice always wins: it is written next to the
- * code that raised the failure, so it can only be more specific than a table
- * shipped with the CLI.
+ * Fills `suggestions`/`docUrl` from the fallback table -- only when the
+ * platform didn't send them. Server-sent advice always wins: it's written
+ * next to the code that raised the failure, so it's only ever more specific.
  */
 export const withFallbackSuggestions = (domain: CliHandledError): CliHandledError => {
   if (domain.suggestions?.length && domain.docUrl) return domain;

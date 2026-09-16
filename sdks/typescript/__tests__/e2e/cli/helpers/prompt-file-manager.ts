@@ -16,15 +16,7 @@ export interface PromptConfig {
   [key: string]: any;
 }
 
-/**
- * Manages prompt YAML files.
- *
- * Responsibilities:
- * - Create and update prompt YAML files
- * - Read prompt file contents
- * - Handle YAML parsing and serialization
- * - Manage prompts directory structure
- */
+/** Manages prompt YAML files: create/update, read, and directory structure. */
 export class PromptFileManager {
   constructor(private readonly config: { cwd: string; materializedDir?: boolean }) {}
 

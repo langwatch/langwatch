@@ -341,11 +341,9 @@ describe("resolveWrapperPath", () => {
 
   describe("when the tool is copilot (ingestion-first defaults, ADR-039)", () => {
     // Copilot's gateway path switches it into BYOK mode, moving spend off
-    // the user's paid Copilot seat onto the org's provider keys — not
-    // billing-neutral like the claude/codex base-URL swap. The resolver is
-    // ingestion-first for every tool, which keeps copilot safe by default;
-    // these tests pin that copilot rides those defaults and that every
-    // gateway route names the seat bypass. Explicit choices are honored.
+    // the user's paid Copilot seat onto the org's provider keys -- not
+    // billing-neutral like the claude/codex base-URL swap. These tests pin
+    // that copilot defaults to ingestion-first and every gateway route names the seat bypass.
 
     /** @scenario Non-interactive copilot run with no pinned mode resolves to direct OTLP */
     it("defaults copilot to ingestion on non-TTY runs (billing neutrality)", async () => {

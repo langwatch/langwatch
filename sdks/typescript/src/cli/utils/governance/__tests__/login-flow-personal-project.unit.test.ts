@@ -1,9 +1,6 @@
 /**
- * Device login persists the personal project delivered by /exchange, so data
- * commands authenticate with zero env vars from the very first post-login
- * command, no lazy exchange needed. Older servers omit the field and the
- * config simply carries none.
- *
+ * Device login persists the personal project from /exchange, so data
+ * commands authenticate with zero env vars from the first post-login command.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

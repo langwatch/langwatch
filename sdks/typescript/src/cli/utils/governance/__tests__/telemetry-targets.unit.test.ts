@@ -1,8 +1,7 @@
 /**
  * The logout scan surface: `scanTelemetryTargets()` must find every place
- * `langwatch <tool>` persisted telemetry wiring and remove exactly those
- * regions. Exercised against a real temp HOME with each target seeded the
- * same way the install path writes it.
+ * `langwatch <tool>` persisted wiring and remove exactly those regions.
+ * Exercised against a real temp HOME, seeded the way install writes it.
  */
 
 import type * as ChildProcessModule from "node:child_process";

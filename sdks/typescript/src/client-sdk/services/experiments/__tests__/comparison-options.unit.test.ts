@@ -1,7 +1,6 @@
 /**
- * The options a caller passes to Experiment.compare(), and the judge settings
- * each one maps onto.
- *
+ * The options a caller passes to Experiment.compare(), and the judge
+ * settings each one maps onto.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

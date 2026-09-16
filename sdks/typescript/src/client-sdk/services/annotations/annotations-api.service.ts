@@ -23,9 +23,8 @@ export type DeleteAnnotationResponse = { status?: string; message?: string };
 
 /**
  * The delete endpoint's `application/json` content is `unknown` in the
- * document (the generator no longer names it as a component schema), so the
- * shape this service promises callers is verified at runtime rather than
- * assumed.
+ * document (the generator no longer names it as a component schema), so
+ * the shape this service promises is verified at runtime, not assumed.
  */
 function isDeleteAnnotationResponse(value: unknown): value is DeleteAnnotationResponse {
   if (typeof value !== "object" || value === null) return false;

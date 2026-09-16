@@ -1,13 +1,7 @@
 /**
- * A support agent connected to LangWatch simulations.
- *
- * Run it with `npx tsx support-agent.ts`. The wrapper opens one outbound
- * connection to LangWatch, the agent shows as Online in Agent Testing, and
- * every simulation turn reaches `supportAgent` below. Ctrl-C deregisters it.
- *
- * Environment: LANGWATCH_API_KEY (required), OPENAI_API_KEY (required),
- * LANGWATCH_ENDPOINT (self-hosted), APP_ENV or LANGWATCH_AGENT_ENVIRONMENT
- * (default development, a personal agent scoped to your key).
+ * A support agent connected to LangWatch simulations (`npx tsx
+ * support-agent.ts`) -- shows as Online in Agent Testing; routes every turn
+ * to `supportAgent` below. Requires LANGWATCH_API_KEY, OPENAI_API_KEY.
  */
 import { openai } from "@ai-sdk/openai";
 import { generateText, type ModelMessage } from "ai";

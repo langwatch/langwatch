@@ -6,10 +6,9 @@ import {
 } from "../virtual-keys-api.service";
 
 /**
- * `GET /api/gateway/v1/virtual-keys` serves one page plus a cursor, and it
- * filters each page for visibility AFTER reading it. A short page therefore
- * says nothing about the end of the walk, which is why only a null cursor
- * stops it.
+ * `GET /api/gateway/v1/virtual-keys` filters each page for visibility
+ * AFTER reading it, so a short page says nothing about the end of the
+ * walk -- only a null cursor stops it.
  */
 
 const mockFetch = vi.fn();

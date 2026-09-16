@@ -1,23 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Compiles the `langwatch` CLI into a single self-contained native binary with
- * Bun (`bun build --compile`).
- *
- * WHY: the Langy agent's ONLY interface to LangWatch is shelling out to the
- * `langwatch` CLI, so every tool call the model makes is a fresh process spawn.
- * Under Node that costs ~120-190ms of interpreter + module-graph boot before a
- * single line of our code runs, and the agent makes several CLI calls per turn.
- * A Bun-compiled binary embeds a pre-parsed bytecode snapshot of the whole
- * bundle, which collapses that to single-digit milliseconds.
- *
- * This is ADDITIVE. The `tsup` build (`pnpm build`) remains the way the npm
- * package is produced and is what contributors and CI use; this script only
- * produces an extra artifact for the Langy worker image. Keep the two in step:
- * the `define` and the inlined workspace package below mirror tsup.config.ts.
- *
- * Usage:
- *   bun run build:binary                      # host platform
- *   bun run build:binary -- --target=bun-linux-arm64 --outfile=dist/bin/langwatch
+ * Compiles the `langwatch` CLI into a native binary (`bun build --compile`)
+ * so Langy's per-tool-call CLI spawn boots in single-digit ms, not Node's
+ * ~150ms. Keep this script's `define`/inlined package in step with tsup.config.ts.
  */
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";

@@ -1,10 +1,7 @@
 /**
- * The vocabulary the management REST families share on the wire.
- *
- * A role binding grants a scoped role, and the same three words appear on
- * roles, role bindings, groups, teams and API keys. Declared once here so the
- * CLI's flag parsers validate against one list rather than five copies that
- * can disagree with the platform.
+ * The vocabulary the management REST families share on the wire: the same
+ * three words appear on roles, bindings, groups, teams and API keys.
+ * Declared once so flag parsers validate against one list, not five.
  */
 
 /** The role a binding grants at its scope. `CUSTOM` defers to a custom role. */

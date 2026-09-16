@@ -11,10 +11,9 @@ import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
- * Returns the secret's metadata rather than printing it: the output port
- * renders it in whatever format the caller asked for (utils/output.ts). The
- * endpoint never returns the VALUE — that is what the human view's closing
- * note says — so the raw record is metadata only and safe as a payload.
+ * Returns the secret's metadata rather than printing it (output port
+ * renders per-format). The endpoint never returns the VALUE, so the raw
+ * record is metadata only and safe as a payload.
  */
 export const getSecretCommand = async (id: string): Promise<CommandResult | void> => {
   const credentials = await resolveCredentials();

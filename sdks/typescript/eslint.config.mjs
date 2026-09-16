@@ -9,12 +9,9 @@ const config = tseslint.config(
       "coverage/**",
       "examples/**",
       "**/generated/**",
-      // Dev-only helpers, ignored BY NAME rather than by a
-      // `scripts/**/*.mjs` glob. That glob also silenced
-      // scripts/generate-skills-bundle.mjs, which is build-critical:
-      // copy-types.sh runs it on every install and build, and its output
-      // is compiled into the published tarball and all five release
-      // binaries. It is linted (untyped) by the block below instead.
+      // Ignored BY NAME, not by a `scripts/**/*.mjs` glob -- that glob also
+      // silenced generate-skills-bundle.mjs, which is build-critical and must
+      // stay linted (untyped, by the block below).
       "scripts/profile-startup.mjs",
       "scripts/startup-require-hook.cjs",
     ],

@@ -24,11 +24,9 @@ const SCOPE_KINDS: BudgetScopeKind[] = [
 ];
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `data` is the raw
- * budget list plus the server's spend_available flag, so a machine caller
- * keeps the full scope ids the table truncates, the exact decimal amounts it
- * rounds, and the honesty signal about whether spend was totalled at all.
+ * Returns the listing rather than printing it (output port renders
+ * per-format). `data` keeps the full scope ids, exact decimals, and the
+ * spend_available honesty flag that the table truncates/rounds/omits.
  */
 export const listGatewayBudgetsCommand = async (
   options: ListGatewayBudgetsOptions = {},

@@ -5,13 +5,9 @@ export class ApiHelpers {
   constructor(private readonly langwatch: LangWatch) {}
 
   /**
-   * Delete test prompts and surface deletion errors.
-   *
-   * When `handles` is omitted, deletes every prompt starting with
-   * PROMPT_NAME_PREFIX. **Avoid the prefix path in parallel test files** —
-   * vitest runs e2e files in parallel, and a prefix-wide cleanup in one
-   * file's afterAll will delete prompts another file is still using.
-   * Prefer passing the per-file set of handles you actually created.
+   * Delete test prompts. Omitting `handles` deletes every PROMPT_NAME_PREFIX
+   * match -- avoid this in parallel e2e files, since one file's cleanup can
+   * delete prompts another file still uses. Pass explicit handles instead.
    */
   cleanUpTestPrompts = async (handles?: string[]) => {
     const targets =

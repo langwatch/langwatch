@@ -1,9 +1,7 @@
 /**
- * refreshClaudeUserTelemetryEnv — re-syncs the langwatch-authored env block
- * in ~/.claude/settings.json to the current run's endpoint + key (latest
- * login wins, #6202). Only touches a block that's already present AND
- * langwatch-shaped; a user's own OTLP wiring under the same key names is
- * left alone.
+ * refreshClaudeUserTelemetryEnv: re-syncs the langwatch-authored env block
+ * in ~/.claude/settings.json to the run's endpoint+key (latest login wins,
+ * #6202). Only touches an already-present, langwatch-shaped block.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

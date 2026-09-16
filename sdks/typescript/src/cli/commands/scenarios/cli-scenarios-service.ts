@@ -3,10 +3,9 @@ import { createLangWatchApiClient } from "@/internal/api/client";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../utils/governance/surface";
 
 /**
- * The scenarios API service for CLI commands. It declares the CLI surface on
- * every request, so a scenario save made from the command line is recorded
- * with the command line as its author in the scenario's version history.
- *
+ * The scenarios API service for CLI commands: declares the CLI surface on
+ * every request, so a scenario saved from the command line is recorded with
+ * the command line as its author in the version history.
  * @see specs/scenarios/scenario-versioning.feature
  */
 export function createCliScenariosService(): ScenariosApiService {

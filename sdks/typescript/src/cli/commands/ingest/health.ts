@@ -4,12 +4,9 @@ import { getSourceHealth } from "@/cli/utils/governance/cli-api";
 import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
- * `langwatch ingest health <sourceId> [--json]`
- *
- * One-shot health snapshot for an IngestionSource: events received in
- * the last 24h / 7d / 30d, plus the timestamp of the most recent
- * successful event. Wraps `sourceHealthMetrics`, the same query the
- * per-source detail page's metric strip uses.
+ * `langwatch ingest health <sourceId> [--json]`: one-shot snapshot of events
+ * received in the last 24h/7d/30d plus the latest success timestamp. Wraps
+ * `sourceHealthMetrics`, the same query the per-source detail page uses.
  */
 export async function ingestHealthCommand(
   sourceId: string,

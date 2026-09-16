@@ -1,10 +1,7 @@
 /**
- * Integration tests for platform evaluations API (Evaluations V3)
- *
- * These tests require:
- * - LANGWATCH_ENDPOINT=http://localhost:5560 (or your backend URL)
- * - LANGWATCH_API_KEY set with a valid API key
- * - A saved evaluation with slug "test-evaluation" (or TEST_EVALUATION_SLUG env var)
+ * Integration tests for platform evaluations API (Evaluations V3). Needs
+ * LANGWATCH_ENDPOINT, LANGWATCH_API_KEY, and a saved evaluation with slug
+ * "test-evaluation" (or TEST_EVALUATION_SLUG).
  */
 
 import { describe, it, expect, beforeAll } from "vitest";

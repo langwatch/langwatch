@@ -1,9 +1,7 @@
 /**
- * `prompt list` under `--limit`, the paging flag every other list command takes.
- *
- * Without it the command answered "unknown option '--limit'", which is where a
- * caller that has used `experiment list` starts, and what sent one agent off to
- * write its own reader instead.
+ * `prompt list` under `--limit`, the paging flag every other list command
+ * takes. Without it the command answered "unknown option '--limit'", which
+ * sent one agent off to write its own reader instead.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

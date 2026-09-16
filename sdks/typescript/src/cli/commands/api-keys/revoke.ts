@@ -6,11 +6,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the revocation result rather than printing it: the output port
- * renders it in whatever format the caller asked for (utils/output.ts).
- *
- * The service answers a bare `{ success }`, which tells a machine caller
- * nothing about WHICH key was revoked, so the id is carried alongside it.
+ * Returns the revocation result rather than printing it (output port renders
+ * per-format). The service answers a bare `{ success }`, so the id is carried
+ * alongside it for a machine caller.
  */
 export const revokeApiKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();

@@ -1,14 +1,7 @@
 /**
- * Guardrail Example - Real-time Evaluation for Safety
- *
- * This example demonstrates how to use langwatch.evaluations.evaluate()
- * to run guardrails in real-time, blocking or modifying responses
- * based on evaluation results.
- *
- * The guardrail runs within a traced span, so it appears connected
- * to the parent trace in the LangWatch dashboard.
- *
- * Run with: npm run start:guardrail
+ * Guardrail Example: uses langwatch.evaluations.evaluate() in real time to
+ * block or modify responses. Runs within a traced span, so it appears
+ * connected to the parent trace in the dashboard. Run: npm run start:guardrail
  */
 
 import "dotenv/config";

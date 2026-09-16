@@ -7,10 +7,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the LangWatchQL analytics schema rather than printing it: the
- * output port renders it in whatever format the caller asked for
- * (utils/output.ts). This is the discovery step an agent runs before writing
- * chart SQL — dataset and column names come from here, never from guessing.
+ * Returns the LangWatchQL analytics schema rather than printing it (output
+ * port renders per-format). The discovery step an agent runs before writing
+ * chart SQL -- dataset and column names come from here, never guessing.
  */
 export const chartSchemaCommand = async (options?: {
   project?: string;

@@ -135,7 +135,8 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
         { callbacks: [tracingCallback] },
       );
 
-      expect(result.output).toContain(date.split(".")[0]); // Ignore milliseconds due to span processing
+      // Ignore milliseconds due to span processing
+      expect(result.output).toContain(date.split(".")[0]);
     });
 
     await spanProcessor.forceFlush();

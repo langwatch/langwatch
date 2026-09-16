@@ -1,8 +1,6 @@
 /**
- * The session context hook entries in the hook file of each agent that takes
- * command hooks: the merge, the ownership rule that keeps a user's own hooks
- * out of it, and the removal logout drives.
- *
+ * The session context hook entries in each agent's hook file: the merge,
+ * ownership rule, and the removal logout drives.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

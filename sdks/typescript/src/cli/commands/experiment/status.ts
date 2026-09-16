@@ -74,11 +74,8 @@ export interface ExperimentStatusOptions {
   runId?: string;
   /**
    * Keep reading until the run reaches a terminal state or the limit is up.
-   *
-   * The alternative callers reach for is `sleep 30; langwatch experiment
-   * status`, which is one command that prints nothing for half a minute: an
-   * agent driving a page shows the sleep as the work in progress, and a turn
-   * that ends while it is open loses the run it was waiting for.
+   * The alternative, `sleep 30; langwatch experiment status`, shows as idle
+   * progress and can lose the run if a turn ends mid-sleep.
    */
   wait?: boolean;
   /** Seconds to keep waiting for, as the CLI hands it over. */

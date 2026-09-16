@@ -1,9 +1,4 @@
-/**
- * End-to-end tests for basic span ingestion
- *
- * These tests validate that spans are correctly created, configured, and sent to LangWatch.
- * Focused on sanity checks for common metadata, name, type, etc.
- */
+/** E2E tests validating spans are correctly created, configured and sent to LangWatch. */
 
 import { describe, it, expect } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";

@@ -1,10 +1,9 @@
 import type { ExperimentRunResult } from "./platformTypes";
 
 /**
- * Print a CI-friendly summary of experiment results to stdout.
- *
- * Shared between platform runs (`langwatch.experiments.run`) and SDK-driven
- * experiments (`langwatch.experiments.init` → `experiment.printSummary()`).
+ * Prints a CI-friendly summary of experiment results to stdout. Shared
+ * between platform runs (`experiments.run`) and SDK-driven experiments
+ * (`experiments.init` → `experiment.printSummary()`).
  */
 export function printSummary(result: Omit<ExperimentRunResult, "printSummary" | "toString">): void {
   const { runId, status, passed, failed, passRate, duration, runUrl, summary } = result;

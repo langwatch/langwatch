@@ -13,12 +13,9 @@ type TeamMemberRow = {
 };
 
 /**
- * One row per person, listing every role they hold on the team.
- *
- * The endpoint answers with the team's bindings, and somebody may hold more
- * than one role at the same scope: their permissions are the union of all of
- * them. Printed straight through, that reads as the same person joining the
- * team twice, and a count of people that is not a count of people.
+ * One row per person, listing every role they hold on the team. Printed
+ * straight through, the endpoint's per-binding rows would show one person
+ * twice and turn a count of people into something else.
  */
 const membersByPerson = (rows: TeamMemberRow[]): (TeamMemberRow & { roles: string[] })[] => {
   const byUser = new Map<string, TeamMemberRow & { roles: string[] }>();

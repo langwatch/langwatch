@@ -13,12 +13,9 @@ const PREVIEW_LIMIT = 10;
 const MAX_CELL_LENGTH = 50;
 
 /**
- * The previewed records, shaped for `formatTable`.
- *
- * Dataset rows are free-form, so the header set is the UNION of every key seen
- * in the preview window rather than the first row's keys — otherwise a row with
- * an extra field renders that field nowhere. Cells are truncated because a
- * single oversized value would push every other column off the terminal.
+ * The previewed records, shaped for `formatTable`. Dataset rows are
+ * free-form, so headers are the UNION of every key seen in the window, not
+ * just the first row's -- otherwise an extra field renders nowhere.
  */
 const buildDatasetPreviewRows = (
   entries: readonly { entry: Record<string, unknown> }[],

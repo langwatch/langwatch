@@ -132,13 +132,9 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
     }
   }
 
-  // Said once, here, because this is where the endpoint that will carry the
-  // key is settled for every wire the command is about to write: the tool's
-  // own OTel exporter and the session context hook both post this bearer to
-  // this URL. A pinned `--endpoint`, a self-hosted control plane, either way
-  // the key travels the same way, so the scheme is worth one line. It is a
-  // warning and not a refusal: a private network on plain http is a real
-  // deployment, and refusing it would take its telemetry and protect nothing.
+  // Warned once here, where the endpoint every wire will post the key to is
+  // settled. Warning, not refusing: a private network on plain http is a
+  // real deployment, and refusing would take its telemetry and protect nothing.
   if (sendsIngestKeyInClear(credential.endpoint)) {
     process.stderr.write(
       `${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`,

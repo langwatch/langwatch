@@ -1,10 +1,7 @@
 /**
- * The telemetry seam — the reason daemon mode exists, not a side benefit. A
- * short-lived CLI process can't emit useful telemetry (it would have to
- * flush a fresh exporter synchronously before exit, losing spans and
- * mid-flight progress); a daemon holds one long-lived exporter instead, for
- * Langy's live-progress UI. Ships only the seam: `DaemonTelemetry` is the
- * interface a real exporter implements, injected via `createDaemonServer`.
+ * The telemetry seam -- the reason daemon mode exists, not a side benefit.
+ * A short-lived CLI can't flush an exporter without losing spans; a daemon
+ * holds one long-lived exporter instead, injected via `createDaemonServer`.
  */
 
 export interface DaemonRequestStartedEvent {

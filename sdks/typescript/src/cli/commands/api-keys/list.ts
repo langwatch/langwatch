@@ -7,10 +7,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `ApiKeyInfo` carries
- * no token material — a token exists only in the create response — so the raw
- * list is safe to hand to a machine caller.
+ * Returns the listing rather than printing it (output port renders per-format).
+ * `ApiKeyInfo` carries no token material -- a token exists only in the create
+ * response -- so the raw list is safe for a machine caller.
  */
 export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

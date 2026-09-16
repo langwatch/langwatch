@@ -1,9 +1,7 @@
 /**
- * The command catalog builder: the one structure behind `langwatch commands`,
- * `langwatch help-tree`, and the `status` cheat-sheet. The tree comes from
- * the live commander program, the hints/skills from the embedded feature map
- * — these tests pin both directions of that join so the catalog can never
- * silently drift from what the CLI registers or the map declares.
+ * The command catalog builder behind `commands`, `help-tree`, and `status`.
+ * Tree from the live commander program, hints/skills from the feature map --
+ * these tests pin both directions so the catalog can't silently drift.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildProgram } from "../../program";

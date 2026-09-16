@@ -71,10 +71,9 @@ const EVALUATION_STATUS_COLOR: Record<SimulationRunEvaluation["status"], (text: 
   };
 
 /**
- * One line per evaluator that ran after the conversation: its status, its
- * score when it produced one, whether it gates the scenario, and the reason
- * it gave. A skipped one names the field the scenario left blank; a failed
- * required one is what failed the scenario.
+ * One line per evaluator that ran: status, score if produced, whether it
+ * gates the scenario, and the reason. A skipped one names the blank field;
+ * a failed required one is what failed the scenario.
  */
 function printEvaluations(evaluations: SimulationRunEvaluation[] | undefined): void {
   if (!evaluations || evaluations.length === 0) return;

@@ -70,12 +70,9 @@ describe("FrameDecoder", () => {
 
   describe("given a multi-byte character split across two socket reads", () => {
     it("decodes it whole instead of resolving each half to U+FFFD", () => {
-      // A socket splits wherever it likes. Decoding each chunk independently
-      // turned a straddling UTF-8 sequence into two replacement characters —
-      // and because the surrounding JSON stayed well-formed, the frame parsed
-      // fine and shipped corrupted argv. `out`/`err` are base64 so they were
-      // safe; the `exec` frame carries raw strings, so `dataset records add
-      // --json '<non-ASCII>'` uploaded mangled records at exit 0.
+      // A socket splits wherever it likes; decoding each chunk independently
+      // corrupted a straddling UTF-8 sequence while the JSON stayed
+      // well-formed, so `exec` frames (raw strings) shipped mangled argv silently.
       const decoder = new FrameDecoder<ClientFrame>();
       const payload = "漢字とカタカナ";
       const frame = Buffer.from(

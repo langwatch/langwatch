@@ -4,12 +4,9 @@ import { getGovernanceStatus } from "@/cli/utils/governance/cli-api";
 import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
- * `langwatch governance status [--json]`
- *
- * Quick org health check showing the persona-routing setup-state
- * OR-of-flags. Mirrors `api.governance.setupState` exactly — same
- * boolean shape that drives the MainMenu Governance entry promotion
- * in the web UI.
+ * `langwatch governance status [--json]`: quick org health check showing the
+ * persona-routing setup-state OR-of-flags. Mirrors `api.governance.setupState`
+ * exactly -- same boolean shape driving the web UI's MainMenu entry promotion.
  */
 export async function governanceStatusCommand(options: { json?: boolean }): Promise<void> {
   const cfg = loadConfig();

@@ -2,10 +2,9 @@ import { uiCallCommand } from "../ui/call";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Read the evaluations workbench as the user sees it right now — unsaved
- * prompt drafts, pending cells and in-memory results included. Sugar over
- * `ui call workbench.getState`, so everything about the channel (needs a
- * running agent turn, answers from the open page) applies here too.
+ * Reads the evaluations workbench live -- unsaved drafts, pending cells and
+ * in-memory results included. Sugar over `ui call workbench.getState`, so
+ * the channel's rules (needs a running agent turn) apply here too.
  */
 export const workbenchGetStateCommand = async (
   experiment: string | undefined,

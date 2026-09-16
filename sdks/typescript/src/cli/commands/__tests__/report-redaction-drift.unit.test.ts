@@ -3,10 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The CLI ships a verbatim mirror of the platform's redaction engine
- * (packages/redaction) so the code agents audit on GitHub is the
- * exact code that scrubs their report. copy-types.sh refreshes the mirror;
- * this test fails when the canonical package changed without regenerating.
+ * The CLI ships a verbatim mirror of the platform's redaction engine so the
+ * code agents audit on GitHub is what scrubs their report. This test fails
+ * when the canonical package changed without copy-types.sh regenerating it.
  */
 const MIRRORED_FILES = ["markers.ts", "secrets.ts", "sessionReport.ts"] as const;
 

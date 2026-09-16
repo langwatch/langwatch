@@ -14,10 +14,9 @@ import { PLUMBING_COMMANDS } from "../utils/commandCatalog";
 const CLI_PROGRAM_PATH = join(__dirname, "../program.ts");
 
 /**
- * The top-level resource words the CLI registers: every
- * `program.command("<word> …")`, whether registered inline or via
- * `const xCmd = program\n  .command(…)`. Sub-commands are registered on the
- * sub-command objects and deliberately not matched.
+ * The top-level resource words the CLI registers -- every
+ * `program.command("<word> …")`, inline or via `const xCmd = program.command(…)`.
+ * Sub-command registrations are deliberately not matched.
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");

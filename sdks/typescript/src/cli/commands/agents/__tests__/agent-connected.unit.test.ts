@@ -1,8 +1,6 @@
 /**
- * The agent commands with a connected agent: the columns the list shows, the
- * parameters and instances the detail shows, and the relay a run goes
- * through.
- *
+ * The agent commands with a connected agent: the columns the list shows,
+ * the parameters/instances the detail shows, and the relay a run goes through.
  * @see specs/typescript-sdk/cli-agents.feature
  */
 import { readFileSync } from "node:fs";

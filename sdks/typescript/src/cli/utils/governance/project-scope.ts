@@ -6,10 +6,8 @@ import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 
 /**
  * Pin a tool's telemetry to a team project: mint a project ingest key
- * (create-only server-side, one per device, so other machines keep
- * theirs) and store it under `tool_project_keys[tool]`. While the pin
- * exists the wrapper and `langwatch instrument` wire the tool with this
- * key and never consult or rewrite the personal path.
+ * (create-only, one per device) and store it under `tool_project_keys[tool]`.
+ * While pinned, the wrapper/`instrument` never touch the personal path.
  */
 export async function pinToolToProject({
   cfg,

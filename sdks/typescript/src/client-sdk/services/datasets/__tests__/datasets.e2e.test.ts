@@ -1,8 +1,6 @@
 /**
- * End-to-end tests for Dataset TypeScript SDK
- *
- * These tests run against a real LangWatch backend.
- * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
+ * End-to-end tests for the Dataset SDK, against a real LangWatch backend.
+ * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { LangWatch } from "@/client-sdk";

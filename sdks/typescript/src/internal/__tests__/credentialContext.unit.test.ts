@@ -1,10 +1,7 @@
 /**
- * The daemon runs concurrent requests in one process, so a resolved per-user
- * key must NOT live in shared `process.env` where an interleaved request
- * could read it — it lives in a per-request holder scope instead. Pins that
- * interleaved scopes observe only their own credential, and that the
- * API-client factory reads the scoped key, falling back to the environment
- * only when unscoped.
+ * The daemon runs concurrent requests in one process, so a resolved
+ * per-user key lives in a per-request holder scope, not shared
+ * `process.env` -- pins interleaved scopes see only their own credential.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

@@ -10,12 +10,9 @@ export interface LocalPromptsServiceConfig {
 }
 
 /**
- * Service for retrieving prompts from local filesystem sources.
- *
- * Searches for prompts in the following priority order:
- * 1. Explicit file mapping in prompts.json config
- * 2. Materialized path from prompts-lock.json
- * 3. Direct file scanning in prompts directory
+ * Retrieves prompts from local filesystem sources, in priority order:
+ * explicit prompts.json mapping, materialized prompts-lock.json path,
+ * then direct scanning of the prompts directory.
  */
 export class LocalPromptsService {
   private readonly fileManager: typeof FileManager;

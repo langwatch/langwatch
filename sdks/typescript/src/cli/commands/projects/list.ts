@@ -7,10 +7,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `data` is the full
- * paginated response, so a machine caller keeps the pagination cursor the
- * table only summarises in its spinner line.
+ * Returns the listing rather than printing it (output port renders
+ * per-format). `data` is the full paginated response, so a machine caller
+ * keeps the cursor the table only summarises in its spinner line.
  */
 export const listProjectsCommand = async (options?: {
   page?: number;

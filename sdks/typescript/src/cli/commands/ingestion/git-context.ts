@@ -57,9 +57,8 @@ export function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): s
 
 /**
  * The name of the linked worktree `directory` sits in, or undefined in the
- * main checkout. A linked worktree is exactly the case where the per-worktree
- * git dir differs from the common one; its name is the directory it is
- * checked out into, which is what people call it.
+ * main checkout (where the per-worktree git dir equals the common one).
+ * The name is just the directory it's checked out into.
  */
 function readWorktreeName({
   directory,

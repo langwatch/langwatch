@@ -1,15 +1,7 @@
 /**
- * Metadata and Labels — REST API Example (No SDK)
- *
- * Demonstrates sending metadata directly via the LangWatch REST API
- * without using the LangWatch TypeScript SDK.
- *
- * This is useful when:
- * - You want full control over trace construction
- * - You're integrating from a non-Node environment (edge, Deno, etc.)
- * - You're debugging or prototyping
- *
- * Run: pnpm run start:rest-api
+ * Metadata and Labels -- REST API Example (No SDK): sends metadata via the
+ * REST API directly, for non-Node environments or full control over trace
+ * construction. Run: pnpm run start:rest-api
  */
 
 const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY!;

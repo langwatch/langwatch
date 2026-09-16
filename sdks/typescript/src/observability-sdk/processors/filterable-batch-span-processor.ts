@@ -1,9 +1,6 @@
 /**
- * Filterable Batch Span Exporter for OpenTelemetry
- *
- * This module provides a BatchSpanProcessor subclass that allows filtering of spans before export
- * based on configurable rules. Spans matching any exclude rule are dropped and not exported.
- *
+ * A BatchSpanProcessor subclass that filters spans before export by
+ * configurable rules -- spans matching any exclude rule are dropped.
  * @module filterable-batch-span-exporter
  */
 

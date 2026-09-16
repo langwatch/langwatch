@@ -1,8 +1,7 @@
 /**
- * The output contract's RESULT rendering, pinned: `printResult` for every
- * format, and the tiny built-in jq subset behind `--jq`. Flag normalisation
- * lives in output-context.unit.test.ts; Commander registration in
- * output-registration.unit.test.ts.
+ * The output contract's RESULT rendering: `printResult` per format, and the
+ * built-in jq subset behind `--jq`. Flag normalisation lives in
+ * output-context.unit.test.ts; Commander registration in output-registration.unit.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AGENT_MODE_ENV_VARS, applyJq, printResult } from "../output";

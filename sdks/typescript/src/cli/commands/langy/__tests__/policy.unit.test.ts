@@ -1,9 +1,7 @@
 /**
- * The permission rules of specs/langy/langy-local-permissions.feature.
- *
- * The table drives one decision per line: the folder is `/work/acme`, the
- * home directory is `/home/dev`, and `realpath` is a fixture map so no test
- * touches the disk. `fs-ops` covers a real symlink.
+ * The permission rules of specs/langy/langy-local-permissions.feature. The
+ * table drives one decision per line (folder `/work/acme`, home `/home/dev`);
+ * `realpath` is a fixture map so no test touches the disk.
  */
 
 import { describe, expect, it } from "vitest";

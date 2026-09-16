@@ -1,9 +1,4 @@
-/**
- * End-to-end tests with real LLM interactions
- *
- * Basic sanity checks for LLM interaction flows.
- * Focused on essential interaction patterns and metadata validation.
- */
+/** E2E sanity checks for real LLM interaction flows and metadata validation. */
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";

@@ -1,9 +1,7 @@
 /**
- * The one way a `langwatch skills …` command rejects bad input.
- *
- * It lives in its own module rather than in `shared.ts` because the installer
- * validates `--dir` too, and `shared.ts` already imports the installer — a
- * cycle the module graph does not need.
+ * The one way a `langwatch skills …` command rejects bad input. Lives in
+ * its own module, not `shared.ts`, because the installer validates `--dir`
+ * too and `shared.ts` already imports the installer -- an avoidable cycle.
  */
 import { commandValidationError } from "../../utils/errorOutput";
 

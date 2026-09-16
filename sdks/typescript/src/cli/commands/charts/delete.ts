@@ -6,10 +6,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the deleted chart's identity rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- * The route answers `204` with no body, so the confirmation carries the id
- * the caller passed — there is no response body to read a name from.
+ * Returns the deleted chart's identity rather than printing it (output port
+ * renders per-format). The route answers `204` with no body, so the
+ * confirmation carries the id the caller passed.
  */
 export const deleteChartCommand = async (
   id: string,

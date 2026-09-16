@@ -4,10 +4,9 @@ import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { LangwatchApiClient } from "@/internal/api/client";
 
 /**
- * The canonical REST envelope a domain refusal answers with (`app/api/shared/schemas.ts`),
- * from `/api/v1/query`. `query_scan_limit_exceeded` is the real ceiling code, mapped from
- * ClickHouse TOO_MANY_ROWS(158)/TOO_MANY_BYTES(307), and answers 422 — a well-formed query
- * refused on a deliberate ceiling, not a malformed or unauthorized one.
+ * The canonical REST envelope `/api/v1/query` answers a domain refusal
+ * with. `query_scan_limit_exceeded` maps from ClickHouse
+ * TOO_MANY_ROWS(158)/TOO_MANY_BYTES(307) and answers 422, not 400/401.
  */
 const scanCeilingBody = {
   error: {

@@ -1,7 +1,6 @@
 /**
  * When the healer may re-mint a personal ingest key, and what it rewrites
  * when it does.
- *
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { describe, expect, it, vi } from "vitest";

@@ -14,10 +14,9 @@ import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Resolves a widget reference (id or name) to the widget it names.
- *
- * Tries it as an id first — the common case, and the cheapest — then falls
- * back to a name match across the project's widgets.
+ * Resolves a widget reference (id or name) to the widget it names. Tries it
+ * as an id first (cheapest), then falls back to a name match across the
+ * project's widgets.
  */
 async function resolveWidgetRef({
   widgets,

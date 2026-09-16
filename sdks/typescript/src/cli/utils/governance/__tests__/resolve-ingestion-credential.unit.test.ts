@@ -1,7 +1,6 @@
 /**
- * Credential resolution for Path B: a project pin wins and is used
- * verbatim with no server round trip; a hand-pasted foreign secret in
- * the personal cache is pinned too (never probed, never re-minted);
+ * Credential resolution for Path B: a project pin wins verbatim, no round
+ * trip; a hand-pasted foreign secret is pinned too (never probed/re-minted);
  * only a personal `ik-lw-` cache entry is liveness-checked.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

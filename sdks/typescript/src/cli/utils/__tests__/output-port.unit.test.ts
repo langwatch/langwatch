@@ -1,8 +1,7 @@
 /**
- * The output PORT, pinned: a command returns data, the port picks the format.
- * Every test guards against answering a machine caller with human text — or a
- * fabricated value — at exit 0: invisible by construction, so it must not be
- * invisible to the suite either.
+ * The output PORT: a command returns data, the port picks the format. Every
+ * test guards against answering a machine caller with human text -- or a
+ * fabricated value -- at exit 0, invisible by construction.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";

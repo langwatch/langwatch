@@ -1,10 +1,7 @@
 /**
- * `workflow run` has two things that can throw `SyntaxError`, from opposite
- * parties: `JSON.parse(options.input)` is the CALLER's mistake, `await
- * response.json()` is the SERVER's. They used to share one `try/catch` that
- * mapped both to `--input must be valid JSON`, sending a caller with a
- * malformed 200-body to debug the wrong side of the wire — so the two paths
- * are tested separately here.
+ * `workflow run` has two `SyntaxError` sources: `JSON.parse(options.input)`
+ * is the CALLER's mistake, `response.json()` is the SERVER's. They used to
+ * share one message, sending a caller to debug the wrong side of the wire.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 

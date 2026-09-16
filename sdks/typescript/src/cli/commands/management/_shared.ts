@@ -30,11 +30,9 @@ export interface RunManagementParams<T> {
 }
 
 /**
- * Run one management API call and return it as a `CommandResult`.
- *
- * `data` is the response verbatim, never a projection, so `-o json` gives a
- * scripted caller exactly what the API said, which is the whole point of the
- * machine format.
+ * Run one management API call and return it as a `CommandResult`. `data` is
+ * the response verbatim, never a projection, so `-o json` gives a scripted
+ * caller exactly what the API said.
  */
 export const runManagement = async <T>({
   action,

@@ -1,15 +1,7 @@
 /**
- * Metadata and Labels Example
- *
- * Demonstrates ALL metadata fields supported by LangWatch:
- * - gen_ai.conversation.id (OTEL semconv, primary)
- * - langwatch.thread.id (legacy alias)
- * - langwatch.user.id
- * - langwatch.customer.id
- * - langwatch.labels (JSON array)
- * - metadata attribute (custom JSON object)
- *
- * Run: pnpm start
+ * Metadata and Labels Example: demonstrates every metadata field LangWatch
+ * supports (gen_ai.conversation.id is the primary OTel semconv; thread/user/
+ * customer id, labels and the metadata attribute are the rest). Run: pnpm start
  */
 
 import { getLangWatchTracer } from "langwatch";

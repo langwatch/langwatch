@@ -51,10 +51,9 @@ const readTextFile = (path: string, label: string): string => {
 };
 
 /**
- * Reads the queries file: a JSON array of `{ name, sql, parameters? }`. The
- * shape is checked by the platform's versioned schema on save — this only
- * refuses input that is not an array of objects, so a plain typo (an object,
- * a bare string) fails before a request rather than as a server rejection.
+ * Reads the queries file: a JSON array of `{ name, sql, parameters? }`. Only
+ * refuses input that isn't an array of objects -- the platform's versioned
+ * schema checks the rest on save.
  */
 const readQueriesFile = (path: string): DashboardWidgetQueryInput[] => {
   const raw = readTextFile(path, "queries");

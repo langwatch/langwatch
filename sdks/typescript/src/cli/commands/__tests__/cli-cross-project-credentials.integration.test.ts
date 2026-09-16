@@ -1,7 +1,6 @@
 /**
  * Which credential a data command authenticates with after `langwatch login`,
  * and which project that credential names when no flag says otherwise.
- *
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { describe, expect, it } from "vitest";

@@ -36,10 +36,9 @@ export interface WiringInstallResult {
   /** Set when a target could not be written (unsupported shell, fs error). */
   warnings: string[];
   /**
-   * Set when a companion write the wiring depends on failed. Unlike a
-   * warning, this means the install did not do what it says: the caller
-   * must report a failure rather than a wired tool. Anything already
-   * written that would be unsafe on its own is undone before this is set.
+   * Set when a companion write the wiring depends on failed -- unlike a
+   * warning, this means the install did not do what it says. Anything
+   * already written that would be unsafe alone is undone before this is set.
    */
   requiredFailures: string[];
 }

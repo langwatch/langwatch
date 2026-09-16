@@ -156,11 +156,8 @@ function normalizeSpanArgs(args: any[]) {
 }
 
 /**
- * Injects `langwatch.origin = "application"` into span options unless
- * the caller already provided a `langwatch.origin` attribute.
- *
- * This ensures regular application traces are explicitly tagged,
- * while experiments (which set `langwatch.origin = "evaluation"`) are not overridden.
+ * Injects `langwatch.origin = "application"` into span options unless the
+ * caller already set one -- so experiments (`"evaluation"`) aren't overridden.
  */
 function withDefaultOrigin(options?: SpanOptions): SpanOptions {
   const existing = options?.attributes?.["langwatch.origin"];

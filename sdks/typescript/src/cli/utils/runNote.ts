@@ -13,12 +13,9 @@ export const MAX_RUN_NOTE_LENGTH = 200;
 export const NOTE_FLAG_HELP = `Why this run is being started: its hypothesis or commit message. Up to ${MAX_RUN_NOTE_LENGTH} characters.`;
 
 /**
- * The note a run records, or nothing.
- *
- * A note of only spaces is no note: sending an empty string would store a
- * value every reader then has to filter out. A note that is too long ends the
- * command before anything is scheduled, so the caller can shorten it and run
- * once, rather than finding the refusal after a batch already started.
+ * The note a run records, or nothing. Spaces-only is no note -- an empty
+ * string would store a value every reader must filter. Too long ends the
+ * command before anything is scheduled, not after a batch already started.
  */
 export const parseRunNoteFlag = ({ note }: { note: string | undefined }): string | undefined => {
   const trimmed = note?.trim();

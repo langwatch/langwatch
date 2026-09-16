@@ -1,8 +1,7 @@
 /**
- * The device label rides on server-minted credentials (personal VKs,
- * project ingest keys) so an admin revoking one can tell which machine
- * it belongs to. It must stay server-safe: lowercase [a-z0-9-], short,
- * and free of the raw hostname's noise (mDNS suffixes, underscores).
+ * The device label rides on server-minted credentials so an admin revoking
+ * one can tell which machine it belongs to. Must stay server-safe:
+ * lowercase [a-z0-9-], short, free of hostname noise (mDNS, underscores).
  */
 import type * as osType from "node:os";
 

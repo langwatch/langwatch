@@ -10,7 +10,6 @@ import { validateDataCaptureMode } from "./features/data-capture/utils.js";
 
 /**
  * Configuration options for the LangWatch Observability SDK.
- *
  * @property logger - The logger instance to use for SDK logging.
  * @property dataCapture - Config for automatic data capture (string, function, or object).
  */

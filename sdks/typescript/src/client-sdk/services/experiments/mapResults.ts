@@ -1,10 +1,7 @@
 /**
- * Maps the platform `/runs/{runId}/results` response (ExperimentRunWithItems)
- * into per-row results.
- *
- * Mirrors the python SDK's `_build_df_from_platform`: dataset entries become the
- * base rows (one per entry, i.e. one per target in multi-target runs), and
- * evaluations are joined onto those rows on `(index, targetId)`.
+ * Maps the platform `/runs/{runId}/results` response into per-row results,
+ * mirroring the python SDK's `_build_df_from_platform`: dataset entries
+ * become base rows, and evaluations join on `(index, targetId)`.
  */
 
 import type { ExperimentRunResultsResponse } from "./experiments-api.service";

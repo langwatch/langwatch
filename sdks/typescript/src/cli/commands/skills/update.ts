@@ -1,8 +1,7 @@
 /**
- * `langwatch skills update [names...] [--dir] [--dry-run]` — refresh
- * installed skills whose content differs from the bundle (e.g. after the CLI
- * itself was upgraded to a newer bundle). Only managed files are
- * overwritten; with no names, every installed skill is a candidate.
+ * `langwatch skills update [names...] [--dir] [--dry-run]`: refreshes
+ * installed skills whose content differs from the bundle. Only managed
+ * files are overwritten; with no names, every installed skill is a candidate.
  */
 import * as fs from "node:fs";
 import { printResult, type RawOutputFlags } from "../../utils/output";

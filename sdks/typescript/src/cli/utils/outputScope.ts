@@ -41,10 +41,9 @@ export const getOutputFormat = (): CliOutputFormat =>
   scopeStorage.getStore()?.format ?? ambientFormat;
 
 /**
- * The format to render a failure in: what the caller explicitly said, else what
- * the running command was invoked with. The explicit argument wins so a command
- * that already holds its own `--format` (and a test that passes one) does not
- * depend on the program hook having run.
+ * The format to render a failure in: what the caller explicitly said, else
+ * what the command was invoked with. Explicit wins so a command with its
+ * own `--format` doesn't depend on the program hook having run.
  */
 export const resolveOutputFormat = (explicit?: string): CliOutputFormat => {
   if (explicit === undefined) return getOutputFormat();

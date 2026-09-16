@@ -163,11 +163,9 @@ describe("experimentStatusCommand()", () => {
   });
 
   /**
-   * Waiting used to be the caller's job, written as `sleep 30; langwatch
-   * experiment status`. That is one command that prints nothing for half a
-   * minute, so an agent driving a page showed the sleep as the work in
-   * progress, and a turn that ended while it was open lost the run it was
-   * waiting for. The command waits for itself now.
+   * Waiting used to be the caller's job (`sleep 30; langwatch experiment
+   * status`), which showed as idle progress and could lose the run if a
+   * turn ended mid-sleep. The command waits for itself now.
    */
   describe("given the caller asks to wait for the run", () => {
     /** @scenario "Waiting for a run returns as soon as the run reaches a terminal state" */

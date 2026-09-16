@@ -57,12 +57,9 @@ const confirmProceed = async (question: string): Promise<boolean> => {
 };
 
 /**
- * `langwatch logout` — the full un-wire. Revokes + clears the device
- * session (unless --keep-credentials) AND discovers and removes every
- * langwatch-authored telemetry block across the wrapped tools. Scans
- * first, shows exactly what it found, confirms (unless --yes), then
- * removes; only marker-bracketed blocks / known key sets are touched, so
- * surrounding user config is preserved.
+ * `langwatch logout`: revokes/clears the device session (unless
+ * --keep-credentials) and removes every langwatch-authored telemetry block
+ * -- scan, confirm (unless --yes), remove; only marker-bracketed blocks are touched.
  */
 export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> => {
   const present = scanTelemetryTargets().filter((t) => t.present);

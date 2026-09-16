@@ -15,10 +15,9 @@ export interface UpdateRoleOptions {
 }
 
 /**
- * Update a custom role. Partial, except for the permissions: a `--permission`
- * list REPLACES the set outright, because a role is defined by exactly what it
- * grants and adding to it silently would leave nobody able to say what the
- * role means.
+ * Updates a custom role. Partial, except permissions: `--permission`
+ * REPLACES the set outright -- a role is defined by exactly what it grants,
+ * so adding silently would leave nobody able to say what it means.
  */
 export const updateRoleCommand = async ({
   id,

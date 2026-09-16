@@ -22,12 +22,9 @@ export interface UpdateApiKeyOptions {
 }
 
 /**
- * Update an API key's name, description and the access it carries. The access
- * is the reason this command exists.
- *
- * `--binding` REPLACES the key's bindings with exactly the ones given: a key's
- * reach is the set of bindings it holds, and a flag that only added would make
- * "tighten this key" impossible to express.
+ * Updates an API key's name, description and access. `--binding` REPLACES
+ * the key's bindings with exactly the ones given -- an additive flag would
+ * make "tighten this key" impossible to express.
  */
 export const updateApiKeyCommand = async ({
   id,

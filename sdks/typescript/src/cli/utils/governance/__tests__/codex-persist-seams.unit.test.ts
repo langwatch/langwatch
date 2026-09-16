@@ -1,8 +1,7 @@
 /**
- * Every seam writing the `[otel]` block must install the turn harvest beside
- * it. Reads CLI source rather than exercising the seams: the defect is a
- * missing call at a call site that doesn't exist yet, invisible to any test of
- * the seams we already have.
+ * Every seam writing the `[otel]` block must install the turn harvest
+ * beside it. Reads CLI source rather than exercising the seams: a missing
+ * call at a not-yet-existing call site is invisible to any test of the rest.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

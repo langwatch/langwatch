@@ -1,10 +1,7 @@
 /**
- * End-to-end tests for metadata and labels
- *
- * Tests that all metadata fields (user_id, thread_id, customer_id, labels,
- * custom metadata) are correctly ingested via both:
- * 1. SDK (OpenTelemetry span attributes)
- * 2. REST API (direct HTTP POST to /api/collector)
+ * E2E tests for metadata and labels: all fields (user_id, thread_id,
+ * customer_id, labels, custom metadata) ingested correctly via both the
+ * SDK (OTel span attributes) and the REST API (POST to /api/collector).
  */
 
 import { describe, it, expect } from "vitest";

@@ -1,9 +1,7 @@
 /**
- * What the LangWatch Claude Code plugin seam reads off disk, and what it makes of a `claude`
- * binary that may or may not understand plugins at all. `node:child_process` is the only thing
- * mocked — every file the module reads is a real file under a temp HOME, so state parsing is
- * exercised against the shapes Claude Code actually writes.
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * What the LangWatch Claude Code plugin seam reads off disk, and what it
+ * makes of a `claude` that may not understand plugins. Only child_process is
+ * mocked; every other file read is real, under a temp HOME.
  */
 
 import * as fs from "node:fs";

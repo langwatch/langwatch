@@ -1,7 +1,6 @@
 /**
  * Where `--project` moves a data command, by id and by slug, and how the
  * selected project reaches the commands that assemble their own request.
- *
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { describe, expect, it } from "vitest";

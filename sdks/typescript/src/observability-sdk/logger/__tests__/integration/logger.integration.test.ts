@@ -45,12 +45,9 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   /**
-   * Starts observability against a fresh in-memory exporter. `langwatch:
-   * "disabled"` keeps the real exporter out of the test; a fresh exporter and
-   * processor per test avoids one test's shutdown silencing the others (a
-   * handle's shutdown shuts down its processors too); `disableAutoShutdown`
-   * skips the beforeExit/SIGINT/SIGTERM handlers that leak three listeners per
-   * start and would otherwise trip Node's MaxListeners warning across the suite.
+   * Starts observability against a fresh in-memory exporter/processor per
+   * test, so one test's shutdown can't silence another's. `disableAutoShutdown`
+   * skips process-exit handlers that would otherwise leak listeners across the suite.
    */
   function startObservability({
     dataCapture,

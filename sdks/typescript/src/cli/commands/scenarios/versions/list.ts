@@ -7,11 +7,9 @@ import type { CommandResult } from "../../../utils/output";
 import { createCliScenariosService } from "../cli-scenarios-service";
 
 /**
- * The saved versions of a scenario, newest first.
- *
- * A scenario saved before versions were recorded closes its history with a
- * Created entry that has no snapshot to read back.
- *
+ * The saved versions of a scenario, newest first. A scenario saved before
+ * versions were recorded closes its history with a Created entry that has
+ * no snapshot to read back.
  * @see specs/scenarios/scenario-versioning.feature
  */
 export const listScenarioVersionsCommand = async (

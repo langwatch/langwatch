@@ -1,9 +1,6 @@
 /**
- * The `--evaluator` family: references resolved against the platform, the
- * mappings inferred from the evaluator's inputs and the suite's fields, the
- * gate read from the flag or from what the evaluator produces, and the full
- * attachment list read from `--evaluators-json`.
- *
+ * The `--evaluator` family: platform references, inferred mappings, the
+ * gate flag, and full attachments from `--evaluators-json`.
  * Spec: specs/features/test-suite-cli.feature
  */
 import { mkdtempSync, writeFileSync } from "node:fs";

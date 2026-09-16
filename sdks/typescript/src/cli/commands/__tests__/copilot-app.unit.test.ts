@@ -1,8 +1,7 @@
 /**
- * Unit tests for the `langwatch copilot-app connect` orchestrator
- * (ADR-039 §Extension) with every collaborator injected — asserts the
- * guards, the mint-after-detect ordering, the agent install, and the
- * tokens-only opt-out notice, without touching the machine or network.
+ * Unit tests for `langwatch copilot-app connect` (ADR-039 §Extension) with
+ * every collaborator injected -- guards, mint-after-detect ordering, agent
+ * install, and the tokens-only opt-out notice, no machine/network touched.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -1,9 +1,7 @@
 /**
- * E2E tests for the Evaluations API
- *
- * These tests require a running LangWatch instance with the NLP service
- * (langwatch_nlp) available, plus a valid API key.
- * Set LANGWATCH_ENDPOINT and LANGWATCH_API_KEY environment variables.
+ * E2E tests for the Evaluations API: needs a running LangWatch instance
+ * with the NLP service (langwatch_nlp) and a valid API key.
+ * Set LANGWATCH_ENDPOINT and LANGWATCH_API_KEY.
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import { LangWatch } from "@/client-sdk";

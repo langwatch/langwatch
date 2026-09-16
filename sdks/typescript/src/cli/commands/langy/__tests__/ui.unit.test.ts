@@ -57,10 +57,9 @@ const ESC = String.fromCharCode(27);
 const ERASE = new RegExp(`^${ESC}\\[(\\d+)A${ESC}\\[0J`);
 
 /**
- * A terminal that keeps the rows that are on it.
- *
- * The real writer is driven, rather than a copy of its rules, so the row
- * counting and the cursor movement are what the test reads back.
+ * A terminal that keeps the rows that are on it. The real writer is driven,
+ * not a copy of its rules, so row counting and cursor movement are what the
+ * test reads back.
  */
 function fakeTty() {
   const rows: string[] = [];

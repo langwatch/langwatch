@@ -7,10 +7,9 @@ import type { CommandResult } from "../../utils/output";
 import { ChartInputError, type DefinitionFlags, resolveDefinitionInput } from "./definitionInput";
 
 /**
- * Returns the updated chart rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). A call
- * touching nothing is refused locally, matching the API's own refusal of an
- * empty update.
+ * Returns the updated chart rather than printing it (output port renders
+ * per-format). A call touching nothing is refused locally, matching the
+ * API's own refusal of an empty update.
  */
 export const updateChartCommand = async (
   id: string,

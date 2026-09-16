@@ -1,7 +1,6 @@
 /**
  * Declarations queued when the agent's own shell could not reach the
  * collector: what is kept, what is dropped, and what a drain records.
- *
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 

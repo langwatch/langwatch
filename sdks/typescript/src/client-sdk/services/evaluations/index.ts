@@ -1,9 +1,4 @@
-/**
- * Evaluations Service - Online Evaluations / Guardrails API
- *
- * This module provides the ability to run evaluators and guardrails in real-time
- * against LLM inputs/outputs, separate from batch experiments.
- */
+/** Evaluations Service: runs evaluators/guardrails in real time against LLM I/O. */
 
 export { EvaluationsFacade } from "./evaluations.facade";
 export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./types";

@@ -1,8 +1,7 @@
 /**
- * Experiments API: run batch experiments over datasets with automatic tracing, parallel
- * execution, and built-in evaluator support. SDK-defined: `langwatch.experiments.init(name)`
- * then `experiment.run(dataset, fn)`. Platform-configured (Experiments Workbench):
- * `langwatch.experiments.run("slug")` then `result.printSummary()`.
+ * Experiments API: batch experiments over datasets with tracing, parallel
+ * execution, and evaluators. SDK-defined: `experiments.init(name)` then
+ * `experiment.run(dataset, fn)`. Platform: `experiments.run("slug")`.
  */
 
 export { Experiment } from "./experiment";

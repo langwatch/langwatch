@@ -1,8 +1,7 @@
 /**
- * Extracts the most informative, user-facing message from an API error body. A generic
- * `{ error: "Internal server error" }` is useless to a user, so this tries, in order:
- * `body.message`, `body.error`, other string fields, then falls back to stringifying the body
- * or the thrown Error's own message — nothing here discards diagnostic information.
+ * Extracts the most informative, user-facing message from an API error
+ * body: tries `body.message`, `body.error`, other string fields, then
+ * falls back to stringifying the body or the Error's own message.
  */
 import { isCodeAsMessage, looksLikeErrorCode, sentenceForCode } from "./error-code-copy";
 

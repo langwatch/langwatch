@@ -1,8 +1,6 @@
 /**
  * The agent client over HTTP long polling, against a fake platform: a plain
- * `http` server that answers the register, poll and frames routes and can
- * refuse a WebSocket upgrade the way a proxy does.
- *
+ * `http` server that can refuse a WebSocket upgrade the way a proxy does.
  * @see specs/typescript-sdk/agent-wrapper.feature
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";

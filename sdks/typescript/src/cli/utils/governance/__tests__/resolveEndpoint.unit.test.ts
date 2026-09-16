@@ -1,8 +1,7 @@
 /**
- * Unit tests for the single source of truth for control-plane endpoint
- * resolution. Locks the 4-source priority (flag > env > config > default)
- * and ensures every command that imports `resolveControlPlaneUrl()`
- * sees the same value for the same inputs.
+ * The single source of truth for control-plane endpoint resolution: locks
+ * the 4-source priority (flag > env > config > default) so every importer
+ * of `resolveControlPlaneUrl()` sees the same value for the same inputs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

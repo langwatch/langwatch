@@ -1,8 +1,7 @@
 /**
- * The flag grammar the management commands share: what each colon-separated shape parses into,
- * and what a malformed value is refused with. Parsed directly rather than through a command,
- * because these are the pieces every family reuses and a refusal must name the expected shape
- * wherever it is hit. @see specs/typescript-sdk/cli-management-apis.feature
+ * The flag grammar the management commands share: what each colon-separated
+ * shape parses into, and what a malformed value is refused with.
+ * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
 import {

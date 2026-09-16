@@ -1,8 +1,6 @@
 /**
- * Integration tests for Experiment API
- *
- * These tests run against a real LangWatch backend.
- * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
+ * Integration tests for Experiment API, against a real LangWatch backend.
+ * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";

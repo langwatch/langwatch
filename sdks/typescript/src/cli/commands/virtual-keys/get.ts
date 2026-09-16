@@ -7,10 +7,9 @@ import { formatScope, formatStatus, virtualKeyDetailUrl } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the virtual key rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts). The read model
- * carries no secret — only `display_prefix`, exactly what the human view
- * shows — so the raw record is safe to hand to a machine caller.
+ * Returns the virtual key rather than printing it (output port renders
+ * per-format). The read model carries no secret -- only `display_prefix`,
+ * what the human view shows -- so it's safe for a machine caller.
  */
 export const getVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();

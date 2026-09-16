@@ -43,9 +43,8 @@ const BUCKET_VALUES = ["none", "hour", "day"] as const;
 
 /**
  * Everything that tells one row from another. A rollup can be grouped two
- * ways and bucketed by time, so `key` alone is now ambiguous: two rows sharing
- * a model but not an end user, or a day, would print under the same label and
- * read as duplicates of each other.
+ * ways and bucketed by time, so `key` alone is ambiguous -- two rows sharing
+ * a model but not a user or day would print under the same label.
  */
 function rowLabel(row: SpendSummaryRow): string {
   const dimensions = Object.values(row.group)

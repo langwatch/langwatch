@@ -59,10 +59,8 @@ export type RunExperimentOptions = {
 
 /**
  * Inputs that override a platform experiment or workflow run on the server.
- *
- * `data` and `datasetId` are mutually exclusive (the backend rejects passing
- * both). `parameters` overrides target parameters (e.g. prompt variables) and
- * `rowIndices` restricts execution to a subset of the configured dataset.
+ * `data`/`datasetId` are mutually exclusive (backend rejects both).
+ * `parameters` overrides target params; `rowIndices` subsets the dataset.
  */
 export type RunWithResultsOptions = {
   /**

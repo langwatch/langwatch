@@ -107,10 +107,8 @@ const HOST_LABEL_MAX_LENGTH = 24;
 
 /**
  * A short label for this machine: lowercase, `[a-z0-9-]`, 24 characters.
- *
- * The platform scopes a development agent connected with a project key to
- * this label, and the Python SDK sends the same shape, so one machine reads
- * the same whichever SDK connected it.
+ * The platform scopes a dev agent connected with a project key to this
+ * label; the Python SDK sends the same shape, so one machine reads the same.
  */
 export function hostLabel(hostname: string): string {
   return hostname

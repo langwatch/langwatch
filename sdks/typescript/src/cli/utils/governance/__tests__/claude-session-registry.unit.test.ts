@@ -1,8 +1,6 @@
 /**
- * Reading the name claude itself holds for a session out of its live session
- * registry — the piece that makes a mid-session /rename observable from the
- * next hook.
- *
+ * Reading the name claude itself holds for a session out of its live
+ * session registry -- what makes a mid-session /rename observable.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

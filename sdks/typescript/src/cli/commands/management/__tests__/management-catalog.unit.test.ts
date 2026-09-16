@@ -1,9 +1,7 @@
 /**
  * The shape of the management command tree, read off the live commander
- * program rather than off a list kept next to it: `buildProgram()` is the
- * ground truth for what the CLI actually registers, so a verb that was never
- * wired up fails here instead of at a customer's terminal.
- *
+ * program -- `buildProgram()` is ground truth, so a verb never wired up
+ * fails here instead of at a customer's terminal.
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";

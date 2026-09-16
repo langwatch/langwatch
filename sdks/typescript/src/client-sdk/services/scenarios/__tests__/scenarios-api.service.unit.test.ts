@@ -1,7 +1,6 @@
 /**
- * The scenarios service: the field values a scenario carries for the fields
- * its test suite declares travel under `fields`, and an empty map clears them.
- *
+ * The scenarios service: field values a scenario carries for the fields
+ * its test suite declares travel under `fields`; an empty map clears them.
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";

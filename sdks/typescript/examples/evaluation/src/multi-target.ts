@@ -1,16 +1,6 @@
 /**
- * Multi-Target Comparison Example
- *
- * This example demonstrates how to compare different models/configurations
- * using the withTarget() API for automatic tracing and metrics capture.
- *
- * Features demonstrated:
- * - withTarget() for target-scoped spans
- * - Automatic latency capture per target
- * - Unique trace IDs per target (clickable in UI)
- * - Context inference for log() calls
- * - Parallel target execution with Promise.all
- *
+ * Multi-Target Comparison Example: withTarget() gives per-target spans,
+ * latency and trace IDs, context inference, and Promise.all parallelism.
  * Run with: npm run start:multi-target
  */
 

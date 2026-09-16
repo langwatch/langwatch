@@ -1,19 +1,7 @@
 /**
- * The CLI records where it runs from, for the processes that cannot find it.
- *
- * The Claude Code plugin's hooks run whatever `langwatch` they can find, and
- * a Claude Code started from a desktop app inherits a PATH with no version
- * manager on it, so `langwatch` resolves from the user's shell and from
- * nowhere else. The commands a user runs by hand (`login`, `claude`,
- * `instrument`) record the node binary and entry script they ran under into
- * the config, and the plugin's launcher runs the hook commands through that
- * record before falling back to PATH.
- *
- * Best-effort by construction: a location that cannot be determined or a
- * config that cannot be written costs the plugin its first lookup, never the
- * command that was recording it.
- *
- * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
+ * The CLI records where it runs from, for processes that can't find it on
+ * PATH (e.g. a desktop-launched Claude Code). Hand-run commands record the
+ * node binary + entry script for the plugin's hooks to fall back on.
  */
 
 import * as fs from "node:fs";

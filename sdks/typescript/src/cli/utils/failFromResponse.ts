@@ -4,10 +4,9 @@ import { handledErrorFrom } from "../../internal/api/errors";
 import { failSpinner } from "./spinnerError";
 
 /**
- * Fails a spinner from a non-2xx `Response`, keeping whatever the platform
- * named — unlike the bare-Error pattern this replaces, which lost the code
- * and status, so a permission refusal reported as a retryable "network_error"
- * that told an agent to retry a wall.
+ * Fails a spinner from a non-2xx `Response`, keeping what the platform
+ * named -- the bare-Error pattern this replaces lost the code and status,
+ * so a permission refusal reported as a retryable "network_error".
  */
 export async function failSpinnerFromResponse({
   spinner,

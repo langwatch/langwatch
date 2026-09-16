@@ -1,7 +1,5 @@
 /**
- * Fetch policy examples.
- *
- * Note: Local imports are used to avoid conflicts with internal caching
+ * Fetch policy examples. Local imports avoid conflicts with internal caching
  * and file management.
  */
 

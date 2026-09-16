@@ -1,8 +1,6 @@
 /**
- * The identity notice's contract: exact one-line wording per mode, stderr
- * only, TTY-gated colour, and the 30-minute per-(credential, mode)
- * suppression window backed by notice-state.json next to config.json.
- *
+ * The identity notice's contract: one-line wording per mode, stderr only,
+ * TTY-gated colour, 30-minute per-(credential, mode) suppression.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import * as fs from "node:fs";

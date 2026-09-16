@@ -1,7 +1,6 @@
 /**
- * The verdict a comparison returns, and the row-level record it leaves in the
- * batch: winner, tie, inconclusive, and the statuses that pair with them.
- *
+ * The verdict a comparison returns, and the row-level record it leaves:
+ * winner, tie, inconclusive, and the statuses that pair with them.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

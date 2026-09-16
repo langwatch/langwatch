@@ -1,8 +1,7 @@
 /**
- * Project pinning for `langwatch instrument` and the wrapper `--project`
- * flag: the pin in `tool_project_keys[tool]` is what routes a tool's
- * telemetry to a team project instead of the personal workspace, and
- * what the wrapper and the login refresh treat as do-not-touch.
+ * Project pinning for `langwatch instrument`/`--project`: the pin in
+ * `tool_project_keys[tool]` routes a tool's telemetry to a team project
+ * instead of personal, and is what the wrapper/login refresh leave untouched.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

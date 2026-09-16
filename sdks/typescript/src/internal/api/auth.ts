@@ -1,10 +1,7 @@
 /**
- * Authentication header assembly for LangWatch SDK clients. Supports two token families: (1)
- * `sk-lw-{random}` legacy project keys, which carry project identity themselves, so we emit
- * both `Authorization: Bearer` and `X-Auth-Token` for backward compat; (2)
- * `sk-lw-{lookupId}_{secret}` / `pat-lw-{lookupId}_{secret}` user-scoped keys, paired with a
- * `projectId` (when available) as `Authorization: Basic base64(projectId:token)` so the server
- * can resolve the role binding.
+ * Authentication header assembly, two token families: legacy `sk-lw-`
+ * project keys send `Bearer` + `X-Auth-Token`; user-scoped keys send
+ * `Basic base64(projectId:token)` so the server can resolve the role binding.
  */
 
 /** Old PAT prefix — still accepted by the server for backward compat. */

@@ -127,10 +127,8 @@ export interface HookHarness {
 
 /**
  * Registers the hooks in the CALLING suite and returns the live buffers.
- *
- * The buffers are emptied in place rather than reassigned, so a suite may
- * destructure them once at module scope and still read what the current test
- * produced.
+ * They're emptied in place, not reassigned, so a suite may destructure them
+ * once at module scope and still read what the current test produced.
  */
 export const installHookHarness = (): HookHarness => {
   const posted: PostedRequest[] = [];

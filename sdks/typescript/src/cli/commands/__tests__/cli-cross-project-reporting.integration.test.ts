@@ -1,7 +1,6 @@
 /**
- * How the CLI answers a `--project` it cannot resolve, and how it reports the
- * reach of the login key: `projects list` and `whoami`.
- *
+ * How the CLI answers a `--project` it cannot resolve, and how it reports
+ * the reach of the login key: `projects list` and `whoami`.
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";

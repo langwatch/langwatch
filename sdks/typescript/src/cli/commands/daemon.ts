@@ -1,9 +1,7 @@
 /**
- * `langwatch daemon start|stop|status`
- *
- * The daemon normally manages itself — it is auto-spawned on first use and
- * self-exits when idle. These commands exist for the cases where you need to
- * see it, restart it, or make sure it is gone.
+ * `langwatch daemon start|stop|status`: manual override for a daemon that
+ * normally manages itself (auto-spawned on first use, self-exits when
+ * idle) -- for when you need to see it, restart it, or confirm it's gone.
  */
 
 import chalk from "chalk";

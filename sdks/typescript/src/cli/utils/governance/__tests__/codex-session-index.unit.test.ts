@@ -1,7 +1,6 @@
 /**
- * Reading codex's own session names out of its session_index.jsonl — the
+ * Reading codex's own session names out of its session_index.jsonl -- the
  * names `codex resume <name>` resolves, mirrored instead of invented.
- *
  * Feature: specs/ai-governance/cli-wrappers/codex-rollout-io.feature
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

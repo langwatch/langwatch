@@ -100,10 +100,9 @@ const isEntrypoint = (value: string): boolean =>
 	/\/(?:langwatch|sdks\/typescript)\/dist\/cli\/index\.js$/.test(value);
 
 /**
- * POSIX ps discards argv boundaries, including quotes around paths with spaces.
- * Recover a split absolute path only when it names a real file. Stop at the
- * first file so an unrelated script's arguments cannot become our entrypoint.
- * Keep the ordinary/quoted-path case independent of filesystem permissions.
+ * POSIX ps discards argv boundaries, including quotes around paths with
+ * spaces. Recovers a split absolute path only when it names a real file,
+ * stopping at the first so unrelated arguments can't become our entrypoint.
  */
 function readCommandPath({
 	args,

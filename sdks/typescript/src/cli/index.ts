@@ -5,13 +5,10 @@
 // runs. Must precede every other import — see compileCache.ts.
 import "./compileCache";
 
-// Load environment variables before we DISPATCH. Note the limit of that
-// promise: static imports are hoisted above this module's body (by ES module
-// semantics, and by esbuild when tsup bundles), so `./daemon/dispatch` below
-// is already evaluated by the time config() runs. Only function bodies called
-// after this point see the loaded .env — never module-level side effects.
-// Anything that must read env at module scope has to be lazily imported.
-// Asserted in __tests__/index-boot.unit.test.ts.
+// Loads env before DISPATCH -- but static imports are hoisted above this
+// body, so `./daemon/dispatch` below is already evaluated by then. Only
+// function bodies called after this point see the loaded .env; module-scope
+// env reads must be lazily imported. Asserted in __tests__/index-boot.unit.test.ts.
 import { config } from "dotenv";
 
 /**

@@ -30,9 +30,8 @@ const skill = (slug: string): BundledSkill => {
 
 /**
  * A local edit the way a user actually makes one: change the skill's PROSE,
- * leaving the managed-by footer where the installer put it (last). Appending
- * below the footer is a different case with different semantics — see the
- * "given a marker that is not the file's last line" block.
+ * leaving the managed-by footer last. Appending below the footer is a
+ * different case -- see "given a marker that is not the file's last line".
  */
 const editBody = (filePath: string): void => {
   const content = fs.readFileSync(filePath, "utf8");

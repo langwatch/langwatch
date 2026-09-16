@@ -1,8 +1,7 @@
 /**
- * The one place the SDK decides "did the platform NAME this failure?" —
- * slotted in immediately before each service's own throw: a domain-error
- * body raises the typed error, anything else keeps the generic path's
- * existing behaviour byte for byte, including the message.
+ * The one place the SDK decides "did the platform NAME this failure?",
+ * slotted before each service's own throw: a domain-error body raises the
+ * typed error; anything else keeps the generic path's behaviour byte for byte.
  */
 import { handledErrorFrom, type LangWatchHandledError } from "@/internal/api/errors";
 import { extractStatusFromResponse } from "./format-api-error";

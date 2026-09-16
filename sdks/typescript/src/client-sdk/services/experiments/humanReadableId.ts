@@ -1,9 +1,4 @@
-/**
- * Human-readable ID generator
- *
- * Generates memorable, human-readable identifiers using adjective-adjective-noun combinations.
- * Similar to Docker container names, Heroku app names, etc.
- */
+/** Generates memorable adjective-adjective-noun ids, like Docker/Heroku container names. */
 
 const ADJECTIVES = [
   "swift",

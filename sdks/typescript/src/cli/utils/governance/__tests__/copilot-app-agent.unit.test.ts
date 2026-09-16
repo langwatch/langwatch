@@ -1,8 +1,7 @@
 /**
  * Unit tests for the imperative Copilot app login-agent installer
- * (ADR-039 §Extension) with fs and the OS register command injected —
- * asserts the descriptor is written and the right service-manager command
- * runs, without touching the machine.
+ * (ADR-039 §Extension), fs and OS register injected -- asserts the
+ * descriptor is written and the right service-manager command runs.
  */
 
 import { describe, expect, it } from "vitest";

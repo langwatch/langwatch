@@ -24,8 +24,7 @@ const DISPLACED_BEGIN_MARKER = "# >>> langwatch displaced notify begin >>>";
 
 /**
  * Every character `String.prototype.replace` gives a second meaning to in a
- * replacement: the match, the text before it, the text after it, and a capture
- * group. A shell one-liner reaches for all of them, and a `notify` argv is a
+ * replacement (match, before, after, capture group) -- a `notify` argv is a
  * shell one-liner as often as it is a path.
  */
 const DOLLAR_ARGV = ["/bin/sh", "-c", "echo $'hi' $& $1 $` done"];

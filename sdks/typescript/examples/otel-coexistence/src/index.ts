@@ -1,20 +1,7 @@
 /**
- * Example: Running LangWatch alongside another OTel-based SDK with
- * true provider isolation.
- *
- * LangWatch uses a dedicated TracerProvider — the global provider
- * (owned by the other SDK) is untouched. No cross-contamination.
- *
- * This example uses manual spans to demonstrate isolation. Spans
- * created via lwProvider.getTracer() go only to LangWatch. Spans
- * created via the global trace.getTracer() go only to the external SDK.
- *
- * Note: Auto-instrumentation libraries that emit through the global
- * OTel API (e.g. Vercel AI SDK's experimental_telemetry) will send
- * spans to the global provider, not the dedicated one. Use
- * lwProvider.getTracer() directly for LLM calls that must be isolated.
- *
- * Run: pnpm start
+ * Runs LangWatch alongside another OTel SDK via its own dedicated
+ * TracerProvider (the global one, owned by the other SDK, stays untouched).
+ * Auto-instrumentation via the global API is NOT isolated by this.
  */
 
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";

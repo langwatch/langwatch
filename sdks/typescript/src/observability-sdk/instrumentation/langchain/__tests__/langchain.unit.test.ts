@@ -388,7 +388,8 @@ describe("Helper Functions", () => {
 
     it("handles arrays", () => {
       const array = [1, 2, 3];
-      expect(wrapNonScalarValues(array)).toBe(JSON.stringify(array)); // Returns JSON string length for arrays
+      // Returns JSON string length for arrays
+      expect(wrapNonScalarValues(array)).toBe(JSON.stringify(array));
     });
 
     it("handles objects", () => {

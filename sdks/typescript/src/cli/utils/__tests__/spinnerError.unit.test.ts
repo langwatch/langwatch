@@ -62,12 +62,9 @@ describe("failSpinner", () => {
   });
 
   describe("when error carries the platform's error shape", () => {
-    // `{ error: <code>, message }` is exactly what the shared Hono error handler
-    // puts on the wire for a `HandledError`. It used to be flattened back
-    // into the sentence "NotFoundError: Record missing", which reads as though
-    // the class name were part of the prose. Now the sentence is the sentence and
-    // the code is named as a code — which is the whole point: a caller can act on
-    // `not_found`, and could only ever have read the string.
+    // `{ error: <code>, message }` is what the Hono error handler puts on the
+    // wire for a `HandledError`. It used to flatten to "NotFoundError: Record
+    // missing"; now the sentence is the sentence and the code is a code a caller can act on.
     it("leads with the platform's sentence and names the code beneath it", () => {
       const err = { error: "NotFoundError", message: "Record missing" };
       const { spinner, calls } = makeSpinner();

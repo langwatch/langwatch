@@ -26,11 +26,9 @@ const authorOf = (version: ExperimentVersionSummary): string => {
 };
 
 /**
- * What the version cell holds.
- *
- * Numbered versions run 1, 2, 3 with no gaps. Typing rewrites one autosave
- * row, whose number changes with every save, so the table names it for what it
- * is. The number is still in the JSON output for a script that restores it.
+ * What the version cell holds: numbered versions run 1, 2, 3 with no gaps.
+ * The one autosave row's number changes with every save, so the table names
+ * it "autosave" -- the number stays in JSON output for a script to restore it.
  */
 const versionOf = (version: ExperimentVersionSummary): string =>
   version.autoSaved ? "autosave" : `v${version.version}`;

@@ -17,9 +17,8 @@ const NOOP_LOGGER_PROVIDER: LoggerProvider = {
 };
 
 /**
- * The LangWatch-specific global logger provider. It may not be the same as the current
- * OpenTelemetry global logger provider, but it's the last one the `setupObservability`
- * knows about.
+ * The LangWatch-specific global logger provider -- may differ from the
+ * current OTel one; the last one `setupObservability` knows about.
  * @internal
  */
 let currentLoggerProvider: LoggerProvider = NOOP_LOGGER_PROVIDER;

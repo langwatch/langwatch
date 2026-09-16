@@ -1,7 +1,6 @@
 /**
- * Which codex session ran the command, read from the process tree: the first
- * ancestor holding a rollout transcript open is the session asking.
- *
+ * Which codex session ran the command, read from the process tree: the
+ * first ancestor holding a rollout transcript open is the session asking.
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 

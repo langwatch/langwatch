@@ -9,10 +9,9 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the snapshot rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). `data` is the whole
- * snapshot — effective resolution, configs AND the scope block the human view
- * only shows in its spinner line.
+ * Returns the snapshot rather than printing it (output port renders
+ * per-format). `data` is the whole snapshot -- resolution, configs and the
+ * scope block the human view only shows in its spinner line.
  */
 export const listModelDefaultsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();

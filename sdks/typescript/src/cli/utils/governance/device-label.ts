@@ -1,10 +1,9 @@
 import * as os from "node:os";
 
 /**
- * A short, server-safe label naming this machine, attached to keys the
- * CLI mints (virtual keys, project ingest keys) so an admin revoking one
- * can tell which device it belongs to. Lowercased hostname, restricted
- * to [a-z0-9-], truncated; empty when the hostname yields nothing usable.
+ * A short, server-safe label naming this machine, attached to keys the CLI
+ * mints so an admin revoking one can tell which device it belongs to.
+ * Lowercased hostname, restricted to [a-z0-9-], truncated.
  */
 export function deviceLabelForThisMachine(): string {
   const raw = os.hostname().toLowerCase();

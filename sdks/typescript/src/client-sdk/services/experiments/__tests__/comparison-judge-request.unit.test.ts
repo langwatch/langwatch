@@ -1,8 +1,6 @@
 /**
- * What Experiment.compare() asks the judge for: one call per row, what each
- * candidate carries, and the settings left unset so the judge's own defaults
- * apply.
- *
+ * What Experiment.compare() asks the judge for: one call per row, what
+ * each candidate carries, and settings left unset for the judge's defaults.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 

@@ -1,8 +1,7 @@
 /**
- * Timestamps for CLI listings (`sessions events`, `traces transcript`), in
- * the reader's local time — a bare UTC stamp would silently read as their own
- * wall clock. The date prints once at the top and again on each local-day
- * rollover, not on every line, since most entries share one.
+ * Timestamps for CLI listings, in the reader's local time -- a bare UTC
+ * stamp would silently read as their own wall clock. The date prints once,
+ * and again on each local-day rollover, not on every line.
  */
 
 const pad = (value: number): string => String(value).padStart(2, "0");

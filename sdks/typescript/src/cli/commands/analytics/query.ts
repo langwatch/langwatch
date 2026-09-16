@@ -31,11 +31,9 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
 };
 
 /**
- * Returns the timeseries rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts). `data` keeps the
- * shape the previous `--format json` branch established — the raw result with
- * the RESOLVED `metric`/`aggregation` attached, so Langy and other consumers
- * can label a result without guessing from the numeric keys.
+ * Returns the timeseries rather than printing it (output port renders
+ * per-format). `data` keeps the prior `--format json` shape -- raw result
+ * plus the RESOLVED `metric`/`aggregation`, so consumers don't guess keys.
  */
 export const queryAnalyticsCommand = async (options: {
   metric?: string;

@@ -59,11 +59,9 @@ export class TargetMetadataConflictError extends ExperimentError {
 }
 
 /**
- * Thrown when a comparison cannot produce a verdict the caller asked for
- *
- * A row that is simply too thin to judge is skipped instead, so this is
- * reserved for a mismatch between what the caller named and what the run
- * actually recorded.
+ * Thrown when a comparison cannot produce a verdict the caller asked for.
+ * A too-thin-to-judge row is skipped instead -- this is reserved for a
+ * mismatch between what the caller named and what the run recorded.
  */
 export class ComparisonError extends ExperimentError {
   constructor(

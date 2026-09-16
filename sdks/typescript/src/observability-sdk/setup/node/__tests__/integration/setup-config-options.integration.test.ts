@@ -26,13 +26,10 @@ function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
-// The concrete tracer provider's resolved config (resource, sampler, spanLimits,
-// idGenerator, ...) isn't part of the public API, so these tests reach into its
-// private state. `@opentelemetry/sdk-node` 0.221 moved from constructing a
-// `NodeTracerProvider`/`BasicTracerProvider` (which stores this under `_config`)
-// to the new unified `@opentelemetry/sdk-trace` package's `TracerProvider`
-// (which stores the equivalent under `_tracerOptions`). Read whichever is
-// present so this doesn't re-break on the next OTel internal reshuffle.
+// The tracer provider's resolved config isn't public API, so these tests
+// reach into private state -- `@opentelemetry/sdk-node` 0.221 moved it from
+// `_config` (NodeTracerProvider) to `_tracerOptions` (new sdk-trace). Read
+// whichever is present so this doesn't re-break on the next reshuffle.
 function getInternalTracerConfig(provider: any): any {
   const config = provider?._tracerOptions ?? provider?._config;
   if (config === undefined) {

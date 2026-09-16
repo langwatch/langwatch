@@ -1,7 +1,6 @@
 /**
- * What the session context hook does when the collector rejects its key: the
- * one path where the hook repairs the device rather than staying silent.
- *
+ * What the session context hook does when the collector rejects its key:
+ * the one path where the hook repairs the device rather than staying silent.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
