@@ -202,23 +202,29 @@ a long tail.
 ### The mop-up nobody should forget
 
 18 `comment-block-size` findings remain inside areas already swept and reported
-clean. They are not regressions, and they break down three ways:
+clean. None is a regression — **every one is a file that was dirty or untracked
+when its lane ran, and was therefore correctly excluded from the slice.** They
+break down two ways:
 
-- **8 are inside files another session has dirty** (`gateway-composition.build.ts`,
+- **9 are inside files another session has dirty** (`gateway-composition.build.ts`,
   `gateway-platform.rest.ts`, `ops-clickhouse-explain.rest.ts`,
   `join-request-notifier.service.ts`,
   `join-request-lifecycle-dispatcher.service.unit.test.ts`,
-  `model-provider-evidence-service.composition.ts`). Every lane correctly
-  skipped them. They can only be cut once that session's work lands.
+  `model-provider-evidence-service.composition.ts`), plus
+  `prisma.gateway-organization-directory.repository.ts`, which was untracked
+  during the gateway sweep and arrived in git with `491fc125ab`. They can only
+  be cut once that session's work settles.
 - **9 are over-long comment *lines*, not blocks** — 100-column violations
   reported under the same rule id, in `modules/analytics/web` (6) and
   `sdks/typescript` (3). Most are `biome-ignore` / `eslint-disable` directives,
   which cannot simply be wrapped: the fix is the one-line relocation used in
   commit `095936beea`.
-- **1 is a genuinely new block** in
-  `modules/gateway/server/src/repositories/prisma/prisma.gateway-organization-directory.repository.ts`,
-  in a clean file, written after the gateway sweep ran.
 
-That last one is the useful signal: **the sweep is not a ratchet.** Nothing stops
-a new over-budget block landing in a swept area, and one already has. Zero will
-not stay zero on its own.
+The lesson is about method, not regression: **a slice built against a dirty tree
+silently under-reports its area, and the excluded files are invisible in the
+lane's own "zero findings" result.** Every lane here reported its area clean and
+every one was telling the truth about its slice. Whoever finishes an area should
+re-measure it against a clean tree before calling it done.
+
+Nothing enforces the sweep either — no ratchet stops a new over-budget block
+landing in a swept area. That has not been observed yet, but nothing prevents it.
