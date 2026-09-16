@@ -2790,6 +2790,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
+      '@langwatch/identity-server':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -4986,9 +4989,6 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
-      '@langwatch/trace-web':
-        specifier: workspace:*
-        version: link:../../trace/web
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../packages/ui-host
@@ -7111,6 +7111,9 @@ importers:
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../../../packages/actor
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../audit-log/contract
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12818,6 +12821,9 @@ importers:
       '@langwatch/api-client-web':
         specifier: workspace:*
         version: link:../api-client-web
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../design-system
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
@@ -12827,12 +12833,33 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
       '@langwatch/ui-drawer':
         specifier: workspace:*
         version: link:../ui-drawer
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+      react-error-boundary:
+        specifier: 'catalog:'
+        version: 6.1.2(react@19.2.8)
+      react-feather:
+        specifier: 'catalog:'
+        version: 2.0.10(react@19.2.8)
+      react-icons:
+        specifier: 'catalog:'
+        version: 5.7.0(react@19.2.8)
+      react-markdown:
+        specifier: 'catalog:'
+        version: 10.1.0(@types/react@19.2.18)(react@19.2.8)
+      remark-gfm:
+        specifier: 'catalog:'
+        version: 4.0.1
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
