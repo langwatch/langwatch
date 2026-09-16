@@ -177,7 +177,7 @@ export class WorkerTraceRecordReader {
   private async visibilityCutoffMs(projectId: string): Promise<number | null> {
     try {
       const organizationId = await this.projects.getOrganizationId(projectId);
-      return await this.window.tryGetVisibilityCutoffMs({ organizationId });
+      return await this.window.getVisibilityCutoffMs({ organizationId });
     } catch (error) {
       this.logger.error(
         { projectId, error },
