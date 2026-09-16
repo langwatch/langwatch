@@ -330,6 +330,27 @@ project link (the optional `apiToken` carries it).
    step with the `platform/app` presentation registry by
    `provider-refusal-copy.unit.test.ts`. Neither side now points at the other.
 
+### modules/automation — `4b9eb9b57b`
+
+9. **An unknown caller must still throttle, not bypass.** `automation.app.ts`,
+   `resolveUnsubscribeView`. The surviving sentence says the public
+   unsubscribe read throttles against a shared bucket to resist token
+   brute-forcing. What is gone is the part that matters when someone later
+   "simplifies" it: a request carrying a *missing* address must still consume
+   from the bucket rather than short-circuit past it, because a bypass on the
+   unknown-address path is exactly what makes enumeration cheap.
+
+10. **Why Slack previews use unicode emoji rather than `:emoji:` codes.**
+    `contract/src/templating/defaults.ts`. Chosen for preview consistency;
+    the rationale is now compressed to "mrkdwn_escaped before rendering" and
+    the emoji decision itself is gone. Low value, recorded because the rule is
+    to name every cut fact rather than decide silently that one did not matter.
+
+    Noted while cutting: two adjacent `/** */` blocks here had no code between
+    them, which oxlint counts as one block. They read as though each was meant
+    to precede its own export before the file was reordered, leaving one
+    orphaned. They were merged losslessly rather than guessing intent.
+
 ### packages/eventing — `498a39009b`
 
 None parked. Blocks that read as narrative (the ATOMIC LEASE comment in
