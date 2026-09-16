@@ -224,6 +224,13 @@ describe("given a pi session launched through the wrapper", () => {
       expect(pi.modeResult.mode).toBe("ingestion");
       expect(cliApi.issuePersonalVirtualKey).not.toHaveBeenCalled();
 
+      // The same sentence the key-holding arm gets. The notice does not read
+      // the key, so a build that made it conditional would leave exactly this
+      // arm silent about why nothing was routed.
+      expect(pi.said).toContain(
+        "pi is captured from its session file rather than through the gateway",
+      );
+
       // The control: same empty config, a tool whose gateway path is real and
       // which therefore does mint a personal key on its first gateway run.
       const control = await launch("cursor", baseCfg());

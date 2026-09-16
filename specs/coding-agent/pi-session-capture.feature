@@ -192,22 +192,35 @@ Feature: pi session capture
 
   # --- Only capturing what we launched, and only once -----------------------
 
+  # What separates the two is when the file was last written, against the run's
+  # own start time. pi writes no marker saying who launched it, so that stamp is
+  # the only identity available. This buys one honest limit: a second pi the user
+  # starts by hand while this run is going has a fresh write time too, and is
+  # captured. Narrowing it needs an identity pi does not give us, and the
+  # alternative is dropping resumed sessions, which are the common case. The
+  # identity belongs to #8132.
+  # Both halves are asserted, never just the absence: a run that captured
+  # nothing at all would satisfy the absence on its own.
   @unit
   Scenario: A pi session LangWatch did not launch is left alone
-    Given a pi session file the user produced by running pi directly
+    Given a pi session file the user produced by running pi directly, last written before this run started
+    And a session this run launches itself
     When LangWatch runs
-    Then that session is not captured
+    Then the session the user produced is not captured
+    And the session this run launched is captured
 
   # pi reads each model's endpoint from its own model settings and ignores
-  # base-URL environment variables, so the langwatch CLI cannot route pi through
-  # the gateway with a virtual key. (langy does route pi, by generating a
-  # models.json for it; the CLI must not copy that. ADR-132 §Invariants.) It is
-  # captured from the file whether or not a key is present. Before this was
-  # measured, the scenario here asserted the opposite, and the opposite is total
-  # silent data loss for every user who holds a key. See ADR-132 revision v10.
+  # base-URL environment variables, so the langwatch CLI has no lever that moves
+  # pi's endpoint and cannot route it through the gateway with a virtual key.
+  # This is not a claim that pi cannot be routed at all: the langy worker does
+  # route pi, by generating a models.json for it, and the langwatch CLI is
+  # forbidden to copy that. ADR-132 §Invariants. So pi is captured from the file
+  # whether or not a key is present. Before this was measured, the scenario here
+  # asserted the opposite, and the opposite is total silent data loss for every
+  # user who holds a key. See ADR-132 revision v10.
   # A key is something a person has stored on their own machine, not a setting
-  # their organisation holds, and it changes nothing here — so neither of these
-  # may rest on what the launcher says: both runs print the same sentence.
+  # their organisation holds, and it changes nothing here, so neither of these
+  # may rest only on what the launcher says: both runs print the same sentence.
   # What each has to show is what a wrongly routed run would have done instead.
   # Holding a key, that is handing the key to pi, which would send it to the
   # model provider it dials directly. Holding none, it is creating one, which a
@@ -226,6 +239,7 @@ Feature: pi session capture
     When the session runs
     Then reading the file is started
     And no virtual key is created for the run
+    And the launcher says the session is read from its file rather than routed through us
 
   # --- Launching it ---------------------------------------------------------
 
