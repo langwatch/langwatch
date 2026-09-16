@@ -40,7 +40,7 @@ import type {
   WorkflowBuilderInput,
   WorkflowBuilderOutput,
 } from "@langwatch/experiment-contract";
-import type { Instant } from "@langwatch/time";
+import { fromDate, type Instant } from "@langwatch/time";
 
 // ============================================================================
 // Main Workflow Builder
@@ -357,12 +357,6 @@ const buildTargetNode = (
           throw new Error(
             `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
           );
-        case "voice":
-          // A voice agent runs as a scenario against a live call, not as an
-          // experiment cell — there is no node that dials the transport.
-          throw new Error(
-            `Voice agent target ${targetConfig.id} cannot run inside an experiment workflow`,
-          );
         default: {
           // Every declared agent type is handled above, so the narrowing has
           // nothing left here and `loadedData.agent` is itself `never`. The
@@ -507,7 +501,7 @@ export const buildSignatureNodeFromPrompt = ({
         handle: prompt.handle,
         versionId: prompt.versionId,
         versionNumber: prompt.version,
-        versionCreatedAt: prompt.versionCreatedAt,
+        versionCreatedAt: fromDate(prompt.versionCreatedAt),
       }),
       inputs,
       outputs,
@@ -567,9 +561,9 @@ const buildPromptIdentity = (identity: {
         versionId: identity.versionId,
         versionNumber: identity.versionNumber,
         versionCreatedAt:
-          identity.versionCreatedAt instanceof Date
-            ? identity.versionCreatedAt.toISOString()
-            : identity.versionCreatedAt,
+          typeof identity.versionCreatedAt === "string"
+            ? identity.versionCreatedAt
+            : identity.versionCreatedAt.toString({ fractionalSecondDigits: 3 }),
       },
     };
   }
@@ -646,7 +640,7 @@ export const buildSignatureNodeFromLocalConfig = ({
               handle: basePrompt.handle,
               versionId: basePrompt.versionId,
               versionNumber: basePrompt.version,
-              versionCreatedAt: basePrompt.versionCreatedAt,
+              versionCreatedAt: fromDate(basePrompt.versionCreatedAt),
             }),
             promptDraft: true,
           }

@@ -4,6 +4,7 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
+import type { WorkbenchCredential } from "@langwatch/experiment-contract";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 import {
@@ -54,7 +55,7 @@ export const experimentServer = defineServerModule("experiment")
     // The workbench family reads the key's PERSON, not the whole principal: a
     // legacy project key stands for nobody, and an api key stands for the
     // person it was issued to.
-    bindRestMiddleware(experimentWorkbenchCredential, (context) => {
+    bindRestMiddleware(experimentWorkbenchCredential, (context): WorkbenchCredential => {
       const credential = projectCredentialOfRequest(context.req.raw);
       if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
 

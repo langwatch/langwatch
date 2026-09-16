@@ -39,6 +39,7 @@ import type {
   ExperimentV3RunLoop,
 } from "#app/experiment-workbench.members";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
+import type { LoadedExecutionData } from "../services/experiment-execution-data.service.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
@@ -797,22 +798,18 @@ export const experimentV3AliasRest = defineRestRouter(ExperimentV3AliasApi)
   .build();
 
 /** The `:slug/run` SSE stream: the same orchestrator, with no mirror or writer. */
-function runEventStream(options: {
-  app: ExperimentV3RestApi;
-  projectId: string;
-  experimentId: string;
-  slug: string;
-  scope: ExecutionScope;
-  state: EvaluationsV3State;
-  datasetRows: unknown[];
-  datasetColumns: unknown;
-  loadedPrompts: unknown;
-  loadedAgents: unknown;
-  loadedEvaluators: unknown;
-  loadedWorkflows: unknown;
-  runPorts: ExperimentRunCollaborators;
-  carriedOverCells: unknown[];
-}): ReadableStream {
+function runEventStream(
+  options: {
+    app: ExperimentV3RestApi;
+    projectId: string;
+    experimentId: string;
+    slug: string;
+    scope: ExecutionScope;
+    state: EvaluationsV3State;
+    runPorts: ExperimentRunCollaborators;
+    carriedOverCells: unknown[];
+  } & LoadedExecutionData,
+): ReadableStream {
   const { app, projectId, slug } = options;
   const encoder = new TextEncoder();
 
@@ -829,8 +826,8 @@ function runEventStream(options: {
           state: options.state,
           datasetRows: options.datasetRows,
           datasetColumns: options.datasetColumns,
-          loadedPrompts: options.loadedPrompts as Map<string, VersionedPrompt>,
-          loadedAgents: options.loadedAgents as Map<string, TypedAgent>,
+          loadedPrompts: options.loadedPrompts,
+          loadedAgents: options.loadedAgents,
           ports: options.runPorts,
           workflows: app.run().workflows,
           loadedEvaluators: options.loadedEvaluators,

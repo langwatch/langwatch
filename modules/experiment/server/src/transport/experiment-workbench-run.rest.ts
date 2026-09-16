@@ -11,9 +11,7 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   ExperimentRunNotFoundError as RunNotFoundError,
   createInitialUIState,
@@ -25,7 +23,10 @@ import { HTTPException } from "hono/http-exception";
 
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
-import { ExperimentExecutionDataService } from "../services/experiment-execution-data.service.ts";
+import {
+  ExperimentExecutionDataService,
+  type LoadedExecutionData,
+} from "../services/experiment-execution-data.service.ts";
 import { ExperimentRunResultsWriterService } from "../services/experiment-run-results-writer.service.ts";
 import { ExperimentRunStateMirrorService } from "../services/experiment-run-state-mirror.service.ts";
 import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
@@ -249,22 +250,18 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
  * The `execute` event stream: runs the orchestrator, mirrors every frame onto
  * the run store and the saved cells, and writes each one as an SSE frame.
  */
-function executeEventStream(options: {
-  app: ExperimentV3RestApi;
-  projectId: string;
-  input: z.infer<typeof executionRequestSchema>;
-  state: EvaluationsV3State;
-  datasetRows: unknown[];
-  datasetColumns: unknown;
-  loadedPrompts: Map<string, VersionedPrompt>;
-  loadedAgents: Map<string, TypedAgent>;
-  loadedEvaluators: unknown;
-  loadedWorkflows: unknown;
-  runPorts: ExperimentRunCollaborators;
-  mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
-  resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
-  userId: string;
-}): ReadableStream {
+function executeEventStream(
+  options: {
+    app: ExperimentV3RestApi;
+    projectId: string;
+    input: z.infer<typeof executionRequestSchema>;
+    state: EvaluationsV3State;
+    runPorts: ExperimentRunCollaborators;
+    mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
+    resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
+    userId: string;
+  } & LoadedExecutionData,
+): ReadableStream {
   const { app, projectId, input, mirror, resultsWriter, userId } = options;
   const encoder = new TextEncoder();
 

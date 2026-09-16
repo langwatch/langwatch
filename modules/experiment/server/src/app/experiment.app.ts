@@ -63,7 +63,7 @@ import type {
   ExperimentWorkbenchObserver,
   ExperimentWorkbenchPermissions,
 } from "#app/experiment-workbench.members";
-import { on } from "node:events";
+import { on, type EventEmitter } from "node:events";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import {
