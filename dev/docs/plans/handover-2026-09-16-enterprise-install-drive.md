@@ -493,7 +493,51 @@ again on the next member.
 Not yet proved to answer, because no process on this branch boots far enough to
 serve anything - blocked on the worker, not on governance or scim.
 
-### The blocker: two tokens named "licensing"
+### Next: one build, and why it did not land tonight
+
+The user's ruling in one line: **there is no separate build. There is one build
+containing everything; enterprise editions are a licence inside the app.** So the
+generator's tier is the defect, not its plumbing.
+
+The change is small and it is **atomic**:
+
+1. `dev/scripts/generate-modules.mjs` - delete the tier. `tierOf`, the `tiers`
+   argument threaded through `declarationsFor`, `memberSourceFor` and
+   `packageSourceFor`, and the `LANGWATCH_BUILD_TIER` read in the CLI all go.
+   One list, every catalogue entry whose half exists on disk.
+2. `packages/architecture-enforcer/tests/generated-module-lists.unit.test.ts` -
+   rewrite. It asserts the tier split by name today ("writes what the
+   open-source tier already carries" at :41, "names every enterprise module the
+   enterprise tier installs" at :85), so it fails by design once there is one
+   list. Replace with: every catalogue entry that has the half appears exactly
+   once.
+3. Regenerate. `modules/package.json` goes from 44 dependencies to 49.
+4. `env -u CI pnpm install --no-frozen-lockfile`, and commit `pnpm-lock.yaml`
+   with it.
+
+**Step 4 is why this waited.** At the time of writing `pnpm-lock.yaml` is already
+dirty and **192 `package.json` files are dirty** - a peer session is mid-flight
+on a workspace-wide manifest rewrite. Regenerating the lockfile would absorb all
+of it into this drive's commit. Steps 1-3 cannot land without step 4 either: a
+`modules/package.json` naming five dependencies the lockfile does not carry fails
+every frozen install, including CI's. Do the whole thing when the tree is quiet,
+in one commit.
+
+`ADR-144 §6` must be amended in the same change - it is the section that says
+enterprise entries are emitted only in the enterprise build.
+
+Two things to check while doing it, neither yet verified:
+
+- `coreAuditLog` (`api-production.composition.ts:52`) installs `auditLogNullServer`
+  when `audit-log` is absent from the list. `audit-log` is a **core** catalogue
+  entry with no `server` half on disk, which is why it is absent at both tiers -
+  so that fallback is probably still correct and is **not** part of this change.
+  Confirm rather than assume.
+- The enterprise modules must actually boot once installed. Only the licensing
+  collision below is known; there may be more behind it, and the only way to find
+  out is the boot.
+
+### The blocker that is now fixed: two tokens named "licensing"
 
 With the enterprise modules always installed, this is what stops the boot. Found
 by booting, not by any static check.
@@ -520,14 +564,23 @@ Both were reproduced, in that order. The guard was written, proved to swap one
 error for the other, and reverted - the duplicate error names both providers and
 is the better diagnostic to leave in place.
 
-This is the same defect as governance's four `moduleApi("governance")` tokens,
-in a second module, and it is a design decision rather than a patch. The obvious
-shape - have the licensing module declare the core token as its `contract` so
-there is one object - costs the module its own `LicensingApi` surface, because a
-module provides exactly one contract. Do not guess between that and renaming.
+**Fixed in `351c4602a2`, and it was not a design choice after all.** Two lines in
+`packages/runtime-composition/src/application.ts` settle it: `resolveProviders`
+keys `apiOwners` by `token.name` for a `ModuleApiToken` **deliberately**, and
+`assertApiDeclarations` refuses any module whose `apiContract.name` differs from
+its own name. So a `moduleApi("licensing")` token may only ever be provided by
+`licensingServer`. `ActivatedLicenseSource` is a seam the **process** fills, so
+declaring it with `moduleApi` was borrowing a name it may not hold.
 
-`entitlement` cannot import from enterprise, so whatever token both sides share
-has to live in a core contract.
+`DependencyToken<T>` is `ModuleApiToken<T> | (abstract new (...) => T)`. The
+second shape is keyed by identity and claims no name, so the token is now an
+abstract class implementing `EntitlementSource`. Nothing else moves: the
+licensing module still provides `LicensingApi` for the sso gate that depends on
+it, and entitlement still resolves the source the process builds.
+
+Repointing the licensing module's `contract` at the core token - the shape that
+looked obvious first - would have been wrong: `enterprise/modules/sso` depends on
+`LicensingApi`, and a module provides exactly one contract.
 
 ### Then
 
