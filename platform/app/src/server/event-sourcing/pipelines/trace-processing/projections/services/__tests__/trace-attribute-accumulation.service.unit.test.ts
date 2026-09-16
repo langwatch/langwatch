@@ -19,13 +19,18 @@ import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
-import type { TraceOriginService } from "../trace-origin.service";
+import { TraceOriginService } from "../trace-origin.service";
 
 function makeService() {
   return new TraceAttributeAccumulationService(
     // extractAttributes never touches the origin service.
     {} as TraceOriginService,
   );
+}
+
+function makeAccumulationService() {
+  // accumulateAttributes does reach the origin service, so use the real one.
+  return new TraceAttributeAccumulationService(new TraceOriginService());
 }
 
 function makeSpan(
@@ -354,14 +359,6 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
  * "has this trace been through the evaluator", so it only climbs.
  */
 describe("TraceAttributeAccumulationService.accumulateAttributes", () => {
-  function accumulateService() {
-    return new TraceAttributeAccumulationService({
-      stripLegacyMarkers: () => void 0,
-      hoistOrigin: () => void 0,
-      hoistSource: () => void 0,
-    } as unknown as TraceOriginService);
-  }
-
   function accumulate(
     existingDepth: string | undefined,
     incomingDepth: number | string | undefined,
@@ -374,7 +371,7 @@ describe("TraceAttributeAccumulationService.accumulateAttributes", () => {
     if (incomingDepth !== void 0) {
       spanAttributes["langwatch.reserved.causality_depth"] = incomingDepth;
     }
-    return accumulateService().accumulateAttributes({
+    return makeAccumulationService().accumulateAttributes({
       state: { attributes } as unknown as TraceSummaryData,
       span: makeSpan({
         spanAttributes: spanAttributes as NormalizedSpan["spanAttributes"],
