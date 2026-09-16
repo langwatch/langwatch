@@ -27,36 +27,15 @@ const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
   mockSsoConnections: vi.fn(),
 }));
 
-/**
- * The service is real code under test in its own suite; here it is a spy, so
- * these tests can say WHICH verb a procedure reached rather than what the
- * verb then did.
- */
-vi.mock(
-  "~/server/app-layer/identity/sso-connection-backoffice.service",
-  async (importOriginal) => {
-    const actual =
-      await importOriginal<
-        typeof import("~/server/app-layer/identity/sso-connection-backoffice.service")
-      >();
-    return {
-      ...actual,
-      SsoConnectionBackofficeService: class {
-        list = mockService.list;
-        getById = mockService.getById;
-        approveDomainClaim = mockService.approveDomainClaim;
-        rejectDomainClaim = mockService.rejectDomainClaim;
-        attestDomain = mockService.attestDomain;
-        activateConnection = mockService.activateConnection;
-        suspendConnection = mockService.suspendConnection;
-        resumeConnection = mockService.resumeConnection;
-        requestTeardown = mockService.requestTeardown;
-      },
-    };
-  },
-);
-
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  /**
+   * The service is real code under test in its own suite; here it is a spy,
+   * so these tests can say WHICH verb a procedure reached rather than what
+   * the verb then did. The router reaches it through this seam, so the spy
+   * has to be the seam's answer — mocking the service class instead would
+   * never be loaded, because this factory replaces the runtime whole.
+   */
+  ssoConnectionBackoffice: () => mockService,
   ssoConnections: mockSsoConnections,
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.

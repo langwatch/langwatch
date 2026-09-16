@@ -188,6 +188,7 @@ import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.r
 import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
 import { PrismaSsoMigrationFinalizationRepository } from "./repositories/sso-migration-finalization.prisma.repository";
+import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
 import { PrismaSsoMigrationProgressRepository } from "./repositories/sso-migration-progress.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
 import {
@@ -225,7 +226,6 @@ import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
 import { ssoMethodIsConfiguredWith } from "./sso-method-configured";
-import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
 import { ssoProviderConfigCipher } from "./sso-provider-config-cipher";
 import {
   DnsDomainProofLookup,
@@ -892,8 +892,10 @@ export function ssoSelfServe(): SsoSelfServeService {
       evidence: new PrismaSsoMigrationFinalizationRepository(
         prisma,
         activationBreakGlassPort(),
-        new PrismaSsoMigrationProgressRepository(prisma, Date.now, ({ userId }) =>
-          credentialAccounts().hasPassword({ userId }),
+        new PrismaSsoMigrationProgressRepository(
+          prisma,
+          Date.now,
+          ({ userId }) => credentialAccounts().hasPassword({ userId }),
         ),
       ),
       retirement: new PrismaSsoLegacyIdentityRetirement({

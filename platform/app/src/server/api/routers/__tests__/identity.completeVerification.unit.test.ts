@@ -117,6 +117,7 @@ vi.mock(
     ssoArrival: () => ({}),
     ssoAssertion: () => ({}),
     ssoBreakGlass: () => ({}),
+    ssoConnectionBackoffice: () => ({}),
     ssoConnections: () => ({}),
     ssoDomainClaimQueue: () => ({}),
     ssoDomainReproof: () => ({}),

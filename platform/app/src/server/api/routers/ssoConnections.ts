@@ -126,7 +126,10 @@ export const ssoConnectionsRouter = createTRPCRouter({
         action: "approveDomainClaim",
         args: input,
       });
-      await ssoConnectionBackoffice().approveDomainClaim({ ...input, operator });
+      await ssoConnectionBackoffice().approveDomainClaim({
+        ...input,
+        operator,
+      });
     }),
 
   rejectDomainClaim: protectedProcedure
@@ -163,7 +166,10 @@ export const ssoConnectionsRouter = createTRPCRouter({
     .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
     .mutation(async ({ ctx, input }) => {
       const operator = await audited({ ctx, action: "activate", args: input });
-      await ssoConnectionBackoffice().activateConnection({ ...input, operator });
+      await ssoConnectionBackoffice().activateConnection({
+        ...input,
+        operator,
+      });
     }),
 
   suspend: protectedProcedure
