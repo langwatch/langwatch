@@ -19,7 +19,7 @@ import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import AnalyticsLayout from "../analytics-layout.tsx";
 import { useShowErrorToast } from "../../../behavior/analytics-feedback.ts";
 import { useWidgetGranularity } from "../../../behavior/use-widget-granularity.ts";
-import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
+import { useFeatureFlag } from "@langwatch/ui-host/feature-flag";
 import { analyticsApi as api } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ReportGrid } from "../report-grid.tsx";

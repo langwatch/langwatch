@@ -22,7 +22,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: mockCloseDrawer }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
+vi.mock("@langwatch/ui-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

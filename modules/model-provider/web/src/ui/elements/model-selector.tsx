@@ -22,12 +22,12 @@ import {
   allLitellmModels,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
 } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
-} from "@langwatch/prompt-web/surfaces/llm-config-constants";
+} from "@langwatch/prompt-contract/llm-config-constants";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Link } from "@langwatch/ui-host/link";

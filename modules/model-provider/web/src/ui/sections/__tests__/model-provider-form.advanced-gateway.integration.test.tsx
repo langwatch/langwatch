@@ -47,7 +47,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
+vi.mock("@langwatch/ui-host/feature-flag", () => ({
   useFeatureFlag: (...args: unknown[]) => mockUseFeatureFlag(...args),
 }));
 

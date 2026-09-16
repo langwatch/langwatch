@@ -2,6 +2,10 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  // Many suites here mock modules, and with isolation off those mocks
+  // leaked across files (same symptom user/web and model-provider-web hit
+  // and fixed the same way).
+  isolate: true,
   test: {
     // Per-file rather than global: the visualization and model suites are pure
     // and run faster without a DOM, and every file that renders declares

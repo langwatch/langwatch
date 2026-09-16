@@ -12,6 +12,9 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // Many suites here mock modules, and with isolation off those mocks
+    // leaked across files (same symptom user/web hit and fixed the same way).
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // The two screen suites drive real user events through Chakra menus and a

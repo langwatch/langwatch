@@ -30,10 +30,10 @@ import { filterOutEmptyFilters } from "../analytics/utils.ts";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
-} from "@langwatch/workflow-web/surfaces/workflow-api";
+} from "@langwatch/api-client-web/workflow-api";
 import { availableFilters } from "../../../model/filters/registry.ts";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types.ts";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";

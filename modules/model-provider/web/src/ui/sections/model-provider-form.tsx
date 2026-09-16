@@ -11,7 +11,7 @@ import {
 } from "../../behavior/use-all-model-providers-list.ts";
 import { useCredentialProbeGate } from "../../behavior/use-credential-probe-gate.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
+import { useFeatureFlag } from "@langwatch/ui-host/feature-flag";
 import { useModelProviderApiKeyValidation } from "../../behavior/use-model-provider-api-key-validation.ts";
 import { useModelProviderForm } from "../../behavior/use-model-provider-form.ts";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";

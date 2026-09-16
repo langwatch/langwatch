@@ -4,7 +4,7 @@ import {
   mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
 } from "@langwatch/model-provider-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 export type { ModelMetadataForFrontend };
 
