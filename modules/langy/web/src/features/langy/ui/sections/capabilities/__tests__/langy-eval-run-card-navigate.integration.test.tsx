@@ -95,7 +95,7 @@ function renderCard(output: unknown) {
 }
 
 describe("Feature: the platform's link for a resource addresses that resource, not an index", () => {
-  describe("Rule: a card's open link is the platform's link for the resource it shows", () => {
+  describe("given a card's open link is the platform's link for the resource it shows", () => {
     describe("given Langy fetched one scenario run and shows its card", () => {
       /** @scenario "A scenario card links to the run it shows, not the simulations list" */
       it("targets that specific run, not the simulations index page", () => {

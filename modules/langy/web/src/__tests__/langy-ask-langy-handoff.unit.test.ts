@@ -47,7 +47,7 @@ describe("askLangy — command-bar → panel handoff", () => {
     });
   });
 
-  describe("consumePendingPrompt", () => {
+  describe("when consuming the pending prompt", () => {
     it("clears the queued prompt so the panel sends it exactly once", () => {
       useLangyStore.getState().askLangy("find the slowest traces");
       expect(useLangyStore.getState().pendingPrompt).not.toBeNull();

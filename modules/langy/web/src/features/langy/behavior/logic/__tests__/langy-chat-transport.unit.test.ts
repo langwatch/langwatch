@@ -613,7 +613,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("reconnectToStream", () => {
+  describe("when reconnecting to the stream", () => {
     it("returns null — resume is a panel-driven re-subscribe, not a transport reconnect", async () => {
       const { transport } = makeTransport();
       await expect(transport.reconnectToStream!(options())).resolves.toBeNull();

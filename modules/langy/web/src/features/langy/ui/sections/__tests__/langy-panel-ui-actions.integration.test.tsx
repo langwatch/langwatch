@@ -330,7 +330,7 @@ async function startTurn() {
 }
 
 describe("Feature: Langy drives the open page through typed UI actions", () => {
-  describe("Rule: the page executes the action the agent dispatched", () => {
+  describe("when the page executes the action the agent dispatched", () => {
     describe("given the page handles the dispatched kind", () => {
       describe("when the action arrives on the turn's stream", () => {
         it("claims the action and runs the page's handler", async () => {
@@ -356,7 +356,7 @@ describe("Feature: Langy drives the open page through typed UI actions", () => {
     });
   });
 
-  describe("Rule: page control is switched off by its rollout flag", () => {
+  describe("given page control is switched off by its rollout flag", () => {
     describe("given page control was switched off before the action arrived", () => {
       describe("when the action arrives on the turn's stream", () => {
         /** @scenario "With page control rolled back, the open page ignores dispatched actions" */

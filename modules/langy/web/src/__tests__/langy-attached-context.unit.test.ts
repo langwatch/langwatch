@@ -81,7 +81,7 @@ describe("attachContext", () => {
     });
   });
 
-  describe("clearAttachedContext", () => {
+  describe("when clearing the attached context", () => {
     it("empties the list", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore.getState().clearAttachedContext();

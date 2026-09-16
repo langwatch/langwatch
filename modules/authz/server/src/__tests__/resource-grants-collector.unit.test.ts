@@ -15,7 +15,7 @@ const customRoleBinding = [
 ];
 
 describe("collector at the resource tier", () => {
-  describe("collectGrants for an anonymous principal", () => {
+  describe("when collecting grants for an anonymous principal", () => {
     it("returns the empty snapshot without touching storage", async () => {
       const reader = makeReader();
       const grants = await AuthzCollectorService.create({
@@ -32,7 +32,7 @@ describe("collector at the resource tier", () => {
     });
   });
 
-  describe("collectGrants for an apiKey principal", () => {
+  describe("when collecting grants for an apiKey principal", () => {
     it("reads only the key's bindings — a key has no membership of its own", async () => {
       const reader = makeReader({
         findApiKeyBindings: vi.fn().mockResolvedValue(customRoleBinding),
@@ -92,7 +92,7 @@ describe("collector at the resource tier", () => {
     });
   });
 
-  describe("collectResourceGrants (ShareLink shim, ADR-057)", () => {
+  describe("when collecting resource grants (ShareLink shim, ADR-057)", () => {
     it("returns nothing for non-resource scopes without querying", async () => {
       const reader = makeReader();
       const grants = await AuthzCollectorService.create({

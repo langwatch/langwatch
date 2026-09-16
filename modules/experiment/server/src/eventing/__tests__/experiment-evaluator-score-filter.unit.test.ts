@@ -5,7 +5,7 @@ import {
 } from "../experiment-evaluator-score-filter.process.ts";
 
 describe("evaluatorScoreFilter", () => {
-  describe("shouldStripScore", () => {
+  describe("when deciding whether to strip a score", () => {
     it("returns true for langevals/exact_match", () => {
       expect(shouldStripScore("langevals/exact_match")).toBe(true);
     });
@@ -39,7 +39,7 @@ describe("evaluatorScoreFilter", () => {
     });
   });
 
-  describe("buildStripScoreEvaluatorIds", () => {
+  describe("when building the strip-score evaluator ids", () => {
     it("returns empty set for no evaluators", () => {
       const result = buildStripScoreEvaluatorIds([]);
       expect(result.size).toBe(0);

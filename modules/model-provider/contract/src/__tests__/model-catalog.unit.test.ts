@@ -14,7 +14,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 describe("Registry Model Access", () => {
-  describe("getAllModels", () => {
+  describe("when getting all models", () => {
     it("returns all models as a record", () => {
       const models = getAllModels();
       expect(typeof models).toBe("object");
@@ -35,7 +35,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getModelById", () => {
+  describe("when getting a model by id", () => {
     it("returns a model when it exists", () => {
       const allModels = getAllModels();
       const modelId = Object.keys(allModels)[0]!;
@@ -50,7 +50,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getModelMetadata", () => {
+  describe("when getting model metadata", () => {
     it("returns metadata for existing model", () => {
       const allModels = getAllModels();
       const modelId = Object.keys(allModels)[0]!;
@@ -77,7 +77,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getProviderModelOptions", () => {
+  describe("when getting provider model options", () => {
     it("returns models for a valid provider", () => {
       const options = getProviderModelOptions("openai", "chat");
       expect(options.length).toBeGreaterThan(0);
@@ -108,7 +108,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getModelsForProvider", () => {
+  describe("when getting models for a provider", () => {
     it("returns all models for a provider", () => {
       const models = getModelsForProvider("openai");
       expect(models.length).toBeGreaterThan(0);
@@ -121,7 +121,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getAllProviders", () => {
+  describe("when getting all providers", () => {
     it("returns sorted list of providers", () => {
       const providers = getAllProviders();
       expect(providers.length).toBeGreaterThan(0);
@@ -139,7 +139,7 @@ describe("Registry Model Access", () => {
     });
   });
 
-  describe("getRegistryMetadata", () => {
+  describe("when getting registry metadata", () => {
     it("returns registry metadata", () => {
       const metadata = getRegistryMetadata();
       expect(metadata).toHaveProperty("updatedAt");
@@ -151,7 +151,7 @@ describe("Registry Model Access", () => {
 });
 
 describe("Backward Compatibility", () => {
-  describe("allLitellmModels", () => {
+  describe("given the allLitellmModels export", () => {
     it("is a record of models with mode", () => {
       expect(typeof allLitellmModels).toBe("object");
       expect(Object.keys(allLitellmModels).length).toBeGreaterThan(0);
@@ -188,7 +188,7 @@ describe("Backward Compatibility", () => {
 });
 
 describe("hasVariantSuffix", () => {
-  describe("known variant suffixes", () => {
+  describe("given a known variant suffix", () => {
     it("returns true for :free suffix", () => {
       expect(hasVariantSuffix("openrouter/model:free")).toBe(true);
     });
@@ -206,7 +206,7 @@ describe("hasVariantSuffix", () => {
     });
   });
 
-  describe("case insensitivity", () => {
+  describe("given a variant suffix in a different case", () => {
     it("returns true for :FREE (uppercase)", () => {
       expect(hasVariantSuffix("openrouter/model:FREE")).toBe(true);
     });
@@ -224,7 +224,7 @@ describe("hasVariantSuffix", () => {
     });
   });
 
-  describe("numeric suffixes (Bedrock version numbers)", () => {
+  describe("given a numeric suffix (Bedrock version numbers)", () => {
     it("returns false for :0 suffix", () => {
       expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
     });
@@ -238,7 +238,7 @@ describe("hasVariantSuffix", () => {
     });
   });
 
-  describe("models without colons", () => {
+  describe("given a model id without colons", () => {
     it("returns false for model without any colon", () => {
       expect(hasVariantSuffix("openai/gpt-4o")).toBe(false);
     });
@@ -248,7 +248,7 @@ describe("hasVariantSuffix", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("given an edge-case model id", () => {
     it("handles model with multiple colons correctly", () => {
       // Should check only the last colon
       expect(hasVariantSuffix("some/model:v1:free")).toBe(true);
@@ -263,9 +263,9 @@ describe("hasVariantSuffix", () => {
     });
   });
 
-  describe("real-world model IDs from major providers", () => {
+  describe("given real-world model IDs from major providers", () => {
     // AWS Bedrock models (should NOT be filtered - numeric version suffixes)
-    describe("AWS Bedrock", () => {
+    describe("given an AWS Bedrock model id", () => {
       it("preserves Anthropic Claude models on Bedrock", () => {
         expect(hasVariantSuffix("anthropic.claude-3-haiku-20240307-v1:0")).toBe(false);
         expect(hasVariantSuffix("anthropic.claude-opus-4-5-20251101-v1:0")).toBe(false);
@@ -308,7 +308,7 @@ describe("hasVariantSuffix", () => {
     });
 
     // Anthropic direct API (no colons)
-    describe("Anthropic Direct API", () => {
+    describe("given an Anthropic Direct API model id", () => {
       it("preserves direct Anthropic model IDs", () => {
         expect(hasVariantSuffix("claude-sonnet-4-5-20250929")).toBe(false);
         expect(hasVariantSuffix("claude-opus-4-5-20251101")).toBe(false);
@@ -326,7 +326,7 @@ describe("hasVariantSuffix", () => {
     });
 
     // Google Gemini (no colons)
-    describe("Google Gemini", () => {
+    describe("given a Google Gemini model id", () => {
       it("preserves Gemini model IDs", () => {
         expect(hasVariantSuffix("gemini-2.5-pro")).toBe(false);
         expect(hasVariantSuffix("gemini-2.5-flash")).toBe(false);
@@ -335,7 +335,7 @@ describe("hasVariantSuffix", () => {
     });
 
     // LiteLLM routing variants (SHOULD be filtered)
-    describe("LiteLLM routing variants", () => {
+    describe("given LiteLLM routing variants", () => {
       it("filters :free variants from OpenRouter", () => {
         expect(hasVariantSuffix("allenai/molmo-2-8b:free")).toBe(true);
         expect(hasVariantSuffix("mistralai/devstral-2512:free")).toBe(true);
@@ -439,7 +439,7 @@ describe("Multimodal Support", () => {
 });
 
 describe("Parameter Constraints", () => {
-  describe("getParameterConstraints", () => {
+  describe("when getting parameter constraints", () => {
     it("returns constraints for Anthropic models", () => {
       const constraints = getParameterConstraints("anthropic/claude-sonnet-4");
 
@@ -483,7 +483,7 @@ describe("Parameter Constraints", () => {
     });
   });
 
-  describe("Anthropic provider constraints", () => {
+  describe("given Anthropic provider constraints", () => {
     it("has temperature constraint defined", () => {
       expect(modelProviders.anthropic.parameterConstraints).toBeDefined();
       expect(modelProviders.anthropic.parameterConstraints?.temperature).toEqual({

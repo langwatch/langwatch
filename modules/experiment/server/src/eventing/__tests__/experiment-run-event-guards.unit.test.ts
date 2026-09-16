@@ -24,7 +24,7 @@ const baseEvent = {
 };
 
 describe("typeGuards", () => {
-  describe("isExperimentRunStartedEvent", () => {
+  describe("when checking for an experiment run started event", () => {
     it("returns true for ExperimentRunStartedEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
@@ -59,7 +59,7 @@ describe("typeGuards", () => {
     });
   });
 
-  describe("isTargetResultEvent", () => {
+  describe("when checking for a target result event", () => {
     it("returns true for TargetResultEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
@@ -94,7 +94,7 @@ describe("typeGuards", () => {
     });
   });
 
-  describe("isEvaluatorResultEvent", () => {
+  describe("when checking for an evaluator result event", () => {
     it("returns true for EvaluatorResultEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,
@@ -129,7 +129,7 @@ describe("typeGuards", () => {
     });
   });
 
-  describe("isExperimentRunCompletedEvent", () => {
+  describe("when checking for an experiment run completed event", () => {
     it("returns true for ExperimentRunCompletedEvent", () => {
       const event: ExperimentRunProcessingEvent = {
         ...baseEvent,

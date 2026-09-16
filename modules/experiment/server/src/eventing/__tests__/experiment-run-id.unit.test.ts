@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ExperimentRunIds } from "../experiment-run-id.process.ts";
 
 describe("ExperimentRunIds", () => {
-  describe("generateDeterministicResultId", () => {
+  describe("when generating a deterministic result id", () => {
     const baseParams = {
       tenantId: "tenant-1",
       runId: "run-123",

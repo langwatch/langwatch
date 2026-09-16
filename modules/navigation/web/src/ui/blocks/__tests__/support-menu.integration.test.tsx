@@ -84,7 +84,7 @@ describe("the support menu chat placement", () => {
     });
   });
 
-  describe("chat entry placement", () => {
+  describe("given the chat entry's placement in the support menu", () => {
     /** @scenario Chat moves inside the Support menu */
     it("folds the chat into the Support menu, no standalone entry", async () => {
       const { openSupportChat } = renderMenu();

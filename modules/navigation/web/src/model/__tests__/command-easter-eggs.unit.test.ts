@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { easterEggs, findEasterEgg } from "../command-easter-eggs.ts";
 
 describe("easterEggs", () => {
-  describe("findEasterEgg", () => {
+  describe("when finding an easter egg", () => {
     it("finds confetti easter egg with exact match", () => {
       const result = findEasterEgg("confetti");
       expect(result).not.toBeNull();
@@ -67,7 +67,7 @@ describe("easterEggs", () => {
     });
   });
 
-  describe("easterEggs registry", () => {
+  describe("given the easter eggs registry", () => {
     it("has all required fields for each easter egg", () => {
       easterEggs.forEach((egg) => {
         expect(egg.id).toBeDefined();

@@ -19,8 +19,8 @@ describe("executionScope utilities", () => {
     { question: "Foo", expected: "Bar" }, // row 3 - non-empty
   ];
 
-  describe("computeExecutionCells", () => {
-    describe("full scope", () => {
+  describe("when computing execution cells", () => {
+    describe("given a full scope", () => {
       it("returns all non-empty cells for full execution", () => {
         const scope: ExecutionScope = { type: "full" };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
@@ -45,7 +45,7 @@ describe("executionScope utilities", () => {
       });
     });
 
-    describe("rows scope", () => {
+    describe("given a rows scope", () => {
       it("returns cells for specified non-empty rows only", () => {
         const scope: ExecutionScope = { type: "rows", rowIndices: [0, 1] };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
@@ -90,7 +90,7 @@ describe("executionScope utilities", () => {
       });
     });
 
-    describe("target scope", () => {
+    describe("given a target scope", () => {
       it("returns cells for all non-empty rows for a single target", () => {
         const scope: ExecutionScope = { type: "target", targetId: "target-1" };
         const cells = computeExecutionCells({ scope, targetIds, datasetRows });
@@ -172,7 +172,7 @@ describe("executionScope utilities", () => {
       });
     });
 
-    describe("cell scope", () => {
+    describe("given a cell scope", () => {
       it("returns exactly one cell for a single cell execution", () => {
         const scope: ExecutionScope = {
           type: "cell",
@@ -219,7 +219,7 @@ describe("executionScope utilities", () => {
       });
     });
 
-    describe("edge cases", () => {
+    describe("given empty datasets, targets, or rows", () => {
       it("handles empty dataset", () => {
         const scope: ExecutionScope = { type: "full" };
         const cells = computeExecutionCells({
@@ -259,7 +259,7 @@ describe("executionScope utilities", () => {
     });
   });
 
-  describe("createExecutionCellSet and isCellInExecution", () => {
+  describe("when looking up cells in an execution cell set", () => {
     it("creates a set for fast lookup", () => {
       const cells = [
         { rowIndex: 0, targetId: "target-1" },
@@ -274,7 +274,7 @@ describe("executionScope utilities", () => {
     });
   });
 
-  describe("getExecutionCellCount", () => {
+  describe("when getting the execution cell count", () => {
     it("returns correct count for full scope", () => {
       const scope: ExecutionScope = { type: "full" };
       const count = getExecutionCellCount({ scope, targetIds, datasetRows });
@@ -303,7 +303,7 @@ describe("executionScope utilities", () => {
     });
   });
 
-  describe("getExecutionRowIndices", () => {
+  describe("when getting execution row indices", () => {
     it("returns unique row indices being executed", () => {
       const cells = [
         { rowIndex: 0, targetId: "target-1" },
@@ -318,7 +318,7 @@ describe("executionScope utilities", () => {
     });
   });
 
-  describe("getExecutionTargetIds", () => {
+  describe("when getting execution target IDs", () => {
     it("returns unique target IDs being executed", () => {
       const cells = [
         { rowIndex: 0, targetId: "target-1" },
@@ -333,7 +333,7 @@ describe("executionScope utilities", () => {
     });
   });
 
-  describe("real-world scenarios", () => {
+  describe("given a real-world execution scenario", () => {
     it("scenario: user runs single cell on row that already has results", () => {
       // Row 0 already has results, user clicks to re-run just target-1
       const scope: ExecutionScope = {

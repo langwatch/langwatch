@@ -91,7 +91,7 @@ describe("the inspector tape", () => {
     });
   });
 
-  describe("scrubbing", () => {
+  describe("when scrubbing the tape to a sequence", () => {
     it("tapeUpTo caps the tape at a seq; null means the whole tape", () => {
       useLangyDevLog.getState().setRecording(true);
       const log = useLangyDevLog.getState();
@@ -104,7 +104,7 @@ describe("the inspector tape", () => {
     });
   });
 
-  describe("conversation attribution", () => {
+  describe("when attributing a lane to a conversation", () => {
     beforeEach(() => {
       useLangyDevLog.getState().setRecording(true);
     });
@@ -143,7 +143,7 @@ describe("the inspector tape", () => {
     });
   });
 
-  describe("scoping the view to one conversation", () => {
+  describe("when scoping the view to one conversation", () => {
     it("keeps the conversation's records and the unattributed ones, hides foreign ones", () => {
       useLangyDevLog.getState().setRecording(true);
       const log = useLangyDevLog.getState();
@@ -162,7 +162,7 @@ describe("the inspector tape", () => {
     });
   });
 
-  describe("replaying the durable lane", () => {
+  describe("when replaying the durable lane", () => {
     it("re-runs the shared fold over a tape prefix — time travel is a replay", () => {
       useLangyDevLog.getState().setRecording(true);
       const log = useLangyDevLog.getState();

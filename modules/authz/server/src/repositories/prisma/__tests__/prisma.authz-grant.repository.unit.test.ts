@@ -7,7 +7,7 @@ import { PrismaAuthzGrantRepository } from "../prisma.authz-grant.repository.ts"
  */
 
 describe("PrismaAuthzGrantRepository", () => {
-  describe("findCustomRole", () => {
+  describe("when finding the custom role", () => {
     it("reads the tenancy and the vocabulary in one query", async () => {
       const findUnique = vi
         .fn()
@@ -28,7 +28,7 @@ describe("PrismaAuthzGrantRepository", () => {
     });
   });
 
-  describe("findTeamOrganization", () => {
+  describe("when finding the team's organization", () => {
     it("reads the owning organization for a team", async () => {
       const findUnique = vi.fn().mockResolvedValue({ organizationId: "org-1" });
       const prisma = { team: { findUnique } } as never;
@@ -45,7 +45,7 @@ describe("PrismaAuthzGrantRepository", () => {
     });
   });
 
-  describe("findProjectLineage", () => {
+  describe("when finding the project lineage", () => {
     describe("when the project has no team", () => {
       it("returns null rather than a half-filled lineage", async () => {
         const findUnique = vi.fn().mockResolvedValue({ team: null });

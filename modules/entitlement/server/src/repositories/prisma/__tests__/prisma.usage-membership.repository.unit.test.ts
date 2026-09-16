@@ -49,7 +49,7 @@ describe("PrismaUsageMembershipRepository", () => {
     repository = PrismaUsageMembershipRepository.create(mockPrisma as unknown as PrismaClient);
   });
 
-  describe("getMemberCount", () => {
+  describe("when getting the member count", () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2024-03-15T12:00:00.000Z"));
@@ -249,7 +249,7 @@ describe("PrismaUsageMembershipRepository", () => {
     });
   });
 
-  describe("getMembersLiteCount", () => {
+  describe("when getting the lite members count", () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2024-03-15T12:00:00.000Z"));
@@ -440,7 +440,7 @@ describe("PrismaUsageMembershipRepository", () => {
     });
   });
 
-  describe("findCurrentMonthCost", () => {
+  describe("when finding the current month's cost", () => {
     /** @scenario "findCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }, { id: "proj-2" }]);
@@ -506,7 +506,7 @@ describe("PrismaUsageMembershipRepository", () => {
     });
   });
 
-  describe("findCurrentMonthCostForProjects", () => {
+  describe("when finding the current month's cost for projects", () => {
     it("aggregates cost for specified project IDs", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
       const projectIds = ["proj-a", "proj-b", "proj-c"];

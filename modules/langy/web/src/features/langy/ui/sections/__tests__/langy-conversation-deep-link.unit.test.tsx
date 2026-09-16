@@ -85,7 +85,7 @@ describe("useLangyConversationDeepLink", () => {
     });
   });
 
-  describe("while the read has not answered", () => {
+  describe("given the read has not answered yet", () => {
     it("waits, rather than dropping the link on the floor", () => {
       detailResult.current = {
         data: undefined,

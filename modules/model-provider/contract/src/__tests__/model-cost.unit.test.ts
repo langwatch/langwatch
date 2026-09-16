@@ -477,7 +477,7 @@ describe("matchModelCostWithFallbacks", () => {
     });
   });
 
-  describe("with real model costs from the registry", () => {
+  describe("given real model costs from the registry", () => {
     const realCosts = getStaticModelCosts();
 
     it("matches real openai/gpt-4o entry by bare model name", () => {

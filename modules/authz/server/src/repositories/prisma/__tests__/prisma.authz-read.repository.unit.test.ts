@@ -70,7 +70,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findUserBindings", () => {
+  describe("when finding user bindings", () => {
     it("gates the direct binding on current organization membership", async () => {
       const findMany = vi.fn().mockResolvedValue([
         {
@@ -118,7 +118,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findGroupBindings", () => {
+  describe("when finding group bindings", () => {
     it("reaches bindings through group membership and stamps viaGroupId", async () => {
       const findMany = vi.fn().mockResolvedValue([
         {
@@ -177,7 +177,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findApiKeyBindings", () => {
+  describe("when finding API key bindings", () => {
     it("reads the key's own bindings in this organization, with no membership gate", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const prisma = {
@@ -204,7 +204,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findApiKeyOwner", () => {
+  describe("when finding the API key owner", () => {
     describe("when the key belongs to a user", () => {
       it("returns the owning user id for a personal key", async () => {
         const findUnique = vi.fn().mockResolvedValue({ userId: "alice" });
@@ -242,7 +242,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findCustomRolePermissions", () => {
+  describe("when finding custom role permissions", () => {
     describe("when the principal is a user", () => {
       /** @scenario "A poisoned cross-organization binding does not grant access" */
       it("fences on the organization and excludes every API-key system role", async () => {
@@ -337,7 +337,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findShareLinks", () => {
+  describe("when finding share links", () => {
     it("filters by presented token AND the resource links, project-anchored", async () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const prisma = {
@@ -375,7 +375,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findLegacyTeamMemberships", () => {
+  describe("when finding legacy team memberships", () => {
     it("scopes TeamUser rows to the organization and flattens the personal flag", async () => {
       const findMany = vi.fn().mockResolvedValue([
         {
@@ -425,7 +425,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findProjectLineage", () => {
+  describe("when finding the project lineage", () => {
     it("returns the owning team and organization, null for an unknown project", async () => {
       const findUnique = vi
         .fn()

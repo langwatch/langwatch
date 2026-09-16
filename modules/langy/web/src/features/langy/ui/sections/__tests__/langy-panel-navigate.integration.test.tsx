@@ -281,7 +281,7 @@ async function startTurn() {
 }
 
 describe("Feature: Langy opens the resource it surfaced in the browser", () => {
-  describe("Rule: Langy navigates only when I asked to be taken somewhere", () => {
+  describe("when I asked Langy to take me somewhere", () => {
     describe("given I ask Langy to show me one of the scenario runs", () => {
       /** @scenario "Asking Langy to show a scenario run opens it in place" */
       it("lands the browser on that run's detail view via the SPA router", async () => {
@@ -347,7 +347,7 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
     });
   });
 
-  describe("Rule: Agent navigation is SPA-safe and never tears the panel down", () => {
+  describe("given navigation is agent-driven and must stay SPA-safe", () => {
     describe("when Langy navigates me to a resource it surfaced", () => {
       /** @scenario "An agent-driven navigation keeps the panel and conversation mounted" */
       it("keeps the same live subscription mounted — the in-flight response keeps streaming", async () => {

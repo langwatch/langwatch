@@ -10,7 +10,7 @@ import {
 } from "../command-catalogue.ts";
 
 describe("command-registry", () => {
-  describe("filterCommands", () => {
+  describe("when filtering commands", () => {
     it("returns all commands when query is empty", () => {
       const result = filterCommands(navigationCommands, "");
       expect(result).toEqual(navigationCommands);
@@ -50,7 +50,7 @@ describe("command-registry", () => {
     });
   });
 
-  describe("navigationCommands", () => {
+  describe("given the navigation commands", () => {
     it("has required properties for all commands", () => {
       for (const cmd of navigationCommands) {
         expect(cmd.id).toBeDefined();
@@ -81,7 +81,7 @@ describe("command-registry", () => {
     });
   });
 
-  describe("actionCommands", () => {
+  describe("given the action commands", () => {
     it("has required properties for all commands", () => {
       for (const cmd of actionCommands) {
         expect(cmd.id).toBeDefined();
@@ -102,7 +102,7 @@ describe("command-registry", () => {
     });
   });
 
-  describe("allStaticCommands", () => {
+  describe("given all static commands", () => {
     it("combines navigation, action, support, and theme commands", () => {
       expect(allStaticCommands.length).toBe(
         navigationCommands.length +

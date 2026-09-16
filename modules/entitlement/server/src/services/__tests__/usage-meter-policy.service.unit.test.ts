@@ -120,7 +120,7 @@ describe("resolveUsageMeter", () => {
     });
   });
 
-  describe("reason traceability", () => {
+  describe("when the resolved decision explains its reason", () => {
     it("includes unit source in reason", () => {
       const decision = UsageMeterPolicyService.resolveUsageMeter({
         pricingModel: PricingModel.TIERED,

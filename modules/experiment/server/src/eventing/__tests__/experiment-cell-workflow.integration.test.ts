@@ -101,7 +101,7 @@ describe("WorkflowBuilder", () => {
     ...overrides,
   });
 
-  describe("buildCellWorkflow", () => {
+  describe("when building the cell workflow", () => {
     it("builds workflow with entry, target, and evaluator nodes", () => {
       const input = createBasicInput();
       const result = buildCellWorkflow(input, {});
@@ -158,7 +158,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("buildSignatureNodeFromLocalConfig", () => {
+  describe("when building a signature node from local config", () => {
     it("builds signature node with correct structure", () => {
       const config = createBasicLocalPromptConfig();
       const targetConfig = createBasicTargetConfig();
@@ -259,7 +259,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("buildSignatureNodeFromPrompt", () => {
+  describe("when building a signature node from a prompt", () => {
     const createMockPrompt = (): VersionedPrompt => ({
       id: "prompt-1",
       name: "Test Prompt",
@@ -324,7 +324,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("buildEvaluatorNode", () => {
+  describe("when building an evaluator node", () => {
     it("builds evaluator node with correct type", () => {
       const evaluator = createBasicEvaluatorConfig();
       const cell = createBasicCell();
@@ -366,7 +366,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("entry node", () => {
+  describe("given the workflow's entry node", () => {
     it("entry node contains dataset values", () => {
       const input = createBasicInput();
       const result = buildCellWorkflow(input, {});
@@ -393,7 +393,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("multiple evaluators", () => {
+  describe("given multiple evaluators", () => {
     it("creates separate nodes for each evaluator", () => {
       const evaluator2: EvaluatorConfig = {
         id: "eval-2",
@@ -426,7 +426,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("buildCodeNodeFromAgent", () => {
+  describe("when building a code node from an agent", () => {
     const createMockAgent = (): TypedAgent => ({
       id: "agent-1",
       name: "Test Code Agent",
@@ -522,7 +522,7 @@ describe("WorkflowBuilder", () => {
     });
   });
 
-  describe("error cases", () => {
+  describe("given a malformed target configuration", () => {
     it("throws when prompt target has no local config or loaded prompt", () => {
       const targetConfig = createBasicTargetConfig({
         localPromptConfig: undefined,

@@ -91,7 +91,7 @@ describe("buildTimeTravelView", () => {
     expect(buildTimeTravelView({ records: [], scrubSeq: null, historyMessages: [] })).toBeNull();
   });
 
-  describe("scrubbed to mid-turn", () => {
+  describe("given the timeline is scrubbed to mid-turn", () => {
     /** @scenario Scrubbing to mid-answer shows the prose as far as it had streamed */
     it("shows the sent question and the answer exactly as far as it had streamed", () => {
       seq = 0;
@@ -118,7 +118,7 @@ describe("buildTimeTravelView", () => {
     });
   });
 
-  describe("scrubbed past the terminal", () => {
+  describe("given the timeline is scrubbed past the terminal", () => {
     it("shows the recorded final answer and a settled turn", () => {
       seq = 0;
       const records = [
@@ -152,7 +152,7 @@ describe("buildTimeTravelView", () => {
     });
   });
 
-  describe("message ordering", () => {
+  describe("when merging tape and history messages", () => {
     it("sorts a tape-only answer between its question and the next one", () => {
       // The regression: an answer recorded on the tape but not yet in the
       // history rows was appended after the WHOLE baseline — below questions
@@ -190,7 +190,7 @@ describe("buildTimeTravelView", () => {
     });
   });
 
-  describe("scrubbed into the settle gap", () => {
+  describe("given the timeline is scrubbed into the settle gap", () => {
     // The answer's history row lands on the server clock; the closing event
     // reaches the tape a catch-up round-trip later. Positions inside that gap
     // used to double-render the answer (settled row + its own partial) under
@@ -268,7 +268,7 @@ describe("buildTimeTravelView", () => {
     });
   });
 
-  describe("history beyond the moment", () => {
+  describe("given history beyond the moment", () => {
     it("hides rows created after the scrubbed instant", () => {
       seq = 0;
       const records = [send(1_000, "first")];

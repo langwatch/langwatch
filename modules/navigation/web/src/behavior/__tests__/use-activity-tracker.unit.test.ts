@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseEntityUrl } from "../use-activity-tracker.ts";
 
 describe("useActivityTracker URL parsing", () => {
-  describe("trace detection", () => {
+  describe("given a trace page URL", () => {
     it("detects trace page URL", () => {
       const result = parseEntityUrl("/my-project/messages/trace_abc123", "my-project");
       expect(result).toMatchObject({
@@ -27,7 +27,7 @@ describe("useActivityTracker URL parsing", () => {
     });
   });
 
-  describe("span detection", () => {
+  describe("given a span page URL", () => {
     it("detects span page URL", () => {
       const result = parseEntityUrl("/my-project/messages/trace_abc/spans/span_xyz", "my-project");
       expect(result).toMatchObject({
@@ -38,7 +38,7 @@ describe("useActivityTracker URL parsing", () => {
     });
   });
 
-  describe("workflow detection", () => {
+  describe("given a workflow page URL", () => {
     it("detects workflow page URL", () => {
       const result = parseEntityUrl("/my-project/workflows/workflow_abc123", "my-project");
       expect(result).toMatchObject({
@@ -49,7 +49,7 @@ describe("useActivityTracker URL parsing", () => {
     });
   });
 
-  describe("dataset detection", () => {
+  describe("given a dataset page URL", () => {
     it("detects dataset page URL", () => {
       const result = parseEntityUrl("/my-project/datasets/dataset_abc123", "my-project");
       expect(result).toMatchObject({
@@ -60,7 +60,7 @@ describe("useActivityTracker URL parsing", () => {
     });
   });
 
-  describe("simulation run detection", () => {
+  describe("given a simulation run page URL", () => {
     it("detects simulation run page URL", () => {
       const result = parseEntityUrl(
         "/my-project/simulations/scenario_set/batch_run/run_abc123",
@@ -74,7 +74,7 @@ describe("useActivityTracker URL parsing", () => {
     });
   });
 
-  describe("non-matching URLs", () => {
+  describe("given a non-matching URL", () => {
     it("returns null for non-entity pages", () => {
       expect(parseEntityUrl("/my-project/analytics", "my-project")).toBeNull();
       expect(parseEntityUrl("/my-project/settings", "my-project")).toBeNull();

@@ -445,7 +445,7 @@ describe("langyThinkingLine", () => {
     });
   });
 
-  describe("the whimsy pool itself", () => {
+  describe("given the whimsy pool itself", () => {
     /**
      * The pool is only ever shown while the model is genuinely thinking, so a verb may
      * joke about Langy's CHARACTER but must never CLAIM AN ACT. "Bribing the GPUs" is a

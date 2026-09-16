@@ -92,7 +92,7 @@ describe("isViewOnlyCustomRole", () => {
 });
 
 describe("classifyMemberType", () => {
-  describe("role-based classification", () => {
+  describe("when classifying by role", () => {
     /** @scenario ADMIN role users count as Full Member */
     it("returns FullMember for ADMIN role", () => {
       expect(
@@ -130,7 +130,7 @@ describe("classifyMemberType", () => {
     });
   });
 
-  describe("EXTERNAL role (Lite Member) with custom permissions", () => {
+  describe("given an EXTERNAL role with custom permissions", () => {
     /** @scenario Custom role with only view permissions counts as Lite Member */
     it("returns LiteMember for view-only permissions", () => {
       expect(
@@ -283,7 +283,7 @@ describe("isLiteMember", () => {
 });
 
 describe("getRoleChangeType", () => {
-  describe("no-change scenarios", () => {
+  describe("given the classification does not change", () => {
     it("returns no-change when both roles are Full Member (ADMIN to MEMBER)", () => {
       expect(
         MemberClassificationService.getRoleChangeType(
@@ -351,7 +351,7 @@ describe("getRoleChangeType", () => {
     });
   });
 
-  describe("lite-to-full scenarios", () => {
+  describe("given the member upgrades from lite to full", () => {
     it("returns lite-to-full when EXTERNAL upgraded to MEMBER", () => {
       expect(
         MemberClassificationService.getRoleChangeType(
@@ -408,7 +408,7 @@ describe("getRoleChangeType", () => {
     });
   });
 
-  describe("full-to-lite scenarios", () => {
+  describe("given the member downgrades from full to lite", () => {
     it("returns full-to-lite when MEMBER downgraded to EXTERNAL", () => {
       expect(
         MemberClassificationService.getRoleChangeType(
