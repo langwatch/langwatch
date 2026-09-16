@@ -212,6 +212,7 @@ beforeEach(async () => {
   selfServe = new SsoSelfServeService({
     connections: () => connectionService,
     reads: connections,
+    legacy: { findLegacySso: async () => null },
     context,
     proofs,
     files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },

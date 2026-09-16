@@ -165,6 +165,8 @@ const refused = (): never => {
 };
 
 let connections: InMemoryConnections;
+/** The pre-connection sign-in strings, when this organization still has them. */
+let legacySso: { ssoDomain: string; ssoProvider: string } | null;
 let breakGlass: StubBreakGlassBindings;
 let licenseAuthority: StubLicenseAuthority;
 let context: StubContext;
@@ -180,6 +182,7 @@ let selfServe: SsoSelfServeService;
 
 beforeEach(() => {
   connections = new InMemoryConnections();
+  legacySso = null;
   breakGlass = new StubBreakGlassBindings(true);
   licenseAuthority = new StubLicenseAuthority(true);
   context = new StubContext(SELF_HOSTED_LICENSED);
@@ -218,6 +221,7 @@ beforeEach(() => {
   selfServe = new SsoSelfServeService({
     connections: () => connectionService,
     reads: connections,
+    legacy: { findLegacySso: async () => legacySso },
     context,
     proofs,
     files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
@@ -1255,6 +1259,7 @@ describe("self-serve single sign-on setup", () => {
       selfServe = new SsoSelfServeService({
         connections: () => connectionService,
         reads: connections,
+        legacy: { findLegacySso: async () => null },
         context,
         proofs,
         files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
@@ -1740,6 +1745,54 @@ describe("given a connection that belongs to another organization", () => {
       expect((foreign as unknown as { code: string }).code).toBe(
         (missing as unknown as { code: string }).code,
       );
+    });
+  });
+});
+
+describe("given an organization still on a pre-connection sign-in route", () => {
+  describe("when the setup screen reads it", () => {
+    /** @scenario "An organization already routing sign-in is not offered a second connection" */
+    it("reports the route it is on, rather than leaving the screen to offer a rival", async () => {
+      legacySso = { ssoDomain: "acme.test", ssoProvider: "auth0" };
+
+      const view = await selfServe.getSetup({ organizationId: ORG });
+
+      // No connection has been recorded yet, which is exactly the state the
+      // screen used to read as "nothing is set up here".
+      expect(view.connection).toBeNull();
+      expect(view.legacyRoute).toEqual({
+        domain: "acme.test",
+        provider: "auth0",
+      });
+    });
+  });
+});
+
+describe("given an organization that has never set sign-in up", () => {
+  describe("when the setup screen reads it", () => {
+    /** @scenario "An organization with no sign-in route is offered the setup journey" */
+    it("reports no route, which is what leaves the setup journey on offer", async () => {
+      const view = await selfServe.getSetup({ organizationId: ORG });
+
+      expect(view.connection).toBeNull();
+      expect(view.legacyRoute).toBeNull();
+    });
+  });
+});
+
+describe("given an organization whose old route has already been recorded", () => {
+  describe("when the setup screen reads it", () => {
+    /** @scenario "An organization already routing sign-in is not offered a second connection" */
+    it("stops reporting the strings, because the connection is the better answer", async () => {
+      legacySso = { ssoDomain: "acme.test", ssoProvider: "auth0" };
+      await register();
+
+      const view = await selfServe.getSetup({ organizationId: ORG });
+
+      // A recorded connection outranks the strings it was derived from;
+      // reporting both would let one screen hold two answers to one question.
+      expect(view.connection).not.toBeNull();
+      expect(view.legacyRoute).toBeNull();
     });
   });
 });

@@ -187,6 +187,7 @@ beforeEach(() => {
   selfServe = new SsoSelfServeService({
     connections: () => connectionService,
     reads: connections,
+    legacy: { findLegacySso: async () => null },
     context: new StubContext(),
     proofs,
     files,

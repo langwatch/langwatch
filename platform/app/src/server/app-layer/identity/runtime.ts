@@ -871,6 +871,7 @@ export function ssoSelfServe(): SsoSelfServeService {
   return new SsoSelfServeService({
     connections: ssoConnections,
     reads: new PrismaSsoConnectionReadRepository(prisma),
+    legacy: new PrismaLegacySsoOrganizationRepository(prisma),
     context: new SsoSelfServeContextResolver({
       featureFlags: featureFlagService,
       licenseProof,

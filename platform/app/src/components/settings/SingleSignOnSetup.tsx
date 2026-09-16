@@ -41,6 +41,7 @@ import { ConnectionNameRow } from "./singleSignOn/ConnectionNameRow";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { HistorySection } from "./singleSignOn/HistorySection";
+import { LegacyRouteNotice } from "./singleSignOn/LegacyRouteNotice";
 import { RegisterConnection } from "./singleSignOn/RegisterConnection";
 import {
   AvailabilityRefusalNotice,
@@ -113,14 +114,28 @@ export function SingleSignOnSetup({
   }
   if (!setup.data) return <Text>Single sign-on setup is unavailable.</Text>;
 
-  const { availability, connection, serviceProvider } =
-    setup.data as SelfServeSetupView;
+  // Named once rather than re-asserted at each use: the same value was cast
+  // three times, and three casts of one value are three places to disagree.
+  const view = setup.data as SelfServeSetupView;
+  const { availability, connection, serviceProvider, legacyRoute } = view;
 
   // The refusal itself is the Authentication page's to place, above the
   // cards that explain what single sign-on would give this organization. A
   // journey that cannot be started is not a screen.
   if (!availability.available) {
     return <AvailabilityRefusalNotice refusal={availability.refusal} />;
+  }
+
+  // BEFORE the empty state, because an organization already routing people
+  // through a provider is not an empty one — it only looks that way until the
+  // old route has been recorded as a connection.
+  //
+  // Truthiness rather than `!== null`, because an ABSENT field is not a route
+  // either: a payload from a server that predates this field arrives with it
+  // undefined, and `undefined !== null` would have hidden the setup journey
+  // from every organization mid-deploy.
+  if (connection === null && legacyRoute) {
+    return <LegacyRouteNotice legacyRoute={legacyRoute} />;
   }
 
   if (connection === null) {
@@ -154,7 +169,7 @@ export function SingleSignOnSetup({
       <LegacyMigrationStart
         organizationId={organizationId}
         canManage={canManage}
-        view={setup.data as SelfServeSetupView}
+        view={view}
         connection={connection}
       />
     );
@@ -164,7 +179,7 @@ export function SingleSignOnSetup({
     <ConnectedJourney
       organizationId={organizationId}
       canManage={canManage}
-      view={setup.data as SelfServeSetupView}
+      view={view}
       connection={connection}
     />
   );
@@ -708,8 +723,8 @@ function ConnectionSummary({
           People with an address at your proved domains now sign in through your
           identity provider. Anybody holding a way back in can still sign in
           directly. To undo this, remove the connection below — sign-in keeps
-          working through a grace period, and we refuse it while it would
-          leave somebody with no way in.
+          working through a grace period, and we refuse it while it would leave
+          somebody with no way in.
         </Text>
       )}
     </SettingsCard>

@@ -419,6 +419,7 @@ describe("how many identity providers an organization may register", () => {
         findDomainOwner: async () => null,
         findConnectionForOrganization: async () => held,
       },
+      legacy: { findLegacySso: async () => null },
       context: {
         resolve: async () => ({
           deployment: "hosted",

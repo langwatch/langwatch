@@ -59,6 +59,7 @@ import {
   selfServeRegistrationCommandId,
   selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
+import type { LegacySsoOrganizationRepository } from "./sso-connection-grandfather.service";
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 import type { SsoConnectionService } from "./sso-connection.service";
 import type { SsoMigrationFinalizationService } from "./sso-migration-finalization.service";
@@ -510,6 +511,23 @@ export interface SelfServeSetupView {
      *  whether that evidence is still there. */
     domainProofs: SelfServeDomainProofView[];
   } | null;
+  /**
+   * The pre-connection sign-in route this organization is still on, when it
+   * has one and no connection has been recorded for it yet.
+   *
+   * WHY THE SCREEN NEEDS IT. `connection: null` used to mean two very
+   * different things — nobody has set single sign-on up, and somebody set it
+   * up years ago through an operator and it is routing people today — and the
+   * screen could only see the first. So it offered a legacy organization
+   * "connect your identity provider", vendor tiles and all, and following that
+   * registered a SECOND connection on a domain the old route already answers:
+   * no `replacesConnectionId`, no inherited proof, no rollback.
+   *
+   * Recording the old route as a connection is an operator's act, not a
+   * customer's (the D04 grandfather migration), so what this field buys is a
+   * screen that says so instead of one that invites a race with it.
+   */
+  legacyRoute: { domain: string; provider: string } | null;
   claims: SelfServeDomainClaimView[];
   /** The record to publish, while one is outstanding and unexpired. */
   record: SelfServeDnsRecordView | null;
@@ -526,6 +544,9 @@ export interface SelfServeSetupView {
 export interface SsoSelfServeServiceDeps {
   connections: () => SsoConnectionService;
   reads: SsoConnectionReadRepository;
+  /** The pre-connection sign-in strings, so the screen can tell an
+   *  organization that already has a route from one that has none. */
+  legacy: LegacySsoOrganizationRepository;
   context: SsoSelfServeContextPort;
   proofs: SsoDomainProofLookup;
   /** The published proof's second channel: the file the domain serves. */
@@ -589,6 +610,13 @@ export class SsoSelfServeService {
           connectionId: migration.replacement.connectionId,
         })
       : await this.deps.reads.findConnectionForOrganization({ organizationId });
+    // Asked only when no connection answered, which is the one case the
+    // screen used to read as "nothing is set up". An organization whose old
+    // route has already been recorded has a connection, and that connection
+    // is the better answer to every question below.
+    const legacy = state
+      ? null
+      : await this.deps.legacy.findLegacySso({ organizationId });
     const nowMs = this.now();
     return {
       availability,
@@ -624,6 +652,9 @@ export class SsoSelfServeService {
               verifiedAtMs: proof.verifiedAtMs,
             })),
           }
+        : null,
+      legacyRoute: legacy
+        ? { domain: legacy.ssoDomain, provider: legacy.ssoProvider }
         : null,
       // Whether a waiting claim is a PERSON's to decide is asked per claim
       // rather than assumed from the tier: a hosted claim waits for the

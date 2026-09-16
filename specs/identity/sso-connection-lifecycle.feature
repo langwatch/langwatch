@@ -292,6 +292,29 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When any state change is commanded
     Then the same guards apply as for a self-served connection
 
+  # Recording the old route is an operator's act, so there is a window where an
+  # organization is routing people through a provider and carries no connection
+  # yet. The setup screen read that window as an empty one and offered the
+  # vendor picker, and following it built a SECOND connection on a domain the
+  # live route already answers -- no predecessor named, no proof inherited, no
+  # way back. The screen has to be able to tell the two apart before it can
+  # stop offering that.
+
+  @unit
+  Scenario: An organization already routing sign-in is not offered a second connection
+    Given "acme" carries legacy ssoDomain "acme.com" and a provider string
+    And no connection has been recorded for "acme" yet
+    When an administrator opens the single sign-on setup screen
+    Then the screen reports the route "acme" already signs in through
+    And it does not offer to connect an identity provider
+
+  @unit
+  Scenario: An organization with no sign-in route is offered the setup journey
+    Given "acme" carries no legacy single sign-on strings and no connection
+    When an administrator opens the single sign-on setup screen
+    Then the screen reports no existing route
+    And the setup journey is offered as before
+
   # ── Routing flip ───────────────────────────────────────────────────────
 
   # There is no fleet-wide flip, and the staged flag that was going to carry
