@@ -254,11 +254,11 @@ function PromptBrowserWindowInner(props: {
               <PromptTabbedSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
-                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: read-only view, no handler
                 onPositionChange={() => {}}
-                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: read-only view, no handler
                 onDragEnd={() => {}}
-                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: read-only view, no handler
                 onToggle={() => {}}
               />
             </Box>
