@@ -11,42 +11,93 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | handover written | wave 4 | wave 5 | wave 6 | now (wave 7 landed) |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 9,208 | 8,695 | **8,242** | 7,721 |
-| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,636** | 1,636 |
-| oxlint total | 24,022 | 14,884 | 10,840 | 10,327 | **9,878** | **9,357** |
-| — of which `comment-block-size` | 6,168 | 6,168 | 2,119 | 1,593 | **1,170** | **662** |
-| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 | 2,840 (see note) | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **13,680** | **13,167** | **12,718** | **12,197** |
+| | drive start | wave 6 | wave 7 | wave 9 | now (wave 10 part) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| oxlint errors | 6,075 | 8,242 | 7,721 | 7,973 | **6,664** |
+| oxlint warnings | 17,947 | 1,636 | 1,636 | 959 | **959** |
+| oxlint total | 24,022 | 9,878 | 9,357 | 8,932 | **7,623** |
+| - of which `comment-block-size` | 6,168 | 1,170 | 662 | 659 | **659** |
 
-Down 14,962 from the drive's start. The comment sweep has cleared **5,506 of
-6,168, or 89%**, across thirty-one areas.
+**1,309 of the last drop was not lane work.** `plugins/langwatch/scripts/
+session-context.mjs` is a vendored bundle - 412 KB of minified output on one
+237,525-character line - and it alone carried 14.7% of the repository's
+findings. Nobody could ever have fixed one: the plugin ships the artefact and
+builds it elsewhere. `8ac2a4ac40` adds it to `ignorePatterns` on exactly the
+reasoning already written there for generated files, and the same commit
+collapses a **duplicated `ignorePatterns` key** that would have made an edit to
+the first block silently lose to the second.
 
-**Wave 7 (this session): 515 cleared in three sonnet lanes**, committed at
-`0096cfd5eb`, `4f5fc8520f` and `6c99d76df5`. `comment-block-size` is now the
-**third** rule, behind `fallible-result-naming` (1,345) and `no-try-prefix`
-(757). Wave 2 below is the next tranche, and it is Opus work, not Sonnet.
+Measure before sweeping. A seventh of this drive's remaining work did not exist.
 
-**Two milestones this wave.** The whole-tree total is below 10,000 for the first
-time in the drive. And `comment-block-size` is no longer the largest rule —
-`fallible-result-naming` (1,347) has overtaken it. The next tranche of this
-drive is arguably no longer the comment sweep.
+### The visible number is about half the real one
 
-**One caveat on the 1,170, stated because it would otherwise flatter the
-number.** About 142 of the findings counted as cleared belong to
-`w6-evaluator-server-mcp`, whose slice is **deliberately uncommitted** — 19 of
-them were cleared by splitting blocks rather than shortening them, and a
-correction lane is merging those back. Its edits are in the working tree, so
-oxlint already counts them. If that slice were reverted rather than corrected,
-the figure returns to roughly 1,312.
+`packages/architecture-enforcer/src/oxlint-baseline.json` holds **6,925
+baselined `rule|file` pairs** against 7,623 visible findings. Reaching zero
+visible leaves the larger half suppressed. The biggest:
 
-**The enforcer number is not comparable to the 2,761.** Measured it prints
-`2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
-rows)`. The 2,761 never stated whether stale rows were counted, so the real
-movement is either 99 down or 79 up. Whoever next touches the enforcer half
-should restate the baseline in the form the tool actually prints and stop
-carrying the ambiguous number forward.
+    no-port-vocabulary .... 1,432      condition-shape ........ 500
+    stand-in-cast ......... 955        test-description ....... 336
+    cognitive-complexity .. 773        feature-source-layout .. 309
+
+`stand-in-cast` deserves its own line. It is enabled as `error`, and its own
+documentation prescribes the fix for the exact regression class that has bitten
+this drive twice - "build the mock to the real shape, or check it with
+`satisfies` instead of forcing it past the compiler". It reports 43 findings
+while suppressed in **955 files, 792 of them tests**, and the repository holds
+430 `as unknown as <X>Api|Service|Repository` casts in tests against 175 uses of
+`satisfies`. That is not a missing rule. It is a rule baselined out of the place
+it was written for.
+
+### Typecheck is now part of the goal, and the gate was not running
+
+The user added it this session: zero typecheck failures beside zero lint.
+
+Every package's script is `typecheck:declarations && tsc --noEmit`. The
+declarations build failed on six TS2883 errors in `modules/analytics/server`, so
+the `&&` short-circuited and **`tsc --noEmit` had stopped running for every
+package in the repository**. `typecheck:one <anything>` exited 1 having compiled
+nothing, and that exit code was being read as "that package is broken".
+
+`66735bd90a` fixes it: the five analytics REST routers write their type out the
+way `modules/organization/server/src/transport/team.rest.ts` already did.
+
+Baseline once it ran: **1,156 distinct errors across 439 files** (a floor -
+package-relative `src/...` paths collide across packages). 665 in source, 491 in
+tests. The raw figure is 3,169, but fourteen `*-web` packages each report the
+same 102 errors because each compiles the shared web graph, so the raw number
+counts single defects up to fourteen times. TS2339 206, TS2322 141, TS2307 105.
+
+**Whole-repo typecheck cannot be measured while lanes are running.** The
+declaration build aborts with "Declaration inputs changed during compilation"
+whenever a lane writes a watched file. Measure when the tree is quiet.
+
+### What the dead gate hid, and how to find the rest
+
+`467c68f065`. Renaming `tryGetVisibilityCutoffMs` to `getVisibilityCutoffMs`
+updated the trace module and the interactive path beside it, but not
+`apps/worker/src/app/worker-automation-settlement-reads.composition.ts`, which is
+outside the module and so outside the slice. `this.window` is properly typed, so
+`tsc` would have caught it in a second - and `tsc` was not running.
+
+It would not have crashed, either. The call sits inside a `catch` that fails
+closed, so the `TypeError` would have been swallowed and the function would have
+returned the free-tier cutoff, on the path that decides which aged customer
+content stays visible. Silently wrong, on a privacy path, indefinitely.
+
+This is the second regression of this shape on this drive; the first was
+`UserApi.tryFindById` across six modules. Both leaked **out of the renaming
+module into `apps/*`**, which no lane owns. The check that finds them, and which
+found this one, is called-but-nowhere-defined:
+
+    for each try* identifier your commits removed:
+      defs   = declarations of that name anywhere in the tree
+      calls  = `.name(` call sites anywhere in the tree
+      defs == 0 and calls > 0  ->  orphan
+
+Run it across the whole repository after every rename wave, not per slice. A
+rename is verified by running the tests of everything that depends on the
+symbol; "it compiled" is not evidence, and while the gate was dead it was not
+even that.
 
 ### The sweep is not a ratchet, and this is now measured
 
