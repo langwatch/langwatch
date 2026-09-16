@@ -30,12 +30,6 @@ export const formatSearchRecordCount = ({
       }`
     : `${formatRecordCount(matched)} of ${formatRecordCount(total)} records`;
 
-/**
- * Shown in place of the grid when a search matched nothing, repeating the
- * searched text — with a debounce between typing and results, the user
- * needs to see which search this belongs to.
- */
-
 /** The count chip with no search in effect: "679 records", "1 record". */
 export const plainRecordCount = (count: number): string =>
   `${formatRecordCount(count)} ${count === 1 ? "record" : "records"}`;
@@ -48,6 +42,11 @@ export const plainRecordCount = (count: number): string =>
 export const searchFailedMessage = (search: string): string =>
   `Couldn’t run the search for “${search}”.`;
 
+/**
+ * Shown in place of the grid when a search matched nothing, repeating the
+ * searched text — with a debounce between typing and results, the user
+ * needs to see which search this belongs to.
+ */
 export const noSearchMatchesMessage = (search: string): string =>
   `No records match “${search}”.`;
 
