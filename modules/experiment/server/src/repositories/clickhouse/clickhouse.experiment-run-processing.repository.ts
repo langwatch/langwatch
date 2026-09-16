@@ -5,6 +5,8 @@ import {
   defineEvents,
   definePipeline,
   type FoldProjectionStore,
+  type Projection,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   type ClickHouseExperimentRunResultRecord,
@@ -16,11 +18,16 @@ import {
 } from "../../eventing/experiment-run-state.projection.ts";
 import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
 import {
+  type EvaluatorResultEventData,
   evaluatorResultEventDataSchema,
+  type ExperimentRunCompletedEventData,
   experimentRunCompletedEventDataSchema,
+  type ExperimentRunStartedEventData,
   experimentRunStartedEventDataSchema,
   type ExperimentRunProcessingEvent,
+  type TargetResultEventData,
   targetResultEventDataSchema,
+  type TraceMetricsComputedEventData,
   traceMetricsComputedEventDataSchema,
 } from "../../eventing/experiment-run-events.process.ts";
 import { makeExperimentRunKey } from "../../eventing/experiment-run-key.process.ts";
@@ -158,6 +165,16 @@ export interface ClickhouseExperimentRunProcessingRepository {
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
+export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
+  ExperimentRunProcessingEvent,
+  Record<string, Projection>,
+  | { name: "startExperimentRun"; payload: ExperimentRunStartedEventData }
+  | { name: "recordTargetResult"; payload: TargetResultEventData }
+  | { name: "recordEvaluatorResult"; payload: EvaluatorResultEventData }
+  | { name: "computeExperimentRunMetrics"; payload: TraceMetricsComputedEventData }
+  | { name: "completeExperimentRun"; payload: ExperimentRunCompletedEventData }
+>;
+
 /**
  * The Eventing side of experiment run processing: the storage this feature's
  * pipeline reads and writes through, and the pipeline definition itself.
@@ -198,7 +215,7 @@ export class ExperimentEventingAdapter {
     });
   }
 
-  static pipeline(deps: ClickhouseExperimentRunProcessingRepository) {
+  static pipeline(deps: ClickhouseExperimentRunProcessingRepository): ExperimentRunProcessingPipeline {
     const builder = definePipeline<ExperimentRunProcessingEvent>({
       name: "experiment_run_processing",
       aggregate: defineAggregate({
@@ -226,9 +243,3 @@ export class ExperimentEventingAdapter {
       .build();
   }
 }
-
-/**
- * The definition this feature registers, named so a composition root can hold
- * one without restating its shape.
- */
-export type ExperimentRunProcessingPipeline = ReturnType<typeof ExperimentEventingAdapter.pipeline>;

@@ -60,7 +60,7 @@ export class TestUsageWarnings implements UsageWarning {
 }
 
 export function createEntitlementTestUsers(): UserApi {
-  return createApiFixture<UserApi>({ tryFindById: async () => null });
+  return createApiFixture<UserApi>({ findById: async () => null });
 }
 
 export function createEntitlementTestApp(

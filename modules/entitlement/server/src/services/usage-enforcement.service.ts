@@ -189,7 +189,7 @@ export class UsageService {
     const decision = await this.getCachedUsageMeterReading(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
-    const cached = await this.countCache.tryGet<number>(cacheKey);
+    const cached = await this.countCache.findValue<number>(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
@@ -261,7 +261,7 @@ export class UsageService {
     organizationId: string,
     plan?: PlanInfo,
   ): Promise<UsageMeterReading> {
-    const cached = await this.decisionCache.tryGet<UsageMeterReading>(organizationId);
+    const cached = await this.decisionCache.findValue<UsageMeterReading>(organizationId);
     if (cached) {
       return cached;
     }

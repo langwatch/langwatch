@@ -27,11 +27,11 @@ export class MemoryUsageMembershipRepository implements UsageMembershipRepositor
     return this.#database.find(organizationId)?.membersLiteCount ?? 0;
   }
 
-  async getCurrentMonthCost(organizationId: string): Promise<number> {
+  async findCurrentMonthCost(organizationId: string): Promise<number> {
     return this.#database.find(organizationId)?.currentMonthCost ?? 0;
   }
 
-  async getCurrentMonthCostForProjects(projectIds: string[]): Promise<number> {
+  async findCurrentMonthCostForProjects(projectIds: string[]): Promise<number> {
     let total = 0;
     for (const organization of this.#database.all()) {
       for (const projectId of projectIds) {

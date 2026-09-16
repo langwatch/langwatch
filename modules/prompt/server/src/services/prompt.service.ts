@@ -248,11 +248,11 @@ export class PromptService {
   }
 
   async listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
-    return this.repository.listCopies(input);
+    return this.repository.findCopies(input);
   }
 
   async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
-    return this.repository.getCopySource(input);
+    return this.repository.findCopySource(input);
   }
 
   getNamesByIds(input: {

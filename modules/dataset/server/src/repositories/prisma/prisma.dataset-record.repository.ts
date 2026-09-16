@@ -24,7 +24,7 @@ export class PrismaDatasetRecordRepository
     return this.prisma;
   }
 
-  async list(input: {
+  async findAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

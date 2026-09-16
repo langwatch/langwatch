@@ -111,9 +111,9 @@ class MemoryExperimentRepository implements ExperimentRepository {
     const value = await this.findBySlug(input);
     return value ? { id: value.id, slug: value.slug } : null;
   }
-  getBySlugOrId(
-    _input: Parameters<ExperimentRepository["getBySlugOrId"]>[0],
-  ): ReturnType<ExperimentRepository["getBySlugOrId"]> {
+  findBySlugOrId(
+    _input: Parameters<ExperimentRepository["findBySlugOrId"]>[0],
+  ): ReturnType<ExperimentRepository["findBySlugOrId"]> {
     throw new Error("Experiment lookup is not configured for this test repository");
   }
   async findRowState(input: { projectId: string; id: string }) {
@@ -166,9 +166,9 @@ class MemoryExperimentRepository implements ExperimentRepository {
     });
     return true;
   }
-  getWorkbenchState(
-    input: Parameters<ExperimentRepository["getWorkbenchState"]>[0],
-  ): ReturnType<ExperimentRepository["getWorkbenchState"]> {
+  findWorkbenchState(
+    input: Parameters<ExperimentRepository["findWorkbenchState"]>[0],
+  ): ReturnType<ExperimentRepository["findWorkbenchState"]> {
     const workbench = [...this.workbenches.values()].find(
       (candidate) => candidate.experimentId === input.id || candidate.slug === input.slug,
     );
@@ -243,9 +243,9 @@ class MemoryExperimentRepository implements ExperimentRepository {
     });
     return Promise.resolve({ id: input.id, slug: input.slug });
   }
-  listWorkbenchVersions(
-    input: Parameters<ExperimentRepository["listWorkbenchVersions"]>[0],
-  ): ReturnType<ExperimentRepository["listWorkbenchVersions"]> {
+  findWorkbenchVersions(
+    input: Parameters<ExperimentRepository["findWorkbenchVersions"]>[0],
+  ): ReturnType<ExperimentRepository["findWorkbenchVersions"]> {
     const workbench = this.workbenches.get(input.experimentId);
     return Promise.resolve(
       (workbench?.versions ?? [])
@@ -263,9 +263,9 @@ class MemoryExperimentRepository implements ExperimentRepository {
         .slice(0, input.take),
     );
   }
-  getWorkbenchVersion(
-    input: Parameters<ExperimentRepository["getWorkbenchVersion"]>[0],
-  ): ReturnType<ExperimentRepository["getWorkbenchVersion"]> {
+  findWorkbenchVersion(
+    input: Parameters<ExperimentRepository["findWorkbenchVersion"]>[0],
+  ): ReturnType<ExperimentRepository["findWorkbenchVersion"]> {
     const found = this.workbenches
       .get(input.experimentId)
       ?.versions.find((version) => version.version === input.version);
@@ -276,20 +276,20 @@ class MemoryExperimentRepository implements ExperimentRepository {
 
 class MemoryExperimentRunRepository extends ExperimentRunRepository {
   values: Record<string, ExperimentRun[]> = {};
-  async list() {
+  async findAll() {
     return this.values;
   }
-  async getAggregates() {
+  async findAggregates() {
     return {};
   }
-  async getPage(input: { experimentId: string }) {
+  async findPage(input: { experimentId: string }) {
     const runs = this.values[input.experimentId] ?? [];
     return { runs, totalHits: runs.length };
   }
   async findRun() {
     return null;
   }
-  async getWorkflowVersions() {
+  async findWorkflowVersions() {
     return {};
   }
 }
@@ -317,7 +317,7 @@ class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
     this.values.push(input);
   }
 
-  async list(input: { tenantId: string; experimentId: string }) {
+  async findAll(input: { tenantId: string; experimentId: string }) {
     return this.values
       .filter(
         (value) => value.tenantId === input.tenantId && value.experimentId === input.experimentId,

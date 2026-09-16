@@ -111,7 +111,7 @@ export interface DatasetContentRepository {
     olderThan: Instant;
   }): Promise<DatasetRow[]>;
   findAllSlugs(input: { projectId: string }): Promise<{ slug: string }[]>;
-  listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
+  findPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }>;

@@ -245,7 +245,7 @@ export class PrismaUsageMembershipRepository implements UsageMembershipRepositor
    * Gets current month cost for an organization.
    * Aggregates costs across all projects in the organization.
    */
-  async getCurrentMonthCost(organizationId: string): Promise<number> {
+  async findCurrentMonthCost(organizationId: string): Promise<number> {
     const projectIds = (
       await this.prisma.project.findMany({
         where: { team: { organizationId } },
@@ -253,13 +253,13 @@ export class PrismaUsageMembershipRepository implements UsageMembershipRepositor
       })
     ).map((project) => project.id);
 
-    return this.getCurrentMonthCostForProjects(projectIds);
+    return this.findCurrentMonthCostForProjects(projectIds);
   }
 
   /**
    * Gets current month cost for a list of projects.
    */
-  async getCurrentMonthCostForProjects(projectIds: string[]): Promise<number> {
+  async findCurrentMonthCostForProjects(projectIds: string[]): Promise<number> {
     return (
       (
         await this.prisma.cost.aggregate({

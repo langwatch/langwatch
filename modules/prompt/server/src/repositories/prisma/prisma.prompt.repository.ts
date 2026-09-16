@@ -73,7 +73,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma });
   }
 
-  async getOrganizationIdForProject(projectId: string): Promise<string> {
+  async findOrganizationIdForProject(projectId: string): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },
@@ -125,7 +125,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     return !existingConfig || existingConfig.id === params.excludeId;
   }
 
-  async listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
+  async findCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
     const rows = await this.prisma.llmPromptConfig.findMany({
       where: { copiedFromPromptId: input.sourcePromptId, deletedAt: null },
       select: {
@@ -156,7 +156,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * when the prompt it was copied from has since been deleted: both leave the
    * caller with no source to sync against.
    */
-  async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
+  async findCopySource(input: { promptId: string }): Promise<PromptCopySource> {
     const prompt = await this.prisma.llmPromptConfig.findUnique({
       where: { id: input.promptId },
       select: { copiedFromPromptId: true },
@@ -177,7 +177,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   /**
    * Get all LLM configs for a project
    */
-  async getAllWithLatestVersion({
+  async findAllWithLatestVersion({
     projectId,
     organizationId,
   }: {
@@ -261,7 +261,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * Get prompt by id or handle, refusing when the project and its organization
    * carry none under that id or handle.
    */
-  async getPromptByIdOrHandle(params: {
+  async findPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
@@ -315,7 +315,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * Get a single LLM config by ID or handle, either at project or organization
    * level, refusing when there is none.
    */
-  async getConfigByIdOrHandleWithLatestVersion(params: {
+  async findConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
@@ -490,7 +490,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     }
 
     // Verify the config exists
-    const existingConfig = await this.getPromptByIdOrHandle({
+    const existingConfig = await this.findPromptByIdOrHandle({
       idOrHandle,
       projectId,
       organizationId,
@@ -552,7 +552,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
         params.data,
         { tx },
       );
-      const latestVersionRaw = await this.versions.getLatestVersion(
+      const latestVersionRaw = await this.versions.findLatestVersion(
         updatedConfig.id,
         params.projectId,
         { tx },
@@ -612,7 +612,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     projectId: string;
     organizationId: string;
   }): Promise<{ success: boolean }> {
-    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+    const config = await this.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
@@ -801,7 +801,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * Get a specific version by version number for a config, refusing when the
    * config has no version under that number.
    */
-  async getConfigVersionByNumber(params: {
+  async findConfigVersionByNumber(params: {
     idOrHandle: string;
     versionNumber: number;
     projectId: string;
@@ -809,7 +809,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }): Promise<LlmPromptConfigVersion> {
     const { idOrHandle, versionNumber, projectId, organizationId } = params;
 
-    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+    const config = await this.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
@@ -845,7 +845,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     // name" rather than propagated.
     let config: LlmConfigWithLatestVersion;
     try {
-      config = await this.getConfigByIdOrHandleWithLatestVersion({
+      config = await this.findConfigByIdOrHandleWithLatestVersion({
         idOrHandle,
         projectId,
         organizationId,

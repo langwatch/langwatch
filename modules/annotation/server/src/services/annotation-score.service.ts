@@ -26,7 +26,7 @@ export class AnnotationScoreService {
   }
 
   listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
-    return this.#repository.listScoreNames(listAnnotationScoreNamesInputSchema.parse(input));
+    return this.#repository.findScoreNames(listAnnotationScoreNamesInputSchema.parse(input));
   }
 
   upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
@@ -34,11 +34,11 @@ export class AnnotationScoreService {
   }
 
   listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
-    return this.#repository.listScores(listAnnotationScoresInputSchema.parse(input));
+    return this.#repository.findScores(listAnnotationScoresInputSchema.parse(input));
   }
 
   getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
-    return this.#repository.getScore(annotationScoreByIdInputSchema.parse(input));
+    return this.#repository.findScore(annotationScoreByIdInputSchema.parse(input));
   }
 
   toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore> {

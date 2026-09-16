@@ -108,7 +108,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
       ),
     ]);
   }
-  async listQueueItems({
+  async findQueueItems({
     projectId,
     organizationMemberIds,
   }: AnnotationQueueItemOrganizationScope): Promise<readonly AnnotationQueueListedItem[]> {
@@ -158,7 +158,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
         (item) => item.projectId === projectId && item.userId === userId && item.doneAt === null,
       ).length;
   }
-  async listMemberQueuePendingCounts({
+  async findMemberQueuePendingCounts({
     projectId,
     userId,
   }: AnnotationQueueItemCaller): Promise<
@@ -230,8 +230,8 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
 
     return annotationQueueItemSchema.parse(structuredClone(done));
   }
-  async listQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage> {
-    const items = await this.listQueueItems(input);
+  async findQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage> {
+    const items = await this.findQueueItems(input);
 
     const reachable = items.filter((item) =>
       input.includeMemberQueues
@@ -242,10 +242,10 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
 
     return this.#page(input, reachable);
   }
-  async listQueueItemsByQueue(
+  async findQueueItemsByQueue(
     input: ListQueueItemsByQueueInput,
   ): Promise<AnnotationQueueItemsPage> {
-    const items = await this.listQueueItems(input);
+    const items = await this.findQueueItems(input);
 
     return this.#page(
       input,
@@ -297,7 +297,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
       },
     });
   }
-  async listQueuesWithItems({
+  async findQueuesWithItems({
     projectId,
     organizationMemberIds,
     queueIds,

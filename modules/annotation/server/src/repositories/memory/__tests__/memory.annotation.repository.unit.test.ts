@@ -31,7 +31,7 @@ describe("MemoryAnnotationRepository", () => {
     expect(created.updatedAt).toBeInstanceOf(Date);
 
     created.scoreOptions.changed = true;
-    expect((await repository.getById(annotationInput)).scoreOptions).toEqual({});
+    expect((await repository.findById(annotationInput)).scoreOptions).toEqual({});
 
     const updated = await repository.update({
       id: annotationInput.id,
@@ -44,10 +44,10 @@ describe("MemoryAnnotationRepository", () => {
     expect(updated.comment).toBe("updated");
 
     await expect(
-      repository.getById({ id: annotationInput.id, projectId: "project_2" }),
+      repository.findById({ id: annotationInput.id, projectId: "project_2" }),
     ).rejects.toThrow("annotation_1");
 
-    expect(await repository.list({ projectId: "project_2", anchor: "all" })).toEqual([]);
+    expect(await repository.findAll({ projectId: "project_2", anchor: "all" })).toEqual([]);
   });
 
   it("does not update a row when its requested trace is different", async () => {
@@ -64,7 +64,7 @@ describe("MemoryAnnotationRepository", () => {
     ).rejects.toBeInstanceOf(AnnotationNotFoundError);
 
     await expect(
-      repository.getById({ id: annotationInput.id, projectId: annotationInput.projectId }),
+      repository.findById({ id: annotationInput.id, projectId: annotationInput.projectId }),
     ).resolves.toMatchObject({
       traceId: annotationInput.traceId,
       comment: annotationInput.comment,

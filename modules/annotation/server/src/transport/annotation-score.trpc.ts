@@ -14,7 +14,7 @@ import { generate } from "@langwatch/ksuid";
  */
 const ANNOTATION_SCORE_KSUID_RESOURCE = "annotationscore";
 
-function radioOptions(values: readonly string[]) {
+function radioOptions(values: readonly string[]): { label: string; value: string }[] {
   return values.map((value) => ({ label: value, value }));
 }
 

@@ -202,7 +202,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
       const repository = PrismaAnnotationRepository.create({ prisma: database });
 
-      const all = await repository.list({
+      const all = await repository.findAll({
         projectId: "project-1",
         traceIds: ["trace-1"],
         anchor: "all",
@@ -223,7 +223,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
       const repository = PrismaAnnotationRepository.create({ prisma: database });
 
-      const traceOnly = await repository.list({
+      const traceOnly = await repository.findAll({
         projectId: "project-1",
         traceIds: ["trace-1"],
         anchor: "trace",

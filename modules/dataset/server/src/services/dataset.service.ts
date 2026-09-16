@@ -231,7 +231,7 @@ export class DatasetService {
 
   async listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
     const parsed = listDatasetsInputSchema.parse(input);
-    const data = await this.options.repository.list(parsed);
+    const data = await this.options.repository.findAll(parsed);
 
     return {
       data,
@@ -451,7 +451,7 @@ export class DatasetService {
       return target;
     }
 
-    const records = await this.options.records.list({
+    const records = await this.options.records.findAll({
       datasetId: source.id,
       projectId: parsed.sourceProjectId,
       page: 1,

@@ -55,7 +55,7 @@ class MemoryDatasetRepository implements DatasetRepository {
       ? this.dataset
       : null;
   }
-  async list(): Promise<DatasetSummary[]> {
+  async findAll(): Promise<DatasetSummary[]> {
     return [{ ...this.dataset, recordCount: 0 }];
   }
   async create(input: {
@@ -116,7 +116,7 @@ class MemoryDatasetRepository implements DatasetRepository {
 
 class MemoryRecordRepository implements DatasetRecordRepository {
   records: DatasetRecord[] = [];
-  async list(): Promise<{ records: DatasetRecord[]; total: number }> {
+  async findAll(): Promise<{ records: DatasetRecord[]; total: number }> {
     return { records: this.records, total: this.records.length };
   }
   async createMany(input: {

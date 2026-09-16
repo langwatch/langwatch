@@ -65,7 +65,7 @@ describe("AnnotationService review workflow", () => {
     expect(harnessed.writeSuggestion).not.toHaveBeenCalled();
 
     await expect(
-      harnessed.repository.getById({ id: created.id, projectId: "project-1" }),
+      harnessed.repository.findById({ id: created.id, projectId: "project-1" }),
     ).resolves.toMatchObject({ id: created.id });
 
     expect(harnessed.permissions.hasProjectPermission).toHaveBeenCalledWith({
@@ -80,7 +80,7 @@ describe("AnnotationService review workflow", () => {
     harnessed.writeSuggestion.mockRejectedValue(new Error("overlay unavailable"));
 
     await expect(harnessed.app.createReview(createInput)).rejects.toThrow("overlay unavailable");
-    expect(await harnessed.repository.list({ projectId: "project-1", anchor: "all" })).toEqual([]);
+    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual([]);
   });
 
   it("keeps the existing anchor when updating a suggestion", async () => {
@@ -127,7 +127,7 @@ describe("AnnotationService review workflow", () => {
     expect(harnessed.writeSuggestion).not.toHaveBeenCalled();
 
     await expect(
-      harnessed.repository.getById({ id: created.id, projectId: "project-1" }),
+      harnessed.repository.findById({ id: created.id, projectId: "project-1" }),
     ).resolves.toMatchObject({
       id: created.id,
       projectId: createInput.projectId,
@@ -153,6 +153,6 @@ describe("AnnotationService review workflow", () => {
     });
 
     expect(deleted.id).toBe(created.id);
-    expect(await harnessed.repository.list({ projectId: "project-1", anchor: "all" })).toEqual([]);
+    expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual([]);
   });
 });

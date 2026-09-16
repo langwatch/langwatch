@@ -102,7 +102,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
         (prisma.promptTagAssignment.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
-        const result = await repo.getTagsForConfig({
+        const result = await repo.findTagsForConfig({
           configId: "config-1",
           projectId: "project-1",
         });
@@ -142,7 +142,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
         );
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
-        const result = await repo.getTagsForConfig({
+        const result = await repo.findTagsForConfig({
           configId: "config-1",
           projectId: "project-1",
         });

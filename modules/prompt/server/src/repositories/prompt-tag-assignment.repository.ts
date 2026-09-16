@@ -43,7 +43,7 @@ export abstract class PromptTagAssignmentRepository {
     userId?: string;
   }): Promise<PromptTagAssignmentRow & { promptTag: PromptTag }>;
 
-  abstract getTagsForConfig(params: {
+  abstract findTagsForConfig(params: {
     configId: string;
     projectId: string;
   }): Promise<(PromptTagAssignmentRow & { promptTag: PromptTag })[]>;
@@ -58,7 +58,7 @@ export abstract class PromptTagAssignmentRepository {
    * carries no version under that tag.
    * Callers must resolve tag name → tagId before calling this method.
    */
-  abstract getByConfigAndTagId(params: {
+  abstract findByConfigAndTagId(params: {
     configId: string;
     tagId: string;
     projectId: string;

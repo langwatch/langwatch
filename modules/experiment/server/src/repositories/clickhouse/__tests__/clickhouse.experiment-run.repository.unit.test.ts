@@ -47,7 +47,7 @@ describe("ClickHouseExperimentRunRepository", () => {
     const repository = ClickHouseExperimentRunRepository.create(options);
 
     await expect(
-      repository.list({
+      repository.findAll({
         projectId: "project_1",
         experimentIds: ["experiment_1"],
       }),
@@ -66,7 +66,7 @@ describe("ClickHouseExperimentRunRepository", () => {
       }),
     });
 
-    await repository.getAggregates({
+    await repository.findAggregates({
       projectId: "project_1",
       experimentIds: ["experiment_1"],
     });
@@ -111,7 +111,7 @@ describe("ClickHouseExperimentRunRepository", () => {
       }),
     });
 
-    await repository.list({ projectId: "project_1", experimentIds: ["experiment_1"] });
+    await repository.findAll({ projectId: "project_1", experimentIds: ["experiment_1"] });
 
     expect(tupleParam).toHaveBeenCalledWith(["experiment_1", "run_1"]);
     expect(queryParams[1]?.runPairs).toEqual([{ tuple: ["experiment_1", "run_1"] }]);

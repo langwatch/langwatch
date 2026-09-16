@@ -35,7 +35,7 @@ function createPromptTestDatabase() {
 export function createPromptServiceForTest(): PromptService {
   const database = createPromptTestDatabase();
   const repository = PrismaLlmConfigRepository.create({ prisma: database });
-  vi.spyOn(repository, "getOrganizationIdForProject").mockResolvedValue("org_test");
+  vi.spyOn(repository, "findOrganizationIdForProject").mockResolvedValue("org_test");
   vi.spyOn(repository, "checkModifyPermission").mockResolvedValue({ hasPermission: true });
   const promptTagRepository = PrismaPromptTagRepository.create({ prisma: database });
 

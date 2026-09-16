@@ -53,7 +53,7 @@ export abstract class ExperimentRepository {
     projectId: string;
     slug: string;
   }): Promise<{ id: string; slug: string } | null>;
-  abstract getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
+  abstract findBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment>;
   abstract findRowState(input: {
     projectId: string;
     id: string;
@@ -81,7 +81,7 @@ export abstract class ExperimentRepository {
     archivedSlug: string;
     archivedAt: Instant;
   }): Promise<boolean>;
-  abstract getWorkbenchState(input: {
+  abstract findWorkbenchState(input: {
     projectId: string;
     id?: string;
     slug?: string;
@@ -111,13 +111,13 @@ export abstract class ExperimentRepository {
     actor: WorkbenchActor;
     commitMessage?: string;
   }): Promise<{ id: string; slug: string }>;
-  abstract listWorkbenchVersions(input: {
+  abstract findWorkbenchVersions(input: {
     projectId: string;
     experimentId: string;
     take: number;
     beforeCounterVersion?: number;
   }): Promise<WorkbenchVersionSummary[]>;
-  abstract getWorkbenchVersion(input: {
+  abstract findWorkbenchVersion(input: {
     projectId: string;
     experimentId: string;
     version: number;

@@ -103,7 +103,7 @@ export class PrismaAnnotationQueueRepository
     }
   }
 
-  async listQueues({
+  async findQueues({
     projectId,
     reachableOnly,
     userId,
@@ -126,7 +126,7 @@ export class PrismaAnnotationQueueRepository
     return queues;
   }
 
-  async getQueueById(input: QueueByIdInput): Promise<AnnotationQueueDetail> {
+  async findQueueById(input: QueueByIdInput): Promise<AnnotationQueueDetail> {
     const queue = await this.prisma.annotationQueue.findUnique({
       where: { id: input.queueId, projectId: input.projectId },
       include: {
@@ -140,7 +140,7 @@ export class PrismaAnnotationQueueRepository
     return queue;
   }
 
-  async getQueueBySlug(input: QueueBySlugInput): Promise<AnnotationQueueDetail> {
+  async findQueueBySlug(input: QueueBySlugInput): Promise<AnnotationQueueDetail> {
     const queue = await this.prisma.annotationQueue.findUnique({
       where: { projectId_slug: { projectId: input.projectId, slug: input.slug } },
       include: {

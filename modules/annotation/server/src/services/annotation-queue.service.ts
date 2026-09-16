@@ -71,7 +71,7 @@ export class AnnotationQueueService {
   listQueues(
     input: AnnotationQueueScope & Readonly<{ reachableOnly?: boolean; userId?: string }>,
   ): Promise<AnnotationQueueListEntry[]> {
-    return this.#repository.listQueues(input);
+    return this.#repository.findQueues(input);
   }
 
   countQueues(
@@ -90,7 +90,7 @@ export class AnnotationQueueService {
       }>,
   ): Promise<AnnotationQueueDetail> {
     if (input.queueId) {
-      return this.#repository.getQueueById({
+      return this.#repository.findQueueById({
         projectId: input.projectId,
         organizationId: input.organizationId,
         organizationMemberIds: input.organizationMemberIds,
@@ -99,7 +99,7 @@ export class AnnotationQueueService {
     }
 
     if (input.slug !== void 0) {
-      return this.#repository.getQueueBySlug({
+      return this.#repository.findQueueBySlug({
         projectId: input.projectId,
         organizationId: input.organizationId,
         organizationMemberIds: input.organizationMemberIds,
@@ -121,7 +121,7 @@ export class AnnotationQueueService {
       organizationMemberIds: readonly string[];
     }>,
   ): Promise<readonly AnnotationQueueListedItem[]> {
-    return this.#items.listQueueItems(input);
+    return this.#items.findQueueItems(input);
   }
 
   countPendingItems(input: AnnotationQueueCaller): Promise<number> {
@@ -135,7 +135,7 @@ export class AnnotationQueueService {
   listMemberQueuePendingCounts(
     input: AnnotationQueueCaller,
   ): Promise<readonly AnnotationQueuePendingCount[]> {
-    return this.#items.listMemberQueuePendingCounts(input);
+    return this.#items.findMemberQueuePendingCounts(input);
   }
 
   deleteQueueItems(
@@ -164,7 +164,7 @@ export class AnnotationQueueService {
     input: ListQueueItemsByUserInput & Readonly<{ queueId?: string }>,
   ): Promise<Readonly<{ totalCount: number; items: readonly AnnotationQueuePageItem[] }>> {
     if (input.queueId) {
-      return this.#items.listQueueItemsByQueue({
+      return this.#items.findQueueItemsByQueue({
         projectId: input.projectId,
         organizationId: input.organizationId,
         organizationMemberIds: input.organizationMemberIds,
@@ -179,7 +179,7 @@ export class AnnotationQueueService {
       });
     }
 
-    return this.#items.listQueueItemsByUser(input);
+    return this.#items.findQueueItemsByUser(input);
   }
 
   listQueuesWithItems(
@@ -190,6 +190,6 @@ export class AnnotationQueueService {
       queueIds: readonly string[];
     }>,
   ): Promise<readonly AnnotationQueueWithItems[]> {
-    return this.#items.listQueuesWithItems(input);
+    return this.#items.findQueuesWithItems(input);
   }
 }

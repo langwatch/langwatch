@@ -32,10 +32,10 @@ describe("PrismaLlmConfigRepository", () => {
         const mockUpdate = vi.fn(() => Promise.resolve({ id: "prompt_1", deletedAt: new Date() }));
         const prisma = makeMockPrisma({ update: mockUpdate });
 
-        // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
+        // Mock findConfigByIdOrHandleWithLatestVersion to return a config with
         // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "findConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -73,7 +73,7 @@ describe("PrismaLlmConfigRepository", () => {
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "findConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -112,7 +112,7 @@ describe("PrismaLlmConfigRepository", () => {
         });
 
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(repo, "findConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -144,7 +144,7 @@ describe("PrismaLlmConfigRepository", () => {
         const prisma = makeMockPrisma({ findMany: mockFindMany });
 
         const repo = PrismaLlmConfigRepository.create({ prisma });
-        await repo.getAllWithLatestVersion({
+        await repo.findAllWithLatestVersion({
           projectId: "proj_1",
           organizationId: "org_1",
         });

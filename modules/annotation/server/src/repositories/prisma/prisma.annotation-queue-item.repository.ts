@@ -141,7 +141,7 @@ export class PrismaAnnotationQueueItemRepository
     });
   }
 
-  async listQueueItems({
+  async findQueueItems({
     projectId,
     organizationId,
   }: AnnotationQueueItemOrganizationScope): Promise<AnnotationQueueListedItem[]> {
@@ -176,7 +176,7 @@ export class PrismaAnnotationQueueItemRepository
     return this.prisma.annotationQueueItem.count({ where: { projectId, doneAt: null, userId } });
   }
 
-  async listMemberQueuePendingCounts({
+  async findMemberQueuePendingCounts({
     projectId,
     userId,
   }: AnnotationQueueItemCaller): Promise<AnnotationQueuePendingCount[]> {
@@ -239,7 +239,7 @@ export class PrismaAnnotationQueueItemRepository
     return item;
   }
 
-  listQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage> {
+  findQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage> {
     const assignments: Prisma.AnnotationQueueItemWhereInput[] = [{ userId: input.userId }];
 
     if (input.includeMemberQueues) {
@@ -254,7 +254,7 @@ export class PrismaAnnotationQueueItemRepository
     return this.#listPage(input, { OR: assignments });
   }
 
-  listQueueItemsByQueue(input: ListQueueItemsByQueueInput): Promise<AnnotationQueueItemsPage> {
+  findQueueItemsByQueue(input: ListQueueItemsByQueueInput): Promise<AnnotationQueueItemsPage> {
     return this.#listPage(input, {
       annotationQueue: { id: input.queueId, projectId: input.projectId },
     });
@@ -300,7 +300,7 @@ export class PrismaAnnotationQueueItemRepository
     return { totalCount, items };
   }
 
-  async listQueuesWithItems({
+  async findQueuesWithItems({
     projectId,
     organizationId,
     queueIds,

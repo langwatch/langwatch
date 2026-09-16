@@ -93,6 +93,6 @@ export interface UsageWarning {
  * — and the absence of one only costs repeated reads.
  */
 export interface UsageCache {
-  tryGet<T>(key: string): Promise<T | undefined>;
+  findValue<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;
 }

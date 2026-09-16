@@ -58,14 +58,14 @@ export class AnnotationService {
   getById(input: AnnotationByIdInput): Promise<Annotation> {
     const parsed = annotationByIdInputSchema.parse(input);
 
-    return this.#repository.getById(parsed);
+    return this.#repository.findById(parsed);
   }
 
   list(input: ListAnnotationsInput): Promise<Annotation[]> {
-    return this.#repository.list(listAnnotationsInputSchema.parse(input));
+    return this.#repository.findAll(listAnnotationsInputSchema.parse(input));
   }
 
   listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
-    return this.#repository.listForProjection(listProjectionAnnotationsInputSchema.parse(input));
+    return this.#repository.findForProjection(listProjectionAnnotationsInputSchema.parse(input));
   }
 }

@@ -14,7 +14,7 @@ export interface AnnotationRepository {
   create(input: CreateAnnotationInput): Promise<Annotation>;
   update(input: UpdateAnnotationInput): Promise<Annotation>;
   delete(input: DeleteAnnotationInput): Promise<Annotation>;
-  getById(input: AnnotationByIdInput): Promise<Annotation>;
-  list(input: ListAnnotationsInput): Promise<Annotation[]>;
-  listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]>;
+  findById(input: AnnotationByIdInput): Promise<Annotation>;
+  findAll(input: ListAnnotationsInput): Promise<Annotation[]>;
+  findForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]>;
 }

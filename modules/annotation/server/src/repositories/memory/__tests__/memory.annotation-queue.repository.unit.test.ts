@@ -34,11 +34,11 @@ describe("memory annotation queue repositories", () => {
     expect(await items.countAssignedItems({ projectId: "project-1", userId: "user-2" })).toBe(1);
 
     expect(
-      await queues.listQueues({ projectId: "project-1", reachableOnly: true, userId: "user-1" }),
+      await queues.findQueues({ projectId: "project-1", reachableOnly: true, userId: "user-1" }),
     ).toHaveLength(1);
 
     await expect(
-      queues.getQueueById({
+      queues.findQueueById({
         projectId: "project-1",
         organizationId: "org-1",
         organizationMemberIds: ["user-1"],
@@ -47,7 +47,7 @@ describe("memory annotation queue repositories", () => {
     ).resolves.toMatchObject({ id: queue.id, members: [{ user: { id: "user-1" } }] });
 
     await expect(
-      queues.getQueueBySlug({
+      queues.findQueueBySlug({
         projectId: "project-2",
         organizationId: "org-1",
         organizationMemberIds: ["user-1"],
@@ -68,7 +68,7 @@ describe("memory annotation queue repositories", () => {
     ).rejects.toBeInstanceOf(AnnotationQueueNotFoundError);
 
     expect(
-      await items.listQueueItems({
+      await items.findQueueItems({
         projectId: "project-1",
         organizationId: "org-1",
         organizationMemberIds: ["user-1"],
@@ -76,7 +76,7 @@ describe("memory annotation queue repositories", () => {
     ).toHaveLength(1);
 
     expect(
-      await items.listQueueItems({
+      await items.findQueueItems({
         projectId: "project-2",
         organizationId: "org-1",
         organizationMemberIds: ["user-1"],
@@ -84,7 +84,7 @@ describe("memory annotation queue repositories", () => {
     ).toEqual([]);
 
     await expect(
-      items.listQueuesWithItems({
+      items.findQueuesWithItems({
         projectId: "project-1",
         organizationId: "org-1",
         organizationMemberIds: [],
@@ -92,7 +92,7 @@ describe("memory annotation queue repositories", () => {
       }),
     ).resolves.toMatchObject([{ id: queue.id, members: [] }]);
 
-    const page = await items.listQueueItemsByUser({
+    const page = await items.findQueueItemsByUser({
       projectId: "project-1",
       organizationId: "org-1",
       organizationMemberIds: ["user-1"],

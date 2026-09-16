@@ -231,7 +231,7 @@ export class PromptWriteService {
     const updatedConfig = await this.repository.updateConfig(idOrHandle, projectId, data);
 
     // Get the latest version to return complete prompt
-    const latestVersionRaw = await this.repository.versions.getLatestVersion(
+    const latestVersionRaw = await this.repository.versions.findLatestVersion(
       updatedConfig.id,
       projectId,
     );
@@ -434,6 +434,6 @@ export class PromptWriteService {
   }
 
   private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
-    return this.repository.getOrganizationIdForProject(projectId);
+    return this.repository.findOrganizationIdForProject(projectId);
   }
 }

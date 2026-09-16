@@ -27,7 +27,7 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
     return new MemoryAnnotationScoreRepository(input.memory);
   }
 
-  async listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
+  async findScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     return this.#database
       .scores()
       .filter((score) => score.projectId === input.projectId)
@@ -57,7 +57,7 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
     return structuredClone(score);
   }
 
-  async listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
+  async findScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
     const scores = this.#database
       .scores()
       .filter(
@@ -74,7 +74,7 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
     return scores.map((score) => structuredClone(score));
   }
 
-  async getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
+  async findScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     const score = this.#database.score(input.projectId, input.id);
 
     if (!score || score.projectId !== input.projectId || score.deletedAt !== null) {
@@ -85,7 +85,7 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
   }
 
   async toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore> {
-    const score = await this.getScore(input);
+    const score = await this.findScore(input);
 
     const updated = annotationScoreSchema.parse({
       ...score,
@@ -99,7 +99,7 @@ export class MemoryAnnotationScoreRepository implements AnnotationScoreRepositor
   }
 
   async deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
-    const score = await this.getScore(input);
+    const score = await this.findScore(input);
 
     const updated = annotationScoreSchema.parse({
       ...score,

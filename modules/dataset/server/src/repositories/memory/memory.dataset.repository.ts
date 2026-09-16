@@ -67,7 +67,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
     return row ? toDataset(row) : null;
   }
 
-  async list(input: {
+  async findAll(input: {
     projectId: string;
     page: number;
     limit: number;

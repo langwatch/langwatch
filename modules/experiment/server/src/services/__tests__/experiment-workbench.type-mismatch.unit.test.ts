@@ -39,7 +39,7 @@ const thrownBy = async (promise: Promise<unknown>): Promise<unknown> => {
 
 function makeService(): ExperimentWorkbenchService {
   const repository = {
-    getWorkbenchState: async () => {
+    findWorkbenchState: async () => {
       throw new ExperimentTypeMismatchError();
     },
     resolveWorkbenchSaveTarget: async () => {

@@ -95,7 +95,7 @@ export class MemoryAnnotationRepository implements AnnotationRepository {
     return structuredClone(annotation);
   }
 
-  async getById(input: AnnotationByIdInput): Promise<Annotation> {
+  async findById(input: AnnotationByIdInput): Promise<Annotation> {
     const annotation = this.#annotations.get(this.#key(input.projectId, input.id));
 
     if (!annotation || annotation.projectId !== input.projectId) {
@@ -105,7 +105,7 @@ export class MemoryAnnotationRepository implements AnnotationRepository {
     return structuredClone(annotation);
   }
 
-  async list(input: ListAnnotationsInput): Promise<Annotation[]> {
+  async findAll(input: ListAnnotationsInput): Promise<Annotation[]> {
     const parsed = listAnnotationsInputSchema.parse(input);
 
     const rows = [...this.#annotations.values()].filter((annotation) =>
@@ -136,7 +136,7 @@ export class MemoryAnnotationRepository implements AnnotationRepository {
     return true;
   }
 
-  async listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
+  async findForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
     const parsed = listProjectionAnnotationsInputSchema.parse(input);
 
     return [...this.#annotations.values()]

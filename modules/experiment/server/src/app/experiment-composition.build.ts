@@ -145,7 +145,7 @@ class FixedExperimentDspyRetention extends ExperimentDspyRetentionRepository {
     super();
   }
 
-  getTraceRetentionDays(_tenantId: string): Promise<number> {
+  findTraceRetentionDays(_tenantId: string): Promise<number> {
     return Promise.resolve(this.days);
   }
 }

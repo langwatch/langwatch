@@ -39,7 +39,7 @@ function serviceHolding(records: ReturnType<typeof record>[]) {
   } as unknown as DatasetRepository;
 
   const recordsRepository = {
-    list: async ({ page, limit }: { page: number; limit: number }) => ({
+    findAll: async ({ page, limit }: { page: number; limit: number }) => ({
       records: records.slice((page - 1) * limit, page * limit),
       total: records.length,
     }),

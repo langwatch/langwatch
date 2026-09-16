@@ -446,7 +446,7 @@ describe("PrismaUsageMembershipRepository", () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }, { id: "proj-2" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
 
-      const result = await repository.getCurrentMonthCost(organizationId);
+      const result = await repository.findCurrentMonthCost(organizationId);
 
       expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
         where: { team: { organizationId } },
@@ -466,7 +466,7 @@ describe("PrismaUsageMembershipRepository", () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
-      const result = await repository.getCurrentMonthCost(organizationId);
+      const result = await repository.findCurrentMonthCost(organizationId);
 
       expect(result).toBe(0);
     });
@@ -474,7 +474,7 @@ describe("PrismaUsageMembershipRepository", () => {
     it("returns zero when no projects exist", async () => {
       mockPrisma.project.findMany.mockResolvedValue([]);
 
-      const result = await repository.getCurrentMonthCost(organizationId);
+      const result = await repository.findCurrentMonthCost(organizationId);
 
       // Should still call aggregate with empty array
       expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
@@ -493,7 +493,7 @@ describe("PrismaUsageMembershipRepository", () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 100 } });
 
-      await repository.getCurrentMonthCost(organizationId);
+      await repository.findCurrentMonthCost(organizationId);
 
       const call = mockPrisma.cost.aggregate.mock.calls[0]?.[0];
       const dateFilter = call?.where?.createdAt?.gte as Date;
@@ -511,7 +511,7 @@ describe("PrismaUsageMembershipRepository", () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
       const projectIds = ["proj-a", "proj-b", "proj-c"];
 
-      const result = await repository.getCurrentMonthCostForProjects(projectIds);
+      const result = await repository.findCurrentMonthCostForProjects(projectIds);
 
       expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
         where: {
@@ -526,7 +526,7 @@ describe("PrismaUsageMembershipRepository", () => {
     it("returns zero when amount is null", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
-      const result = await repository.getCurrentMonthCostForProjects(["proj-1"]);
+      const result = await repository.findCurrentMonthCostForProjects(["proj-1"]);
 
       expect(result).toBe(0);
     });
@@ -534,7 +534,7 @@ describe("PrismaUsageMembershipRepository", () => {
     it("handles empty project array", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: null } });
 
-      const result = await repository.getCurrentMonthCostForProjects([]);
+      const result = await repository.findCurrentMonthCostForProjects([]);
 
       expect(mockPrisma.cost.aggregate).toHaveBeenCalledWith({
         where: {

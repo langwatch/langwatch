@@ -1,7 +1,7 @@
 import type { DatasetRecord, DatasetRecordInput } from "@langwatch/dataset-contract";
 
 export interface DatasetRecordRepository {
-  list(input: {
+  findAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

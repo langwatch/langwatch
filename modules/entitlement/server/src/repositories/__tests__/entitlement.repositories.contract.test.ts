@@ -90,8 +90,8 @@ describe.each(backends)("given the $name entitlement repositories", ({ create })
     it("reports nothing spent this month", async () => {
       const { membership } = create([]);
 
-      await expect(membership.getCurrentMonthCost(ACME)).resolves.toBe(0);
-      await expect(membership.getCurrentMonthCostForProjects(["project_1"])).resolves.toBe(0);
+      await expect(membership.findCurrentMonthCost(ACME)).resolves.toBe(0);
+      await expect(membership.findCurrentMonthCostForProjects(["project_1"])).resolves.toBe(0);
     });
 
     it("rolls up no spend for the caller", async () => {
@@ -114,17 +114,17 @@ describe.each(backends)("given the $name entitlement repositories", ({ create })
     it("reports the month's spend for the organization", async () => {
       const { membership } = create([ACME_USAGE]);
 
-      await expect(membership.getCurrentMonthCost(ACME)).resolves.toBe(42);
+      await expect(membership.findCurrentMonthCost(ACME)).resolves.toBe(42);
     });
 
     it("sums only the projects the caller named", async () => {
       const { membership } = create([ACME_USAGE]);
 
-      await expect(membership.getCurrentMonthCostForProjects(["project_1"])).resolves.toBe(30);
+      await expect(membership.findCurrentMonthCostForProjects(["project_1"])).resolves.toBe(30);
       await expect(
-        membership.getCurrentMonthCostForProjects(["project_1", "project_2"]),
+        membership.findCurrentMonthCostForProjects(["project_1", "project_2"]),
       ).resolves.toBe(42);
-      await expect(membership.getCurrentMonthCostForProjects([])).resolves.toBe(0);
+      await expect(membership.findCurrentMonthCostForProjects([])).resolves.toBe(0);
     });
 
     it("rolls the spend up per project for the person who may see it", async () => {
@@ -150,14 +150,14 @@ describe.each(backends)("given the $name entitlement repositories", ({ create })
 
       await expect(membership.getMemberCount(ACME)).resolves.toBe(3);
       await expect(membership.getMembersLiteCount(ACME)).resolves.toBe(2);
-      await expect(membership.getCurrentMonthCost(ACME)).resolves.toBe(42);
+      await expect(membership.findCurrentMonthCost(ACME)).resolves.toBe(42);
     });
 
     it("never counts a project the caller did not name", async () => {
       const { membership } = create([ACME_USAGE, OTHER_USAGE]);
 
       await expect(
-        membership.getCurrentMonthCostForProjects(["project_1", "project_2"]),
+        membership.findCurrentMonthCostForProjects(["project_1", "project_2"]),
       ).resolves.toBe(42);
     });
 

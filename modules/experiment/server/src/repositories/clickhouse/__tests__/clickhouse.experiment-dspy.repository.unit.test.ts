@@ -26,7 +26,7 @@ const step = (overrides: Partial<ExperimentDspyStep> = {}): ExperimentDspyStep =
 });
 
 class FixedRetention extends ExperimentDspyRetentionRepository {
-  getTraceRetentionDays = vi.fn(async () => 49);
+  findTraceRetentionDays = vi.fn(async () => 49);
 }
 
 const telemetry = { warn: vi.fn() };
@@ -56,7 +56,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
 
     await expect(repository.upsert(step())).resolves.toBeUndefined();
     await expect(
-      repository.list({ tenantId: "project_1", experimentId: "experiment_1" }),
+      repository.findAll({ tenantId: "project_1", experimentId: "experiment_1" }),
     ).resolves.toEqual([]);
     await expect(
       repository.findStep({
@@ -66,7 +66,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
         stepIndex: "0",
       }),
     ).resolves.toBeNull();
-    expect(retention.getTraceRetentionDays).not.toHaveBeenCalled();
+    expect(retention.findTraceRetentionDays).not.toHaveBeenCalled();
   });
 
   it("merges examples and calls by hash while preserving first-write times", async () => {
@@ -173,7 +173,7 @@ describe("ClickHouseExperimentDspyRepository", () => {
     });
 
     await expect(
-      repository.list({ tenantId: "project_1", experimentId: "experiment_1" }),
+      repository.findAll({ tenantId: "project_1", experimentId: "experiment_1" }),
     ).resolves.toEqual([
       {
         tenantId: "project_1",

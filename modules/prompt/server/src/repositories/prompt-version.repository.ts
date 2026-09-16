@@ -44,20 +44,20 @@ export type CreateLlmConfigVersionParams = Omit<
  * Repository for managing LLM Configuration Versions.
  */
 export abstract class LlmConfigVersionsRepository {
-  abstract getVersionsForConfigByIdOrHandle(params: {
+  abstract findVersionsForConfigByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
   }): Promise<(PromptVersionRow & { author: PromptVersionAuthor | null })[]>;
 
-  abstract getVersionById(params: {
+  abstract findVersionById(params: {
     versionId: string;
     projectId: string;
   }): Promise<PromptVersionRow & { author: PromptVersionAuthor | null }>;
 
   abstract findLatestId(params: { configId: string; projectId: string }): Promise<string | null>;
 
-  abstract getLatestVersion(
+  abstract findLatestVersion(
     configId: string,
     projectId: string,
   ): Promise<PromptVersionRow & { author: PromptVersionAuthor | null }>;

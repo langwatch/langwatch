@@ -25,16 +25,16 @@ describe("MemoryAnnotationScoreRepository", () => {
       await repository.countAnnotationScores({ projectId: "project_1", scoreTypeIds: ["score_1"] }),
     ).toBe(1);
 
-    expect(await repository.listScoreNames({ projectId: "project_1" })).toEqual([
+    expect(await repository.findScoreNames({ projectId: "project_1" })).toEqual([
       { id: "score_1", name: "Correctness" },
     ]);
 
     await repository.toggleScore({ id: "score_1", projectId: "project_1", active: false });
-    expect(await repository.listScores({ projectId: "project_1", activeOnly: true })).toEqual([]);
+    expect(await repository.findScores({ projectId: "project_1", activeOnly: true })).toEqual([]);
 
     await repository.deleteScore({ id: "score_1", projectId: "project_1" });
 
-    await expect(repository.getScore({ id: "score_1", projectId: "project_1" })).rejects.toThrow(
+    await expect(repository.findScore({ id: "score_1", projectId: "project_1" })).rejects.toThrow(
       "score_1",
     );
 

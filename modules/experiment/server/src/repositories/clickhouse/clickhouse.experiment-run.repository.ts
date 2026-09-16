@@ -146,7 +146,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     super();
   }
 
-  async list(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
+  async findAll(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
     return this.options.telemetry.trace(
       {
         name: "ExperimentRunService.listRuns",
@@ -180,7 +180,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async getAggregates(
+  async findAggregates(
     input: ExperimentRunListInput,
   ): Promise<Record<string, ExperimentRunAggregate>> {
     return this.options.telemetry.trace(
@@ -238,7 +238,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async getPage(
+  async findPage(
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
     return this.options.telemetry.trace(
@@ -511,7 +511,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
         },
         format: "JSONEachRow",
       }),
-      this.getWorkflowVersions(
+      this.findWorkflowVersions(
         projectId,
         rows.flatMap((row) => (row.WorkflowVersionId ? [row.WorkflowVersionId] : [])),
       ),
@@ -540,7 +540,7 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     );
   }
 
-  async getWorkflowVersions(
+  async findWorkflowVersions(
     projectId: string,
     versionIds: string[],
   ): Promise<Record<string, ExperimentRunWorkflowVersion>> {
@@ -638,7 +638,12 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
     });
   }
 }
-function timestamps(row: RunRow) {
+function timestamps(row: RunRow): {
+  createdAt: number;
+  updatedAt: number;
+  finishedAt: number | null;
+  stoppedAt: number | null;
+} {
   const parse = (value: string): number => toEpochMs(`${value.replace(" ", "T")}Z`);
   return {
     createdAt: parse(row.CreatedAt),

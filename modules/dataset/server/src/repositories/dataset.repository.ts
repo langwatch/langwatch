@@ -51,7 +51,7 @@ export interface DatasetRepository {
     excludeId?: string;
     includeArchived?: boolean;
   }): Promise<Dataset | null>;
-  list(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]>;
+  findAll(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]>;
   create(input: DatasetCreateInput): Promise<Dataset>;
   update(input: DatasetUpdateInput): Promise<Dataset>;
   archive(input: {

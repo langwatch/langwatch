@@ -32,7 +32,7 @@ const row = (): Dataset =>
 class Repo implements DatasetRepository {
   findById = vi.fn(async () => row());
   findBySlug = vi.fn(async () => row());
-  list = vi.fn(async () => []);
+  findAll = vi.fn(async () => []);
   create = vi.fn(async () => row());
   update = vi.fn(async () => row());
   archive = vi.fn(async () => row());
@@ -41,7 +41,7 @@ class Repo implements DatasetRepository {
   count = vi.fn(async () => 0);
 }
 class Records implements DatasetRecordRepository {
-  list = vi.fn(async () => ({ records: [], total: 0 }));
+  findAll = vi.fn(async () => ({ records: [], total: 0 }));
   createMany = vi.fn(async () => []);
   update = vi.fn(async () => {
     throw new Error("unused");

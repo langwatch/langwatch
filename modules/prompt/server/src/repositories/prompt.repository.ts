@@ -65,7 +65,7 @@ export interface LlmConfigWithLatestVersion extends PromptConfigRow {
 export abstract class LlmConfigRepository {
   abstract readonly versions: LlmConfigVersionsRepository;
 
-  abstract getOrganizationIdForProject(projectId: string): Promise<string>;
+  abstract findOrganizationIdForProject(projectId: string): Promise<string>;
 
   abstract isHandleUnique(params: {
     handle: string;
@@ -76,22 +76,22 @@ export abstract class LlmConfigRepository {
     excludeId?: string;
   }): Promise<boolean>;
 
-  abstract listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]>;
+  abstract findCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]>;
 
-  abstract getCopySource(input: { promptId: string }): Promise<PromptCopySource>;
+  abstract findCopySource(input: { promptId: string }): Promise<PromptCopySource>;
 
-  abstract getAllWithLatestVersion(params: {
+  abstract findAllWithLatestVersion(params: {
     projectId: string;
     organizationId: string;
   }): Promise<LlmConfigWithLatestVersion[]>;
 
-  abstract getPromptByIdOrHandle(params: {
+  abstract findPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
   }): Promise<PromptConfigRow>;
 
-  abstract getConfigByIdOrHandleWithLatestVersion(params: {
+  abstract findConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
@@ -130,7 +130,7 @@ export abstract class LlmConfigRepository {
     };
   }): Promise<LlmConfigWithLatestVersion>;
 
-  abstract getConfigVersionByNumber(params: {
+  abstract findConfigVersionByNumber(params: {
     idOrHandle: string;
     versionNumber: number;
     projectId: string;

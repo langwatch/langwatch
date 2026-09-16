@@ -61,7 +61,7 @@ export class PrismaDatasetRepository
     return row ? toDataset(row) : null;
   }
 
-  async list(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]> {
+  async findAll(input: { projectId: string; page: number; limit: number }): Promise<DatasetSummary[]> {
     const rows = await this.database.dataset.findMany({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { createdAt: "desc" },

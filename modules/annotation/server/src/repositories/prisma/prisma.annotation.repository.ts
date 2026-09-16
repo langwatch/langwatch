@@ -149,7 +149,7 @@ export class PrismaAnnotationRepository
     }
   }
 
-  async getById(input: AnnotationByIdInput): Promise<Annotation> {
+  async findById(input: AnnotationByIdInput): Promise<Annotation> {
     const row = await this.prisma.annotation.findFirst({
       where: { id: input.id, projectId: input.projectId },
       select: annotationSelect,
@@ -160,7 +160,7 @@ export class PrismaAnnotationRepository
     return parseRow(row);
   }
 
-  async list(input: ListAnnotationsInput): Promise<Annotation[]> {
+  async findAll(input: ListAnnotationsInput): Promise<Annotation[]> {
     const parsed = listAnnotationsInputSchema.parse(input);
 
     const rows = await this.prisma.annotation.findMany({
@@ -179,7 +179,7 @@ export class PrismaAnnotationRepository
     return rows.map(parseRow);
   }
 
-  async listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
+  async findForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
     const parsed = listProjectionAnnotationsInputSchema.parse(input);
 
     const rows = await this.prisma.annotation.findMany({

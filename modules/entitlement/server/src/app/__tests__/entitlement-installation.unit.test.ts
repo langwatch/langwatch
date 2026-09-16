@@ -44,7 +44,7 @@ function operatorDirectory(
   profiles: Record<string, { email: string | null; name: string | null }>,
 ) {
   return createApiFixture<UserApi>({
-    tryFindById: async ({ id }) => {
+    findById: async ({ id }) => {
       const profile = profiles[id];
       if (!profile) return null;
 

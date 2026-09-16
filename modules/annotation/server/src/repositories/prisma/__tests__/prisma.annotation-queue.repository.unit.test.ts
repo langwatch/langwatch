@@ -72,7 +72,7 @@ describe("PrismaAnnotationQueueItemRepository response projections", () => {
 
     queueItem.findMany.mockResolvedValue([row]);
 
-    const result = await PrismaAnnotationQueueItemRepository.create({ prisma }).listQueueItems({
+    const result = await PrismaAnnotationQueueItemRepository.create({ prisma }).findQueueItems({
       projectId: "project-1",
       organizationId: "org-1",
       organizationMemberIds: ["user-1"],
@@ -112,7 +112,7 @@ describe("PrismaAnnotationQueueItemRepository response projections", () => {
     };
 
     await expect(
-      PrismaAnnotationQueueItemRepository.create({ prisma }).listQueueItemsByUser(input),
+      PrismaAnnotationQueueItemRepository.create({ prisma }).findQueueItemsByUser(input),
     ).resolves.toEqual({ totalCount: 1, items: [row] });
 
     expect(queueItem.findMany).toHaveBeenCalledWith(
@@ -133,7 +133,7 @@ describe("PrismaAnnotationQueueItemRepository response projections", () => {
     queue.findMany.mockResolvedValue([row]);
 
     await expect(
-      PrismaAnnotationQueueItemRepository.create({ prisma }).listQueuesWithItems({
+      PrismaAnnotationQueueItemRepository.create({ prisma }).findQueuesWithItems({
         projectId: "project-1",
         organizationId: "org-1",
         organizationMemberIds: ["user-1"],

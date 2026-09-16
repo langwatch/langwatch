@@ -32,7 +32,7 @@ class Repo implements DatasetRepository {
   value = row();
   findById = async () => this.value;
   findBySlug = async () => null;
-  list = async () => [];
+  findAll = async () => [];
   create = async () => this.value;
   update = async () => this.value;
   archive = async () => this.value;
@@ -41,7 +41,7 @@ class Repo implements DatasetRepository {
   count = async () => 0;
 }
 class Records implements DatasetRecordRepository {
-  list = async () => ({ records: [], total: 0 });
+  findAll = async () => ({ records: [], total: 0 });
   createMany = async () => [];
   update = async () => {
     throw new Error("unused");

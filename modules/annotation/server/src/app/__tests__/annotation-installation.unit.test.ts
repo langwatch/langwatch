@@ -183,7 +183,7 @@ describe("annotation app installation", () => {
     });
 
     await expect(
-      annotations.getById({ projectId: "project-1", id: created.id }),
+      annotations.findById({ projectId: "project-1", id: created.id }),
     ).resolves.toMatchObject({ comment: "Saved through the replacement" });
 
     members.splice(0, members.length);

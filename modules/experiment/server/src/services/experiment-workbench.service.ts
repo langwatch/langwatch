@@ -102,7 +102,7 @@ export class ExperimentWorkbenchService {
 
   async getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
     const query = getWorkbenchStateInputSchema.parse(input);
-    const state = await this.repository.getWorkbenchState(query);
+    const state = await this.repository.findWorkbenchState(query);
 
     return { ...state, state: repairWorkbenchState(state.state) };
   }
@@ -195,7 +195,7 @@ export class ExperimentWorkbenchService {
     const query = listWorkbenchVersionsInputSchema.parse(input);
     const current = await this.getWorkbenchState({ projectId: query.projectId, id: query.id });
     const take = Math.min(Math.max(query.limit ?? 50, 1), 100);
-    const versions = await this.repository.listWorkbenchVersions({
+    const versions = await this.repository.findWorkbenchVersions({
       projectId: query.projectId,
       experimentId: current.experimentId,
       take,
@@ -209,7 +209,7 @@ export class ExperimentWorkbenchService {
   async restoreWorkbenchVersion(input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
     const command = restoreWorkbenchVersionInputSchema.parse(input);
     const current = await this.getWorkbenchState(command);
-    const version = await this.repository.getWorkbenchVersion({
+    const version = await this.repository.findWorkbenchVersion({
       projectId: command.projectId,
       experimentId: current.experimentId,
       version: command.version,

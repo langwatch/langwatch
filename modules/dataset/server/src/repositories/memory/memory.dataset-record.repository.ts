@@ -26,7 +26,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     return new MemoryDatasetRecordRepository(input.database);
   }
 
-  async list(input: {
+  async findAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

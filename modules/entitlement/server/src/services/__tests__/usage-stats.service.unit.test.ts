@@ -32,10 +32,10 @@ class StubMembership implements UsageMembershipRepository {
   async getMembersLiteCount(): Promise<number> {
     return 1;
   }
-  async getCurrentMonthCost(): Promise<number> {
+  async findCurrentMonthCost(): Promise<number> {
     return 12.5;
   }
-  async getCurrentMonthCostForProjects(): Promise<number> {
+  async findCurrentMonthCostForProjects(): Promise<number> {
     return 12.5;
   }
 }

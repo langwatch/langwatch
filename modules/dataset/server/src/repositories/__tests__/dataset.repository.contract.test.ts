@@ -89,7 +89,7 @@ function contractCases(backend: Backend): void {
       ).resolves.toMatchObject({ slug: "third-archived" });
 
       await expect(
-        backend.datasets().list({ projectId: backend.mine(), page: 1, limit: 50 }),
+        backend.datasets().findAll({ projectId: backend.mine(), page: 1, limit: 50 }),
       ).resolves.toEqual([]);
     });
 
@@ -132,7 +132,7 @@ function contractCases(backend: Backend): void {
         ],
       });
 
-      const listed = await backend.datasets().list({
+      const listed = await backend.datasets().findAll({
         projectId: backend.mine(),
         page: 1,
         limit: 50,
@@ -174,7 +174,7 @@ function contractCases(backend: Backend): void {
         ],
       });
 
-      const page = await backend.records().list({
+      const page = await backend.records().findAll({
         datasetId: dataset.id,
         projectId: backend.mine(),
         page: 2,
@@ -205,7 +205,7 @@ function contractCases(backend: Backend): void {
         }),
       ).resolves.toBe(1);
 
-      const remaining = await backend.records().list({
+      const remaining = await backend.records().findAll({
         datasetId: dataset.id,
         projectId: backend.mine(),
         page: 1,

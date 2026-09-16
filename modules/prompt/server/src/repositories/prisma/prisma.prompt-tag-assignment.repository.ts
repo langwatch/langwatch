@@ -127,7 +127,7 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
   /**
    * Get all tags for a prompt config, including the tag name via the promptTag relation.
    */
-  async getTagsForConfig({
+  async findTagsForConfig({
     configId,
     projectId,
   }: {
@@ -165,7 +165,7 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
    * carries no version under that tag.
    * Callers must resolve tag name → tagId before calling this method.
    */
-  async getByConfigAndTagId({
+  async findByConfigAndTagId({
     configId,
     tagId,
     projectId,

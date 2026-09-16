@@ -141,7 +141,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
       const examples = mergeByHash<ExperimentDspyExample>(existing?.examples ?? [], input.examples);
       const llmCalls = mergeByHash<ExperimentDspyLlmCall>(existing?.llmCalls ?? [], input.llmCalls);
       const summary = llmSummary(llmCalls);
-      const retentionDays = await this.options.retention.getTraceRetentionDays(input.tenantId);
+      const retentionDays = await this.options.retention.findTraceRetentionDays(input.tenantId);
 
       await client.insert({
         table: TABLE_NAME,
@@ -181,7 +181,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     }
   }
 
-  async list(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
+  async findAll(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return [];

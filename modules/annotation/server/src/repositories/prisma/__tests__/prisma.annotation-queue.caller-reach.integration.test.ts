@@ -233,13 +233,13 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
     };
 
     it("keeps direct assignments separate until member queues are requested", async () => {
-      const direct = await queues.listQueueItemsByUser({
+      const direct = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: false,
       });
 
-      const reachable = await queues.listQueueItemsByUser({
+      const reachable = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
@@ -259,28 +259,28 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
     });
 
     it("applies status, dates, picked queues, and paging to the same reachable set", async () => {
-      const pending = await queues.listQueueItemsByUser({
+      const pending = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
         status: "pending",
       });
 
-      const completed = await queues.listQueueItemsByUser({
+      const completed = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
         status: "completed",
       });
 
-      const picked = await queues.listQueueItemsByUser({
+      const picked = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
         pickedQueueIds: [reviewerQueueId],
       });
 
-      const dated = await queues.listQueueItemsByUser({
+      const dated = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
@@ -288,7 +288,7 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
         endDate: thirdQueuedAtInstant,
       });
 
-      const sliced = await queues.listQueueItemsByUser({
+      const sliced = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
@@ -296,7 +296,7 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
         pageOffset: 1,
       });
 
-      const exported = await queues.listQueueItemsByUser({
+      const exported = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,
@@ -340,12 +340,12 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
     it("reads an explicit queue without using actor reach and keeps project rows out", async () => {
       const { startDate: _startDate, endDate: _endDate, ...unboundedPage } = page;
 
-      const unrelated = await queues.listQueueItemsByQueue({
+      const unrelated = await queues.findQueueItemsByQueue({
         ...unboundedPage,
         queueId: unrelatedQueueId,
       });
 
-      const reviewerScope = await queues.listQueueItemsByUser({
+      const reviewerScope = await queues.findQueueItemsByUser({
         ...page,
         userId: reviewerId,
         includeMemberQueues: true,

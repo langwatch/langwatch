@@ -53,7 +53,7 @@ export class PromptReadService {
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(projectId));
 
-    const configs = await this.repository.getAllWithLatestVersion({
+    const configs = await this.repository.findAllWithLatestVersion({
       projectId,
       organizationId,
     });
@@ -110,7 +110,7 @@ export class PromptReadService {
     // If a tag is provided, resolve it to a versionId
     let resolvedVersionId = params.versionId;
     if (normalizedTag) {
-      const config = await this.repository.getPromptByIdOrHandle({
+      const config = await this.repository.findPromptByIdOrHandle({
         idOrHandle,
         projectId,
         organizationId,
@@ -125,7 +125,7 @@ export class PromptReadService {
       });
     }
 
-    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion({
+    const config = await this.repository.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
       projectId,
       organizationId,
@@ -209,14 +209,14 @@ export class PromptReadService {
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
 
     // Get the config
-    const config = await this.repository.getPromptByIdOrHandle({
+    const config = await this.repository.findPromptByIdOrHandle({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,
       organizationId,
     });
 
     // Get the versions
-    const rawVersions = await this.repository.versions.getVersionsForConfigByIdOrHandle({
+    const rawVersions = await this.repository.versions.findVersionsForConfigByIdOrHandle({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,
       organizationId,
@@ -268,6 +268,6 @@ export class PromptReadService {
   }
 
   private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
-    return this.repository.getOrganizationIdForProject(projectId);
+    return this.repository.findOrganizationIdForProject(projectId);
   }
 }

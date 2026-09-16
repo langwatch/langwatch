@@ -51,21 +51,21 @@ export type AnnotationQueueItemsPage = Readonly<{
 /** Private persistence capability for queue-item work. */
 export interface AnnotationQueueItemRepository {
   createQueueItems(input: CreateAnnotationQueueItemsInput): Promise<void>;
-  listQueueItems(
+  findQueueItems(
     input: AnnotationQueueItemOrganizationScope,
   ): Promise<readonly AnnotationQueueListedItem[]>;
   countPendingItems(input: AnnotationQueueItemCaller): Promise<number>;
   countAssignedItems(input: AnnotationQueueItemCaller): Promise<number>;
-  listMemberQueuePendingCounts(
+  findMemberQueuePendingCounts(
     input: AnnotationQueueItemCaller,
   ): Promise<
     readonly Readonly<{ id: string; name: string; slug: string; pendingCount: number }>[]
   >;
   deleteQueueItems(input: DeleteAnnotationQueueItemsInput): Promise<number>;
   markQueueItemDone(input: MarkAnnotationQueueItemDoneInput): Promise<AnnotationQueueItem>;
-  listQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage>;
-  listQueueItemsByQueue(input: ListQueueItemsByQueueInput): Promise<AnnotationQueueItemsPage>;
-  listQueuesWithItems(
+  findQueueItemsByUser(input: ListQueueItemsByUserInput): Promise<AnnotationQueueItemsPage>;
+  findQueueItemsByQueue(input: ListQueueItemsByQueueInput): Promise<AnnotationQueueItemsPage>;
+  findQueuesWithItems(
     input: ListAnnotationQueuesWithItemsInput,
   ): Promise<readonly AnnotationQueueWithItems[]>;
 }

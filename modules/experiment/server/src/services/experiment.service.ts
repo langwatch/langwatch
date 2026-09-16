@@ -182,7 +182,7 @@ export class ExperimentService {
   }
 
   getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment> {
-    return this.options.repository.getBySlugOrId(input);
+    return this.options.repository.findBySlugOrId(input);
   }
 
   async findById(input: ExperimentLookup): Promise<Experiment | null> {
@@ -361,7 +361,7 @@ export class ExperimentService {
   }
 
   async listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
-    const values = await this.options.dspyRepository.list(
+    const values = await this.options.dspyRepository.findAll(
       experimentDspyStepsLookupSchema.parse(input),
     );
 
@@ -374,7 +374,7 @@ export class ExperimentService {
     const versionIds = steps.flatMap((step) =>
       step.workflowVersionId ? [step.workflowVersionId] : [],
     );
-    const versions = await this.options.runRepository.getWorkflowVersions(
+    const versions = await this.options.runRepository.findWorkflowVersions(
       query.tenantId,
       versionIds,
     );
@@ -452,17 +452,17 @@ export class ExperimentService {
   }
 
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
-    return this.options.runRepository.list(experimentRunListInputSchema.parse(input));
+    return this.options.runRepository.findAll(experimentRunListInputSchema.parse(input));
   }
 
   getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
-    return this.options.runRepository.getAggregates(experimentRunListInputSchema.parse(input));
+    return this.options.runRepository.findAggregates(experimentRunListInputSchema.parse(input));
   }
 
   getRunsPage(
     input: ExperimentRunPageInput,
   ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
-    return this.options.runRepository.getPage(experimentRunPageInputSchema.parse(input));
+    return this.options.runRepository.findPage(experimentRunPageInputSchema.parse(input));
   }
 
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {

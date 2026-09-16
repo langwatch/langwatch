@@ -113,7 +113,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     });
   }
 
-  async getBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment> {
+  async findBySlugOrId(input: { projectId: string; slugOrId: string }): Promise<Experiment> {
     const bySlug = await this.database.experiment.findFirst({
       where: { projectId: input.projectId, slug: input.slugOrId, archivedAt: null },
     });
@@ -256,7 +256,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return result.count === 1;
   }
 
-  async getWorkbenchState(input: {
+  async findWorkbenchState(input: {
     projectId: string;
     id?: string;
     slug?: string;
@@ -321,14 +321,14 @@ export class PrismaExperimentRepository extends ExperimentRepository {
 
       return {
         kind: "update",
-        state: await this.getWorkbenchState({ projectId: input.projectId, id: input.id }),
+        state: await this.findWorkbenchState({ projectId: input.projectId, id: input.id }),
       };
     }
 
     if (input.slug) {
       return {
         kind: "update",
-        state: await this.getWorkbenchState({ projectId: input.projectId, slug: input.slug }),
+        state: await this.findWorkbenchState({ projectId: input.projectId, slug: input.slug }),
       };
     }
 
@@ -465,7 +465,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return { id: input.id, slug: input.slug };
   }
 
-  async listWorkbenchVersions(input: {
+  async findWorkbenchVersions(input: {
     projectId: string;
     experimentId: string;
     take: number;
@@ -494,7 +494,7 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     });
   }
 
-  async getWorkbenchVersion(input: {
+  async findWorkbenchVersion(input: {
     projectId: string;
     experimentId: string;
     version: number;

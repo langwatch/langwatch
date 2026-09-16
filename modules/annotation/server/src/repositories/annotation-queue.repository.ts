@@ -34,7 +34,7 @@ export interface AnnotationQueueRepository {
   createQueue(input: QueueCreateInput): Promise<AnnotationQueueRecord>;
   updateQueue(input: QueueUpdateInput): Promise<AnnotationQueueRecord>;
   /** The project's queues, newest first, for the picker. */
-  listQueues(input: QueueListInput): Promise<AnnotationQueueListEntry[]>;
-  getQueueById(input: QueueByIdInput): Promise<AnnotationQueueDetail>;
-  getQueueBySlug(input: QueueBySlugInput): Promise<AnnotationQueueDetail>;
+  findQueues(input: QueueListInput): Promise<AnnotationQueueListEntry[]>;
+  findQueueById(input: QueueByIdInput): Promise<AnnotationQueueDetail>;
+  findQueueBySlug(input: QueueBySlugInput): Promise<AnnotationQueueDetail>;
 }

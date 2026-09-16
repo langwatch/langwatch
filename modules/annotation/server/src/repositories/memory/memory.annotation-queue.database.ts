@@ -28,10 +28,10 @@ export class MemoryAnnotationQueueDatabase {
   items(): readonly AnnotationQueueItem[] {
     return this.#items;
   }
-  replaceQueues(queues: readonly MemoryAnnotationQueue[]) {
+  replaceQueues(queues: readonly MemoryAnnotationQueue[]): void {
     this.#queues = [...queues];
   }
-  replaceItems(items: readonly AnnotationQueueItem[]) {
+  replaceItems(items: readonly AnnotationQueueItem[]): void {
     this.#items = [...items];
   }
   score(projectId: string, scoreId: string): AnnotationScore | undefined {
@@ -40,7 +40,7 @@ export class MemoryAnnotationQueueDatabase {
   scores(): readonly AnnotationScore[] {
     return [...this.#scores.values()];
   }
-  replaceScore(score: AnnotationScore) {
+  replaceScore(score: AnnotationScore): void {
     this.#scores.set(`${score.projectId}:${score.id}`, score);
   }
   scoreName(projectId: string, scoreId: string) {

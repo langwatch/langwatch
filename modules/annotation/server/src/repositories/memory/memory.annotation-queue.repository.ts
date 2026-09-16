@@ -60,7 +60,7 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
 
     return structuredClone(queue);
   }
-  async listQueues({
+  async findQueues({
     projectId,
     reachableOnly,
     userId,
@@ -96,7 +96,7 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
       }),
     };
   }
-  async getQueueById({
+  async findQueueById({
     projectId,
     organizationMemberIds,
     queueId,
@@ -109,7 +109,7 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
 
     return this.#detail(queue, organizationMemberIds);
   }
-  async getQueueBySlug({
+  async findQueueBySlug({
     projectId,
     organizationMemberIds,
     slug,

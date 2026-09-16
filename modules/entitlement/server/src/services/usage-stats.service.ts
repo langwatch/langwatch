@@ -133,7 +133,7 @@ export class UsageStatsService {
       usageUnit,
     ] = await Promise.all([
       this.counter.getCurrentMonthCountForDisplay({ organizationId }),
-      this.membership.getCurrentMonthCost(organizationId),
+      this.membership.findCurrentMonthCost(organizationId),
       this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.membership.getMemberCount(organizationId),

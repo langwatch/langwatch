@@ -252,9 +252,9 @@ export class EntitlementApp implements EntitlementApiContract {
     if (!input.operator) return undefined;
 
     const [caller, impersonator] = await Promise.all([
-      this.#users.tryFindById({ id: input.operator.id }),
+      this.#users.findById({ id: input.operator.id }),
       input.operator.impersonatorId
-        ? this.#users.tryFindById({ id: input.operator.impersonatorId })
+        ? this.#users.findById({ id: input.operator.impersonatorId })
         : Promise.resolve(null),
     ]);
 

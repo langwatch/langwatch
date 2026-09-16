@@ -7,6 +7,6 @@ import type {
 
 export abstract class ExperimentDspyRepository {
   abstract upsert(input: ExperimentDspyStep): Promise<void>;
-  abstract list(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
+  abstract findAll(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
   abstract findStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null>;
 }

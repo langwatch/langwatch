@@ -4,5 +4,5 @@
  * policy, which this module does not own, so DSPy just asks the application.
  */
 export abstract class ExperimentDspyRetentionRepository {
-  abstract getTraceRetentionDays(tenantId: string): Promise<number>;
+  abstract findTraceRetentionDays(tenantId: string): Promise<number>;
 }

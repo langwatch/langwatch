@@ -181,7 +181,7 @@ export class PromptSyncService {
     // failure, so the refusal is read here as "no base to compare against".
     let localBaseVersion: PromptVersionRow | undefined;
     try {
-      localBaseVersion = await this.repository.getConfigVersionByNumber({
+      localBaseVersion = await this.repository.findConfigVersionByNumber({
         idOrHandle,
         versionNumber: localVersion,
         projectId,

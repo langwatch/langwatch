@@ -40,7 +40,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   /**
    * Get all versions for a specific config
    */
-  async getVersionsForConfigByIdOrHandle({
+  async findVersionsForConfigByIdOrHandle({
     idOrHandle,
     projectId,
     organizationId,
@@ -51,7 +51,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
     const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.getPromptByIdOrHandle({
+    const config = await promptRepository.findPromptByIdOrHandle({
       idOrHandle,
       projectId,
       organizationId,
@@ -70,7 +70,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   /**
    * Get a specific version by ID
    */
-  async getVersionById({
+  async findVersionById({
     versionId,
     projectId,
   }: {
@@ -118,7 +118,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   /**
    * Get the latest version for a config
    */
-  async getLatestVersion(
+  async findLatestVersion(
     configId: string,
     projectId: string,
     options?: {
@@ -164,7 +164,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     const { versionData, organizationId } = params;
     // Verify the config exists
     const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.getConfigByIdOrHandleWithLatestVersion({
+    const config = await promptRepository.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle: versionData.configId,
       projectId: versionData.projectId,
       organizationId,

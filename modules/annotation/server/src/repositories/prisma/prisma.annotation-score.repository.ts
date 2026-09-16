@@ -34,7 +34,7 @@ export class PrismaAnnotationScoreRepository
 {
   static readonly create = this.factory((prisma) => new PrismaAnnotationScoreRepository(prisma));
 
-  async listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
+  async findScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     const rows = await this.prisma.annotationScore.findMany({
       where: { projectId: input.projectId },
       select: { id: true, name: true },
@@ -64,7 +64,7 @@ export class PrismaAnnotationScoreRepository
     return annotationScoreSchema.parse(row);
   }
 
-  async listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
+  async findScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
     const rows = await this.prisma.annotationScore.findMany({
       where: {
         projectId: input.projectId,
@@ -78,7 +78,7 @@ export class PrismaAnnotationScoreRepository
     return rows.map((row) => annotationScoreSchema.parse(row));
   }
 
-  async getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
+  async findScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     const row = await this.prisma.annotationScore.findFirst({
       where: { id: input.id, projectId: input.projectId, deletedAt: null },
       select: annotationScoreSelect,

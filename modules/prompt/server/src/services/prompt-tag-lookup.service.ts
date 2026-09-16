@@ -66,7 +66,7 @@ export class PromptTagLookupService {
     // The repository refuses by config id; the name the caller asked under is
     // only known here, so the refusal is re-raised carrying it.
     try {
-      const versionTag = await this.tagRepository.getByConfigAndTagId({
+      const versionTag = await this.tagRepository.findByConfigAndTagId({
         configId: params.configId,
         tagId,
         projectId: params.projectId,
@@ -88,7 +88,7 @@ export class PromptTagLookupService {
     configId: string;
     projectId: string;
   }): Promise<PromptTagAssignment[]> {
-    const rows = await this.tagRepository.getTagsForConfig(params);
+    const rows = await this.tagRepository.findTagsForConfig(params);
     return rows.map(toAssignment);
   }
 
@@ -176,6 +176,6 @@ export class PromptTagLookupService {
   }
 
   private async getOrganizationIdFromProjectId(projectId: string): Promise<string> {
-    return this.repository.getOrganizationIdForProject(projectId);
+    return this.repository.findOrganizationIdForProject(projectId);
   }
 }
