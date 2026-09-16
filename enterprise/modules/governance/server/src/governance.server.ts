@@ -15,6 +15,7 @@ import {
 import { defineServerModule } from "@langwatch/runtime-composition";
 
 import { GovernanceApp } from "./app/governance.app.ts";
+import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import {
   governanceRest,
   governanceRestCaller,
@@ -110,6 +111,7 @@ import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
  * services behind the application stay private to this feature server.
  */
 export const governanceServer = defineServerModule("governance")
+  .withRepositories(governanceRepositories)
   .withApp(GovernanceApp)
   .withTransports(governanceRest, governanceCliRest, governanceIngestRest)
   // The member behind the project credential, and which surface asked. A

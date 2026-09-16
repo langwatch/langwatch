@@ -21,6 +21,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -116,6 +117,7 @@ function buildApi(
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
 
   const app = GovernanceApp.create({
+    repositories: MemoryGovernanceRepositories.create(),
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       organizations: createApiFixture<OrganizationApi>(),

@@ -85,6 +85,8 @@ import {
   GovernanceIngestAccessService,
   type GovernanceIngestAccessApi,
 } from "../services/governance-ingest-access.service.ts";
+import { DepartmentService } from "../services/department.service.ts";
+import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
@@ -358,7 +360,8 @@ export type GovernanceBespokeMembers = Omit<
 type GovernanceSetup = FeatureSetup<
   typeof GovernanceApp.dependencies,
   GovernanceBespokeMembers,
-  undefined
+  undefined,
+  GovernanceRepositories
 >;
 
 export class GovernanceApp
@@ -377,16 +380,23 @@ export class GovernanceApp
     permissions: AuthzApi,
   };
 
-  static create({ members, dependencies }: GovernanceSetup): GovernanceApp {
-    return new GovernanceApp({
-      ...members,
-      projects: dependencies.projects,
-      organizations: dependencies.organizations,
-      permissions: dependencies.permissions,
-    });
+  static create({ members, dependencies, repositories }: GovernanceSetup): GovernanceApp {
+    return new GovernanceApp(
+      {
+        ...members,
+        projects: dependencies.projects,
+        organizations: dependencies.organizations,
+        permissions: dependencies.permissions,
+      },
+      repositories,
+    );
   }
 
-  private constructor(private readonly dependencies: GovernanceAppDependencies) {
+  private constructor(
+    private readonly dependencies: GovernanceAppDependencies,
+    repositories: GovernanceRepositories,
+  ) {
+    this.departments = DepartmentService.create({ repository: repositories.departments });
     this.personalUsageDashboards = PersonalUsageDashboardService.create({
       governance: dependencies.governance,
       organizations: dependencies.organizations,
@@ -428,6 +438,7 @@ export class GovernanceApp
     });
   }
 
+  private readonly departments: DepartmentService;
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
   private readonly cliAccessService: GovernanceCliAccessApi;
   private readonly cliCredentialService: GovernanceCliCredentialApi;
@@ -597,7 +608,7 @@ export class GovernanceApp
     organizationId: string;
     name: string;
   }): Promise<Department> {
-    return this.dependencies.governance.departmentResolveByNameOrCreate(input);
+    return this.departments.resolveByNameOrCreate(input);
   }
 
   /** Assigns (or clears) a member's department, for SCIM cost-center sync. */
@@ -606,7 +617,7 @@ export class GovernanceApp
     userId: string;
     departmentId: string | null;
   }): Promise<void> {
-    return this.dependencies.governance.departmentAssignUser(input);
+    return this.departments.assignUser(input);
   }
 
   // ── Personal virtual keys ─────────────────────────────────────────────────

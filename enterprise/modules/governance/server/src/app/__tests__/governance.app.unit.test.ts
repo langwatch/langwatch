@@ -3,15 +3,17 @@
  * Moved from @audit-uniform integration test (proves the rule once at unit level instead of
  * four times). Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CreateIngestionTemplateInput,
   type GovernanceCallSurface,
   type IngestionTemplate,
 } from "@langwatch/enterprise-governance-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
@@ -49,17 +51,14 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
 
   const app = GovernanceApp.create({
+    repositories: MemoryGovernanceRepositories.create(),
+    dependencies: {
+      projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      organizations: createApiFixture<OrganizationApi>(),
+      permissions: createApiFixture<AuthzApi>(),
+    },
     members: {
       governance,
-      projects: {
-        getOrganizationId,
-        findInternal: unreachable<ProjectApi["findInternal"]>(),
-      },
-      organizations: {
-        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-        tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
-      },
-      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
       personalVirtualKeys: {
         isOrganizationMember:
           unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),

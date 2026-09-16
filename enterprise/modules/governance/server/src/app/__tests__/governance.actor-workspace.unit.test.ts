@@ -3,10 +3,12 @@
  * Test verifies failed lookups return null (no info leak) and short-circuit.
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationService, PersonalWorkspace } from "@langwatch/organization-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
   GovernanceApp,
   type GovernanceActorUser,
@@ -48,17 +50,14 @@ function buildApp(options: {
   const tryFindPersonalWorkspace = vi.fn(async () => options.workspace ?? null);
 
   const app = GovernanceApp.create({
+    repositories: MemoryGovernanceRepositories.create(),
+    dependencies: {
+      projects: createApiFixture<ProjectApi>(),
+      organizations: createApiFixture<OrganizationApi>({ tryFindPersonalWorkspace }),
+      permissions: createApiFixture<AuthzApi>(),
+    },
     members: {
       governance: new TestGovernanceService(),
-      projects: {
-        getOrganizationId: unreachable<ProjectApi["getOrganizationId"]>(),
-        findInternal: unreachable<ProjectApi["findInternal"]>(),
-      },
-      organizations: {
-        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-        tryFindPersonalWorkspace,
-      },
-      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
       personalVirtualKeys: {
         isOrganizationMember,
         hasActivePersonalKeyLabelled:
