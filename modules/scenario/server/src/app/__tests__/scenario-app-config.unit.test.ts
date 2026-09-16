@@ -22,6 +22,8 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { Encryption } from "@langwatch/infrastructure/members";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -30,7 +32,11 @@ import { describe, expect, it } from "vitest";
 function buildProductionApp(config: unknown) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
-    dependencies: { users: createApiFixture<UserApi>() },
+    dependencies: {
+      users: createApiFixture<UserApi>(),
+      projects: createApiFixture<ProjectApi>(),
+      plans: createApiFixture<EntitlementApi>(),
+    },
     // The same parse boot runs before handing `create` its config.
     config: ScenarioApp.configSchema.parse(config),
     resources: createApiFixture<ResourceOwnership>(),
@@ -50,6 +56,7 @@ function buildProductionApp(config: unknown) {
       testSuiteIds: {} as ScenarioTestSuiteId,
       clock: {} as ScenarioClock,
       secretCipher: {} as ScenarioSecretCipher,
+      rateLimiter: { check: async () => ({ allowed: true }) },
     },
   });
 }

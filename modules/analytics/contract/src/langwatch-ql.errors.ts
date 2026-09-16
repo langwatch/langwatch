@@ -308,3 +308,24 @@ export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError 
     this.name = "LangWatchQLGranularityRequiresTimeWindowError";
   }
 }
+
+/**
+ * The project answered one statement too many inside the window (HTTP 429).
+ * The counter is the project's fixed window, because the compute a query loop
+ * burns is invoiced to the project.
+ */
+export class LangWatchQLRateLimitedError extends HandledError {
+  declare readonly code: "lwql_rate_limited";
+
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super("lwql_rate_limited", "Too many LangWatchQL queries for this project.", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+    });
+    this.name = "LangWatchQLRateLimitedError";
+  }
+}

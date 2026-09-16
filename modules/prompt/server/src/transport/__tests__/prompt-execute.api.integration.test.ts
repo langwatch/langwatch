@@ -4,7 +4,11 @@
  * that accepted runs stream playground events. Spec: specs/prompts/playground-conversation.feature
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
-import { PROMPT_EXECUTE_ENDPOINT } from "@langwatch/prompt-contract";
+import {
+  PROMPT_EXECUTE_ENDPOINT,
+  PromptExecuteRateLimitedError,
+  PromptMessagesTooManyError,
+} from "@langwatch/prompt-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -49,6 +53,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
   const isAllowedOrigin = vi.fn(() => true);
   const findSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
   const probeProjectPermission = vi.fn(async () => true);
+  const assertExecuteWithinBounds = vi.fn(async () => {});
   const prepareStudioEvent = vi.fn(async (input: { event: StudioClientEvent }) => input.event);
   const postEvent = vi.fn(async ({ onEvent }: { onEvent: (event: { type: "done" }) => void }) => {
     onEvent({ type: "done" });
@@ -59,6 +64,7 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     findSession,
     probeProjectPermission,
     isDemoProject: () => false,
+    assertExecuteWithinBounds,
     prepareStudioEvent,
     postEvent,
     newTraceId: () => "trace_1",
@@ -97,6 +103,8 @@ function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestS
     isAllowedOrigin,
     findSession,
     probeProjectPermission,
+    assertExecuteWithinBounds,
+    prepareStudioEvent,
     postEvent,
   };
 }
@@ -181,6 +189,51 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
       expect(response.status).toBe(403);
       expect(postEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project has spent its run window", () => {
+    it("refuses 429 and never opens a run", async () => {
+      const { execute, prepareStudioEvent, postEvent } = buildApi({
+        assertExecuteWithinBounds: async () => {
+          throw new PromptExecuteRateLimitedError({ retryAfterSeconds: 42 });
+        },
+      });
+
+      const response = await execute();
+
+      expect(response.status).toBe(429);
+      expect(prepareStudioEvent).not.toHaveBeenCalled();
+      expect(postEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the message array is over the plan's bound", () => {
+    it("refuses 422 and never opens a run", async () => {
+      const { execute, prepareStudioEvent, postEvent } = buildApi({
+        assertExecuteWithinBounds: async () => {
+          throw new PromptMessagesTooManyError(100);
+        },
+      });
+
+      const response = await execute();
+
+      expect(response.status).toBe(422);
+      expect(prepareStudioEvent).not.toHaveBeenCalled();
+      expect(postEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the budget check passes", () => {
+    it("counts the run against the project the body names, with its message count", async () => {
+      const { execute, assertExecuteWithinBounds } = buildApi();
+
+      await execute({ projectId: "project_other" });
+
+      expect(assertExecuteWithinBounds).toHaveBeenCalledWith({
+        projectId: "project_other",
+        messageCount: 1,
+      });
     });
   });
 

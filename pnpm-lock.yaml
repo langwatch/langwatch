@@ -1679,6 +1679,9 @@ importers:
       '@langwatch/identity-server':
         specifier: workspace:*
         version: link:../../modules/identity/server
+      '@langwatch/infrastructure':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
@@ -3655,6 +3658,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -7248,6 +7254,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -7272,12 +7281,18 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../../presence/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
@@ -7318,6 +7333,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
@@ -9175,6 +9193,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
@@ -9197,6 +9218,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -9209,6 +9233,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -9571,6 +9598,9 @@ importers:
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

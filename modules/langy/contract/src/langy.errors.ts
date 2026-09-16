@@ -232,6 +232,27 @@ export class LangyRateLimitedError extends HandledError {
   }
 }
 
+/**
+ * The project answered one turn too many inside the window (HTTP 429).
+ * Distinct from {@link LangyRateLimitedError}, the composer's per-user
+ * slow-down: this counter is the project's, because the invoice is too.
+ */
+export class LangyTurnsRateLimitedError extends HandledError {
+  declare readonly code: "langy_turns_rate_limited";
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super("langy_turns_rate_limited", "Too many Langy turns for this project.", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+      ...remediation("langy_turns_rate_limited"),
+    });
+    this.name = "LangyTurnsRateLimitedError";
+  }
+}
+
 /** A turn is already in flight for the conversation — one at a time (HTTP 409). */
 export class LangyTurnInProgressError extends HandledError {
   declare readonly code: "langy_turn_in_progress";

@@ -6,6 +6,11 @@ import {
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
 import { LangyApp } from "../langy.app.ts";
 import { describe, expect, it, vi } from "vitest";
@@ -93,8 +98,22 @@ function fakePresence(): PresenceApi {
 
 function createApp(): LangyApp {
   return LangyApp.create({
-    dependencies: { presence: fakePresence() },
-    members: { prisma: undefined!, redis: null, eventing: producerEventing() },
+    dependencies: {
+      presence: fakePresence(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      projects: createApiFixture<ProjectApi>({
+        getOrganizationId: async () => "org_1",
+      }),
+      plans: createApiFixture<EntitlementApi>(),
+    },
+    members: {
+      prisma: undefined!,
+      // A throwing double rather than a Redis-less build: the reads this
+      // suite exercises never reach the member, and a reach is a loud failure.
+      redis: createApiFixture<RedisConnection>(),
+      eventing: producerEventing(),
+      rateLimiter: { check: async () => ({ allowed: true }) },
+    },
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
     repositories: {} as LangyRepositories,

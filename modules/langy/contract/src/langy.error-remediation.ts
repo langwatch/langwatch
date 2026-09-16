@@ -21,6 +21,7 @@ const tips: Record<string, readonly string[]> = {
     "Wait for the current response to finish before sending another message",
   ],
   langy_rate_limited: ["Wait a few seconds before sending another message"],
+  langy_turns_rate_limited: ["Wait a minute before starting another turn"],
   langy_turn_not_stoppable: [
     "Read the conversation to find the turn it currently has in flight, and stop that one",
     "A turn that already finished needs no stopping — its answer is on the conversation",

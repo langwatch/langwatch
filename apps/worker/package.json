@@ -110,6 +110,7 @@
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/langy-server": "workspace:*",

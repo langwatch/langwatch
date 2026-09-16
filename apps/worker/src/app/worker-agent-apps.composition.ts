@@ -3,9 +3,13 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createAbsentRequestBound } from "@langwatch/entitlement-server";
 import { evaluatorServer } from "@langwatch/evaluator-server";
+import { redisRateLimiter } from "@langwatch/infrastructure";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   createApp,
   LocalFeatureApis,
@@ -74,9 +78,14 @@ export async function createWorkerAgentApps(options: {
     members: membersFrom({
       prisma: database,
       encryption: resolveWorkerStoredSecretCipher(prerequisites.config),
+      // Every check names its own window; the constructed one is only the
+      // fallback the member's contract asks for.
+      rateLimiter: redisRateLimiter(prerequisites.redis, { requests: 10, seconds: 60 }),
     }),
   })
     .withProvided(UserApi, foundation.users)
+    .withProvided(ProjectApi, foundation.tenancy.projects)
+    .withProvided(EntitlementApi, uncomposedPlanDirectory())
     .withModules([scenarioServer])
     .boot();
   resources.own("worker scenario module", () => scenarioRuntime.stop());
@@ -139,5 +148,24 @@ export async function createWorkerAgentApps(options: {
       await broadcast.start();
       await agent.runtime.start();
     },
+  };
+}
+
+/**
+ * The plan peer for a process that composes no entitlement graph: every bound
+ * answers its free-tier value, and any OTHER entitlement question refuses by
+ * name — the author-assist door this process never mounts is the only reader.
+ */
+function uncomposedPlanDirectory(): EntitlementApi {
+  const refuse = (member: string) => (): never => {
+    throw new Error(`The worker composed no plan directory, so ${member} cannot answer.`);
+  };
+
+  return {
+    ...createAbsentRequestBound(),
+    getActivePlan: refuse("getActivePlan"),
+    getUsage: refuse("getUsage"),
+    sendUsageLimitWarning: refuse("sendUsageLimitWarning"),
+    listOrganizationSpend: refuse("listOrganizationSpend"),
   };
 }

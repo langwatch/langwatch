@@ -3,6 +3,8 @@
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   LangyConversationNotFoundError,
@@ -37,6 +39,7 @@ import {
   SETTLEMENT_POLL_MS,
 } from "../services/langy-turn-tail.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
+import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
 
@@ -64,6 +67,8 @@ type LangyAppDependencies = {
    * than a second of their own.
    */
   presence: PresenceApi;
+  /** The per-project window every turn is counted against before it dispatches. */
+  turnBounds: LangyTurnsBoundsService;
 };
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
@@ -111,14 +116,18 @@ export class LangyApp implements LangyApiContract {
   static readonly dependencies = {
     presence: PresenceApi,
     featureFlags: FeatureFlagApi,
+    /** The project→organization hop the turn window resolves through. */
+    projects: ProjectApi,
+    /** The plan the turn window resolves through. */
+    plans: EntitlementApi,
   };
   static readonly configSchema = langyServerConfigSchema;
   /**
    * `eventing` is the agent-pipeline dispatcher's own producer registration
-   * (`langy-eventing.build.ts`): the twenty-two conversation writes, now
-   * registered here instead of a process composition root.
+   * (`langy-eventing.build.ts`). `rateLimiter` is the per-project counter
+   * every turn is checked against.
    */
-  static readonly reads = reads("prisma", "redis", "eventing");
+  static readonly reads = reads("prisma", "redis", "eventing", "rateLimiter");
 
   static create(setup: LangySetup): LangyApp {
     const built = buildLangyInfrastructure({
@@ -140,6 +149,11 @@ export class LangyApp implements LangyApiContract {
       repositories: setup.repositories,
       redis: setup.members.redis,
       presence: setup.dependencies.presence,
+      turnBounds: LangyTurnsBoundsService.create({
+        entitlement: setup.dependencies.plans,
+        projects: setup.dependencies.projects,
+        rateLimiter: setup.members.rateLimiter,
+      }),
     });
   }
 
@@ -201,7 +215,14 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.forkById(input);
   }
 
-  startConversationTurn(input: Parameters<LangyApiContract["startConversationTurn"]>[0]) {
+  /**
+   * Counted before anything dispatches: one turn is agent work the project
+   * pays for, so the project's window is spent here and an over-limit caller
+   * never reaches the engine.
+   */
+  async startConversationTurn(input: Parameters<LangyApiContract["startConversationTurn"]>[0]) {
+    await this.dependencies.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
+
     return this.dependencies.langy.startConversationTurn(input);
   }
 
@@ -417,7 +438,9 @@ export class LangyApp implements LangyApiContract {
       // the HandledError's own `message` is not put on the wire.
       throw new ValidationError(message, { meta: { message } });
     }
-    return this.dependencies.langy.startConversationTurn({
+    // Routed through the app's own `startConversationTurn` so the composer
+    // path and the REST door count against the same per-project window.
+    return this.startConversationTurn({
       projectId: input.projectId,
       idempotencyKey,
       session,

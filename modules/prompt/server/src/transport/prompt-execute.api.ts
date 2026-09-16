@@ -74,6 +74,12 @@ export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSess
    * signed-in user is a *view* grant — execution spends provider credit.
    */
   isDemoProject(projectId: string): boolean;
+  /**
+   * Counts this run against the project's window and refuses a message array
+   * above the plan's bound. Runs after the permission probe and before any
+   * LLM work; the refusal is the door's own 429/422.
+   */
+  assertExecuteWithinBounds(input: { projectId: string; messageCount: number }): Promise<void>;
   /** Resolves a client event's environment and datasets before dispatch. */
   prepareStudioEvent(input: {
     event: StudioClientEvent;
@@ -270,6 +276,10 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
     if (!permitted) {
       throw new PromptPlaygroundNotPermittedError();
     }
+
+    // Counted after the permission probe: a caller without standing never
+    // reaches the budget, and a refused caller never spends it.
+    await members.assertExecuteWithinBounds({ projectId, messageCount: messages.length });
 
     // Allocated before anything that can throw: the error path streams under
     // the same id, so the conversation's trace affordance points at the run

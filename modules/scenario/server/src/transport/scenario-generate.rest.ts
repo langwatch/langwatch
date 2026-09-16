@@ -46,6 +46,11 @@ export interface ScenarioGenerateRestPorts<TSession extends ScenarioGenerateRest
     projectId: string,
     permission: "scenarios:manage",
   ): Promise<boolean>;
+  /**
+   * Counts this generation against the project's tier-effective window, after
+   * the permission probe and before the model is resolved.
+   */
+  assertGenerateWithinBounds(input: { projectId: string }): Promise<void>;
   /** The model a feature key resolves to on this deployment. */
   resolveModel(input: { projectId: string; featureKey: string }): Promise<LanguageModel>;
   /**
@@ -108,7 +113,7 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
     .withVersion(MANAGEMENT_API_VERSION)
     .withAddressing("literal", { v1Twin: false })
 
-    .post("/generate", "generateScenario")
+    .post("/api/scenario/generate", "generateScenario")
     .withRawBody("text", { mediaType: "application/json" })
     .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
     .withAccess(deferredScope({ reason: DOOR_REASON }))
@@ -133,6 +138,10 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
       if (!(await ports.probeProjectPermission(session, projectId, "scenarios:manage"))) {
         return answer(403, { error: "You do not have permission to access this endpoint." });
       }
+
+      // Counted after the permission probe: a caller without standing never
+      // reaches the budget, and a refused caller never spends it.
+      await ports.assertGenerateWithinBounds({ projectId });
 
       try {
         const model = await ports.resolveModel({

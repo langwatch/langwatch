@@ -66,6 +66,8 @@ import {
   withResolvedModels,
 } from "@langwatch/scenario-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { z } from "zod";
 import type { EventEmitter } from "node:events";
 import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput, TargetAdapterData, LiteLLMParams } from "@langwatch/scenario-contract";
@@ -73,6 +75,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
+import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import type {
   RunConfigurationEntry,
@@ -113,6 +116,8 @@ export interface ScenarioAppDependencies {
   runConfigurations: RunConfigurationsService;
   /** Product analytics and lifecycle nurturing, both fire-and-forget. */
   activity: ScenarioActivity;
+  /** The author-assist door's tier-effective generation window. */
+  generateBounds: ScenarioGenerateBoundsService;
 }
 
 /**
@@ -156,8 +161,14 @@ export interface ScenarioAppInfrastructure {
 const scenarioAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
 export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
 
-/** The one peer API this feature reads directly. */
-export const scenarioAppDependencyTokens = { users: UserApi };
+/** The peer APIs this feature reads directly. */
+export const scenarioAppDependencyTokens = {
+  users: UserApi,
+  /** The project→organization hop the author-assist's window resolves through. */
+  projects: ProjectApi,
+  /** The plan the author-assist's generation window resolves through. */
+  plans: EntitlementApi,
+};
 
 /**
  * What `ScenarioApp.create` is handed as `setup.members`: the one platform
@@ -170,7 +181,7 @@ type ScenarioAppMembers = MembersRead<typeof ScenarioApp.reads> &
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
-  static readonly reads = reads("encryption");
+  static readonly reads = reads("encryption", "rateLimiter");
   static readonly configSchema = scenarioAppConfigSchema;
 
   static create(
@@ -204,6 +215,11 @@ export class ScenarioApp implements ScenarioApi {
       resultAtoms: setup.members.resultAtoms,
       runConfigurations: setup.members.runConfigurations,
       activity: setup.members.activity ?? new SilentScenarioActivity(),
+      generateBounds: ScenarioGenerateBoundsService.create({
+        entitlement: setup.dependencies.plans,
+        projects: setup.dependencies.projects,
+        rateLimiter: setup.members.rateLimiter,
+      }),
       publicBaseUrl: setup.config.publicBaseUrl,
     });
   }
@@ -461,6 +477,15 @@ export class ScenarioApp implements ScenarioApi {
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult> {
     return this.#dependencies.scenarioExecution.prefetch(input);
+  }
+
+  /**
+   * The author-assist door's one budget question, answered before its model
+   * is resolved: counts the generation against the project's tier-effective
+   * window and refuses the overage.
+   */
+  assertScenarioGenerateWithinBounds(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.generateBounds.assertGenerateWithinBounds(input);
   }
 
   /**

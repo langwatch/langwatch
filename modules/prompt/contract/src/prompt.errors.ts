@@ -110,6 +110,53 @@ export class PromptSystemPromptRequiredError extends HandledError {
   }
 }
 /**
+ * The playground door answered this project one run too many inside the
+ * window. `fault` stays customer: it is their run rate, and the retry-after
+ * is theirs to wait out.
+ */
+export class PromptExecuteRateLimitedError extends HandledError {
+  declare readonly code: "prompt_execute_rate_limited";
+
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super(
+      "prompt_execute_rate_limited",
+      "Too many playground runs for this project",
+      {
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        ...(input.retryAfterSeconds !== undefined
+          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+          : {}),
+      },
+    );
+    this.name = "PromptExecuteRateLimitedError";
+  }
+}
+
+/**
+ * A message array above the plan's bound. Refused rather than truncated: a
+ * caller must learn the bound on the first oversized run, not discover
+ * dropped messages in a bill later.
+ */
+export class PromptMessagesTooManyError extends HandledError {
+  declare readonly code: "prompt_messages_too_many";
+
+  constructor(maxMessages: number) {
+    super(
+      "prompt_messages_too_many",
+      `At most ${maxMessages} messages can be run at once under this plan. Shorten the conversation or split the run.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxMessages },
+      },
+    );
+    this.name = "PromptMessagesTooManyError";
+  }
+}
+
+/**
  * The playground door was reached without a signed-in browser session. The
  * door reads the session itself, so the refusal is its own rather than the
  * framework's.

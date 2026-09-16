@@ -203,6 +203,7 @@ export type {
   OpenLangyTurnBuffer,
   TurnSettlement,
 } from "./services/langy-turn-settlement-waiter.service.ts";
+export { LangyTurnsBoundsService } from "./services/langy-turns-bounds.service.ts";
 
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.

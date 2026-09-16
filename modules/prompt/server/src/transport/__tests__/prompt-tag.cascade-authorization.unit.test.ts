@@ -4,6 +4,7 @@
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TRPCError } from "@trpc/server";
@@ -36,8 +37,13 @@ function buildCaller(options: { manageable: readonly string[] }) {
           hasPermission,
           getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
         } as unknown as AuthzApi,
+        plans: {} as unknown as EntitlementApi,
       },
-      members: { prisma: {} as never, logger: { info: () => {} } as unknown as Logger },
+      members: {
+        prisma: {} as never,
+        logger: { info: () => {} } as unknown as Logger,
+        rateLimiter: { check: async () => ({ allowed: true }) },
+      },
       config: { publicBaseUrl: "https://app.langwatch.test" },
       resources: { own: () => {}, ownService: () => {} },
     },

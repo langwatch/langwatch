@@ -11,6 +11,8 @@ import type {
   SimulationService,
 } from "@langwatch/scenario-contract";
 import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -37,7 +39,11 @@ function harness() {
 
   const app = ScenarioApp.create({
     repositories: { scenarios: {} as ScenarioRepository },
-    dependencies: { users: {} as UserApi },
+    dependencies: {
+      users: {} as UserApi,
+      projects: {} as ProjectApi,
+      plans: {} as EntitlementApi,
+    },
     config: {},
     resources: {} as ResourceOwnership,
     // Nothing below is reached: assembling the envelope reads only its
@@ -54,6 +60,7 @@ function harness() {
       testSuiteIds: {} as ScenarioTestSuiteId,
       clock: {} as ScenarioClock,
       secretCipher: {} as ScenarioSecretCipher,
+      rateLimiter: { check: async () => ({ allowed: true }) },
       broadcast: {
         getTenantEmitter: () => {
           throw new Error("the queue path subscribes to nothing");

@@ -25,12 +25,14 @@ import {
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import type { PromptService } from "../services/prompt.service.ts";
 import { PostgresPromptAdapter } from "../services/prompt-postgres-composition.service.ts";
+import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
 /**
@@ -73,6 +75,8 @@ export interface PromptInfrastructure {
 type PromptDependencies = Readonly<{
   projects: typeof ProjectApi;
   permissions: typeof AuthzApi;
+  /** The plan the playground door's run counter and message cap resolve through. */
+  plans: typeof EntitlementApi;
 }>;
 
 /**
@@ -167,12 +171,17 @@ function asHandledTagError(error: unknown): never {
   throw error;
 }
 
-/** What every method below reads: the engine, the two peers and the members. */
+/** What every method below reads: the engine, the three peers and the members. */
 type PromptAppDependencies = Readonly<{
   prompts: PromptService;
   projects: ProjectApi;
   permissions: AuthzApi;
   members: PromptInfrastructure;
+  /**
+   * The playground door's tier-effective run counter and message cap. Absent
+   * only on the read-only twin, which serves no execution door.
+   */
+  executeBounds: PromptExecuteBoundsService | null;
   /**
    * Absent only on the read-only twin, which serves no REST family and so is
    * never asked for a deep link.
@@ -185,14 +194,15 @@ export class PromptApp implements PromptApi {
   static readonly dependencies: PromptDependencies = {
     projects: ProjectApi,
     permissions: AuthzApi,
+    plans: EntitlementApi,
   };
   static readonly configSchema = promptAppConfigSchema;
   /**
    * The one member the engine is built over; becomes a declared `repositories`
    * bundle once the four repositories behind `PostgresPromptAdapter` move onto
-   * `defineRepositories`.
+   * `defineRepositories`. `rateLimiter` is the playground door's run counter.
    */
-  static readonly reads = reads("prisma", "logger");
+  static readonly reads = reads("prisma", "logger", "rateLimiter");
 
   static create(setup: PromptSetup): PromptApp {
     const prompts: PromptService = PostgresPromptAdapter.create({
@@ -213,6 +223,11 @@ export class PromptApp implements PromptApi {
       prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
+      executeBounds: PromptExecuteBoundsService.create({
+        entitlement: dependencies.plans,
+        projects: dependencies.projects,
+        rateLimiter: members.rateLimiter,
+      }),
       members: {
         prompts,
         afterPromptCreated: (input) => {
@@ -243,9 +258,25 @@ export class PromptApp implements PromptApi {
       prompts: input.prompts,
       projects: input.projects,
       permissions,
+      executeBounds: null,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
       publicBaseUrl: undefined,
     });
+  }
+
+  /**
+   * The playground door's one budget question, answered before any LLM work.
+   * Refuses by name on the read-only twin, which serves no execution door.
+   */
+  assertExecuteWithinBounds(input: { projectId: string; messageCount: number }): Promise<void> {
+    const bounds = this.#dependencies.executeBounds;
+    if (!bounds) {
+      throw new Error(
+        "The prompt reader holds no execute bounds: assertExecuteWithinBounds is not available on this process",
+      );
+    }
+
+    return bounds.assertExecuteWithinBounds(input);
   }
 
   /**

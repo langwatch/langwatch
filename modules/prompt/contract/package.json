@@ -29,6 +29,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "zod": "catalog:"
   },

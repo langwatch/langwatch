@@ -1,4 +1,5 @@
 export type { PromptService } from "./services/prompt.service.ts";
+export { PromptExecuteBoundsService } from "./services/prompt-execute-bounds.service.ts";
 export { PostgresPromptAdapter } from "./services/prompt-postgres-composition.service.ts";
 export { promptServer, createPromptReader } from "./prompt.server.ts";
 export {

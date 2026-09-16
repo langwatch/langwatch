@@ -3,6 +3,7 @@
  */
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -60,8 +61,13 @@ function harness() {
           listIdsByOrganization: async () => ["project-copy"],
         } as unknown as ProjectApi,
         permissions: {} as unknown as AuthzApi,
+        plans: {} as unknown as EntitlementApi,
       },
-      members: { prisma: {} as never, logger: { info: () => {} } as unknown as Logger },
+      members: {
+        prisma: {} as never,
+        logger: { info: () => {} } as unknown as Logger,
+        rateLimiter: { check: async () => ({ allowed: true }) },
+      },
       config: { publicBaseUrl: "https://app.langwatch.test" },
       resources: { own: () => {}, ownService: () => {} },
     },
@@ -311,8 +317,13 @@ describe("PromptApp.create", () => {
             listIdsByOrganization: async () => [],
           } as unknown as ProjectApi,
           permissions: {} as unknown as AuthzApi,
+          plans: {} as unknown as EntitlementApi,
         },
-        members: { prisma: fakePrisma, logger: fakeLogger },
+        members: {
+          prisma: fakePrisma,
+          logger: fakeLogger,
+          rateLimiter: { check: async () => ({ allowed: true }) },
+        },
         config: { publicBaseUrl: "https://app.langwatch.test" },
         resources: { own: () => {}, ownService: () => {} },
       });

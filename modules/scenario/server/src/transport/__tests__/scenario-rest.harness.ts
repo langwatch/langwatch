@@ -12,6 +12,8 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
@@ -78,7 +80,11 @@ export function createScenarioRestTestApp(
 
   const app = ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
-    dependencies: { users: createApiFixture<UserApi>() },
+    dependencies: {
+      users: createApiFixture<UserApi>(),
+      projects: createApiFixture<ProjectApi>(),
+      plans: createApiFixture<EntitlementApi>(),
+    },
     members: {
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
@@ -91,6 +97,7 @@ export function createScenarioRestTestApp(
       testSuiteIds: new SequentialTestSuiteId(),
       clock: new FixedScenarioClock(),
       secretCipher: new PlainScenarioCipher(),
+      rateLimiter: { check: async () => ({ allowed: true }) },
     },
     resources: createApiFixture<ResourceOwnership>(),
     config: { publicBaseUrl: "https://app.langwatch.test" },

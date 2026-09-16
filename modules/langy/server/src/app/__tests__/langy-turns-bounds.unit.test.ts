@@ -1,0 +1,178 @@
+/**
+ * `LangyApp.startConversationTurn` — every turn is counted against the
+ * project's tier-effective window before it dispatches; an over-limit caller
+ * never reaches the engine.
+ * @vitest-environment node
+ */
+import { EventEmitter } from "node:events";
+import {
+  EventSourcing,
+  EventStoreProducerOnly,
+  type EventSourcedQueueDefinition,
+  type EventSourcedQueueProcessor,
+} from "@langwatch/eventing";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { RateLimiter } from "@langwatch/infrastructure/members";
+import { resolveRequestBound } from "@langwatch/plans";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it, vi } from "vitest";
+
+import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
+import { LangyApp } from "../langy.app.ts";
+
+const TIER_PLAN_TYPE: Record<string, string> = {
+  "org-free": "FREE",
+  "org-enterprise": "ENTERPRISE",
+};
+
+/** A real fixed window: each key counts its own checks, refused past the allowance named. */
+function windowLimiter(): RateLimiter {
+  const used = new Map<string, number>();
+  return {
+    check: (key, limit) => {
+      const count = (used.get(key) ?? 0) + 1;
+      used.set(key, count);
+      const requests = limit?.requests ?? Number.POSITIVE_INFINITY;
+
+      return Promise.resolve(
+        count <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 60 },
+      );
+    },
+  };
+}
+
+function recordingEventing(): EventSourcing {
+  const factory = (
+    _definition: EventSourcedQueueDefinition<Record<string, unknown>>,
+  ): EventSourcedQueueProcessor<Record<string, unknown>> => ({
+    async send() {},
+    async sendBatch() {},
+    async waitUntilReady() {},
+    async close() {},
+  });
+  return new EventSourcing({
+    enabled: true,
+    eventStore: EventStoreProducerOnly.create({ processName: "langwatch-test" }),
+    queueFactory: factory,
+    consumersEnabled: false,
+    executionTarget: "api",
+    processManagerMode: "producer-only",
+  });
+}
+
+function fakePresence(): PresenceApi {
+  return {
+    isEnabledForProject: () => Promise.resolve(true),
+    update: () => Promise.resolve(),
+    leave: () => Promise.resolve(),
+    list: () => Promise.resolve([]),
+    broadcastCursor: () => Promise.resolve(),
+    events: async function* () {},
+    cursors: async function* () {},
+    getTenantEmitter: () => new EventEmitter(),
+    cleanupTenantEmitter: () => void 0,
+  };
+}
+
+function harness() {
+  const app = LangyApp.create({
+    dependencies: {
+      presence: fakePresence(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      projects: createApiFixture<ProjectApi>({
+        getOrganizationId: async (projectId) =>
+          projectId === "project-enterprise" ? "org-enterprise" : "org-free",
+      }),
+      plans: createApiFixture<EntitlementApi>({
+        requestBound: ({ key, organizationId }) =>
+          Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[organizationId] ?? "FREE")),
+      }),
+    },
+    members: {
+      prisma: undefined!,
+      // A throwing double rather than a Redis-less build: the turn paths this
+      // suite exercises never reach the member, and a reach is a loud failure.
+      redis: createApiFixture<RedisConnection>(),
+      eventing: recordingEventing(),
+      rateLimiter: windowLimiter(),
+    },
+    config: { agentUrl: undefined, internalSecret: undefined },
+    resources: { own: () => void 0, ownService: () => void 0 },
+    repositories: {} as LangyRepositories,
+  });
+
+  const dispatched = vi
+    .spyOn(app.langyService, "startConversationTurn")
+    .mockResolvedValue({ conversationId: "conversation_1", turnId: "turn_1" });
+
+  const startTurn = (projectId: string) =>
+    app.startConversationTurn({
+      projectId,
+      idempotencyKey: `turn-${projectId}-${dispatched.mock.calls.length}`,
+      session: { user: { id: "user_1" } },
+      requestedConversationId: null,
+      messages: [{ role: "user", parts: [] }],
+      isRetry: false,
+      turnContext: {},
+    });
+
+  return { startTurn, dispatched };
+}
+
+const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE");
+
+describe("LangyApp.startConversationTurn", () => {
+  describe("given a free-tier project under its turn ceiling", () => {
+    it("dispatches every turn", async () => {
+      const { startTurn, dispatched } = harness();
+
+      for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
+        await expect(startTurn("project-free")).resolves.toEqual({
+          conversationId: "conversation_1",
+          turnId: "turn_1",
+        });
+      }
+      expect(dispatched).toHaveBeenCalledTimes(FREE_TURNS_PER_MINUTE);
+    });
+  });
+
+  describe("given a free-tier project at its turn ceiling", () => {
+    it("refuses the next turn 429 and never dispatches it", async () => {
+      const { startTurn, dispatched } = harness();
+      for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
+        await startTurn("project-free");
+      }
+      dispatched.mockClear();
+
+      const refusal = await startTurn("project-free").catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        code: "langy_turns_rate_limited",
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        meta: { retryAfterSeconds: 60 },
+      });
+      expect(dispatched).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an enterprise project past the free turn ceiling", () => {
+    it("dispatches the turn: the ceiling is tier-resolved, not static", async () => {
+      const { startTurn, dispatched } = harness();
+      for (let index = 0; index < FREE_TURNS_PER_MINUTE; index++) {
+        await startTurn("project-enterprise");
+      }
+
+      await expect(startTurn("project-enterprise")).resolves.toEqual({
+        conversationId: "conversation_1",
+        turnId: "turn_1",
+      });
+      expect(dispatched).toHaveBeenCalledTimes(FREE_TURNS_PER_MINUTE + 1);
+    });
+  });
+});

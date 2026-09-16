@@ -31,6 +31,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
@@ -51,6 +52,7 @@ import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
 import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
 import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
+import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 
@@ -99,6 +101,8 @@ export interface AnalyticsAppDependencies {
   dataPrivacy: DataPrivacyApi;
   /** The SAME project peer the rollout gate and the run-caller's identity read. */
   projects: ProjectApi;
+  /** The per-project window every LangWatchQL execution is counted against. */
+  lwqlBounds: LangWatchQLBoundsService;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -113,6 +117,8 @@ type AnalyticsDependencies = Readonly<{
   authz: typeof AuthzApi;
   dataPrivacy: typeof DataPrivacyApi;
   projects: typeof ProjectApi;
+  /** The plan the LangWatchQL execution window resolves through. */
+  plans: typeof EntitlementApi;
 }>;
 
 /**
@@ -195,9 +201,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     authz: AuthzApi,
     dataPrivacy: DataPrivacyApi,
     projects: ProjectApi,
+    plans: EntitlementApi,
   };
   static readonly configSchema = analyticsAppConfigSchema;
-  static readonly reads = reads("clickhouse");
+  /** `rateLimiter` is the per-project counter every LangWatchQL execution is checked against. */
+  static readonly reads = reads("clickhouse", "rateLimiter");
 
   static create(setup: AnalyticsSetup): AnalyticsApp {
     const clickhouse = setup.members.clickhouse;
@@ -233,6 +241,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        lwqlBounds: LangWatchQLBoundsService.create({
+          entitlement: setup.dependencies.plans,
+          projects: setup.dependencies.projects,
+          rateLimiter: setup.members.rateLimiter,
+        }),
       },
       setup.config.publicBaseUrl,
     );
@@ -303,11 +316,12 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * Runs one submitted statement exactly as it was written. Parsing, the default-deny
-   * policy, tenant isolation and the resource ceilings are the service's — nothing here
-   * second-guesses them, because a second opinion could only ever disagree.
+   * Runs one submitted statement exactly as it was written, counted against the
+   * project's window first so an over-limit caller never reaches the engine.
    */
-  executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: input.project.id });
+
     return this.#dependencies.langWatchQL.execute(input);
   }
 
