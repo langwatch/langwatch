@@ -40,6 +40,7 @@ function appFor(config: Partial<AuthAppConfig> = {}): AuthApp {
       // nothing until a request reaches them; no test below reaches one.
       prisma: {} as never,
       redis: null as never,
+      rateLimiter: { check: async () => ({ allowed: true }) } as never,
       identityEmails: undefined as never,
       rateLimit: undefined as never,
       route: undefined as never,

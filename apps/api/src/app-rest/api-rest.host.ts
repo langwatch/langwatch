@@ -1,6 +1,7 @@
 // The process's ONE REST door table: credential kinds it opens and how each
 // resolves. Built by boot from peer Apps.
 import type { Actor } from "@langwatch/actor";
+import type { RateLimiter } from "@langwatch/api";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -198,6 +199,12 @@ export type ApiRestDoorConfig = Readonly<{
    * behaviour is refused at mount rather than answering as though protected.
    */
   idempotency?: IdempotentRunner | undefined;
+  /**
+   * The counter a route declaring `.withRateLimit()` is counted against.
+   * Absent on a deployment with no Redis, such a route is refused at mount
+   * rather than answering uncounted.
+   */
+  rateLimiter?: RateLimiter | undefined;
 }>;
 
 /** Builds this process's door table once, and mounts declared families on it. */
@@ -292,6 +299,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
       // process composed: two ledgers over the same table would run two
       // takeover clocks against each other's claims.
       ...(this.config.idempotency ? { idempotency: this.config.idempotency } : {}),
+      // Every counted route counts against the ONE limiter this process
+      // composed, so two counters can never disagree about one caller.
+      ...(this.config.rateLimiter ? { rateLimiter: this.config.rateLimiter } : {}),
       // Every route-declared trail lands on the ONE audit application this
       // process installed; a caller no door named is recorded as anonymous.
       audit: {

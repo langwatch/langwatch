@@ -1,6 +1,7 @@
 // The API tRPC door: one runtime for request and stream lanes. Every module
 // namespace is mounted here. Process owns caller identity and policy.
 import { AuditLogApi, recordAuditLogCommandSchema } from "@langwatch/audit-log-contract";
+import type { RateLimiter } from "@langwatch/api";
 import {
   auditScopeIds,
   bindTrpcFact,
@@ -17,6 +18,8 @@ import {
   type TrpcRequestLike,
   type TrpcRoot,
   type TrpcRuntime,
+  type TrpcThrottle,
+  type TrpcThrottlePolicy,
 } from "@langwatch/api/trpc";
 import { AuthzApi, LiteMemberRestrictedError } from "@langwatch/authz-contract";
 import { callerEmailFact } from "@langwatch/auth-server";
@@ -94,6 +97,16 @@ export type ApiTrpcDoorConfig = Readonly<{
   browserSession?: ApiTrpcSessionResolver | undefined;
   /** Named in every log line this door writes. */
   logger?: Pick<Logger, "warn" | "error"> | undefined;
+  /**
+   * The counter throttled procedures count against, and the window each one
+   * names by its wire path. A procedure the map does not name passes through.
+   */
+  throttle?:
+    | Readonly<{
+        limiter: RateLimiter;
+        policies: Readonly<Record<string, TrpcThrottlePolicy>>;
+      }>
+    | undefined;
 }>;
 
 /**
@@ -147,6 +160,7 @@ export class ApiTrpcHost implements FeatureTrpcHost<ApiTrpcNamespace> {
       errorReporting: this.errorReporting(),
       causes: this.causes,
       denials: this.denials,
+      ...(config.throttle ? { throttle: buildThrottle(config.throttle) } : {}),
     }).declaredRuntime;
   }
 
@@ -384,4 +398,20 @@ function procedureTypeOf(
   const type = procedures[path]?._def?.type;
 
   return type === "query" || type === "mutation" || type === "subscription" ? type : undefined;
+}
+
+/**
+ * The door's one throttle: the caller is the actor the check resolved or the
+ * address the request came from, and the counting is the process limiter's.
+ * `policyFor` reads the map literally until tier-resolved policies land.
+ */
+function buildThrottle(config: {
+  limiter: RateLimiter;
+  policies: Readonly<Record<string, TrpcThrottlePolicy>>;
+}): TrpcThrottle<ApiTrpcRequestContext> {
+  return {
+    policyFor: ({ procedure }) => Promise.resolve(config.policies[procedure]),
+    principalOf: (ctx) => ctx.tryActor()?.id ?? ctx.clientIp() ?? "anonymous",
+    check: ({ key, policy }) => config.limiter.check(key, policy),
+  };
 }

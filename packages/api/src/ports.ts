@@ -11,13 +11,15 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 
 /**
- * Rate limiting port, supplied via `createService({ rateLimiter })`.
- *
- * The framework owns the key — service name + endpoint name + version
- * namespace + principal — so the limiter never decides who is being limited.
+ * Rate limiting port. The framework owns the key — service, endpoint, version,
+ * principal — so the limiter only counts. A caller may name its own window per
+ * check; the constructed one is the default.
  */
 export interface RateLimiter {
-  check(key: string): Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
+  check(
+    key: string,
+    limit?: { requests: number; seconds: number },
+  ): Promise<{ allowed: boolean; retryAfterSeconds?: number }>;
 }
 
 /**

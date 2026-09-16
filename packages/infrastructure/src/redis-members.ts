@@ -52,23 +52,24 @@ export function redisIdempotency(redis: RedisConnection): IdempotencyStore {
 }
 
 /**
- * A fixed window per key: the first request in a window sets the expiry, and
- * the one that crosses the allowance reads the remaining seconds back as its
- * retry-after.
+ * A fixed window per key: the first request sets the expiry, the one crossing
+ * the allowance reads the remaining seconds as its retry-after, and a caller
+ * naming its own window counts against it instead of the constructed one.
  */
 export function redisRateLimiter(
   redis: RedisConnection,
   window: Readonly<{ requests: number; seconds: number }>,
 ): RateLimiter {
   return {
-    async check(key) {
+    async check(key, limit) {
+      const allowance = limit ?? window;
       const counter = `${RATE_LIMIT_PREFIX}${key}`;
       const used = await redis.incr(counter);
-      if (used === 1) await redis.expire(counter, window.seconds);
-      if (used <= window.requests) return { allowed: true };
+      if (used === 1) await redis.expire(counter, allowance.seconds);
+      if (used <= allowance.requests) return { allowed: true };
 
       const remaining = await redis.ttl(counter);
-      return { allowed: false, retryAfterSeconds: remaining > 0 ? remaining : window.seconds };
+      return { allowed: false, retryAfterSeconds: remaining > 0 ? remaining : allowance.seconds };
     },
   };
 }

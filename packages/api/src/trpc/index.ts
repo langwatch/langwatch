@@ -67,6 +67,13 @@ export {
 } from "./audit.ts";
 
 export {
+  trpcThrottle,
+  type TrpcThrottle,
+  type TrpcThrottleDecision,
+  type TrpcThrottlePolicy,
+} from "./throttle.ts";
+
+export {
   createDeclaredAuthzMiddlewares,
   createIsPublicProcedure,
   createPermissionProcedureBuilder,

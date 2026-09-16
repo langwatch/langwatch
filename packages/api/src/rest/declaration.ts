@@ -608,9 +608,9 @@ class RouteBuilder<
   }
 
   /**
-   * How often one caller may ask. The framework owns the key - this family,
-   * this operation, this version and the principal the door resolved - so the
-   * store the process supplies never decides who is being limited.
+   * How often one caller may ask. The framework owns the key, so the store
+   * never decides who is limited; a policy names its window whole or not at
+   * all, since one number alone would miscount against the default.
    */
   withRateLimit(
     policy: RestRateLimitPolicy = {},
@@ -629,6 +629,13 @@ class RouteBuilder<
     Door
   > {
     assertSourceUnset("rateLimit", this.state.rateLimit);
+
+    if ((policy.requests === undefined) !== (policy.seconds === undefined)) {
+      throw new Error(
+        `REST ${this.router.namespace}.${this.operation} declares half a rate-limit window: ` +
+          "requests and seconds travel together or not at all",
+      );
+    }
 
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,

@@ -2528,6 +2528,131 @@ describe("a route that declares how often one caller may ask", () => {
   });
 });
 
+// A family with a counted route naming its own window, and an uncounted
+// sibling, behind a door that reads its principal off a header.
+const metered = defineRestRouter(CatalogueApi)
+  .withNamespace("metered")
+  .withVersion(VERSION)
+  .withAddressing("v1-only")
+  .get("/:id", "readMetered")
+  .withParams(z.object({ id: z.string() }))
+  .withPermission("evaluations:view")
+  .withRateLimit({ requests: 2, seconds: 60 })
+  .withOutput(z.object({ id: z.string(), evaluators: z.number() }))
+  .handle(async ({ app, input }) => app.read({ id: input.id }))
+
+  .get("/", "listMetered")
+  .withPermission("evaluations:view")
+  .withOutput(z.object({ id: z.string(), evaluators: z.number() }).array())
+  .handle(async () => [])
+  .build();
+
+/** The limiter stub: counts per key, and remembers the window each check named. */
+function meteredApp() {
+  const counts = new Map<string, number>();
+  const windows: ({ requests: number; seconds: number } | undefined)[] = [];
+  const reads: string[] = [];
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: ({ request }) => ({
+        actor: null,
+        scope: {
+          tier: "project" as const,
+          id: request.headers.get("x-principal") ?? "project-1",
+        },
+      }),
+    },
+    rateLimiter: {
+      check: async (key: string, limit?: { requests: number; seconds: number }) => {
+        windows.push(limit);
+        const used = (counts.get(key) ?? 0) + 1;
+        counts.set(key, used);
+        const requests = limit?.requests ?? Number.POSITIVE_INFINITY;
+
+        return used <= requests ? { allowed: true } : { allowed: false, retryAfterSeconds: 42 };
+      },
+    },
+  });
+
+  const app = runtime.mount(metered.router(), {
+    app: () => ({
+      read: async ({ id }: { id: string }) => {
+        reads.push(id);
+
+        return { id, evaluators: 41 };
+      },
+    }),
+    onError: createErrorHandler(),
+  });
+
+  return { app, windows, reads };
+}
+
+describe("a route that names the window one caller may ask inside", () => {
+  /** @scenario "A route-declared rate-limit window reaches the limiter" */
+  it("passes the declared window to the counter with the framework's key", async () => {
+    const { app, windows } = meteredApp();
+
+    await app.request("/api/v1/metered/one");
+
+    expect(windows).toEqual([{ requests: 2, seconds: 60 }]);
+  });
+
+  /** @scenario "A caller past its declared window is refused until it reopens" */
+  it("refuses the third call from one principal with the wait the counter named", async () => {
+    const { app, reads } = meteredApp();
+
+    expect((await app.request("/api/v1/metered/one")).status).toBe(200);
+    expect((await app.request("/api/v1/metered/one")).status).toBe(200);
+
+    const refused = await app.request("/api/v1/metered/one");
+
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("Retry-After")).toBe("42");
+    expect(reads).toEqual(["one", "one"]);
+  });
+
+  /** @scenario "One caller's exhaustion refuses nobody else" */
+  it("counts each principal apart, so one caller's refusal leaves another untouched", async () => {
+    const { app } = meteredApp();
+
+    await app.request("/api/v1/metered/one", { headers: { "x-principal": "project-1" } });
+    await app.request("/api/v1/metered/one", { headers: { "x-principal": "project-1" } });
+    await app.request("/api/v1/metered/one", { headers: { "x-principal": "project-1" } });
+
+    const other = await app.request("/api/v1/metered/one", {
+      headers: { "x-principal": "project-2" },
+    });
+
+    expect(other.status).toBe(200);
+  });
+
+  /** @scenario "A route declaring no rate limit is never counted" */
+  it("leaves a sibling route with no declaration uncounted", async () => {
+    const { app, windows } = meteredApp();
+
+    for (let call = 0; call < 4; call += 1) {
+      expect((await app.request("/api/v1/metered")).status).toBe(200);
+    }
+
+    expect(windows).toEqual([]);
+  });
+
+  /** @scenario "A rate-limit window is declared whole or not at all" */
+  it("refuses half a window at declaration, naming the pair", () => {
+    expect(() =>
+      defineRestRouter(CatalogueApi)
+        .withNamespace("metered")
+        .withVersion(VERSION)
+        .get("/:id", "readMetered")
+        .withParams(z.object({ id: z.string() }))
+        .withPermission("evaluations:view")
+        .withRateLimit({ requests: 2 }),
+    ).toThrow(/requests and seconds travel together/);
+  });
+});
+
 describe("a route whose answer stands for a while", () => {
   /** @scenario "A cache hit serves the validated bytes without the handler" */
   it("serves the stored bytes on the second identical call, without the handler", async () => {

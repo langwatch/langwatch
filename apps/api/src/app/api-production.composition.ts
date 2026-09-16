@@ -10,6 +10,7 @@ import {
 } from "@langwatch/infrastructure";
 import { IdempotencyLedger, type IdempotentRunner } from "@langwatch/api/rest";
 import type { MountableRestApp } from "@langwatch/api/rest";
+import type { RateLimiter } from "@langwatch/api";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { serverModules } from "@langwatch/installed-modules/server";
@@ -235,6 +236,20 @@ function apiIdempotencyLedger(options: {
 }
 
 /**
+ * The one counter every rate-declaring route and throttled procedure counts
+ * against: a Redis window, so a deployment with no Redis composes none and a
+ * route declaring the behaviour is refused at mount instead.
+ */
+function apiRateLimiter(options: {
+  readonly config: ProcessConfig;
+  readonly members: ProcessMemberSource;
+}): RateLimiter | undefined {
+  if (!options.config.redis) return undefined;
+
+  return options.members.read("rateLimiter");
+}
+
+/**
  * The licence source for a process that opened no database: the core
  * `createAbsentLicenseSource` default, named once, with the same consequence
  * line the deleted `api-usage.composition.ts` wrote its own absences to.
@@ -416,6 +431,7 @@ export async function bootApiProcess(options: {
   });
 
   const idempotency = apiIdempotencyLedger({ config: processConfig, members });
+  const rateLimiter = apiRateLimiter({ config: processConfig, members });
 
   // The licence leg of plan resolution: `EntitlementApp` declares this as a
   // mandatory dependency, so a process that opened no database still names
@@ -470,6 +486,7 @@ export async function bootApiProcess(options: {
             },
             instanceAdminKey: config.instanceAdminApiKey,
             ...(idempotency ? { idempotency } : {}),
+            ...(rateLimiter ? { rateLimiter } : {}),
             ...(options.browserSession ? { browserSession: options.browserSession } : {}),
             ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
             // The engine's address plus the proxy path, joined here because the
@@ -479,7 +496,13 @@ export async function bootApiProcess(options: {
         }),
         trpc: (trpc = ApiTrpcHost.create({
           peers,
-          config: trpcSession ? { browserSession: trpcSession } : {},
+          config: {
+            ...(trpcSession ? { browserSession: trpcSession } : {}),
+            // The expensive-door entries land with the doors themselves; until
+            // then the map is empty and every procedure passes through
+            // untouched, exactly as an absent port would leave it.
+            ...(rateLimiter ? { throttle: { limiter: rateLimiter, policies: {} } } : {}),
+          },
         })),
       };
     })

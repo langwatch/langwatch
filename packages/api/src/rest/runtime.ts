@@ -1073,7 +1073,12 @@ async function countCall({
     principal: principalOf(caller),
   });
 
-  const verdict = await ports.rateLimiter.check(key);
+  const limit =
+    route.rateLimit.requests !== undefined && route.rateLimit.seconds !== undefined
+      ? { requests: route.rateLimit.requests, seconds: route.rateLimit.seconds }
+      : undefined;
+
+  const verdict = await ports.rateLimiter.check(key, limit);
 
   if (verdict.allowed) return;
 

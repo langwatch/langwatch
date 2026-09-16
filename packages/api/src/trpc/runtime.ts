@@ -45,6 +45,7 @@ import type {
 } from "@trpc/server/unstable-core-do-not-import";
 import { z } from "zod";
 
+import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 import {
   AuthenticationRequiredError,
   decide,
@@ -824,6 +825,11 @@ export type TrpcRuntimePorts<TContext> = Readonly<{
   denials: AccessDenial;
   /** What the process reads a tenant's entitlements from, for a procedure that asks. */
   entitlements?: Entitlements;
+  /**
+   * The per-procedure window a caller is counted inside, where the process
+   * throttles at all. Absent, every procedure passes through uncounted.
+   */
+  throttle?: TrpcThrottle<TContext>;
   audit: Readonly<{
     record(entry: TrpcRuntimeAuditEntry): Promise<void>;
     /** The owner says WHAT is sensitive; the path only redacts. */
@@ -892,6 +898,7 @@ export function createTrpcRuntime<
 }): TrpcRuntime<TContext> {
   const trace = tracer(ports);
   const handledError = handledErrors(ports);
+  const throttle = ports.throttle ? trpcThrottle(ports.throttle) : undefined;
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
@@ -902,7 +909,7 @@ export function createTrpcRuntime<
 
     // The parser FIRST, then the check: a check installed ahead of `.input()`
     // reads `undefined` and silently authorizes nothing.
-    const built = doorOf({ anonymous, procedure, anonymousProcedure, request })
+    const checked = doorOf({ anonymous, procedure, anonymousProcedure, request })
       .input(request.member.input)
       .use(trace)
       .use(requestLog(ports, { anonymous }))
@@ -916,8 +923,14 @@ export function createTrpcRuntime<
           facts,
           ...(request.entitlement ? { entitlement: request.entitlement } : {}),
         }),
-      )
-      .use(auditTrail(ports, { anonymous }));
+      );
+
+    // The throttle runs AFTER the check, so the caller it counts is the one
+    // the door resolved, and BEFORE the trail, so a refused call writes no
+    // audit row.
+    const built = (throttle ? checked.use(throttle) : checked).use(
+      auditTrail(ports, { anonymous }),
+    );
 
     const handle = guardOutput({
       procedure: request.procedure,

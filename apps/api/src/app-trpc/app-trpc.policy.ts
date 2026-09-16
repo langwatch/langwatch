@@ -17,6 +17,7 @@ import {
   type TrpcRoot,
   type TrpcRuntimeContext,
   type TrpcRuntimePorts,
+  type TrpcThrottle,
 } from "@langwatch/api/trpc";
 
 /**
@@ -31,6 +32,8 @@ export type ApiTrpcPolicyMembers<TContext, TAuthenticatedContext extends object>
   errorReporting: TrpcErrorReporting;
   causes: TrpcCauseTranslation;
   denials: TrpcAuthorizationDenial;
+  /** The throttle the declared path counts through, where this process has one. */
+  throttle?: TrpcThrottle<TContext>;
 }>;
 
 // Called ONCE per root. AuthZ service is process-wide, not per-request.
@@ -73,6 +76,7 @@ function runtimePorts<TContext extends TrpcRuntimeContext & object, TAuthenticat
     identity: { caller: (ctx) => ({ actor: actorOf(actorOfContext(ctx)) }) },
     authorization: { forRequest: () => ports.authz },
     denials: ports.denials,
+    ...(ports.throttle ? { throttle: ports.throttle } : {}),
     audit: {
       record: (entry) => ports.audit.record(entry),
       redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),

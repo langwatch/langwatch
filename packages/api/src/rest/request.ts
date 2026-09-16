@@ -338,8 +338,16 @@ export const validator = build as unknown as typeof openApiValidator;
 // store never decides who is being limited or what an entry describes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** What a rate-limited route declares: the bucket its calls are counted in. */
-export type RestRateLimitPolicy = Readonly<{ bucket?: string }>;
+/**
+ * What a rate-limited route declares: the bucket its calls are counted in,
+ * and optionally the window one caller may ask inside. A policy with no
+ * numbers counts against the limiter's own constructed window.
+ */
+export type RestRateLimitPolicy = Readonly<{
+  bucket?: string;
+  requests?: number;
+  seconds?: number;
+}>;
 
 /** What a cached route declares: how long an answer stands, and under what tag. */
 export type RestCachePolicy = Readonly<{ ttlSeconds: number; tag: string }>;

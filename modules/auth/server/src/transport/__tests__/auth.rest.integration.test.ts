@@ -122,6 +122,40 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({ message: "Invalid auth token." });
     });
+
+    it("names the nearest forwarding hop as the caller the check is counted against", async () => {
+      const findProjectSlugByToken = vi.fn<
+        (input: { token: string; callerKey?: string }) => Promise<string | null>
+      >(async () => "acme");
+      const world = authWorld({ findProjectSlugByToken });
+
+      await world.app.request("/api/auth/validate", {
+        method: "POST",
+        headers: { "x-auth-token": "tok", "x-forwarded-for": "1.1.1.1, 2.2.2.2" },
+      });
+
+      expect(findProjectSlugByToken).toHaveBeenCalledWith({
+        token: "tok",
+        callerKey: "ip:2.2.2.2",
+      });
+    });
+
+    it("counts a caller that named no hop as unknown rather than skipping the count", async () => {
+      const findProjectSlugByToken = vi.fn<
+        (input: { token: string; callerKey?: string }) => Promise<string | null>
+      >(async () => "acme");
+      const world = authWorld({ findProjectSlugByToken });
+
+      await world.app.request("/api/auth/validate", {
+        method: "POST",
+        headers: { "x-auth-token": "tok" },
+      });
+
+      expect(findProjectSlugByToken).toHaveBeenCalledWith({
+        token: "tok",
+        callerKey: "ip:unknown",
+      });
+    });
   });
 
   describe("when the browser signs out", () => {

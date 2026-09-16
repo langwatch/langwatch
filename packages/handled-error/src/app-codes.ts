@@ -70,6 +70,7 @@ export const APP_ERROR_CODES = [
   "api_key_scope_violation",
   "auth_no_address_to_confirm",
   "auth_rate_limited",
+  "auth_validate_rate_limited",
   "authz_grant_not_confirmed",
   "authz_ledger_unavailable",
   "automation_filters_unsupported",

@@ -15,6 +15,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -150,11 +151,11 @@ export class AuthApp implements AuthApiContract {
   };
   static readonly configSchema = authAppConfigSchema;
   /**
-   * Declared rather than cast: Better Auth's storage, hooks and session cache
-   * each need one of these three. A process that cannot supply one refuses at
-   * boot, instead of composing a door whose collaborators are `undefined`.
+   * Declared rather than cast: Better Auth's storage, hooks and cache need the
+   * first three, the token check's counter the fourth. A process that cannot
+   * supply one refuses at boot rather than composing a door on `undefined`.
    */
-  static readonly reads = reads("logger", "prisma", "redis");
+  static readonly reads = reads("logger", "prisma", "redis", "rateLimiter");
 
   readonly #sessions: BrowserSessionService;
   readonly #signUp: SignUpVerificationService | null;
@@ -257,11 +258,35 @@ export class AuthApp implements AuthApiContract {
     return this.tryResolveBrowserSession({ verified });
   }
 
-  /** The project a legacy `X-Auth-Token` names, by slug. */
-  async findProjectSlugByToken(input: { token: string }): Promise<string | null> {
+  /**
+   * The project a legacy `X-Auth-Token` names, by slug. Every call probes a
+   * secret and gets a yes/no answer, so a caller that names itself is counted
+   * first: past the registry's per-minute ceiling the probe stops answering.
+   */
+  async findProjectSlugByToken(input: {
+    token: string;
+    callerKey?: string;
+  }): Promise<string | null> {
+    if (input.callerKey !== undefined) {
+      await this.countValidateCall(input.callerKey);
+    }
+
     const resolved = await this.#dependencies.apiKeys.findResolvedToken({ token: input.token });
 
     return resolved?.project.slug ?? null;
+  }
+
+  /** One probe of the token check, against the registry's per-IP ceiling. */
+  private async countValidateCall(callerKey: string): Promise<void> {
+    const requests = resolveRequestBound("authValidatePerIpPerMinute", "ENTERPRISE");
+    const decision = await this.#members.rateLimiter.check(`auth-validate:${callerKey}`, {
+      requests,
+      seconds: 60,
+    });
+
+    if (!decision.allowed) {
+      throw new AuthValidateRateLimitedError({ retryAfterSeconds: decision.retryAfterSeconds });
+    }
   }
 
   featureFlags(): FeatureFlagApi {
@@ -436,6 +461,30 @@ function signUpVerification({
       `${signUp.baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     now,
   });
+}
+
+/**
+ * The token check answered one caller too often. `fault` stays customer: it
+ * is their probe rate, and the retry-after is theirs to wait out.
+ */
+export class AuthValidateRateLimitedError extends HandledError {
+  declare readonly code: "auth_validate_rate_limited";
+
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super(
+      "auth_validate_rate_limited",
+      "Too many token validation attempts from this address",
+      {
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        ...(input.retryAfterSeconds !== undefined
+          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+          : {}),
+      },
+    );
+    this.name = "AuthValidateRateLimitedError";
+  }
 }
 
 /**

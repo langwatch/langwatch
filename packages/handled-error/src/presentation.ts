@@ -1853,6 +1853,12 @@ const presentations = {
         : `Wait ${minutes} minutes, then try again.`;
     },
   },
+  auth_validate_rate_limited: {
+    // Read by an integration probing the token check, not by a person on a
+    // page: waiting out the window is the whole remedy.
+    title: "Too many token checks",
+    describe: () => "Wait a minute, then validate the token again.",
+  },
   auth_no_address_to_confirm: {
     title: "This account has no email address",
     describe: () => "Add an email address in your account settings, then confirm it.",

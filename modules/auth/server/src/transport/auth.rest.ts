@@ -54,8 +54,14 @@ export interface AuthDoorApi {
   revokeBrowserSession: (input: { sessionId: string }) => Promise<void>;
   /** The session as this process resolves it, for the browser's own poll. */
   resolveSession: (request: Request) => Promise<AuthRestSession | null>;
-  /** The project a legacy `X-Auth-Token` names, by slug. */
-  findProjectSlugByToken: (input: { token: string }) => Promise<string | null>;
+  /**
+   * The project a legacy `X-Auth-Token` names, by slug. `callerKey` names the
+   * probing address so the answer stays a token check and not a token oracle.
+   */
+  findProjectSlugByToken: (input: {
+    token: string;
+    callerKey?: string;
+  }) => Promise<string | null>;
   /** This deployment's flag store, for the born-finalized entrance. */
   featureFlags: () => FeatureFlagApi;
   /** The typed client the born-finalized entrance reads its allowlist through. */
@@ -110,7 +116,10 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
     if (!authToken) return answer({ message: "X-Auth-Token header is required." }, 401);
 
-    const projectSlug = await app.findProjectSlugByToken({ token: authToken });
+    const projectSlug = await app.findProjectSlugByToken({
+      token: authToken,
+      callerKey: callerKeyOf(request),
+    });
 
     if (!projectSlug) return answer({ message: "Invalid auth token." }, 401);
 
@@ -298,4 +307,15 @@ function extractCookie(cookieHeader: string, name: string): string | null {
     .find((cookie) => cookie.startsWith(`${name}=`));
 
   return match ? match.slice(name.length + 1) : null;
+}
+
+/**
+ * Rate-limit bucket for the caller: the LAST `x-forwarded-for` hop, the only
+ * one not client-supplied.
+ */
+function callerKeyOf(request: Request): string {
+  const hops = request.headers.get("x-forwarded-for")?.split(",") ?? [];
+  const nearest = hops[hops.length - 1]?.trim();
+
+  return `ip:${nearest ?? "unknown"}`;
 }
