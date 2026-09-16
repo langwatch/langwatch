@@ -84,11 +84,9 @@ export function FieldHeader({
 }
 
 /**
- * Opt-in expander for the layered template authoring flow. The default
- * authoring surface stays simple (a preset gallery and a preview); the
- * deeper editing surfaces (plain text, then the raw code editor) sit behind
- * these expanders so most authors never see a brace. Children mount only
- * while open, so a collapsed tier adds nothing to the page.
+ * Opt-in expander for the layered template authoring flow: the default
+ * (preset gallery, preview) stays simple; deeper editing sits behind
+ * these so most authors never see a brace. Children mount only while open.
  */
 export function TemplateDisclosure({
   triggerLabel,
@@ -329,12 +327,10 @@ export function CompactSlackPreview({
 
   const syncedPopup = useRef<Window | null>(null);
 
-  // Keep the synced popup in step with the latest payload. If the user
-  // never opened it, this is a no-op. If they closed it, we drop the
-  // stale handle so the next click reopens a fresh window. Wrapped in
-  // try/catch because some browsers raise a SecurityError if the popup
-  // navigated to a page that briefly errored — we don't want a preview
-  // hiccup to crash the editor.
+  // Keeps the synced popup in step with the latest payload; closing it
+  // drops the stale handle so the next click reopens fresh. Wrapped in
+  // try/catch since some browsers raise a SecurityError on a popup that
+  // briefly errored -- a preview hiccup shouldn't crash the editor.
   useEffect(() => {
     if (!builderUrl) return;
     const popup = syncedPopup.current;
@@ -367,13 +363,11 @@ export function CompactSlackPreview({
       existing.focus();
       return;
     }
-    // We need the returned window handle to push template updates into the
-    // Block Kit Builder as the operator edits, so we cannot use `noopener`
-    // (which would null the handle). Instead, immediately strip
-    // `window.opener` on the popup after open — this breaks the reverse-tab
-    // nabbing vector (the cross-origin Block Kit Builder cannot navigate
-    // this tab via `opener.location = …`) while keeping the forward sync
-    // channel alive.
+    // We need the window handle to push updates into the Block Kit
+    // Builder, so we can't use `noopener` (it would null the handle).
+    // Instead we strip `window.opener` after open -- blocking reverse-tab
+    // nabbing (the cross-origin builder can't navigate this tab) while
+    // keeping the forward sync channel alive.
     const popup = window.open(builderUrl, SYNCED_BUILDER_WINDOW_NAME, "width=1200,height=900");
     if (popup) {
       try {
@@ -430,10 +424,8 @@ export function CompactSlackPreview({
 
 /**
  * Card-shaped preview for the plain-text Slack channel. Grows with the
- * content (no fixed height, no resize handle) and runs the rendered text
- * through `<Markdown>` so bold/italic/links/blockquotes look like the
- * real Slack message — close enough to be useful, far less effort than
- * approximating Slack's chrome.
+ * content and runs text through `<Markdown>` so it looks like the real
+ * Slack message -- close enough to be useful, far less effort than chrome.
  */
 function SlackTextPreviewCard({ text }: { text: string }) {
   const asMarkdown = useMemo(() => slackMrkdwnToCommonMark(text), [text]);

@@ -1,10 +1,7 @@
 /**
- * What the automation REST doors send and answer.
- *
- * Three families share this file because they share a subject: `/api/triggers`
- * (the project's automations), `/api/trigger/slack` (the one-action ancestor of
- * it) and `/api/unsubscribe` (RFC 8058 one-click). Every shape below is the one
- * those doors already published; nothing is reshaped.
+ * What the automation REST doors send and answer: `/api/triggers`, the
+ * older `/api/trigger/slack`, and `/api/unsubscribe` (RFC 8058) share
+ * this file since every shape is one those doors already published.
  */
 import { z } from "zod";
 
@@ -50,11 +47,9 @@ export const automationRestCreateInputSchema = z.object({
 });
 
 /**
- * Delivery settings are declared here only so an edit that carries them is
- * REFUSED rather than silently dropped. They are not updatable through REST:
- * the per-action shape check, the secret encryption and the unconditional
- * `createdByUserId` stamp all live on the authoring surface, and a forwarded
- * record would skip every one of them.
+ * Delivery settings are declared here only so an edit carrying them is
+ * REFUSED, not silently dropped: they aren't updatable through REST, since
+ * the authoring surface's per-action check and secret encryption would be skipped.
  */
 export const automationRestUpdateInputSchema = z.object({
   name: z.string().min(1).optional(),

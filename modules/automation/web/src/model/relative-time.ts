@@ -1,10 +1,7 @@
 /**
  * How long ago something happened, in the two shapes this family prints.
- *
- * A family-local copy of `platform/app`'s `~/utils/formatTimeAgo`, taken rather
- * than promoted: it is nine lines of `@langwatch/time` around a threshold, and the
- * application still has half a dozen callers that deletes-only forbids
- * repointing. The same call the me family made for its own copies.
+ * A family-local copy of `platform/app`'s original: nine lines around a
+ * threshold, kept local since deletes-only forbids repointing callers.
  */
 
 import {
@@ -19,8 +16,7 @@ import {
 
 /**
  * "12 minutes ago" while it is recent, an absolute stamp once it is not.
- *
- * Undefined for a falsy timestamp, which is what the table cells check before
+ * Undefined for a falsy timestamp, which table cells check before
  * printing an em dash.
  */
 export const formatTimeAgo = (

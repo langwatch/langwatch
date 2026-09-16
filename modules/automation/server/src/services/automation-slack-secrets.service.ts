@@ -121,12 +121,9 @@ export class AutomationSlackSecretsService extends AutomationSlackProvider {
 }
 
 /**
- * Narrows the Slack provider to the one thing evaluation asks of it.
- *
- * `AutomationSlackSecretsService` also persists and redacts action
- * parameters, which is the drawer's business, not this path's. The wrapper is
- * what keeps the evaluator's dependency honest — and it is a class rather
- * than an object literal because the interface it satisfies is nominal.
+ * Narrows the Slack provider to the one thing evaluation asks of it --
+ * not the persist/redact surface, which is the drawer's business. A
+ * class, not a literal, since the interface it satisfies is nominal.
  */
 export class AutomationSlackBotTokenDecryptorService extends AutomationSlackBotTokenDecryptor {
   constructor(private readonly provider: AutomationSlackSecretsService) {

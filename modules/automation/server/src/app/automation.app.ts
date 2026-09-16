@@ -1,9 +1,7 @@
 /**
  * The automation feature's application: the one typed thing all five of its
- * doors are given. Every rule two doors used to keep a copy of each lives here
- * or in the services below, and the caller arrives as an argument rather than
- * being read from a session, so one operation serves a browser, an API key and
- * a background job alike. @see adrs/001-automation-service-boundary.md
+ * doors are given, so one operation serves a browser, an API key and a job.
+ * @see adrs/001-automation-service-boundary.md
  */
 import {
   automationServerConfigSchema,
@@ -91,10 +89,8 @@ export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
 
 // ---------------------------------------------------------------------------
-// The technical members the process supplies. None of it is automation's
-// own: a cipher, an HTTP client, a query compiler, a counter and an audit
-// ledger all belong to the deployment, and every one of them was a transport
-// port before - reachable from one door and invisible to the next.
+// The technical members the process supplies: a cipher, an HTTP client, a
+// query compiler, a counter and an audit ledger, all owned by the deployment.
 // ---------------------------------------------------------------------------
 
 /**
@@ -273,9 +269,8 @@ export class AutomationApp implements AutomationApi {
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
-   * members it reads and its own config, then composes over it exactly as
-   * {@link AutomationApp.fromInfrastructure} does. What a hand composition
-   * (or a test) still supplies directly.
+   * members it reads and its own config, then composes exactly as
+   * {@link AutomationApp.fromInfrastructure} does.
    */
   static create(setup: AutomationSetup): AutomationApp {
     const infrastructure = buildAutomationInfrastructure({
@@ -534,10 +529,9 @@ export class AutomationApp implements AutomationApi {
   }
 
   /**
-   * Stores a new TRACE automation, which must say which traces it is about: one
-   * with no condition matches every trace forever. Graph alerts and reports are
-   * exempt - a threshold and a schedule are their conditions - and use
-   * {@link create}.
+   * Stores a new TRACE automation, which must name a condition -- one with
+   * none matches every trace forever. Graph alerts and reports are exempt
+   * (a threshold and a schedule are their conditions) and use {@link create}.
    */
   async createTraceAutomation(command: CreateTriggerCommand): Promise<Trigger> {
     this.assertTraceConditionPresent(command.filters);
@@ -666,11 +660,9 @@ export class AutomationApp implements AutomationApi {
   }
 
   /**
-   * The unsubscribe page's own read, throttled per caller.
-   *
-   * Public, so it is a surface an attacker can hammer to brute-force tokens;
-   * an unknown caller falls back to a shared bucket, because a missing address
-   * must still throttle rather than bypass.
+   * The unsubscribe page's own read, throttled per caller -- public, so it
+   * is a target for brute-forcing tokens; an unknown caller falls back to a
+   * shared bucket, since a missing address must still throttle, not bypass.
    */
   async resolveUnsubscribeView(input: {
     token: string;
@@ -697,12 +689,9 @@ export class AutomationApp implements AutomationApi {
   }
 
   /**
-   * The same confirmation from either affordance, throttled per caller.
-   *
-   * A bad or tampered token is the recipient's problem and they can act on it:
-   * ask for the link again. A downstream persistence failure is ours, has no
-   * action for them, and is re-raised exactly as it arrived so it degrades to
-   * "unknown" plus a trace id rather than masquerading as an invalid link.
+   * The same confirmation from either affordance, throttled per caller. A
+   * bad token is the recipient's problem; a persistence failure is ours and
+   * is re-raised as-is, degrading to "unknown" plus a trace id.
    */
   async acceptUnsubscribe(input: {
     token: string;
@@ -735,10 +724,8 @@ export class AutomationApp implements AutomationApi {
   }
 
   /**
-   * The operator-facing suppression list, each row with its automation's name.
-   *
-   * Audited explicitly rather than by the mutation trail: this is a query, and
-   * reading a suppression list means reading customer email addresses.
+   * The operator-facing suppression list. Audited explicitly, not via the
+   * mutation trail, because reading it means reading customer emails.
    */
   async listSuppressions(input: {
     projectId: string;

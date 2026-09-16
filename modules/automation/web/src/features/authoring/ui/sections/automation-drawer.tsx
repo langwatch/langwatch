@@ -146,11 +146,9 @@ function cadenceTodo(draft: AutomationDraft): string {
 }
 
 /**
- * Orchestrator for the staged automation authoring drawer (ADR-036). Owns
- * the data-loading lifecycle, live preview/test-fire/upsert mutations, and
- * renders the main drawer plus the Filters and Configuration secondaries.
- * Everything else lives in `components/`, `state/`, `providers/`, `logic/` —
- * adding a new action type doesn't change this file.
+ * Orchestrator for the staged automation authoring drawer (ADR-036): owns
+ * the data-loading lifecycle and preview/test-fire/upsert mutations, and
+ * renders the drawer plus the Filters and Configuration secondaries.
  */
 export function AutomationDrawer({
   automationId,
@@ -174,12 +172,10 @@ export function AutomationDrawer({
    *  point (Phase 5.2). */
   prefilledGraphId?: string;
   prefilledSeriesName?: string;
-  /** Fresh-create prefills, set by the Alerts & automations page's "New
-   *  alert" button and use-case cards. `initialSource: "customGraph"` opens
-   *  the drawer as a new alert (severity seeded to Warning, graph left for
-   *  the user to pick — unlike `prefilledGraphId`, nothing is locked).
-   *  `initialFilters` is a JSON-encoded trigger filter object (the persisted
-   *  shape), sanitized on the way in like the edit-hydration path. */
+  /** Fresh-create prefills from the "New alert" button and use-case cards:
+   *  `initialSource: "customGraph"` opens a new alert with the graph left
+   *  unlocked (unlike `prefilledGraphId`). `initialFilters` is the
+   *  persisted-shape JSON filter, sanitized like the edit-hydration path. */
   initialSource?: string;
   initialName?: string;
   initialAction?: string;
@@ -245,12 +241,10 @@ export function AutomationDrawer({
     [reset],
   );
 
-  // Open on a blank draft unless this mount is the return leg of a sub-flow.
-  // A sub-flow the reader walks away from never announces a return, so the
-  // draft it left behind is discarded here rather than seeding the next
-  // automation. Latched in a ref and run before paint, because StrictMode
-  // replays effects in development and a replayed read would find the one-shot
-  // intent spent and blank the draft that just came back.
+  // Opens on a blank draft unless this is a sub-flow's return leg (a
+  // walked-away sub-flow never announces one, so its draft is discarded).
+  // Latched in a ref and run before paint, since StrictMode's effect
+  // replay would otherwise find the one-shot intent spent and blank it.
   const decidedOnMountDraft = useRef(false);
   useLayoutEffect(() => {
     if (decidedOnMountDraft.current) return;
@@ -483,13 +477,10 @@ export function AutomationDrawer({
     [appBaseUrl, project?.name, project?.slug],
   );
 
-  // Live preview for the active notify channel.
-  //
-  // Renders fully client-side via the shared templating module. No tRPC,
-  // no debounce — Liquid renders are sub-millisecond on a draft-sized
-  // template, so we can update on every keystroke and stay responsive.
-  // A monotonically increasing token guards against the rare race where
-  // a slow render returns out of order.
+  // Live preview for the active notify channel, client-side via the shared
+  // templating module. No debounce -- Liquid renders are sub-millisecond,
+  // so every keystroke updates. A monotonic token guards against a slow
+  // render returning out of order.
   const channel = notifyChannel(draft);
   const [preview, setPreview] = useState<NotifyPreview | undefined>(undefined);
   const previewToken = useRef(0);
@@ -803,12 +794,9 @@ export function AutomationDrawer({
         action: draft.action,
         alertType: draft.alertType ?? undefined,
         filters: draft.source === "customGraph" ? {} : draft.filters,
-        // ADR-043 Subject facet: send the liqe query for a trace automation AND
-        // for a report — a trace-query report is scoped by exactly this query,
-        // and the router persists it for that source (it nulls the column for
-        // graph/dashboard report sources itself). Only a graph alert never has
-        // one. When set the router persists `filters` as `{}` and matches the
-        // query in-memory.
+        // ADR-043 Subject facet: sent for trace and report automations (the
+        // router nulls it for graph/dashboard sources); a report scoped by
+        // this query persists `filters` as `{}` and matches it in-memory.
         filterQuery: draft.source === "customGraph" ? null : draft.filterQuery || null,
         customGraphId: draft.source === "customGraph" ? draft.customGraphId : null,
         // The graph-alert threshold rule travels alongside the destination
@@ -1088,10 +1076,9 @@ export function AutomationDrawer({
 }
 
 /**
- * One-line landing context for users who arrived here from the "Edit
- * automation" link in a trigger email. Kept inline rather than as a toast
- * because the user already changed page — a toast on a fresh load is easy
- * to miss; a banner above the form gives them the orientation they need.
+ * Landing context for users arriving via the "Edit automation" email link.
+ * Inline, not a toast: a toast on a fresh load is easy to miss, but a
+ * banner above the form orients them.
  */
 function EmailLinkLandingBanner() {
   return (

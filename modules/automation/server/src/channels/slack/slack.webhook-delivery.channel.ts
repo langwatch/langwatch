@@ -36,11 +36,9 @@ export interface RenderedSlackMessageRequest {
 }
 
 /**
- * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
- * control characters to be escaped in message text; everything else is
- * literal. Escaping these stops user-authored trace content from forging
- * links/formatting or breaking the message structure.
- * See https://api.slack.com/reference/surfaces/formatting#escaping
+ * Minimal Slack mrkdwn escaping: only three HTML-ish control characters
+ * need escaping, stopping trace content from forging links/formatting.
+ * https://api.slack.com/reference/surfaces/formatting#escaping
  */
 const escapeMrkdwn = (value: unknown): string =>
   String(value ?? "")
@@ -163,11 +161,9 @@ async function deliverSlackWebhook(
 }
 
 /**
- * Sends a pre-rendered (customer-authored, ADR-036) Slack payload. Mirrors the
- * guards and DispatchError classification of `sendSlackWebhook` exactly — same
- * non-retryable host guard (`assertSlackWebhookUrl`) and the same
- * toDispatchError wrap around the send — but takes the Block Kit / text payload
- * already rendered.
+ * Sends a pre-rendered (customer-authored, ADR-036) Slack payload. Mirrors
+ * `sendSlackWebhook`'s guards and DispatchError classification exactly
+ * (same host guard, same toDispatchError wrap), already rendered.
  */
 async function deliverRenderedSlackMessage(
   { triggerWebhook, triggerName, payload }: RenderedSlackMessageRequest,

@@ -30,11 +30,9 @@ export function computeScheduledFor(input: {
 }
 
 /**
- * Whether a filter value contains an actual condition.
- *
- * Empty arrays and objects are intentionally vacuous. This is shared by the
- * authoring boundary and runaway containment so legacy rows that predate the
- * authoring guard retain their existing dispatch semantics.
+ * Whether a filter value contains an actual condition. Empty arrays and
+ * objects are intentionally vacuous. Shared by the authoring boundary and
+ * runaway containment so legacy rows keep their existing dispatch semantics.
  */
 export function hasActionableTriggerFilters(filters: Record<string, unknown>): boolean {
   return Object.values(filters).some(hasActionableFilterValue);
@@ -80,10 +78,9 @@ const EVALUATION_TRIGGER_FILTER_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Whether any of a trigger's filters can only be decided after an evaluation.
- *
- * The trace-alert subscriber uses this to leave such a trigger to the
- * evaluation pipeline instead of matching it on the trace alone.
+ * Whether any of a trigger's filters can only be decided after an
+ * evaluation. The trace-alert subscriber uses this to leave such a
+ * trigger to the evaluation pipeline instead of matching on the trace alone.
  */
 export function triggerFiltersNeedEvaluation(filters: Record<string, unknown>): boolean {
   return Object.keys(filters).some((field) => EVALUATION_TRIGGER_FILTER_FIELDS.has(field));

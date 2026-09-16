@@ -1,8 +1,7 @@
 /**
- * The once-per-trace guarantee. A trace can match the same automation many
- * times inside its debounce window — a redelivered event, a retried job, a
- * second matcher pass — and each of those must dedupe onto one recorded match,
- * or the customer is mailed twice about the same trace.
+ * The once-per-trace guarantee: a redelivered event, a retried job, or
+ * a second matcher pass can all match the same automation, and each
+ * must dedupe onto one match, or the customer is mailed twice.
  */
 import {
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,

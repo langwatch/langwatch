@@ -136,10 +136,9 @@ export function settlementSummary(
 }
 
 /**
- * Exactly `AutomationSettlementLedger`'s ten methods — the settlement
- * dispatch path's whole dependency on Automation. Folded off the deleted
- * `AutomationService` contract-service (ADR-133); no method beyond the port
- * belongs here, since nothing in this suite reaches one.
+ * Exactly `AutomationSettlementLedger`'s ten methods -- the settlement
+ * dispatch path's whole dependency on Automation (ADR-133). No method
+ * beyond the port belongs here; nothing in this suite reaches one.
  */
 class SettlementAutomationService implements AutomationSettlementLedger {
   readonly claims: { triggerId: string; traceId: string; projectId: string }[] = [];
@@ -265,10 +264,9 @@ export class SettlementProjectService extends TestProjectApi {
 }
 
 /**
- * The traces a settlement re-reads, as this feature's own port declares them.
- * Based on that port and not on Trace's service: a double that inherits the
- * whole trace surface grows a new `never` member every time Trace adds one,
- * and none of them is a call settlement makes.
+ * The traces a settlement re-reads, as this feature's own port declares
+ * them -- not Trace's service, since inheriting that whole surface grows
+ * a new `never` member every time Trace adds one settlement never calls.
  */
 class SettlementTraceService extends AutomationSettlementTraceReader {
   readonly summaries = new Map<string, TraceSummaryData>();

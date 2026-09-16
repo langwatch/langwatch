@@ -1,12 +1,9 @@
 import { TriggerAction } from "@langwatch/automation-contract";
 
 /**
- * Actions that write one record per confirmed match, the only ones the plan's
- * daily automation ceiling governs. Notify actions are bounded by their digest
- * cadence and the email caps instead, so a busy notify automation is not over
- * this ceiling no matter how many traces it matches.
- *
- * Mirrors `PERSIST_TRIGGER_ACTIONS` on the dispatch side.
+ * Actions that write one record per confirmed match -- the only ones the
+ * plan's daily ceiling governs. Notify actions are bounded by digest
+ * cadence and email caps instead. Mirrors `PERSIST_TRIGGER_ACTIONS`.
  */
 const PERSIST_ACTIONS: readonly string[] = [
   TriggerAction.ADD_TO_DATASET,

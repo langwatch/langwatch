@@ -1,10 +1,7 @@
 /**
- * ADR-031: turns a rejected rate-limit window into a user-facing "try again in
- * N seconds" message.
- *
- * Its own module rather than a closure inside the test-fire mutation so the
- * retry-seconds arithmetic (clamped to >= 1, correct pluralisation) can be
- * unit-tested without standing up a tRPC procedure.
+ * ADR-031: turns a rejected rate-limit window into a "try again in N
+ * seconds" message. Its own module, not a test-fire closure, so the
+ * retry-seconds arithmetic can be unit-tested without a tRPC procedure.
  */
 
 import { nowInstant } from "@langwatch/time";

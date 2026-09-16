@@ -17,11 +17,9 @@ export type AutomationPersistCapBreach = {
 };
 
 /**
- * Where a project's organization can go for a higher automation ceiling,
- * matching the shape `@langwatch/mail`'s automation-limit template asks for.
- *
- * Resolved only for a `ceiling_reached` notice — a paused automation is a
- * mistake in the customer's own condition, not a sales moment.
+ * Where a project's organization can go for a higher automation ceiling
+ * (matches `@langwatch/mail`'s template). Resolved only for
+ * `ceiling_reached` -- a paused automation is a mistake, not a sales moment.
  */
 export type AutomationLimitNextStep =
   | {

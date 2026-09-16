@@ -1,8 +1,7 @@
 /**
- * The `/api/triggers` family: the project's automations, over an API key. Every
- * rule about one is {@link AutomationApi}'s; this family owns its wire shape and
- * its status codes, and answers its own 404 rather than leaving that body to a
- * process error handler.
+ * The `/api/triggers` family: the project's automations, over an API
+ * key. Every rule about one is {@link AutomationApi}'s; this family owns
+ * its wire shape, status codes, and its own 404.
  */
 import {
   badRequestSchema,
@@ -190,10 +189,9 @@ async function readAutomation(args: {
 }
 
 /**
- * The edit, with the two refusals it owns: delivery settings this door cannot
- * safely forward, and a condition an edit would empty. Editing is the other
- * route to a match-everything automation - create one with a real condition,
- * then patch the condition away - and that rule is the application's.
+ * The edit, with the two refusals it owns: delivery settings this door
+ * can't safely forward, and a condition an edit would empty -- the other
+ * route to a match-everything automation, which is the application's rule.
  */
 async function editAutomation(args: {
   app: AutomationApi;

@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The authoring behaviour the tRPC transport used to carry: the daily-cap
- * status the automations list reads, and what resuming a paused automation
- * writes. Both are the application's now, so the REST family reaches the same
- * answers.
+ * The authoring behaviour the tRPC transport used to carry: daily-cap
+ * status and what resuming a paused automation writes. Both are the
+ * application's now, so REST reaches the same answers.
  * @see specs/automations/runaway-automation-containment.feature
  */
 import type { AutomationApi } from "@langwatch/automation-contract";

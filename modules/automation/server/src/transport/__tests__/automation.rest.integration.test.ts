@@ -33,10 +33,9 @@ afterEach(async () => {
 });
 
 /**
- * The family over a stubbed application, except for the two rules under test:
- * the condition a trace automation must keep, and the create that enforces it,
- * both taken from the canonical application so this suite cannot pass against a
- * rule of its own invention.
+ * The family over a stubbed application, except the two rules under
+ * test -- the condition a trace automation must keep, and the create
+ * that enforces it -- both taken from the canonical application.
  */
 function mount(options: { live?: Trigger | null } = {}) {
   const fixture = createCanonicalAutomationApp();

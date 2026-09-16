@@ -52,11 +52,9 @@ vi.mock("../../../behavior/automation-api.ts", () => {
 });
 
 /**
- * Both editors, as anything the screen mounted would print.
- *
- * They are stubbed rather than left real so that "the screen does not render
- * either one" is an assertion about the screen and not about whether a thousand
- * lines of Chakra happened to throw.
+ * Both editors, as anything the screen mounted would print. Stubbed
+ * rather than left real, so "the screen renders neither" is an
+ * assertion about the screen, not about a thousand lines of Chakra.
  */
 vi.mock("../../../features/authoring/ui/sections/automation-drawer.tsx", () => ({
   AutomationDrawer: () => <div>the editor</div>,

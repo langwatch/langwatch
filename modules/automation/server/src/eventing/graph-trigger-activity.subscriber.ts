@@ -20,12 +20,9 @@ export function graphTriggerActivityGroupKey(event: { tenantId: string }): strin
 }
 
 /**
- * ADR-052: the real-time graph-alert path as a plain subscriber handler —
- * no process state: the shared evaluator owns its `TriggerSent`
- * open/resolve idempotency, queue redelivery is the retry, and the sweep
- * PM backstops anything lost. Register with a 5s NON-extending dedup
- * window per project so event bursts collapse to at most one evaluation
- * sweep per window without starving under constant traffic.
+ * ADR-052: the real-time graph-alert path as a plain subscriber, no
+ * process state -- the shared evaluator owns idempotency, redelivery is
+ * the retry, and the sweep PM backstops the rest with a 5s dedup window.
  */
 export async function handleGraphTriggerActivity(
   automation: AutomationGraphActivity,

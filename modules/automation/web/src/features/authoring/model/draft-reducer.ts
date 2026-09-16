@@ -128,11 +128,9 @@ export type DraftAction<C extends ProviderClients> =
   | { type: "HYDRATE"; value: AutomationDraft<C> };
 
 /**
- * Distributive shape: each TriggerAction maps to *its own* slice variant so
- * a SET_SLICE dispatch with action `SEND_EMAIL` can't carry a Slack slice.
- * Without the distributive `A extends TriggerAction` form, `slice` would be
- * the union of every action's slice and the discriminator would do nothing
- * at the type level.
+ * Distributive shape: each TriggerAction maps to its own slice variant, so
+ * `SEND_EMAIL` can't carry a Slack slice. Without the distributive `A
+ * extends TriggerAction` form, the discriminator would do nothing.
  */
 export type SetSliceAction<C extends ProviderClients> = {
   [A in TriggerAction]: {
@@ -201,14 +199,11 @@ function reduceDraft<C extends ProviderClients>(
         };
       }
       if (action.value === "report") {
-        // Reports send a rendered notification on a schedule — notify only.
-        // `filterQuery` SURVIVES the switch: a trace-query report is scoped by
-        // exactly that query (the Subject editor writes it, the router persists
-        // it), so clearing it here would silently drop the author's scope and
-        // send the newest traces instead of the ones they asked for.
-        // Severity belongs to alerts only — clear a leaked `alertType` so a
-        // report doesn't render (or save) a stray "(WARNING)" the author has
-        // no facet to change.
+        // Reports notify only, on a schedule. `filterQuery` SURVIVES the
+        // switch -- a trace-query report is scoped by it, so clearing it here
+        // would drop the author's scope and notify on the newest traces.
+        // `alertType` is cleared -- severity belongs to alerts only, and a
+        // report has no facet to change a leaked "(WARNING)".
         return {
           ...state,
           source: "report",
@@ -278,10 +273,7 @@ export interface PresetLabels {
 /**
  * The single source of truth for the Automation / Alert / Schedule nouns,
  * keyed on the preset (`draft.source`) so every heading, button, and toast
- * stays in step with the chosen type. Replaces the scattered
- * `source === "customGraph" ? … : …` two-way branches that classified a
- * REPORT as trace data — the visible bug where the drawer said "New report"
- * yet the save button read "Create automation" (field-5015).
+ * stays in step with the chosen type.
  */
 export function presetLabels(source: ConditionSource, isEdit: boolean): PresetLabels {
   switch (source) {
@@ -455,11 +447,8 @@ export function filtersAreSet(filters: AutomationFilters): boolean {
 
 /**
  * The "what" facet (ADR-043 Subject): is the thing it's about chosen?
- * - Automation: a trace filter query, or (legacy edit) at least one structured
- *   trace filter.
- * - Alert: a custom graph plus a series to watch.
- * - Report: a valid content source — a trace table, a picked graph, or a
- *   picked dashboard.
+ * Automation needs a trace filter (or legacy structured filter); Alert
+ * needs a graph and series; Report needs a trace table, graph, or dashboard.
  */
 export function subjectIsSet<C extends ProviderClients>(draft: AutomationDraft<C>): boolean {
   if (draft.source === "customGraph") {
@@ -508,10 +497,9 @@ export function conditionsAreSet<C extends ProviderClients>(draft: AutomationDra
 }
 
 /**
- * Channel-setup completeness ONLY — deliberately excludes the name. A
- * fully-configured Slack/email section goes green even while the name is
- * empty; the missing name is surfaced on the name field itself and gates
- * the Save button, not the section indicator.
+ * Channel-setup completeness ONLY -- excludes the name. A complete
+ * Slack/email section goes green even with an empty name; the name gates
+ * Save on its own field, not this indicator.
  */
 function configIsComplete<C extends ProviderClients>(
   registry: ClientProviderRegistry<C>,
@@ -594,12 +582,10 @@ function isNotifyAction<C extends ProviderClients>(draft: AutomationDraft<C>): b
  *  The drawer relies on this on edit hydration so the threshold fields
  *  pre-populate. */
 export function extractGraphAlertFromTriggerRow(actionParams: unknown): GraphAlertDraft {
-  // Delegate to the SSOT parser on the server side. `parseGraphAlertRow`
-  // uses the same Zod schema the writer produces (`graphAlertActionParamsSchema`),
-  // so the drawer's edit-hydration path can never drift from the row shape.
-  // Falls back to the seeded defaults on any parse failure (legacy /
-  // hand-edited rows) — the drawer's contract needs a filled draft, never
-  // a null.
+  // Delegates to the server-side SSOT parser (`parseGraphAlertRow`, same
+  // Zod schema as the writer) so edit-hydration can't drift from the row
+  // shape, falling back to seeded defaults on any parse failure since the
+  // drawer's contract needs a filled draft, never a null.
   const parsed = parseGraphAlertRow(actionParams);
   if (!parsed) return INITIAL_GRAPH_ALERT_DRAFT;
   return {

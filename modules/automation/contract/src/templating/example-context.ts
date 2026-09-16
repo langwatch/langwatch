@@ -1,11 +1,9 @@
 import type { TemplateMatchInput } from "./template-context.ts";
 
 /**
- * A single representative example trace that the editor preview, the test
- * fire, and the editor autocomplete all agree on (see ADR-036). Both
- * `matches[]` (canonical iteration surface, exposed at every cadence) and
- * `match.*` (singular shortcut, `matches[0]`) are available to templates;
- * an immediate fire simply has `matches.length === 1`.
+ * A single representative example trace the editor preview, test fire,
+ * and autocomplete agree on (ADR-036). `matches[]` and the `match.*`
+ * shortcut are both available; an immediate fire has one match.
  */
 export const EXAMPLE_MATCH: TemplateMatchInput = {
   traceId: "trace_2x9fK3aQ",
@@ -145,12 +143,10 @@ export const TEMPLATE_VARIABLES: VariableInfo[] = [
  *  is live today; "digest" is reserved for ADR-026. */
 export type TemplateCadence = "immediate" | "digest";
 
-/** Filters the variable list down to what's *actually available* at the given
- *  cadence. `matches[]` (and the `match.*` shortcut) are exposed at every
- *  cadence; the only variables hidden for immediate fires are the window-bound
- *  ones — `digest.windowStart` / `digest.windowEnd` are null outside a digest
- *  payload, so we hide them so authors don't reach for variables that always
- *  render empty. */
+/** Filters the variable list down to what's actually available at the
+ *  given cadence: `matches[]` (and `match.*`) are exposed at every
+ *  cadence, but `digest.windowStart` / `windowEnd` are hidden for
+ *  immediate fires since they're always null and would render empty. */
 export function filterVariablesForCadence(
   variables: VariableInfo[],
   cadence: TemplateCadence,

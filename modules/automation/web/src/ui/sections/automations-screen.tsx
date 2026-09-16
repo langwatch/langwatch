@@ -55,12 +55,9 @@ import { toEpochMs } from "@langwatch/time";
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
 /**
- * The two editors this screen opens, by the name the registry answers to
- * (`dev/docs/best_practices/drawers.md`). Addressed via the shared
- * `?drawer.open=` query string rather than a screen-local key, so every
- * alert email, the REST `platformUrl`, and Langy's relay links resolve to
- * the same editor a colleague pastes here. Create is the same drawer with
- * no id, not a `?automation=new` sentinel.
+ * The two editors this screen opens, by registry name (drawers.md), via
+ * shared `?drawer.open=` so every relay link resolves to the same editor;
+ * create is this drawer with no id, not a `?automation=new` sentinel.
  */
 const EDIT_DRAWER = "automation" as const;
 const VIEW_DRAWER = "viewAutomation" as const;
@@ -415,12 +412,10 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     </Menu.Root>
   );
 
-  // Dropped in the move: each row was wrapped in `<LangyContextTarget>` so a
-  // page could hand the automation to Langy by drag. `langy-web` is
-  // ungoverned and needs an `es2023` lib + stylesheet this family may not
-  // impose on the global tsconfig; returns once it publishes a governed
-  // surface (see `dev/docs/best_practices/drawers.md`, "The drawer registry").
-  // The `key` moved back onto the row with the wrapper gone.
+  // Dropped in the move: `<LangyContextTarget>` let a page hand rows to
+  // Langy by drag, but `langy-web` is ungoverned and needs an `es2023`
+  // lib + stylesheet this family may not impose globally -- returns once
+  // it publishes a governed surface (drawers.md, "The drawer registry").
   const sharedRowProps = (trigger: EnhancedTrigger) => ({
     key: trigger.id,
     "data-trigger-id": trigger.id,

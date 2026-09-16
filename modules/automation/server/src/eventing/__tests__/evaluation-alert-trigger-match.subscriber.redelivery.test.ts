@@ -158,9 +158,8 @@ class TestTraceService extends TraceService {
 
 /**
  * The redelivery test only exercises the trace-catalogue read; graph
- * evaluation is unreached but the double still satisfies the port so
- * `AutomationEvaluationSubscriberService.create` type-checks against the
- * same two narrow ports production composes over.
+ * evaluation is unreached, but the double still satisfies the port so
+ * `create` type-checks against the same two narrow ports production uses.
  */
 class TestAutomationService
   implements AutomationTraceTriggerCatalogue, AutomationGraphActivity

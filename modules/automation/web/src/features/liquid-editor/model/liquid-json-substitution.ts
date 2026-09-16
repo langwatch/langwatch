@@ -92,12 +92,10 @@ export function substituteLiquidForJsonValidation(source: string): LiquidSubstit
     const span = source.slice(next, end);
     const spanLength = end - next;
 
-    // Passthrough block tags (`{% capture %}…{% endcapture %}`,
-    // `{% comment %}…{% endcomment %}`): the body is a Liquid-only string
-    // declaration (or pure documentation), never inlined into the JSON.
-    // Per-span substitution would wrap embedded `{{ ... }}` in `"___"` at
-    // top level, producing invalid JSON and a misleading marker — fold
-    // the whole region into one tag span instead.
+    // Passthrough block tags (`{% capture %}`, `{% comment %}`): the body
+    // is Liquid-only, never inlined into JSON. Per-span substitution would
+    // wrap embedded `{{ ... }}` in `"___"` at top level, producing invalid
+    // JSON -- fold the whole region into one tag span instead.
     const passthroughOpener = !isOutput ? PASSTHROUGH_OPENER_RE.exec(span) : null;
     if (passthroughOpener) {
       const closerName = PASSTHROUGH_BLOCK_TAGS[passthroughOpener[1]!]!;

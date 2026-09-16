@@ -20,9 +20,8 @@ export const triggerTemplateSchema = z.object({
 
 /**
  * A template set as an author's draft carries it: every column optional,
- * because the drawer sends only what it has. It is also the legacy wire form
- * `parseTriggerTemplatesWire` accepts, so the two are one schema rather than
- * two copies of the same four columns.
+ * since the drawer sends only what it has. Also the legacy wire form
+ * `parseTriggerTemplatesWire` accepts, so it's one schema, not two.
  */
 export const triggerTemplateDraftSchema = z.object({
   slackTemplateType: z.string().nullable().optional(),

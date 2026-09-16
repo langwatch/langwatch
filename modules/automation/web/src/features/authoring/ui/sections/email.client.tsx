@@ -89,10 +89,9 @@ function templatesFromSlice(slice: EmailSlice) {
 }
 
 /**
- * Email config form. Team members render as checkboxes (the canonical
- * list); anything that isn't a team email shows below as a chip with an
- * "External" warning badge. A "+ Add email" input accepts arbitrary
- * addresses validated against `EMAIL_RX`.
+ * Email config form: team members render as checkboxes; anything else
+ * shows below as a chip with an "External" warning badge. "+ Add email"
+ * accepts arbitrary addresses validated against `EMAIL_RX`.
  */
 function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, EmailPreview>) {
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(

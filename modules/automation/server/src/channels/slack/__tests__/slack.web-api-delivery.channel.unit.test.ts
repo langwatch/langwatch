@@ -1,9 +1,7 @@
 /**
- * The bot connection's delivery leg. A webhook renders a subset of Block Kit;
- * a bot connection posts through `chat.postMessage`, which is what makes the
- * chart, table and alert blocks render at all. What this suite pins is the
- * call that carries the customer's token: where it goes, what it carries, and
- * which Slack refusals are worth retrying rather than dead-lettering.
+ * The bot connection's delivery leg: only `chat.postMessage` (not a
+ * webhook) renders chart, table and alert blocks. This suite pins the
+ * call carrying the customer's token: destination, payload, and retries.
  */
 import type { SlackPayload } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";

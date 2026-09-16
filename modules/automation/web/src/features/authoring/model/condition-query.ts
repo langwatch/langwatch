@@ -103,10 +103,9 @@ interface Conjunct {
 }
 
 /**
- * Flatten a top-level AND chain into its tag leaves, or bail (`null`) the
- * moment anything the builder can't represent appears: an OR, a negated group
- * (which would need De Morgan to distribute), or free-text. Negation is only
- * accepted when it wraps a single tag directly.
+ * Flattens a top-level AND chain into tag leaves, or bails (`null`) at
+ * anything unrepresentable: an OR, a negated group (needs De Morgan), or
+ * free-text. Negation is accepted only wrapping a single tag directly.
  */
 function collectConjuncts(node: ParserAst, negated: boolean, out: Conjunct[]): boolean {
   switch (node.type) {

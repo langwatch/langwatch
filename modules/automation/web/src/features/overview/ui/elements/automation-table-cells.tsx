@@ -134,11 +134,9 @@ export function FiringStatus({ firing }: { firing: boolean }) {
 }
 
 /**
- * Section header for one automation kind. An accent-coloured icon chip gives
- * each kind its own identity so the three sections stop reading as one block;
- * the one-line summary is the scannable copy and the full explanation lives in
- * the `(?)` tooltip (per `copywriting.md`). `accent` is a Chakra colorPalette
- * token, shared with the section's chip, count badge and CTA.
+ * Section header for one automation kind: an accent-coloured icon chip
+ * gives it identity; the summary is scannable, full detail lives in the
+ * `(?)` tooltip (`copywriting.md`). `accent` is a shared Chakra token.
  */
 export function SectionHeader({
   icon,

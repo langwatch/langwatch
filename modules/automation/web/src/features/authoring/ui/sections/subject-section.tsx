@@ -69,11 +69,9 @@ const SUBJECT_HELP = {
 } as const;
 
 /**
- * The Subject facet (ADR-043 facet 3) — "what is it about?". Switches on
+ * The Subject facet (ADR-043 facet 3) -- "what is it about?". Switches on
  * the preset: trace filters for an automation, a graph + series for an
- * alert, a content source for a report. Reads and writes the draft through
- * the store, so the awkward required-`report` prop the old secondary drawer
- * needed is gone.
+ * alert, a content source for a report. Reads and writes via the store.
  */
 export function SubjectSection({
   prefilledGraphId,
@@ -372,10 +370,9 @@ const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
 const QUERY_DEBOUNCE_MS = 400;
 
 /**
- * The trace-filter query editor: a Traces-V2 search query bound to the draft,
- * with a live count of matching traces over the last 7 days. The preview runs
- * the exact same compiler the dispatcher validates against, so an invalid query
- * surfaces its parse error here instead of failing silently at save.
+ * The trace-filter query editor: a Traces-V2 search query bound to the
+ * draft, with a live 7-day match count, run through the same compiler the
+ * dispatcher validates against, so a bad query errors here, not at save.
  */
 function TraceQuerySubject({
   query,
@@ -692,10 +689,9 @@ function TracePreview({
 }
 
 /**
- * Advice, sitting right under the firing-rate line so it reads as a comment on
- * that rate: the drafted condition would match more traces a day than the
- * plan's daily action ceiling allows. It never blocks saving, and it is absent
- * whenever the estimate, the ceiling, or the relevance of either is in doubt.
+ * Advice under the firing-rate line: the drafted condition would match
+ * more traces a day than the plan's daily ceiling allows. Never blocks
+ * saving, and absent whenever the estimate or ceiling is in doubt.
  */
 function DailyCapAdviceAlert({
   advice,

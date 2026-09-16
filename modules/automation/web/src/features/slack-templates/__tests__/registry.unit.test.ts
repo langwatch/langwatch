@@ -277,12 +277,10 @@ describe("slack Block Kit template registry", () => {
     describe("when a report's content has no ungated way to render it", () => {
       /** @scenario "Changing the report's source moves the author to a layout that fits" */
       it("still defaults to the layout that shows the data", () => {
-        // A chart report's default HAS to be a chart — there is no non-gated
-        // chart block. New Slack connections are bot-only (webhooks are
-        // legacy), and on a webhook the block is stripped and the message
-        // degrades to its headline fallback rather than failing, so leading
-        // with the real layout is right. The parity suite pins that every one
-        // of these survives the allowlist non-empty.
+        // A chart report's default HAS to be a chart -- there is no
+        // non-gated chart block. New Slack connections are bot-only, so on
+        // a webhook the block strips and degrades to its headline
+        // fallback rather than failing, which is why leading with it is right.
         const id = pickDefaultSlackBlockKitTemplateId({
           cadence: "digest",
           hasEvaluationFilter: false,

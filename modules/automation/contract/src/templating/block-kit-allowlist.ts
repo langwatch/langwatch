@@ -1,8 +1,7 @@
 /**
- * Sanitises customer-authored Block Kit to presentational, webhook-safe blocks.
- * Interactive callbacks, images, mentions, and unsafe link schemes are removed.
- * Gated block types are dropped by default until the delivery path is verified;
- * callers may opt in after verification and templates provide safe fallbacks.
+ * Sanitises customer-authored Block Kit to presentational, webhook-safe
+ * blocks: interactive callbacks, images, mentions, and unsafe link schemes
+ * are removed; gated types stay off until their delivery path is verified.
  */
 
 export const ALLOWED_BLOCK_TYPES = [
@@ -127,11 +126,9 @@ function findCappedTextObject(value: unknown, max: number): Record<string, unkno
 }
 
 /**
- * `section` — the workhorse block. Interactive accessories are stripped
- * (ADR-036) and the text / fields are capped to Slack's documented maxima so a
- * template that packs an unbounded list into one section degrades to a cut
- * section instead of a rejected message. A section left with neither text nor a
- * field is unusable, so it is dropped (→ the caller's fallback delivers).
+ * `section` -- the workhorse block: interactive accessories are stripped
+ * (ADR-036) and text/fields capped to Slack's maxima, so overflow degrades
+ * to a cut section, not a rejected message; an empty one is dropped.
  */
 function findSanitizedSection(block: Record<string, unknown>): Record<string, unknown> | null {
   const out = stripInteractiveAccessory(block);
@@ -152,10 +149,9 @@ function findSanitizedSection(block: Record<string, unknown>): Record<string, un
 }
 
 /**
- * `context` — text-only footnotes. Slack rejects a context block whose
- * `elements` array is empty, so a block whose every element was filtered out
- * (an image element, say) is DROPPED rather than emitted empty — an empty
- * `elements` array fails the whole message with `invalid_blocks`.
+ * `context` -- text-only footnotes. Slack rejects an empty `elements`
+ * array with `invalid_blocks`, so a block whose every element was
+ * filtered out is DROPPED rather than emitted empty.
  */
 function findSanitizedContext(block: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(block.elements)) return null;
@@ -204,12 +200,11 @@ function findSanitizedRichTextElement(el: unknown): Record<string, unknown> | nu
   return { ...el, elements };
 }
 
-// Recursively sanitise a rich_text block: keep only allowed sub-block types,
-// and within each keep only text-shaped inline elements (mention elements that
-// ping recipients are dropped). Mirrors the context-element sanitiser but for
-// the nested rich_text tree (ADR-041) — including its empty-`elements` rule: a
-// rich_text block with nothing left is dropped so Slack never sees an empty
-// array (`invalid_blocks` fails the WHOLE message, it doesn't skip the block).
+// Recursively sanitise a rich_text block: keep only allowed sub-block
+// types and text-shaped inline elements (mentions are dropped). Mirrors
+// the context sanitiser for the nested tree (ADR-041): an empty result is
+// dropped so Slack never sees an empty `elements` array (`invalid_blocks`
+// fails the whole message).
 function findSanitizedRichText(block: Record<string, unknown>): Record<string, unknown> | null {
   if (!Array.isArray(block.elements)) return null;
   const elements = block.elements
@@ -219,13 +214,11 @@ function findSanitizedRichText(block: Record<string, unknown>): Record<string, u
   return { ...block, elements };
 }
 
-// Slack treats `&`, `<`, `>` as the control characters that open mrkdwn links
-// (`<https://evil|click>`) and broadcasts (`<!channel>` / `<!here>`). Mirrors the
-// `mrkdwn_escape` template filter (engine.ts) so a `markdown` block — whose
-// `text` is a raw string Slack parses directly, NOT a template-escaped text
-// object — cannot carry attacker-controlled trace content that forges a
-// broadcast ping or a link. Escaping angle brackets also neutralises markdown
-// autolinks / raw HTML (`<https://…>`, `<script>`) in the same pass.
+// Slack treats `&`, `<`, `>` as control chars that open mrkdwn links and
+// broadcasts (`<!channel>`). Mirrors the `mrkdwn_escape` template filter
+// (engine.ts): a `markdown` block's `text` is raw, Slack-parsed, and NOT
+// template-escaped, so this is what stops attacker-controlled trace
+// content forging a broadcast ping or link.
 function escapeMrkdwnControlChars(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -243,11 +236,9 @@ function findSanitizedMarkdown(block: Record<string, unknown>): Record<string, u
 }
 
 /**
- * `header` — a bold banner. Slack accepts ONLY a `plain_text` object here (it
- * does NOT parse mrkdwn, so there is no broadcast/link vector), and rejects the
- * whole message past 150 characters. A stray `mrkdwn`-typed header would fail
- * `invalid_blocks`, so the text object is coerced to `plain_text` and capped; a
- * header with no valid text object is dropped (→ fallback delivers).
+ * `header` -- a bold banner. Slack accepts ONLY `plain_text` here (no
+ * mrkdwn, so no broadcast/link vector) and rejects text past 150 chars, so
+ * a `mrkdwn`-typed header is coerced to `plain_text` and capped; empty is dropped.
  */
 function findSanitizedHeader(block: Record<string, unknown>): Record<string, unknown> | null {
   const parsed = findSanitizedTextObject(block.text);

@@ -50,12 +50,9 @@ export class TriggerNoReplyService {
 }
 
 /**
- * The sender domain, taken from the configured default `from`.
- *
- * A deployment that wrote its default from as a bare address rather than
- * `Name <local@domain>` has no domain to read, and `langwatch.ai` is what the
- * application has always fallen back to. Changing the fallback would change
- * the To header of every self-hosted deployment's automation mail.
+ * The sender domain, from the configured default `from`. A bare address
+ * has no domain to read, so `langwatch.ai` is the fallback -- changing it
+ * breaks every self-hosted deployment's automation mail To header.
  */
 function domainOf(defaultFrom: string): string {
   const match = defaultFrom.match(/<[^@]+@([^>]+)>/);

@@ -1,10 +1,7 @@
 /**
- * The rules every automation door shares, over the collaborators they need.
- *
- * They were the application's own methods, and they still answer for it; they
- * live here so the authoring service can ask them without reaching back through
- * the application that owns it. Nothing here is new: each rule is the one a
- * door already enforced, in one copy rather than two.
+ * The rules every automation door shares, over the collaborators they
+ * need: the application's own methods, moved here so the authoring
+ * service can ask without reaching back through the application.
  */
 import {
   AutomationNotInProjectError,
@@ -40,10 +37,9 @@ export class AutomationRulesService {
   private constructor(private readonly collaborators: AutomationRulesCollaborators) {}
 
   /**
-   * One LIVE automation, or null when the project does not have one. The store
-   * answers with soft-deleted rows too, so every caller had to test `deleted` —
-   * and the two doors did not agree, so the same id answered "gone" at one door
-   * and "here it is" at the other.
+   * One LIVE automation, or null when there isn't one. The store answers
+   * soft-deleted rows too, so every caller tested `deleted` -- and the
+   * two doors disagreed on the same id's answer.
    */
   async findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const trigger = await this.collaborators.automation.findById(input);

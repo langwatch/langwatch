@@ -14,10 +14,9 @@ export const notifyDigestIntentSchema = z.object({
 export type NotifyDigestIntent = z.infer<typeof notifyDigestIntentSchema>;
 
 /**
- * Union of the paged shape and the legacy single-trace shape. The union is
- * the rolling-deploy contract: outbox rows are durable, so during a deploy
- * the fleet holds rows written by both pod versions and every pod must parse
- * both. The emitter side moves to pages only after every pod can read them.
+ * Union of the paged shape and the legacy single-trace shape: the
+ * rolling-deploy contract. Outbox rows are durable, so a deploy's fleet
+ * holds both, and the emitter moves to pages only once every pod can read them.
  */
 export const persistMatchIntentSchema = z.union([
   z.object({

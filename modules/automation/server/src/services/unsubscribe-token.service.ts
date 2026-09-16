@@ -101,11 +101,9 @@ export class UnsubscribeTokenService {
 }
 
 /**
- * The signed shape, field order included.
- *
- * The HMAC covers `JSON.stringify` of this object, so the ORDER of the three
- * keys is part of the format: re-ordering them changes every signature and
- * silently invalidates every link already in an inbox.
+ * The signed shape, field order included: the HMAC covers
+ * `JSON.stringify` of this object, so reordering these three keys
+ * changes every signature and invalidates every link already in an inbox.
  */
 function normalize(payload: UnsubscribeTokenPayload): UnsubscribeTokenPayload {
   return {
@@ -116,12 +114,9 @@ function normalize(payload: UnsubscribeTokenPayload): UnsubscribeTokenPayload {
 }
 
 /**
- * The verifier every process composes over the one token format.
- *
- * It exists so a composition root supplies a key and nothing else: the format
- * itself is the feature's (`UnsubscribeTokenService`), and a root that
- * re-implemented the verify half would be free to disagree with the sign half
- * that minted the link.
+ * The verifier every process composes over the one token format, so a
+ * composition root supplies only a key -- the format itself is the
+ * feature's (`UnsubscribeTokenService`), never re-implemented per root.
  */
 export class HmacUnsubscribeTokenAdapter extends UnsubscribeTokenVerifier {
   static create(input: { secret: string | undefined }): HmacUnsubscribeTokenAdapter {

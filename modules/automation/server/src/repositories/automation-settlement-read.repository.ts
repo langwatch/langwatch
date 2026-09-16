@@ -21,11 +21,9 @@ export abstract class AutomationSettlementTraceReader {
   }): Promise<TraceSummaryData | null>;
 
   /**
-   * The full record, or a stated reason there is none.
-   *
-   * Throws `TraceNotFoundError` when the trace is gone and
-   * {@link AutomationTraceRecordUnavailableError} when the reader itself cannot
-   * answer. Every other failure is a real one and propagates.
+   * The full record, or a stated reason there is none: `TraceNotFoundError`
+   * when the trace is gone, {@link AutomationTraceRecordUnavailableError}
+   * when the reader can't answer. Every other failure propagates.
    */
   abstract getById(input: { projectId: string; traceId: string }): Promise<TraceRecord>;
 
@@ -41,10 +39,8 @@ export abstract class AutomationSettlementTraceReader {
 
 /**
  * The one evaluation read a settled match's filters are checked against.
- *
- * `EvaluationService` is ten methods over execution, monitor performance and
- * workflow resolution; the confirmation check reaches exactly this one, and it
- * is a ClickHouse read keyed by trace.
+ * `EvaluationService` is ten methods over execution, monitor performance
+ * and workflow; this reaches exactly one -- a ClickHouse read keyed by trace.
  */
 export abstract class AutomationSettlementEvaluationReader {
   abstract findRunsByTraceId(input: {

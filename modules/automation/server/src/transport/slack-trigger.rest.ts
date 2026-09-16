@@ -1,8 +1,7 @@
 /**
- * `POST /api/trigger/slack` - the narrow, one-action ancestor of `/api/triggers`,
- * kept at its own path, body spelling and refusal bodies because callers were
- * written against them. Both doors dispatch through the SAME
- * {@link AutomationApi}, which is also where the filter vocabulary now lives.
+ * `POST /api/trigger/slack` -- the narrow, one-action ancestor of
+ * `/api/triggers`, kept at its own path and body shape since callers
+ * were written against them. Both dispatch through the SAME {@link AutomationApi}.
  */
 import {
   defineRestRouter,
@@ -64,11 +63,9 @@ export const slackAutomationRest = defineRestRouter(AutomationApi)
   .build();
 
 /**
- * The three bodies this door has always answered: a body that is not JSON and a
- * body the schema rejects are both the CALLER's mistake and both 400s, and
- * everything else is one 500 sentence with the detail in this process's log.
- * Read as "everything else", a rejected body became a 500 telling the caller to
- * retry a body that will never be accepted.
+ * The three bodies this door has always answered: non-JSON and
+ * schema-rejected bodies are both the CALLER's mistake and both 400s;
+ * everything else is one 500, with the detail in this process's log.
  */
 export const slackAutomationRestErrors: RestErrorHandler = (error, c) => {
   if (error instanceof HTTPException && error.status === 400) {

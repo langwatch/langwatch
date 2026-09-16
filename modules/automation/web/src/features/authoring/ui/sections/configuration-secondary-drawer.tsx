@@ -7,10 +7,9 @@ import { useAutomationStore } from "./automation-store.ts";
 import { SecondaryDrawerShell } from "./secondary-drawer-shell.tsx";
 
 /**
- * Configuration secondary drawer. Delegates the type-specific UI to the
+ * Configuration secondary drawer: delegates the type-specific UI to the
  * active provider's `ConfigForm`. Identity fields (name + alert type)
- * live on the main drawer now, so this surface is purely about the
- * destination — recipients, templates, dataset target, etc.
+ * live on the main drawer, so this is purely about the destination.
  */
 export function ConfigurationSecondaryDrawer({
   open,

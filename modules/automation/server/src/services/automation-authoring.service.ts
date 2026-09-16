@@ -1,9 +1,7 @@
 /**
- * Everything the authoring surface does beyond reading a row back. It lived in
- * the tRPC transport class, where the REST door could not reach it. The caller —
- * whose id stamps an annotation queue and whose address a test fire is delivered
- * to - arrives as an argument, never read from a session.
- * Spec: ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
+ * Everything the authoring surface does beyond reading a row back. The
+ * caller arrives as an argument, never read from a session.
+ * ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
  */
 import {
   AutomationFiltersUnsupportedError,
@@ -104,10 +102,9 @@ export class AutomationAuthoringService {
   private constructor(private readonly collaborators: AutomationAuthoringCollaborators) {}
 
   /**
-   * Strips secrets from a trigger row before it leaves the server through the
-   * provider registry's redact hook: the encrypted Slack bot token (ADR-041)
-   * and webhook header values (ADR-040 §3 - names echo with the kept sentinel,
-   * values never return). Identity for every other action.
+   * Strips secrets from a trigger row via the provider registry's redact
+   * hook: the Slack bot token (ADR-041) and webhook headers (ADR-040 §3 --
+   * names echo, values never return). Identity for every other action.
    */
   redactForRead<T extends { action: AutomationAction; actionParams: unknown }>(trigger: T): T {
     return {
@@ -372,11 +369,9 @@ export class AutomationAuthoringService {
   }
 
   /**
-   * The authoring drawer's save: one row, whichever of the three kinds it is.
-   *
-   * A graph alert and a report go through their own SSOT builders so the row is
-   * byte-identical to what the dashboard path writes - the dispatcher knows one
-   * shape, and drift between two writers silently breaks whichever loses.
+   * The authoring drawer's save: one row, whichever of the three kinds. A
+   * graph alert and report use their own SSOT builders to stay byte-identical
+   * to the dashboard path, since drift silently breaks whichever writer loses.
    */
   async save(args: { input: AutomationApiUpsertInput; author: AutomationAuthor }): Promise<Trigger> {
     const { input, author } = args;
@@ -529,10 +524,9 @@ export class AutomationAuthoringService {
   }
 
   /**
-   * ADR-043 Subject facet: empty or whitespace collapses to null (the legacy
-   * `filters` path), and a non-empty query is dry-run through the compiler so a
-   * malformed one is refused here with author feedback rather than silently
-   * failing closed at dispatch time.
+   * ADR-043 Subject facet: blank collapses to null (legacy `filters` path);
+   * non-empty is dry-run through the compiler so a malformed query is
+   * refused with author feedback, not silently failed closed at dispatch.
    */
   private normalizeFilterQuery(input: AutomationApiUpsertInput): string | null {
     const filterQuery =
@@ -711,10 +705,9 @@ export class AutomationAuthoringService {
   }
 
   /**
-   * Email shares the mail provider; a webhook fires at an ARBITRARY customer
-   * URL from our egress addresses, so an uncapped test button would be an
-   * outbound request-flood primitive (ADR-040 §4). Slack stays exempt: its
-   * destination is host-pinned to hooks.slack.com.
+   * A webhook fires at an ARBITRARY customer URL from our egress, so an
+   * uncapped test button would be a flood primitive (ADR-040 §4). Slack and
+   * email are exempt: both destinations are pinned, not customer-supplied.
    */
   private async countTestFire(args: {
     channel: AutomationApiTestFireInput["channel"];
@@ -777,10 +770,9 @@ export class AutomationAuthoringService {
   }
 
   /**
-   * ADR-040 §3: header secrets never reach the client, so a kept header and the
-   * signing secret are both resolved from the saved automation. A test fire
-   * then signs exactly as a real one does, which is the only way an author can
-   * point the button at their own receiver's verification.
+   * ADR-040 §3: header secrets never reach the client, so a kept header and
+   * signing secret resolve from the saved automation. The test fire then
+   * signs exactly like a real one, letting an author verify their receiver.
    */
   private async testFireWebhook(
     input: AutomationApiTestFireInput,

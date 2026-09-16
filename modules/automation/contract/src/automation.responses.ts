@@ -1,9 +1,7 @@
 /**
- * What the automation tRPC surface answers with.
- *
- * Every shape here is the one the procedures already returned; nothing is
- * reshaped. They live in the contract rather than in the transport so the one
- * statement of an answer is the same one an SDK or a document would read.
+ * What the automation tRPC surface answers with. Every shape is one the
+ * procedures already returned, kept in the contract rather than the
+ * transport so an SDK or a document reads the same statement of an answer.
  */
 import { monitorSchema } from "@langwatch/monitor-contract";
 import { z } from "zod";

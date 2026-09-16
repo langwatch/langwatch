@@ -146,10 +146,9 @@ export interface AutomationApi {
     projectId: string;
   }): Promise<(EmailSuppression & { triggerName: string | null })[]>;
   /**
-   * The platform's own address for one automation resource, built from the
-   * project's slug and the path the caller already resolved. The REST
-   * declaration is a static object with no request-scoped builder to
-   * receive, so the app composes the link itself.
+   * The platform's own address for one automation resource, built from
+   * the project's slug and the path the caller resolved. The REST
+   * declaration has no request-scoped builder, so the app composes it.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
 }

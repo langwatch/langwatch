@@ -1,9 +1,7 @@
 /**
- * One automation resource's platform address: the app's `publicBaseUrl`, the
- * project's slug, and the path the caller already resolved. Mirrors
- * `suite-platform-url.rules.ts` / `agent-platform-url.rules.ts` — the REST
- * declaration is a static object with no request-scoped builder, so the app
- * composes the link itself.
+ * One automation resource's platform address: `publicBaseUrl`, project
+ * slug, and the caller's path -- mirrors `suite-platform-url.rules.ts`.
+ * No request-scoped builder, so the app composes the link itself.
  */
 export function automationPlatformUrl({
   publicBaseUrl,

@@ -45,12 +45,9 @@ export type AutomationSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: since the
- * wire message of a handled error is its code slug, a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * screen-composed sentence -- a handled error's wire message is its code
+ * slug, so local copy would print the slug. `fallbackTitle` names the action.
  */
 export type AutomationFailureNotice = {
   error: unknown;
@@ -90,11 +87,9 @@ export abstract class AutomationHost {
   abstract isFeatureEnabled(flag: string): boolean;
 
   /**
-   * The same flag, undecided included.
-   *
-   * `undefined` means the answer has not arrived. Only one surface needs the
-   * difference — a `SEND_WEBHOOK` prefill must wait rather than be dropped —
-   * and everything else reads `isFeatureEnabled`.
+   * The same flag, undecided included: `undefined` means the answer hasn't
+   * arrived. Only one surface needs that -- a `SEND_WEBHOOK` prefill must
+   * wait, not be dropped -- everything else reads `isFeatureEnabled`.
    */
   abstract featureFlag(flag: string): boolean | undefined;
 
@@ -123,12 +118,9 @@ export abstract class AutomationHost {
   }): void;
 
   /**
-   * The application's own address, for the links a rendered preview prints.
-   *
-   * `platform/app` read `window.location.origin` inside the drawer. A screen
-   * may read the document it is rendered in, but the example URLs a preview
-   * prints are a property of the deployment rather than of the browser tab, so
-   * they come from the host and a test can state them.
+   * The application's own address, for the links a rendered preview prints:
+   * a deployment property, not a browser-tab property, so it comes from the
+   * host and a test can state it directly.
    */
   abstract appBaseUrl(): string;
 
@@ -146,10 +138,9 @@ const AutomationHostContext = createContext<AutomationHost | undefined>(void 0);
 export const AutomationHostProvider = AutomationHostContext.Provider;
 
 /**
- * The application this screen is running in.
- *
- * Missing means the screen was mounted outside its frontend feature, which is a
- * composition fault rather than something the screen can degrade around.
+ * The application this screen is running in. Missing means it was
+ * mounted outside its frontend feature -- a composition fault, not
+ * something the screen can degrade around.
  */
 export function useAutomationHost(): AutomationHost {
   const host = useContext(AutomationHostContext);

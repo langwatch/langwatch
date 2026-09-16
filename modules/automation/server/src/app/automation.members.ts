@@ -90,11 +90,9 @@ export interface AutomationEvaluationTraceSummary {
 }
 
 /**
- * Whether a saved filter query reads evaluations at all.
- *
- * Synchronous because the published service's is: classification is a parse
- * of the customer's own query text, not a read. Narrowed off `TraceService`
- * for the same reason the summary read is, and satisfied by it structurally.
+ * Whether a saved filter query reads evaluations at all. Synchronous,
+ * since classification is a parse of the customer's query text, not a
+ * read; narrowed off `TraceService` for the same reason the summary read is.
  */
 export interface AutomationEvaluationQueryClassification {
   classifyQuery(input: { query: string }): TraceQueryClassification;
@@ -106,20 +104,16 @@ export interface AutomationEvaluationQueryClassification {
  */
 export interface AutomationGraphActivity {
   /**
-   * The project's active automations that watch a custom graph.
-   *
-   * Reports only, and never a REPORT-kind automation: a report is a schedule,
-   * not an alert, and re-evaluating one on trace activity would fire it off
-   * calendar.
+   * The project's active automations that watch a custom graph. Never a
+   * REPORT-kind automation: a report is a schedule, not an alert, and
+   * re-evaluating one on trace activity would fire it off calendar.
    */
   getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
 
   /**
-   * Re-evaluates one graph automation and dispatches an alert if it fired.
-   *
-   * Idempotent by its own open/resolve bookkeeping rather than by the caller's:
-   * the subscriber's retry, the heartbeat sweep and a manual re-run all land
-   * here, and the same incident must not notify twice.
+   * Re-evaluates one graph automation and dispatches an alert if it
+   * fired. Idempotent by its own open/resolve bookkeeping, since retry,
+   * heartbeat sweep and manual re-run all land here for the same incident.
    */
   evaluateGraphTrigger(input: {
     triggerId: string;

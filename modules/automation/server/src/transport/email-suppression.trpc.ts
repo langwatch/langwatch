@@ -1,8 +1,7 @@
 /**
- * The server half of `emailSuppression.*` (ADR-031): two audiences on one
- * namespace. The unsubscribe pair is public and throttled per caller address by
- * the application; the operator pair is gated on the automation permissions,
- * and its list read is audited because it reads customer email addresses.
+ * The server half of `emailSuppression.*` (ADR-031): two audiences on
+ * one namespace -- the public, throttled-per-address unsubscribe pair,
+ * and the permission-gated operator pair, whose list read is audited.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { callerAddressFact, defineTrpcRouter } from "@langwatch/api/trpc";

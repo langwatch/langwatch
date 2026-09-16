@@ -169,11 +169,9 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         });
 
         // The expiry is attempted on BOTH hits, so a transient first-hit
-        // failure cannot leave the key immortal. Whether it actually applies
-        // is the script's business, pinned against real Redis in the
-        // integration suite; what belongs here is that it is one atomic call
-        // over exactly one key, since a second key would need a Cluster hash
-        // tag to share a slot.
+        // failure can't leave the key immortal (pinned against real Redis
+        // in the integration suite). One atomic call over exactly one key
+        // -- a second key would need a Cluster hash tag to share a slot.
         expect(evalFn).toHaveBeenCalledTimes(2);
         for (const call of evalFn.mock.calls) {
           expect(call[0]).toContain("TTL");

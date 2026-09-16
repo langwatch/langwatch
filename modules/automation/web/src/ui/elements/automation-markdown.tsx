@@ -1,10 +1,7 @@
 /**
- * Markdown, as a template's help text needs it.
- *
- * `platform/app`'s `~/components/Markdown` carries an image proxy, a code
- * renderer and the application router; none of that is what a variable's
- * description is written in. This is `react-markdown` plus GFM — the same cut
- * the me family made for its own tool descriptions.
+ * Markdown, as a template's help text needs it -- not `platform/app`'s
+ * `~/components/Markdown`, which carries an image proxy, a code renderer
+ * and the router a variable's description doesn't need. `react-markdown` plus GFM.
  */
 
 import { Box, type BoxProps } from "@chakra-ui/react";

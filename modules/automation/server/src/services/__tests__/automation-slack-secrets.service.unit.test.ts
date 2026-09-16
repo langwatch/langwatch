@@ -1,8 +1,7 @@
 /**
- * What happens to a Slack bot token between the form and the database. It is
- * a customer credential with a Slack workspace behind it, so it is encrypted
- * on the way in, never handed back on the way out, and an author who edits an
- * automation without retyping it keeps the one already stored.
+ * What happens to a Slack bot token between the form and the database:
+ * a customer credential, encrypted on the way in, never handed back out,
+ * and kept as-is when an author edits without retyping it.
  */
 import {
   MissingSlackBotTokenError,

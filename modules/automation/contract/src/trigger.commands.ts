@@ -32,13 +32,11 @@ export const updateTriggerCommandSchema = z
     id: z.string().min(1),
     projectId: z.string().min(1),
     name: z.string().min(1).optional(),
-    // An edit may change WHAT an automation is, not only how it is configured:
-    // the drawer converts a trace automation into a report, a report into a
-    // graph alert, and back. All three keys travel on every save the drawer
-    // makes, so a strict schema without them rejects the edit outright —
-    // `unrecognized_keys`, on a channel that has no handled shape, which is a
-    // 500 the author reads as "unknown error". Releasing the graph on a
-    // conversion is why `customGraphId` must accept null.
+    // An edit may change WHAT an automation is, not just how it's
+    // configured: the drawer converts trace<->report<->graph alert, and
+    // all three keys travel on every save, so a strict schema without
+    // them would 500 as `unrecognized_keys`. `customGraphId` accepts
+    // null since a conversion releases the graph.
     action: triggerActionSchema.optional(),
     triggerKind: triggerKindSchema.optional(),
     customGraphId: z.string().min(1).nullable().optional(),

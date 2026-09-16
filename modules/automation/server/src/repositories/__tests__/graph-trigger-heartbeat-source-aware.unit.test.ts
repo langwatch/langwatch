@@ -1,10 +1,7 @@
 /**
- * Phase 6 source-awareness tests for the graph-trigger heartbeat.
- *
- * The heartbeat must group candidate triggers per (project, source) and
- * issue at most one batched recency query per (project, source) per tick.
- * Trace-source triggers query `trace_analytics`; eval-source triggers
- * query `evaluation_analytics`.
+ * Source-awareness tests for the graph-trigger heartbeat: it groups
+ * triggers per (project, source), issuing one batched recency query per
+ * pair per tick -- trace queries `trace_analytics`, eval queries `evaluation_analytics`.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

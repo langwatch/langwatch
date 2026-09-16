@@ -26,10 +26,9 @@ export interface SlackApiTransport {
 }
 
 /**
- * Slack Web API errors that clear on their own — a retry is worth taking. Rate
- * limiting, timeouts, and Slack-side blips fall here; everything else (bad
- * token, missing channel, malformed blocks) is a permanent misconfiguration a
- * retry can never fix, so it dead-letters.
+ * Slack Web API errors that clear on their own -- rate limiting,
+ * timeouts, Slack-side blips. Everything else (bad token, missing
+ * channel, malformed blocks) is permanent misconfiguration, so it dead-letters.
  */
 const RETRYABLE_SLACK_ERRORS = new Set([
   "rate_limited",
@@ -152,18 +151,16 @@ const CHANNEL_PAGE_SIZE = 200;
 /** Hard stop on paging, so a pathological workspace can't spin the request. */
 const MAX_CHANNEL_PAGES = 10;
 /**
- * A conversations.list entry is ~0.7-1.5 KB of JSON, so a full page can run to
- * ~300 KB — far past the shared 64 KiB default, which would truncate the body
- * mid-string and make it unparseable. This body is PARSED, not just logged, so
- * it needs a cap sized for the payload (with headroom), not for a log snippet.
+ * A conversations.list entry is ~0.7-1.5 KB, so a full page can run to
+ * ~300 KB -- far past the shared 64 KiB default, which would truncate
+ * and make this PARSED body unparseable.
  */
 const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /**
- * One cursor-paged `conversations.list` walk for a specific `types` set. Slack
- * pages by cursor, so a real workspace needs the full walk — one page is only
- * ever a prefix. A failure part-way through returns the channels gathered so
- * far ALONGSIDE the error, so a caller can still offer what it has.
+ * One cursor-paged `conversations.list` walk for a `types` set. A
+ * failure part-way returns the channels gathered so far ALONGSIDE the
+ * error, so a caller can still offer what it has.
  */
 async function listChannelsForTypes(
   token: string,

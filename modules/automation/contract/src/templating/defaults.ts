@@ -35,12 +35,9 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
 {% endunless %}{% endfor %}`;
 
 /**
- * Block Kit JSON with Liquid variables; uses unicode emoji for preview consistency;
- * user content is mrkdwn_escaped before JSON rendering.
- */
-/**
- * Alert defaults for custom-graph threshold alerts in metric-crossed-threshold
- * language; graph-alert dispatch passes ALERT_TRIGGER_DEFAULTS.
+ * Block Kit JSON with Liquid variables, mrkdwn_escaped before rendering.
+ * Alert defaults for custom-graph threshold alerts (metric-crossed-threshold
+ * language); graph-alert dispatch passes ALERT_TRIGGER_DEFAULTS.
  */
 export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
   "[Alert] {{ trigger.name }} — {{ metric.label }} {{ condition.operatorLabel }} {{ condition.threshold }}";
@@ -120,12 +117,9 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
 ]`;
 
 /**
- * ADR-040: default Liquid JSON bodies for the Webhook channel — a stable,
- * documented envelope so a receiver can integrate without authoring a
- * template. Every interpolated value goes through `| json` so trace content
- * containing `"` or `}` cannot break out of the JSON structure (the JSON
- * analog of `mrkdwn_escape`). Optional values are guarded with `{% if %}`
- * rather than piped as nil, so the output always parses.
+ * ADR-040: default Liquid JSON bodies for the Webhook channel. Every value
+ * goes through `| json` so trace content can't break out of the JSON
+ * structure; optionals are guarded with `{% if %}`, not piped as nil.
  */
 export const DEFAULT_WEBHOOK_BODY_TEMPLATE = `{
   "event": "trigger.matched",
@@ -164,10 +158,9 @@ export const DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE = `{
 }`;
 
 /**
- * The default-template strings a renderer needs, grouped together
- * to keep email + slack + webhook defaults aligned. Callers select the set
- * that matches the trigger directly — `ALERT_TRIGGER_DEFAULTS` for
- * custom-graph threshold alerts, `TRACE_TRIGGER_DEFAULTS` for trace triggers.
+ * The default-template strings a renderer needs, grouped to keep email +
+ * slack + webhook defaults aligned. Callers select directly:
+ * `ALERT_TRIGGER_DEFAULTS` for graph alerts, `TRACE_TRIGGER_DEFAULTS` for traces.
  */
 export interface TriggerTemplateDefaults {
   emailSubject: string;
@@ -268,12 +261,9 @@ Nothing to show for this period.
 [View in LangWatch ↗]({{ viewUrl }})`;
 
 /**
- * How many rows the default Slack report message lists inline. A report can
- * match up to 100 traces, and Slack rejects a `section` whose text runs past
- * 3000 characters — with a non-retryable `invalid_blocks`, so an over-long
- * message is not delivered at all. The default therefore lists the first rows
- * and tells the reader how many more there are; the full set is one click away
- * in LangWatch.
+ * How many rows the default Slack report message lists inline. Slack
+ * rejects a `section` past 3000 characters with a non-retryable
+ * `invalid_blocks`, so this lists the first rows and points to the rest.
  */
 const REPORT_SLACK_ROW_LIMIT = 10;
 
@@ -333,11 +323,9 @@ export const REPORT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
 export type TemplateSourceKind = "trace" | "graphAlert" | "report";
 
 /**
- * The single answer to "which default templates apply to this source kind".
- * Every surface that seeds, previews, or dispatches a template asks here — the
- * editor an author types into, the preview beside it, and the message that is
- * actually sent must all resolve the same set, or the author is shown a
- * template that will never be sent.
+ * The single answer to "which default templates apply to this source
+ * kind". Every surface that seeds, previews, or dispatches a template
+ * asks here, so the author is never shown a preview that won't be sent.
  */
 export function defaultsForSourceKind(sourceKind: TemplateSourceKind): TriggerTemplateDefaults {
   switch (sourceKind) {

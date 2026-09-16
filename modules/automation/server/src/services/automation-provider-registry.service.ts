@@ -31,10 +31,9 @@ export interface PersistActionParamsArgs {
   /** Schema-parsed wire `actionParams` for this channel. */
   incoming: unknown;
   /**
-   * Lazily loads the saved row's stored `actionParams`, or `undefined` while
-   * creating. A channel calls it only when it actually needs the stored
-   * secrets — a kept sentinel to resolve, say — so a plain save skips the
-   * extra read.
+   * Lazily loads the saved row's stored `actionParams`, or `undefined`
+   * while creating. Called only when a channel needs stored secrets (a
+   * kept sentinel, say), so a plain save skips the extra read.
    */
   loadExisting: () => Promise<unknown>;
 }

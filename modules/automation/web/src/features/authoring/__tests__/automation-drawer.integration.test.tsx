@@ -241,12 +241,10 @@ describe("AutomationDrawer", () => {
       });
 
     describe("when the drawer opens", () => {
-      // The sub-flow half of this pair is gone with the sub-flow: creating a
-      // dataset from inside the drawer opened another feature's overlay, which
-      // the screen cannot address from a package, so there is no return leg to
-      // keep a draft for. What is left is the invariant that survived it — a
-      // draft left in the singleton store never seeds the next open — and that
-      // is the one a StrictMode replay can still break.
+      // The sub-flow half of this pair is gone (creating a dataset opened
+      // another feature's overlay with no return leg). What survives is
+      // the invariant: a draft left in the singleton store never seeds
+      // the next open -- the one a StrictMode replay can still break.
       it("starts blank, so a draft left in the store cannot seed it", () => {
         writeDraft("Abandoned draft");
 

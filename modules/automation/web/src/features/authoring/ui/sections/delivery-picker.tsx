@@ -17,12 +17,9 @@ const ACCENT_FOR_SOURCE: Record<ConditionSource, string> = {
 type AutomationProviderEntry = AutomationProviderRegistry[keyof AutomationProviderRegistry];
 
 /**
- * The Delivery facet (ADR-043 facet 6) — where it goes and what it sends.
- * Cards come straight from `CLIENT_PROVIDERS` so registering a provider adds
- * a card automatically. Grouped by `shared.category` (`notify` first, then
- * `action`); alerts and reports only ever notify, so the `action` group is
- * hidden for them (the router enforces the same rule server-side). The
- * guided template authoring lives one level down, behind the setup row.
+ * The Delivery facet (ADR-043 facet 6): cards come from `CLIENT_PROVIDERS`
+ * automatically, grouped by `shared.category`; alerts/reports hide the
+ * `action` group (the router enforces the same rule server-side).
  */
 export function DeliveryPicker({
   value,

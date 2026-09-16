@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 import { graphTriggerActivityGroupKey } from "../graph-trigger-activity.subscriber.ts";
 
 /**
- * The sweep lane must be tenant-keyed and aggregate-independent: all of a
- * tenant's sweep jobs serialize in one group, so the 5s dedup's staging
- * bound is matched by a concurrency bound of 1. A key that varies by trace
- * or event id regresses to the 2026-07-31 parallel sweep storm.
+ * The sweep lane must be tenant-keyed and aggregate-independent: a
+ * tenant's jobs serialize into one group (concurrency 1) matching the 5s
+ * dedup bound -- keying by trace/event id regresses the 2026-07-31 storm.
  */
 describe("graphTriggerActivityGroupKey", () => {
   describe("when events for the same tenant come from different traces", () => {

@@ -116,11 +116,9 @@ describe("EmailConfigForm authoring tiers", () => {
 });
 
 /**
- * The editor is seeded with the template dispatch will really render — the
- * author's first keystroke persists whatever it was showing. Seed the wrong
- * kind and a report author saves trace copy (`{% for m in matches %}`) that
- * renders empty against the report context, next to a preview showing something
- * else entirely.
+ * The editor is seeded with the template dispatch will really render,
+ * since the author's first keystroke persists whatever it was showing --
+ * seed the wrong kind and a report author saves trace copy that renders empty.
  */
 describe("EmailConfigForm default wording", () => {
   afterEach(() => cleanup());

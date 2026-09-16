@@ -45,12 +45,9 @@ import { type Instant } from "@langwatch/time";
 const normalize = (email: string): string => email.trim().toLowerCase();
 
 /**
- * The automation feature's own trigger-and-suppression service: the full
- * surface `AutomationApp` forwards from, and the surface the graph-activity
- * and settlement-ledger ports narrow down to. Folded out of the contract
- * package per ADR-133 (was the `automation.service.ts` abstract class under
- * `contract/src`, the flagged "contract-service" shape) - this class is now
- * the sole definition of the surface, server-side.
+ * The automation feature's own trigger-and-suppression service, narrowed
+ * by the graph-activity and settlement-ledger ports. Folded out of the
+ * contract package per ADR-133; the sole definition, server-side.
  */
 export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;

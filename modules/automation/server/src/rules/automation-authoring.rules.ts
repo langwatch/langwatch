@@ -1,8 +1,7 @@
 /**
- * The authoring decisions that need nothing but their arguments: which filter
- * fields this platform still evaluates, what cadence a saved automation is
- * pinned to, whether a recipient list is well formed, and which stored webhook
- * headers a "keep what is there" sentinel resolves to.
+ * The authoring decisions that need nothing but their arguments: filter
+ * fields still evaluated, cadence pinning, recipient-list validity, and
+ * webhook-header sentinel resolution.
  */
 import {
   automationFilterFieldSchema,
@@ -49,10 +48,9 @@ export function extractCheckKeys(inputObject: Record<string, unknown>): string[]
 const KNOWN_FILTER_FIELDS = new Set<string>(automationFilterFieldSchema.options);
 
 /**
- * Splits an author's filter set into the fields this platform still supports
- * and the ones it no longer does. The unknown names are kept rather than
- * dropped silently: an automation whose every condition is legacy would
- * otherwise save as "matches everything".
+ * Splits an author's filter set into fields this platform still supports
+ * and ones it no longer does. Unknown names are kept, not dropped, so a
+ * fully-legacy automation doesn't silently save as "matches everything".
  */
 export function partitionFilterFields(filters: Record<string, unknown>): {
   sanitized: AutomationFilters;
@@ -73,11 +71,9 @@ export function partitionFilterFields(filters: Record<string, unknown>): {
 }
 
 /**
- * ADR-026: cadence applies to notify actions only. New notify triggers default
- * to a 5-minute digest (operator-friendly storm protection); persist actions
- * are pinned to immediate at the storage boundary so a stale value can't leak
- * into the dispatch path. Graph alerts are incident-based - fire on breach,
- * silent while open, resolve on recovery - so there is nothing to digest.
+ * ADR-026: cadence applies to notify actions only -- new ones default to
+ * a 5-minute digest, persist actions pin to immediate at the storage
+ * boundary, and graph alerts (incident-based) have nothing to digest.
  */
 export function resolveCadenceForCreate(
   action: AutomationAction,
@@ -91,10 +87,9 @@ export function resolveCadenceForCreate(
 }
 
 /**
- * Persist actions always pin to `immediate`. `"unchanged"` when the client
- * omits the field on a notify-class row, so the caller skips the column
- * update rather than leaking a stale notify-class cadence onto a row edited
- * from notify to persist — the boundary invariant is forced on every update.
+ * Persist actions always pin to `immediate`. `"unchanged"` when the
+ * client omits the field on a notify-class row, so the caller skips the
+ * update instead of leaking a stale cadence onto a notify-to-persist edit.
  */
 export function resolveCadenceForUpdate(
   action: AutomationAction,
@@ -108,10 +103,9 @@ export function resolveCadenceForUpdate(
 }
 
 /**
- * Validates recipient addresses by RFC shape only - external addresses are
- * intentionally allowed (Slack's "email to a channel" pattern, partner
- * inboxes). The UI surfaces an "External" warning badge for non-team addresses
- * so operators know what they are shipping.
+ * Validates recipient addresses by RFC shape only -- external addresses
+ * are intentionally allowed (Slack's "email to a channel" pattern,
+ * partner inboxes); the UI badges them "External" so operators know.
  */
 export function validateEmailRecipientFormats(recipients: readonly string[]): void {
   for (const email of recipients) {

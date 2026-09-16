@@ -85,10 +85,9 @@ export function buildAutomationInfrastructure(input: {
 }
 
 /**
- * {@link AutomationScheduledJobRepository} over Eventing's own `Date`-typed
- * store: the module reads and writes report calendars in {@link Instant},
- * matching the clock the rest of the feature already reads through, so the
- * boundary conversion lives here rather than at every call site.
+ * {@link AutomationScheduledJobRepository} over Eventing's `Date`-typed
+ * store: converts to/from {@link Instant} here, once, instead of at every
+ * call site.
  */
 class InstantScheduledJobRepository implements AutomationScheduledJobRepository {
   constructor(private readonly store: PrismaScheduledJobStore) {}
@@ -134,12 +133,9 @@ class ApiAutomationClock implements AutomationClock {
 }
 
 /**
- * The cross-process wake a freshly written schedule publishes, best-effort.
- *
- * The worker's loop subscribes to it, so a report saved here comes due there
- * without waiting for the poll backstop. Postgres is the correctness layer:
- * the row is already written by the time this runs, so a dropped publish
- * costs the time to the worker's next sweep, never a fire.
+ * The cross-process wake a freshly written schedule publishes, best-effort:
+ * the worker's poll backstop is the correctness layer, so a dropped publish
+ * only costs time until the next sweep, never a missed fire.
  */
 class ApiSchedulerWake extends SchedulerWake {
   constructor(private readonly redis: RedisConnection) {
@@ -193,11 +189,8 @@ class ApiAutomationSlackTokens implements AutomationSlackBotTokenDecryptor {
 }
 
 /**
- * Retryable versus terminal, for a process that delivers nothing.
- *
- * Every failure reads as terminal here, which is the safe reading: this
- * process has no queue to retry on, so a failure it called retryable would
- * simply be lost.
+ * Retryable versus terminal, for a process with no queue: every failure
+ * reads as terminal, since one called retryable here would simply be lost.
  */
 class ApiAutomationDispatchErrors implements AutomationDispatchError {
   isTerminal(): boolean {
@@ -217,11 +210,9 @@ class UnmeasuredApiAutomationHeartbeat implements AutomationHeartbeat {
 }
 
 /**
- * Runaway containment, for a process that fires nothing.
- *
- * The reads answer emptily and the writes refuse: containment is a decision
- * taken where a fire happens, and a ceiling this process claimed to enforce
- * would be a ceiling nobody actually counts against.
+ * Runaway containment, for a process that fires nothing: reads answer
+ * emptily and writes refuse, since a ceiling enforced here would be one
+ * nobody actually counts against.
  */
 class UncontainedApiAutomationRunaway
   implements AutomationRunaway, AutomationRunawayNotice, AutomationRunawaySignals
@@ -344,11 +335,9 @@ class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
 }
 
 /**
- * The Slack conversations a bot token can see, absent.
- *
- * Ported from the deleted TRPC-layer mount, which refused this by name for
- * the same reason: listing a workspace's channels is a live call to Slack's
- * own API, and this process makes none.
+ * The Slack conversations a bot token can see, absent: listing a
+ * workspace's channels is a live call to Slack's API, and this process
+ * makes none.
  */
 class UnavailableAutomationSlackDirectory implements AutomationSlackDirectory {
   list(): Promise<SlackChannelListing> {
@@ -361,11 +350,9 @@ class UnavailableAutomationSlackDirectory implements AutomationSlackDirectory {
 }
 
 /**
- * ADR-043's filter-query dry run, absent: no compiler for the facet exists
- * anywhere in the tree yet, on the api process or the worker's. Refusing
- * means an author cannot save a trigger with a non-empty `filterQuery` until
- * one is built — a real gap, not a parity loss, since the deleted composition
- * predates this facet and never wired it either.
+ * ADR-043's filter-query dry run, absent: no compiler for this facet exists
+ * yet on either process, so a non-empty `filterQuery` cannot be saved until
+ * one is built. A real gap, not a parity loss.
  */
 class UnwiredAutomationTraceFilterCompiler implements AutomationTraceFilterCompiler {
   assertCompiles(): void {
@@ -376,11 +363,9 @@ class UnwiredAutomationTraceFilterCompiler implements AutomationTraceFilterCompi
 const REDIS_CALL_COUNTER_PREFIX = "automation:call-counter:";
 
 /**
- * Per-key fixed-window counting for automation's own multi-policy throttles
- * (the test-fire button, the webhook flood cap, the unauthenticated
- * unsubscribe pair — ADR-031, ADR-040 §4) — each call names its own window
- * and ceiling, which the process's shared `rateLimiter` member cannot: that
- * one is built with ONE fixed policy at boot.
+ * Per-key fixed-window counting for automation's multi-policy throttles
+ * (test-fire, webhook flood, unsubscribe — ADR-031, ADR-040 §4): each call
+ * names its own window and ceiling, unlike the boot-fixed `rateLimiter`.
  */
 class RedisAutomationCallCounter implements AutomationCallCounter {
   constructor(private readonly redis: RedisConnection) {}

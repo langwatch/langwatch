@@ -8,11 +8,9 @@ import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry.ts";
 import { Temporal } from "@langwatch/time";
 
 /**
- * `history` is `[...previousPoints, ...currentPoints]` — oldest first, easily
- * 100+ buckets. Liquid applies `limit:` BEFORE `reversed`, so the obvious
- * `{% for point in history reversed limit: 20 %}` yields the OLDEST 20 points,
- * reversed: the breach that fired the alert never reaches its own message.
- * These tests pin the window on the newest end of history.
+ * `history` is oldest-first. Liquid applies `limit:` BEFORE `reversed`,
+ * so `reversed limit: 20` yields the OLDEST 20 reversed -- the breach
+ * that fired never reaches its own message. These tests pin the newest end.
  */
 const HISTORY_POINTS = 100;
 const BREACH_VALUE = HISTORY_POINTS - 1;

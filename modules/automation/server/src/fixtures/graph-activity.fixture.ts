@@ -174,12 +174,9 @@ type PrismaDoubleSeed = {
 };
 
 /**
- * The tables this path reads and writes, held in arrays.
- *
- * Filtering is deliberately literal — the `where` shapes the repositories use
- * are enumerated here rather than interpreted generically, so a repository that
- * starts asking a different question stops matching instead of quietly reading
- * every row.
+ * The tables this path reads and writes, held in arrays. Filtering is
+ * deliberately literal -- enumerated `where` shapes, not a generic
+ * interpreter, so a drifted repository stops matching instead of reading everything.
  */
 export function createGraphActivityPrismaDouble(seed: PrismaDoubleSeed) {
   const triggers = seed.triggers.map((row) => ({ ...row }));

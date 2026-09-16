@@ -285,12 +285,10 @@ describe("testFireTrigger", () => {
       expect(payload).toContain("/acme/analytics/custom/example-graph");
     });
 
-    // Regression for the field-5015 garbled test-fire: the exact gallery
-    // template the user selected ("Alert — detailed") must render populated
-    // fields + a real dashboard URL. The empty-field symptom happens when
-    // the alert template is rendered against the TRACE context — a null
-    // `graphAlert` — so we assert the dashboard link resolves and the
-    // skeleton labels never appear alone.
+    // Regression for field-5015: the "Alert — detailed" gallery template
+    // must render populated fields + a real dashboard URL. The empty-field
+    // symptom happens when rendered against a null `graphAlert` (TRACE
+    // context), so we assert the link resolves and skeletons never appear alone.
     it("renders the real 'graph_alert_detailed' gallery source with a resolved dashboard URL", async () => {
       const { notifier, sentSlack } = makeNotifier();
       const service = makeService(notifier);

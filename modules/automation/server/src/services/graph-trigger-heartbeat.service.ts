@@ -44,11 +44,9 @@ interface CandidateTrigger {
   /** "absence" = no-data shape; "resolve" = firing-resolve when traffic stops. */
   reasonKind: "absence" | "resolve";
   /**
-   * ADR-034 Phase 6 source-awareness: the upstream pipeline whose slim
-   * table the heartbeat queries for recency. `"trace"` candidates query
-   * `trace_analytics`; `"evaluation"` candidates query
-   * `evaluation_analytics`. Unknown-source candidates default to `"trace"`
-   * (preserves the pre-Phase-6 behaviour).
+   * ADR-034 §6: the upstream pipeline whose slim table the heartbeat
+   * queries for recency -- `"trace"` queries `trace_analytics`,
+   * `"evaluation"` queries `evaluation_analytics`. Unknown defaults to `"trace"`.
    */
   source: AnalyticsMetricSource;
 }

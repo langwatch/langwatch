@@ -34,11 +34,9 @@ import { formatTimeAgo } from "../../../../model/relative-time.ts";
 interface ViewAutomationDrawerProps {
   automationId: string;
   /**
-   * Closes the panel.
-   *
-   * Taken as a prop for the drawers doc's reason: a target that calls
-   * `closeDrawer` itself clears the caller's stack too. The registry adapter
-   * supplies the navigator's own close.
+   * Closes the panel. Taken as a prop (drawers doc rule): a target that
+   * calls `closeDrawer` itself clears the caller's stack too. The
+   * registry adapter supplies the navigator's own close.
    */
   onClose: () => void;
   /** Hands over to the editor, which the registry answers to as `automation`. */
@@ -297,12 +295,9 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
 type RecentFire = RouterOutputs["automation"]["getRecentFires"][number];
 
 /**
- * Recent fires as a compact, honest list. The fire ledger is metadata-only
- * (no trace ids: `triggers:view` is weaker than trace-content permission), so
- * there is nothing per-trace to link. A busy automation logs many rows that
- * otherwise read as identical "fired 6 minutes ago" lines, so a burst that
- * shares a relative-time label collapses into one "Fired 7 times" row. Alerts
- * stay per-incident because each open/resolve is a distinct event.
+ * Recent fires as a compact, honest list. No trace ids (`triggers:view`
+ * is weaker than trace-content permission), so a same-minute burst
+ * collapses into one "Fired N times" row; alerts stay per-incident.
  */
 function RecentFiresList({ fires, isGraphAlert }: { fires: RecentFire[]; isGraphAlert: boolean }) {
   const rows = isGraphAlert
@@ -387,10 +382,9 @@ const OUTCOME_DOT: Record<WebhookDelivery["outcome"], string> = {
 };
 
 /**
- * The webhook delivery log (ADR-040 §6): attempts grouped by the fire that
- * produced them (`dispatchId`), newest fire first. A failed attempt expands
- * to its error and a plain-language explanation of what went wrong — the log
- * stores outcome facts only, never request or response content.
+ * The webhook delivery log (ADR-040 §6): attempts grouped by dispatch,
+ * newest first. A failed attempt expands to a plain-language explanation
+ * -- the log stores outcome facts only, never request or response content.
  */
 function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }) {
   // Rows arrive newest-first. Group by dispatchId keeping first-seen order

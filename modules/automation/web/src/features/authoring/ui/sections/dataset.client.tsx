@@ -32,12 +32,9 @@ export interface DatasetSlice {
 const EMPTY_MAPPING: DatasetMapping = { mapping: {}, expansions: [] };
 
 /**
- * Obvious trace source for a dataset column by its (lower-cased) name. Mirrors
- * the inference the dataset-view mapping editor applies so an authored
- * ADD_TO_DATASET trigger lands on the same defaults a user would see there.
- * Columns not listed fall back to the `metadata` source keyed by the column
- * name (see `sourceForColumn`), so every column gets a real mapping entry and
- * the dispatcher never writes a blank, column-less row.
+ * Obvious trace source for a dataset column by its lower-cased name,
+ * mirroring the dataset-view mapping editor so authored triggers get the
+ * same defaults; unlisted columns fall back to `metadata` (`sourceForColumn`).
  */
 const INFERRED_SOURCE_BY_COLUMN_NAME: Record<string, string> = {
   trace_id: "trace_id",

@@ -61,11 +61,9 @@ const FilterValue = ({ children }: { children: React.ReactNode }) => {
 };
 
 /**
- * One nested filter group, flattened into the lines the value cell prints.
- *
- * Lifted out of the loop it used to sit inside: a saved filter can be nested
- * twice (`evaluations.<monitor>.passed`), and reading all three levels inline
- * put six blocks inside one function. The shape it reads is unchanged.
+ * One nested filter group, flattened into the lines the value cell
+ * prints. A saved filter can nest twice (`evaluations.<monitor>.passed`),
+ * so this is its own function rather than inline. Reads the same shape.
  */
 function describeNestedFilter(value: Record<string, unknown>): string[] {
   const lines: string[] = [];

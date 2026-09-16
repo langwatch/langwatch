@@ -12,10 +12,9 @@ import { CLIENT_PROVIDERS } from "../ui/sections/client-providers.ts";
 import type { SlackSlice } from "../ui/sections/slack.client.tsx";
 
 /**
- * Build a `SavedTriggerRow` from a provider's `toActionParams` output so we can
- * feed it back through `fromTriggerRow`. Only `actionParams` is provider-owned
- * for the action providers; the notify template columns live at the row root
- * and are exercised separately.
+ * Builds a `SavedTriggerRow` from a provider's `toActionParams` output,
+ * to feed back through `fromTriggerRow`. Only `actionParams` is
+ * provider-owned; notify template columns live at the row root.
  */
 function rowFrom(action: TriggerAction, actionParams: unknown): SavedTriggerRow {
   return {

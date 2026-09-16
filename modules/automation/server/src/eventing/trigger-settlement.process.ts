@@ -23,10 +23,9 @@ export interface TriggerSettlementState {
 export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
 /**
- * Traces per persist-match outbox message. Sized so a page stays well
- * inside the outbox lease even when the per-trace confirm degrades to
- * seconds: 25 traces through the handler's 4-wide pool at a degraded ~4s
- * per trace is ~25-30s against a 300s lease.
+ * Traces per persist-match outbox message, sized to stay inside the
+ * outbox lease even degraded: 25 traces through a 4-wide pool at ~4s
+ * each is ~25-30s against a 300s lease.
  */
 export const PERSIST_PAGE_MAX = 25;
 export type SettlementState = TriggerSettlementState;
@@ -52,10 +51,9 @@ export interface OverflowFlush {
 export interface PersistPage {
   traceIds: string[];
   /**
-   * Deterministic message-key body. The settle window bucket is INSIDE the
-   * hash on purpose: keyed on traceIds alone, a later settlement round over
-   * the same traces would collide with the completed page's outbox row and
-   * be swallowed by the outbox dedup.
+   * Deterministic message-key body. The settle window bucket is INSIDE
+   * the hash on purpose: keyed on traceIds alone, a later round over the
+   * same traces would collide with the completed page and be swallowed.
    */
   pageKey: string;
 }
@@ -154,10 +152,8 @@ export class TriggerSettlement {
 
   /**
    * Chunks settled persist matches into deterministic pages: sorted by
-   * traceId, sliced by PERSIST_PAGE_MAX. Evolve retries and event redelivery
-   * re-run this on identical state, so identical input must produce
-   * byte-identical page keys — the sort is what guarantees it regardless of
-   * pending-map insertion order.
+   * traceId, sliced by PERSIST_PAGE_MAX -- the sort is what guarantees
+   * byte-identical page keys on retry, regardless of insertion order.
    */
   static pagePersistMatches({
     matches,

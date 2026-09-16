@@ -1,9 +1,7 @@
 /**
- * The RFC 8058 one-click unsubscribe endpoint (ADR-031). The token in `?token=`
- * is the authorization, so no session is resolved, and one-click is
- * trigger-scoped. A valid token answers 200 so the mail client shows success; a
- * missing or tampered one is a 400, a throttled caller a 429, and every other
- * method a 405 with an `Allow` header.
+ * The RFC 8058 one-click unsubscribe endpoint (ADR-031). The `?token=` is
+ * the authorization, so no session is resolved. A valid token answers 200,
+ * a bad one 400, a throttled caller 429, and any other method 405.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -25,11 +23,8 @@ import { z } from "zod";
 const logger = createLogger("langwatch:unsubscribe:one-click");
 
 /**
- * Which caller a request is counted as.
- *
- * A fact because the answer depends on the process's HTTP adapter: header
- * priority is one half, and the raw socket address - reachable only through the
- * Node server's own connection info - is the other. A family that read headers
+ * Which caller a request is counted as: header priority, falling back to
+ * the raw socket address from the Node server's connection info. Headers
  * alone would drop every caller that sends none into a single bucket.
  */
 export const unsubscribeCallerAddress = defineRestMiddleware(
@@ -101,10 +96,9 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
   })
 
   /**
-   * RFC 8058 one-click is POST-only. Declared AFTER the POST route so a POST
-   * resolves to the handler above; every other method falls through to here for
-   * a 405 with an `Allow` header, matching the body this door has always
-   * answered, rather than a bare 404.
+   * RFC 8058 one-click is POST-only. Declared AFTER the POST route so a
+   * POST resolves there; every other method falls through here for a 405
+   * with `Allow`, not a bare 404.
    */
   .get("/api/unsubscribe", "unsubscribeMethodGuard")
   .withAccess(publicRoute({ reason: ONE_CLICK_IS_TOKEN_AUTHORIZED }))

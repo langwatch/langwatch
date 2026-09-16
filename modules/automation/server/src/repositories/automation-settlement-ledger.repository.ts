@@ -20,11 +20,9 @@ export abstract class AutomationSettlementLedger {
   }): Promise<boolean>;
 
   /**
-   * Claims one delivery, exactly once.
-   *
-   * The claim is what makes a redelivered settlement safe: the boundary a
-   * digest is keyed on survives a retry, so without it one trace would be
-   * mailed once per delivery attempt.
+   * Claims one delivery, exactly once: the claim is what makes a
+   * redelivered settlement safe, since the digest's keying boundary
+   * survives a retry rather than mailing once per delivery attempt.
    */
   abstract claimSend(input: {
     triggerId: string;

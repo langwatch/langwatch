@@ -173,12 +173,9 @@ export class ProjectNotFoundError extends HandledError {
 }
 
 // ---------------------------------------------------------------------------
-// The refusals the application names.
-//
-// Each one has a cause we can name and an action the caller can take, which is
-// what makes it a `HandledError` rather than a transport error a door builds
-// for itself. Every status below is the status that door already answered
-// with: this move renamed the channel, never the outcome.
+// The refusals the application names: each has a nameable cause and a
+// caller action, making it a `HandledError`, not a door's own transport
+// error. Every status is the one that door already answered with.
 // ---------------------------------------------------------------------------
 
 /** One automation, looked up in a project that does not have it. */

@@ -40,18 +40,15 @@ export type AutomationHostRecording = {
   navigations: string[];
   queries: { next: AutomationQuery; replace: boolean }[];
   /**
-   * RECORDED RATHER THAN SPELLED. The `drawer.` vocabulary is the composing
-   * application's — its adapter writes `?drawer.open=<name>` plus one
-   * `drawer.<key>` per parameter, and its own suite pins that. What this
-   * package can state, and all it should, is WHICH overlay a click asked for
-   * and with what. The shape the model-provider family's double already takes.
+   * RECORDED RATHER THAN SPELLED. The `drawer.` query vocabulary belongs to
+   * the composing application, whose own suite pins it; this package states
+   * only WHICH overlay a click asked for, and with what.
    */
   drawerOpens: RecordedAutomationDrawerOpen[];
   /**
-   * The dataset hand-overs a section asked for, with the handlers still
-   * attached. A sub-flow only means something once one of its two endings
-   * happens, so the double records the request and lets the test play the
-   * ending it is about rather than choosing one.
+   * The dataset hand-overs a section asked for, with handlers attached. A
+   * sub-flow only means something once one of its two endings happens, so
+   * the double records the request and lets the test choose the ending.
    */
   datasetHandovers: AutomationDatasetHandover[];
   successes: AutomationSuccessNotice[];
@@ -76,10 +73,9 @@ export type FakeAutomationHostOptions = {
   /** The grants the viewer holds, read through the authz hierarchy rule. */
   permissions?: readonly string[];
   /**
-   * The frontend flags that are on. `"all"` is the default because the platform
-   * suites mocked `useFeatureFlag` to answer yes; name a list when the flag
-   * itself is what a test is about, and `"pending"` when the point is that the
-   * answer has not arrived.
+   * The frontend flags that are on. `"all"` is the default, since the
+   * platform suites mocked `useFeatureFlag` to answer yes; name a list
+   * when the flag matters, and `"pending"` when the answer hasn't arrived.
    */
   enabledFlags?: readonly string[] | "all" | "pending";
   /** `null` means the scope has not resolved, which several surfaces gate on. */
@@ -242,12 +238,9 @@ export class FakeAutomationHost extends AutomationHost {
   }
 
   /**
-   * The one line `apps/ui` would show for this failure.
-   *
-   * The real host asks the feedback capability, which falls back to the action
-   * name plus the generic sentence for a code it cannot name. That fallback is
-   * the whole answer here, so a test never depends on copy that lives in a
-   * registry this package cannot see.
+   * The one line `apps/ui` would show for this failure: the fallback the
+   * real host's feedback capability uses for an unnamed code, so a test
+   * never depends on copy that lives in a registry this package can't see.
    */
   describeFailure(failure: AutomationFailureNotice): string {
     return failure.title ?? failure.fallbackTitle;
@@ -274,11 +267,9 @@ export function recordingAutomationToaster(): RecordingAutomationToaster {
 }
 
 /**
- * The address, held where React can see it change.
- *
- * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one every surface that filters,
- * paginates or selects a tab relies on.
+ * The address, held where React can see it change. `setQuery` replaces
+ * the whole query string -- a key left out is a key removed -- the
+ * contract every filtering, paginating or tab-selecting surface relies on.
  */
 function AutomationHostHarness({
   host,

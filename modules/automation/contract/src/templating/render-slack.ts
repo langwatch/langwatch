@@ -10,10 +10,9 @@ import type {
 } from "./template-context.ts";
 
 /**
- * Default-template overrides for `renderTriggerSlack` (ADR-034 Phase 8.1).
- * Lets the graph-alert path render against `ALERT_TRIGGER_DEFAULTS`
- * without forking the engine; trace callers omit it and keep the
- * trace defaults (`DEFAULT_SLACK_TEMPLATE` / `DEFAULT_SLACK_BLOCK_KIT_TEMPLATE`).
+ * Default-template overrides for `renderTriggerSlack` (ADR-034 Phase
+ * 8.1). Lets the graph-alert path render against `ALERT_TRIGGER_DEFAULTS`
+ * without forking the engine; trace callers omit it and keep defaults.
  */
 export interface SlackRenderDefaults {
   slackString: string;
@@ -117,12 +116,10 @@ export async function renderTriggerSlack({
 
   const effectiveTemplate = template ?? slackBlockKit;
   const usedDefaultTemplate = template == null;
-  // `customMissing` captures the missing-variable diagnostics from the
-  // customer's template render. If the JSON.parse / allowlist filter
-  // below throws, we still want to surface THOSE diagnostics (the
-  // author's typos) rather than swap them out for the framework
-  // default's. Without this the preview UI loses the actual signal the
-  // author needs to fix their template.
+  // `customMissing` captures the customer template's missing-variable
+  // diagnostics, so a later JSON.parse/allowlist throw still surfaces
+  // THOSE typos instead of the framework default's -- otherwise the
+  // preview UI loses the signal the author needs to fix their template.
   let customMissing: string[] | undefined;
   try {
     const rendered = await renderLiquid({

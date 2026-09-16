@@ -5,11 +5,9 @@ import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 
 /**
- * A project's trace automations, read the way the ingestion path needs them.
- *
- * SAME CACHE, SAME WINDOW as the wide service - two caches over one table
- * would give one process two different ideas of which automations are live.
- * One minute of staleness is the deliberate, inherited cost.
+ * A project's trace automations, read the way ingestion needs them.
+ * SAME CACHE, SAME WINDOW as the wide service, so one process can't hold
+ * two ideas of which automations are live; staleness is one minute.
  */
 export class AutomationTraceTriggerCatalogueService extends AutomationTraceTriggerCatalogue {
   static create(input: {

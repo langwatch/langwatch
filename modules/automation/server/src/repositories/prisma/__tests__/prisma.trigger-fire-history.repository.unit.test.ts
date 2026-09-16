@@ -1,8 +1,7 @@
 /**
- * The automations activity feed reads this repository, and the feed is gated
- * by a weaker permission than trace content is. A row in `TriggerSent` carries
- * the `traceId` that made the automation fire; the mapped view must not, or
- * the list hands a trace identifier to a viewer who may not read traces.
+ * The activity feed reads this repository under a weaker permission than
+ * trace content needs. `TriggerSent` carries the `traceId` that fired,
+ * but the mapped view must not, or a viewer who can't read traces gets one.
  */
 import { describe, expect, it } from "vitest";
 import {

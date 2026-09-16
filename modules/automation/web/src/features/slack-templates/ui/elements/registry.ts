@@ -1,11 +1,8 @@
 /// <reference path="../../model/liquid-raw.d.ts" />
-// The reference is load-bearing rather than decorative. `?raw` imports are a
-// Vite convention TypeScript has to be told about, and the declaration that
-// tells it lives beside this file — reachable from THIS package's `include`,
-// and from nobody else's. A consumer that compiles this source (workspace
-// packages resolve to each other's source, so `apps/ui` does) would otherwise
-// fail on twenty-one imports for want of a declaration it has no way to know
-// about. Triple-slash pulls it in wherever this module is compiled.
+// Load-bearing, not decorative: `?raw` imports need this declaration,
+// reachable only from THIS package's `include`. A consumer that compiles
+// this source (e.g. `apps/ui`) would otherwise fail on twenty-one
+// imports; triple-slash pulls it in wherever this module compiles.
 import type { GatedBlockType } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 import digestCompactSource from "./digest-compact.liquid?raw";

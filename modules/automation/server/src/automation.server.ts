@@ -122,12 +122,9 @@ export const automationServer = defineServerModule("automation")
   );
 
 /**
- * The envelope a trigger's mail leaves in: who it appears to come from, and the
- * token that lets a recipient stop receiving it.
- *
- * Both are HMACs over the same deployment secret, which is why they are
- * composed together: a process that signed the unsubscribe link with one key
- * and the no-reply tag with another would honour a link it had not issued.
+ * The envelope a trigger's mail leaves in: who it appears to come from,
+ * and the token that stops it. Both are HMACs over one secret, composed
+ * together so signing them differently could honour an unissued link.
  */
 export type AutomationMailEnvelope = Readonly<{
   /** The `To:` a trigger's mail is addressed to, with recipients in bcc. */
@@ -169,12 +166,9 @@ class ReportedNoReplyWarning extends TriggerNoReplyWarning {
 }
 
 /**
- * The email ceilings both halves of this feature spend against.
- *
- * Composed once per process on purpose: the hourly and daily allowances are one
- * budget, and two services counting the same allowance would let one fleet send
- * twice what the deployment configured. A process with no shared store counts
- * per pod, which is what the application already does when Redis is down.
+ * The email ceilings both halves of this feature spend against. Composed
+ * once per process, since two services counting the same budget separately
+ * would let one fleet send double; with no shared store, it counts per pod.
  */
 export function createAutomationEmailCaps(input: {
   store: AutomationEmailCapRepository | null;
@@ -183,11 +177,9 @@ export function createAutomationEmailCaps(input: {
 }
 
 /**
- * The graph-alert vertical, over the substrates the composing process owns.
- *
- * Which tables the evaluation reads, which secrets it decrypts and which
- * schedule it re-checks on stay this package's business; the process supplies
- * its client, its clock, its transports and the ceilings it configured.
+ * The graph-alert vertical, over substrates the composing process owns:
+ * which tables it reads, which secrets it decrypts and which schedule it
+ * checks; the process supplies the client, clock, transports and ceilings.
  */
 export function createAutomationGraphActivity(input: {
   /** The one database client the composing process opened. */
@@ -212,10 +204,9 @@ export function createAutomationGraphActivity(input: {
 }
 
 /**
- * What this feature does when an evaluation finishes: decide whether the run
- * matched a trigger, and re-check the graph alerts that evaluation feeds. The
- * filter is built here rather than handed in, because a caller that built its
- * own could classify a saved query differently from the application.
+ * What this feature does when an evaluation finishes: decide whether the
+ * run matched a trigger, and re-check the graph alerts it feeds. The
+ * filter is built here, not handed in, so a caller can't reclassify a query.
  */
 export function createAutomationEvaluationSubscriber(input: {
   triggers: AutomationTraceTriggerCatalogue;
@@ -369,10 +360,9 @@ export type AutomationSettlement = Readonly<{
 }>;
 
 /**
- * Settlement, composed over the substrates the process owns. Containment and
- * the ledger each need the other — containment's notice is filtered through the
- * SAME suppression rows a digest is — so the runaway collaborator arrives as a
- * callback rather than already made, and that table keeps one reader.
+ * Settlement, composed over substrates the process owns. Containment
+ * shares the ledger's suppression rows with a digest, so the runaway
+ * collaborator arrives as a callback, keeping that table to one reader.
  */
 export function createAutomationSettlement(input: {
   /** The one database client the composing process opened. */
@@ -505,10 +495,9 @@ function statedCeiling(ceiling: AutomationPersistCeiling): number {
 }
 
 /**
- * The breach handler, resolved LATE — containment reads the suppression rows off
- * the ledger this port is handed to — so the thunk is the knot, not an optional
- * dependency nobody supplies. With no containment composed, the process's own
- * report of the breach stands.
+ * The breach handler, resolved LATE: containment reads suppression rows
+ * off the ledger this port is handed to, so the thunk is the knot, not an
+ * optional. Absent containment, this process's own report stands.
  */
 class LateContainmentBreach extends AutomationSettlementBreach {
   constructor(

@@ -1,8 +1,7 @@
 /**
- * Every `emailSuppression.*` procedure, declared once (ADR-031). Two audiences
- * on one namespace: the unsubscribe pair arrives from a mail client with no
- * session, the operator pair from the settings page. The declaration says
- * nothing about either - the server half binds the access.
+ * Every `emailSuppression.*` procedure, declared once (ADR-031). Two
+ * audiences share one namespace: the unsubscribe pair from a session-less
+ * mail client, the operator pair from settings. Access binds server-side.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
