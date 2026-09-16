@@ -31,8 +31,7 @@
  * bodies.
  */
 
-import { INGESTION_PULL_LISTING_OUTCOME } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullRunProjection } from "~/generated/prisma/client";
+import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
 import type { ListingRefusalReason } from "./provider-listing.service.ts";
 
 /**
@@ -108,6 +107,16 @@ const REFUSAL_CAUSE: Record<ListingRefusalReason, AgentsListingRefusalCause> = {
   // send this reader round a loop.
   pagination_stalled: "incomplete",
 };
+
+/**
+ * The two words the ingestion-pull pipeline stores for how a listing ended.
+ * Read-side copy of the written vocabulary: the values are the stored ones and
+ * a change here is a silent misread, not a rename.
+ */
+const INGESTION_PULL_LISTING_OUTCOME = {
+  LISTED: "listed",
+  REFUSED: "refused",
+} as const;
 
 export function agentsListingOutcome(
   row: AgentsListingSummary | null | undefined,

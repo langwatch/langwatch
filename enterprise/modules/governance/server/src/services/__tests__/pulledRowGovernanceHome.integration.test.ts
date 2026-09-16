@@ -22,7 +22,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import type { Organization, Team } from "~/generated/prisma/client";
+import type { Organization, Team } from "@langwatch/prisma-client/generated";
 import { prisma } from "~/server/db";
 import { pulledUsageScopeId } from "../../../process-manager/pulledUsageLedger.process";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";

@@ -50,7 +50,7 @@ class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
   }
 
-  tryFindIngestKey(input: {
+  findIngestKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -72,7 +72,7 @@ class LedgerRepository implements IngestionKeyRepository {
     return Promise.resolve([]);
   }
 
-  tryFindByLookupId(): Promise<null> {
+  findByLookupId(): Promise<null> {
     return Promise.resolve(null);
   }
 }

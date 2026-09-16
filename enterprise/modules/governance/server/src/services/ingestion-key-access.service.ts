@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ApiKeyRevocationCause, ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  type IngestionKeyIssuer,
-  type IngestionKeyRepository,
-  type StoredIngestionKey,
-  type StoredIngestionKeyOwnership,
-} from "@langwatch/enterprise-governance-server";
+/**
+ * Ingestion keys are API keys, so the module owns none of their state: both
+ * classes here answer `../app/governance.members.ts` interfaces by delegating
+ * straight to `ApiKeyApi`, the peer that owns the concept.
+ */
+import type { ApiKeyApi, ApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import { fromDate } from "@langwatch/time";
+import type {
+  IngestionKeyIssuer,
+  IngestionKeyRepository,
+  StoredIngestionKey,
+  StoredIngestionKeyOwnership,
+} from "../app/governance.members.ts";
 
 type IngestionKeyCreateInput = {
   name: string;
@@ -46,14 +51,14 @@ function storedIngestionKeyOf(key: ApiKeyIngestionRow): StoredIngestionKey {
   };
 }
 
-export class AppIngestionKeyRepository implements IngestionKeyRepository {
+export class ApiKeyIngestionKeyRepositoryService implements IngestionKeyRepository {
   private constructor(private readonly apiKeys: ApiKeyApi) {}
 
-  static create(apiKeys: ApiKeyApi): AppIngestionKeyRepository {
-    return new AppIngestionKeyRepository(apiKeys);
+  static create(apiKeys: ApiKeyApi): ApiKeyIngestionKeyRepositoryService {
+    return new ApiKeyIngestionKeyRepositoryService(apiKeys);
   }
 
-  tryFindIngestKey(input: {
+  findIngestKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -72,7 +77,7 @@ export class AppIngestionKeyRepository implements IngestionKeyRepository {
       .then((keys) => keys.map(storedIngestionKeyOf));
   }
 
-  async tryFindByLookupId(input: {
+  async findByLookupId(input: {
     lookupId: string;
   }): Promise<StoredIngestionKeyOwnership | null> {
     const key = await this.apiKeys.findByLookupId(input);
@@ -88,11 +93,11 @@ export class AppIngestionKeyRepository implements IngestionKeyRepository {
   }
 }
 
-export class AppIngestionKeyIssuer implements IngestionKeyIssuer {
+export class ApiKeyIngestionKeyIssuerService implements IngestionKeyIssuer {
   private constructor(private readonly apiKeys: ApiKeyApi) {}
 
-  static create(apiKeys: ApiKeyApi): AppIngestionKeyIssuer {
-    return new AppIngestionKeyIssuer(apiKeys);
+  static create(apiKeys: ApiKeyApi): ApiKeyIngestionKeyIssuerService {
+    return new ApiKeyIngestionKeyIssuerService(apiKeys);
   }
 
   async create(input: IngestionKeyCreateInput): Promise<{ token: string; apiKey: { id: string } }> {
@@ -106,21 +111,5 @@ export class AppIngestionKeyIssuer implements IngestionKeyIssuer {
 
   revoke(input: IngestionKeyRevokeInput): Promise<void> {
     return this.apiKeys.revoke(input).then(() => undefined);
-  }
-}
-
-export class AppIngestionKeyAdapter {
-  private constructor(private readonly apiKeys: ApiKeyApi) {}
-
-  static create(apiKeys: ApiKeyApi): AppIngestionKeyAdapter {
-    return new AppIngestionKeyAdapter(apiKeys);
-  }
-
-  repository(): IngestionKeyRepository {
-    return AppIngestionKeyRepository.create(this.apiKeys);
-  }
-
-  issuer(): IngestionKeyIssuer {
-    return AppIngestionKeyIssuer.create(this.apiKeys);
   }
 }

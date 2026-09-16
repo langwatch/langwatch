@@ -20,32 +20,9 @@ import {
   governanceRestCaller,
   governanceRestSurface,
 } from "./transport/governance.rest.ts";
+import { governanceCliRest } from "./transport/governance-cli.rest.ts";
+import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
 
-import {
-  GovernanceCliAccessService,
-  type GovernanceCliAccessApi,
-  type GovernanceCliAccessMembers,
-} from "./services/governance-cli-access.service.ts";
-import {
-  GovernanceCliActivityService,
-  type GovernanceCliActivityApi,
-  type GovernanceCliActivityMembers,
-} from "./services/governance-cli-activity.service.ts";
-import {
-  GovernanceCliCredentialService,
-  type GovernanceCliCredentialApi,
-  type GovernanceCliCredentialMembers,
-} from "./services/governance-cli-credentials.service.ts";
-import {
-  GovernanceIngestAccessService,
-  type GovernanceIngestAccessApi,
-  type GovernanceIngestAccessMembers,
-} from "./services/governance-ingest-access.service.ts";
-import {
-  GovernanceIngestReceiverService,
-  type GovernanceIngestReceiverApi,
-  type GovernanceIngestReceiverMembers,
-} from "./services/governance-ingest-receiver.service.ts";
 
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
@@ -134,7 +111,7 @@ import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
  */
 export const governanceServer = defineServerModule("governance")
   .withApp(GovernanceApp)
-  .withTransports(governanceRest)
+  .withTransports(governanceRest, governanceCliRest, governanceIngestRest)
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.
   .withTransportFacts(() => [
@@ -145,44 +122,6 @@ export const governanceServer = defineServerModule("governance")
     }),
     bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
   ]);
-
-/**
- * The three gates the CLI governance plane applies before it serves a route:
- * the device bearer, the plan, and the organization permission.
- */
-export function createGovernanceCliAccess(
-  members: GovernanceCliAccessMembers,
-): GovernanceCliAccessApi {
-  return GovernanceCliAccessService.create(members);
-}
-
-/** Everything `/api/auth/cli` hands back or mints, over one process's ports. */
-export function createGovernanceCliCredentials(
-  members: GovernanceCliCredentialMembers,
-): GovernanceCliCredentialApi {
-  return GovernanceCliCredentialService.create(members);
-}
-
-/** The Activity Monitor reads the CLI performs, each with its ownership proof. */
-export function createGovernanceCliActivity(
-  members: GovernanceCliActivityMembers,
-): GovernanceCliActivityApi {
-  return GovernanceCliActivityService.create(members);
-}
-
-/** The gate the push-mode receivers share: throttle, secret, then the path id. */
-export function createGovernanceIngestAccess(
-  members: GovernanceIngestAccessMembers,
-): GovernanceIngestAccessApi {
-  return GovernanceIngestAccessService.create(members);
-}
-
-/** Where a received payload of each signal is folded, priced and acknowledged. */
-export function createGovernanceIngestReceiver(
-  members: GovernanceIngestReceiverMembers,
-): GovernanceIngestReceiverApi {
-  return GovernanceIngestReceiverService.create(members);
-}
 
 /** The substrates one ingestion-pull worker installation is built over. */
 export type IngestionPullWorkerSubstrates = Readonly<{

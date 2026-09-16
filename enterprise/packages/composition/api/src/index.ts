@@ -18,21 +18,6 @@ export {
   GovernanceSignalStorage,
 } from "./governance/governance-signals.adapter.ts";
 /**
- * How a personal key is minted: the Governance issuer port over the gateway's own virtual-key
- * writes.
- */
-export {
-  AppPersonalVirtualKeyIssuer,
-  type GovernanceVirtualKey,
-} from "./governance/governance-products.adapter.ts";
-/**
- * The governance REST family, reached through this composition rather than
- * directly: the API application may depend on the Enterprise API composition
- * and not on an Enterprise feature server.
- */
-export { createGovernanceRestApp } from "@langwatch/enterprise-governance-server";
-
-/**
  * The governance capability itself, and the three shapes an API-role process reads off it.
  */
 export {

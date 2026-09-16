@@ -3,20 +3,20 @@
 import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
-import type { CliBudgetOverviewReader } from "../app/governance.members.ts";
+import type { PersonalBudgetOverviewReader } from "../app/governance.members.ts";
 
 /** Private cohesive collaborator for the activity operation set. */
 export class GovernanceActivityOperationsService {
   private constructor(
     private readonly activity: ActivityMonitorService,
     private readonly personalUsage: DefaultGovernancePersonalUsageService,
-    private readonly budgetOverview: CliBudgetOverviewReader,
+    private readonly budgetOverview: PersonalBudgetOverviewReader,
   ) {}
 
   static create(
     activity: ActivityMonitorService,
     personalUsage: DefaultGovernancePersonalUsageService,
-    budgetOverview: CliBudgetOverviewReader,
+    budgetOverview: PersonalBudgetOverviewReader,
   ): GovernanceActivityOperationsService {
     return new GovernanceActivityOperationsService(activity, personalUsage, budgetOverview);
   }

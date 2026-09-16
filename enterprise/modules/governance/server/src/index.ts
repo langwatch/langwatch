@@ -131,13 +131,6 @@ export { governanceServer } from "./governance.server.ts";
 // sit under an auth path because the project-scoped governance REST rejects a
 // device token; the services underneath are the console's own.
 export { governanceCliRest, GovernanceCliRestApi } from "./transport/governance-cli.rest.ts";
-export {
-  createGovernanceCliAccess,
-  createGovernanceCliActivity,
-  createGovernanceCliCredentials,
-  createGovernanceIngestAccess,
-  createGovernanceIngestReceiver,
-} from "./governance.server.ts";
 export type {
   GovernanceCliAccessApi,
   GovernanceCliAccessMembers,

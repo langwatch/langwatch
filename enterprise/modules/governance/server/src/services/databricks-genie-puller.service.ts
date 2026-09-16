@@ -3414,7 +3414,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
    * Which statements are missing is exactly what none of these can tell us, so
    * pricing the ones that did arrive would put a confident zero on the rest.
    */
-  private static warehouseAnswerCutShort({
+  static warehouseAnswerCutShort({
     statement,
     dataLength,
   }: {
@@ -4003,7 +4003,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       };
     }
 
-    const askedAtMs = DatabricksGeniePullerAdapter.toEpochMs(event.event_timestamp);
+    const askedAtMs = toEpochMs(event.event_timestamp);
     const isReread = Number.isFinite(askedAtMs) && askedAtMs <= watermarkMs;
     if (!isReread) return event;
 

@@ -5,10 +5,10 @@ import { IngestionKeyService } from "../ingestion-source-key.service.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 
 class FakeIngestionKeyRepository implements IngestionKeyRepository {
-  prior: Awaited<ReturnType<IngestionKeyRepository["tryFindIngestKey"]>> = null;
-  tryFindIngestKey = vi.fn(async () => this.prior);
+  prior: Awaited<ReturnType<IngestionKeyRepository["findIngestKey"]>> = null;
+  findIngestKey = vi.fn(async () => this.prior);
   findIngestKeysForProject = vi.fn(async () => []);
-  tryFindByLookupId = vi.fn(async () => null);
+  findByLookupId = vi.fn(async () => null);
 }
 
 class FakeIngestionKeyIssuer implements IngestionKeyIssuer {

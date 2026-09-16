@@ -44,7 +44,7 @@ export class DefaultGovernanceCliBootstrapService {
       this.catalog.resolveCliCatalogForUser(parsed),
       this.catalog.resolveToolPolicyMap(parsed),
       this.budgets.overviewForUser(parsed),
-      this.contacts.tryResolveAdminEmail(parsed.organizationId),
+      this.contacts.findAdminEmail(parsed.organizationId),
     ]);
 
     return {

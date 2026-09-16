@@ -5,9 +5,9 @@
  *
  * Until this module the ONLY path that unsealed a source's credentials was
  * `runIngestionPull`, reached from the outbox. That is a good property and this
- * does not spend it: the seam is one function, it reuses `decryptCredentials`
- * rather than reaching into the envelope itself, and the plaintext exists only
- * for the duration of the callback.
+ * does not spend it: the seam is one function, it unseals through the module's
+ * own credentials service rather than reaching into the envelope itself, and the
+ * plaintext exists only for the duration of the callback.
  *
  * A CALLBACK rather than a getter, and that is the point of the shape. A
  * function that returned credentials would put them in a variable somebody can
@@ -23,8 +23,8 @@
  */
 
 import { IngestionSourceNotFoundError } from "@langwatch/enterprise-governance-contract";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 
 /** What the callback is given: everything about the source EXCEPT the seal. */
 export interface SourceCredentialContext {
@@ -53,11 +53,12 @@ export interface SourceCredentialContext {
  */
 export async function withSourceCredentials<T>(params: {
   prisma: PrismaClient;
+  credentials: IngestionCredentialsService;
   organizationId: string;
   ingestionSourceId: string;
   use: (context: SourceCredentialContext) => Promise<T>;
 }): Promise<T> {
-  const { prisma, organizationId, ingestionSourceId, use } = params;
+  const { prisma, credentials, organizationId, ingestionSourceId, use } = params;
 
   const source = await prisma.ingestionSource.findFirst({
     where: { id: ingestionSourceId, organizationId },
@@ -72,6 +73,6 @@ export async function withSourceCredentials<T>(params: {
     sourceId: source.id,
     sourceType: source.sourceType,
     config,
-    credentials: decryptCredentials(sealed),
+    credentials: credentials.decrypt(sealed),
   });
 }

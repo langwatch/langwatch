@@ -51,7 +51,7 @@ const ORPHAN_CREATED_AT = new Date("2020-01-01T00:00:00.000Z");
 const HEALTHY_CREATED_AT = new Date("2021-01-01T00:00:00.000Z");
 
 class PrismaContacts implements CliAdminContactReader {
-  tryResolveAdminEmail(organizationId: string): Promise<string | null> {
+  findAdminEmail(organizationId: string): Promise<string | null> {
     return OrganizationSupportContactService.create({
       repository: PrismaOrganizationSupportContactRepository.create({ prisma }),
     }).findOrgAdminEmail({

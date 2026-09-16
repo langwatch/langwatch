@@ -34,7 +34,7 @@ class MemoryBudgets implements CliBudgetOverviewReader {
 }
 
 class MemoryContacts implements CliAdminContactReader {
-  tryResolveAdminEmail = vi.fn(async () => "admin@example.com");
+  findAdminEmail = vi.fn(async () => "admin@example.com");
 }
 
 describe("DefaultGovernanceCliBootstrapService", () => {

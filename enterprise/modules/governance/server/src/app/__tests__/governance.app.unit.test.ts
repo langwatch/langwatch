@@ -17,7 +17,10 @@ import {
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
   type GovernanceProjectCaller,
+  type GovernanceCliMembers,
+  type GovernanceIngestMembers,
 } from "../governance.app.ts";
+import { governanceServer } from "../../governance.server.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 /** A dependency these operations never reach; calling one is the test's bug. */
@@ -64,6 +67,18 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
           unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
       },
       actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
+      cli: {
+        accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
+        members: unreachable<GovernanceCliMembers["members"]>(),
+        plans: unreachable<GovernanceCliMembers["plans"]>(),
+        persons: unreachable<GovernanceCliMembers["persons"]>(),
+        supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
+      },
+      ingest: {
+        projects: unreachable<GovernanceIngestMembers["projects"]>(),
+        principals: unreachable<GovernanceIngestMembers["principals"]>(),
+        traceCollection: unreachable<GovernanceIngestMembers["traceCollection"]>(),
+      },
     },
   });
 
@@ -200,6 +215,23 @@ describe("GovernanceApp ingestion templates", () => {
         everythingButTheSurface,
         everythingButTheSurface,
       ]);
+    });
+  });
+});
+
+describe("GovernanceApp as the module a process installs", () => {
+  describe("given the three REST declarations the module mounts", () => {
+    /** @scenario "Every governance REST family answers from the installed module" */
+    it("answers every capability the declarations name from the one app", () => {
+      const { app } = buildApp();
+
+      expect(governanceServer.transports).toHaveLength(3);
+      expect(app.cliAccess().findCaller).toBeTypeOf("function");
+      expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
+      expect(app.cliActivity().sources).toBeTypeOf("function");
+      expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
+      expect(app.ingestAccess().authorize).toBeTypeOf("function");
+      expect(app.ingestReceiver().receiveTraces).toBeTypeOf("function");
     });
   });
 });

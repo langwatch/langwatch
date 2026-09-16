@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * What this feature is configured with, as opposed to what it is handed.
+ *
+ * Five values, and no environment variable is named here: the process parses
+ * this schema once at its entrypoint and hands the result down, so the module
+ * never reads `process.env` and a test states its own values in one literal.
+ */
+import { z } from "zod";
+
+/**
+ * Where the aigateway's OTTL endpoints are, and the shared secret every call
+ * to them is signed with. Both nullable together: a deployment with no
+ * gateway folds OTTL nowhere, and the channel answers "unconfigured" rather
+ * than pretending to transform.
+ */
+const governanceOttlConfigSchema = z
+  .object({
+    baseUrl: z.string().min(1).nullable().default(null),
+    secret: z.string().min(1).nullable().default(null),
+  })
+  .default({ baseUrl: null, secret: null });
+
+/**
+ * The governance module's configuration slice.
+ *
+ * `ingestionSecretPepper` defaults to the empty string because that is what
+ * the served behaviour is today — an unset pepper hashes an ingestion secret
+ * unpeppered rather than refusing to boot. Requiring it is a deliberate
+ * hardening, not a conversion, and belongs in its own change.
+ */
+export const governanceAppConfigSchema = z.object({
+  /** Where an issued personal virtual key tells its holder to send traffic. */
+  gatewayBaseUrl: z.string().min(1),
+  /** This deployment's public origin; the CLI family's links are built on it. */
+  publicBaseUrl: z.string().min(1),
+  /** Prefixed into an ingestion secret's hash, so a database-only leak is inert. */
+  ingestionSecretPepper: z.string().default(""),
+  ottl: governanceOttlConfigSchema,
+});
+
+export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;

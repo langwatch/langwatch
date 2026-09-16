@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { azureBillSourceId, withAzureBillIdentity } from "../prisma.azure-bill-identity.repository";
 
 const subscription = "aaaaaaaa-0000-4000-8000-000000000001";

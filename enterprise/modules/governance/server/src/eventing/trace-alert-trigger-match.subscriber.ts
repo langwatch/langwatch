@@ -12,14 +12,14 @@ import {
 export class TraceAlertTriggerMatchSubscriber {
   private constructor(
     private readonly triggers: TraceAlertTriggerReader,
-    private readonly mat: TraceAlertTriggerMatchChannel,
+    private readonly matches: TraceAlertTriggerMatchChannel,
     private readonly originGuard: TraceAlertOriginGuard,
     private readonly metrics: TraceAlertMetricsSink,
   ) {}
 
   static create(options: {
     triggers: TraceAlertTriggerReader;
-    mat: TraceAlertTriggerMatchChannel;
+    matches: TraceAlertTriggerMatchChannel;
     originGuard: TraceAlertOriginGuard;
     metrics: TraceAlertMetricsSink;
   }): TraceAlertTriggerMatchSubscriber {

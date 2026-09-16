@@ -6,18 +6,25 @@ import type {
   ActivityMonitorWindowQuery,
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,
+  GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
+  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
+  GovernanceBudgetOverviewForUser,
   GovernanceIngestionSource,
   GovernanceOcsfExportRow,
+  IngestionKeyMintCommand,
   IngestionSourceHealthRow,
+  IssuedIngestionKey,
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageWindow,
   PersonalVirtualKey,
   PulledUsageObservedEventData,
   RecentAnomalyRow,
+  RecordBudgetCrossingCommandData,
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
   RecordPulledUsageCommand,
+  RecordVkLifecycleCommandData,
   RecordWorkspaceViewInput,
   SourceHealthMetrics,
   SpendByDepartmentRow,
@@ -27,8 +34,16 @@ import type {
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, IntentContext, ProcessStore, TriggerContext } from "@langwatch/eventing";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectWithTeam,
+} from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
+import type {
+  exportTraceServiceRequestSchema,
+  TraceProcessingEvent,
+} from "@langwatch/trace-contract";
 import type { z } from "zod";
 export interface GovernanceInfrastructure {
   activityMonitorRepository: ActivityMonitorRepository;
@@ -96,8 +111,20 @@ export interface CliBudgetOverviewReader {
   overviewForUser(input: { userId: string; organizationId: string }): Promise<CliBudgetOverview>;
 }
 
+/**
+ * The /me budget overview: every budget binding this member's own keys in one
+ * organization. Answered by `GatewayApi.budgetOverviewForUser` — the gateway
+ * owns budgets, governance only presents them.
+ */
+export interface PersonalBudgetOverviewReader {
+  overviewForUser(input: {
+    userId: string;
+    organizationId: string;
+  }): Promise<GovernanceBudgetOverviewForUser>;
+}
+
 export interface CliAdminContactReader {
-  tryResolveAdminEmail(organizationId: string): Promise<string | null>;
+  findAdminEmail(organizationId: string): Promise<string | null>;
 }
 
 export interface CliTokenStore {
@@ -365,6 +392,30 @@ export interface GovernanceTraceIngestionClient {
   }>;
 }
 
+/**
+ * OCSF v1.1 SeverityId: 1 informational, 3 low, 4 medium, 5 high, 6 critical.
+ * Default 1; elevated when `langwatch.governance.anomaly_alert_id` is set.
+ */
+export const OCSF_SEVERITY = {
+  INFO: 1,
+  LOW: 3,
+  MEDIUM: 4,
+  HIGH: 5,
+  CRITICAL: 6,
+} as const;
+
+/**
+ * OCSF v1.1 ActivityId for ClassUid 6003 (API Activity): 1 create, 2 read,
+ * 3 update, 4 delete, 6 invoke (an LLM call or agent action).
+ */
+export const OCSF_ACTIVITY = {
+  CREATE: 1,
+  READ: 2,
+  UPDATE: 3,
+  DELETE: 4,
+  INVOKE: 6,
+} as const;
+
 export type GovernanceOcsfEventInput = {
   tenantId: string;
   eventId: string;
@@ -446,6 +497,11 @@ export type GovernanceHttpResponse = {
    * build responses by hand; the 429 path doesn't use them, so absence = no Retry-After.
    */
   readonly headers?: { get(name: string): string | null };
+  /**
+   * The response body stream, when the transport carries it. Optional for the same
+   * reason as `headers`; callers only drain it, so absence means nothing to drain.
+   */
+  readonly body?: { cancel(): Promise<void> } | null;
   json(): Promise<unknown>;
   text(): Promise<string>;
 };
@@ -746,7 +802,7 @@ export type StoredIngestionKeyOwnership = StoredIngestionKey & {
 };
 
 export interface IngestionKeyRepository {
-  tryFindIngestKey(input: {
+  findIngestKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -758,7 +814,7 @@ export interface IngestionKeyRepository {
   }): Promise<StoredIngestionKey[]>;
 
   /** One key by the lookup id embedded in its token, whether live or not. */
-  tryFindByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null>;
+  findByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null>;
 }
 
 export interface IngestionKeyIssuer {

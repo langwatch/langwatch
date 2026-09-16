@@ -66,6 +66,22 @@ const REQUEST_TIMEOUT_MS = 30_000;
  */
 const MAX_PAGES_PER_RUN = 20;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * How far a cost cursor rewinds on a restatement: Anthropic revises a day's cost
+ * for up to three days, so a resumed run re-reads that window rather than trusting
+ * the stored watermark.
+ */
+const COST_RESTATEMENT_LOOKBACK_DAYS = 3;
+
+/** The hint this adapter attaches under `PULLED_USAGE_HINT_KEY`, read back. */
+interface EmittedUsageHint {
+  dimensions?: Record<string, string>;
+  tokensCacheRead?: number;
+  tokensCacheWrite?: number;
+}
+
 /**
  * The cost report is daily-only, so its width is a constant rather than a
  * setting. It is BOTH the request parameter and the restatement-key dimension,
@@ -482,7 +498,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       throw new DispatchError({
         message: "Anthropic rate limit exceeded (HTTP 429).",
         retryable: true,
-        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+        retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after") ?? null),
       });
     }
     if (response.status === 401 || response.status === 403) {
@@ -1066,7 +1082,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    */
   private static differingFieldNames(events: NormalizedPullEvent[]): string[] {
     const rows = events
-      .map(parsedRawPayload)
+      .map((event) => AnthropicAdminPullerAdapter.parsedRawPayload(event))
       .filter((row): row is Record<string, unknown> => row !== null);
     const first = rows[0];
     if (first === undefined) return [];

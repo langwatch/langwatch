@@ -21,7 +21,7 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Organization, Team } from "~/generated/prisma/client";
+import type { Organization, Team } from "@langwatch/prisma-client/generated";
 import { prisma } from "~/server/db";
 import { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
 

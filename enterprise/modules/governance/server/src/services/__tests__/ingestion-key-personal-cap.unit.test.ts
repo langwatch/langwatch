@@ -87,7 +87,7 @@ class LedgerRepository implements IngestionKeyRepository {
   constructor(private readonly ledger: KeyLedger) {
   }
 
-  tryFindIngestKey(): Promise<StoredIngestionKey | null> {
+  findIngestKey(): Promise<StoredIngestionKey | null> {
     return Promise.resolve(null);
   }
 
@@ -95,7 +95,7 @@ class LedgerRepository implements IngestionKeyRepository {
     return Promise.resolve(this.ledger.rows.filter((row) => !row.revokedAt));
   }
 
-  tryFindByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null> {
+  findByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null> {
     return Promise.resolve(this.ledger.rows.find((row) => row.lookupId === input.lookupId) ?? null);
   }
 }

@@ -13,9 +13,12 @@ import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceOcsfEventInput } from "../app/governance.members.ts";
-import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../governanceOcsfEvents.clickhouse.repository";
-import { normalizeEmail } from "../logic/identityEvidence";
+import { Temporal } from "@langwatch/time";
+import {
+  type GovernanceOcsfEventInput,
+  OCSF_ACTIVITY,
+  OCSF_SEVERITY,
+} from "../app/governance.members.ts";
 
 /**
  * The amount this event carries and the currency it is denominated in.
@@ -69,17 +72,26 @@ function ocsfMoneyFields(event: NormalizedPullEvent): {
  * unchanged — readers take the first of email / user id / enduser id that is
  * set — while the audit row stops claiming an address it never had.
  *
- * The address test is {@link normalizeEmail}, the same one the identity match
- * engine uses to decide what proves a link, so the two cannot drift into
- * disagreeing about what an address is. The value is stored verbatim rather
+ * The address test is {@link isEmailAddress}, the same rule the identity match
+ * engine normalizes by, so the two cannot drift into disagreeing about what an
+ * address is. The value is stored verbatim rather
  * than normalized: this is an audit row, and it records what the provider
  * said, not a lowercased rewrite of it.
  */
+/**
+ * One `@`, something either side, a dot in the domain, no whitespace, lowercased.
+ * Strict on purpose: a permissive parser manufactures identity matches. The
+ * identity-match engine applies the same rule and the two must not drift.
+ */
+function isEmailAddress(text: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim().toLowerCase());
+}
+
 export function ocsfActorFields(actor: string): {
   actorUserId: string;
   actorEmail: string;
 } {
-  if (normalizeEmail(actor) !== null) {
+  if (isEmailAddress(actor)) {
     return { actorUserId: "", actorEmail: actor };
   }
   return { actorUserId: actor, actorEmail: "" };
@@ -162,7 +174,7 @@ export function mapToOcsfRow({
     sourceType,
     activityId: OCSF_ACTIVITY.INVOKE,
     severityId: OCSF_SEVERITY.INFO,
-    eventTime: safeEventTime,
+    eventTime: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
     actorUserId,
     actorEmail,
     actorEnduserId: "",

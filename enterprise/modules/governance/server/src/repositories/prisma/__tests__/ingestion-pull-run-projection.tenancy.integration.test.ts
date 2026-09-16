@@ -16,7 +16,7 @@
 import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Organization, Team } from "~/generated/prisma/client";
+import type { Organization, Team } from "@langwatch/prisma-client/generated";
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";

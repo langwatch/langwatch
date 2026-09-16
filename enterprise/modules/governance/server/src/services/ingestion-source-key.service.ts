@@ -37,7 +37,7 @@ export class IngestionKeyService {
   }
 
   async ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey> {
-    const prior = await this.repository.tryFindIngestKey({
+    const prior = await this.repository.findIngestKey({
       organizationId: input.organizationId,
       projectId: input.projectId,
       sourceType: input.sourceType,
@@ -197,7 +197,7 @@ export class IngestionKeyService {
     organizationId: string;
     lookupId: string;
   }): Promise<PersonalIngestionKeyState | null> {
-    const key = await this.repository.tryFindByLookupId({ lookupId: input.lookupId });
+    const key = await this.repository.findByLookupId({ lookupId: input.lookupId });
     if (
       !key ||
       key.organizationId !== input.organizationId ||

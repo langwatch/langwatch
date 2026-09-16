@@ -1,6 +1,7 @@
 // Tests NormalizedPullEvent→OCSF mapping (eventId, raw_event, time-coercion, actor field).
 // Real mapper imported to catch bugs (hand-copied contracts missed them).
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 
 import {
   PULLED_USAGE_HINT_KEY,
@@ -87,8 +88,8 @@ describe("given a pulled provider event", () => {
     it("falls back to a usable time rather than an invalid date", () => {
       const row = mapEvent({ ...baseEvent, event_timestamp: "not-a-date" });
 
-      expect(row.eventTime).toBeInstanceOf(Date);
-      expect(Number.isFinite(row.eventTime.getTime())).toBe(true);
+      expect(row.eventTime).toBeInstanceOf(Temporal.Instant);
+      expect(Number.isFinite(row.eventTime.epochMilliseconds)).toBe(true);
     });
   });
 });

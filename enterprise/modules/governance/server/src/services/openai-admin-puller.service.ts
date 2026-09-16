@@ -267,7 +267,7 @@ async function providerRefusal(response: GovernanceHttpResponse): Promise<Dispat
     return new DispatchError({
       message: "OpenAI rate limit exceeded (HTTP 429).",
       retryable: true,
-      retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after") ?? null),
     });
   }
   return new DispatchError({

@@ -139,3 +139,10 @@ Feature: Enterprise governance package boundary
     Given a coding-assistant cost-attribution policy already resolved once
     When the same source is resolved again
     Then the cached resolution is reused and an explicit billable tile overrides it
+
+  @unit
+  Scenario: Every governance REST family answers from the installed module
+    Given the governance module is installed in a process
+    When a request arrives on the project-scoped family, the CLI governance plane or a push-mode ingestion receiver
+    Then each family is served by the same installed governance application
+    And no family answers an unknown error because the capability its routes name was declared but never provided

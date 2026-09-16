@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { ValidationError } from "@langwatch/handled-error";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { readClaimedSubscription } from "./prisma.azure-bill-ownership.repository.ts";
 
 const SOURCE_FIELD = "_azureBillSourceId";

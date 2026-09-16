@@ -26,6 +26,8 @@ import {
   GovernanceApp,
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
+  type GovernanceCliMembers,
+  type GovernanceIngestMembers,
 } from "../../app/governance.app.ts";
 import {
   governanceRest,
@@ -131,6 +133,18 @@ function buildApi(
           unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
       },
       actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
+      cli: {
+        accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
+        members: unreachable<GovernanceCliMembers["members"]>(),
+        plans: unreachable<GovernanceCliMembers["plans"]>(),
+        persons: unreachable<GovernanceCliMembers["persons"]>(),
+        supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
+      },
+      ingest: {
+        projects: unreachable<GovernanceIngestMembers["projects"]>(),
+        principals: unreachable<GovernanceIngestMembers["principals"]>(),
+        traceCollection: unreachable<GovernanceIngestMembers["traceCollection"]>(),
+      },
     },
   });
 

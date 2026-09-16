@@ -42,7 +42,7 @@ import {
   type OttlTransformResult,
   type OttlValidationError,
   type OttlValidationResult,
-} from "@langwatch/enterprise-governance-contract";
+} from "../ottl-transform.channel.ts";
 
 interface RawValidateResponse {
   ok: boolean;
@@ -107,7 +107,7 @@ function normaliseErrors(raw: RawValidateResponse | RawTransformResponse): OttlV
  * processes source the same `.env`, so configuration is resolved once by the
  * process composition root and injected here.
  */
-export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
+export class HttpOttlTransformChannel extends GovernanceOttlGateway {
   private constructor(
     private readonly baseUrl: string | null,
     private readonly secret: string | null,
@@ -122,8 +122,8 @@ export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
     secret?: string | null;
     request?: typeof fetch;
     now?: () => number;
-  }): AppGovernanceOttlGateway {
-    return new AppGovernanceOttlGateway(
+  }): HttpOttlTransformChannel {
+    return new HttpOttlTransformChannel(
       options.baseUrl ?? null,
       options.secret ?? null,
       options.request ?? fetch,
@@ -189,7 +189,7 @@ export class AppGovernanceOttlGateway extends GovernanceOttlGateway {
     const timestamp = Math.floor(this.now() / 1_000).toString();
     const bodyJson = JSON.stringify(body);
     const signature = sign(this.secret, canonical("POST", path, timestamp, bodyJson));
-    return await this.request(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
+    return this.request(`${this.baseUrl.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

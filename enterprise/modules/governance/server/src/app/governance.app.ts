@@ -27,7 +27,7 @@
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   NoEligibleProvidersError,
@@ -64,6 +64,41 @@ import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
+import {
+  GovernanceCliAccessService,
+  type GovernanceCliAccessApi,
+  type GovernanceCliAccessToken,
+  type GovernanceCliMemberDirectory,
+} from "../services/governance-cli-access.service.ts";
+import {
+  GovernanceCliActivityService,
+  type GovernanceCliActivityApi,
+} from "../services/governance-cli-activity.service.ts";
+import {
+  GovernanceCliCredentialService,
+  type GovernanceCliBudgetReader,
+  type GovernanceCliCredentialApi,
+  type GovernanceCliPersonDirectory,
+} from "../services/governance-cli-credentials.service.ts";
+import {
+  GovernanceIngestAccessService,
+  type GovernanceIngestAccessApi,
+} from "../services/governance-ingest-access.service.ts";
+import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
+import {
+  GovernanceIngestReceiverService,
+  type GovernanceIngestLogCollectionChannel,
+  type GovernanceIngestMetricCollectionChannel,
+  type GovernanceIngestPrincipalDirectory,
+  type GovernanceIngestReceiverApi,
+  type GovernanceIngestSpend,
+  type GovernanceIngestTraceCollection,
+} from "../services/governance-ingest-receiver.service.ts";
+import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
+import type { GovernanceProjectDirectory } from "./governance.members.ts";
+import type { GovernanceCliRestApi } from "../transport/governance-cli.rest.ts";
+import type { GovernanceIngestRestApi } from "../transport/governance-ingest.rest.ts";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
 
 /**
  * A member already holds an unrevoked personal key under this label.
@@ -213,6 +248,53 @@ export interface GovernanceActorUser {
 }
 
 /** Where an actor's own workspace lives, for the admin's drill-in link. */
+/**
+ * What the `/api/auth/cli` governance plane reads that this feature does not
+ * own: the device session a bearer names, the seat behind it, the plan it is
+ * admitted against, and the identity and contact reads its credential routes
+ * perform.
+ */
+export interface GovernanceCliMembers {
+  /** The caller behind an `Authorization` header, and the sever for it. */
+  accessTokens: GovernanceCliAccessToken;
+  /** Whether a caller still holds a seat in the token's organization. */
+  members: GovernanceCliMemberDirectory;
+  /** The plan every Enterprise-gated CLI route is admitted against. */
+  plans: PlanProvider;
+  /** The identity and project reads the credential routes perform. */
+  persons: GovernanceCliPersonDirectory;
+  /** Who to point a caller at when a budget refuses the request. */
+  supportContacts: Pick<OrganizationSupportContactService, "findSupportContact">;
+  /** The spend decision the budget pre-flight asks, where one is composed. */
+  budgets?: GovernanceCliBudgetReader | undefined;
+  /** The deployment's public origin; the links this family answers use it. */
+  publicBaseUrl?: string | undefined;
+}
+
+/**
+ * What the push-mode `/api/ingest` receivers reach: the tenant every payload
+ * lands under, the pipelines each signal is folded into, and the throttle the
+ * gate applies before a byte is read. Only the trace pipeline is required —
+ * a signal this deployment folds nowhere answers `not-served` rather than
+ * pretending to accept it.
+ */
+export interface GovernanceIngestMembers {
+  /** The hidden per-organization governance project every receiver writes under. */
+  projects: Pick<GovernanceProjectDirectory, "ensureInternal">;
+  /** Who a cost event's actor email names, where they are a member. */
+  principals: GovernanceIngestPrincipalDirectory;
+  /** The trace pipeline. Required — without it there is no receiver at all. */
+  traceCollection: GovernanceIngestTraceCollection;
+  /** The log pipeline, where this process folds logs. */
+  logCollection?: GovernanceIngestLogCollectionChannel | undefined;
+  /** The metric pipeline, where this process folds metrics. */
+  metricCollection?: GovernanceIngestMetricCollectionChannel | undefined;
+  /** The spend ledger a cost event is priced into, where one is composed. */
+  spend?: GovernanceIngestSpend | undefined;
+  /** The per-caller throttle, where this deployment composed a counter. */
+  rateLimit?: GovernanceIngestRateLimiter | undefined;
+}
+
 /** What the process composes this feature's application from. */
 export interface GovernanceAppDependencies {
   governance: GovernanceApi;
@@ -236,6 +318,10 @@ export interface GovernanceAppDependencies {
   personalVirtualKeys: GovernancePersonalVirtualKeyMembers;
   /** Resolves the actor token stamped on a span to the person who owns it. */
   actors: GovernanceActorDirectory;
+  /** What the CLI governance plane reaches beyond this feature. */
+  cli: GovernanceCliMembers;
+  /** What the push-mode ingestion receivers reach beyond this feature. */
+  ingest: GovernanceIngestMembers;
 }
 
 /** Who a call is attributed to, and (for a lazy backfill) what to name them. */
@@ -248,7 +334,9 @@ export interface GovernanceCaller {
 /** How a process installs this application: one members object, no peers. */
 type GovernanceSetup = FeatureSetup<Record<never, never>, GovernanceAppDependencies, undefined>;
 
-export class GovernanceApp implements GovernanceRestApi {
+export class GovernanceApp
+  implements GovernanceRestApi, GovernanceCliRestApi, GovernanceIngestRestApi
+{
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
   static readonly dependencies: Readonly<Record<string, never>> = {};
 
@@ -262,9 +350,102 @@ export class GovernanceApp implements GovernanceRestApi {
       organizations: dependencies.organizations,
       projects: dependencies.projects,
     });
+    this.cliAccessService = GovernanceCliAccessService.create({
+      accessTokens: dependencies.cli.accessTokens,
+      directory: () => dependencies.cli.members,
+      plans: () => dependencies.cli.plans,
+      permittedOnOrganization: (input) => this.permittedOn("organization", input.organizationId, input),
+      publicBaseUrl: dependencies.cli.publicBaseUrl,
+    });
+    this.cliCredentialService = GovernanceCliCredentialService.create({
+      governance: () => dependencies.governance,
+      directory: () => dependencies.cli.persons,
+      supportContacts: () => dependencies.cli.supportContacts,
+      ensurePersonalWorkspace: (input) => dependencies.organizations.ensurePersonalWorkspace(input),
+      tryFindPersonalWorkspace: (input) =>
+        dependencies.organizations.tryFindPersonalWorkspace(input),
+      permittedOnProject: (input) => this.permittedOn("project", input.projectId, input),
+      budgets: dependencies.cli.budgets,
+      publicBaseUrl: dependencies.cli.publicBaseUrl,
+    });
+    this.cliActivityService = GovernanceCliActivityService.create({
+      governance: () => dependencies.governance,
+    });
+    this.ingestAccessService = GovernanceIngestAccessService.create({
+      governance: () => dependencies.governance,
+      rateLimit: dependencies.ingest.rateLimit,
+    });
+    this.ingestReceiverService = GovernanceIngestReceiverService.create({
+      governance: () => dependencies.governance,
+      projects: () => dependencies.ingest.projects,
+      directory: () => dependencies.ingest.principals,
+      traceCollection: dependencies.ingest.traceCollection,
+      logCollection: dependencies.ingest.logCollection,
+      metricCollection: dependencies.ingest.metricCollection,
+      spend: dependencies.ingest.spend,
+    });
   }
 
   private readonly personalUsageDashboards: PersonalUsageDashboardService;
+  private readonly cliAccessService: GovernanceCliAccessApi;
+  private readonly cliCredentialService: GovernanceCliCredentialApi;
+  private readonly cliActivityService: GovernanceCliActivityApi;
+  private readonly ingestAccessService: GovernanceIngestAccessApi;
+  private readonly ingestReceiverService: GovernanceIngestReceiverApi;
+
+  /**
+   * One permission question at one scope. Both CLI families ask it — the gate
+   * at organization tier, the credential routes at project tier — and asking
+   * it here is what keeps the deployment's AuthZ graph a single member rather
+   * than a function each service is handed separately.
+   */
+  private async permittedOn(
+    tier: "organization" | "project",
+    id: string,
+    input: { userId: string; permission: AuthzPermission },
+  ): Promise<boolean> {
+    const { permitted } = await this.dependencies.permissions.getDecision({
+      userId: input.userId,
+      permission: input.permission,
+      scope: { tier, id },
+    });
+
+    return permitted;
+  }
+
+  // ── The CLI governance plane ──────────────────────────────────────────────
+
+  /** The bearer, the plan and the RBAC permission, in that order. */
+  cliAccess(): GovernanceCliAccessApi {
+    return this.cliAccessService;
+  }
+
+  /** Everything `/api/auth/cli` hands back or mints. */
+  cliCredentials(): GovernanceCliCredentialApi {
+    return this.cliCredentialService;
+  }
+
+  /** The Activity Monitor reads, each with its ownership proof. */
+  cliActivity(): GovernanceCliActivityApi {
+    return this.cliActivityService;
+  }
+
+  /** The same governance capability the console's tRPC procedures read. */
+  governance(): GovernanceApi {
+    return this.dependencies.governance;
+  }
+
+  // ── The push-mode ingestion receivers ─────────────────────────────────────
+
+  /** Throttle, bearer secret and path-id check, in that order. */
+  ingestAccess(): GovernanceIngestAccessApi {
+    return this.ingestAccessService;
+  }
+
+  /** Where a payload of each signal is folded, priced and acknowledged. */
+  ingestReceiver(): GovernanceIngestReceiverApi {
+    return this.ingestReceiverService;
+  }
 
   // ── Ingestion templates ───────────────────────────────────────────────────
 

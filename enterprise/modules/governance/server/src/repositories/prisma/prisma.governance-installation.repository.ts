@@ -37,7 +37,7 @@ import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members
 import type { AiToolProviderCatalog, AiToolSlug } from "../ai-tool-catalog.repository.ts";
 import type { CliAdminContactReader } from "../../app/governance.members.ts";
 import type { CliTokenStore } from "../../app/governance.members.ts";
-import type { CliBudgetOverviewReader } from "../../app/governance.members.ts";
+import type { PersonalBudgetOverviewReader } from "../../app/governance.members.ts";
 import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import type { GovernanceEventingChannel } from "../../app/governance.members.ts";
@@ -79,7 +79,7 @@ export type GovernanceInstallationOptions = {
   ingestionDiagnostics: GovernanceDiagnosticsSink;
   personalUsageReader?: PersonalUsageReader;
   personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
-  budgetOverview: CliBudgetOverviewReader;
+  budgetOverview: PersonalBudgetOverviewReader;
   aiToolSlugs: AiToolSlug;
   aiToolProviders: AiToolProviderCatalog;
   cliContacts: CliAdminContactReader;

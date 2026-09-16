@@ -19,7 +19,7 @@
  * The comparison is the reason this is a guard and not an equality check. An
  * environment address survives a trailing slash, a change of case and a path
  * after it, and a check that takes the typed text at face value refuses almost
- * nothing. `isSameDataverseEnvironment` already normalises exactly that for the
+ * nothing. `isSameEnvironment` already normalises exactly that for the
  * transcript walk, so it is imported rather than re-derived here — a second
  * copy of that rule is a copy that can quietly disagree with the first.
  *
@@ -28,7 +28,7 @@
  */
 
 import { ValidationError } from "@langwatch/handled-error";
-import { isSameDataverseEnvironment } from "../../services/dataverse-environment.service.ts";
+import { DataverseEnvironmentService } from "../../services/dataverse-environment.service.ts";
 
 /** The config key naming the environment a source reads conversations from. */
 export const ENVIRONMENT_URL_FIELD = "environmentUrl";
@@ -89,9 +89,9 @@ export function assertEnvironmentNotAlreadyClaimed(params: {
     (reader) =>
       reader.id !== sourceId &&
       // A reader whose own address is blank must not swallow a real claim:
-      // `isSameDataverseEnvironment` returns false for an unparseable address,
+      // `isSameEnvironment` returns false for an unparseable address,
       // so two sources that name nothing are never in conflict.
-      isSameDataverseEnvironment({
+      DataverseEnvironmentService.isSameEnvironment({
         value: claimed,
         environmentUrl: reader.environmentUrl,
       }),

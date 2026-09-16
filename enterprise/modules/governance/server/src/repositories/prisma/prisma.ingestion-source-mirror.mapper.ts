@@ -1,6 +1,27 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
+/**
+ * The nine run-status fold fields this mapper reads.
+ *
+ * Declared locally because the fold projection that used to produce them
+ * (`@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection`)
+ * does not exist anywhere in the live tree. This is exactly the shape this
+ * mapper reads and no wider — it is not the `IngestionPullRunStatusData` in
+ * `../../eventing/ingestion-pull-run-status-eventing.projection.ts`, which is
+ * a different, narrower fold's state and does not carry `LastSuccessAt`,
+ * `LastReadThroughAt` or `LastRunCompleteness`.
+ */
+export interface IngestionPullRunStatusData {
+  Enabled: boolean;
+  Cursor: string | null;
+  LastRunOutcome: string | null;
+  LastRunEventCount: number;
+  ConsecutiveErrors: number;
+  LastSuccessAt: number | null;
+  LastRunAt: number | null;
+  LastReadThroughAt: number | null;
+  LastRunCompleteness: "complete" | "truncated" | null | undefined;
+}
 
 /**
  * The columns the run-status projection mirrors back onto `IngestionSource`.
