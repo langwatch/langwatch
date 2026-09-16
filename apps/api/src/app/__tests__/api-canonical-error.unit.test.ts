@@ -63,6 +63,26 @@ class DatastoreUnavailable extends HandledError {
 }
 
 describe("canonicalErrorFor", () => {
+  describe("given any refusal at all", () => {
+    /**
+     * The `/api/` surface is not tRPC, and a caller there reads `body.code`
+     * rather than unwrapping `body.error.code`.
+     *
+     * @scenario "A REST refusal carries its fields at the root of the body"
+     */
+    it("puts code, type, message and retryable at the root of the body", () => {
+      const { body } = canonicalErrorFor(new ValidationError("Validation error"));
+
+      expect(body).toMatchObject({
+        code: "validation_error",
+        type: "unprocessable_entity",
+        retryable: false,
+      });
+      expect(typeof body.message).toBe("string");
+      expect(body).not.toHaveProperty("error");
+    });
+  });
+
   describe("given a request that arrived intact and was rejected on its values", () => {
     it("answers 422 for the refusal the shared REST validator raises", () => {
       const { status, body } = canonicalErrorFor(
@@ -73,14 +93,14 @@ describe("canonicalErrorFor", () => {
       );
 
       expect(status).toBe(422);
-      expect(body.error.code).toBe("validation_error");
+      expect(body.code).toBe("validation_error");
     });
 
     it("answers 422 for the refusal a tRPC procedure's zod failure is promoted to", () => {
       const { status, body } = canonicalErrorFor(new ValidationError("Validation error"));
 
       expect(status).toBe(422);
-      expect(body.error.code).toBe("validation_error");
+      expect(body.code).toBe("validation_error");
     });
 
     /** @scenario "A validation failure answers 422 whatever status its class named" */
@@ -90,14 +110,14 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new ContractValidationErrorAt400());
 
       expect(status).toBe(422);
-      expect(body.error.code).toBe("validation_error");
+      expect(body.code).toBe("validation_error");
     });
 
     /** @scenario "A validation failure answers 422 whatever status its class named" */
     it("classes the envelope as unprocessable rather than as a bad request", () => {
       const { body } = canonicalErrorFor(new ValidationError("Validation error"));
 
-      expect(body.error.type).toBe("unprocessable_entity");
+      expect(body.type).toBe("unprocessable_entity");
     });
 
     it("keeps the offending fields on the envelope so the caller learns where", () => {
@@ -108,8 +128,8 @@ describe("canonicalErrorFor", () => {
         }),
       );
 
-      expect(body.error.meta?.fields).toEqual(["from"]);
-      expect(body.error.meta?.reasons).toMatchObject([{ code: "schema_failure" }]);
+      expect(body.meta?.fields).toEqual(["from"]);
+      expect(body.meta?.reasons).toMatchObject([{ code: "schema_failure" }]);
     });
   });
 
@@ -118,13 +138,13 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new MalformedBody());
 
       expect(status).toBe(400);
-      expect(body.error.code).toBe("malformed_request");
+      expect(body.code).toBe("malformed_request");
     });
 
     it("classes the envelope as a bad request", () => {
       const { body } = canonicalErrorFor(new MalformedBody());
 
-      expect(body.error.type).toBe("bad_request");
+      expect(body.type).toBe("bad_request");
     });
   });
 
@@ -133,7 +153,7 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new FeatureNotEnabled());
 
       expect(status).toBe(403);
-      expect(body.error.code).toBe("lwql_not_enabled");
+      expect(body.code).toBe("lwql_not_enabled");
     });
   });
 
@@ -142,7 +162,7 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new DatastoreUnavailable());
 
       expect(status).toBe(503);
-      expect(body.error.code).toBe("internal_error");
+      expect(body.code).toBe("internal_error");
       expect(JSON.stringify(body)).not.toContain("ch-internal-host");
     });
 
@@ -152,8 +172,8 @@ describe("canonicalErrorFor", () => {
         spanId: "span-def",
       });
 
-      expect(body.error.trace_id).toBe("trace-abc");
-      expect(body.error.span_id).toBe("span-def");
+      expect(body.trace_id).toBe("trace-abc");
+      expect(body.span_id).toBe("span-def");
     });
   });
 
@@ -162,7 +182,7 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new Error("prisma-host:5432 refused"));
 
       expect(status).toBe(500);
-      expect(body.error.code).toBe("internal_error");
+      expect(body.code).toBe("internal_error");
       expect(JSON.stringify(body)).not.toContain("prisma-host");
     });
 
@@ -170,7 +190,7 @@ describe("canonicalErrorFor", () => {
       const { status, body } = canonicalErrorFor(new StatusCarryingError());
 
       expect(status).toBe(500);
-      expect(body.error.code).toBe("internal_error");
+      expect(body.code).toBe("internal_error");
     });
   });
 });

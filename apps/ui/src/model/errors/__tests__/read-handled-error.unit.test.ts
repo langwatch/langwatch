@@ -230,6 +230,40 @@ describe("readHandledError", () => {
       expect(readHandledError(body)).toBeNull();
     });
   });
+
+  describe("given the canonical envelope a /api/ route answers", () => {
+    /**
+     * The `/api/` surface is not tRPC: its fields sit at the ROOT of the body,
+     * not under an `error` key. Read at the root, a caller writes `body.code`.
+     */
+    it("lifts the code, meta and trace id off the root", () => {
+      const result = readHandledError({
+        type: "not_found",
+        code: "scenario_not_found",
+        message: "Scenario abc was not found.",
+        retryable: false,
+        meta: { scenarioId: "abc" },
+        fault: "customer",
+        trace_id: "4bf92f",
+      });
+
+      expect(result).toMatchObject({
+        code: "scenario_not_found",
+        fault: "customer",
+        traceId: "4bf92f",
+        retryable: false,
+      });
+      expect(result?.meta).toMatchObject({
+        scenarioId: "abc",
+        message: "Scenario abc was not found.",
+      });
+    });
+
+    /** The trio is the discriminator, so a body missing one is left to the later readers. */
+    it("declines a root body that carries no retryable flag", () => {
+      expect(readHandledError({ type: "not_found", code: "scenario_not_found" })).toBeNull();
+    });
+  });
 });
 
 describe("readErrorTraceId", () => {

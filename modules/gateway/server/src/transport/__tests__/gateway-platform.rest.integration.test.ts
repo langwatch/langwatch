@@ -49,7 +49,7 @@ function statefulIdempotency(): IdempotentRunner {
   };
 }
 
-/** The canonical `{ error: { code, message, ... } }` envelope this family publishes. */
+/** The canonical `{ type, code, message, ... }` envelope this family publishes. */
 const onError: RestErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {
     const status = (error.httpStatus ?? 500) as ContentfulStatusCode;

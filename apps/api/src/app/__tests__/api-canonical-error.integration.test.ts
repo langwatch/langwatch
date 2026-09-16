@@ -81,7 +81,7 @@ async function refusalOf(response: Response): Promise<{
   code: string;
   meta?: Record<string, unknown>;
 }> {
-  return apiErrorSchema.parse(await response.json()).error;
+  return apiErrorSchema.parse(await response.json());
 }
 
 describe("given the families the api process mounts", () => {

@@ -30,6 +30,17 @@ Feature: Handled errors — the handled-error boundary
     And Hono's `onError` normalises a HandledError to `{ error: code, message, ...meta }`
 
   # ==========================================================================
+  # The REST body's shape: the fields sit at the root, not in an envelope
+  # ==========================================================================
+
+  @unit @bdd @domain-errors
+  Scenario: A REST refusal carries its fields at the root of the body
+    Given a handled error crosses the /api/ REST boundary
+    When the caller reads the response body
+    Then code, type, message and retryable are at the root of the body
+    And none of them is nested under an error key, because the REST surface is not tRPC
+
+  # ==========================================================================
   # Handled: known, user-relevant failures cross the boundary with meaning
   # ==========================================================================
 

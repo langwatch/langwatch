@@ -236,33 +236,36 @@ export const successSchema = z.object({ success: z.boolean() });
  * The canonical REST error envelope: one shape for every refusal so a caller writes one
  * reader. `type` is the HTTP status class; `code` is the stable machine name to branch on;
  * `message` is for humans. `meta`, `retryable`, `tips`, `docs_url`, `fault` are optional detail.
+ *
+ * The fields sit at the ROOT of the body, not under an `error` key. The REST
+ * surface is not tRPC: a caller reads `body.code`, the same place
+ * `packages/api/src/errors.ts`'s `ErrorResponseBody` and the Go envelope put
+ * it, so one reader serves every `/api/` answer.
  */
 export const apiErrorSchema = z.object({
-  error: z.object({
-    type: z.string(),
-    code: z.string(),
-    message: z.string(),
-    retryable: z.boolean(),
-    meta: z.record(z.string(), z.unknown()).optional(),
-    /**
-     * Correlation handles for the failing request, present when the request
-     * was traced. Same field names and semantics as `herr.ErrorBody`.
-     */
-    trace_id: z.string().optional(),
-    span_id: z.string().optional(),
-    /**
-     * The remediation channel: what to do about it, where it is documented,
-     * and whose mistake it was.
-     */
-    tips: z.array(z.string()).optional(),
-    docs_url: z.string().optional(),
-    fault: z.enum(["customer", "platform", "provider"]).optional(),
-    /**
-     * The cause chain a multi-fact refusal IS — one entry per offending
-     * field for a schema failure.
-     */
-    reasons: z.array(z.unknown()).optional(),
-  }),
+  type: z.string(),
+  code: z.string(),
+  message: z.string(),
+  retryable: z.boolean(),
+  meta: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * Correlation handles for the failing request, present when the request
+   * was traced. Same field names and semantics as `herr.ErrorBody`.
+   */
+  trace_id: z.string().optional(),
+  span_id: z.string().optional(),
+  /**
+   * The remediation channel: what to do about it, where it is documented,
+   * and whose mistake it was.
+   */
+  tips: z.array(z.string()).optional(),
+  docs_url: z.string().optional(),
+  fault: z.enum(["customer", "platform", "provider"]).optional(),
+  /**
+   * The cause chain a multi-fact refusal IS — one entry per offending
+   * field for a schema failure.
+   */
+  reasons: z.array(z.unknown()).optional(),
 });
 
 export type ApiErrorBody = z.infer<typeof apiErrorSchema>;
@@ -320,19 +323,17 @@ export function apiErrorBody({
   reasons?: readonly SerializedReason[];
 }): ApiErrorBody {
   return {
-    error: {
-      type: apiErrorType(status),
-      code,
-      message,
-      retryable,
-      ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
-      ...(traceId ? { trace_id: traceId } : {}),
-      ...(spanId ? { span_id: spanId } : {}),
-      ...(tips && tips.length > 0 ? { tips: [...tips] } : {}),
-      ...(docsUrl ? { docs_url: docsUrl } : {}),
-      ...(fault ? { fault } : {}),
-      ...(reasons && reasons.length > 0 ? { reasons: [...reasons] } : {}),
-    },
+    type: apiErrorType(status),
+    code,
+    message,
+    retryable,
+    ...(meta && Object.keys(meta).length > 0 ? { meta } : {}),
+    ...(traceId ? { trace_id: traceId } : {}),
+    ...(spanId ? { span_id: spanId } : {}),
+    ...(tips && tips.length > 0 ? { tips: [...tips] } : {}),
+    ...(docsUrl ? { docs_url: docsUrl } : {}),
+    ...(fault ? { fault } : {}),
+    ...(reasons && reasons.length > 0 ? { reasons: [...reasons] } : {}),
   };
 }
 
@@ -654,7 +655,7 @@ export function createCanonicalFamilyErrorHandler(options: {
         path: c.req.path,
         method: c.req.method,
         status,
-        code: body.error.code,
+        code: body.code,
         error: {
           name: error.name,
           message: error.message,
