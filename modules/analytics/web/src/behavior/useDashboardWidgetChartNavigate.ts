@@ -73,7 +73,7 @@ function buildClause({
  * Builds the liqe `q` expression from author params, dropping `projectId`, `startDate`/`endDate`
  * (handled separately), and anything unresolvable to a known liqe field (warn-and-drop).
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: loops params applying independent per-key resolution/escaping rules; the branches don't interact.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent rules.
 function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
   const clauses: string[] = [];
   for (const [key, value] of Object.entries(params)) {

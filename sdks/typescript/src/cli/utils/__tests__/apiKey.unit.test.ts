@@ -449,7 +449,7 @@ describe("resolveCredentials()", () => {
         // codes are stripped so a color-forcing environment cannot skew it.
         const stderr = errorSpy.mock.calls
           .map((c: unknown[]) =>
-            // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+            // eslint-disable-next-line no-control-regex -- strips ANSI codes from chalk output
             String(c[0]).replace(/\u001b\[[0-9;]*m/g, ""),
           )
           .join("\n");

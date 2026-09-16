@@ -76,7 +76,8 @@ describe("searchTracesCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSearch = vi.fn();
-    // biome-ignore lint/complexity/useArrowFunction: the command news up TracesApiService, and an arrow function is not constructible.
+    // The command news up TracesApiService, and an arrow function is not constructible.
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
     vi.mocked(TracesApiService).mockImplementation(function () {
       return {
         search: mockSearch,
@@ -581,7 +582,8 @@ describe("getTraceCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    // biome-ignore lint/complexity/useArrowFunction: the command news up TracesApiService, and an arrow function is not constructible.
+    // The command news up TracesApiService, and an arrow function is not constructible.
+    // biome-ignore lint/complexity/useArrowFunction: needs a constructible function.
     vi.mocked(TracesApiService).mockImplementation(function () {
       return {
         search: vi.fn(),
