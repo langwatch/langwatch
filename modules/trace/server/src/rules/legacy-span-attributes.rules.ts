@@ -104,7 +104,7 @@ function unwrapLegacyWrapper(
  * Reads the annotated value type for a canonical key from
  * langwatch.reserved.value_types (e.g. ["langwatch.input=chat_messages"]).
  */
-function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string): string | null {
+function findAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string): string | null {
   let raw = spanAttributes["langwatch.reserved.value_types"];
 
   // ClickHouse Map(String, String) stores arrays as JSON strings
@@ -158,7 +158,7 @@ function readAnnotatedValue(
     return unwrapLegacyWrapper(value, spanAttributes, key);
   }
 
-  const annotatedType = getAnnotatedType(spanAttributes, key);
+  const annotatedType = findAnnotatedType(spanAttributes, key);
   if (annotatedType === "chat_messages" && Array.isArray(value)) {
     return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
   }
@@ -262,7 +262,7 @@ export function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOu
  * Extracts model name from canonical span attributes only.
  * After canonicalization, model is at gen_ai.response.model / gen_ai.request.model.
  */
-export function extractModel(spanAttributes: NormalizedAttributes): string | null {
+export function findModel(spanAttributes: NormalizedAttributes): string | null {
   const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
 
   return typeof model === "string" ? model : null;
@@ -272,7 +272,7 @@ export function extractModel(spanAttributes: NormalizedAttributes): string | nul
  * Extracts vendor from canonical span attributes only.
  * After canonicalization, vendor is at gen_ai.system / gen_ai.provider.name.
  */
-export function extractVendor(spanAttributes: NormalizedAttributes): string | null {
+export function findVendor(spanAttributes: NormalizedAttributes): string | null {
   const vendor = spanAttributes["gen_ai.provider.name"] ?? spanAttributes["gen_ai.system"];
 
   return typeof vendor === "string" ? vendor : null;

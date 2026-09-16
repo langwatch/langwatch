@@ -13,7 +13,7 @@ export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEdi
   .procedure("getByTraceId")
   .withPermission("traces:view")
   .handle(async ({ app, input, actor }) => {
-    const overlay = await app.readTraceEditOverlay({
+    const overlay = await app.findTraceEditOverlay({
       projectId: input.projectId,
       traceId: input.traceId,
     });
@@ -42,7 +42,7 @@ export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEdi
   .procedure("upsert")
   .withPermission("annotations:update")
   .handle(async ({ app, input, actor }) => {
-    const stored = await app.readTraceEditOverlay({
+    const stored = await app.findTraceEditOverlay({
       projectId: input.projectId,
       traceId: input.traceId,
     });

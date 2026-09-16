@@ -22,7 +22,7 @@ export abstract class TraceContentReadService {
       projection?: CompiledProjection["plan"];
     };
   }): Promise<TracesForProjectResult>;
-  abstract readTrace(input: {
+  abstract findTrace(input: {
     projectId: string;
     traceId: string;
     protections: unknown;

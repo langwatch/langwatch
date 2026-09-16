@@ -67,7 +67,7 @@ export type TraceLegacyCredentialResolver = (input: {
 
 /** The trace reads these five routes answer from. */
 export interface TraceLegacyReads {
-  readTrace(
+  findTrace(
     input: Readonly<{ projectId: string; traceId: string; protections: unknown }>,
   ): Promise<Trace | undefined>;
   readEvaluations(
@@ -215,9 +215,9 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
     const headers = supersededBy(`/api/traces/${traceId}?format=${format}`);
 
     const protections = await app.getProtections({ projectId: project.id, credential });
-    // `readTrace` resolves offloaded values in full (#4991) — the same
+    // `findTrace` resolves offloaded values in full (#4991) — the same
     // `{ full: true }` this handler used to pass for itself.
-    const trace = await app.traces().readTrace({
+    const trace = await app.traces().findTrace({
       projectId: project.id,
       traceId,
       protections,

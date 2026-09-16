@@ -13,9 +13,9 @@ import {
   extractContexts,
   extractError,
   extractInput,
-  extractModel,
+  findModel,
   extractOutput,
-  extractVendor,
+  findVendor,
 } from "../../rules/legacy-span-attributes.rules.ts";
 
 /**
@@ -135,8 +135,8 @@ export class TraceLegacySpanMappingService {
       return {
         ...baseSpan,
         type: "llm" as const,
-        model: extractModel(normalizedSpan.spanAttributes),
-        vendor: extractVendor(normalizedSpan.spanAttributes),
+        model: findModel(normalizedSpan.spanAttributes),
+        vendor: findVendor(normalizedSpan.spanAttributes),
       };
     }
 

@@ -41,7 +41,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       userId: actor.id,
     });
 
-    const trace = await app.readTrace({
+    const trace = await app.findTrace({
       projectId: input.projectId,
       traceId: input.traceId,
       protections,
@@ -73,7 +73,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("getEvaluationInputs")
   .withPermission("traces:view")
   .handle(({ app, input }) =>
-    app.readEvaluationInputs({ projectId: input.projectId, evaluationId: input.evaluationId }),
+    app.findEvaluationInputs({ projectId: input.projectId, evaluationId: input.evaluationId }),
   )
 
   .procedure("getEvaluationsMultiple")

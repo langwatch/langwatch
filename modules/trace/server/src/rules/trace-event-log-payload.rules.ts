@@ -95,7 +95,7 @@ export function eventLogOccurredAtWindow(eventId: string): {
  * sits at the top level; a span attribute is found by key, each entry parsed on its own so a
  * malformed sibling can never mask the offloaded field.
  */
-export function readEventPayloadField(payload: EventLogPayload, field: string): string | null {
+export function findEventPayloadField(payload: EventLogPayload, field: string): string | null {
   if (field === "body") {
     return typeof payload.body === "string" ? payload.body : null;
   }

@@ -87,7 +87,7 @@ export interface TraceApi {
       scrollId?: string | null;
     };
   }): Promise<TracesForProjectResult>;
-  readTrace(input: {
+  findTrace(input: {
     projectId: string;
     traceId: string;
     protections: unknown;
@@ -223,7 +223,7 @@ export interface TraceApi {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span[]>;
-  readSpan(input: {
+  findSpan(input: {
     projectId: string;
     traceId: string;
     spanId: string;
@@ -275,7 +275,7 @@ export interface TraceApi {
     traceIds: string[];
     protections: unknown;
   }): Promise<Record<string, unknown[]>>;
-  readEvaluationInputs(input: {
+  findEvaluationInputs(input: {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null>;
@@ -286,7 +286,7 @@ export interface TraceApi {
     startDate: number;
     endDate: number;
   }): Promise<unknown>;
-  readPromptStudioSpan(input: {
+  findPromptStudioSpan(input: {
     projectId: string;
     spanId: string;
     protections: unknown;
@@ -329,7 +329,7 @@ export interface TraceApi {
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
     by: { id: string },
   ): Promise<unknown>;
-  readTraceEditOverlay(input: {
+  findTraceEditOverlay(input: {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null>;
@@ -351,7 +351,7 @@ export interface TraceApi {
     protections: unknown;
     payload: unknown;
   }): Promise<void>;
-  readProject(projectId: string): Promise<unknown>;
+  findProject(projectId: string): Promise<unknown>;
 
   /** The platform's own address for one trace resource, built from the
    * project's slug and the path the caller already resolved. */

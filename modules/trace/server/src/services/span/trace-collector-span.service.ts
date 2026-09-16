@@ -23,7 +23,7 @@ function spanTypeToESpanKind(type: SpanTypes): ESpanKind {
   }
 }
 
-function stringAttr(key: string, value: string): OtlpKeyValue {
+function findStringAttribute(key: string, value: string): OtlpKeyValue {
   return { key, value: { stringValue: value } };
 }
 
@@ -70,30 +70,30 @@ function spanStringAttributes(span: Span): OtlpKeyValue[] {
   const attrs: OtlpKeyValue[] = [];
 
   if (span.input) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)));
+    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_INPUT, JSON.stringify(span.input)));
   }
 
   if (span.output) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)));
+    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_OUTPUT, JSON.stringify(span.output)));
   }
 
   if ("model" in span && span.model) {
-    attrs.push(stringAttr(ATTR_KEYS.GEN_AI_REQUEST_MODEL, span.model));
+    attrs.push(findStringAttribute(ATTR_KEYS.GEN_AI_REQUEST_MODEL, span.model));
   }
 
   if ("vendor" in span && span.vendor) {
-    attrs.push(stringAttr(ATTR_KEYS.GEN_AI_SYSTEM, span.vendor));
+    attrs.push(findStringAttribute(ATTR_KEYS.GEN_AI_SYSTEM, span.vendor));
   }
 
   if ("contexts" in span && span.contexts) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)));
+    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, JSON.stringify(span.contexts)));
   }
 
   return attrs;
 }
 
 function buildSpanAttributes(span: Span): OtlpKeyValue[] {
-  const attrs: OtlpKeyValue[] = [stringAttr(ATTR_KEYS.SPAN_TYPE, span.type)];
+  const attrs: OtlpKeyValue[] = [findStringAttribute(ATTR_KEYS.SPAN_TYPE, span.type)];
 
   attrs.push(...spanStringAttributes(span));
 
@@ -102,12 +102,12 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
   }
 
   if (span.params) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_PARAMS, JSON.stringify(span.params)));
+    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_PARAMS, JSON.stringify(span.params)));
   }
 
   if (span.error) {
     attrs.push(boolAttr(ATTR_KEYS.ERROR_HAS_ERROR, true));
-    attrs.push(stringAttr(ATTR_KEYS.ERROR_MESSAGE, span.error.message));
+    attrs.push(findStringAttribute(ATTR_KEYS.ERROR_MESSAGE, span.error.message));
   }
 
   return attrs;
@@ -116,7 +116,7 @@ function buildSpanAttributes(span: Span): OtlpKeyValue[] {
 /** One custom metadata value, under the attribute type its JavaScript type implies. */
 function customMetadataAttribute(attrKey: string, value: unknown): OtlpKeyValue {
   if (typeof value === "string") {
-    return stringAttr(attrKey, value);
+    return findStringAttribute(attrKey, value);
   }
 
   if (typeof value === "number") {
@@ -127,7 +127,7 @@ function customMetadataAttribute(attrKey: string, value: unknown): OtlpKeyValue 
     return boolAttr(attrKey, value);
   }
 
-  return stringAttr(attrKey, JSON.stringify(value));
+  return findStringAttribute(attrKey, JSON.stringify(value));
 }
 
 /** The reserved trace metadata, each field under its canonical resource attribute. */
@@ -141,20 +141,20 @@ function reservedMetadataAttributes(metadata: ReservedTraceMetadata): OtlpKeyVal
   ];
   for (const [value, key] of strings) {
     if (value) {
-      attrs.push(stringAttr(key, value));
+      attrs.push(findStringAttribute(key, value));
     }
   }
 
   if (metadata.labels && metadata.labels.length > 0) {
-    attrs.push(stringAttr(ATTR_KEYS.LANGWATCH_LABELS, JSON.stringify(metadata.labels)));
+    attrs.push(findStringAttribute(ATTR_KEYS.LANGWATCH_LABELS, JSON.stringify(metadata.labels)));
   }
 
   if (metadata.sdk_version) {
-    attrs.push(stringAttr("langwatch.sdk.version", metadata.sdk_version));
+    attrs.push(findStringAttribute("langwatch.sdk.version", metadata.sdk_version));
   }
 
   if (metadata.sdk_language) {
-    attrs.push(stringAttr("langwatch.sdk.language", metadata.sdk_language));
+    attrs.push(findStringAttribute("langwatch.sdk.language", metadata.sdk_language));
   }
 
   return attrs;
@@ -180,7 +180,7 @@ function buildResource({
   }
 
   if (expectedOutput) {
-    attrs.push(stringAttr("langwatch.expected_output", expectedOutput));
+    attrs.push(findStringAttribute("langwatch.expected_output", expectedOutput));
   }
 
   return attrs.length > 0 ? { attributes: attrs } : null;

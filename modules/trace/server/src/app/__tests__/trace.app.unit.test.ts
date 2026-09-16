@@ -156,12 +156,12 @@ function harness(
 }
 
 describe("TraceApp", () => {
-  describe("readTrace", () => {
+  describe("findTrace", () => {
     describe("given a read that shows the content it fetches", () => {
       it("resolves the trace in full rather than serving the stored preview", async () => {
         const { app, tryGetById } = harness();
 
-        await app.readTrace({
+        await app.findTrace({
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -177,7 +177,7 @@ describe("TraceApp", () => {
       it("leaves the overlay opt-in rather than asking for it or refusing it", async () => {
         const { app, tryGetById } = harness();
 
-        await app.readTrace({
+        await app.findTrace({
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -191,7 +191,7 @@ describe("TraceApp", () => {
       it("forwards the overlay flag alongside full resolution", async () => {
         const { app, tryGetById } = harness();
 
-        await app.readTrace({
+        await app.findTrace({
           projectId: "project-1",
           traceId: "trace-1",
           protections: PROTECTIONS,
@@ -213,7 +213,7 @@ describe("TraceApp", () => {
         const { app } = harness({ findById: async () => undefined });
 
         await expect(
-          app.readTrace({
+          app.findTrace({
             projectId: "project-1",
             traceId: "missing",
             protections: PROTECTIONS,

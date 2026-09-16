@@ -16,7 +16,7 @@ export const SPAN_USER_PROMPT_KEY = "user_prompt";
 export const INTERACTION_SPAN_NAME = "claude_code.interaction";
 export const CLAUDE_SPAN_NAME_PREFIX = "claude_code.";
 
-export function readStringParam(
+export function findStringParam(
   params: Record<string, unknown> | null | undefined,
   key: string,
 ): string | null {
@@ -29,17 +29,17 @@ export function nonEmptyOrNull(value: string | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export function spanToolUseId(span: Span): string | null {
+export function findSpanToolUseId(span: Span): string | null {
   return (
-    readStringParam(span.params, SPAN_TOOL_USE_ID_KEY) ??
-    readStringParam(span.params, SPAN_TOOL_CALL_ID_KEY)
+    findStringParam(span.params, SPAN_TOOL_USE_ID_KEY) ??
+    findStringParam(span.params, SPAN_TOOL_CALL_ID_KEY)
   );
 }
 
 export function isInteractionSpan(span: Span): boolean {
   return (
     span.name === INTERACTION_SPAN_NAME ||
-    readStringParam(span.params, SPAN_USER_PROMPT_KEY) !== null
+    findStringParam(span.params, SPAN_USER_PROMPT_KEY) !== null
   );
 }
 

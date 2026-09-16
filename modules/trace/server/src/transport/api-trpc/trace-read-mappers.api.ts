@@ -663,7 +663,7 @@ export function toConversationContextTurn({
  * unflattens dotted attribute keys into nested objects, so a marker lands at the
  * matching nested path rather than as a flat key.
  */
-function readNestedString(
+function findNestedString(
   params: Record<string, unknown> | null | undefined,
   dottedKey: string,
 ): string | null {
@@ -684,7 +684,7 @@ export function readDroppedFromParams(
   params: Record<string, unknown> | null | undefined,
   contentPrivacy: TraceContentPrivacy,
 ): Set<string> {
-  const value = readNestedString(params, contentPrivacy.droppedMarkerAttribute);
+  const value = findNestedString(params, contentPrivacy.droppedMarkerAttribute);
   if (value == null) return new Set();
   return new Set(
     value
@@ -699,7 +699,7 @@ export function readPiiIncompleteFromParams(
   params: Record<string, unknown> | null | undefined,
   contentPrivacy: TraceContentPrivacy,
 ): boolean {
-  return readNestedString(params, contentPrivacy.piiIncompleteMarkerAttribute) != null;
+  return findNestedString(params, contentPrivacy.piiIncompleteMarkerAttribute) != null;
 }
 
 /**

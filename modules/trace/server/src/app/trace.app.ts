@@ -602,8 +602,8 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
       },
     });
   }
-  readTrace(input: Parameters<TraceContentReadService["readTrace"]>[0]) {
-    return this.#contentReader.readTrace(input);
+  findTrace(input: Parameters<TraceContentReadService["findTrace"]>[0]) {
+    return this.#contentReader.findTrace(input);
   }
   async readTracesWithSpans(input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0]) {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
@@ -849,7 +849,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  readEvaluationInputs(input: {
+  findEvaluationInputs(input: {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
@@ -880,7 +880,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */
-  readPromptStudioSpan(input: {
+  findPromptStudioSpan(input: {
     projectId: string;
     spanId: string;
     protections: unknown;
@@ -1102,7 +1102,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** One span, by id. */
-  readSpan(input: {
+  findSpan(input: {
     projectId: string;
     traceId: string;
     spanId: string;
@@ -1299,7 +1299,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** The correction stored on a trace, before any reader-specific redaction. */
-  readTraceEditOverlay(input: {
+  findTraceEditOverlay(input: {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null> {
@@ -1379,7 +1379,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** The project card the share page prints above the trace. */
-  readProject(projectId: string): Promise<{
+  findProject(projectId: string): Promise<{
     name: string | null;
     slug: string | null;
     language: string | null;

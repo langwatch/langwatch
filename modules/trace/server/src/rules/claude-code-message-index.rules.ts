@@ -305,7 +305,7 @@ function buildSpanInput({
     return { type: "chat_messages", value };
   }
 
-  const promptText = pickPromptFallback({
+  const promptText = findPromptFallbackBody({
     prompts,
     refTimeUnixMs: requestBody?.timeUnixMs,
   });
@@ -324,7 +324,7 @@ function buildSpanInput({
  * non-empty prompt at or before the body's time, which is the triggering user turn, else the
  * earliest non-empty prompt. Null when no prompt carries text.
  */
-function pickPromptFallback({
+function findPromptFallbackBody({
   prompts,
   refTimeUnixMs,
 }: {

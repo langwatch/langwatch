@@ -6,7 +6,7 @@
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { parseJsonStringArray, stringAttr } from "../../rules/trace-summary-attributes.rules.ts";
+import { parseJsonStringArray, findStringAttribute } from "../../rules/trace-summary-attributes.rules.ts";
 
 const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
 
@@ -224,17 +224,17 @@ export class TraceAttributeExtractionService {
       }
     }
 
-    const origin = stringAttr(spanAttrs, "langwatch.origin");
+    const origin = findStringAttribute(spanAttrs, "langwatch.origin");
     if (origin) {
       result["langwatch.origin"] = origin;
     }
 
-    const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
+    const scenarioRunId = findStringAttribute(spanAttrs, "scenario.run_id");
     if (scenarioRunId) {
       result["scenario.run_id"] = scenarioRunId;
     }
 
-    const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
+    const evaluationRunId = findStringAttribute(spanAttrs, "evaluation.run_id");
     if (evaluationRunId) {
       result["evaluation.run_id"] = evaluationRunId;
     }
@@ -291,7 +291,7 @@ export class TraceAttributeExtractionService {
     spanAttrs: NormalizedSpan["spanAttributes"];
     result: Record<string, string>;
   }): void {
-    const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
+    const promptId = findStringAttribute(spanAttrs, "langwatch.prompt.id");
     if (promptId?.includes(":")) {
       result["langwatch.prompt.id"] = promptId;
     }

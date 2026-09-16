@@ -28,7 +28,7 @@ export const spansTrpcTransport = defineTrpcRouter(TraceApi, spansTrpc)
     const { projectId, spanId } = input;
     const protections = await app.resolveViewerProtections({ projectId, userId: actor.id });
 
-    const result = await app.readPromptStudioSpan({ projectId, spanId, protections });
+    const result = await app.findPromptStudioSpan({ projectId, spanId, protections });
 
     if (!result) throw new SpanNotFoundError(spanId);
 

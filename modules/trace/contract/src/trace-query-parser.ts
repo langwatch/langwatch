@@ -142,7 +142,7 @@ type ParseEntry = { ok: true; ast: LiqeQuery } | { ok: false; error: ParseError 
 const PARSE_CACHE_LIMIT = 8;
 const parseCache = new Map<string, ParseEntry>();
 
-function cacheGet(key: string): ParseEntry | undefined {
+function findCachedParse(key: string): ParseEntry | undefined {
   const entry = parseCache.get(key);
   if (!entry) {
     return void 0;
@@ -168,7 +168,7 @@ export function parse(query: string): LiqeQuery {
   if (trimmed.length === 0) {
     return EMPTY_AST;
   }
-  const hit = cacheGet(trimmed);
+  const hit = findCachedParse(trimmed);
   if (hit) {
     if (hit.ok) {
       return hit.ast;

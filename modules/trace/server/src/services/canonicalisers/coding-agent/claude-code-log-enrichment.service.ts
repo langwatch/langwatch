@@ -25,11 +25,11 @@ import {
   nonEmptyOrNull,
   parseBoolAttr,
   parseNumberAttr,
-  readStringParam,
+  findStringParam,
   SPAN_QUERY_SOURCE_KEY,
   SPAN_REQUEST_ID_KEY,
   SPAN_USER_PROMPT_KEY,
-  spanToolUseId,
+  findSpanToolUseId,
 } from "../../../rules/claude-code-span-keys.rules.ts";
 
 /**
@@ -86,7 +86,7 @@ const DURATION_MS_ATTR = "duration_ms";
 const RESULT_SIZE_ATTR = "tool_result_size_bytes";
 
 /** The attribute carrying the event's content payload, per event name. */
-function readContentBody(
+function findContentBody(
   eventName: string,
   attrs: Record<string, string>,
   codingAgents?: CodingAgentApi,
@@ -113,13 +113,13 @@ export class ClaudeCodeLogEnrichmentService {
    */
   static mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
     return spans
-      .filter((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
+      .filter((span) => findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
       .slice()
       .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
       .map((span) => ({
         spanId: span.span_id,
-        requestId: readStringParam(span.params, SPAN_REQUEST_ID_KEY),
-        querySource: readStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
+        requestId: findStringParam(span.params, SPAN_REQUEST_ID_KEY),
+        querySource: findStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
       }));
   }
 
@@ -128,7 +128,7 @@ export class ClaudeCodeLogEnrichmentService {
    * span has a `request_id` for the logs to join onto.
    */
   static hasClaudeModelCallSpans(spans: Span[]): boolean {
-    return spans.some((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
+    return spans.some((span) => findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
   }
 
   /**
@@ -139,8 +139,8 @@ export class ClaudeCodeLogEnrichmentService {
   static hasCodingAgentJoinableSpans(spans: Span[]): boolean {
     return spans.some(
       (span) =>
-        readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
-        spanToolUseId(span) !== null ||
+        findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
+        findSpanToolUseId(span) !== null ||
         isInteractionSpan(span),
     );
   }
@@ -152,8 +152,8 @@ export class ClaudeCodeLogEnrichmentService {
    */
   static isCodingAgentShapedSpan(span: Span): boolean {
     return (
-      readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
-      spanToolUseId(span) !== null ||
+      findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
+      findSpanToolUseId(span) !== null ||
       isInteractionSpan(span) ||
       (span.name ?? "").startsWith(CLAUDE_SPAN_NAME_PREFIX)
     );
@@ -163,7 +163,7 @@ export class ClaudeCodeLogEnrichmentService {
   static mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
     const refs: ClaudeToolSpanRef[] = [];
     for (const span of spans) {
-      const toolUseId = spanToolUseId(span);
+      const toolUseId = findSpanToolUseId(span);
       if (toolUseId !== null) {
         refs.push({ spanId: span.span_id, toolUseId });
       }
@@ -184,7 +184,7 @@ export class ClaudeCodeLogEnrichmentService {
         return span;
       }
 
-      const prompt = readStringParam(span.params, SPAN_USER_PROMPT_KEY);
+      const prompt = findStringParam(span.params, SPAN_USER_PROMPT_KEY);
       if (prompt === null) {
         return span;
       }
@@ -224,7 +224,7 @@ export class ClaudeCodeLogEnrichmentService {
         requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
         querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
         timeUnixMs: row.timeUnixMs,
-        body: readContentBody(eventName, attrs, codingAgents),
+        body: findContentBody(eventName, attrs, codingAgents),
         // Parsed out of the raw body once, at ingest, so the read path can skip
         // re-parsing it. Absent on records ingested before that existed, which is
         // why every consumer keeps its parse as a fallback.
@@ -471,7 +471,7 @@ export class ClaudeCodeLogEnrichmentService {
     traceCanonicalisation: TraceCanonicalisationService;
     codingAgents?: CodingAgentApi;
   }): Span {
-    const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
+    const isModelCall = findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
 
     const [enriched] = ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent({
       spans: [span],

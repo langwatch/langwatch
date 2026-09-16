@@ -78,7 +78,7 @@ async function readOneTraceOrThrow(input: {
 }): Promise<Trace> {
   let trace: Trace | undefined;
   try {
-    trace = await input.app.readTrace({
+    trace = await input.app.findTrace({
       projectId: input.projectId,
       traceId: input.traceId,
       protections: input.protections,

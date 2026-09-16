@@ -12,7 +12,7 @@ import {
   eventLogOccurredAtWindow,
   eventLogRowSchema,
   eventPayloadSchema,
-  readEventPayloadField,
+  findEventPayloadField,
 } from "../../rules/trace-event-log-payload.rules.ts";
 /**
  * The one read this store issues, in the default JSON format. Declared here rather than taken from
@@ -307,7 +307,7 @@ export class TraceBlobStoreService {
       throw new BlobFieldNotFoundError(eventId, field);
     }
 
-    const value = readEventPayloadField(payloadParse.data, field);
+    const value = findEventPayloadField(payloadParse.data, field);
     if (value === null) {
       throw new BlobFieldNotFoundError(eventId, field);
     }

@@ -20,7 +20,7 @@ function readMetricsValue(rawMetrics: unknown): Record<string, unknown> | null {
 }
 
 /** The first key that carries a finite number, under either spelling. */
-function numberField(metrics: Record<string, unknown>, ...keys: string[]): number | null {
+function findNumberField(metrics: Record<string, unknown>, ...keys: string[]): number | null {
   for (const key of keys) {
     const value = metrics[key];
     if (typeof value === "number" && Number.isFinite(value)) {
@@ -76,7 +76,7 @@ function canonicaliseMetrics(ctx: ExtractorContext): void {
   if (!metricsValue) return;
 
   for (const field of METRIC_FIELDS) {
-    const value = numberField(metricsValue, ...field.keys);
+    const value = findNumberField(metricsValue, ...field.keys);
     if (value === null || !field.accepts(value)) continue;
 
     ctx.setAttrIfAbsent(field.attribute, value);

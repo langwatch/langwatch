@@ -29,7 +29,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
     return this.read.getAllTracesForProject(input.query, input.protections, input.options);
   }
 
-  readTrace(input: {
+  findTrace(input: {
     projectId: string;
     traceId: string;
     protections: unknown;

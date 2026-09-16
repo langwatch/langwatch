@@ -24,7 +24,7 @@ const runtime = createRestRuntime({
   },
 });
 
-function buildApi(readTrace: () => Promise<never>) {
+function buildApi(findTrace: () => Promise<never>) {
   const members: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
     credential: async () => ({
       ok: true,
@@ -33,7 +33,7 @@ function buildApi(readTrace: () => Promise<never>) {
       markUsed: () => undefined,
     }),
     traces: () => ({
-      readTrace,
+      findTrace,
       readEvaluations: vi.fn(),
       listTraces: vi.fn(),
       readThreadTraces: vi.fn(),

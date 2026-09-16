@@ -10,13 +10,13 @@ export function normalizeContentSource(source: unknown): ContentSource | null {
   const s = parseRecord(source);
   if (!s) return null;
 
-  const mimeType = firstString(s, "mimeType", "media_type")?.toLowerCase();
+  const mimeType = findFirstString(s, "mimeType", "media_type")?.toLowerCase();
 
   if (s.type === "url") {
-    return typedSource("url", firstString(s, "value", "url"), mimeType);
+    return typedSource("url", findFirstString(s, "value", "url"), mimeType);
   }
   if (s.type === "data" || s.type === "base64") {
-    return typedSource("data", firstString(s, "value", "data"), mimeType);
+    return typedSource("data", findFirstString(s, "value", "data"), mimeType);
   }
   return null;
 }
@@ -30,7 +30,7 @@ function typedSource(
   return mimeType ? { type, value, mimeType } : { type, value };
 }
 
-function firstString(o: Record<string, unknown>, ...keys: string[]): string | undefined {
+function findFirstString(o: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = o[key];
     if (typeof value === "string") return value;

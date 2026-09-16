@@ -103,7 +103,7 @@ export class OtlpSpanTokenEstimationService {
       return;
     }
 
-    const model = this.modelNames.extractModelName(span, MODEL_ATTRIBUTE_KEYS);
+    const model = this.modelNames.findModelName(span, MODEL_ATTRIBUTE_KEYS);
     if (!model) {
       return;
     }
