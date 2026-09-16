@@ -157,15 +157,17 @@ retention of the logs it generates (Art. 19) map onto:
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
 - **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (it delivers the flagged event to a URL you control; the human review of what arrives there is your receiving process, not something LangWatch performs or records today), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
-- **Art. 19 log retention (≥6 months)**: **Enterprise** extended retention policies, with windows set in years. Art. 19 — not Art. 12 — governs how long the automatically generated logs are kept: at least six months, unless other Union or national law provides otherwise. The Apache 2.0 default 49d window sits below that floor, so a deployment in scope of Art. 19 raises the extended-retention window to at least six months.
+- **Art. 19 log retention (≥6 months)**: **Enterprise** extended retention policies, with windows set in whole weeks. Art. 19 governs how long the automatically generated logs are kept: at least six months, unless other Union or national law provides otherwise. The Apache 2.0 default 49d window sits below that floor, so a deployment in scope of Art. 19 raises the window to at least 27 whole weeks (189 days).
 
-Most enterprise-deploying-an-LLM-agent uses engage Art. 12 (the logging
-capability) and Art. 19 (retention of those logs, at least six months —
-which the Enterprise extended-retention windows satisfy). Art. 18 is a
-separate duty: the provider keeps the system's *technical documentation*
-available to authorities for ten years. That documentation set is not the
-operational log data LangWatch stores, so Art. 18 does not drive the
-trace-retention window.
+Where an LLM-agent deployment is high-risk under the Act, the logging
+capability (Art. 12) and the retention of those logs both attach, but
+the retention duty falls on different roles: Art. 19 puts it on the
+**provider**, while Art. 26(6) puts the equivalent duty on the
+**deployer** for logs under its control. Art. 18 is a separate provider
+duty: keeping the system's *technical documentation* available to
+authorities for ten years. That documentation set is not the operational
+log data LangWatch stores, so Art. 18 does not drive the trace-retention
+window.
 
 ## What's *intentionally* unavailable on Apache 2.0
 
