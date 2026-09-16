@@ -470,7 +470,13 @@ shapes with no way to tell them apart afterwards.
 
 ## Consequences
 
-Positive: pi users get transcript, cost and session boundaries with one command.
+Positive: pi users get turn-by-turn usage, cost and session boundaries with one
+command. Not transcript: this line said "transcript" and was wrong about our own
+build. The events carry each turn's speaker, timing, model and sizes and none of
+its text (`pi-turn-events.ts:144`), and the session record they fold into has no
+field for a conversation. Readable conversation lives on the span lane, which
+§4 declines for pi on the stated grounds that pi's file has no span parentage;
+moving pi's message text there is issue #8173, filed alongside #8161.
 pi becomes the first agent to
 populate session lineage. Our own use of pi becomes visible to us. The capture
 path cannot crash or stall the user's editor session, which is not true of the

@@ -109,7 +109,7 @@ function attributesOf(event: PiTurnEvent | undefined) {
 
 describe("building pi's turn events", () => {
   describe("given a session of user prompts, a tool call and assistant replies", () => {
-    /** @scenario "A captured pi session shows the whole conversation in order" */
+    /** @scenario "A captured pi session records every turn in the order pi wrote them" */
     it("emits one event per row, in the order pi wrote them", () => {
       const events = buildPiTurnEvents({
         session: sessionOf([
@@ -129,10 +129,53 @@ describe("building pi's turn events", () => {
         PI_EVENT.API_REQUEST,
       ]);
     });
+
+    /**
+     * The other half of the scenario, and the half nothing asserted while the
+     * scenario claimed the conversation was captured: the events carry the
+     * shape of the turn and none of its text.
+     *
+     * Every distinctive string the rows hold is searched for across the whole
+     * serialised payload, not across the attributes a reader thought to check,
+     * so a future field that happens to carry text fails this without anyone
+     * remembering to extend the list. Lengths are asserted alongside, because
+     * "no text" must not be satisfied by dropping the turn.
+     *
+     * @scenario "A captured pi session records every turn in the order pi wrote them"
+     */
+    it("records each turn's speaker, timing and usage, and none of its text", () => {
+      const events = buildPiTurnEvents({
+        session: sessionOf([
+          userRow({
+            id: "aaaa0001",
+            at: "2026-09-13T15:39:23.074Z",
+            text: "SECRETPROMPT",
+          }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:39:25.000Z" }),
+          toolResultRow({ id: "aaaa0003", at: "2026-09-13T15:39:26.000Z" }),
+        ]),
+      });
+
+      const serialised = JSON.stringify(
+        buildPiEventsPayload({ events, scopeVersion: "1.2.3" }),
+      );
+
+      expect(serialised).not.toContain("SECRETPROMPT");
+      // "xxxx" and "xxxxx" are the assistant reply and the tool result body in
+      // the helpers above; neither may appear either.
+      expect(serialised).not.toContain("xxxx");
+
+      // Recorded, not merely absent: the turn is there, measured.
+      expect(attributesOf(events[0]).prompt_length).toBe(
+        "SECRETPROMPT".length,
+      );
+      expect(attributesOf(events[1]).model).toBe("claude-opus-4-6");
+      expect(attributesOf(events[2]).tool_name).toBe("read");
+    });
   });
 
   describe("given the whole of a real session", () => {
-    /** @scenario "A captured pi session shows the whole conversation in order" */
+    /** @scenario "A captured pi session records every turn in the order pi wrote them" */
     it("keeps every conversation row, interleaved exactly as the file has them", () => {
       const events = buildPiTurnEvents({ session: REAL_SESSION });
 

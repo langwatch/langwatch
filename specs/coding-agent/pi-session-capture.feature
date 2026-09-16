@@ -27,11 +27,33 @@ Feature: pi session capture
 
   # --- What the user gets ---------------------------------------------------
 
+  # What "shows the conversation" does and does not mean here, because this
+  # scenario said more than the code does and its test could not tell.
+  #
+  # Every turn is recorded, in pi's order, and each carries who spoke, when,
+  # which model answered, what it cost and how much text moved. None of them
+  # carries the text. A user prompt is recorded with its length, an assistant
+  # reply with its model and token counts, a tool result with its name and
+  # size. Nobody reading a captured pi session can read what was typed or
+  # answered.
+  #
+  # That is deliberate in the builder, which says so where the text is measured
+  # and dropped, and it is also forced: the session record these events fold
+  # into has no field to put a conversation in. The agents that do show their
+  # conversation put it on a different lane entirely, as spans carrying the
+  # message bodies, and pi declines that lane on the stated grounds that its
+  # file has no span parentage to honour.
+  #
+  # So the promise below is turn-by-turn usage, not readable conversation. Both
+  # this scenario and the decision record used to claim the second. Carrying
+  # pi's message text to the same place the other agents put theirs is issue
+  # #8173, which needs a decision about that lane rather than an extra field.
   @unit
-  Scenario: A captured pi session shows the whole conversation in order
+  Scenario: A captured pi session records every turn in the order pi wrote them
     Given a pi session with two user prompts, one tool call and two assistant replies
     When the session is captured
-    Then all five appear in the transcript, in the order pi wrote them
+    Then all five turns are recorded, in the order pi wrote them
+    And each turn names its speaker, its timing and its usage, and carries none of its text
 
   @unit
   Scenario: The session cost counts assistant turns, work inside tools, and summarised stretches
