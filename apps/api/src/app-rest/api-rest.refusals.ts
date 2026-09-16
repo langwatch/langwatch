@@ -1,9 +1,7 @@
 /**
- * What a door answers a credential it will not accept.
- *
- * One class per code, because the code is what a caller branches on. The
- * sentences are the ones this surface has always published: an SDK's own error
- * copy quotes them, so they are part of the wire and not decoration.
+ * What a door answers a credential it will not accept. One class per code,
+ * because the code is what a caller branches on. The sentences are part of
+ * the wire, not decoration: an SDK's own error copy quotes them.
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { AuthzPermission } from "@langwatch/authz-contract";

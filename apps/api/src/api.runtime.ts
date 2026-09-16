@@ -11,9 +11,8 @@ export type ApiRuntimeOptions<Application, Services> = {
 };
 
 /**
- * Owns one interactive application graph and its process resources.
- *
- * Product composition stays behind nominal ports so this package never learns
+ * Owns one interactive application graph and its process resources. Product
+ * composition stays behind nominal ports, so this package never learns
  * about the legacy App type or feature catalogue.
  */
 export class ApiRuntime<Application, Services> {

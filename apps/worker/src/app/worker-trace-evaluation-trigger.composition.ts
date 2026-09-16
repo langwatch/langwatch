@@ -21,12 +21,9 @@ import {
  */
 export function createWorkerTraceEvaluationTrigger(options: {
   /**
-   * The one monitor listing this path reads.
-   *
-   * Not the whole `MonitorService`: creating and replicating a monitor is what
-   * puts an `EvaluatorApi` behind it, and this asks which of a project's
-   * monitors run on every message. `MonitorService` satisfies it, and so does
-   * the catalogue-only service the feature publishes.
+   * The one monitor listing this path reads, not the whole `MonitorService`:
+   * creating and replicating a monitor is what puts an `EvaluatorApi` behind
+   * it. `MonitorService` satisfies this, and so does the catalogue-only service.
    */
   monitors: TraceEvaluationMonitorReader;
   featureFlags: FeatureFlagApi;
@@ -66,10 +63,8 @@ export class WorkerTraceEvaluationTrigger {
 
 /**
  * Pairs the process's evaluation queue with Evaluation's own dedup identity.
- *
- * The two halves come from different places on purpose: the transport is this
- * process's, and the key is the evaluation command's, so both graphs squash
- * against the same string while both are ingesting.
+ * The two halves come from different places on purpose: the transport is
+ * this process's, the key is the command's, so both graphs squash on the same string.
  */
 class WorkerTraceEvaluationDispatchAdapter implements TraceEvaluationDispatch {
   constructor(

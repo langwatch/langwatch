@@ -471,12 +471,10 @@ export class WorkerProductionComposition {
         })
       : undefined;
 
-    // The flag answer, handed out before the feature is installed. The Eventing
-    // runtime below reads it, the foundation apps are composed over that
-    // runtime, and a tenant-targeted flag read is authorized against the
-    // directories those apps boot — so the reference is what lets one order
-    // exist. ONE per process, which is what keeps the cache tier shared and two
-    // callers from disagreeing for a TTL about whether a switch is thrown.
+    // The flag answer, handed out before the feature is installed: the
+    // Eventing runtime and foundation apps below are composed over it, so
+    // the reference is what lets that order exist. ONE per process, keeping
+    // the cache tier shared so two callers can't disagree for a TTL.
     const featureFlagApis = new LocalFeatureApis();
     featureFlagApis.declare(FeatureFlagApi);
     const featureFlags = featureFlagApis.reference(FeatureFlagApi);
@@ -2084,10 +2082,9 @@ class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeam {
 }
 
 /**
- * The two organization columns an automation upgrade line is quoted from. Read here
- * because they are one `findUnique` on the client this process already opened, and
- * carrying an organization repository into automation's mail to reach two columns
- * would couple the notice to an aggregate it never otherwise touches.
+ * The two organization columns an automation upgrade line is quoted from,
+ * read as one `findUnique` on the client already opened — pulling in an
+ * organization repository would couple the mail to an aggregate it never otherwise touches.
  */
 class PrismaAutomationOrganizationPricingAdapter extends WorkerAutomationOrganizationPricing {
   static create(database: {

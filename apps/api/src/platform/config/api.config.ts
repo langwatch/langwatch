@@ -216,9 +216,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
   opsApiKey: opsServerConfigDefinition.apiKey,
   /**
    * The external monitor's key and the project credential its canaries are
-   * sent with. Both refused blank, and with either absent the platform-health
-   * family is not mounted — a platform-wide probe is not reachable by
-   * presenting nothing.
+   * sent with. Both refused blank; with either absent the platform-health
+   * family is not mounted, so presenting nothing cannot reach a probe.
    */
   platformHealth: { ...platformHealthServerConfigDefinition },
   /**
@@ -250,9 +249,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
   mail: { ...notificationServerConfigDefinition },
   /**
    * The payment provider, under the names every LangWatch tier already reads
-   * them by. Every leaf is optional: a self-hosted or OSS install bills through
-   * nobody, and `resolveApiBillingConfig` answers nothing rather than letting a
-   * half-configured Stripe boot a webhook that cannot verify a signature.
+   * them by. Every leaf is optional; `resolveApiBillingConfig` answers nothing
+   * rather than letting a half-configured Stripe boot an unverifiable webhook.
    */
   billing: { ...billingServerConfigDefinition },
   /** The retention every tenant is stamped with when its cascade names none. */
@@ -525,18 +523,16 @@ export type ApiMailConfig = Readonly<{
 }>;
 
 /**
- * The studio's per-project Lambda deployment: the account, the image and the
- * network every per-project function is created in. The Lambda cleanup cron
- * reads only its three credential fields; the studio's execution half (see
- * `composeApiWorkflowStudioDispatch`) reads the whole shape.
+ * The studio's per-project Lambda deployment: the account, image and network
+ * every per-project function is created in. The cleanup cron reads only its
+ * credential fields; the execution half reads the whole shape.
  */
 export type ApiNlpLambdaFleetConfig = StudioLambdaConfig;
 
 /**
  * `LANGWATCH_NLP_LAMBDA_CONFIG` is one JSON document describing the studio's
- * Lambda deployment. It is parsed by the workflow feature's own leaf, at this
- * process's one boot seam, and this only turns the parsed fields into the
- * shape the studio host takes.
+ * Lambda deployment, parsed by the workflow feature's own leaf at boot; this
+ * only turns the parsed fields into the shape the studio host takes.
  */
 function resolveNlpLambdaFleetConfig(
   workflow: ApiConfigProjection["workflow"],
@@ -587,9 +583,8 @@ export type ApiConfig = Readonly<
     requestBounds: RequestBoundsOverrides;
     /**
      * The payment provider, present only when this deployment can both call
-     * Stripe and verify what Stripe calls back with. Absent everywhere else,
-     * which is what leaves the webhook route unmounted rather than mounted
-     * over a client that cannot authenticate a delivery.
+     * Stripe and verify what it calls back with. Absent otherwise, which
+     * leaves the webhook route unmounted rather than unable to authenticate.
      */
     billing: ApiBillingConfig | undefined;
     /**
@@ -626,16 +621,14 @@ export type ApiConfig = Readonly<
     platformDefaultRetentionDays: number;
     /**
      * The AWS account the studio's per-project NLP Lambda functions live in,
-     * or nothing where the deployment fronts the engine with none. A
-     * deployment that named a fleet it did not describe never gets here: the
-     * workflow feature's leaf refuses that boot.
+     * or nothing where the deployment fronts the engine with none. A fleet
+     * named but not described never gets here — the workflow leaf refuses that boot.
      */
     nlpLambdaFleet: ApiNlpLambdaFleetConfig | undefined;
     /**
      * True whenever the deployment named `LANGWATCH_NLP_LAMBDA_CONFIG` at all.
      * A named-but-unusable fleet now refuses the boot, so this agrees with
-     * `nlpLambdaFleet` and the studio host's own refusal for that case is
-     * unreachable. It stays declared until that host is rewired.
+     * `nlpLambdaFleet`; stays declared until the studio host is rewired.
      */
     nlpLambdaFleetNamed: boolean;
     shutdown: ApiShutdownConfig;

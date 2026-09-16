@@ -24,12 +24,9 @@ import {
 } from "./api-rest.refusals.ts";
 
 /**
- * What a resolved project credential gives a door.
- *
- * There is no refused shape: a door that will not accept a credential throws
- * the `HandledError` naming why, and the REST boundary renders it. A result
- * object here would carry a status and a body the boundary never sees, so the
- * caller would receive a message with no `code` to branch on.
+ * What a resolved project credential gives a door. There is no refused
+ * shape: a door that won't accept a credential throws the `HandledError`
+ * naming why, so the boundary renders a `code` a caller can branch on.
  */
 export type ApiProjectCredential = Readonly<{
   project: ResolvedApiKeyCredential["project"];

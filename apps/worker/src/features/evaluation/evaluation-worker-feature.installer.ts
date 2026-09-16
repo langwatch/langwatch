@@ -11,11 +11,8 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 
 /**
  * A registrable Eventing definition, left open in its own event union.
- *
- * `prepareEventForProjection` is contravariant in the event type, so a
- * definition pinned to the base `Event` refuses the very definition Evaluation
- * publishes over `EvaluationProcessingEvent`. The capability below carries the
- * union as a parameter and the installer never names it.
+ * `prepareEventForProjection` is contravariant in the event type, so pinning
+ * to the base `Event` would refuse Evaluation's own `EvaluationProcessingEvent`.
  */
 type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
   TEvent,

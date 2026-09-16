@@ -1,7 +1,6 @@
 /**
  * The served OpenAPI document, generated from the installed module
  * declarations. One declaration is one family; the union is the document.
- *
  * Spec: specs/api/openapi-document.feature.
  */
 import { mkdtemp, readFile } from "node:fs/promises";

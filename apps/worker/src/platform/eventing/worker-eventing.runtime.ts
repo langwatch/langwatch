@@ -23,10 +23,9 @@ export type WorkerEventingConsumerOptions =
   | {
       enabled: true;
       /**
-       * Consulted per event before a projection applies it, so it only ever
-       * runs where the jobs are processed. A consumer without one applies
-       * events a projection replay is mid-way through re-deriving, and the two
-       * writers race for the same aggregate.
+       * Consulted per event before a projection applies it, so it only runs
+       * where jobs are processed. Without one, a consumer applies events a
+       * replay is mid-way re-deriving, and both writers race the aggregate.
        */
       replayMarkerChecker?: ReplayMarkerChecker;
     }

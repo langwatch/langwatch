@@ -20,11 +20,9 @@ const DRAIN_PHASE_TIMEOUT_MS = 60_000;
 export type WorkerProcessComposition = {
   readonly application: WorkerApplicationLifecycle;
   /**
-   * Who consumes the shared Eventing queue in this process, stated by the
-   * composition that decided it. The process itself cannot know: consumer
-   * ownership is a property of which graph the boot root composed, so the
-   * boot log reports what the composition declares rather than asserting a
-   * mode the process may not be in.
+   * Who consumes the shared Eventing queue, stated by the composition that
+   * decided it — the process itself cannot know. The boot log reports what
+   * the composition declares, not a mode the process may not be in.
    */
   readonly eventingConsumers?: "packaged" | "app-owned";
 };
@@ -59,10 +57,8 @@ export type WorkerBootOptions = {
 
 /**
  * Owns the worker's process graph after configuration has been validated.
- *
- * Passing this scope to a worker runtime makes that runtime borrow it by
- * construction. That leaves this boundary with the explicit order:
- * Eventing/application drain, observability flush, technical resources.
+ * Passing this scope to a runtime makes it borrow it by construction, in the
+ * explicit order: Eventing/application drain, observability flush, resources.
  */
 export class WorkerProcess {
   static async boot(options: WorkerBootOptions): Promise<WorkerProcess> {

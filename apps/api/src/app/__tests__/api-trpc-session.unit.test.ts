@@ -1,10 +1,7 @@
 /**
- * The api's tRPC door reads sessions through the auth module's own lookup.
- *
- * Spec: specs/auth/verified-session-on-request-context.feature. The door left
- * unwired stays mounted and refuses every signed-in caller as anonymous, which
- * the browser shell reads as "signed out" — these tests hold the default
- * resolver `bootApiProcess` composes to the same answers the REST door gives.
+ * The api's tRPC door reads sessions through the auth module's own lookup
+ * (spec: verified-session-on-request-context.feature). Left unwired it stays
+ * mounted, refusing signed-in callers as "signed out" — pinned to the REST door's answers.
  */
 import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { authzTrpcTransport } from "@langwatch/authz-server";

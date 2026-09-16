@@ -10,11 +10,9 @@ type StorageEnv = {
 };
 
 /**
- * Resolve a URL to its origin, or null if unusable. `new URL("file:///x")` (and
- * other opaque-origin schemes) does NOT throw — it returns the *string* `"null"`,
- * which if emitted into `connect-src` becomes an unquoted `null` source that
- * matches null-origin documents (sandboxed iframes, `data:` URIs) and silently
- * weakens the policy. Reject it explicitly.
+ * Resolve a URL to its origin, or null if unusable. `new URL("file:///x")`
+ * does NOT throw — it returns the *string* `"null"`, which in `connect-src`
+ * becomes an unquoted `null` source matching sandboxed/`data:` documents.
  */
 const safeOrigin = (url: string | undefined): string | null => {
   if (!url) return null;

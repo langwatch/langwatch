@@ -57,9 +57,8 @@ export type WorkerGatewaySpendDatabase = GatewayBudgetResolutionDatabase &
 
 /**
  * Reports composition decisions the spend graph would otherwise hide, each
- * silent in production (a stalled settlement, an undeliverable SQS endpoint,
- * an unreadable entitlement). The first two depend on which substrates the
- * graph was handed, not what this package can build.
+ * silent in production (stalled settlement, undeliverable SQS endpoint,
+ * unreadable entitlement) — the first two depend on substrates handed in.
  */
 export abstract class WorkerGatewaySpendAbsenceReport {
   /** No all-instance ClickHouse directory: open admissions are never swept. */

@@ -12,12 +12,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 const ACCOUNT_TEAM_CONTACT_URL = "https://langwatch.ai/contact";
 
 /**
- * The two organization columns a quote depends on, read where they live.
- *
- * A port rather than the organization repository: what a next step needs of an
- * organization is which ladder it buys from and which currency it is billed in,
- * and a graph that took the whole aggregate to read two columns would couple
- * automation's mail to every future change in it.
+ * The two organization columns a quote depends on, read where they live. A
+ * port rather than the repository: reading the whole aggregate for two
+ * columns would couple automation's mail to every future change in it.
  */
 export abstract class WorkerAutomationOrganizationPricing {
   abstract pricingFor(input: { organizationId: string }): Promise<{
@@ -53,11 +50,9 @@ export class WorkerAutomationNextStepAdapter {
   ) {}
 
   /**
-   * The rung above this project's organization, or nothing.
-   *
-   * Nothing rather than a throw on every failure: the notice this decorates is
-   * the message telling an administrator their automation has stopped acting,
-   * and an unresolvable upgrade line is not a reason to withhold it.
+   * The rung above this project's organization, or nothing. Nothing rather
+   * than a throw: the notice this decorates tells an administrator their
+   * automation stopped, and an unresolvable upgrade line shouldn't withhold it.
    */
   async resolve(projectId: string): Promise<AutomationLimitNextStep | undefined> {
     try {

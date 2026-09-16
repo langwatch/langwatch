@@ -40,11 +40,8 @@ export type WorkerAutomationDeliveryComposition = Readonly<{
 
 /**
  * Builds that shared trio, or reports that this process can send nothing.
- *
- * Nothing exactly when the deployment named no `BASE_HOST`. Every alert and
- * every digest carries links back to the deployment and a sender address
- * derived from the same host, so a process composed without one would render
- * mail nobody can act on.
+ * Nothing exactly when the deployment named no `BASE_HOST`: every alert and
+ * digest carries links back to it, so mail composed without one is unactionable.
  */
 export function tryCreateWorkerAutomationDelivery(options: {
   config: WorkerConfig;
@@ -102,20 +99,17 @@ export type WorkerAutomationGraphCompositionOptions = Readonly<{
   dependencies: WorkerAutomationGraphDependencies;
   /**
    * The shared Redis the email ceilings count in. Absent falls back to
-   * per-process counters, which is the application's own behaviour when Redis
-   * is down: a ceiling enforced per pod rather than per fleet, and a burst that
-   * is larger than intended but still bounded.
+   * per-process counters (Redis-down behaviour): a ceiling per pod rather
+   * than per fleet — a larger burst than intended, but still bounded.
    */
   redis?: RedisConnection | null;
   // SSRF-fenced sender for customer webhook URLs; defaulted to match the
   // application's own fence so tests can observe without side effects
   webhookTransport?: WebhookDeliveryTransport;
   /**
-   * How this process reaches the Slack Web API.
-   *
-   * Defaulted to a direct HTTPS call, because both of that adapter's
-   * destinations are constants under `slack.com` and nothing a customer typed
-   * reaches it. A deployment that egresses through a proxy supplies its own.
+   * How this process reaches the Slack Web API. Defaulted to a direct HTTPS
+   * call: both destinations are constants under `slack.com`, and nothing a
+   * customer typed reaches it. A proxied deployment supplies its own.
    */
   slackApiTransport?: SlackApiTransport;
   logger?: Logger;
@@ -171,12 +165,9 @@ class UnconfiguredAutomationCrypto implements AutomationSecretCrypto {
 }
 
 /**
- * The one clock this process's automation reads.
- *
- * Exported because two verticals share it and must: the graph evaluator's
- * debounce and the trace-trigger cache's window are both measured against it,
- * and two clocks in one process is how a cache expires against a time the
- * evaluator has not reached.
+ * The one clock this process's automation reads, exported because the graph
+ * evaluator's debounce and the trace-trigger cache's window are both measured
+ * against it — two clocks here is how a cache expires against unreached time.
  */
 export class WorkerAutomationClock implements AutomationClock {
   now() {
@@ -204,10 +195,9 @@ class WorkerAutomationLogger extends AutomationLogger {
 }
 
 /**
- * How this process's queue tells a permanent delivery failure from a retryable
- * one. It is the Eventing contract, so a graph composed here classifies exactly
- * as the application's does — a misread here would retry a dead payload forever
- * or dead-letter a transient one.
+ * How this process's queue tells a permanent delivery failure from a
+ * retryable one, per the Eventing contract: a misread here would retry a
+ * dead payload forever or dead-letter a transient one.
  */
 class WorkerAutomationDispatchErrors extends AutomationDispatchError {
   isTerminal(error: unknown): boolean {

@@ -169,12 +169,9 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }
 
   /**
-   * The same digest, as a Slack message.
-   *
-   * Rendered by the packaged adapter rather than here: escaping customer text
-   * into Slack mrkdwn is a correctness question — an unescaped `<` forges a
-   * link — and one implementation of it is what keeps two processes from
-   * disagreeing about which characters are safe.
+   * The same digest, as a Slack message. Rendered by the packaged adapter
+   * rather than here: escaping customer text into Slack mrkdwn is a
+   * correctness question (an unescaped `<` forges a link), kept in ONE place.
    */
   sendLegacySlackWebhook(input: {
     webhook: string;
@@ -317,12 +314,9 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
   }
 
   /**
-   * The footer appended OUTSIDE the customer's template (ADR-031), so a
-   * template author cannot strip it, and the RFC 8058 headers beside it.
-   *
-   * Two scopes are offered: this automation only, and every automation in the
-   * project. Both links are per-recipient, which is what makes them
-   * forge-proof — the token's HMAC binds the link to one address.
+   * The footer appended OUTSIDE the customer's template (ADR-031), plus the
+   * RFC 8058 headers beside it. Two scopes: this automation, or the whole
+   * project — both links are per-recipient, HMAC-bound to one address.
    */
   private unsubscribeFooter(payload: { projectId: string; triggerId: string; email: string }): {
     footerHtml: string;
@@ -351,10 +345,9 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
 }
 
 /**
- * `render()` returns a whole HTML document, so appending the footer would land
- * it after `</body></html>`, and some mail clients drop content outside the
- * body. Insert it immediately before the closing tag when there is one, and
- * append otherwise (fragments, plain HTML).
+ * `render()` returns a whole HTML document, so appending the footer would
+ * land it after `</body></html>` and some clients drop content there. Insert
+ * before the closing tag when present, else append (fragments, plain HTML).
  */
 export function injectFooterIntoBody(html: string, footerHtml: string): string {
   const bodyClose = /<\/body>/i;

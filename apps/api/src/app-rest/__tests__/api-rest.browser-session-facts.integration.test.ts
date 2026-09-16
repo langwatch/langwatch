@@ -1,8 +1,7 @@
 /**
  * The six session-bearing facts this process answers, and what each answers
- * with no session behind the request. Mounted on a PUBLIC family on purpose:
- * three of the six sit on routes whose door resolves nobody, so they read the
- * session themselves rather than relying on a door having run.
+ * with no session behind the request. Mounted on a PUBLIC family: some sit
+ * on routes whose door resolves nobody, so they read the session themselves.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter } from "@langwatch/api/rest";

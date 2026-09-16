@@ -6,12 +6,9 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 type WorkerPipelineDefinition = Parameters<WorkerEventingRuntime["eventSourcing"]["register"]>[0];
 
 /**
- * The two Governance signal senders the Gateway spend pipeline delivers into.
- *
- * A virtual key's lifecycle and a budget crossing are the only two facts the
- * spend spine hands to Governance, and both are appends rather than requests,
- * which is why the delivery seam is a pair of command senders and not a
- * service.
+ * The two Governance signal senders the Gateway spend pipeline delivers into:
+ * a virtual key's lifecycle and a budget crossing, the only two facts handed
+ * over. Both are appends, not requests — hence senders, not a service.
  */
 export interface GovernanceEventsWorkerCommands<TVkLifecycle = unknown, TBudgetCrossing = unknown> {
   recordVkLifecycle: CommandDispatcher<TVkLifecycle>;
@@ -22,9 +19,8 @@ export interface GovernanceEventsWorkerCommands<TVkLifecycle = unknown, TBudgetC
 export interface GovernanceEventsWorkerCapability {
   /**
    * Builds the governance events definition, including the ADR-073 webhook
-   * delivery process manager where a delivery graph was supplied. Whether that
-   * process manager is mounted is the composition root's decision, taken once,
-   * rather than a flag read here.
+   * delivery process manager where a delivery graph was supplied. Mounting it
+   * is the composition root's decision, taken once, not a flag read here.
    */
   buildProcessing(): WorkerPipelineDefinition;
 }

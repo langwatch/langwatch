@@ -19,11 +19,9 @@ import {
 export function createWorkerTraceCapabilityServices(options: {
   database: WorkerTraceCapabilityDatabase;
   /**
-   * Where a swallowed org-admin read reports itself.
-   *
-   * `resolveOrgAdmin` answers an empty resolution rather than failing the fold
-   * that triggered it, so without this the only trace of a broken read is a
-   * first-trace notification that silently never goes out.
+   * Where a swallowed org-admin read reports itself. `resolveOrgAdmin`
+   * answers an empty resolution rather than failing the fold, so without
+   * this the only trace is a first-trace notification that silently never fires.
    */
   diagnostics?: ProjectDiagnostics;
   /**
@@ -57,11 +55,8 @@ export function createWorkerTraceCapabilityServices(options: {
 
 /**
  * The Prisma models the record path reads, and nothing else in the client.
- *
- * Each half is the feature's own declaration rather than a list repeated here,
- * so a model a feature starts reading arrives at this seam by typecheck rather
- * than by review. The monitor listing is not here: it is answered by the
- * monitor application, over that feature's own repositories.
+ * Each half is the feature's own declaration, so a model a feature starts
+ * reading arrives at this seam by typecheck, not by review.
  */
 export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase & ModelCostCatalogDatabase;
 

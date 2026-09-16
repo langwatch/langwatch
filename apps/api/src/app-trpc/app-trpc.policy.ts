@@ -20,11 +20,9 @@ import {
 } from "@langwatch/api/trpc";
 
 /**
- * What the process fills for the chain to exist.
- *
- * `authz` is the decisions half of the composed AuthZ service — the same
- * instance the REST doors authorize through, never a second one, because two
- * services for one organization is two permission caches and two epochs.
+ * What the process fills for the chain to exist. `authz` is the decisions
+ * half of the composed AuthZ service — the same instance REST doors
+ * authorize through, never a second: two services means two epochs.
  */
 export type ApiTrpcPolicyMembers<TContext, TAuthenticatedContext extends object> = Readonly<{
   authz: TrpcAuthorizationDecisions;

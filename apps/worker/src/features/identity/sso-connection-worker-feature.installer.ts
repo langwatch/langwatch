@@ -9,10 +9,8 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 
 /**
  * A registrable Eventing definition, left open in its own event union.
- *
- * `prepareEventForProjection` is contravariant in the event type, so a
- * definition pinned to the base `Event` refuses the very definition the
- * connection ledger publishes over its own discriminated union.
+ * `prepareEventForProjection` is contravariant in the event type, so pinning
+ * to the base `Event` would refuse the connection ledger's own union.
  */
 type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
   TEvent,
@@ -24,10 +22,8 @@ type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
 export interface SsoConnectionWorkerCapability<TEvent extends Event = Event> {
   /**
    * The SSO connection pipeline (D04, ADR-117 §5), teardown grace timer
-   * included.
-   *
-   * Built by the composition root: its projection store, its guards and the
-   * teardown port are storage and delivery bindings the worker does not own.
+   * included. Built by the composition root: its projection store, guards
+   * and teardown port are storage/delivery bindings the worker does not own.
    */
   readonly pipeline: WorkerPipelineDefinition<TEvent>;
 }

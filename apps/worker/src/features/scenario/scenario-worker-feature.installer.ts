@@ -12,10 +12,8 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 
 /**
  * A registrable Eventing definition, left open in its own event union.
- *
- * `prepareEventForProjection` is contravariant in the event type, so a
- * definition pinned to the base `Event` refuses the very definition a feature
- * publishes over its own discriminated union.
+ * `prepareEventForProjection` is contravariant in the event type, so pinning
+ * to the base `Event` would refuse a feature's own discriminated union.
  */
 type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
   TEvent,
@@ -24,11 +22,9 @@ type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
 >;
 
 /**
- * The scenario package's own description of its delayed metrics retry.
- *
- * Name, delay and deduplication are the feature's decisions and travel with
- * it; only the act of registering the job needs the live pipeline service,
- * which is why the installer performs it rather than the package.
+ * The scenario package's own description of its delayed metrics retry. Name,
+ * delay and deduplication are the feature's decisions; only registering the
+ * job needs the live pipeline service, so the installer does that part.
  */
 export interface ScenarioDeferredMetricsJobSpec<
   TPayload extends Record<string, unknown> = Record<string, unknown>,
@@ -47,20 +43,16 @@ export interface ScenarioWorkerCapability<
   buildProcessing(): WorkerPipelineDefinition<TEvent>;
   /**
    * Resolves the two dispatchers the definition was built against: the
-   * self-referencing `computeRunMetrics` its own suite sync re-enters, and the
-   * delayed retry the metrics command schedules when a trace is not summarised
-   * yet. Both exist only after registration, which is why they are late-bound
-   * rather than constructor arguments.
+   * self-referencing `computeRunMetrics` and the delayed retry scheduled when
+   * a trace isn't summarised yet. Both exist only after registration.
    */
   connect(bindings: {
     computeRunMetrics: CommandDispatcher<TComputeRunMetrics>;
     scheduleComputeRunMetricsRetry: (payload: TComputeRunMetrics) => Promise<void>;
     /**
-     * Every command this registration produced, by name.
-     *
-     * The run-execution process manager's `finish` intent appends `finishRun`
-     * back into the pipeline it is mounted on, so the whole map is handed over
-     * rather than a second named binding per command the process may reach.
+     * Every command this registration produced, by name. The run-execution
+     * process manager's `finish` intent appends `finishRun` back into the
+     * pipeline, so the whole map is handed over rather than named per command.
      */
     commands: Record<string, CommandDispatcher<unknown>>;
   }): void;

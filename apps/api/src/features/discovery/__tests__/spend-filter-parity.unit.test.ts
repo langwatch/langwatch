@@ -29,11 +29,9 @@ interface QueryParameter {
 }
 
 /**
- * The query parameters the published document gives this operation.
- *
- * Throws when the path is absent rather than answering with nothing: every
- * assertion below compares two of these, and two empty lists are equal, so a
- * renamed route would turn this whole file green while checking nothing.
+ * The query parameters the published document gives this operation. Throws
+ * when the path is absent rather than answering nothing: two empty lists are
+ * equal, so a renamed route would otherwise turn this whole file green.
  */
 function queryParameters(path: string): QueryParameter[] {
   const paths = (openapi as { paths: Record<string, unknown> }).paths;
@@ -119,12 +117,9 @@ describe("given the two gateway spend reads", () => {
 
     it("says on the rollup status parameter why it is narrower", () => {
       // A caller who sends `status=admitted` reads the refusal against this
-      // text. Without it the published contract states the narrowing and never
-      // states the reason, which reads as an oversight rather than a rule.
-      // Named rather than dereferenced blind: `find` answers undefined, and a
-      // status parameter dropped from the rollups would otherwise fail here
-      // with "cannot read properties of undefined" instead of saying what is
-      // missing. Same rule as `queryParameters` above.
+      // text, so the contract states the reason, not just the narrowing.
+      // Named rather than dereferenced blind, so a dropped status parameter
+      // fails here saying what's missing, not with an undefined-property error.
       const parameter = queryParameters(SUMMARIES).find((p) => p.name === "status") as
         | { description?: string; schema?: { description?: string } }
         | undefined;

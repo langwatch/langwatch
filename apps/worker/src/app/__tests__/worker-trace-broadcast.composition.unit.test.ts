@@ -112,11 +112,9 @@ describe("tryCreateWorkerTraceBroadcast", () => {
 
   describe("given a publisher that cannot reach Redis", () => {
     /**
-     * Asserted at the PORT and again at the subscriber, because the swallow is
-     * doubled on purpose and either half alone hides a regression in the other:
-     * the packaged adapter absorbs the publish failure, and each subscriber has
-     * its own catch as well. Only the port-level assertion can see the adapter
-     * stop absorbing it.
+     * Asserted at the PORT and again at the subscriber: the swallow is
+     * doubled on purpose, so either assertion alone hides a regression in
+     * the other half. Only the port-level one can see the adapter stop absorbing it.
      */
     describe("when the port is published through directly", () => {
       /** @scenario "A failed publish does not fail the ingestion that caused it" */

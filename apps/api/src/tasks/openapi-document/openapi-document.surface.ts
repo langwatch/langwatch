@@ -63,10 +63,9 @@ export type OpenApiDocumentSurface = Readonly<{
 }>;
 
 /**
- * A route whose declaration says it publishes no operation. Neither is a hole:
- * an any-method route has no single operation to name, and a family behind a
- * browser session can be called by no API client, so an advertised operation
- * would be one nothing can satisfy.
+ * A route whose declaration says it publishes no operation. Neither is a
+ * hole: an any-method route has no single operation to name, and no API
+ * client can call a family behind a browser session.
  */
 function publishable({
   route,
@@ -181,10 +180,9 @@ export class DuplicatePublishedAddressError extends Error {
 }
 
 /**
- * Describes the families it is handed, and never serves one. What is installed
- * is the generator's question, asked once through `declaredRestFamilies`; this
- * describes whatever it is given, so describing a family costs nothing but the
- * declaration itself.
+ * Describes the families it is handed, and never serves one. What is
+ * installed is the generator's own question, asked once; this describes
+ * whatever it is given, costing nothing but the declaration itself.
  */
 export function composeOpenApiDocumentSurface({
   families,

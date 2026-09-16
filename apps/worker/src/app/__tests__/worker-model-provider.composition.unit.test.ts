@@ -40,12 +40,9 @@ class RecordingAbsence extends WorkerModelProviderAbsenceReport {
 }
 
 /**
- * The cipher every stored provider credential is written under.
- *
- * A reversible marker rather than AES so the assertion below reads as "this
- * value went through THIS process's cipher": a composition that forgot the
- * credentials port would hand the stored value back with the marker still on
- * it, which is exactly the failure the assertion catches.
+ * The cipher every stored provider credential is written under. A reversible
+ * marker, not AES, so the assertion reads as "this went through THIS
+ * process's cipher" — a forgotten credentials port fails exactly this way.
  */
 const cipher = {
   encrypt: (value: string) => `sealed:${value}`,

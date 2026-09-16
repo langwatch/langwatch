@@ -5,11 +5,9 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 /** Directory sync's worker-facing capability: the built pipeline definition. */
 export interface ScimSyncWorkerCapability {
   /**
-   * The directory-sync pipeline (D08).
-   *
-   * Built by the composition root from `PostgresScimSyncPipelineAdapter`: its
-   * projection store and its guards are one `ScimSyncState` repository in two
-   * roles, over the one Prisma client this process opened.
+   * The directory-sync pipeline (D08). Built by the composition root from
+   * `PostgresScimSyncPipelineAdapter`: projection store and guards are one
+   * `ScimSyncState` repository in two roles, over the one Prisma client opened.
    */
   readonly pipeline: ScimSyncPipeline;
 }

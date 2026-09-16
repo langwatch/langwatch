@@ -71,13 +71,10 @@ export class WorkerTiktokenCounterAdapter implements TraceTokenCounter {
 
   private async resolveEncoding(model: string): Promise<string> {
     try {
-      // The `with` attribute is required, not decorative: production runs the
-      // esbuild bundle, where tiktoken stays external, so this survives as a
-      // real dynamic import and Node resolves it through the ESM loader, which
-      // rejects JSON without it (ERR_IMPORT_ATTRIBUTE_MISSING). tsx used to
-      // absorb that, which is why it only broke once the bundles shipped — and
-      // it broke quietly, because the catch below falls back to a default
-      // encoding rather than failing.
+      // The `with` attribute is required, not decorative: the esbuild bundle
+      // keeps tiktoken external, so this is a real dynamic import Node's ESM
+      // loader resolves — and rejects JSON without it (ERR_IMPORT_ATTRIBUTE_MISSING).
+      // The catch below then falls back to a default encoding rather than failing.
       const models = (await import("tiktoken/model_to_encoding.json", {
         with: { type: "json" },
       })) as {

@@ -1,8 +1,7 @@
 /**
- * Spec: enterprise/modules/governance/specs/governance.feature
- *       ("Anomaly delivery delegates network safety")
- * Alert adapter's address fence judges destination before transport; refused
- * addresses recorded as failed outcomes.
+ * Spec: enterprise/modules/governance/specs/governance.feature ("Anomaly
+ * delivery delegates network safety"). Alert adapter's address fence judges
+ * destination before transport; refused addresses recorded as failed outcomes.
  */
 import { createHmac } from "node:crypto";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
@@ -121,12 +120,9 @@ afterEach(() => {
 });
 
 /**
- * One tick, driven forward.
- *
- * The scheduler waits five seconds before its first tick so the process can
- * settle; nine is enough for that tick plus the dispatcher's two backoffs
- * (250ms, then 500ms) and short of the five-second request timeout the
- * dispatcher arms per attempt, so no assertion here depends on an abort.
+ * One tick, driven forward. The scheduler waits five seconds before its
+ * first tick; nine covers that plus the dispatcher's two backoffs (250ms,
+ * 500ms), short of the five-second request timeout — no assertion aborts.
  */
 async function runOneTick(): Promise<void> {
   await vi.advanceTimersByTimeAsync(9_000);

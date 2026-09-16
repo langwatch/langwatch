@@ -85,11 +85,9 @@ export function apiSocketAddress(c: Context): string | undefined {
 let announcedUndeclaredPublicProxy = false;
 
 /**
- * A proxy on a public address nobody declared. Only this shape is worth saying:
- * a private hop is recognised and its chain read, but a public one is
- * indistinguishable from a caller, so every visitor behind it shares one
- * signed-out budget. Only `TRUSTED_PROXY_ADDRESSES` can tell the two apart, so
- * this warns rather than guesses — a deployment behind no proxy is fine as is.
+ * A proxy on a public address nobody declared: a private hop is recognised,
+ * but a public one is indistinguishable from a caller, so every visitor
+ * behind it shares one signed-out budget. Only `TRUSTED_PROXY_ADDRESSES` tells them apart.
  */
 function announceUndeclaredPublicProxyOnce(input: {
   forwardedFor: string | undefined;
@@ -149,12 +147,9 @@ function parseAddress(value: string): string | null {
 }
 
 /**
- * Whether an address is one of this deployment's own hops rather than a caller.
- * With the setting present the operator has answered exactly, empty included.
- * Absent, the address itself answers: a private peer reached this process
- * without crossing the internet, so it is infrastructure. That default is what
- * keeps a public caller from choosing its own budget AND every visitor behind
- * an ingress from sharing one.
+ * Whether an address is this deployment's own hop rather than a caller. With
+ * the setting present, the operator has answered exactly; absent, a private
+ * peer counts as infrastructure — the default keeping visitors from sharing one budget.
  */
 function isInfrastructureHop(address: string, trusted: readonly string[] | undefined): boolean {
   if (trusted === undefined) return isPrivateAddress(address);
@@ -164,12 +159,9 @@ function isInfrastructureHop(address: string, trusted: readonly string[] | undef
 }
 
 /**
- * Ranges that cannot be reached from the public internet, so an address in one
- * of them belongs to the operator's own network.
- *
- * Carrier-grade NAT (100.64.0.0/10) is deliberately absent: it is unreachable
- * publicly, but it is where a mobile CARRIER puts its subscribers, so a peer in
- * it is a caller rather than a hop.
+ * Ranges unreachable from the public internet, so an address in one belongs
+ * to the operator's own network. Carrier-grade NAT (100.64.0.0/10) is
+ * deliberately absent: mobile CARRIERs put subscribers there, so it's a caller, not a hop.
  */
 const PRIVATE_IPV4_RANGES = [
   "10.0.0.0/8",

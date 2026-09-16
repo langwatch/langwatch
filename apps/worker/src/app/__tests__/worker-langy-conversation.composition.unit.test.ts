@@ -79,12 +79,9 @@ function clickHouseDouble() {
 }
 
 /**
- * A model gateway that answers, without one existing.
- *
- * Only the composition decision is under test here: whether the process wires
- * `@langwatch/langy-server`'s own generator or reports the absence. What the
- * generator DOES with a handle is that service's own suite, which is where the
- * prompt, the character budget and the failure contract live.
+ * A model gateway that answers, without one existing. Only the composition
+ * decision is under test: whether the process wires `@langwatch/langy-server`'s
+ * generator or reports the absence — what it DOES is that service's own suite.
  */
 class FakeTitleModel extends LangyTitleModel {
   resolveTitleModel(): Promise<never> {

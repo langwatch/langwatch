@@ -4,11 +4,9 @@ import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feat
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
- * The two suite-run senders the Scenario pipeline's suite sync dispatches to.
- *
- * `startSuiteRun` is deliberately absent: it is dispatched by the API when a
- * suite begins, never by another worker pipeline, so exposing it here would
- * widen the cross-feature surface for nothing.
+ * The two suite-run senders the Scenario pipeline's suite sync dispatches
+ * to. `startSuiteRun` is deliberately absent: dispatched by the API, never
+ * by another worker pipeline, so exposing it here would widen the surface.
  */
 export interface SuiteWorkerCommands<TRecordItemStarted = unknown, TCompleteItem = unknown> {
   recordSuiteRunItemStarted: CommandDispatcher<TRecordItemStarted>;

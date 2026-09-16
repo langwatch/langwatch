@@ -88,18 +88,14 @@ export async function createWorkerFoundationApps(options: {
   resources: ResourceScope;
   /**
    * No longer read: AuthzApp builds its own command dispatcher over the
-   * `eventing` member (see modules/authz/server/src/app/authz.app.ts). Kept on
-   * this options record so the process root, which still allocates one before
-   * this function runs, does not need a matching change.
+   * `eventing` member (see `authz.app.ts`). Kept here so the process root,
+   * which still allocates one, needs no matching change.
    */
   authzDispatcher: AuthzGrantsCommandDispatcher;
   /**
    * No longer wired: ProjectApp reads `members.topicClustering`, but no
-   * installed module declares `topicClustering` as a `reads()` member and the
-   * process's fourteen-member vocabulary (@langwatch/infrastructure/members)
-   * has no such name, so there is no seam to supply it through. Recorded in
-   * the handoff for worker-foundation-v2; the fix belongs to project's module
-   * conversion, not to this composition.
+   * module declares it as a `reads()` member, so there is no seam to supply
+   * it through (worker-foundation-v2 handoff; fix belongs to project's module conversion).
    */
   topicClustering: ProjectInfrastructure["topicClustering"];
 }): Promise<WorkerFoundationApps> {

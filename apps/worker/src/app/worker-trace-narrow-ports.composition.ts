@@ -31,12 +31,9 @@ export function createWorkerTraceNarrowPorts(options: {
 }
 
 /**
- * The monitor listing on its own.
- *
- * The evaluation trigger is the only caller of this read and needs none of the
- * other three, so it composes this rather than a four-port bundle it would
- * have to satisfy with placeholders. Same adapter either way — there is one
- * rename of `getEnabledOnMessageMonitors`, not two.
+ * The monitor listing on its own: the evaluation trigger is the only caller
+ * and needs none of the other three, so it composes this rather than a
+ * four-port bundle satisfied with placeholders — one adapter, not two.
  */
 export function createWorkerTraceEvaluationMonitorPort(
   monitors: TraceEvaluationMonitorReader,
@@ -52,10 +49,9 @@ export function createWorkerTraceModelCostCatalogPort(
 }
 
 /**
- * The three project reads and the one project write the subscribers make.
- *
- * A structural type rather than a service, so the feature's read-side service
- * and its wide sibling both answer it and this file names neither.
+ * The three project reads and the one project write the subscribers make. A
+ * structural type rather than a service, so the feature's read-side service
+ * and its wide sibling both answer it, and this file names neither.
  */
 export type TraceProjectMetadataReader = {
   findById(id: string): Promise<Project | null>;

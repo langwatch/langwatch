@@ -25,11 +25,9 @@ export type WorkerCodingAgent = Readonly<{
 }>;
 
 /**
- * Builds the coding-agent read application over the worker's existing graph, booted
- * through the same `createApp().withModule().boot()` path every other module boots
- * through, rather than a hand-built `CodingAgentApp.create(...)` call.
- * The app owns its projection adapter, while the event pipeline owns its
- * processing adapter over the same tenant-keyed ClickHouse storage.
+ * Builds the coding-agent read application over the worker's existing
+ * graph, booted through the same `createApp().withModule().boot()` path
+ * every module uses. It owns projection; the pipeline owns processing.
  */
 export async function createWorkerCodingAgentApp(options: {
   database: PrismaConnection["client"];

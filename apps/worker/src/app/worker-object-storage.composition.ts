@@ -48,10 +48,9 @@ export type WorkerObjectStorage = {
    */
   azureConfig: WorkerStorageConfig["azure"];
   /**
-   * Where an oversized outbound payload is parked while the call carrying it is
-   * in flight. Published here because this composition already owns the
-   * deployment's S3 routing; the features that stage take it as a required
-   * collaborator and refuse by name when it is the absent one.
+   * Where an oversized outbound payload is parked while the call carrying
+   * it is in flight. Published here since this composition owns the S3
+   * routing; features that stage it refuse by name when it's absent.
    */
   payloadStaging: PayloadStaging;
 };

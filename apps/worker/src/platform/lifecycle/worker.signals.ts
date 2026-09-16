@@ -9,11 +9,9 @@ export interface WorkerSignalSource {
 }
 
 /**
- * Installs the worker's one idempotent shutdown boundary.
- *
- * The source is a port so tests and supervisors can exercise signal handling
- * without mutating the host process. The required failure callback is the
- * executable's explicit exit-status policy; this library never calls exit.
+ * Installs the worker's one idempotent shutdown boundary. The source is a
+ * port so tests and supervisors can exercise signal handling without
+ * touching the host process; this library never calls exit itself.
  */
 export class WorkerSignalHandlers {
   static install(options: {

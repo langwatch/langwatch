@@ -137,12 +137,9 @@ const PLAYGROUND_PERMISSION = "playground:view" as const;
 export type ApiRestDoor = RestDoorCredential | "public";
 
 /**
- * What this process's session verifier left on a request it resolved.
- *
- * Every field is optional and each answers a different question, because the
- * two halves of verification fail apart: a cookie Better Auth accepted whose
- * live session the auth module cannot resolve carries `authSessionId` and no
- * `userId`, and reaches no handler.
+ * What this process's session verifier left on a request. The two halves of
+ * verification fail apart: a cookie Better Auth accepted whose live session
+ * cannot resolve carries `authSessionId` and no `userId`, reaching no handler.
  */
 export type ApiRestBrowserCaller = Readonly<{
   /** The signed-in person, absent for a verified cookie with no live session. */
@@ -165,10 +162,9 @@ export type ApiRestBrowserCaller = Readonly<{
 }>;
 
 /**
- * The deployment secret that guards each internal family, by the family's own
- * namespace. One door, several secrets: the cron bearer must not reach the
- * agent manager's internal surface, so the door is chosen per family rather
- * than accepting any secret this deployment happens to hold.
+ * The deployment secret guarding each internal family, keyed by namespace: the
+ * cron bearer must not also open the agent manager's surface, so the door is
+ * chosen per family rather than any secret this deployment happens to hold.
  */
 export type ApiRestInternalSecrets = Readonly<Record<string, string | undefined>>;
 
@@ -185,11 +181,9 @@ export type ApiRestDoorConfig = Readonly<{
    */
   browserSession?: ApiBrowserSessionResolver | undefined;
   /**
-   * The deployment's own Better Auth request boundary, where it composed one.
-   * Taken instead of a resolver: the live-session half is a module peer boot
-   * holds, so the process supplies only the half no module can - whether the
-   * cookie verifies. An explicit `browserSession` wins, for a host that
-   * composed the whole answer itself.
+   * The deployment's own Better Auth request boundary, taken instead of a
+   * resolver: the process supplies only the half no module can (cookie
+   * verification); an explicit `browserSession` wins over this one.
    */
   browserSessions?: ApiBrowserSessionTransport | undefined;
   /**
@@ -200,9 +194,8 @@ export type ApiRestDoorConfig = Readonly<{
   executionProxyBaseUrl?: string | undefined;
   /**
    * The process's ONE receipt ledger, behind every create a route declared
-   * replayable. Absent on a deployment with no database, where a route
-   * declaring the behaviour is refused at mount rather than answering as
-   * though a retry were protected.
+   * replayable. Absent on a deployment with no database, a route declaring the
+   * behaviour is refused at mount rather than answering as though protected.
    */
   idempotency?: IdempotentRunner | undefined;
 }>;
@@ -262,10 +255,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   private readonly callerCredentials = new WeakMap<RestCaller, ResolvedOrganizationApiKeyToken>();
   private readonly browserCallers = new WeakMap<Request, ApiRestBrowserCaller>();
   /**
-   * The session answer for one request, resolved ONCE however many doors and
-   * facts ask for it. Three of this process's facts read a session on routes
-   * whose door resolves nobody, and a cookie verified four times per request
-   * is four round trips to the session store.
+   * The session answer for one request, resolved ONCE however many doors ask
+   * for it — some routes' doors resolve nobody but still need a session, and
+   * verifying it once avoids four round trips to the session store.
    */
   private readonly sessions = new WeakMap<Request, Promise<ApiRestBrowserCaller | null>>();
 
@@ -280,12 +272,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   ) {}
 
   /**
-   * One declared family on the door its declaration named.
-   *
-   * Every door is opened for each mount, not only the family's own: a ROUTE
-   * may raise a credential of its own - the deployment's cron bearer sits on
-   * two routes of a project family - and the runtime resolves that route
-   * through the door table rather than through the family's door.
+   * One declared family on the door its declaration named. Every door opens
+   * for each mount: a ROUTE may raise its own credential (the cron bearer sits
+   * on two routes of a project family), resolved through the door table.
    */
   mount(
     declaration: MountableTransport,
@@ -422,10 +411,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /**
-   * Every organization-scoped family. The permission is asked of the credential
-   * at the ORGANIZATION, the only scope this door resolves; a route that names
-   * its own project asks a SECOND question through `authorize` rather than
-   * replacing this one, so such a route is the stricter of the two.
+   * Every organization-scoped family. Permission is asked of the credential at
+   * the ORGANIZATION; a route naming its own project asks a SECOND question
+   * through `authorize`, making such a route the stricter of the two.
    */
   private organizationDoor(): RestIdentity {
     return {
@@ -491,10 +479,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /**
-   * The byte door a signed-in page reaches. A deployment that composed no
-   * session verifier refuses every request rather than admitting an unverified
-   * one: the routes still MOUNT, so the surface is the one the document
-   * describes, and nobody reaches a handler without a session.
+   * The byte door a signed-in page reaches. A deployment with no session
+   * verifier refuses every request rather than admitting an unverified one:
+   * the routes still MOUNT, and nobody reaches a handler without a session.
    */
   private browserDoor(): RestIdentity {
     const admit = async (request: Request): Promise<RestCaller | null> => {
@@ -516,10 +503,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /**
-   * This process's session answer for one request, resolved once and shared by
-   * every door and fact that asks. A deployment that composed no verifier
-   * answers null for every request: the routes still MOUNT and each reader
-   * takes its own refusing branch.
+   * This process's session answer for one request, resolved once and shared
+   * by every door and fact that asks. With no verifier composed this answers
+   * null for every request, and each reader takes its own refusing branch.
    */
   private sessionOf(request: Request): Promise<ApiRestBrowserCaller | null> {
     const resolved = this.sessions.get(request);
@@ -532,10 +518,9 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   }
 
   /**
-   * Every fact this process answers on behalf of a module, for every mount.
-   * The six session-bearing ones are bound here because no module can verify a
-   * cookie, and three of them sit on routes whose door resolves nobody - so
-   * they read {@link sessionOf} directly, which is why the memo exists.
+   * Every fact this process answers on behalf of a module. Session-bearing
+   * facts are bound here because no module can verify a cookie, reading
+   * {@link sessionOf} directly rather than resolving one themselves.
    */
   private processFacts(): readonly RestTransportMiddlewareBinding[] {
     return [

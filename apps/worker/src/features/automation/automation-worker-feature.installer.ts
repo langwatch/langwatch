@@ -12,10 +12,8 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 
 /**
  * A registrable Eventing definition, left open in its own event union.
- *
- * `prepareEventForProjection` is contravariant in the event type, so a field
- * pinned to the base `Event` refuses the very definition a feature publishes
- * over its own discriminated union.
+ * `prepareEventForProjection` is contravariant in the event type, so pinning
+ * to the base `Event` would refuse a feature's own discriminated union.
  */
 type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
   TEvent,
@@ -67,9 +65,8 @@ class RegisteredAutomationTriggerMatches implements AutomationTriggerMatchRecord
 export interface AutomationWorkerCapability<TEvent extends Event = Event> {
   /**
    * Builds the pipeline definition against the worker's own process store.
-   * Retention is supplied by the installer rather than the composition root so
-   * the intent retention and the outbox it prunes can never come from two
-   * different process stores.
+   * Retention is supplied by the installer, not the composition root, so the
+   * intent retention and the outbox it prunes never come from two stores.
    */
   buildPipeline(options: {
     retention: AutomationIntentRetention;

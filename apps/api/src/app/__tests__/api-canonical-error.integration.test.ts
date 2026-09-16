@@ -1,13 +1,7 @@
 /**
- * The reach of the two-class mapping, through the door table that actually
- * mounts it.
- *
- * `ApiRestHost` binds `canonicalErrorResponse` as the `onError` of every family
- * it mounts, so a status asserted here is the status a caller receives on any
- * family the api process serves. Two families behind two different doors are
- * mounted for that reason: a refusal that answered 422 on one and 400 on the
- * next would be the exact defect the pin exists to prevent, and one family
- * could not show it.
+ * The reach of the two-class mapping, through the door table that mounts it.
+ * `ApiRestHost` binds `canonicalErrorResponse` as every family's `onError`,
+ * so two families (two doors) prove no family can hide a 422/400 split.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { apiErrorSchema, defineRestRouter, projectRestFacts } from "@langwatch/api/rest";
@@ -128,22 +122,9 @@ describe("given the families the api process mounts", () => {
 
   describe("when a body cannot be read as a request at all", () => {
     /**
-     * REGRESSION, and not this file's to fix. On `origin/main` an unparseable
-     * body answers 400 `malformed_request`; on a declared router it answers 500
-     * `internal_error`, so the corrupt-payload class never reaches the caller.
-     *
-     * The cause is in `packages/api/src/rest/runtime.ts`. Its `validators()`
-     * installs the hook that raises `requestValidationErrorFrom` but not the
-     * wrapper that `build()` in `packages/api/src/rest/request.ts:284-301` puts
-     * AROUND the validator — and hono raises a malformed body as
-     * `HTTPException(400)` from inside its own validator, before any hook runs.
-     * That exception carries no `error` string, so it misses
-     * `isStatusCarryingError` too and collapses to the opaque 500.
-     *
-     * This asserts what a caller receives today rather than what it should, so
-     * the suite does not go red for a defect outside this lane's paths. It
-     * fails the moment `runtime.ts` grows the guard — which is the point: flip
-     * it back to 400 / `malformed_request` in the same change.
+     * REGRESSION, not this file's to fix: `origin/main` answers 400
+     * `malformed_request` for an unparseable body; the declared-router
+     * runtime answers 500 instead — pins today's behaviour until fixed.
      */
     it("answers 500 today, because the declared-router runtime drops the guard", async () => {
       const response = await mount(projectFamily).request("/api/probes/2026-08-07/", {

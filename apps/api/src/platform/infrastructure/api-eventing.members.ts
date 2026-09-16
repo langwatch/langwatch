@@ -13,12 +13,9 @@ export abstract class ApiEventingAbsenceReport {
 }
 
 /**
- * The one thing this needs of the process's queue.
- *
- * Declared structurally rather than as `ApiQueueInfrastructure`, because what
- * it uses is the Group Queue dependency object and nothing else — not the
- * Redis connection, not the readiness gate. Naming the class would have made
- * this composable only where a real Redis exists.
+ * The one thing this needs of the process's queue. Structural rather than
+ * `ApiQueueInfrastructure`: only the Group Queue dependency object is used,
+ * not the Redis connection or gate — naming the class would need real Redis.
  */
 export type ApiEventingQueue = Readonly<{
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
@@ -42,11 +39,9 @@ export type ApiEventingInfrastructureOptions = {
 // EventStoreProducerOnly, and processManagerMode: producer-only.
 export class ApiEventingInfrastructure {
   /**
-   * Composes the producer only when this process has a Group Queue.
-   *
-   * An absent queue is an absent Redis, which the queue infrastructure has
-   * already announced; this reports the consequence rather than the cause, so
-   * a deployment reads "no dispatch" from its logs instead of inferring it.
+   * Composes the producer only when this process has a Group Queue. An
+   * absent queue is an absent Redis, already announced elsewhere; this
+   * reports the consequence, so logs read "no dispatch" instead of inferring it.
    */
   static tryCreate(
     options: Omit<ApiEventingInfrastructureOptions, "queue"> & {

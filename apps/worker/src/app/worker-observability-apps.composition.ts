@@ -71,10 +71,8 @@ export type WorkerObservabilityAppsOptions = Readonly<{
   resolveClickHouseClient: (tenantId: string) => Promise<ClickHouseClient>;
   /**
    * The process's routed query client, over the same connection the
-   * resolver above dials per-tenant. The trace module reads this member
-   * directly; a caller that names none leaves trace to refuse at boot
-   * naming "clickhouse", rather than this composition inventing a resolver
-   * shaped like one.
+   * resolver above dials per-tenant. Trace reads this directly; naming none
+   * leaves trace to refuse at boot naming "clickhouse".
    */
   clickhouse?: ClickHouseQueryClient;
   /** The trace module's command pipeline. Absent, trace refuses at boot naming "eventing". */
@@ -197,12 +195,10 @@ export async function createWorkerObservabilityApps(
       // by the one Data Privacy application this runtime already provides.
       metricServer,
       workerEvaluationServer,
-      // Monitor asks this runtime's own evaluator and evaluation peers for its
-      // evaluator port and its seven-day trend; evaluator asks this runtime's
-      // permissions/audit log/users/model providers. Both still name workflows
-      // (WorkflowApi), unresolved on this runtime today - boot refuses naming
-      // it, which is the correct intermediate wall until a later lane installs
-      // workflowServer beside these.
+      // Monitor and evaluator ask this runtime's own peers (evaluator port,
+      // trend, permissions/audit/users/models). Both still name workflows
+      // (WorkflowApi), unresolved here — boot refuses naming it, the correct
+      // wall until a later lane installs workflowServer beside these.
       monitorServer,
       evaluatorServer,
     ])

@@ -4,11 +4,9 @@ import type { WorkerFeatureCloser, WorkerFeatureInstaller } from "../worker-feat
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 /**
- * The three contribution senders the source pipelines dispatch into (ADR-056).
- *
- * Coding Agent is a session aggregate assembled from facts that arrive on
- * other pipelines: spans on Trace, metrics on Metric, logs on Log. Each of
- * those mounts a dispatch subscriber that closes over one of these.
+ * The three contribution senders the source pipelines dispatch into
+ * (ADR-056): spans on Trace, metrics on Metric, logs on Log. Each mounts a
+ * dispatch subscriber that closes over one of these.
  */
 export interface CodingAgentWorkerCommands<
   TSpanFacts = unknown,

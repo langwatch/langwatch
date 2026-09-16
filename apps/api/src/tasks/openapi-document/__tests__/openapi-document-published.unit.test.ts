@@ -1,21 +1,7 @@
 /**
- * The PUBLISHED document — the checked-in artifact `/api/openapi.json` serves —
- * read as an integrator reads it.
- *
- * Every other test in this directory feeds the generator a fixture and asserts
- * what comes out. None of them opens the artifact, which is how the document
- * stayed two days stale while its own checks reported green: the declarations
- * were renamed and the routes were mounted, the source literals agreed with
- * themselves, and the bytes on the wire still carried the old names and no
- * teams family at all. An SDK is generated from these bytes, so these bytes are
- * what has to be asserted.
- *
- * Regenerate with:
- *   pnpm --filter @langwatch/platform-api task openapi-generate \
- *     "$PWD/apps/api/src/features/discovery/openapi-document.json"
- *
- * The path argument is required and is resolved against apps/api, so pass an
- * absolute one. Never hand-edit the artifact: the next regeneration reverts it.
+ * The PUBLISHED document, read as an integrator reads it — unlike every other
+ * test here, which feeds the generator a fixture. Regenerate with `pnpm
+ * --filter @langwatch/platform-api task openapi-generate <absolute-path>`.
  */
 import { readFile } from "node:fs/promises";
 
@@ -44,9 +30,8 @@ async function publishedOperationIds(): Promise<Map<string, string>> {
 
 /**
  * The teams family, mounted by `560f409863` after the document's previous
- * regeneration and therefore absent from it until this one. Nine operations:
- * apidiff reported all nine as present on main and missing on the branch while
- * the branch was answering every one of them.
+ * regeneration, so absent from it until this one. apidiff flagged these nine
+ * as present on main but missing from a branch that answered all of them.
  */
 const TEAM_OPERATIONS = [
   "GET /api/v1/teams",
@@ -61,11 +46,9 @@ const TEAM_OPERATIONS = [
 ] as const;
 
 /**
- * A sample of the operationIds `2ccc43d219` restored, spread across the
- * families it touched. Each expectation is the name main publishes for that
- * same operation, read from `origin/main`'s own document — so a rename that
- * lands without a regeneration fails here, which is the check that did not
- * exist when the renames were made.
+ * A sample of the operationIds `2ccc43d219` restored, read from
+ * `origin/main`'s own document. A rename landing without a regeneration
+ * fails here — the check that did not exist when the renames were made.
  */
 const RESTORED_OPERATION_IDS: Readonly<Record<string, string>> = {
   "GET /api/v1/prompts": "getApiPrompts",
@@ -85,14 +68,9 @@ const RESTORED_OPERATION_IDS: Readonly<Record<string, string>> = {
 };
 
 /**
- * The deprecated `/api/agents` alias. It is still SERVED — the agent module's
- * own `agent-rest-family.integration.test.ts` drives every one of these through
- * the mounted Hono app — but it is no longer PUBLISHED: it answers the
- * successor family's own operations, so documenting it a second time declared
- * five operationIds twice, which OpenAPI forbids and which broke the generated
- * TypeScript client outright (duplicate identifiers). Restoring main's names on
- * the canonical `/api/v1/agents` operations is what made the collision
- * unavoidable; unpublishing the alias is how it is resolved.
+ * The deprecated `/api/agents` alias — still SERVED, no longer PUBLISHED: it
+ * answers the successor family's operations, so documenting both declared
+ * duplicate operationIds, which OpenAPI forbids and broke the generated client.
  */
 const UNPUBLISHED_LEGACY_AGENT_OPERATIONS = [
   "GET /api/agents",

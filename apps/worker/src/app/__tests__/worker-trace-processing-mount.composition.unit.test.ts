@@ -241,9 +241,8 @@ function composePipeline() {
 
 /**
  * One registered subscriber, driven exactly as the dispatcher drives it:
- * `shouldDispatch` first, then `handle` only if it passed. Skipping the
- * predicate would make every guard in the pipeline invisible to these tests —
- * including the origin guard that stops a replay re-firing alerts.
+ * `shouldDispatch` first, then `handle` only if it passed — skipping the
+ * predicate would hide every pipeline guard from these tests, replay guard included.
  */
 function dispatch(
   definition: ReturnType<typeof composePipeline>,
@@ -289,12 +288,9 @@ function spanEvent(overrides: Record<string, unknown> = {}): TraceProcessingEven
 }
 
 /**
- * The dispatcher's own context shape.
- *
- * `foldState` and not `state`: the trace subscribers read the committed fold
- * through the `TriggerContext` wrapper the pipeline builds around this, and a
- * test that invented its own field name would exercise handlers against a
- * state they never see in production.
+ * The dispatcher's own context shape: `foldState`, not `state`. Trace
+ * subscribers read the committed fold through the `TriggerContext` wrapper
+ * built around this — a different name would test a state production never sees.
  */
 function context(state: object = traceState) {
   return { tenantId: "project-1", aggregateId: "trace-1", foldState: state } as never;

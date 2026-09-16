@@ -267,12 +267,9 @@ const DATASET_ACTION_PARAMS = {
 };
 
 /**
- * A grandfathered automation with no narrowing condition at all.
- *
- * `triggerKind: "AUTOMATION"` with empty filters and no query is what
- * `isMatchEverythingTrigger` reads as misconfigured: it appends every trace
- * the project sees. Two ids because the containment claim keys are per
- * trigger and a claim taken in one test must not decide another.
+ * A grandfathered automation with no narrowing condition at all: empty
+ * filters and no query is what `isMatchEverythingTrigger` reads as
+ * misconfigured, appending every trace. Two ids so one claim can't decide another.
  */
 const RUNAWAY_TRIGGER_ROW: TriggerRow = {
   ...TRIGGER_ROW,
@@ -293,10 +290,8 @@ const NARROWED_TRIGGER_ROW: TriggerRow = {
 
 /**
  * Two more of the same pair, for the notices that carry an upgrade line.
- *
- * Separate ids because a notice is claimed once per automation per UTC day and
- * the claim keyspace outlives one test — two assertions on `trigger-runaway-2`
- * would leave the second silently unnotified and green.
+ * Separate ids: a notice is claimed once per automation per UTC day, so two
+ * assertions on one id would leave the second silently unnotified and green.
  */
 const NEXT_STEP_CEILING_TRIGGER_ROW: TriggerRow = {
   ...NARROWED_TRIGGER_ROW,
@@ -362,10 +357,8 @@ const DATASET_TRIGGER_ROW: TriggerRow = {
 
 /**
  * The same automation again, written to queue its matches for annotation.
- *
- * The annotator id carries the `user-`/`queue-` prefix the reference grammar
- * is written in, because that grammar is Annotation's and this process must
- * send what Annotation parses rather than what it would have parsed itself.
+ * The annotator id carries the `user-`/`queue-` prefix Annotation's own
+ * reference grammar expects — this process sends what Annotation parses.
  */
 const ANNOTATION_TRIGGER_ROW: TriggerRow = {
   ...TRIGGER_ROW,
@@ -495,12 +488,9 @@ function compose(over: ComposeOverrides = {}) {
 }
 
 /**
- * The three substrates containment adds, standing where this process's mail
- * graph, tenancy directories and routed ClickHouse client stand in production.
- *
- * The POLICY is not doubled: `RunawayContainmentService` is the packaged one,
- * so what these assertions observe is the decision the feature makes, not one
- * written in the test.
+ * The three substrates containment adds, standing in for production's mail
+ * graph, tenancy directories and ClickHouse client. `RunawayContainmentService`
+ * is the packaged POLICY — assertions observe its real decision, not the test's.
  */
 function recordingContainment(input: {
   projectTraces24h: number;

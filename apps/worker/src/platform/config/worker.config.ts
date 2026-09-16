@@ -140,9 +140,8 @@ export const workerConfigDefinition = RuntimeConfig.define({
   },
   /**
    * The deployment's one browser-session identity, read through the auth
-   * feature's own schema so both processes reach one answer. Its secret also
-   * signs unsubscribe links (ADR-031) and is the `CREDENTIALS_SECRET`
-   * fallback (ADR-027 order).
+   * feature's schema so both processes agree. Its secret also signs
+   * unsubscribe links (ADR-031) and is the `CREDENTIALS_SECRET` fallback (ADR-027).
    */
   browserSession: { ...authServerConfigDefinition },
   /**

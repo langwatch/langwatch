@@ -76,11 +76,9 @@ export class WorkerEvaluationProcessingResult {
 }
 
 /**
- * The worker's Evaluation declaration, built over the process-specific bag the
- * composition root closes in. The v2 builder supplies no bespoke bag, so the
- * factory carries it by closure; peers still arrive as declared dependencies,
- * and Trace and Evaluation can name one another because boot preallocates
- * their API clients before either setup runs.
+ * The worker's Evaluation declaration, built over the process-specific bag
+ * the composition root closes in via the v2 builder. Trace and Evaluation
+ * can name one another because boot preallocates their API clients first.
  */
 function workerEvaluationApp(infrastructure: WorkerEvaluationInfrastructure) {
   return {

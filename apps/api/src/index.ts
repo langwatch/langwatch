@@ -1,10 +1,7 @@
 /**
- * What this package is, now that the api process boots on its module list.
- *
- * Everything a family used to export from here is exported by that family's
- * own module. What is left is the process itself: the root that states what
- * the api role is, its parsed config, the doors it opens and the lifecycle it
- * runs.
+ * What this package is, now that the api process boots on its module list:
+ * everything a family used to export here is exported by that family's own
+ * module. What's left is the process root — role, config, doors, lifecycle.
  */
 export {
   apiProcessConfig,

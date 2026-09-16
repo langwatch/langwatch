@@ -123,9 +123,8 @@ export function createWorkerEvaluationWorkflows(
 
 /**
  * The real Evaluation application closure for the worker. Its evaluator
- * engine is supplied by Evaluation's durable processing graph, which owns the
- * one process instance; this function only adds the synchronous API boundary
- * around that same engine.
+ * engine is supplied by Evaluation's durable processing graph, the one
+ * process instance; this only adds the synchronous API boundary around it.
  */
 export function createWorkerEvaluationApp(input: {
   resolveClickHouseClient: EventingClickHouseClientResolver;

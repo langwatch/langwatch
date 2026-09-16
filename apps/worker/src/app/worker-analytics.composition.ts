@@ -2,12 +2,9 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { AnalyticsAdapter } from "@langwatch/analytics-server";
 
 /**
- * The client shape Analytics reads through.
- *
- * Derived from the adapter rather than restated because it is WIDER than the
- * two methods `@langwatch/eventing` narrowed its own resolver to: the analytics
- * repositories reach for the driver's own result-set handling. The composition
- * root holds the deployment's real client and is where the two shapes meet.
+ * The client shape Analytics reads through. Derived from the adapter rather
+ * than restated: it is WIDER than the two methods `@langwatch/eventing`
+ * narrowed its resolver to, since the repositories use the driver's own result-set handling.
  */
 export type WorkerAnalyticsClickHouseResolver = Parameters<
   typeof AnalyticsAdapter.create

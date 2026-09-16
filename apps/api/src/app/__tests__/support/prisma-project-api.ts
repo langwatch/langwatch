@@ -21,12 +21,9 @@ export interface PostgresProjectAdapterOptions {
 }
 
 /**
- * A `ProjectApi` over real rows, for the suites that seed a project and then
- * exercise another feature's doors against it.
- *
- * The module's own directory answers every read; the three operations that
- * belong to the project application's cross-entity half refuse by name,
- * because nothing composed here is behind them.
+ * A `ProjectApi` over real rows, for suites that seed a project and then
+ * exercise another feature's doors. The module's directory answers every
+ * read; the cross-entity operations refuse by name — nothing here backs them.
  */
 export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): ProjectApi {
   const directory = ProjectService.create({

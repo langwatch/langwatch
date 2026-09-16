@@ -5,11 +5,8 @@ import { WorkerStandaloneComposition } from "./worker-standalone.composition.ts"
 
 /**
  * The Node process surface the standalone executable needs, injectable for
- * tests.
- *
- * It is the executable's ONE seam onto the process, so a test can drive a boot
- * failure and a signal without touching the real `process`, and a host that
- * embeds this can remove every handler it installed.
+ * tests. The executable's ONE seam onto the process, so a test can drive a
+ * boot failure or signal without touching the real `process`.
  */
 export type WorkerExecutableProcessHost = WorkerExecutableHost & {
   env: Readonly<Record<string, unknown>>;

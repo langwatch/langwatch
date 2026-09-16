@@ -25,12 +25,9 @@ export type WorkerWebhookEgressCompositionOptions = Readonly<{
 }>;
 
 /**
- * The counter the hourly dispatch cap is kept in, composed on its own.
- *
- * Named separately from the sender because not every outbound hop passes
- * through the sender: a webhook endpoint that delivers to a queue is put on
- * that queue directly, so the queue transport has to be handed the SAME
- * counter or it would be the one uncapped destination in the product.
+ * The counter the hourly dispatch cap is kept in, composed on its own. Named
+ * separately because not every outbound hop passes through the sender: a
+ * queue-delivered webhook must share the SAME counter or go uncapped.
  */
 export function createWorkerWebhookDispatchRateLimiter(
   options: WorkerWebhookEgressCompositionOptions,
@@ -41,12 +38,9 @@ export function createWorkerWebhookDispatchRateLimiter(
 }
 
 /**
- * The one fenced sender this process holds.
- *
- * Composed once and shared, because both outbound surfaces — an automation's
- * webhook alert and a webhook ENDPOINT's delivery — count against the same
- * dispatch ceiling and answer to the same address policy. Two services over
- * two counters would let one surface exhaust a budget the other cannot see.
+ * The one fenced sender this process holds, composed once and shared: an
+ * automation's alert and an ENDPOINT's delivery share one dispatch ceiling
+ * and address policy, so two counters could let either exhaust the other's budget.
  */
 export function createWorkerWebhookEgress(
   options: WorkerWebhookEgressCompositionOptions & {
@@ -73,12 +67,9 @@ export function createWorkerWebhookTransport(
 }
 
 /**
- * The dispatch cap counted in the Redis this process already holds.
- *
- * A frozen twin of the Redis branch of `platform/app/src/server/rateLimit.ts`,
- * down to the key prefix: both graphs count into ONE keyspace while the
- * pipelines are twinned, and a process counting under a different key spends a
- * budget the other was protecting.
+ * The dispatch cap counted in the Redis this process already holds. A frozen
+ * twin of `platform/app/src/server/rateLimit.ts`'s Redis branch, down to the
+ * key prefix — a different key here spends a budget the other was protecting.
  */
 class WorkerWebhookDispatchRateLimiter extends WebhookDispatchRateLimiter {
   constructor(private readonly connection: RedisConnection) {

@@ -5,12 +5,9 @@ import type { WorkerTracePrivacyConfig } from "../../config/worker.config.ts";
 import { WorkerPiiAnalysisAdapter } from "../worker-pii-analysis.adapter.ts";
 
 /**
- * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * The wire format between this process and the analysis service, pinned by
- * literal. The service answers with anonymized text and no positions, so a
- * request this process shapes differently is redacted differently and the
- * response carries nothing that would show it.
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature. The wire
+ * format between this process and the analysis service, pinned by literal:
+ * it answers anonymized text with no positions, showing nothing if shaped differently.
  */
 
 const inspectContent = vi.fn();

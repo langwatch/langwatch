@@ -65,13 +65,10 @@ export async function createWorkerAgentApps(options: {
   const broadcast = BroadcastAdapter.create(prerequisites.redis);
   resources.own("worker scenario broadcasts", () => broadcast.close());
   // The scenario module's App still reads a bespoke infrastructure bag
-  // (agentTesting, scenarioTabs, broadcast, resultAtoms, runConfigurations,
-  // ...) that the v2 builder has no seam for — only its declared `reads`
-  // ("encryption") and its one peer dependency (UserApi) travel through
-  // `createApp` now. The rest (agentTesting built from `agents`/`graph`,
-  // the tab registry, the broadcast subscription, the ClickHouse-backed
-  // result/run-configuration reads) has nowhere left to plug in; that gap is
-  // the scenario module's own conversion to close, not this composition's.
+  // (agentTesting, scenarioTabs, broadcast, resultAtoms, runConfigurations)
+  // the v2 builder has no seam for — only `reads("encryption")` and its one
+  // peer (UserApi) travel through `createApp`. Closing that gap is the
+  // scenario module's own conversion to make, not this composition's.
   const scenarioRuntime = await createApp({
     role: "worker",
     members: membersFrom({

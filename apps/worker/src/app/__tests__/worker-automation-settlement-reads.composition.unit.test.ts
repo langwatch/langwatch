@@ -71,22 +71,16 @@ function recordReader(
 }
 
 /**
- * Long enough that the teaser actually truncates it.
- *
- * `teaserOf` keeps `max(50, min(300, 10%))` characters, so a short fixture
- * comes back whole and a test asserting on its text would pass whether the
- * window fired or not. The `redacted_by_visibility_window` flag is asserted
- * beside the truncation for the same reason.
+ * Long enough that the teaser actually truncates it: `teaserOf` keeps
+ * `max(50, min(300, 10%))` characters, so a short fixture would pass whether
+ * the window fired or not. `redacted_by_visibility_window` is asserted too.
  */
 const AGED_INPUT = `how do I reset my password? ${"the customer wrote a great deal more. ".repeat(20)}`;
 
 /**
- * A ClickHouse double that answers the summary read and nothing else.
- *
- * The joined record read issues two queries — light summaries, then the heavy
- * `stored_spans` scan bounded by them — and only the first is fixtured here:
- * the trace-level teaser is what the plan's window decides, and a span list
- * would only re-assert the pass that runs over it.
+ * A ClickHouse double that answers the summary read and nothing else. The
+ * joined record read issues two queries; only the light-summary one is
+ * fixtured — a span list would only re-assert the pass that already runs.
  */
 function clickHouseWithAgedTrace() {
   const startedAt = Date.now() - 365 * 24 * 60 * 60 * 1000;

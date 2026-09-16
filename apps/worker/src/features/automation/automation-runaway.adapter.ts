@@ -16,12 +16,9 @@ import { z } from "zod";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Who a limit notice goes to, resolved through this process's own directories.
- *
- * Two collaborators rather than one because a project's admins are an
- * ORGANIZATION's role bindings: the ceiling is breached by a project, the
- * people who can do something about it are named on its organization, and the
- * hop between the two is the project directory's answer.
+ * Who a limit notice goes to, resolved through this process's own
+ * directories. Two collaborators: a project breaches the ceiling, but its
+ * admins are named on the ORGANIZATION, so the project directory bridges them.
  */
 export type WorkerAutomationRunawayDirectories = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
@@ -194,9 +191,8 @@ const CLAIM_SWEEP_INTERVAL_MS = 60_000;
 
 /**
  * The app's KSUID resource for a containment-notice claim's fencing token
- * (`KSUID_RESOURCES.AUTOMATION_CLAIM`). The literal rather than the app's
- * constant table: the value is only ever compared for equality, never
- * persisted, but the kind still says what the token is for.
+ * (`KSUID_RESOURCES.AUTOMATION_CLAIM`), as a literal: only ever compared for
+ * equality, never persisted, but the kind still says what the token is for.
  */
 const AUTOMATION_CLAIM_KSUID_RESOURCE = "automationclaim";
 

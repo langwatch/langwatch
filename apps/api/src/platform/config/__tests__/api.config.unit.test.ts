@@ -7,12 +7,9 @@ import {
 } from "../api.config.ts";
 
 /**
- * The fallback model, derived rather than written down.
- *
- * A literal here would pin the assertions to whichever model was newest the
- * day they were written, and the registry advances: the fact under test is
- * that an unconfigured deployment gets the CURRENT flagship, not that it gets
- * a particular one.
+ * The fallback model, derived rather than written down. A literal would pin
+ * assertions to whichever model was newest when written; the registry
+ * advances, and the fact under test is getting the CURRENT flagship.
  */
 const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 
@@ -581,12 +578,9 @@ describe("API process configuration", () => {
   });
 
   /**
-   * The self-ingest refusal, at the boundary that owns it.
-   *
-   * `assertObservabilityDoesNotSelfIngest` is tested exhaustively in
-   * `@langwatch/config`; what belongs here is the WIRING — that this process
-   * hands the guard its own three addresses, and that a boot which would loop
-   * refuses before anything is composed.
+   * The self-ingest refusal, at the boundary that owns it — the guard itself
+   * is tested exhaustively in `@langwatch/config`; what belongs here is the
+   * WIRING: this process's own three addresses, refusing before composing.
    */
   describe("when the observability exporter is configured", () => {
     /** @scenario "A process pointed at its own ingest refuses to boot" */
@@ -654,11 +648,8 @@ describe("API process configuration", () => {
 
   /**
    * The outbound mail gateway, resolved the way the worker resolves its own.
-   *
-   * `BASE_HOST` is what makes the whole leaf resolvable, and it is bound ONCE
-   * — as `infrastructure.execution.publicBaseUrl` — so what is pinned here is
-   * that the mail leaf reads it from there rather than binding a second copy
-   * that could answer differently.
+   * `BASE_HOST` is bound ONCE, as `infrastructure.execution.publicBaseUrl`;
+   * pinned here is that mail reads from there, not a second bound copy.
    */
   describe("the outbound mail gateway", () => {
     describe("given a deployment that named no BASE_HOST", () => {

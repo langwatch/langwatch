@@ -25,10 +25,8 @@ import {
 
 /**
  * A cross-pipeline map projection and the subscriber that follows it, reduced
- * to the shape the registry needs. The live SaaS pair is the billable-events
- * meter and its usage-reporting dispatch; what matters here is that both land
- * in the shared job registry under `global:`, because that is the namespace a
- * consumer of `event-sourcing/jobs` has to be able to route.
+ * to the shape the registry needs. What matters is that both land in the
+ * shared job registry under `global:`, the namespace `event-sourcing/jobs` routes on.
  */
 const meterProjection: MapProjectionDefinition<{ eventId: string }, Event> = {
   name: "orgBillableEventsMeter",
@@ -194,12 +192,9 @@ describe("WorkerEventingRuntime global projections", () => {
 });
 
 /**
- * Consumer ownership is one decision with two effects, and a graph that got
- * only one of them is worse than one that got neither: the Group Queue factory
- * decides whether a queue definition also starts a consumer loop, and the
- * Eventing runtime decides whether the process-manager outbox, wake and
- * schedule workers run. A runtime that claims jobs but never drains its own
- * process managers looks healthy and settles nothing.
+ * Consumer ownership is one decision with two effects: the queue factory
+ * starts (or not) a consumer loop, and the runtime starts (or not) the
+ * process-manager workers. Getting only one claims jobs but never drains them.
  */
 describe("WorkerEventingRuntime consumer ownership", () => {
   /** Ports the stubbed server runtime never reads; only the decision matters. */
@@ -273,10 +268,9 @@ describe("WorkerEventingRuntime consumer ownership", () => {
 });
 
 /**
- * The replay marker is a consuming-side concern and nothing else: the CLI
- * writes a cutoff to Redis and the projection that folds the event is what has
- * to read it. A packaged consumer without one applies events a replay is
- * mid-way through re-deriving, and both writers land on the same aggregate.
+ * The replay marker is a consuming-side concern: the CLI writes a cutoff to
+ * Redis, and the projection folding the event is what reads it. Without one,
+ * a packaged consumer applies events a replay is still re-deriving.
  */
 describe("WorkerEventingRuntime replay markers", () => {
   function projectionFixture(consumers: WorkerEventingConsumerOptions) {

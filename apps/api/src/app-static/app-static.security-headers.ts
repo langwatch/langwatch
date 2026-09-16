@@ -25,12 +25,10 @@ export function buildSecurityHeaders({
 
   const cspHeader = [
     "default-src 'self'",
-    // blob: in script-src, not only worker-src: AudioWorklet.addModule() is a
-    // script fetch, and the ElevenLabs browser client (1.23.x) registers its
-    // rawAudioProcessor / audioConcatProcessor worklets from a blob: URL. Without
-    // it the voice panel fails in production with "Failed to load the
-    // rawAudioProcessor worklet module" while working in dev, where no CSP is
-    // enforced (#7947).
+    // blob: in script-src, not only worker-src: AudioWorklet.addModule() is
+    // a script fetch, and the ElevenLabs client (1.23.x) registers worklets
+    // from a blob: URL — omitting it broke the voice panel in production
+    // only, since dev enforces no CSP (#7947).
     `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
     `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com${cdn}`,
     `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,

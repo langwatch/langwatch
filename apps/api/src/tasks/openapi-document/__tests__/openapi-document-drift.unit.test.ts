@@ -1,8 +1,7 @@
 /**
- * The drift check between the frozen OpenAPI document and what the installed
- * declarations publish.
- *
- * Spec: specs/api-reference/openapi-document-drift.feature.
+ * The drift check between the frozen OpenAPI document and what the
+ * installed declarations publish. Spec:
+ * specs/api-reference/openapi-document-drift.feature.
  */
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

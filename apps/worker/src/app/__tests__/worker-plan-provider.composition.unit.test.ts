@@ -19,10 +19,9 @@ import { Temporal } from "@langwatch/time";
  */
 
 /**
- * The row shape, taken off the one read the source makes rather than imported:
- * `BillingSubscriptionRecord` is the billing package's own and is not on its
- * public surface, and restating twelve fields here is how a fixture starts
- * disagreeing with the table it stands for.
+ * The row shape, taken off the one read the source makes, not imported:
+ * `BillingSubscriptionRecord` isn't on the billing package's public surface,
+ * and restating twelve fields here is how a fixture starts disagreeing with the table.
  */
 type SubscriptionRecord = NonNullable<
   Awaited<ReturnType<BillingSubscription["findActive"]>>
@@ -52,11 +51,9 @@ function subscriptions(active: SubscriptionRecord | null): BillingSubscription {
 }
 
 /**
- * The licence row, as the composition reads it.
- *
- * The KEY is a genuinely signed fixture and the verifier below it is the real
- * one, so what these tests exercise is the whole licence leg: the read, the
- * signature check, the deployment-mode reading and the plan it answers.
+ * The licence row, as the composition reads it. The KEY is a genuinely
+ * signed fixture and the verifier is the real one, so these tests exercise
+ * the whole licence leg: read, signature check, deployment mode, plan.
  */
 function licenses(licenseKey: string | null): OrganizationLicense {
   return { tryReadLicense: async () => licenseKey } as OrganizationLicense;

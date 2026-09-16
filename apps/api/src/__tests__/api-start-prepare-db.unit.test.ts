@@ -13,12 +13,9 @@ const scripts: Record<string, string> = JSON.parse(
 ).scripts;
 
 /**
- * Runs one of apps/api's own scripts for real, with `pnpm` and `node` replaced
- * by stubs that record what they were asked to do. The stub `pnpm` dispatches
- * `-s run <script>` back through apps/api's package.json, so the chain under
- * test is the shell the developer and the image actually run — not a string
- * this test re-derives. The stub `pnpm` reaches the real Node by its absolute
- * path, since the stub `node` shadows the name on PATH.
+ * Runs one of apps/api's own scripts for real, `pnpm`/`node` replaced by
+ * stubs that record calls. `pnpm` dispatches through apps/api's own
+ * package.json by absolute Node path, since the stub `node` shadows PATH.
  */
 function runScript({ script, failOn }: { script: string; failOn?: string }): {
   calls: string[];

@@ -6,11 +6,9 @@ import {
 } from "../automation-worker-feature.installer.ts";
 
 /**
- * The one registration this installer makes, stubbed.
- *
- * What the suite observes is the report calendar's lifecycle, not the pipeline
- * registration — that is the eventing package's own contract, and is pinned by
- * `worker-feature-registration-order`.
+ * The one registration this installer makes, stubbed. What the suite
+ * observes is the report calendar's lifecycle, not the pipeline
+ * registration — the eventing package's own contract, pinned elsewhere.
  */
 function createEventing(): WorkerEventingRuntime {
   const eventing = WorkerEventingRuntime.create({

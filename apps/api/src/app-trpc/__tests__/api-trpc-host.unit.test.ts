@@ -1,10 +1,7 @@
 /**
- * The api's tRPC door, over a real declared namespace.
- *
- * The declaration is `modules/authz`'s own — the exemplar the conversion is
- * measured against — rather than a fixture, because what this proves is that a
- * module's inert declaration reaches the wire through the process's root: a
- * fixture would prove only that the host can mount a fixture.
+ * The api's tRPC door, over a real declared namespace: `modules/authz`'s own
+ * declaration, not a fixture — proving a module's inert declaration reaches
+ * the wire through the process's root, not just that a host can mount one.
  */
 import { authzTrpcTransport } from "@langwatch/authz-server";
 import type { DependencyToken, TransportPeers } from "@langwatch/runtime-composition";

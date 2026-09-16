@@ -84,10 +84,9 @@ async function evaluateMetricsRequest({
 }
 
 /**
- * The worker metrics server's request handler, split out so the routing and
- * auth branches are testable without binding a port. Used directly only on
- * the fallback path (liveness thread failed to start); the normal path serves
- * the same decisions through the thread proxy.
+ * The worker metrics server's request handler, split out so routing and auth
+ * are testable without binding a port. Used directly only on the fallback
+ * path; the normal path serves the same decisions through the thread proxy.
  */
 export function createWorkerMetricsHandler(ports: WorkerMetricsMembers): RequestListener {
   return (req: IncomingMessage, res: ServerResponse) => {
@@ -215,11 +214,9 @@ export async function startWorkerMetricsServer(
 }
 
 /**
- * Wires the liveness thread's lifecycle: resolves once it is listening,
- * routes its proxy messages, and installs the post-startup error/exit
- * listeners (an unhandled Worker "error" would re-throw on the main thread
- * and kill the process; a dead thread instead stops answering the port,
- * probes fail, and the pod restarts through the normal Kubernetes path).
+ * Wires the liveness thread's lifecycle: resolves once listening, routes its
+ * proxy messages, and installs error/exit listeners — an unhandled Worker
+ * "error" would otherwise re-throw on the main thread and kill the process.
  */
 async function wireLivenessThread({
   thread,

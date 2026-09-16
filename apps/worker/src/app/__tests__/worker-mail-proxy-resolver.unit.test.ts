@@ -1,8 +1,6 @@
 /**
  * The worker mail graph's outbound-proxy bypass rules: SES traffic follows
- * the process's configured HTTPS/HTTP proxy, except for a host `NO_PROXY`
- * names.
- *
+ * the configured HTTPS/HTTP proxy, except a host `NO_PROXY` names.
  * Spec: specs/ops/email-providers.feature
  */
 import { describe, expect, it } from "vitest";

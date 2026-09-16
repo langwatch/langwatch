@@ -29,11 +29,9 @@ export type ApiListenerAddress = Readonly<{ host: string; port: number }>;
 /** The closed API process built by a runtime composition root. */
 export abstract class ApiRuntimeProcess {
   /**
-   * The bound address, or nothing for a process composed without a listener.
-   *
-   * Declared rather than left as `unknown`: every implementation answers this
-   * shape, and a caller that has to reach for the port a test binds could not
-   * read it through the port at all.
+   * The bound address, or nothing for a process composed without a
+   * listener. Declared rather than `unknown`: every implementation answers
+   * this shape, so a caller needing the port a test binds can read it here.
    */
   abstract start(): Promise<ApiListenerAddress | undefined>;
 
@@ -66,11 +64,8 @@ export type ApiRuntimeBootstrapOptions = {
 
 /**
  * Injectable API runtime foundation: parse once, configure logging, compose
- * one graph, and retain its ResourceScope until process shutdown completes.
- *
- * A physical executable supplies the complete composition port and calls
- * `startApiExecutable`. This foundation does not import legacy feature graph
- * construction, so it cannot accidentally launch a partial second process.
+ * one graph, retain its ResourceScope until shutdown completes. Imports no
+ * legacy feature graph construction, so it can't accidentally launch a second process.
  */
 export class ApiRuntimeBootstrap {
   static async create(options: ApiRuntimeBootstrapOptions): Promise<ApiRuntimeBootstrap> {

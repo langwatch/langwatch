@@ -1,11 +1,7 @@
 /**
- * The status a refusal reaches the caller at, for the two classes the request
- * boundary can fail in.
- *
- * A request that arrived intact and was rejected on its values is a validation
- * failure and answers 422. A request whose body could not be read as a request
- * at all is malformed and answers 400. Both are asserted on `code`, never on
- * message prose, because the prose is copy and the code is the contract.
+ * The status a refusal reaches the caller at, for the two classes the
+ * request boundary can fail in: intact but rejected on values (422), or
+ * unreadable as a request at all (400). Asserted on `code`, never prose.
  */
 import { RequestValidationError } from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";

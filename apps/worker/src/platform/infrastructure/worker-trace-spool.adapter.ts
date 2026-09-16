@@ -22,12 +22,9 @@ export type WorkerTraceSpoolStorageOptions = {
 };
 
 /**
- * The trace spool over this process's stored-objects runtime.
- *
- * Exactly what the application's `defaultSpoolStorage` is, built from the
- * substrate this process already holds: the same registry every other
- * byte-writing surface here uses, resolved per project so a BYOC tenant writes
- * into its own bucket.
+ * The trace spool over this process's stored-objects runtime. Exactly what
+ * the application's `defaultSpoolStorage` is: the same registry every other
+ * byte-writing surface uses, resolved per project so BYOC writes to its own bucket.
  */
 export class WorkerTraceSpoolStorageAdapter implements TraceSpoolStorage {
   static create(options: WorkerTraceSpoolStorageOptions): WorkerTraceSpoolStorageAdapter {

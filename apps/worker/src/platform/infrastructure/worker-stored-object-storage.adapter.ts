@@ -52,11 +52,9 @@ export type WorkerStoredObjectStorageConfig = Readonly<{
 }>;
 
 /**
- * Production storage composition for the eventual Worker executable.
- *
- * It deliberately accepts semantic configuration and a project source from
- * the physical host. This package neither reads environment state nor imports
- * the legacy application graph.
+ * Production storage composition for the eventual Worker executable. It
+ * deliberately accepts semantic configuration and a project source from the
+ * host, reading no environment state and importing no legacy application graph.
  */
 export class WorkerStoredObjectStorageRuntimeFactory {
   static create(options: {

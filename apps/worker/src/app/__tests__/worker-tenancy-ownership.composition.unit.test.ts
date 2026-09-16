@@ -1,8 +1,7 @@
 /**
- * One table, one owning module. The project module owns `Project` and `Team`;
- * the API-key module owns `ApiKey` and asks the project directory for the rest,
- * so booting the two together must not raise an ownership conflict.
- *
+ * One table, one owning module: the project module owns `Project`/`Team`,
+ * the API-key module owns `ApiKey` and asks the project directory for the
+ * rest, so booting both must not raise an ownership conflict.
  * @see dev/docs/adr/134-private-prisma-table-ownership.md
  */
 import type { ApiKeyServerConfig } from "@langwatch/api-key-contract";

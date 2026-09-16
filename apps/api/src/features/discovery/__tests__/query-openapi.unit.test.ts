@@ -97,11 +97,8 @@ describe("given the generated OpenAPI document", () => {
 
     /**
      * The paths these doors replaced must be gone, not merely superseded.
-     *
-     * The spec generator merges onto the previous document, so a path is only
-     * removed when its prefix is listed for pruning. A stale entry left behind
-     * publishes a second, dead way to call this domain — and it would look as
-     * official as the live one.
+     * The spec generator merges onto the previous document: a path is only
+     * removed when its prefix is listed for pruning, else it looks live.
      */
     it("no longer publishes the superseded query-domain paths", () => {
       for (const stale of [

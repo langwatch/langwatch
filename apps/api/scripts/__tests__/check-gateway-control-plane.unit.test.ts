@@ -1,6 +1,5 @@
 /**
  * @vitest-environment node
- *
  * Tests for the decision logic: given worktree expectations vs what the
  * gateway reports on GET /debug/control-plane, decide to warn and what to
  * say. Probe logic (fetch, timeout, JSON parsing) is tested elsewhere.

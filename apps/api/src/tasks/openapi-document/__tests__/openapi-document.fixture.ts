@@ -1,8 +1,7 @@
 /**
- * Declared families the document tests describe. Real declarations built with
- * `defineRestRouter`, because the whole point of the generator is that a
- * declaration is its only input: a hand-written stand-in would prove nothing
- * about what a family actually publishes.
+ * Declared families the document tests describe. Real declarations built
+ * with `defineRestRouter`: the generator's whole point is a declaration is
+ * its only input, so a hand-written stand-in would prove nothing.
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";

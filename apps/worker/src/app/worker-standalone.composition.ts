@@ -43,12 +43,10 @@ export class WorkerStandaloneComposition extends WorkerExecutableComposition {
     const clickhouse = WorkerClickHouseInfrastructure.create({
       resources,
       clickhouse: config.infrastructure.clickhouse,
-      // The routing directory, over the three kinds of tenant the event store
-      // carries: a project names its owner, an organization names itself, and
-      // a user is platform-level, so no membership is consulted. The SAME
-      // implementation the API process composes, read through the same client
-      // every repository uses, so a project that moves organizations routes to
-      // its new endpoint on the next resolution.
+      // The routing directory, over the three kinds of tenant the event
+      // store carries (project, organization, user — no membership
+      // consulted). The SAME implementation the API process composes, so a
+      // moved project routes to its new endpoint on the next resolution.
       directory: bindTenantDirectoryReader(database.connection.client),
     });
 

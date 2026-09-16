@@ -9,11 +9,8 @@ import type { WorkerEventingRuntime } from "../../platform/eventing/worker-event
 
 /**
  * A registrable Eventing definition, left open in its own event union.
- *
- * `prepareEventForProjection` is contravariant in the event type, so a
- * definition pinned to the base `Event` refuses the very definition a feature
- * publishes over its own discriminated union. The capability below therefore
- * carries the union as a parameter and the installer never names it.
+ * `prepareEventForProjection` is contravariant in the event type, so pinning
+ * to the base `Event` would refuse a feature's own discriminated union.
  */
 type WorkerPipelineDefinition<TEvent extends Event> = StaticPipelineDefinition<
   TEvent,
@@ -31,19 +28,15 @@ export interface LangyConversationWorkerCapability<
   TGenerateConversationTitle = unknown,
 > {
   /**
-   * Builds the conversation definition: the conversation aggregate, its two
-   * Postgres folds, the per-message and analytics map projections, the turn
-   * process manager and the three live subscribers. Every port the effects
-   * need is already bound by the composition root.
+   * Builds the conversation definition: the aggregate, its two Postgres
+   * folds, the message and analytics projections, the turn process manager
+   * and three live subscribers — every port their effects need is prebound.
    */
   buildProcessing(): WorkerPipelineDefinition<TEvent>;
   /**
    * Hands the pipeline's own effects the two senders they append through.
-   *
-   * A permanently rejected dispatch fails the turn, and a generated title is
-   * saved as an event, so both need commands produced by the very
-   * registration that mounts them. Binding them here means a graph missing
-   * either command fails at boot rather than leaving a turn hanging.
+   * Both need commands produced by the very registration that mounts them,
+   * so binding here fails a graph missing either command at boot, not mid-turn.
    */
   connectCommands(commands: {
     failAgentResponse(data: TFailAgentResponse): Promise<void>;
@@ -52,11 +45,9 @@ export interface LangyConversationWorkerCapability<
 }
 
 /**
- * Worker registration for the Langy conversation pipeline.
- *
- * Registered unconditionally: Langy's operational projections are Postgres,
- * so unlike the ClickHouse-gated pipelines there is no configuration under
- * which the graph is meaningless.
+ * Worker registration for the Langy conversation pipeline. Registered
+ * unconditionally: Langy's projections are Postgres, so unlike the
+ * ClickHouse-gated pipelines, no configuration makes this graph meaningless.
  */
 export class LangyConversationWorkerFeatureInstaller implements WorkerFeatureInstaller {
   /**

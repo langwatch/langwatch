@@ -84,9 +84,8 @@ export function routeVoiceUpgrade(params: {
 
 /**
  * Write a bare HTTP status line to a pre-handshake socket, then end it. Uses
- * `socket.end` rather than a `write` followed by `destroy` - destroy can tear
- * the socket down before the write flushes, so the client would see a
- * connection reset instead of the intended status.
+ * `socket.end` rather than `write` + `destroy` — destroy can tear the socket
+ * down before the write flushes, so the client sees a reset, not the status.
  */
 function refuseSocket(socket: Duplex, status: 404 | 403): void {
   const reasonPhrase = status === 404 ? "Not Found" : "Forbidden";
@@ -185,11 +184,9 @@ function logListenerStarted(params: {
 }
 
 /**
- * Boot the media listener on `port`. Returns the bound server, its address, and
- * a `close` the caller registers for shutdown. When `publicBaseUrl` is set the
- * listener logs the wss origin Twilio will dial; the env layer already refuses
- * to start a voice worker without it, so an unset value here only ever happens
- * in a test.
+ * Boot the media listener on `port`: returns the bound server, its address,
+ * and a `close` for shutdown. The env layer already refuses to start a voice
+ * worker without `publicBaseUrl`, so an unset value here only happens in a test.
  */
 export async function bootVoiceWsListener(params: {
   port: number;

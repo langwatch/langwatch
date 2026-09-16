@@ -44,12 +44,9 @@ export class WorkerPiiAnalysisAdapter implements PiiAnalysis {
     // Assigned before the first await so concurrent callers observe the in-flight
     // promise rather than an unset client.
     this.dlpClient ??= (async () => {
-      // Dynamic import (the sanctioned exception to the "no inline import()"
-      // rule — same as server.mts / trpc.ts) so the module loads here on first
-      // use, never at boot. Only reached after the guards below confirm DLP is
-      // enabled and credentialed, so it never loads for deployments that don't
-      // use DLP. `import()` rather than `require()` so vitest's module mock
-      // intercepts it (a raw require of this externalized dep would not).
+      // Dynamic import (sanctioned exception to "no inline import()", like
+      // server.mts) so the module loads only after DLP is confirmed enabled.
+      // `import()` not `require()` so vitest's module mock intercepts it.
       const { DlpServiceClient } = await import("@google-cloud/dlp");
       return new DlpServiceClient({ credentials: this.config.googleDlp.credentials });
     })().catch((error) => {
@@ -207,11 +204,9 @@ const codepointToCodeUnitConverter = (text: string): ((cp: number) => number) =>
 };
 
 /**
- * Mask every DLP finding over `text`, skipping findings vetoed by a policy
- * exception. DLP reports codepoint offsets against the original text; they are
- * converted to code-unit indices once. Each mask replaces the range with the
- * same number of code units ("✳" is a single BMP code unit), so code-unit
- * indices derived from the original text stay valid on the accumulating copy.
+ * Mask every DLP finding over `text`, skipping those vetoed by a policy
+ * exception. DLP reports codepoint offsets, converted to code-unit indices
+ * once; "✳" being one code unit keeps indices valid on the accumulating copy.
  */
 const maskDlpFindings = ({
   text,
@@ -230,12 +225,10 @@ const maskDlpFindings = ({
     return [{ finding, startIdx: toCodeUnit(+start), endIdx: toCodeUnit(+end) }];
   });
 
-  // First pass: findings whose entire matched text matches a policy exception
-  // are known-safe formats (an internal id that merely looks like PII). Their
-  // ranges become protected so an overlapping finding cannot eat into them.
-  // `includeQuote` is set, but derive the matched text from the range over the
-  // ORIGINAL text as the fallback, so the veto never depends on the quote
-  // being echoed back.
+  // First pass: findings whose entire matched text matches a policy
+  // exception are known-safe formats. Their ranges become protected so an
+  // overlapping finding cannot eat into them; the matched text is derived
+  // from the range over the ORIGINAL text, not the quote, for the veto.
   const protectedRanges: ProtectedRange[] = ranged.flatMap(({ finding, startIdx, endIdx }) => {
     const matchedText = finding.quote?.length ? finding.quote : text.substring(startIdx, endIdx);
     return matchesPiiException(matchedText, exceptions) ? [{ start: startIdx, end: endIdx }] : [];

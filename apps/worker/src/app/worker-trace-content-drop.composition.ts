@@ -35,12 +35,9 @@ export class WorkerTraceContentDrop {
 }
 
 /**
- * Renames `dropSpanContent` onto the port Trace declares.
- *
- * The service is not a subclass of the port and must not become one: the drop
- * belongs to data privacy, which owes the same answer to the log and metric
- * ingestion paths when they convert, and a service extending one feature's
- * port could not answer the others'.
+ * Renames `dropSpanContent` onto the port Trace declares. The service must
+ * NOT subclass the port: data privacy owes the same answer to log/metric
+ * ingestion when they convert, and a subclass could answer only one.
  */
 class WorkerTraceSpanContentDropAdapter implements TraceSpanContentDrop {
   constructor(private readonly service: OtlpSpanContentDropService) {}

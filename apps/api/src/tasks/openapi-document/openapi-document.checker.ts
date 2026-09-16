@@ -28,11 +28,9 @@ export type OpenApiDriftReport = Readonly<{
   /** Documented and published by no declaration. The breaking direction. */
   removed: readonly string[];
   /**
-   * Documented, still declared, and kept out of the generated document by its
-   * own declaration — so the frozen document describes it by hand.
-   *
-   * Not drift. Reported apart from `removed` because the two look identical in
-   * a document diff and mean opposite things: this is a route that answers.
+   * Documented, declared, but kept out of the generated document by its own
+   * declaration — described by hand, not drift. Reported apart from `removed`:
+   * the two look identical in a diff but mean opposite things (this one answers).
    */
   undescribed: readonly string[];
   /** Declared and not documented. Reported only. */
@@ -60,11 +58,8 @@ export const FROZEN_DOCUMENT_PATH = fileURLToPath(
 
 /**
  * Generates into `scratchPath` and reports the drift against the frozen
- * document.
- *
- * Nothing is written anywhere else. The frozen path is opened for READING
- * only, and the scratch path is the caller's — a check that has to write
- * somewhere writes there.
+ * document. Nothing else is written: the frozen path is READ only, and the
+ * scratch path is the caller's — a check that must write somewhere writes there.
  */
 export async function checkOpenApiDocument({
   scratchPath,
@@ -106,11 +101,9 @@ export async function checkOpenApiDocument({
 }
 
 /**
- * Whether some declaration still publishes an address answering an operation.
- *
- * `ALL` is matched as well as the verb: a family declaring an any-method route
- * answers every method on that path, and treating one of those as unserved
- * would report a live route as a deletion.
+ * Whether some declaration still publishes an address answering an
+ * operation. `ALL` matches as well as the verb: an any-method route answers
+ * every method on that path, so treating one as unserved would misreport a deletion.
  */
 function routeMatcher(declaredRoutes: readonly string[]): (operation: string) => boolean {
   const routes = new Set(declaredRoutes);

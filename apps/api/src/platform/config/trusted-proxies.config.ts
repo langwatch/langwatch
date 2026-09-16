@@ -1,11 +1,9 @@
 import { RuntimeConfig, trustedProxyConfigDefinition } from "@langwatch/config";
 
 /**
- * The hops `TRUSTED_PROXY_ADDRESSES` trusts to state a client address.
- * Three-valued: `undefined` falls back to classifying the peer by address,
- * `[]` is an explicit "trust nothing". So PRESENCE is asked of the variable,
- * not the parsed value — `RuntimeConfig` reads `FOO=` as absent, right
- * wherever a default exists and wrong here.
+ * The hops `TRUSTED_PROXY_ADDRESSES` trusts. Three-valued: `undefined`
+ * classifies the peer by address, `[]` means "trust nothing" — PRESENCE is
+ * asked, since `RuntimeConfig` reads `FOO=` as absent, wrong only here.
  */
 let cached: { raw: string | undefined; value: readonly string[] | undefined } | undefined;
 

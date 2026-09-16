@@ -14,10 +14,9 @@ import {
 } from "../worker.liveness.ts";
 
 /**
- * The probe path as the Helm chart writes it — `charts/langwatch/templates/
- * workers/deployment.yaml` and `charts/langwatch/tests/e2e.sh` both hard-code
- * this literal. Asserted against the constant, and then USED as the literal
- * below, so renaming the constant fails here instead of in a rolling deploy.
+ * The probe path as the Helm chart writes it — hard-coded in both
+ * `deployment.yaml` and `tests/e2e.sh`. Asserted against the constant, then
+ * USED as the literal below, so renaming it fails here, not in a rolling deploy.
  */
 const CHART_PROBE_PATH = "/healthz";
 

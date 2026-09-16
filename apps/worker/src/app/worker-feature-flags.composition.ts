@@ -11,11 +11,9 @@ import { createApp, membersFrom } from "@langwatch/runtime-composition";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 
 /**
- * How this process reaches the shared flag cache.
- *
- * Structural rather than a `RedisConnection`, because it is three commands and
- * the adapter already accepts `null` for a deployment that has no Redis to
- * share.
+ * How this process reaches the shared flag cache. Structural rather than a
+ * `RedisConnection`: it is three commands, and the adapter already accepts
+ * `null` for a deployment with no Redis to share.
  */
 export type WorkerFeatureFlagRedis = {
   get(key: string): Promise<string | null>;
@@ -37,10 +35,8 @@ export async function installWorkerFeatureFlags(options: {
   config: WorkerConfig;
   /**
    * No longer read: `FeatureFlagApp` builds its own uncached row adapter now
-   * (see `modules/feature-flag/server/src/app/feature-flag.app.ts`), so a
-   * shared Redis tier has nowhere left to plug in. Kept on this options
-   * record so `worker-production.composition.ts`, which still allocates one
-   * before this function runs, needs no matching change.
+   * (see `feature-flag.app.ts`), so a shared Redis tier has nowhere to plug
+   * in. Kept so `worker-production.composition.ts` needs no matching change.
    */
   redis?: WorkerFeatureFlagRedis | null;
   peers: WorkerFeatureFlagPeers;

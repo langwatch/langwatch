@@ -46,10 +46,8 @@ export function createWorkerTraceAlertTriggerHandler(options: {
 
 /**
  * Renames a project's trace automations onto the shape the subscriber reads.
- *
- * The explicit return type is load-bearing: without it `actionClass` widens to
- * `string` and this stops satisfying the port, which the compiler would report
- * far from here.
+ * The explicit return type is load-bearing: without it `actionClass` widens
+ * to `string`, and this stops satisfying the port far from where it's reported.
  */
 class WorkerTraceAlertTriggerAdapter implements TraceAlertTriggerReader {
   constructor(private readonly catalogue: AutomationTraceTriggerCatalogue) {}
@@ -98,12 +96,9 @@ class WorkerTraceAlertTriggerMatchAdapter implements TraceAlertTriggerMatchChann
 }
 
 /**
- * The same origin guard every other trace subscriber runs behind.
- *
- * It is the package's own function rather than a re-statement, and that matters
- * for one reason above the rest: it is what keeps a topic-clustering re-emit
- * over thousands of historical traces from re-firing every alert a customer has
- * ever configured.
+ * The same origin guard every other trace subscriber runs behind. The
+ * package's own function, not a re-statement: this is what keeps a
+ * topic-clustering re-emit over historical traces from re-firing every alert.
  */
 class WorkerTraceAlertOriginGuardAdapter implements TraceAlertOriginGuard {
   passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean {

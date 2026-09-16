@@ -88,11 +88,9 @@ export type WorkerModelProviders = Readonly<{
   modelProviders: ModelProviderApi;
   managedProviders: ManagedProviderApi;
   /**
-   * What the installed model-provider module is built over in this same
-   * process: the deployment's credential cipher, which travels with the
-   * connection because a stored credential is a wire format, and the technical
-   * answers the module asks for. Stated once, so the gateway above and the
-   * installed module cannot be composed from two different registries.
+   * What the installed model-provider module is built over: the
+   * deployment's credential cipher (a stored credential is a wire format).
+   * Stated once, so the gateway and the module never use two registries.
    */
   installation: Readonly<{
     credentials: ModelProviderCredentialCodec;

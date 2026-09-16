@@ -48,11 +48,9 @@ export class WorkerDatabaseInfrastructure {
   private constructor(readonly connection: PrismaConnection) {}
 
   /**
-   * Releases the client and then the pool, in that order.
-   *
-   * No local once-only latch: {@link PrismaShutdownService} closes the
-   * connection through `closeOnce`, which already memoises, so a second latch
-   * here would guard nothing and hide where the guarantee actually lives.
+   * Releases the client and then the pool, in that order. No local
+   * once-only latch: {@link PrismaShutdownService} already memoises through
+   * `closeOnce`, so a second latch here would only hide where it lives.
    */
   close(): Promise<void> {
     return PrismaShutdownService.create().shutdown(this.connection);

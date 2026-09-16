@@ -47,12 +47,10 @@ describe("resolveWorkerBootPlan", () => {
   describe("given the voice tunnel can take minutes to mint on a cold binary download", () => {
     /** @scenario "The liveness server boots before every other stage, including the voice tunnel" */
     it("puts the metrics stage first in the plan", () => {
-      // startWorkers boots the "metrics" stage (the kubelet liveness thread)
-      // as soon as it appears in the plan, before it resolves the voice
-      // public URL tunnel — a slow cloudflared download or slow trycloudflare
-      // DNS must not leave /healthz unanswered past the kubelet's liveness
-      // budget (prod: ~90s) or the pod is killed mid-mint, crash-looping the
-      // rollout. Pinning "metrics" first here is what makes that true.
+      // startWorkers boots "metrics" (the kubelet liveness thread) before
+      // resolving the voice tunnel — a slow cloudflared download/DNS must
+      // not leave /healthz unanswered past the kubelet's ~90s liveness
+      // budget, or the pod is killed mid-mint, crash-looping the rollout.
       const plan = resolveWorkerBootPlan({ shouldStartMetricsServer: true });
 
       expect(plan[0]).toBe("metrics");

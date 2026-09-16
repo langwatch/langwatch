@@ -69,10 +69,9 @@ export type ApiTrpcRequestContext = {
   readonly req?: TrpcRequestLike | undefined;
   readonly res?: { statusCode?: number } | undefined;
   /**
-   * Written by the declared authorization check and read by the fail-closed
-   * backstop, so it starts false on EVERY request: a flag carried over from a
-   * previous call would be a procedure that passes because another one was
-   * checked.
+   * Written by the declared authorization check, read by the fail-closed
+   * backstop — starts false on EVERY request, so a carried-over flag can't
+   * pass a procedure because a different one was checked.
    */
   permissionChecked: boolean;
   organizationRole?: string | null;

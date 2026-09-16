@@ -1,10 +1,7 @@
 /**
- * The locations the API description is published at, and the one sentence that
- * says why reading it needs no credential.
- *
- * Shared by the two discovery route modules so the copy in `/llms.txt` and the
- * paths a host routes to the API are the same strings rather than two that
- * agree today.
+ * The locations the API description is published at, and why reading it
+ * needs no credential. Shared by both discovery route modules so `/llms.txt`
+ * and the paths a host routes to stay the same strings, not two agreeing today.
  */
 
 /** The conventional location. What `/llms.txt` points at. */
@@ -17,20 +14,16 @@ export const API_OPENAPI_PATH = "/api/openapi.json";
 export const LLMS_TXT_PATH = "/llms.txt";
 
 /**
- * The discovery paths that sit outside `/api`. A host that only dispatches
- * `/api/*` into this process's Hono app dispatches on this as well; miss it and
- * the single-page-app fallback answers with the HTML shell and a 200 that a
- * caller reads as success.
+ * The discovery paths that sit outside `/api`. A host dispatching only
+ * `/api/*` into this process's Hono app must dispatch these too, or the SPA
+ * fallback answers with the HTML shell and a 200 the caller reads as success.
  */
 export const ROOT_DISCOVERY_PATHS: readonly string[] = [WELL_KNOWN_OPENAPI_PATH, LLMS_TXT_PATH];
 
 /**
- * True for a root-level path that belongs to the API rather than the SPA.
- *
- * A single trailing slash counts. `/llms.txt/` is the same resource to every
- * client that would send it, and the cost of disagreeing is not a 404 — it is
- * the SPA fallback answering with the HTML shell and a 200 that the caller
- * reads as the document.
+ * True for a root-level path that belongs to the API rather than the SPA. A
+ * trailing slash counts: `/llms.txt/` is the same resource, and disagreeing
+ * costs not a 404 but the SPA shell answering 200 as if it were the document.
  */
 export function isRootDiscoveryPath(pathname: string): boolean {
   const withoutTrailingSlash =

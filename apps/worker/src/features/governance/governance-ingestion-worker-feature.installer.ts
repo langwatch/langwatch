@@ -48,11 +48,9 @@ export class GovernanceIngestionWorkerFeatureInstaller implements WorkerFeatureI
   ) {}
 
   /**
-   * The installed command surfaces and lifecycle service.
-   *
-   * It refuses rather than returning an empty shape, because a caller that
-   * read `undefined` here would take a Governance installation that had not
-   * registered for one that had nothing to report.
+   * The installed command surfaces and lifecycle service. Refuses rather
+   * than returning an empty shape: reading `undefined` here would look like
+   * "nothing to report" rather than "not registered yet".
    */
   getInstallation(): GovernanceIngestionInstallation {
     if (!this.installation) {

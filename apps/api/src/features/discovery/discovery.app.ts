@@ -1,9 +1,7 @@
 /**
  * The discovery locations, served by the process itself. Deliberately NOT a
- * declared REST family, like the SSE lane (`app-trpc.sse.ts`): the document
- * describes every module at once, so none can own it, and the frozen artifact
- * may not be imported out of `apps/api`. Each route still registers its
- * policy, so the audits read what a declared family would publish.
+ * declared REST family: the document describes every module at once, so none
+ * can own it, and the frozen artifact may not be imported out of `apps/api`.
  */
 import { publicEndpoint } from "@langwatch/api";
 import { registerRoutePolicy } from "@langwatch/api/rest";
@@ -24,18 +22,16 @@ import { apiDocumentBytes, apiDocumentETag } from "./openapi-document.ts";
 const API_V1_OPENAPI_PATH = "/api/v1/openapi.json";
 
 /**
- * The description's original address. It reads like it belongs to the AI
- * Gateway when the document covers the whole API, which is why the other
- * locations exist — but integrators' generators are already pointed at it,
- * so it keeps answering.
+ * The description's original address: reads like it belongs to the AI
+ * Gateway, though the document covers the whole API — but integrators'
+ * generators are already pointed at it, so it keeps answering.
  */
 const GATEWAY_OPENAPI_PATH = "/api/gateway/v1/openapi.json";
 
 /**
- * Public and immutable for the life of a deploy, but not immutable across
- * deploys — so a short max-age with revalidation, not `immutable`. An agent
- * that polls gets a 304 costing ~200 bytes instead of 688 KB, and a redeploy
- * that actually changed the document is picked up within the minute.
+ * Public and immutable for the life of a deploy, but not across deploys — a
+ * short max-age with revalidation, not `immutable`. A polling agent gets a
+ * 304 costing ~200 bytes instead of 688 KB, picked up within the minute.
  */
 const CACHE_CONTROL = "public, max-age=60, must-revalidate";
 
@@ -74,9 +70,8 @@ legacy; new integrations should use \`Authorization\`.
 
 /**
  * True when the caller already holds these bytes. `If-None-Match` is a
- * comma-separated list and may carry the `W/` weak prefix, so a bare equality
- * check would miss a hit and send 688 KB to a client that did not need it — a
- * wrong answer that looks exactly like a working one.
+ * comma-separated list that may carry the `W/` weak prefix, so a bare
+ * equality check would miss a hit and send 688 KB nobody needed.
  */
 function alreadyHasIt(ifNoneMatch: string | null): boolean {
   if (!ifNoneMatch) return false;
@@ -90,9 +85,8 @@ function alreadyHasIt(ifNoneMatch: string | null): boolean {
 
 /**
  * Writes the precomputed JSON bytes without copying them. The stream body is
- * load-bearing: `new Response(bytes)` COPIES the shared buffer (measured at
- * 134.4 MB of `arrayBuffers` over 200 responses), where enqueuing the same
- * non-transferable array into concurrent streams allocates nothing.
+ * load-bearing: `new Response(bytes)` COPIES the shared buffer (134.4 MB of
+ * `arrayBuffers` measured over 200 responses); enqueuing it allocates nothing.
  */
 function documentResponse(): Response {
   const body = new ReadableStream({
@@ -136,9 +130,8 @@ function llmsTxt(): Response {
 
 /**
  * The discovery app, for the process to mount at its own root. Both spellings
- * of each root-level path are routed: `isRootDiscoveryPath` accepts a trailing
- * slash and Hono routes strictly, so without the second registration the host
- * dispatches `/llms.txt/` here and this app 404s it.
+ * of each root-level path are routed: `isRootDiscoveryPath` accepts a
+ * trailing slash but Hono routes strictly, so `/llms.txt/` would 404 without it.
  */
 export function createDiscoveryApp(): Hono {
   const app = new Hono();

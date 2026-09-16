@@ -38,11 +38,9 @@ export class ApiStaticSurface extends ApiPreRoutingSurface {
     /** Normalized `LANGWATCH_ASSET_BASE`; "/" serves assets same-origin. */
     assetBase?: string;
     /**
-     * Route patterns the mounted REST families declare, so this fallback declines the ones
-     * that sit outside `/api` — the hosted Model Context Protocol endpoint's `/mcp`, `/sse`
-     * and `/.well-known/oauth-*` among them. Supplied by the composition root from the real
-     * route table (see {@link mountedPathsOfRestFamilies}); a literal list here would drift
-     * the moment a family declared another root address.
+     * Route patterns the mounted REST families declare, so this fallback
+     * declines the ones outside `/api` (MCP's `/mcp`, `/sse`, `/.well-known/oauth-*`).
+     * Supplied by the composition root; a literal list here would drift.
      */
     mountedPaths?: readonly string[];
   }): ApiStaticSurface {

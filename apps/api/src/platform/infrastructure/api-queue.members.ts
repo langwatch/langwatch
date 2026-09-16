@@ -36,12 +36,9 @@ export abstract class ApiQueueAbsenceReport {
  */
 export class ApiQueueInfrastructure {
   /**
-   * Composes the queue only when Redis is configured.
-   *
-   * The API process dispatches nothing yet, so an unconfigured Redis is a
-   * smaller process rather than a dead one, and the caller is told which is
-   * happening. A Redis that IS configured and unusable still fails at boot:
-   * degrading that quietly would move the failure to the first request.
+   * Composes the queue only when Redis is configured. Unconfigured means a
+   * smaller process, not a dead one; configured-but-unusable still fails at
+   * boot, so degrading quietly can't move the failure to the first request.
    */
   static tryCreate(
     options: ApiQueueInfrastructureOptions & { report?: ApiQueueAbsenceReport },

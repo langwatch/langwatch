@@ -48,12 +48,9 @@ export class WorkerPostHogProductAnalyticsAdapter implements TraceProductAnalyti
   ) {}
 
   /**
-   * Fire and forget, and never at the expense of the trace.
-   *
-   * This runs inside a projection subscriber on the ingest path. A sink that
-   * could throw would fail the trace that triggered it and the customer would
-   * lose data over an analytics event, so the capture is guarded even though
-   * the vendor client buffers in memory and is not supposed to throw.
+   * Fire and forget, never at the expense of the trace: this runs inside a
+   * projection subscriber where a throw would fail the trace over an
+   * analytics event, so capture is guarded despite the vendor client's contract.
    */
   record(event: TraceProductEvent): void {
     const client = this.tryGetClient();
@@ -104,10 +101,8 @@ export class WorkerPostHogProductAnalyticsAdapter implements TraceProductAnalyti
 
 /**
  * The two operations this capability performs on a capture client.
- *
  * Structural rather than a `PostHog` import at the seam: the real client
- * satisfies it, and so does a fake, which is what lets the twin test read the
- * exact capture that would have gone on the wire.
+ * satisfies it, and so does a fake — letting a twin test read the exact wire capture.
  */
 export type ProductAnalyticsClient = {
   capture(input: {
