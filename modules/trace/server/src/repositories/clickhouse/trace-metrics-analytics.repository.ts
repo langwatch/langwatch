@@ -1,7 +1,6 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
-import type { TraceWindowedReadMetrics } from "../../app/trace.members.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
@@ -10,7 +9,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../projection/trace-analytics-projection.repository.ts";
-import { queryWindowed } from "./windowed-read.mapper.ts";
+import { queryWindowed } from "@langwatch/clickhouse-client";
 
 const TABLE_NAME = "trace_analytics" as const;
 
@@ -89,7 +88,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
-      windowedReadMetrics?: TraceWindowedReadMetrics;
     },
   ) {
     super();
@@ -98,7 +96,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
   }
@@ -218,7 +215,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         appliedEventIds: string[];
       } | null>({
         table: TABLE_NAME,
-        metrics: this.options.windowedReadMetrics,
         hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
         ...(window !== undefined ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
         fallback: "none",

@@ -180,3 +180,20 @@ export type { ClickHouseConfig } from "./tasks/goose.migration-runner.ts";
  * trace-server cold-scan detector and the analytics-server JOIN bound guard
  * both read, so they can't drift apart. */
 export { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
+
+/** The partition-window read policy (ADR-068): one hinted attempt, a graceful
+ * widening, and exactly one counted outcome. Shared so trace and scenario reads
+ * prune and report identically instead of each carrying their own copy. */
+export {
+  DEFAULT_PARTITION_WINDOW_MS,
+  RESOLVER_RECENT_WINDOW_MS,
+  queryWindowed,
+  setWindowedReadMetrics,
+} from "./windowedRead.ts";
+export type {
+  QueryWindowedOptions,
+  WindowFallback,
+  WindowFragment,
+  WindowedReadMetrics,
+  WindowedReadOutcome,
+} from "./windowedRead.ts";

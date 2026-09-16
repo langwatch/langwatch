@@ -14,6 +14,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Buffer } from "node:buffer";
+import { queryWindowed, type WindowFragment } from "@langwatch/clickhouse-client";
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
@@ -40,34 +41,6 @@ import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";
-
-/**
- * Simulation's boundary to the shared partition-window read policy: the
- * feature chooses when it can use a partition hint, and application
- * composition supplies the shared policy and its telemetry implementation.
- */
-export type SimulationWindowFragment = {
-  fromMs: number;
-  toMs: number;
-  params: { fromMs: number; toMs: number };
-  sqlFor(column: string): string;
-};
-
-export type SimulationWindowFallback = "unbounded" | "none" | { lookbackMs: number };
-
-export type SimulationWindowedReadInput<Result> = {
-  table: string;
-  hintMs: number | null;
-  windowMs?: number;
-  fallback: SimulationWindowFallback;
-  isEmpty(result: Result): boolean;
-  run(window: SimulationWindowFragment | null): Promise<Result>;
-};
-
-/** Application adapter for the shared query-window and telemetry policy. */
-export abstract class SimulationWindowedRepository {
-  abstract query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result>;
-}
 
 /** Eventing is application composition; Simulation dispatches through this repository. */
 export abstract class SimulationExecutionRepository {
@@ -284,9 +257,8 @@ type SimulationClickHouseClientResolver = (tenantId: string) => Promise<Simulati
 export class SimulationClickHouseRepository extends SimulationRepository {
   static create(
     resolveClient: SimulationClickHouseClientResolver,
-    windowedRead: SimulationWindowedRepository,
   ): SimulationClickHouseRepository {
-    return new SimulationClickHouseRepository(resolveClient, windowedRead);
+    return new SimulationClickHouseRepository(resolveClient);
   }
 
   /**
@@ -346,7 +318,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return { minMs, maxMs };
   }
 
-  static buildStartedAtWindowClause(window: SimulationWindowFragment | null): {
+  static buildStartedAtWindowClause(window: WindowFragment | null): {
     whereClause: string;
     params: Record<string, string>;
   } {
@@ -362,10 +334,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     };
   }
 
-  private constructor(
-    private readonly resolveClient: SimulationClickHouseClientResolver,
-    private readonly windowedRead: SimulationWindowedRepository,
-  ) {
+  private constructor(private readonly resolveClient: SimulationClickHouseClientResolver) {
     super();
   }
 
@@ -557,14 +526,14 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
 
     // Bounds the heavy step-2 read to the page's StartedAt window (from step
-    // 1) via queryWindowed so it's metered exactly once (ADR-067): a range
+    // 1) via queryWindowed so it's metered exactly once (ADR-068): a range
     // runs windowed/hit; no usable range runs unbounded/unwindowed (the old
     // silent widening, now counted). fallback "none": step 1 already bounded
     // these batches, so an empty windowed read is a genuine empty page.
     const startedAtBounds = SimulationClickHouseRepository.tryStartedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
-    const itemRows = await this.windowedRead.query<PreviewItemRow[]>({
+    const itemRows = await queryWindowed<PreviewItemRow[]>({
       table: TABLE_NAME,
       hintMs: startedAtBounds ? (startedAtBounds.minMs + startedAtBounds.maxMs) / 2 : null,
       windowMs: startedAtBounds ? (startedAtBounds.maxMs - startedAtBounds.minMs) / 2 : undefined,

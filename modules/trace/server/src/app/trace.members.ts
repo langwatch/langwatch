@@ -36,7 +36,6 @@ export interface TraceInfrastructure {  traceEdgeMediaTelemetry: TraceEdgeMediaT
   traceTenantBroadcast: TraceTenantBroadcast;
   traceTokenCounter: TraceTokenCounter;
   traceTopicAssignmentCommand: TraceTopicAssignmentCommand;
-  traceWindowedReadMetrics: TraceWindowedReadMetrics;
 }
 
 /**
@@ -457,17 +456,3 @@ export interface TraceTenantBroadcast {
 /** The one channel the trace path publishes on, as the far side spells it. */
 export const TRACE_TENANT_BROADCAST_EVENT_TYPE = "trace_updated" as const;
 
-export type TraceWindowedReadOutcome =
-  | "error"
-  | "hit"
-  | "unbounded_empty"
-  | "unbounded_hit"
-  | "unwindowed"
-  | "windowed_empty"
-  | "widened_empty"
-  | "widened_hit";
-
-/** Process-owned observability boundary for partition-pruned ClickHouse reads. */
-export interface TraceWindowedReadMetrics {
-  record(input: { table: string; outcome: TraceWindowedReadOutcome }): void;
-}

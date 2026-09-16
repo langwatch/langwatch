@@ -14,35 +14,8 @@ import {
   SimulationRunStateFoldProjection,
   type SimulationRunState,
 } from "../../../eventing/simulation-run-state.projection.ts";
-import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-
-/** The repository's own hint window, derived the way production derives it. */
-class HintWindowedRead extends SimulationWindowedRepository {
-  async query<Result>(input: {
-    hintMs: number | null;
-    windowMs?: number;
-    run: (
-      window: {
-        fromMs: number;
-        toMs: number;
-        params: { fromMs: number; toMs: number };
-        sqlFor: (column: string) => string;
-      } | null,
-    ) => Promise<Result>;
-  }): Promise<Result> {
-    if (input.hintMs === null || input.windowMs === undefined) return input.run(null);
-    const fromMs = input.hintMs - input.windowMs;
-    const toMs = input.hintMs + input.windowMs;
-    return input.run({
-      fromMs,
-      toMs,
-      params: { fromMs, toMs },
-      sqlFor: (column) => `AND ${column} >= {fromMs:Int64} AND ${column} <= {toMs:Int64}`,
-    });
-  }
-}
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -110,7 +83,7 @@ beforeAll(() => {
     resolveClient: async () => ch!,
     defaultRetentionDays: 30,
   });
-  runs = SimulationClickHouseRepository.create(async () => ch!, new HintWindowedRead());
+  runs = SimulationClickHouseRepository.create(async () => ch!);
 });
 
 afterAll(async () => {

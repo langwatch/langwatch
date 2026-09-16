@@ -8,7 +8,6 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -66,32 +65,6 @@ function makeInsertRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Same window strategy as `SimulationWindowedRead`'s production adapter, minus caching. */
-class HintWindowedRead extends SimulationWindowedRepository {
-  async query<Result>(input: {
-    hintMs: number | null;
-    windowMs?: number;
-    run: (
-      window: {
-        fromMs: number;
-        toMs: number;
-        params: { fromMs: number; toMs: number };
-        sqlFor: (column: string) => string;
-      } | null,
-    ) => Promise<Result>;
-  }): Promise<Result> {
-    if (input.hintMs === null || input.windowMs === undefined) return input.run(null);
-    const fromMs = input.hintMs - input.windowMs;
-    const toMs = input.hintMs + input.windowMs;
-    return input.run({
-      fromMs,
-      toMs,
-      params: { fromMs, toMs },
-      sqlFor: (column) => `AND ${column} >= {fromMs:Int64} AND ${column} <= {toMs:Int64}`,
-    });
-  }
-}
-
 let client: ClickHouseClient | undefined;
 let repo: SimulationClickHouseRepository;
 
@@ -113,7 +86,7 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repo = SimulationClickHouseRepository.create(async () => client!, new HintWindowedRead());
+  repo = SimulationClickHouseRepository.create(async () => client!);
 });
 
 afterAll(async () => {

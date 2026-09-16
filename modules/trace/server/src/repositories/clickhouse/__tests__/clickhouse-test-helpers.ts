@@ -1,18 +1,15 @@
 import type { TraceClickHouseWriteClient } from "../../trace-clickhouse-client.repository.ts";
-import {
-  type TraceWindowedReadMetrics,
-  type TraceWindowedReadOutcome,
-} from "../../../app/trace.members.ts";
+import type { WindowedReadMetrics, WindowedReadOutcome } from "@langwatch/clickhouse-client";
 
-export class TestWindowedReadMetrics implements TraceWindowedReadMetrics {
+export class TestWindowedReadMetrics implements WindowedReadMetrics {
   private readonly counts = new Map<string, number>();
 
-  record(input: { table: string; outcome: TraceWindowedReadOutcome }): void {
+  record(input: { table: string; outcome: WindowedReadOutcome }): void {
     const key = `${input.table}:${input.outcome}`;
     this.counts.set(key, (this.counts.get(key) ?? 0) + 1);
   }
 
-  count(input: { table: string; outcome: TraceWindowedReadOutcome }): number {
+  count(input: { table: string; outcome: WindowedReadOutcome }): number {
     return this.counts.get(`${input.table}:${input.outcome}`) ?? 0;
   }
 }

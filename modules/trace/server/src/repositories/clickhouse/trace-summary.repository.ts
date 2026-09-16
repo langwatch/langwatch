@@ -6,7 +6,6 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
-import type { TraceWindowedReadMetrics } from "../../app/trace.members.ts";
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import {
@@ -15,7 +14,7 @@ import {
   type TraceSummaryReadWindow,
 } from "../projection/trace-summary-projection.repository.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 
 /**
  * Fields shared between trace summary and list repositories from trace_summaries.
@@ -131,14 +130,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
-      windowedReadMetrics?: TraceWindowedReadMetrics;
     },
   ) {}
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceSummaryClickHouseRepository {
     return new TraceSummaryClickHouseRepository(options);
   }
@@ -243,7 +240,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     try {
       return await queryWindowed<TraceSummaryData | null>({
         table: TABLE_NAME,
-        metrics: this.options.windowedReadMetrics,
         hintMs: (fromMs + toMs) / 2,
         windowMs: (toMs - fromMs) / 2,
         fallback: "none",
@@ -328,7 +324,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     try {
       return await queryWindowed<TraceSummaryData | null>({
         table: TABLE_NAME,
-        metrics: this.options.windowedReadMetrics,
         hintMs: options?.occurredAtMs ?? null,
         fallback: "unbounded",
         isEmpty: (result) => result === null,
@@ -613,7 +608,6 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
       TraceSummaryClickHouseRepository.create(options),

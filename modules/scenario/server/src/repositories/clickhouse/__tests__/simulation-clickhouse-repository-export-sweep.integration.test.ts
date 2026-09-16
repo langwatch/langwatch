@@ -9,33 +9,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { STALL_THRESHOLD_MS } from "../../../index.ts";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
-import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
-
-/** Derives the real [hint-window, hint+window] fragment from the hint the repository computes. */
-class HintWindowedRead extends SimulationWindowedRepository {
-  async query<Result>(input: {
-    hintMs: number | null;
-    windowMs?: number;
-    run: (
-      window: {
-        fromMs: number;
-        toMs: number;
-        params: { fromMs: number; toMs: number };
-        sqlFor: (column: string) => string;
-      } | null,
-    ) => Promise<Result>;
-  }): Promise<Result> {
-    if (input.hintMs === null || input.windowMs === undefined) return input.run(null);
-    const fromMs = input.hintMs - input.windowMs;
-    const toMs = input.hintMs + input.windowMs;
-    return input.run({
-      fromMs,
-      toMs,
-      params: { fromMs, toMs },
-      sqlFor: (column) => `AND ${column} >= {fromMs:Int64} AND ${column} <= {toMs:Int64}`,
-    });
-  }
-}
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -120,7 +93,7 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  repo = SimulationClickHouseRepository.create(async () => client!, new HintWindowedRead());
+  repo = SimulationClickHouseRepository.create(async () => client!);
 });
 
 afterAll(async () => {

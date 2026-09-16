@@ -86,10 +86,6 @@ export type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "./repositories/trace-clickhouse-client.repository.ts";
-export type {
-  TraceWindowedReadMetrics,
-  TraceWindowedReadOutcome,
-} from "./app/trace.members.ts";
 export { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
 
 export { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
@@ -361,7 +357,6 @@ export {
 export { TraceIOExtractionService } from "./services/content/trace-io-extraction.service.ts";
 export { TraceReadableSpanService } from "./services/read/trace-readable-span.service.ts";
 export { VisibilityWindowService } from "./services/viewer/trace-visibility-window.service.ts";
-export { TraceWindowedReadService } from "./services/read/trace-windowed-read.service.ts";
 export { TraceTtlCacheService, type TraceCacheRedis } from "./services/support/trace-ttl-cache.service.ts";
 export {
   TraceMetadataWriteService,

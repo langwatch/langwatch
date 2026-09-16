@@ -1,4 +1,3 @@
-import { TraceWindowedReadService } from "../../services/read/trace-windowed-read.service.ts";
 import { TraceSpanCostMatchingService } from "../../services/span/trace-span-cost-matching.service.ts";
 import { TraceLegacySpanMappingService } from "../../services/read/trace-legacy-span-mapping.service.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
@@ -6,8 +5,9 @@ import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   RESOLVER_RECENT_WINDOW_MS,
+  queryWindowed,
   type WindowFragment,
-} from "../../services/read/trace-windowed-read.service.ts";
+} from "@langwatch/clickhouse-client";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 /**
@@ -849,7 +849,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await TraceWindowedReadService.queryWindowed<NormalizedSpan | null>({
+      return await queryWindowed<NormalizedSpan | null>({
         table: TABLE_NAME,
         hintMs: occurredAtMs,
         windowMs: DEFAULT_PARTITION_WINDOW_MS,
@@ -1042,7 +1042,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return TraceWindowedReadService.queryWindowed<T>({
+    return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,
@@ -1062,7 +1062,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return TraceWindowedReadService.queryWindowed<T>({
+    return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,

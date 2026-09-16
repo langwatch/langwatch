@@ -108,9 +108,7 @@ export {
 export {
     SimulationClickHouseRepository,
     SimulationExecutionRepository,
-    SimulationWindowedRepository,
-    type SimulationClickHouseClient as SimulationReadClient,
-    type SimulationWindowedReadInput
+    type SimulationClickHouseClient as SimulationReadClient
 } from "./repositories/clickhouse/simulation-clickhouse.repository.ts";
 export { MemoryResultAtomsRepository } from "./repositories/memory/memory.result-atoms.repository.ts";
 export { MemoryRunConfigurationsRepository } from "./repositories/memory/memory.run-configurations.repository.ts";

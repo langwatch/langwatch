@@ -9,7 +9,7 @@ import {
   mapChRowToNormalized,
   serializeAttributes,
 } from "./stored-span-row.mapper.ts";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 
 const logger = createLogger("langwatch:trace:span-storage-repository");
 

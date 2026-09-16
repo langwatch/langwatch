@@ -1,7 +1,6 @@
-import { TraceWindowedReadService } from "../../services/read/trace-windowed-read.service.ts";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/read/trace-windowed-read.service.ts";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   type LogRecordStorageRepository,
@@ -41,11 +40,11 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
     // Bounds the read on the TimeUnixMs partition key to prune weekly
     // partitions instead of cold-scanning every one. With a turn-time hint,
     // ±2d around it; without, now-90d..now+2d. Routed through
-    // TraceWindowedReadService.queryWindowed for the metric, but stays
+    // queryWindowed for the metric, but stays
     // SINGLE-SHOT and byte-identical to the previous inline window.
     const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
 
-    return TraceWindowedReadService.queryWindowed<StoredLogRecordRow[]>({
+    return queryWindowed<StoredLogRecordRow[]>({
       table: TABLE_NAME,
       hintMs: hasWindow ? occurredAtMs : null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,

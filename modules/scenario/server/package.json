@@ -58,6 +58,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/eventing": "workspace:*",

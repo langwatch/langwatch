@@ -9595,6 +9595,9 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv

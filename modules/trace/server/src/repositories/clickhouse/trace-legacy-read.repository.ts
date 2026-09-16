@@ -1,5 +1,4 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceWindowedReadService } from "../../services/read/trace-windowed-read.service.ts";
 import { TraceEvaluationMappingService } from "../../services/support/trace-evaluation-mapping.service.ts";
 import { TraceEventAttributeMappingService } from "../../services/attribute/trace-event-attribute-mapping.service.ts";
 import { TraceLlmSpanMessagesService } from "../../services/content/trace-llm-span-messages.service.ts";
@@ -13,7 +12,7 @@ import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import { TraceRetentionFloorService } from "../../services/support/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
-import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/read/trace-windowed-read.service.ts";
+import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -2671,7 +2670,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // heavy stored_spans scan below to the traces' weekly partitions. A span's StartTime
           // always falls within its trace's lifetime, so a ±2-day window is safe headroom; when
           // no summary row is found we fall back to an unbounded span scan.
-          const summaryRows = await TraceWindowedReadService.queryWindowed<TraceSummaryRow[]>({
+          const summaryRows = await queryWindowed<TraceSummaryRow[]>({
             table: "trace_summaries",
             hintMs: summaryHintMs,
             windowMs: summaryWindowMs,
@@ -2805,7 +2804,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
                   result_overflow_mode: "throw" as const,
                 };
 
-          const spanRows = await TraceWindowedReadService.queryWindowed<SpanRow[]>({
+          const spanRows = await queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
             windowMs: spanWindowMs,

@@ -8,6 +8,7 @@ import { env as nodeProcessEnv } from "node:process";
 nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
+import { setWindowedReadMetrics } from "@langwatch/clickhouse-client";
 import type { TraceAnalyticsRow } from "@langwatch/trace-server";
 import {
   capturingInsertClient,
@@ -20,13 +21,14 @@ import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.r
 const TENANT_ID = "project_analyticsreadbackunit";
 const TRACE_ID = "trace-tz";
 const TABLE = "trace_analytics";
+/** The policy counts through one process-wide sink, so the test registers its own. */
 const windowedReadMetrics = new TestWindowedReadMetrics();
+setWindowedReadMetrics(windowedReadMetrics);
 
 function makeRepositoryReturning(record: Record<string, unknown>) {
   return TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => clientReturning(record),
     defaultRetentionDays: 30,
-    windowedReadMetrics,
   });
 }
 
@@ -36,7 +38,6 @@ function makeOrderingRepository(rows: Record<string, unknown>[]) {
     repository: TraceAnalyticsClickHouseRepository.create({
       resolveClient: async () => client,
       defaultRetentionDays: 30,
-      windowedReadMetrics,
     }),
     seen,
   };
