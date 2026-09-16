@@ -19,6 +19,7 @@ import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { evaluatorServer } from "@langwatch/evaluator-server";
 import type { EventSourcing } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { redisRateLimiter } from "@langwatch/infrastructure";
 import { LogApi } from "@langwatch/log-contract";
 import { logServer } from "@langwatch/log-server";
 import { metricServer } from "@langwatch/metric-server";
@@ -169,6 +170,14 @@ export async function createWorkerObservabilityApps(
       ...(options.eventing ? { eventing: options.eventing } : {}),
       // model-provider declares reads("redis") for its custom-key cache.
       ...(options.redis ? { redis: options.redis } : {}),
+      // trace reads a limiter for its export-bounds service, which this
+      // process's TraceApp genuinely constructs and consults (unlike auth's,
+      // it is not behind a closed door here). Every check that service makes
+      // names its own window from the caller's entitlement tier, so the
+      // window below is only the fallback the member's contract asks for.
+      ...(options.redis
+        ? { rateLimiter: redisRateLimiter(options.redis, { requests: 60, seconds: 60 }) }
+        : {}),
     }),
   })
     .withProvided(ProjectApi, foundation.projects)
