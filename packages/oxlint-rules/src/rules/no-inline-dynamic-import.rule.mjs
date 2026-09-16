@@ -5,6 +5,14 @@ import { defineRule } from "../define-rule.mjs";
 
 const GENERATED = /(?:^|\/)(?:dist|node_modules|generated)\/|\.generated\.[cm]?tsx?$/;
 const CLI_STARTUP = /^sdks\/typescript\/src\/cli\//;
+// The published `langwatch-mcp-server` binary, which an editor or agent starts
+// per session. It registers ~100 tools and a session calls a handful, so each
+// handler -- and the 2,027-line generated evaluator catalogue behind one of
+// them -- is reached from inside the callback that needs it. That keeps the
+// boot graph at 21 modules. Same trade as the CLI above, same kind of artefact,
+// and pinned the same way: src/__tests__/create-mcp-server-boot.unit.test.ts
+// walks the static graph and fails if a handler moves onto the boot path.
+const MCP_SERVER_STARTUP = /^mcp\/typescript\/src\//;
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/web\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
@@ -12,6 +20,7 @@ const UI_APPLICATION = /^apps\/ui\/src\//;
 function isExempt(workspacePath) {
   return (
     CLI_STARTUP.test(workspacePath) ||
+    MCP_SERVER_STARTUP.test(workspacePath) ||
     CLI_TSUP_CONFIG.test(workspacePath) ||
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath)
