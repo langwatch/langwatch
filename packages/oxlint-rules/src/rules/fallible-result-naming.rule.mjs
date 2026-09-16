@@ -19,6 +19,7 @@ const TRY_PREFIX = /^try[A-Z]/;
 // or implements — that is what keeps this a per-file syntactic check.
 const REPOSITORY_METHOD_FILE = /\/repositories\/(?:prisma\/|memory\/)?[^/]*\.repository\.ts$/;
 const REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/;
+const GET_VOCABULARY = /^get([A-Z]|$)/;
 
 /** Shared with `no-try-prefix` so the two rules cannot drift apart on what counts as hedged. */
 export function isTryPrefixedName(name) {
@@ -128,6 +129,35 @@ function containsNullableType(node) {
   return false;
 }
 
+/**
+ * Whether the declared result is an array, looking through `Promise<...>`.
+ * `find*` is the name for an array, so a `get*` answering one is still the
+ * wrong prefix however non-nullable it is.
+ */
+function containsArrayType(node) {
+  if (!node) return false;
+  if (node.type === "TSArrayType") return true;
+  if (node.type === "TSParenthesizedType") return containsArrayType(node.typeAnnotation);
+  if (node.type === "TSTypeReference") {
+    const name = node.typeName?.type === "Identifier" ? node.typeName.name : undefined;
+    if (name === "Array" || name === "ReadonlyArray") return true;
+  }
+  const promiseArgument = promiseTypeArgument(node);
+  if (promiseArgument) return containsArrayType(promiseArgument);
+  return false;
+}
+
+/**
+ * The one-or-throw shape, which is what `get` means and what belongs here. A
+ * nullable result is `find*` wearing the wrong prefix, an array is `find*`
+ * whatever precedes it, and no stated result type is `noResultType`'s case.
+ */
+function isOneOrThrowGet(name, returnType) {
+  if (!GET_VOCABULARY.test(name)) return false;
+  if (!returnType) return false;
+  return !containsNullableType(returnType) && !containsArrayType(returnType);
+}
+
 export function isFallibleResultModule(file) {
   if (file.role !== "contract" && file.role !== "server") return false;
   if (file.layoutVersion !== 0) return false;
@@ -224,7 +254,10 @@ export const fallibleResultNamingRule = defineRule({
       }
 
       const isRepositoryVocabularyName =
-        allowRepositoryVocabulary && isRepositoryVocabularyFile && REPOSITORY_SERVICE_VOCABULARY.test(name);
+        allowRepositoryVocabulary
+        && isRepositoryVocabularyFile
+        && REPOSITORY_SERVICE_VOCABULARY.test(name)
+        && !isOneOrThrowGet(name, returnType);
       if (isRepositoryVocabularyName) {
         context.report({
           node: key,

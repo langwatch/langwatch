@@ -28,6 +28,14 @@ Feature: The fallible-result-naming lint rule
   repository file, `get*` keeps its ordinary meaning and this check says
   nothing.
 
+  One `get*` in a repository is not the service layer's vocabulary borrowed:
+  it is the one-or-throw shape, and it is correct there. A repository method
+  whose declared result cannot be null or undefined answers or raises, which
+  is what `get*` means, so the vocabulary check passes over it. `list*` is not
+  exempted the same way — a list answers an array, and an array is what
+  `find*` names — and neither is a `get*` that can still answer with absence,
+  because that one really is the `find*` shape wearing the wrong prefix.
+
   Background:
     Given a workspace whose agent feature is at strict layout version 0
 
@@ -80,12 +88,20 @@ Feature: The fallible-result-naming lint rule
 
   @unit
   Scenario: A repository get method is reported
-    Given a repository class method named get or getSomething, in the interface file or a prisma or memory backend
+    Given a repository class method named get or getSomething whose result is nullable or an array, in the interface file or a prisma or memory backend
     When the fallible-result-naming rule runs over it
     Then it reports repositoryServiceVocabulary naming the find-prefixed rename
     And a bare get renames to findAll
     And it does not also report nullableWithoutFind when the same method is nullable
     But a find-prefixed method on the same file is left alone
+
+  @unit
+  Scenario: A repository get method that cannot answer with absence is left alone
+    Given a repository class method named get or getSomething whose declared result is neither nullable nor an array
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing for that method
+    But a get method on the same file whose result is nullable is still reported
+    And a list method on the same file is still reported whatever its result type
 
   @unit
   Scenario: A repository list signature is reported

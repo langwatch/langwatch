@@ -216,10 +216,31 @@ describe("given a strict feature API interface", () => {
 
 describe("given a repository class or interface file", () => {
   describe("when a repository method is named with get vocabulary", () => {
-    /** @scenario "A repository get method is reported" */
-    it("reports repositoryServiceVocabulary for getById on a memory repository class", () => {
+    /** @scenario "A repository get method that cannot answer with absence is left alone" */
+    it("leaves getById alone when its result is neither nullable nor an array", () => {
       const found = report(
         "export class MemoryAgentRepository { getById(): Promise<string> { return this.lookup(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    /** @scenario "A repository get method that cannot answer with absence is left alone" */
+    it("still reports a get method whose result is an array, because find names an array", () => {
+      const found = report(
+        "export class MemoryAgentRepository { getActive(): Promise<string[]> { return this.all(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+      expect(found[0].data).toEqual({ name: "getActive", rest: "Active" });
+    });
+
+    /** @scenario "A repository get method is reported" */
+    it("reports repositoryServiceVocabulary for a nullable getById on a memory repository class", () => {
+      const found = report(
+        "export class MemoryAgentRepository { getById(): Promise<string | null> { return this.lookup(); } }",
         REPOSITORY_MEMORY,
       );
 
