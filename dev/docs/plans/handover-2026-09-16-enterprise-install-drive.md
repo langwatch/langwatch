@@ -429,20 +429,41 @@ build: regenerate the same worktree with plain `node dev/scripts/generate-module
 and the identical `MissingMemberError` appears. The worker composition is clean in
 git, so no session is mid-fix on it.
 
-Two candidate fixes, and choosing between them is an architecture decision rather
-than a patch:
+**Decided: the worker supplies the member; no `reads` is weakened.** The evidence
+is `auth.app.ts:282`, which calls `this.#members.rateLimiter.check(...)` inside
+the operation behind `/api/auth/validate`. The module genuinely needs it and
+cannot know which doors a process mounts, so the declaration is honest and
+ADR-144 offers no conditional read. Weakening a `reads` would turn a loud boot
+refusal into a silent absence, which is what the mechanism exists to prevent.
 
-- the worker supplies a limiter (or a no-op) in its own member record, which asks
-  what rate limiting means in a process with no public doors; or
-- `auth`'s `reads` stops requiring one unconditionally, which asks whether the
-  member is genuinely required by the module or only by its HTTP surface.
+**It is seven modules, not one**, which is why the first fix did not finish the
+job - `auth` was satisfied and boot stopped at `trace` instead:
 
-Do not guess between them. The owning change is `651625d14f`.
+```
+auth       reads("logger","prisma","redis","rateLimiter")
+trace      reads("clickhouse","eventing","logger","redis","rateLimiter")
+analytics  reads("clickhouse","rateLimiter")
+prompt     reads("prisma","logger","rateLimiter")
+langy      reads("prisma","redis","eventing","rateLimiter")
+scenario   reads("encryption","rateLimiter")
+webhook    reads("prisma","rateLimiter")
+```
 
-**Where this leaves the 25.** They are proved declared and their boot graph
-resolves; they are not yet proved to answer, because no process on this branch
-currently boots far enough to serve anything. That is blocked on the `rateLimiter`
-decision, not on governance or scim.
+`596df7a094` does the first site (`worker-foundation-apps.composition.ts`) and is
+the exemplar: `redisRateLimiter(options.redis, WORKER_RATE_ALLOWANCE)` over the
+connection the composition already holds, the api's own 60-per-minute window
+named beside it, and a comment saying the member is never consulted in a process
+mounting `workerClosedDoors()`. Lane `worker-supplies-rate-limiter` has the rest.
+
+**The underlying cause, recorded and deliberately not fixed in that lane:** the
+worker hand-builds **ten** separate member records with `membersFrom(...)` while
+the api builds one through `createProcessMembers`. That asymmetry is why a single
+added `reads` entry broke seven modules across many files, and it will happen
+again on the next member.
+
+**Where this leaves the 25.** Proved declared, and their boot graph resolves.
+Not yet proved to answer, because no process on this branch boots far enough to
+serve anything - blocked on the worker, not on governance or scim.
 
 ### Then
 
