@@ -122,7 +122,7 @@ export const datasetRecordSchema = z
   .strict();
 export type DatasetRecord = z.infer<typeof datasetRecordSchema>;
 
-export const datasetSummarySchema = datasetSchema.extend({
+export const datasetSummarySchema = datasetSchema.safeExtend({
   recordCount: z.number().int().nonnegative(),
 });
 export type DatasetSummary = z.infer<typeof datasetSummarySchema>;
@@ -211,7 +211,7 @@ export const datasetLookupInputSchema = z
   .strict();
 export type DatasetLookupInput = z.infer<typeof datasetLookupInputSchema>;
 
-export const datasetWithRecordsInputSchema = datasetLookupInputSchema.extend({
+export const datasetWithRecordsInputSchema = datasetLookupInputSchema.safeExtend({
   limitMb: z.number().nonnegative().nullable().optional(),
   entrySelection: z
     .union([
@@ -241,24 +241,24 @@ export const datasetRecordLookupInputSchema = z
   })
   .strict();
 
-export const datasetPageInputSchema = datasetRecordLookupInputSchema.extend({
+export const datasetPageInputSchema = datasetRecordLookupInputSchema.safeExtend({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(200).default(50),
 });
 export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;
 
-export const createDatasetRecordsInputSchema = datasetRecordLookupInputSchema.extend({
+export const createDatasetRecordsInputSchema = datasetRecordLookupInputSchema.safeExtend({
   entries: z.array(datasetRecordInputSchema),
 });
 export type CreateDatasetRecordsInput = z.infer<typeof createDatasetRecordsInputSchema>;
 
-export const updateDatasetRecordInputSchema = datasetRecordLookupInputSchema.extend({
+export const updateDatasetRecordInputSchema = datasetRecordLookupInputSchema.safeExtend({
   recordId: z.string().min(1),
   updatedRecord: z.record(z.string(), z.unknown()),
 });
 export type UpdateDatasetRecordInput = z.infer<typeof updateDatasetRecordInputSchema>;
 
-export const deleteDatasetRecordsInputSchema = datasetRecordLookupInputSchema.extend({
+export const deleteDatasetRecordsInputSchema = datasetRecordLookupInputSchema.safeExtend({
   recordIds: z.array(z.string().min(1)),
 });
 export type DeleteDatasetRecordsInput = z.infer<typeof deleteDatasetRecordsInputSchema>;

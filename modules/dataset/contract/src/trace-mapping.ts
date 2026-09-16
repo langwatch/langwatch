@@ -892,38 +892,32 @@ export const mappingStateSchema = z.object({
   mapping: z.record(
     z.string(),
     z.union([
-      z
-        .object({
-          source: z.union([
-            z.enum([
-              ...(Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS]),
-              ...SERVER_ONLY_TRACE_SOURCES,
-            ]),
-            z.literal(""),
+      z.object({
+        source: z.union([
+          z.enum([
+            ...(Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS]),
+            ...SERVER_ONLY_TRACE_SOURCES,
           ]),
-          key: z.string().optional(),
-          subkey: z.string().optional(),
-          selectedFields: z.array(z.string()).optional(),
-        })
-        .extend({
-          type: z.literal("trace").optional(),
-        }),
-      z
-        .object({
-          source: z.union([
-            z.enum([
-              ...(Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS]),
-              ...SERVER_ONLY_THREAD_SOURCES,
-            ]),
-            z.literal(""),
+          z.literal(""),
+        ]),
+        key: z.string().optional(),
+        subkey: z.string().optional(),
+        selectedFields: z.array(z.string()).optional(),
+        type: z.literal("trace").optional(),
+      }),
+      z.object({
+        source: z.union([
+          z.enum([
+            ...(Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS]),
+            ...SERVER_ONLY_THREAD_SOURCES,
           ]),
-          key: z.string().optional(),
-          subkey: z.string().optional(),
-          selectedFields: z.array(z.string()).optional(),
-        })
-        .extend({
-          type: z.literal("thread"),
-        }),
+          z.literal(""),
+        ]),
+        key: z.string().optional(),
+        subkey: z.string().optional(),
+        selectedFields: z.array(z.string()).optional(),
+        type: z.literal("thread"),
+      }),
     ]),
   ),
   expansions: z.array(z.enum(Object.keys(TRACE_EXPANSIONS) as [keyof typeof TRACE_EXPANSIONS])),

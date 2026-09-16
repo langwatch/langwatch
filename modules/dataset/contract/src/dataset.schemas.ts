@@ -31,16 +31,14 @@ export const datasetApiUpsertBaseInputSchema = z.object({
  * experiment pages name an experiment and borrow its name.
  */
 export const datasetApiUpsertTargetInputSchema = z.union([
-  datasetRecordFormSchema.extend({
+  z.object({
+    ...datasetRecordFormSchema.shape,
     datasetId: z.string().optional(),
   }),
-  datasetRecordFormSchema
-    .omit({
-      name: true,
-    })
-    .extend({
-      experimentId: z.string(),
-    }),
+  z.object({
+    ...datasetRecordFormSchema.omit({ name: true }).shape,
+    experimentId: z.string(),
+  }),
 ]);
 
 export const datasetApiValidateNameInputSchema = z.object({

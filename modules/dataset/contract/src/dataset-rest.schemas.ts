@@ -81,12 +81,13 @@ export const datasetRestSummarySchema = z.object({
 
 /** `GET /api/dataset`: a page of the project's datasets, each with its URL. */
 export const datasetRestListResponseSchema = z.object({
-  data: z.array(datasetSummarySchema.extend({ platformUrl: z.string() })),
+  data: z.array(datasetSummarySchema.safeExtend({ platformUrl: z.string() })),
   pagination: datasetPaginationSchema,
 });
 
 /** `GET /api/dataset/:slugOrId`: the dataset, with every entry inline. */
-export const datasetRestDetailResponseSchema = datasetRestSummarySchema.extend({
+export const datasetRestDetailResponseSchema = z.object({
+  ...datasetRestSummarySchema.shape,
   data: z.array(datasetRecordSchema),
 });
 
