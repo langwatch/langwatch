@@ -337,6 +337,43 @@ skill puts in front of every lane) and `dev/docs/lint-rules.md:371,372,836`
 (generated - regenerate with `pnpm --filter @langwatch/architecture-enforcer
 docs`, do not hand-edit). Fix both the moment that session releases them.
 
+## no-try-prefix CANNOT BE GROUND, AND SHOULD NOT BE QUEUED AS A WAVE (2026-09-16)
+
+Measured, not estimated. Of its 448 findings, walking each reported offset
+through its parameter list to the return annotation:
+
+    430   declared result IS nullable   - every one a behaviour decision
+      9   no declared return type
+      6   not nullable - a pure rename
+      3   unparsed
+
+**Six of 448 are mechanical.** That matches what the langy lane found the hard
+way: 109 mechanical renames against 2 real conversions.
+
+The 430 have no cheap correct answer, and the tempting one is the move that cost
+this drive a lane. `tryGetFoo(): T | null` cannot become `findFoo(): T | null` -
+that is the nullable `find*` the naming decision forbids, and it is precisely
+what the old rule text told lanes to do. It also cannot become `getFoo(): T`
+without reading every caller to decide whether absence there is an ordinary
+answer or a failure, which is the conversion the user declined to take on
+("lets not bite this off now, too many changes").
+
+**Recommendation: do not spawn a `no-try-prefix` wave.** Leave the 430 where they
+are and convert one properly only when that code is being changed for another
+reason. Grinding the family can only produce the banned shape or an unreviewed
+behaviour change across 430 call sites. It keeps 448 findings on the board, and
+that is the cheaper of the two prices.
+
+The same measurement applies to most of `fallible-result-naming`'s remaining 890:
+605 carry `nullableWithoutFind`, whose leading verbs are `resolve` (63), `get`
+(51) and `read` (40) - lookups, each needing the same per-caller decision.
+
+**Grind instead, in this order:** `condition-shape` (367, manifest ready),
+`comment-block-size`, `temporal-only`, `zod-object-composition`,
+`feature-source-layout` (319, trace/server holds 158, manifest ready),
+`service-classes` (296) and `package-boundaries` (374). Those are shape, not
+contract, and a lane can finish one without deciding what absence means.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
