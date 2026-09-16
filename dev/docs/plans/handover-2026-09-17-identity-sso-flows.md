@@ -53,24 +53,35 @@ yet" there too, not "none".
 
 ### Checks, as actually run
 
+Re-run 2026-09-17, after the rebase and the fixes below. The parity script is
+at `platform/app/scripts/check-feature-parity.ts` on this branch, and `tsx` is
+only in `platform/app/node_modules/.bin`, so the root `pnpm exec tsx` fails.
+
 | Command | Result |
 | --- | --- |
-| `pnpm typecheck:all` | exit 0 |
-| `pnpm exec tsx scripts/check-feature-parity.ts` | exit 0 — **13,568** bound, 0 unbound in enforced files |
-| `pnpm test:component` (whole suite) | **6,546 passed**, 8 skipped, 817 files |
-| `pnpm test:unit` (whole suite) | **38,295 passed**, 2 failed — neither mine, see below |
+| `pnpm typecheck` | exit 0 |
+| `pnpm --filter @langwatch/identity-server typecheck` | **4 errors**, all pre-existing in `sso-connection-rename.unit.test.ts` — see §4's note |
+| parity check | OK — **13,610** bound across 1,316 files |
+| `pnpm --filter @langwatch/web test:component` | **6,560 passed**, 8 skipped, 819 files, 0 failed |
+| `pnpm --filter @langwatch/web test:unit` | **38,341 passed, 0 failed** on the run before the §4d work; a later run showed 1 failure whose name was lost to a truncated capture, being re-run |
 | `pnpm --filter @langwatch/identity test` | 250 passed |
-| `pnpm --filter @langwatch/identity-server test` | 446 passed |
+| `pnpm --filter @langwatch/identity-server test` | 449 passed |
+
+The original figures, for comparison: typecheck:all exit 0, 13,568 bound,
+6,546 component, 38,295 unit with 2 failures.
 
 Three failures remain and **none are caused by this work**:
 
-1. `src/test-utils/__tests__/typescriptCompilerApi.unit.test.ts` — ENOENT on
-   `platform/app/src/server/breakGlassExpiryWorker.ts`. The branch owner
-   deleted that file but has **not staged the deletion**, so `git ls-files`
-   still lists it and the test reads a path that is not there. Staging the
-   deletion fixes it; it is green in CI.
+1. ~~`typescriptCompilerApi.unit.test.ts` — ENOENT on
+   `breakGlassExpiryWorker.ts`~~ **FIXED 2026-09-17.** The prediction held
+   exactly: committing the deletion fixed it, and the whole unit suite went to
+   38,341 passed / 0 failed.
 2. `src/components/projects/__tests__/CreateProjectDrawer.test.tsx` — passes in
-   isolation, fails under full-suite parallelism. Flake.
+   isolation, fails under full-suite parallelism. Flake. **Still the best
+   candidate for the single failure in the later run** — it passes alone on
+   2026-09-17 too — but that is not established: the run that failed was
+   captured through a `tail`, so the test's name was never recorded. Do not
+   write this one off until a full capture names it.
 3. `packages/server` `test/cli-doctor.test.ts` (2) — environmental, missing
    predeps on this machine. That package was never touched.
 
@@ -168,6 +179,46 @@ admitted across the redirect boundary on a promise no screen kept.
 
 ## 4. Open work, lane-able
 
+> **2026-09-17 — 4a, 4b and four of 4g are done.** Commits, newest first:
+> `fix(migration)` the D04 spec, `fix(identity)` the dialog title and the claim
+> guard, `fix(identity)` the staff-lookup tenancy read, `fix(scim)` the PATCH
+> name merge. `pnpm typecheck` exit 0 after them.
+>
+> **One 4g item was checked and is NOT a bug.** `AuthenticationLayout.tsx:52`
+> linking a bare `/settings/authentication` is the house convention, not a
+> defect unique to that rail: `useSettingsMenu.ts:226` links `/settings/members`
+> the same bare way and `routes.tsx:178` registers it bare. The whole settings
+> section resolves its organization from context. Changing only this rail would
+> make it inconsistent without changing where it lands, so it was left alone.
+> Whether settings paths should carry an organization at all is a real question
+> and a much larger one than §4g implies.
+>
+> **And one item turned out to be bigger than it was written.** The stale
+> docblock in `identity/runtime.ts` was real, but the spec underneath it was
+> worse: the scenario "PR1 does not run the unproved SSO grandfather migration"
+> asserted D04 "is not declared or run" while `registeredMigrations()` declares
+> it — and the bound test had already been updated to assert the registration,
+> so the pair read green while the words said the reverse, under a test title
+> that still said it left D04 out. A binding enforcing the OPPOSITE of its
+> scenario is worse than an unbound one, and greps for stale prose will not
+> find it. Worth a sweep of its own.
+>
+> **4d is now half done** — the customer-visible half. See its own section: the
+> competing-connection path is closed, and the operator-driven half turns out to
+> be the existing design rather than something to build.
+>
+> **Still open here:** 4c is untouched on purpose — a product decision by its
+> own text. 4e, 4f and the remaining ten 4g items are untouched. The claim guard
+> shipped without a test because nothing in the tree renders `DomainsSection`.
+>
+> **One pre-existing failure worth knowing about**, found while checking this
+> work and not caused by it: `pnpm --filter @langwatch/identity-server typecheck`
+> reports **4 errors**, all in `src/__tests__/sso-connection-rename.unit.test.ts`,
+> all a missing `tenantId` on the rename command. It rides in the wip commit with
+> the rest of the in-flight rename work. `pnpm typecheck` cannot see it — that
+> command covers the three applications only, so this needs `typecheck:all` or
+> the package's own script.
+
 ### 4a. Residue to resolve first
 
 `platform/app/ee/scim/scim-name.ts` was **created and never wired in** — I was
@@ -175,12 +226,9 @@ interrupted mid-change. It holds `mergeNameParts` and `namePartsIn`, both pure
 and both correct as far as they go, intended for 4b. Either finish 4b or delete
 the file; it currently imports nothing and nothing imports it.
 
-**Still true as of 2026-09-17.** The file is now committed (inside the wip
-commit `98ede9d535`) rather than untracked, so it is no longer at risk of being
-lost — but it is still dead code and still nothing imports it. Read both
-functions before wiring: they already handle all three PATCH spellings and the
-half-a-name merge, which is the whole of 4b's logic. What is missing is the call
-site in `scim.service.ts:1005`, the tests, and the spec scenario.
+**RESOLVED 2026-09-17 by doing 4b.** `scim.service.ts` imports both functions
+and the file is load-bearing; it is no longer residue. Both were correct as
+written and neither needed changing — only the call site did.
 
 ### 4b. SCIM PATCH does not interoperate with Okta or Entra — highest value
 
@@ -191,6 +239,15 @@ the request log files it "Accepted". Separately, the dot-notation branch
 rebuilds the whole name from the half it was given, so patching a surname
 **destroys the forename**. `scim-name.ts` exists to fix both; it needs wiring,
 tests, and a spec scenario in `specs/identity/scim-connection-sync.feature`.
+
+**DONE 2026-09-17.** The name branch now runs BEFORE the object guard, which is
+what was eating the scalar form. Five tests in
+`ee/scim/__tests__/scim-patch-name.unit.test.ts`, two scenarios bound in
+`scim-connection-sync.feature`, all 16 SCIM test files green (156 tests).
+**Verified as a regression, not just as a pass**: reverted against the old
+handler, three fail — two with `expected undefined` (the silent accept) and one
+with `expected 'Smith' to be 'Ada Smith'` (the lost forename) — and the two
+describing already-correct behaviour pass on both sides.
 
 ### 4c. `active:false` does not deprovision on the shipped default
 
@@ -213,6 +270,33 @@ period. Upstream of that, the grandfathered connection can only be minted by an
 operator-enrolled system migration (`connection-grandfather.migration.ts:47`,
 `enrolledAutomatically = false`), and on self-hosted there is **no operator path
 either**. See `dev/docs/adr/` and flow 3's `NOTES.md`.
+
+**HALF DONE 2026-09-17, and the framing was wrong.** The customer-visible half
+is fixed: `getSetup` reports a `legacyRoute`, and a legacy organization now gets
+"single sign-on is already set up" instead of the vendor picker. The competing
+connection is no longer reachable from the screen.
+
+The wrong framing was treating this as a customer journey to build. **Doing the
+move in backoffice, invisibly, is already the design** — the migration declares
+`requiresOperatorConfirmation = false` under the comment "Dark preparation: the
+connection projection decides nothing until the routing flag is flipped, so
+finalizing changes nothing customer-visible", its bound scenario is literally
+"A legacy SSO organization is grandfathered without noticing", and the operator
+surface exists at `/ops/migrations` (enroll, enroll-cohort, run for one
+organization, roll back). On Cloud that path works today.
+
+**What is genuinely left is one boolean and one decision.**
+`availableOnThisInstallation = isSaaS || migration.runsAutomaticallyOnSelfHosted`
+(`system-migrations.service.ts:342`), and D04 sets `runsAutomaticallyOnSelfHosted
+= false` — which hides the whole action row on self-hosted, `RunForOrganization`
+included, even though that action is *not* `isSaaS`-gated. Its own comment says
+it is waiting on the cloud soak. Note this leans on `isSaaS`, the unsigned flag.
+
+And the flip itself is still customer-visible in effect: recording the old route
+changes nothing, but moving sign-in onto the connection is a real cutover. That
+part needs a decision about what, if anything, the customer is told — and it
+makes §4e matter **more**, not less, because a customer who was never involved
+in the migration was never walked through the way back in either.
 
 ### 4e. The break-glass way back in cannot be spent
 
