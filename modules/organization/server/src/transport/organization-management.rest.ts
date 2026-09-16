@@ -39,7 +39,6 @@ export const organizationManagementEnterpriseGate = defineRestMiddleware(
 );
 
 /** A wire date field the way every app answer carries it: an `Instant`, converted here once. */
-const dateOf = (value: Instant): Date => toDate(value);
 
 /** The member the organizationKey door hands over as `actor`; null for a service key. */
 const callerOf = (actor: { type: string; id?: string } | null): OrganizationCaller | null =>
@@ -56,9 +55,9 @@ const memberWire = (member: {
   userId: member.userId,
   role: member.role as z.infer<typeof organizationManagementRestMemberSchema>["role"],
   disabled: member.disabledAt !== null,
-  disabledAt: member.disabledAt ? dateOf(member.disabledAt) : null,
-  createdAt: dateOf(member.createdAt),
-  updatedAt: dateOf(member.updatedAt),
+  disabledAt: member.disabledAt ? toDate(member.disabledAt) : null,
+  createdAt: toDate(member.createdAt),
+  updatedAt: toDate(member.updatedAt),
   user: member.user,
 });
 
