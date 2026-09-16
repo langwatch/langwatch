@@ -39,14 +39,21 @@ visible leaves the larger half suppressed. The biggest:
     stand-in-cast ......... 955        test-description ....... 336
     cognitive-complexity .. 773        feature-source-layout .. 309
 
-`stand-in-cast` deserves its own line. It is enabled as `error`, and its own
-documentation prescribes the fix for the exact regression class that has bitten
-this drive twice - "build the mock to the real shape, or check it with
-`satisfies` instead of forcing it past the compiler". It reports 43 findings
-while suppressed in **955 files, 792 of them tests**, and the repository holds
-430 `as unknown as <X>Api|Service|Repository` casts in tests against 175 uses of
-`satisfies`. That is not a missing rule. It is a rule baselined out of the place
-it was written for.
+`stand-in-cast` is the largest of these after `no-port-vocabulary`: enabled as
+`error`, reporting 43 findings while suppressed in **955 files, 792 of them
+tests**, against 430 `as unknown as <X>Api|Service|Repository` casts in tests
+and only 175 uses of `satisfies`. Worth un-baselining on its own merits.
+
+**It did not, however, cause either regression on this drive, and an earlier
+draft of this handover said it did.** The SCIM doubles that carried the
+`UserApi` one contain no casts at all - they are typed returns,
+`(): ScimUserProvisioning => ({ ... })`, over a type built from
+`Pick<UserApi, ...>`. TypeScript checks that completely: after the rename,
+`Pick<UserApi, "tryFindById">` is a TS2344 and the missing method is another
+error beside it. Both regressions were ordinary type errors that `tsc` catches
+in a second, and both survived for one reason only - `tsc` was not running.
+Rank the fixes by that: a check that cannot run costs more than any rule that
+was never written.
 
 ### Typecheck is now part of the goal, and the gate was not running
 
