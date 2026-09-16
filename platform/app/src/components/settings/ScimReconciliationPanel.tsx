@@ -11,9 +11,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plug } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronDown, ChevronRight, Plug } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
+import { Link } from "~/components/ui/link";
 import { isRunningConnection } from "~/features/directory/logic/connectionLifecycle";
 import type { OrganizationReconciliation } from "~/server/app-layer/identity/scim-reconciliation.service";
 import { api } from "../../utils/api";
@@ -265,7 +266,32 @@ function ConnectionCard({
         <VStack align="stretch" gap={4}>
           <HStack>
             <VStack align="start" gap={0}>
-              <Text fontWeight="600">{connection.providerId}</Text>
+              {/* THE NAME GOES SOMEWHERE. This card is about a connection
+                  the reader almost always wants to open — its issuer, its
+                  domains, its history and the control that renames it are
+                  all one page away, and the name sat here as dead text.
+
+                  AND IT LOOKS LIKE IT GOES SOMEWHERE. A bare link inherits
+                  the body colour and only underlines on hover, so the only
+                  reader who discovers it is one who already happened to put
+                  the pointer on it — reported, exactly, as "not clear i can
+                  click this". The chevron is the part that is visible
+                  without hovering; the accent on hover confirms it. */}
+              <Link
+                href="/settings/authentication/provider"
+                data-testid="connector-provider-link"
+                colorPalette="orange"
+                _hover={{
+                  color: "colorPalette.fg",
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                }}
+              >
+                <HStack gap={1} align="center">
+                  <Text fontWeight="600">{connection.providerId}</Text>
+                  <ChevronRight size={14} aria-hidden="true" />
+                </HStack>
+              </Link>
               {connection.verifiedDomains.length > 0 && (
                 <Text fontSize="xs" color="fg.muted">
                   {connection.verifiedDomains.join(", ")}
@@ -299,15 +325,63 @@ function ConnectionCard({
             <DirectoryFailures connection={connection} />
           )}
 
-          {/* Under the facts and the failures, because it answers a question
-              the reader only has once those did not answer it. */}
-          <DirectoryRequestsPanel
+          {/* CLOSED, because this page said the same thing three times.
+              The raw requests, the changes they caused and the people they
+              produced are one sync at three altitudes, and all three were
+              open at once — so the page opened on a wall of "POST users"
+              and buried both the state above it and the tokens below.
+
+              This is the lowest altitude and the narrowest audience: it is
+              what somebody reads when the humanised changes did NOT answer
+              their question, which is why it is the one that folds. */}
+          <RawRequests
             organizationId={organizationId}
             connectionId={connection.connectionId}
           />
         </VStack>
       </Card.Body>
     </Card.Root>
+  );
+}
+
+/**
+ * The request log, behind a disclosure.
+ *
+ * Kept on the card rather than moved off it: when a provider reports errors
+ * and nothing else on the page explains why, this is the answer, and a
+ * reader in that state should not have to find another screen. Closed,
+ * because everybody else is here for the state and the tokens.
+ */
+function RawRequests({
+  organizationId,
+  connectionId,
+}: {
+  organizationId: string;
+  connectionId: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <VStack align="stretch" gap={2}>
+      <Button
+        size="xs"
+        variant="ghost"
+        alignSelf="start"
+        onClick={() => setOpen((shown) => !shown)}
+        data-testid="directory-requests-toggle"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        {open
+          ? "Hide what your identity provider sent"
+          : "Show what your identity provider sent"}
+      </Button>
+      {open && (
+        <DirectoryRequestsPanel
+          organizationId={organizationId}
+          connectionId={connectionId}
+        />
+      )}
+    </VStack>
   );
 }
 
@@ -352,29 +426,80 @@ function DirectoryFailures({ connection }: { connection: ConnectionPanel }) {
  * organization made needs an author before anybody goes looking for who made
  * it.
  */
+const RECENT_CHANGES_SHOWN = 8;
+
 function RecentDirectoryChanges({ changes }: { changes: DirectoryChange[] }) {
+  /* EIGHT, NOT FIFTY. The read is capped at fifty server-side, and fifty
+     rows of "somebody was given access" is a wall: on an organization whose
+     directory had just pushed five hundred people it filled the page below
+     the connection card and buried everything under it. Eight is enough to
+     answer "is it doing anything, and what did it just do"; the reader who
+     wants the rest of what we hold asks for it, and asking costs nothing
+     because every row is already here. */
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? changes : changes.slice(0, RECENT_CHANGES_SHOWN);
+  const hidden = changes.length - shown.length;
+
   return (
     <VStack align="stretch" gap={3}>
       <Heading size="sm">Recent changes from your identity provider</Heading>
+      {/* WHO CHANGED THE CONNECTION ITSELF is a different question from who
+          the directory moved, and this page only answers the second. People
+          came here looking for the first — it is the page with the word
+          "connector" on it — and found no way through. */}
+      <Text fontSize="sm" color="fg.muted">
+        Changes to the connection itself — who set it up, proved a domain or
+        turned it on — are in its{" "}
+        <Link href="/settings/authentication/provider">event log</Link>.
+      </Text>
       {changes.length === 0 && (
         <Text color="fg.muted" fontSize="sm">
           Your identity provider has not changed anyone&apos;s access yet.
         </Text>
       )}
       <VStack align="stretch" gap={2}>
-        {changes.map((change) => (
+        {shown.map((change) => (
           <HStack key={change.grantId} gap={3}>
             <Badge colorPalette={change.kind === "removed" ? "red" : "green"}>
               {change.kind === "removed" ? "Removed" : "Added"}
             </Badge>
             <Text fontSize="sm">{change.summary}</Text>
             <Spacer />
-            <Text fontSize="xs" color="fg.muted">
-              {change.author} · {new Date(change.occurredAtMs).toLocaleString()}
+            {/* THE AUTHOR IS THE HEADING'S JOB, ONCE. `author` is a
+                constant — `DIRECTORY_CHANGE_AUTHOR`, always the directory and
+                never a person, which is the whole point of the list — so
+                printing it on every row said "Your identity provider" fifty
+                times under a heading that had already said it. The
+                attribution is not lost by dropping it here; it is stated
+                where it applies, which is to all of them. */}
+            <Text fontSize="xs" color="fg.muted" flexShrink={0}>
+              {new Date(change.occurredAtMs).toLocaleString()}
             </Text>
           </HStack>
         ))}
       </VStack>
+      {hidden > 0 && (
+        <Button
+          alignSelf="start"
+          size="xs"
+          variant="ghost"
+          onClick={() => setShowAll(true)}
+          data-testid="recent-changes-show-all"
+        >
+          Show {hidden} more
+        </Button>
+      )}
+      {showAll && changes.length > RECENT_CHANGES_SHOWN && (
+        <Button
+          alignSelf="start"
+          size="xs"
+          variant="ghost"
+          onClick={() => setShowAll(false)}
+          data-testid="recent-changes-show-fewer"
+        >
+          Show fewer
+        </Button>
+      )}
     </VStack>
   );
 }

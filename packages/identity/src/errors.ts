@@ -747,6 +747,147 @@ export class SsoSelfServeUnavailableError extends SsoConnectionCommandRefusedErr
 }
 
 /**
+ * A single sign-on assertion the gate would not turn into a session
+ * (`SsoAssertionService.decide`, `specs/identity/sso-assertion-refusals.feature`).
+ *
+ * These are NOT `SsoConnectionCommandRefusedError`s. Those refuse an
+ * administrator's command against a connection they are signed in to manage;
+ * these refuse an authenticated assertion from somebody's identity provider,
+ * on a path with no LangWatch session yet, and they travel to the browser in
+ * the query string of a redirect rather than in a response body.
+ *
+ * WHICH OF THEM NAMES ITS CAUSE is the one decision this family encodes. A
+ * refusal names the cause when the cause is a fact about the caller's own
+ * assertion or their own organization's configuration — something they or
+ * their administrator can change. It stays opaque when the cause would answer
+ * "does this exist inside LangWatch", because a refusal that distinguished
+ * those is how connection identifiers get enumerated. That is ADR-045's test
+ * with the existence-oracle carved out of it.
+ *
+ * All of them are 403: the plugin turns a refusal into `APIError("FORBIDDEN")`
+ * regardless, and a status that disagreed with what actually goes on the wire
+ * would only mislead whoever read it next.
+ */
+export abstract class SsoAssertionRefusedError extends HandledError {}
+
+/**
+ * The general single sign-on refusal: we will not say which cause fired.
+ *
+ * DELIBERATELY NOT `identity_sign_in_refused`, which is the CREDENTIAL
+ * refusal and means "that email or password is wrong". Borrowing it was the
+ * bug this family was written for — it told somebody who had never typed a
+ * password that their password was wrong, and it did so for every one of the
+ * gate's seven causes at once. The credential code also has to keep meaning
+ * exactly one thing, because the indistinguishability of "wrong password" and
+ * "no such account" rests on it.
+ *
+ * The copy says the sign-in was refused and to ask an administrator, which is
+ * true of every cause that reaches this code.
+ */
+export class SsoSignInRefusedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_sign_in_refused", "sso_sign_in_refused", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSignInRefusedError";
+  }
+}
+
+/**
+ * The provider authenticated somebody and released no email address.
+ *
+ * Named rather than hidden because it is a fact about the CUSTOMER'S OWN
+ * assertion and discloses nothing of ours, and because it is the single most
+ * common enterprise misconfiguration there is — the scope or claim mapping
+ * that releases `email` was never added to the application they created.
+ * Answering it with "your sign-in was refused" sends an administrator looking
+ * for a fault in LangWatch.
+ */
+export class SsoAssertionWithoutAddressError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_assertion_without_address", "sso_assertion_without_address", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoAssertionWithoutAddressError";
+  }
+}
+
+/**
+ * The connection has not gone live, and the address asserted is not the one
+ * belonging to the administrator who registered it.
+ *
+ * NAMED FOR THE ADDRESS, NOT FOR THE CONNECTION'S STATE, and the difference
+ * is the whole usefulness of it. This fires during the setup journey, whose
+ * own instructions tell an administrator to go and prove the connection with
+ * a real sign-in — so a refusal reading "this connection is still being set
+ * up" tells the one person who is supposed to act that they may not, and
+ * sends them looking for a permission they already hold. What actually
+ * happened is narrower and fixable: their provider asserted an address that
+ * is not on the LangWatch account which registered this connection.
+ *
+ * The setup exemption admits exactly one address, because activation refuses
+ * without a real sign-in through the connection and proving that round trip
+ * takes exactly one person. NAMING NEITHER THE REGISTRANT NOR ANY ADDRESS is
+ * what keeps it safe to say: the remedy is written where the reader is
+ * already authenticated and the screen knows their own address, so the code
+ * itself needs to carry nobody's identity.
+ */
+export class SsoSetupAddressMismatchError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_setup_address_mismatch", "sso_setup_address_mismatch", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSetupAddressMismatchError";
+  }
+}
+
+/**
+ * A live connection asserted an address on a domain it has never proved.
+ *
+ * The proof is the entire basis for trusting the provider's `email_verified`,
+ * so this refusal is the gate doing its job rather than a fault — but it is
+ * also the shape of an ordinary mistake (a second domain the company uses and
+ * never claimed), and the remedy is a claim and a DNS record.
+ */
+export class SsoDomainNotVerifiedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_not_verified", "sso_domain_not_verified", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainNotVerifiedError";
+  }
+}
+
+/**
+ * The domain's published record stayed missing through its grace window, and
+ * the person being refused is not already bound to this connection (ADR-123).
+ *
+ * A lapsed domain still ROUTES — everyone already there keeps signing in —
+ * and vouches for nobody new, so this is only ever read by somebody arriving
+ * for the first time. The remedy is an administrator republishing the record,
+ * which is worth saying rather than leaving them to guess why a colleague can
+ * sign in and they cannot.
+ */
+export class SsoDomainProofLapsedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_lapsed", "sso_domain_proof_lapsed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofLapsedError";
+  }
+}
+
+/**
  * A join-request refusal (D12).
  *
  * One of these is deliberately INDISTINGUISHABLE across several causes, and
@@ -1212,6 +1353,79 @@ export class IdentitySignInRefusedError extends IdentityCommandRefusedError {
 }
 
 /**
+ * Too many failed attempts against this address (GAC-09).
+ * Spec: specs/identity/org-account-lockout.feature.
+ *
+ * It inherits `IdentitySignInRefusedError`'s load-bearing property and adds
+ * one of its own, and BOTH are the whole point of the class:
+ *
+ *   - it says nothing about which half of the credentials was right. Telling
+ *     somebody their password was correct but the account is locked turns the
+ *     lock-out screen into a password oracle - the attacker learns the
+ *     credential without ever getting in;
+ *   - it is raised for an address with NO ACCOUNT just as readily as for one
+ *     that resolves. We already answer "no such account" and "wrong password"
+ *     identically so that sign-in cannot be used to discover who has an
+ *     account here; a lock-out that only ever appeared for real accounts
+ *     would hand that back, because five wrong guesses saying "locked" for
+ *     one address and "incorrect" for another names the addresses worth
+ *     attacking.
+ *
+ * `detail` is for the log and never reaches the customer, so it may name the
+ * count. What the customer reads is the registry's copy for this code.
+ */
+export class IdentitySignInLockedOutError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_sign_in_locked_out", "identity_sign_in_locked_out", {
+      httpStatus: 429,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentitySignInLockedOutError";
+  }
+}
+
+/**
+ * An administrator's session-window save named a maximum session length that
+ * is shorter than the idle timeout it is offered beside (GAC-10).
+ *
+ * Refused rather than silently accepted: a session that ends at the maximum
+ * before it could ever go idle makes the idle timeout unreachable, which is
+ * almost certainly not what was intended when both numbers were typed in the
+ * same save.
+ */
+export class IdentitySessionMaxLifetimeTooShortError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "identity_session_max_lifetime_too_short",
+      "identity_session_max_lifetime_too_short",
+      { httpStatus: 422, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "IdentitySessionMaxLifetimeTooShortError";
+  }
+}
+
+/**
+ * The person named is not a member of the organization asking about them.
+ *
+ * Raised when an administrator's release names a userId their own
+ * `organization:manage` grant does not reach — releasing a lock-out is a
+ * per-organization act on a member's record, not a way to touch anybody's.
+ */
+export class IdentityUserNotInOrganizationError extends HandledError {
+  declare readonly code: "user_not_in_organization";
+
+  constructor(userId?: string) {
+    super(
+      "user_not_in_organization",
+      "That user is not a member of this organization",
+      { httpStatus: 422, ...(userId ? { meta: { userId } } : {}) },
+    );
+    this.name = "IdentityUserNotInOrganizationError";
+  }
+}
+
+/**
  * The proposal named is not one this person has. Either it never existed, or
  * the operator is holding a stale page — the surface lists what is waiting,
  * so a proposal that is gone from the list is gone from here too.
@@ -1272,5 +1486,30 @@ export class CannotImpersonateWithoutSecondFactorError extends HandledError {
       { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
     );
     this.name = "CannotImpersonateWithoutSecondFactorError";
+  }
+}
+
+/**
+ * Somebody signed in to prove a connection, and is now being offered a
+ * workspace of their own.
+ *
+ * The test sign-in that going live requires necessarily happens while the
+ * connection is still VERIFIED, and nobody is provisioned before a connection
+ * is live — so the tester holds a session, no membership, and the orgless
+ * landing's usual answer is the screen that creates an organization. Creating
+ * one there is never what they came to do: it strands the real organization's
+ * setup behind an account that now belongs to a second, empty one.
+ *
+ * Refused rather than hidden, because the screen is reachable directly and a
+ * guard that only removes a link is not a guard.
+ */
+export class SsoTestArrivalCannotCreateOrganizationError extends HandledError {
+  constructor(detail: string) {
+    super(
+      "sso_test_arrival_cannot_create_organization",
+      "sso_test_arrival_cannot_create_organization",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoTestArrivalCannotCreateOrganizationError";
   }
 }

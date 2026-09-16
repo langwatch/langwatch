@@ -17,6 +17,7 @@ import {
   isGovernanceOcsfTrace,
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
@@ -52,6 +53,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
+import { reapFinishedSignInLocks } from "~/server/app-layer/identity/sign-in-security-adapters";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
@@ -80,6 +82,7 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import { ssoBreakGlass, ssoDomainReproof } from "../app-layer/identity/runtime";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
 import {
   mintLangySessionApiKeyForUser,
@@ -149,6 +152,7 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { createBreakGlassMaintenancePipeline } from "./pipelines/break-glass-maintenance/pipeline";
 import { createCliLoginKeyMaintenancePipeline } from "./pipelines/cli-login-key-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
@@ -213,8 +217,10 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
+import { createScimRequestLogMaintenancePipeline } from "./pipelines/scim-request-log-maintenance/pipeline";
 import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
 import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
+import { createSignInLockMaintenancePipeline } from "./pipelines/sign-in-lock-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -234,6 +240,7 @@ import type { SimulationProcessingEvent } from "./pipelines/simulation-processin
 import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
 import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
+import { createSsoDomainReproofMaintenancePipeline } from "./pipelines/sso-domain-reproof-maintenance/pipeline";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -673,6 +680,75 @@ export class PipelineRegistry {
       createCliLoginKeyMaintenancePipeline({
         loginKeyReap: {
           reap: () => reapExpiredCliLoginKeys({ prisma: this.deps.prisma }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Sign-in lock-out maintenance (GAC-09), on the same footing. The
+    // counter is keyed on the address somebody typed rather than on an
+    // account — which is what stops a lock-out revealing who has an account
+    // here — so anybody can make rows appear by getting an address wrong, and
+    // this is what clears the finished ones away. It releases nothing.
+    this.deps.eventSourcing.register(
+      createSignInLockMaintenancePipeline({
+        lockReap: {
+          reap: ({ settledBefore }) =>
+            reapFinishedSignInLocks({
+              prisma: this.deps.prisma,
+              settledBefore,
+            }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // Break-glass expiry warnings (D05), on the same footing. Moved off a
+    // `setTimeout` chain with no lock, so the fleet no longer sends the same
+    // warning sweep once per replica. It never expires a binding — that
+    // happens by comparing two numbers at the moment somebody asks — so a
+    // missed tick costs a late warning rather than an access decision nobody
+    // made. See createBreakGlassMaintenancePipeline's own docblock for why
+    // this one keeps `maxAttempts: 1` instead of the template's usual 3.
+    this.deps.eventSourcing.register(
+      createBreakGlassMaintenancePipeline({
+        expiryWarn: {
+          warn: () => ssoBreakGlass().sweepWarnings(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // SSO domain re-proof (ADR-123), on the same footing. Re-reads every
+    // published domain proof a few times a day and states a fact only when
+    // DNS disagrees with what was last recorded, so a healthy fleet running
+    // this sweep on every replica used to cost nothing beyond the duplicated
+    // lookups — the lock removes that duplication without changing what a
+    // customer ever sees.
+    this.deps.eventSourcing.register(
+      createSsoDomainReproofMaintenancePipeline({
+        domainReproof: {
+          sweep: () => ssoDomainReproof().sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
+    // SCIM request log retention (ADR-126), on the same footing. The table is
+    // operational evidence rather than an event log, so a missed tick costs a
+    // few extra rows kept a few hours longer and nothing downstream derives
+    // from them.
+    this.deps.eventSourcing.register(
+      createScimRequestLogMaintenancePipeline({
+        logRetention: {
+          sweep: () =>
+            ScimRequestLogService.create(this.deps.prisma).sweepExpired({
+              now: new Date(),
+            }),
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },

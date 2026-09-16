@@ -234,6 +234,32 @@ Feature: Directory administration
       Then she is offered the way to Governance, where they are assigned
       And nothing on this tab assigns anybody
 
+  # ONE SYNC, NOT THREE. The page showed the same activity at three
+  # altitudes at once — the raw requests the provider sent, the membership
+  # changes they caused, and the people they produced — all expanded, all
+  # long. Opening it meant scrolling past a wall of "POST users" to reach
+  # either the state above or the tokens below, which are the two things the
+  # page is for.
+
+  Rule: the sync is reported once, at the altitude a reader asked for
+
+    @integration
+    Scenario: What the provider sent is there for whoever needs it, and folded for everybody else
+      When "ana" opens the connectors page
+      Then the changes the directory made are shown
+      But what the provider sent is folded away until she asks for it
+
+    @integration
+    Scenario: The connection's name leads to the connection
+      When "ana" opens the connectors page
+      Then the connection's name takes her to the connection itself
+
+    @integration
+    Scenario: Changes to the connection itself are where they belong, and said so
+      When "ana" opens the connectors page
+      Then it tells her that changes to the connection are in its event log
+      And it takes her there
+
   Rule: the people the directory manages are named, not only counted
 
     @integration
@@ -250,6 +276,19 @@ Feature: Directory administration
       Then each of them is a row with their name, their address and the access
       they hold
       And each row says the directory is where they came from
+
+    # A WORKING DIRECTORY MAKES A LIST NOBODY CAN READ. Hundreds of rows
+    # rendered in full buried the sync state above them and the provisioning
+    # tokens below, on a page whose job is both. The roster has a page built
+    # for it, with search and filters; this one shows enough to see the sync
+    # is real and hands over.
+
+    @integration
+    Scenario: The list shows enough to see the sync is real, then hands over
+      Given the directory manages more people than the page shows
+      When "ana" reads the people the directory manages
+      Then she is shown the first of them and told how many there are
+      And she is offered the page that lists them all
 
     @integration
     Scenario: The people who arrived another way are not in that list

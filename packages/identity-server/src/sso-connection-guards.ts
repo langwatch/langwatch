@@ -54,10 +54,13 @@ import {
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   type SetArrivalPolicyCommandData,
+  type RenameConnectionCommandData,
   type RegisterConnectionCommandData,
   type RejectDomainClaimCommandData,
   type RequestTeardownCommandData,
@@ -224,6 +227,25 @@ const ALLOWED_FROM: Record<
   // TEARDOWN_PENDING: a connection on its way out admits nobody, and saying
   // otherwise would be a setting that does nothing.
   [SET_ARRIVAL_POLICY_COMMAND_TYPE]: ["VERIFIED", "ACTIVE", "SUSPENDED"],
+  // EVERY STATE A CONNECTION CAN BE READ IN, because a name decides nothing.
+  // The other verbs are narrow because each one changes who gets in and when
+  // that is safe; this one changes the word on a card. Refusing it anywhere
+  // the card still renders would leave an administrator looking at a name
+  // they cannot correct — including the two states where a wrong name is
+  // most likely to be noticed, a draft mid-setup and a connection on its way
+  // out. The terminal pair is left off because their cards are history, and
+  // editing history is a different act.
+  [RENAME_CONNECTION_COMMAND_TYPE]: [
+    "DRAFT",
+    "CLAIMED",
+    "APPROVED",
+    "REJECTED",
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+    "ACTIVE",
+    "SUSPENDED",
+    "TEARDOWN_PENDING",
+  ],
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -1186,6 +1208,36 @@ export class SsoConnectionGuards {
         data: {
           connectionId: data.connectionId,
           policy: data.policy,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * The word on the card, changed.
+   *
+   * NOTHING ELSE MOVES. A sign-in reaches this connection by its id, the
+   * engine's own row is keyed by that id, and every saved link keeps working
+   * — which is what makes this safe in states where no other change is.
+   *
+   * Renaming to the name it already has costs no fact: unlike the arrival
+   * policy, there is no "somebody has decided" for a name to be evidence of,
+   * so an identical rename is genuinely nothing happening.
+   */
+  async renameConnection(
+    data: RenameConnectionCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, RENAME_CONNECTION_COMMAND_TYPE);
+    const name = data.name.trim();
+    if (state.idpMetadata.providerId === name) return [];
+    return [
+      {
+        type: CONNECTION_RENAMED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          name,
           actor: data.actor,
           source: data.source,
         },

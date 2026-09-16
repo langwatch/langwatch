@@ -1,4 +1,5 @@
 import { declareAuthzMiddleware } from "@langwatch/authz";
+import { SsoTestArrivalCannotCreateOrganizationError } from "@langwatch/identity";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
@@ -9,7 +10,10 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { memberProvenance } from "~/server/app-layer/identity/runtime";
+import {
+  memberProvenance,
+  ssoTestArrival,
+} from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -100,6 +104,27 @@ export const organizationRouter = createTRPCRouter({
         "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
     })
     .mutation(async ({ input, ctx }) => {
+      // A TEST SIGN-IN IS NOT A SIGNUP, and this is the one door.
+      //
+      // Going live with single sign-on requires a test sign-in, and that
+      // sign-in necessarily happens before the connection is live — so it
+      // leaves somebody holding a session that belongs to no organization,
+      // which is exactly the condition the onboarding screen exists to
+      // resolve for a genuine new customer. Creating one here strands the
+      // real organization's setup inside a second, empty one.
+      //
+      // GUARDED HERE RATHER THAN IN ONBOARDING, because onboarding's own
+      // mutation delegates to this procedure: a check up there is one this
+      // call walks straight past.
+      const testArrival = await ssoTestArrival().standingFor({
+        userId: ctx.session.user.id,
+      });
+      if (testArrival) {
+        throw new SsoTestArrivalCannotCreateOrganizationError(
+          `session opened through connection ${testArrival.connectionId}, which is not live`,
+        );
+      }
+
       const result = await getApp().organizations.createAndAssign({
         userId: ctx.session.user.id,
         orgName: input.orgName,

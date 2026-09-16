@@ -1,6 +1,7 @@
 import { passkey } from "@better-auth/passkey";
 import { sso } from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
+import { createLogger } from "@langwatch/observability";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
@@ -11,13 +12,22 @@ import { passkeyRelyingParty } from "../passkeyRelyingParty";
 import type { ConfirmSignUpAddressContext } from "../sign-up-confirmation";
 import { signUpConfirmation } from "../sign-up-confirmation";
 
+const logger = createLogger("langwatch:better-auth:plugins");
+
 /** Whether a customer's identity provider may assert this address. */
 export interface SsoAssertionPort {
   decide(args: {
     providerId: string;
     accountId: string;
     email: string | null | undefined;
-  }): Promise<{ action: "continue" } | { action: "reject"; code: string }>;
+  }): Promise<
+    | { action: "continue" }
+    // The refusal states itself as a handled error rather than a bare code,
+    // so the one place that knows WHY also owns the stable code, the customer
+    // -safe message and the fault. This seam reads `code` off it and nothing
+    // else; see the translation in `resolveUser` for why it is never thrown.
+    | { action: "reject"; error: { code: string } }
+  >;
 }
 
 export interface SsoCallbackEvidencePort {
@@ -218,18 +228,55 @@ export function plugins({
        * lives here and not in a database hook.
        */
       resolveUser: async (input) => {
-        const decision = await ssoAssertion().decide({
-          providerId: input.providerId,
-          accountId: input.accountKey.accountId,
-          email: input.providerUser.email,
-        });
-        if (decision.action === "continue") {
-          ssoCallbackEvidence().recordAuthenticatedSsoAccount({
+        // WE LOG OUR OWN FAILURE, because nobody else will. The plugin wraps
+        // this call in a bare `catch {}` and answers
+        // `SSO_USER_RESOLUTION_FAILED` — it never inspects the error, never
+        // logs it, and never puts it anywhere a reader can reach. So a
+        // customer sees "something went wrong signing you in" and the only
+        // record of WHY is the exception object the plugin just discarded.
+        //
+        // The refusal itself is unchanged: this rethrows, so the plugin still
+        // answers exactly what it answered before. All that is added is that
+        // the cause survives.
+        try {
+          const decision = await ssoAssertion().decide({
             providerId: input.providerId,
-            providerAccountId: input.accountKey.accountId,
+            accountId: input.accountKey.accountId,
+            email: input.providerUser.email,
           });
+          if (decision.action === "continue") {
+            ssoCallbackEvidence().recordAuthenticatedSsoAccount({
+              providerId: input.providerId,
+              providerAccountId: input.accountKey.accountId,
+            });
+            return decision;
+          }
+
+          // The refusal, translated into the shape the plugin understands.
+          //
+          // RETURNED, NEVER THROWN, and that is the whole reason the gate
+          // states its refusals as handled errors instead of throwing them:
+          // `resolveSSOUser` wraps this callback in a bare `catch` and answers
+          // `SSO_USER_RESOLUTION_FAILED`, so a thrown handled error would be
+          // destroyed by the very mechanism it exists to survive. Returned,
+          // the plugin raises `APIError("FORBIDDEN")` carrying our code
+          // verbatim, and the code is what both the sign-in error screen and
+          // the single sign-on settings screen render their copy from.
+          return { action: "reject", code: decision.error.code } as const;
+        } catch (error) {
+          logger.error(
+            {
+              error,
+              providerId: input.providerId,
+              // The address is the one thing that makes a failed sign-in
+              // findable afterwards, and it is already ours — the person
+              // typed it at the provider and the provider handed it back.
+              email: input.providerUser.email,
+            },
+            "deciding whether a single sign-on account may be linked threw; the plugin will answer SSO_USER_RESOLUTION_FAILED and discard this error",
+          );
+          throw error;
         }
-        return decision;
       },
     }),
   ];

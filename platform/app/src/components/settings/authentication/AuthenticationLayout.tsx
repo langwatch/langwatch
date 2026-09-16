@@ -1,3 +1,4 @@
+import { Box } from "@chakra-ui/react";
 import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import type { PropsWithChildren } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -29,11 +30,20 @@ import { SectionNavigationFrame } from "~/components/ui/layouts/SectionNavigatio
  * is a sub-navigation within one settings entry, the shape `/ai-gateway`
  * and `/ops/event-sourcing` already established.
  *
+ * THE RAIL SITS ON THE EDGE AND THE READING COLUMN STAYS CENTRED. Inside
+ * the ordinary settings frame both are inside one centred 1280px column, so
+ * on a wide display the rail starts a couple of hundred pixels in from the
+ * panel it belongs to and reads as floating rather than as the page's own
+ * left-hand navigation. Taking the full width and centring the content
+ * column instead puts the rail where the eye looks for it without moving
+ * the words: the column it draws is the width the settings container gave
+ * it before, minus the rail it always sat beside.
+ *
  * Spec: specs/identity/org-access-cluster.feature
  */
 export function AuthenticationLayout({ children }: PropsWithChildren) {
   return (
-    <SettingsLayout>
+    <SettingsLayout fullBleed>
       <SectionNavigationFrame
         sectionLabel="Authentication"
         navigationItems={[
@@ -56,7 +66,9 @@ export function AuthenticationLayout({ children }: PropsWithChildren) {
           },
         ]}
       >
-        {children}
+        <Box maxWidth="1100px" width="full" marginInline="auto">
+          {children}
+        </Box>
       </SectionNavigationFrame>
     </SettingsLayout>
   );

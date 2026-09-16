@@ -29,6 +29,15 @@ const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth request hooks on this router's
+  // import graph (GAC-09). Locks nobody: these suites assert nothing about
+  // lock-out, and a mock that omits the export fails the whole file at
+  // collection rather than at an assertion.
+  signInLockout: () => ({
+    refuseIfLockedOut: async () => void 0,
+    recordFailure: async () => void 0,
+    recordSuccess: async () => void 0,
+  }),
   /**
    * The service is real code under test in its own suite; here it is a spy,
    * so these tests can say WHICH verb a procedure reached rather than what
@@ -257,6 +266,39 @@ describe("the back-office single sign-on surface", () => {
           targetId: "ssoc_1",
         }),
       );
+    });
+
+    /** @scenario "An operator reads a connection's history from the back office, gated like the rest of that surface" */
+    it("answers the history to an operator on the staff list, and the same not-found to anybody else", async () => {
+      // The same words the organization's own authentication page reads —
+      // this surface reads the connection's history, it does not write a
+      // second version of it.
+      const history = [
+        {
+          eventId: "evt_1",
+          occurredAtMs: 1_600_000_000_000,
+          summary: "The connection was registered",
+          carriedOver: false,
+        },
+      ];
+      mockService.getHistory.mockResolvedValue(history);
+
+      await expect(
+        buildCaller("olive@langwatch.ai").getHistory({
+          connectionId: "ssoc_1",
+        }),
+      ).resolves.toEqual(history);
+
+      // NOT_FOUND rather than FORBIDDEN, exactly as every other procedure on
+      // this surface answers: a reader outside the staff list cannot tell
+      // this surface apart from a path that was never registered.
+      await expect(
+        buildCaller("ana@acme.com").getHistory({ connectionId: "ssoc_1" }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+      // And the refused read never reached the service — the gate is in
+      // front of it, not a filter applied to what came back.
+      expect(mockService.getHistory).toHaveBeenCalledTimes(1);
     });
 
     it("keeps a rejection note out of the audit row", async () => {

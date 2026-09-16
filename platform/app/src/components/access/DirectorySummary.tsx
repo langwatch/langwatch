@@ -155,8 +155,26 @@ export function DirectorySummary({
               : formatTimeAgo(facts.lastPushedAtMs)}
           </Text>
         </Fact>
-        <Fact label="People it manages" icon={<Users size={14} />}>
-          <FactNumber>{facts.managedPeople}</FactNumber>
+        {/* THE DIRECTORY'S OWN COUNT, and deliberately not the membership's.
+            It is one of the sync facts, so it survives a membership read
+            this reader may not make or that simply failed — the tile three
+            along goes unavailable in both cases and this one must not follow
+            it down.
+
+            Which means it is NOT the complement of "members it does not
+            manage": that one counts current members, this one counts the
+            people the directory has a mapping for, and somebody an
+            administrator removed by hand is in the second and not the first.
+            The two are close enough to read as one sentence and are not one,
+            so each says which side it is counting from. */}
+        <Fact
+          label="People it manages"
+          hint="Counted from the directory itself, so it holds even when the membership cannot be read."
+          icon={<Users size={14} />}
+        >
+          <FactNumber data-testid="directory-managed-people">
+            {facts.managedPeople}
+          </FactNumber>
         </Fact>
         <Fact label="Groups it sent" icon={<Boxes size={14} />}>
           <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
@@ -165,7 +183,16 @@ export function DirectorySummary({
         </Fact>
         <Fact
           label="Members it does not manage"
-          hint="Invited by a colleague or admitted by a domain, so removing them from your directory will not remove them here."
+          // NAMES NO ROUTE, because it kept naming the wrong ones. It said
+          // "invited by a colleague or admitted by a domain", and on a real
+          // organization none of the three people it was describing had
+          // arrived either way: one was the founding administrator with a
+          // password, one arrived through single sign-on just-in-time, and
+          // one held no sign-in method at all. There are more ways in than a
+          // sentence can list, and the only thing an administrator needs
+          // from this number is what it means for the act they are about to
+          // perform — which is the half that was always true.
+          hint="Your directory did not create these accounts, so removing them there will not remove them here."
           icon={<UserX size={14} />}
         >
           <DirectoryFactUnavailable

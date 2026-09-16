@@ -46,6 +46,15 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth request hooks on this router's
+  // import graph (GAC-09). Locks nobody: these suites assert nothing about
+  // lock-out, and a mock that omits the export fails the whole file at
+  // collection rather than at an assertion.
+  signInLockout: () => ({
+    refuseIfLockedOut: async () => void 0,
+    recordFailure: async () => void 0,
+    recordSuccess: async () => void 0,
+  }),
   // Read at module load by the better-auth plugin list, which is on this
   // router's import graph. Off so the passkey ceremony is not mounted: this
   // suite asserts nothing about it, and a mock that omits the export fails

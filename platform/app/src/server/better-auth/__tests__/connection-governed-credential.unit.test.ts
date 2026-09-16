@@ -56,6 +56,14 @@ function hookOver({
     }),
     signInAfterPasswordReset: async () => {},
     addressRoutesToConnection: routesToConnection,
+    // Locks nobody, which is what every organization that has not set a
+    // threshold asks for — so these cases exercise the connection refusal
+    // and nothing else (GAC-09).
+    signInLockout: () => ({
+      refuseIfLockedOut: async () => {},
+      recordFailure: async () => {},
+      recordSuccess: async () => {},
+    }),
   });
   const before = hooks?.before;
   if (!before) throw new Error("no before hook was configured");

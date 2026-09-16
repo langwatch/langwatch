@@ -62,6 +62,8 @@ export interface SsoConnectionHistoryEntry {
   route: string | null;
   /** The arrival policy a `connection_arrival_policy_set` fact names. */
   policy: string | null;
+  /** The name a `connection_renamed` fact gives the connection. */
+  name: string | null;
   /** Free text an actor gave: a claim's rejection note, an attestation's
    *  note, or a suspend/teardown reason. Never a secret - these are the
    *  same words the connection's own projection already carries back to
@@ -89,6 +91,7 @@ interface SsoConnectionPayloadShape {
   method?: unknown;
   route?: unknown;
   policy?: unknown;
+  name?: unknown;
   note?: unknown;
   reason?: unknown;
   replacesConnectionId?: unknown;
@@ -148,6 +151,7 @@ function toHistoryEntry(event: SsoConnectionEvent): SsoConnectionHistoryEntry {
     method: text(data.method),
     route: text(data.route),
     policy: text(data.policy),
+    name: text(data.name),
     note: text(data.note) ?? text(data.reason),
     replacesConnectionId: text(data.replacesConnectionId),
   };

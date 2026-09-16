@@ -100,6 +100,39 @@ afterEach(() => cleanup());
 
 describe("given the people a directory manages", () => {
   describe("when the directory has provisioned some of the organization", () => {
+    /** @scenario "The list shows enough to see the sync is real, then hands over" */
+    it("shows the first of them, says how many there are, and offers the full page", () => {
+      // A directory that is working renders hundreds. Rendering them all
+      // buried the sync state above this list and the tokens below it.
+      state.members = Array.from({ length: 30 }, (_, index) => ({
+        userId: `user_${index}`,
+        role: "MEMBER",
+        disabledAt: null,
+        user: {
+          name: `Person ${index}`,
+          email: `person${index}@acme.com`,
+          image: null,
+          deactivatedAt: null,
+        },
+      }));
+      state.provenance = Object.fromEntries(
+        Array.from({ length: 30 }, (_, index) => [
+          `user_${index}`,
+          { source: "directory", connectionId: "conn_1" },
+        ]),
+      );
+
+      draw();
+
+      expect(screen.getAllByTestId("directory-managed-member")).toHaveLength(8);
+      const more = screen.getByTestId("directory-managed-more");
+      expect(more.textContent).toContain("30");
+      expect(within(more).getByRole("link")).toHaveAttribute(
+        "href",
+        "/settings/directory",
+      );
+    });
+
     /** @scenario "The people who arrived another way are not in that list" */
     it("names the ones it manages and leaves out the ones it does not", () => {
       draw();

@@ -21,8 +21,9 @@ import {
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
-import { auth } from "~/server/better-auth";
+import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
+import { withholdInternalSignInError } from "~/server/better-auth/signin-error-redirect";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 
@@ -209,7 +210,21 @@ const betterAuthCatchAll = async (c: Context) => {
   // registered code nor copy anybody wrote for a customer. This is where the
   // families we have translated join the handled-error contract; everything
   // else passes through byte for byte. See `better-auth/handled-errors.ts`.
-  return translateBetterAuthError({ response, path: c.req.path });
+  const answered = await translateBetterAuthError({
+    response,
+    path: c.req.path,
+  });
+  // AND THE SAME RULE FOR THE ANSWERS THAT ARE NOT BODIES. A sign-in that
+  // fails REDIRECTS, so its reason travels in a query string somebody can
+  // read, copy and paste into a ticket rather than in a body only code sees.
+  // The two are one doctrine — only a refusal we have written down crosses —
+  // applied to the two shapes an answer takes.
+  // See `better-auth/signin-error-redirect.ts`.
+  return withholdInternalSignInError({
+    response: answered,
+    errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+    traceId: c.get("traceId") as string | undefined,
+  });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

@@ -4,6 +4,11 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell } from "~/features/auth";
+import {
+  isStableAuthError,
+  normalizeErrorCode,
+} from "~/features/auth/logic/signInErrorCodes";
+import { explainHandledError } from "~/features/errors/logic/presentation";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { isSameOrigin, signIn, useSession } from "~/utils/auth-client";
@@ -12,65 +17,15 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
-/**
- * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
- * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow. Map
- * them back to the friendly uppercase codes this UI already handles, so
- * the same error page works for both the NextAuth-era codes we throw from
- * hooks and the BetterAuth-native ones coming out of the OAuth callback.
- *
- * Exported for unit testing.
+/*
+ * `normalizeErrorCode`, `STABLE_AUTH_ERRORS` and `isStableAuthError` moved to
+ * `~/features/auth/logic/signInErrorCodes` when the redirect boundary
+ * (specs/identity/sso-signin-error-boundary.feature) started needing them on
+ * the SERVER: the list of codes a screen has words for is the same list that
+ * decides which codes may travel in the address bar, and two copies of it
+ * would drift into a code that crosses with nothing to say about it. This
+ * page is a consumer of that list now, not its home.
  */
-export const normalizeErrorCode = (
-  error: string | null | undefined,
-): string | null => {
-  if (!error) return null;
-  if (
-    error === "email_doesn't_match" ||
-    error === "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
-  ) {
-    return "DIFFERENT_EMAIL_NOT_ALLOWED";
-  }
-  if (
-    error === "account_already_linked_to_different_user" ||
-    error === "account_not_linked" ||
-    error === "OAuthAccountNotLinked"
-  ) {
-    return "OAuthAccountNotLinked";
-  }
-  return error;
-};
-
-/**
- * Auth errors that represent a *stable* failure the user has to act on (wrong
- * sign-in method / account collision), not a transient glitch we can silently
- * retry. For these we must NOT auto-redirect back to the identity provider:
- * the IdP still holds a live session for the failing identity, so bouncing
- * straight back silently re-authenticates the same identity and traps the user
- * in a loop (the exact symptom behind the "stuck in the sign-in loop" report).
- * Recovery instead goes through a federated logout so the IdP session is
- * cleared first and the next attempt lets them pick a different method.
- *
- * Shared between this page and the sign-in page so the two auto-redirect gates
- * can never drift apart.
- */
-export const STABLE_AUTH_ERRORS = [
-  "OAuthAccountNotLinked",
-  "DIFFERENT_EMAIL_NOT_ALLOWED",
-  "SSO_PROVIDER_NOT_ALLOWED",
-  // Stable in the same sense as the three above: retrying the same way will
-  // fail the same way, because what has to change is a person's decision,
-  // not the attempt.
-  "LINK_NEEDS_APPROVAL",
-  // Stable only as a FALLBACK. The ordinary path for this code is the bounce
-  // below, which leaves before any timer runs; it reaches here when the
-  // refusal named no connection this page is willing to dial, and then the
-  // same button would be refused the same way.
-  "SSO_REQUIRED_BY_ORGANIZATION",
-] as const;
-
-export const isStableAuthError = (error: string | null | undefined): boolean =>
-  !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
 
 /**
  * A refusal that is a BOUNCE: somebody pressed a native social button, and
@@ -111,6 +66,46 @@ export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
  * never itself: `?error=` is caller-controlled, and echoing it made this
  * heading a place to put attacker-chosen words under LangWatch branding.
  */
+/**
+ * The words the presentation registry already holds for a code, when it holds
+ * any and when the code is one we admit.
+ *
+ * THE FIVE ASSERTION REFUSALS WERE CROSSING ON A PROMISE NOBODY KEPT.
+ * `signInErrorCodes.ts` admits `sso_sign_in_refused`,
+ * `sso_assertion_without_address`, `sso_setup_address_mismatch`,
+ * `sso_domain_not_verified` and `sso_domain_proof_lapsed` across the redirect
+ * boundary on the grounds that they are "codes a screen has written words
+ * for" — and every one of them fell through this file's default arm and read
+ * "Something went wrong signing you in". The words existed the whole time, in
+ * the registry, written with care; this page simply never looked.
+ *
+ * GATED ON THE ADMITTED SET, not on the registry alone. `?error=` is
+ * caller-controlled, so consulting the registry for ANY code would let
+ * somebody pick whichever of our sentences suited them and show it under a
+ * LangWatch heading. The codes the server boundary is willing to let travel
+ * are exactly the codes this page is willing to read copy for, which keeps
+ * one list in charge of both halves.
+ */
+function admittedCopyFor(
+  code: string,
+): { title: string; description: string } | null {
+  if (!isStableAuthError(code)) return null;
+  const explained = explainHandledError({
+    code,
+    meta: {},
+    httpStatus: 400,
+    fault: "customer",
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  });
+  // `isRegistered` is false for the humanised-code fallback, which is the
+  // degraded form and no better than the generic line below it.
+  if (!explained.isRegistered || !explained.description) return null;
+  return { title: explained.title, description: explained.description };
+}
+
 const errorTitle = (error: string): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
@@ -123,7 +118,9 @@ const errorTitle = (error: string): string => {
     case "LINK_NEEDS_APPROVAL":
       return "This sign-in method needs approval";
     default:
-      return "Something went wrong signing you in";
+      return (
+        admittedCopyFor(error)?.title ?? "Something went wrong signing you in"
+      );
   }
 };
 
@@ -268,6 +265,11 @@ export function SignInError({ error: rawError }: { error: string }) {
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const error = normalizeErrorCode(rawError) ?? rawError;
   const { prose, action } = recoveryFor({ error, callbackUrl });
+  // The handle on a cause we deliberately did not name. The boundary puts it
+  // here precisely because the reason itself is withheld — without it the
+  // person has nothing to quote and support has nothing to look up, which is
+  // what the old habit of pasting the whole URL was really for.
+  const trace = query?.get("trace") ?? null;
 
   return (
     <AuthCard title={errorTitle(error)}>
@@ -278,6 +280,16 @@ export function SignInError({ error: rawError }: { error: string }) {
         <RecoveryAction href={action.href} internal={action.internal}>
           {action.label}
         </RecoveryAction>
+        {trace && (
+          <Text
+            fontSize="11.5px"
+            color="fg.subtle"
+            fontFamily="mono"
+            data-testid="sign-in-error-trace"
+          >
+            Reference: {trace}
+          </Text>
+        )}
       </VStack>
     </AuthCard>
   );
@@ -358,7 +370,18 @@ function recoveryFor({
         ],
         action: signOutAndRetry,
       };
-    default:
+    default: {
+      // The refusals the boundary admits, in the words already written for
+      // them. Reached only for a code `isStableAuthError` allows, so the
+      // sentence is one of ours; the way out is the federated logout, because
+      // every one of these is stable in the sense that matters here — the
+      // identity provider still holds a live session, so pressing the same
+      // button re-authenticates the same identity and is refused the same
+      // way.
+      const admitted = admittedCopyFor(error);
+      if (admitted) {
+        return { prose: [admitted.description], action: signOutAndRetry };
+      }
       return {
         // NAMES THE BUTTON, not a redirect. `SignInError` is rendered from
         // inside the identifier-first screen for any unrecognised
@@ -375,6 +398,7 @@ function recoveryFor({
           label: "Try Sign In Again",
         },
       };
+    }
   }
 }
 

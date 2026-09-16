@@ -26,6 +26,7 @@ import {
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
@@ -90,7 +91,7 @@ function arrivalPolicyWords(policy: string | null): string {
  *  repeat. */
 type HistoryCopyFields = Pick<
   SsoConnectionHistoryEntry,
-  "domain" | "method" | "route" | "policy" | "note"
+  "domain" | "method" | "route" | "policy" | "note" | "name"
 >;
 
 /**
@@ -147,6 +148,10 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
   [CONNECTION_TORN_DOWN_EVENT_TYPE]: () => "The connection was removed",
   [CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE]: ({ policy }) =>
     `Who this connection admits was set to "${arrivalPolicyWords(policy)}"`,
+  // The new name and not the old one: the history is read top-down, so the
+  // line above already says what it was called before.
+  [CONNECTION_RENAMED_EVENT_TYPE]: ({ name }) =>
+    `The connection was renamed to "${name}"`,
 };
 
 function forDomain(domain: string | null): string {
@@ -165,7 +170,7 @@ function withNote(note: string | null): string {
 export function ssoConnectionHistoryCopy(
   entry: Pick<
     SsoConnectionHistoryEntry,
-    "type" | "domain" | "method" | "route" | "policy" | "note"
+    "type" | "domain" | "method" | "route" | "policy" | "note" | "name"
   >,
 ): string {
   const copy = HISTORY_COPY_BY_EVENT_TYPE[entry.type];

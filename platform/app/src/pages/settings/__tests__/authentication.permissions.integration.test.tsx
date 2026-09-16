@@ -47,17 +47,35 @@ const apiDouble = {
       setArrivals: mutationDouble(),
       discardConnection: mutationDouble(),
       removeConnection: mutationDouble(),
+      // The inline rename on the connection card. Absent here, the card threw
+      // on render and took both permission assertions with it.
+      rename: mutationDouble(),
       breakGlassBindings: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
       breakGlassCandidates: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      // The event log, which is offered to whoever may MANAGE single sign-on
+      // and withheld from whoever may only see it — so it renders in exactly
+      // one of this file's two cases.
+      getHistory: {
+        useQuery: () => ({
+          data: [],
+          isLoading: false,
+          isError: false,
+          error: null,
+        }),
+      },
+      onHistoryActivity: {},
     },
     useUtils: () => ({
       ssoSetup: {
         getSetup: { invalidate: vi.fn() },
         breakGlassBindings: { invalidate: vi.fn() },
+        // A rename invalidates the history beside it, which is stale the
+        // moment the name changes.
+        getHistory: { invalidate: vi.fn() },
       },
     }),
   },
@@ -65,12 +83,21 @@ const apiDouble = {
 
 /** The test sign-in leaves the page for the identity provider, which jsdom
  *  has none of. The button's presence is what this file is about. */
-vi.mock("~/utils/auth-client", () => ({
+// `useSession` as well as the client: the test sign-in step reads the
+// reader's own address to say which one this connection will accept while it
+// is being set up, and a mock without it throws before either permission
+// assertion is reached.
+const authClientDouble = {
   authClient: { signIn: { sso: vi.fn() } },
+  useSession: () => ({ data: null }),
+  signIn: vi.fn(),
+  isSameOrigin: () => false,
+};
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => undefined,
 }));
-vi.mock("../../../utils/auth-client", () => ({
-  authClient: { signIn: { sso: vi.fn() } },
-}));
+vi.mock("~/utils/auth-client", () => authClientDouble);
+vi.mock("../../../utils/auth-client", () => authClientDouble);
 
 const hookDouble = {
   useOrganizationTeamProject: mockUseOrganizationTeamProject,

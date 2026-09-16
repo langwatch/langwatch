@@ -123,6 +123,11 @@ describe("given a connection with a history of facts", () => {
             "domain",
             "eventId",
             "method",
+            // The connection's own display name, carried by the rename fact.
+            // Structural in the sense this test means: a label the customer
+            // chose and reads on the card above this panel, not a scrap of
+            // the raw event payload.
+            "name",
             "note",
             "occurredAtMs",
             "policy",

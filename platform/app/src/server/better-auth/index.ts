@@ -21,6 +21,7 @@ import {
   sessionCallbackEvidence,
   sessionClaims,
   sessionRevocation,
+  signInLockout,
   signUpConfirmationEndpoint,
   ssoAssertion,
   ssoRegisteredIssuers,
@@ -55,6 +56,17 @@ const isBuildTime = !!process.env.BUILD_TIME;
  * whether it is counting in a shared store or in this pod's memory.
  */
 const store = secondaryStorage(composeSecondaryStorage());
+
+/**
+ * Where a failed sign-in is sent.
+ *
+ * Named once and exported because two places have to agree about it: this is
+ * what better-auth appends its code and its prose to, and it is what the
+ * boundary in `signin-error-redirect.ts` recognises on the way back out. A
+ * second copy of the string would let a redirect start slipping past the
+ * boundary the moment either moved.
+ */
+export const SIGN_IN_ERROR_PAGE_URL = `${env.NEXTAUTH_URL}/auth/error`;
 
 export const auth = betterAuth({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
@@ -149,7 +161,7 @@ export const auth = betterAuth({
    * intentional — `c.redirect` honors it at the response level.
    */
   onAPIError: {
-    errorURL: `${env.NEXTAUTH_URL}/auth/error`,
+    errorURL: SIGN_IN_ERROR_PAGE_URL,
   },
 
   ...models(),
@@ -203,6 +215,7 @@ export const auth = betterAuth({
     signInAfterPasswordReset: (ctx) =>
       passwordResetSessionBridge().signInAfterPasswordReset(ctx),
     addressRoutesToConnection,
+    signInLockout,
   }),
 });
 

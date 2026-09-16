@@ -23,6 +23,7 @@ import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import {
+  breakGlassIsLive,
   normalizeIdentifierValue,
   type SignInMethod,
   type SignInRoutingReasonCode,
@@ -116,6 +117,7 @@ import {
   BetterAuthOperatorSessions,
   InviteServiceOperatorInvitations,
 } from "./identity-lookup-adapters";
+import { postgresTransactionOver } from "./identity-storage-transaction.adapter";
 import {
   EmailJoinRequestNotifier,
   PrismaJoinMembership,
@@ -187,6 +189,7 @@ import { PrismaSsoConnectionRegistrationRepository } from "./repositories/sso-co
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
 import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
+import { PrismaSsoTestArrivalAccountsRepository } from "./repositories/sso-test-arrival.prisma.repository";
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
 import { PrismaSsoMigrationFinalizationRepository } from "./repositories/sso-migration-finalization.prisma.repository";
 import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
@@ -206,9 +209,25 @@ import {
   RedisSessionRevocationCache,
   VerifiedCallbackProviderAssertions,
 } from "./session-adapters";
+import { SessionBoundService } from "./session-bound.service";
 import { SessionClaimsService } from "./session-claims.service";
 import { SessionInventoryService } from "./session-inventory.service";
 import { SessionRevocationService } from "./session-revocation.service";
+import { SignInLockoutService } from "./sign-in-lockout.service";
+import {
+  AuditLogLockoutEvidence,
+  AuditLogSignInSecurityReleaseEvidence,
+  keyedIdentifierHasher,
+  PrismaLockoutIdentity,
+  PrismaLockoutPolicies,
+  PrismaLockoutState,
+  PrismaOrganizationMembership,
+  PrismaOrganizationSessions,
+  PrismaSessionActivity,
+  PrismaSessionBoundPolicies,
+  PrismaSignInSecuritySettings,
+  RevocationSessionEnd,
+} from "./sign-in-security-adapters";
 import { SignUpHealthService } from "./sign-up-health.service";
 import { SignUpIdentifierService } from "./sign-up-identifier";
 import { ProjectionSignInAccountLookup } from "./signin-account-lookup";
@@ -221,6 +240,7 @@ import {
 import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { SsoArrivalService } from "./sso-arrival.service";
+import { SsoTestArrivalService } from "./sso-test-arrival.service";
 import { SsoAssertionService } from "./sso-assertion.service";
 import { SsoConnectionBackofficeService } from "./sso-connection-backoffice.service";
 import { SsoConnectionHistoryService } from "./sso-connection-history.service";
@@ -1196,6 +1216,78 @@ export function ssoConnectionBackoffice(): SsoConnectionBackofficeService {
 }
 
 /**
+ * The two sign-in security rules an organization can set: locking an account
+ * after repeated failures (GAC-09) and bounding how long a browser session
+ * lasts (GAC-10).
+ *
+ * The two policy adapters are HELD rather than built per call, which is the
+ * one thing this composition has to get right. Each keeps the
+ * installation-wide answer - "has anybody here set one of these at all" - for
+ * thirty seconds, and that answer is the early-out that keeps both features
+ * off the hot path entirely on a deployment that has not turned them on.
+ * Rebuilding the adapter per call would throw the answer away every time and
+ * turn the cheap question into a query per sign-in and per authenticated
+ * request.
+ */
+const lockoutPolicies = new PrismaLockoutPolicies(prisma);
+const sessionBoundPolicies = new PrismaSessionBoundPolicies(prisma);
+
+/** Forgets both cached installation-wide answers, for a save that changed one. */
+export function forgetSignInSecurityPolicies(): void {
+  lockoutPolicies.forget();
+  sessionBoundPolicies.forget();
+}
+
+export function signInLockout(): SignInLockoutService {
+  return new SignInLockoutService({
+    state: new PrismaLockoutState(prisma),
+    policy: lockoutPolicies,
+    identity: new PrismaLockoutIdentity(prisma),
+    evidence: new AuditLogLockoutEvidence(prisma),
+    // Stated once, here, like every other environment read this root owns.
+    hashIdentifier: keyedIdentifierHasher(env.NEXTAUTH_SECRET),
+    now: () => new Date(),
+  });
+}
+
+export function sessionBound(): SessionBoundService {
+  return new SessionBoundService({
+    policy: sessionBoundPolicies,
+    activity: new PrismaSessionActivity(prisma),
+    // Through the revocation service rather than a delete, because the row is
+    // only half of a session — the cached copy would keep answering for up to
+    // thirty days, and a session refused in one place and honoured in another
+    // has not ended.
+    ending: new RevocationSessionEnd(() => sessionRevocation()),
+    now: () => new Date(),
+  });
+}
+
+/**
+ * The sign-in security SETTINGS surface's four stores (`signInSecurity.ts`),
+ * distinct from `lockoutPolicies` / `sessionBoundPolicies` above: those
+ * answer the strictest rule across an installation or a person's
+ * memberships, and these answer one organization's own saved values, its
+ * members' sessions, its membership, and where a release is put on the
+ * record. Composed per call like every other write surface here.
+ */
+export function signInSecuritySettings(): PrismaSignInSecuritySettings {
+  return new PrismaSignInSecuritySettings(prisma);
+}
+
+export function signInSecuritySessions(): PrismaOrganizationSessions {
+  return new PrismaOrganizationSessions(prisma);
+}
+
+export function signInSecurityMembership(): PrismaOrganizationMembership {
+  return new PrismaOrganizationMembership(prisma);
+}
+
+export function signInSecurityReleaseEvidence(): AuditLogSignInSecurityReleaseEvidence {
+  return new AuditLogSignInSecurityReleaseEvidence(prisma);
+}
+
+/**
  * A connection's raw event history (ADR-117 SS5, D04) — the log itself,
  * read as a sequence. Both the organization's own authentication page and
  * the back office read through this one factory; only the caller and its
@@ -1293,6 +1385,12 @@ export function identityAddressLockReaper(): IdentityAddressLockReaperService {
  */
 const identityStorage = createIdentityStorageAdapter({
   legacyEngine: prismaAdapter(prisma, { provider: "postgresql" }),
+  // The adapter's one real transaction, which `@better-auth/sso` requires
+  // before it will resolve a user at all. It lives in its own adapter file
+  // rather than inline here because opening a transaction is a query, and
+  // this composition root is explicitly not exempt from that rule — see the
+  // file's own docblock for what the transaction does and does not span.
+  postgresTransaction: postgresTransactionOver(prisma),
   passkeyRemoval: PrismaPasskeyRemovalRepository.create({
     prisma,
     routesToIdentity: routesToIdentityBranch,
@@ -1510,6 +1608,20 @@ export function ssoAssertion(): SsoAssertionService {
   return new SsoAssertionService({
     connections: new PrismaSsoConnectionReadRepository(prisma),
     memberships: new PrismaSsoMembershipRepository(prisma),
+    breakGlass: {
+      // Asked only for a connection that is not live yet and has proved the
+      // asserted domain, so this read never happens on an ordinary sign-in.
+      // `breakGlassIsLive` is the same predicate activation counts with, so
+      // the gate and the go-live checklist cannot disagree about whether a
+      // way back in exists.
+      hasLiveBreakGlass: async ({ organizationId }) => {
+        const bindings = await new PrismaSsoBreakGlassRepository(
+          prisma,
+        ).findAllForOrganization({ organizationId });
+        const nowMs = Date.now();
+        return bindings.some((binding) => breakGlassIsLive({ binding, nowMs }));
+      },
+    },
   });
 }
 
@@ -1522,6 +1634,23 @@ export function ssoAssertion(): SsoAssertionService {
  * rather than captured: both resolve the pipeline handle when they run, so a
  * service composed before the App exists still appends once one does.
  */
+/**
+ * Where a pre-activation arrival stands — the administrator's own test
+ * sign-in, on every setup there has ever been.
+ *
+ * Reads only. It shares the connection and membership repositories with
+ * `ssoArrival()` on purpose: the two answer the same question from opposite
+ * ends, and a separate reading of "live" or "member" is how they would come
+ * to disagree about who is stranded.
+ */
+export function ssoTestArrival(): SsoTestArrivalService {
+  return new SsoTestArrivalService({
+    accounts: new PrismaSsoTestArrivalAccountsRepository(prisma),
+    connections: new PrismaSsoConnectionReadRepository(prisma),
+    memberships: new PrismaSsoMembershipRepository(prisma),
+  });
+}
+
 export function ssoArrival(): SsoArrivalService {
   return new SsoArrivalService({
     connections: new PrismaSsoConnectionReadRepository(prisma),

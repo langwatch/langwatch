@@ -27,6 +27,8 @@ const {
   hasPermissionMock,
   ssoSignInMock,
   activateMock,
+  invalidateSetupMock,
+  invalidateScimMock,
   grantMock,
   renewMock,
 } = vi.hoisted(() => ({
@@ -36,6 +38,8 @@ const {
   hasPermissionMock: vi.fn(),
   ssoSignInMock: vi.fn(),
   activateMock: vi.fn(),
+  invalidateSetupMock: vi.fn(),
+  invalidateScimMock: vi.fn(),
   grantMock: vi.fn(),
   renewMock: vi.fn(),
 }));
@@ -46,6 +50,9 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("../../../utils/auth-client", () => ({
   authClient: { signIn: { sso: ssoSignInMock } },
+  // The test sign-in names the reader's own address in the copy for one of
+  // our own refusals, so the hook reads the session.
+  useSession: () => ({ data: { user: { email: "admin@acme.test" } } }),
 }));
 
 vi.mock("../../../utils/api", () => {
@@ -76,6 +83,8 @@ vi.mock("../../../utils/api", () => {
         claimDomain: idle(),
         removeDomain: idle(),
         activate: mutation(activateMock),
+        // The name on the summary card is editable in place now.
+        rename: mutation(vi.fn()),
         grantBreakGlass: mutation(grantMock),
         renewBreakGlass: mutation(renewMock),
         revokeBreakGlass: idle(),
@@ -102,10 +111,13 @@ vi.mock("../../../utils/api", () => {
       },
       useUtils: () => ({
         ssoSetup: {
-          getSetup: { invalidate: vi.fn() },
+          getSetup: { invalidate: invalidateSetupMock },
           getHistory: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
+        // What going live has to refresh besides its own screen: the token
+        // dialog on the next page decides what to offer from this read.
+        scimReconciliation: { invalidate: invalidateScimMock },
       }),
     },
   };
@@ -299,6 +311,25 @@ describe("given an administrator whose identity provider is registered", () => {
       expect.anything(),
     );
   });
+
+  /** @scenario "A connection just turned on can carry a provisioning token without a reload" */
+  it("refreshes what the provisioning step reads, not only its own screen", async () => {
+    setupRef.current = setupWith({ goLive: EVERYTHING_DONE });
+
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^go live$/i }));
+
+    // The success path is the thing under test: the dialog that issues a
+    // token lives on another page and decides what to offer from the
+    // reconciliation read, which sits behind a stale window. Without this it
+    // said no connection was live yet, about the one just turned on.
+    const onSuccess = activateMock.mock.calls.at(-1)?.[1]?.onSuccess;
+    expect(onSuccess).toBeTypeOf("function");
+    await onSuccess();
+
+    expect(invalidateSetupMock).toHaveBeenCalled();
+    expect(invalidateScimMock).toHaveBeenCalled();
+  });
 });
 
 describe("given the ways back in an organization holds", () => {
@@ -367,9 +398,13 @@ describe("given the ways back in an organization holds", () => {
       expect.objectContaining({
         organizationId: "org_acme",
         userId: "user_ben",
-        // The END of the day they picked: a grant that stopped working just
-        // after midnight would end a day before the date it says.
-        expiresAtMs: new Date("2026-12-31T23:59:59.999Z").getTime(),
+        // The END of the day they picked, IN THE READER'S OWN TIMEZONE. A
+        // grant that stopped working just after midnight would end a day
+        // before the date it says; one built through UTC lands on the wrong
+        // day entirely for anybody east of it, which is what this used to
+        // assert. Constructed rather than written as a literal, because a
+        // literal `…T23:59:59.999Z` IS the bug.
+        expiresAtMs: new Date(2026, 11, 31, 23, 59, 59, 999).getTime(),
       }),
       expect.anything(),
     );
@@ -406,7 +441,7 @@ describe("given the ways back in an organization holds", () => {
       expect.objectContaining({
         organizationId: "org_acme",
         bindingId: "bgb_1",
-        expiresAtMs: new Date("2026-12-31T23:59:59.999Z").getTime(),
+        expiresAtMs: new Date(2026, 11, 31, 23, 59, 59, 999).getTime(),
       }),
       expect.anything(),
     );

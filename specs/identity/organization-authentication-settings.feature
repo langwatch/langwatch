@@ -118,7 +118,9 @@ Feature: Organization authentication settings
     Scenario: The page points at where the reader's own sign-in lives
       Given "acme" has a live connection
       When "ana" opens the authentication page
-      Then it says her own passkeys and linked accounts are on her profile
+      Then it says her own passkeys and linked accounts are in her security
+      settings
+      And it takes her straight there rather than by way of another page
 
   Rule: an organization that cannot set it up still reads the page
 

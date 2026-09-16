@@ -81,6 +81,11 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "databaseHooks",
     "deploymentIsFederationCapable",
     "resolveSignInMethodPolicy",
+    // GAC-09. Read at module load by the better-auth request hooks, which
+    // are on this router's import graph. `inert` answers with an empty
+    // object, and the hook only calls its members on a credential path no
+    // suite here takes.
+    "signInLockout",
   ];
   return {
     ...Object.fromEntries(factories.map((name) => [name, inert])),

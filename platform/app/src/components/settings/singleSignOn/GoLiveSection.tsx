@@ -109,6 +109,16 @@ export function GoLiveSection({
                 {
                   onSuccess: async () => {
                     await utils.ssoSetup.getSetup.invalidate();
+                    // THE NEXT STEP READS A DIFFERENT QUERY ON A DIFFERENT
+                    // PAGE. Turning the connection on is precisely what makes
+                    // it able to carry a provisioning token, and the token
+                    // dialog decides what to offer from the reconciliation
+                    // read — which this page never touched. Behind the
+                    // thirty-second stale window that left the dialog saying
+                    // "no single sign-on connection is live yet" about the
+                    // connection just turned on, with a page reload as the
+                    // only way forward.
+                    await utils.scimReconciliation.invalidate();
                   },
                   onError: reportRefusal,
                 },

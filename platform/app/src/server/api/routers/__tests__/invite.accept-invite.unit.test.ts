@@ -60,6 +60,15 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth request hooks on this router's
+  // import graph (GAC-09). Locks nobody: these suites assert nothing about
+  // lock-out, and a mock that omits the export fails the whole file at
+  // collection rather than at an assertion.
+  signInLockout: () => ({
+    refuseIfLockedOut: async () => void 0,
+    recordFailure: async () => void 0,
+    recordSuccess: async () => void 0,
+  }),
   clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
   // The credential boundary asks this before it lets a password through; no

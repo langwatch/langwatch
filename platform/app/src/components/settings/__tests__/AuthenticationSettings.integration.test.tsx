@@ -45,6 +45,15 @@ const mutationDouble = () => ({
 
 const apiDouble = {
   api: {
+    // The organization's two sign-in security rules (GAC-09, GAC-10). This
+    // page renders their card, so the read has to answer even in the cases
+    // that are about something else entirely.
+    signInSecurity: {
+      get: {
+        useQuery: () => ({ data: undefined, isLoading: false, error: null }),
+      },
+      save: mutationDouble(),
+    },
     ssoSetup: {
       getSetup: { useQuery: mockGetSetup },
       register: mutationDouble(),
@@ -53,6 +62,8 @@ const apiDouble = {
       proveDomain: mutationDouble(),
       checkDomainRecord: mutationDouble(),
       activate: mutationDouble(),
+      // The name on the summary card is editable in place now.
+      rename: mutationDouble(),
       grantBreakGlass: mutationDouble(),
       renewBreakGlass: mutationDouble(),
       revokeBreakGlass: mutationDouble(),
@@ -100,6 +111,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => hookDouble);
 vi.mock("~/utils/api", () => apiDouble);
 vi.mock("~/utils/auth-client", () => ({
   authClient: { signIn: { sso: mockSignInSso } },
+  // The test sign-in names the reader's own address in one of its refusals,
+  // so the hook reads the session.
+  useSession: () => ({ data: { user: { email: "ana@acme.com" } } }),
 }));
 
 // The two rules that arrived from the page called Access. Each is covered
@@ -460,13 +474,14 @@ describe("the organization's authentication page", () => {
     });
 
     /** @scenario "The page points at where the reader's own sign-in lives" */
-    it("points at the reader's own profile for their personal sign-in", async () => {
+    it("points at the reader's own security settings, where both actually live", async () => {
       await open();
 
-      expect(screen.getByText(/your profile/i).closest("a")).toHaveAttribute(
-        "href",
-        "/settings/profile",
-      );
+      // Not profile: it renders a summary that points onward to security,
+      // so sending them there made this a hop to another link.
+      expect(
+        screen.getByText(/your security settings/i).closest("a"),
+      ).toHaveAttribute("href", "/settings/security");
     });
 
     /** @scenario "Managing a live connection stays on the same page" */
@@ -543,10 +558,9 @@ describe("the organization's authentication page", () => {
       expect(preview.textContent).toMatch(/identity provider/i);
       expect(preview.textContent).toMatch(/domain you prove/i);
       expect(screen.getByTestId("directory-card")).toBeTruthy();
-      expect(screen.getByText(/your profile/i).closest("a")).toHaveAttribute(
-        "href",
-        "/settings/profile",
-      );
+      expect(
+        screen.getByText(/your security settings/i).closest("a"),
+      ).toHaveAttribute("href", "/settings/security");
     });
 
     /** @scenario "Nothing is offered that would be refused" */

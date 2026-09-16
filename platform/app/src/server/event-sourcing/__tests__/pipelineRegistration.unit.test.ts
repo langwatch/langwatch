@@ -102,6 +102,31 @@ describe("PipelineRegistry.registerAll", () => {
       it("mounts the GitHub branch recheck and retention sweep", () => {
         expect(registeredPipelineNames()).toContain("github_maintenance");
       });
+
+      /**
+       * Moved off a `setTimeout` chain with no leader election (every replica
+       * warned the same binding). An unmounted sweep leaves nobody warned that
+       * a way back in is ending.
+       */
+      it("mounts the break-glass expiry warning sweep", () => {
+        expect(registeredPipelineNames()).toContain("break_glass_maintenance");
+      });
+
+      /** Same move, same guard: an unmounted sweep leaves a domain vouching
+       *  forever once its published proof goes missing. */
+      it("mounts the SSO domain re-proof sweep", () => {
+        expect(registeredPipelineNames()).toContain(
+          "sso_domain_reproof_maintenance",
+        );
+      });
+
+      /** Same move, same guard: the table is operational evidence with a
+       *  retention window, and an unmounted sweep never enforces it. */
+      it("mounts the SCIM request log retention sweep", () => {
+        expect(registeredPipelineNames()).toContain(
+          "scim_request_log_maintenance",
+        );
+      });
     });
   });
 });

@@ -85,6 +85,7 @@ import { secretsRouter } from "./routers/secrets";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
+import { signInSecurityRouter } from "./routers/signInSecurity";
 import { spansRouter } from "./routers/spans";
 import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { ssoSetupRouter } from "./routers/ssoSetup";
@@ -111,6 +112,7 @@ const coreRouters = {
   invite: inviteRouter,
   joinRequests: joinRequestsRouter,
   twoStepVerification: twoStepVerificationRouter,
+  signInSecurity: signInSecurityRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,

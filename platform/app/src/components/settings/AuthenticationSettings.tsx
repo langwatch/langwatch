@@ -32,10 +32,13 @@ import { AvailabilityRefusalNotice } from "./singleSignOn/refusals";
  * Answering somebody's navigation click with nothing but "you can't use this"
  * teaches them neither what the feature is nor what their organization does.
  *
- * WHAT IS NOT HERE. Requiring single sign-on of everybody, a password
- * fallback, and browser session lifetimes are all things this organization
- * cannot actually set, so the page says nothing about them. A frame drawn
- * around a setting that does not exist is a promise the product has not made.
+ * WHAT IS NOT HERE. Requiring single sign-on of everybody and a password
+ * fallback are things this organization cannot actually set, so the page
+ * says nothing about them. A frame drawn around a setting that does not
+ * exist is a promise the product has not made. Locking accounts after
+ * repeated failures and bounding a browser session's lifetime (GAC-09,
+ * GAC-10) moved the other way — they are real settings now, in the sign-in
+ * security card below the pair.
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
@@ -92,6 +95,12 @@ export function AuthenticationSettings({
         organizationId={organizationId}
         canManage={canReadMembership}
         ssoLive={connection?.state === "ACTIVE"}
+        // Held back only while a connection EXISTS and is not live yet —
+        // never on an organization that has no connection at all. These
+        // rules govern the people who arrive without single sign-on, so
+        // greying them for an organization that does not federate would
+        // withhold them from the only population they apply to.
+        awaitingConnection={connection != null && connection.state !== "ACTIVE"}
       />
 
       <PersonalMethodsFooter />
@@ -107,12 +116,17 @@ export function AuthenticationSettings({
  * reader's head, so the organization's page ends by pointing at the personal
  * one rather than leaving somebody hunting for their passkeys under a heading
  * about identity providers.
+ *
+ * AT SECURITY, NOT PROFILE. Both of the things this sentence names —
+ * passkeys and linked accounts — are rendered by `/settings/security`;
+ * profile carries only a summary that points onward to it. Sending the
+ * reader to profile made the one link on the page a hop to another link.
  */
 function PersonalMethodsFooter() {
   return (
     <Text fontSize="sm" color="fg.muted">
       Looking for your own passkeys and linked accounts? Those are personal and
-      live on <Link href="/settings/profile">your profile</Link>.
+      live in <Link href="/settings/security">your security settings</Link>.
     </Text>
   );
 }

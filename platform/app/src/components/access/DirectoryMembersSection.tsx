@@ -1,10 +1,15 @@
 import { Heading, Spinner, Text, VStack } from "@chakra-ui/react";
 import { orgRoleOptions } from "~/components/settings/OrganizationUserRoleField";
+import { Link } from "~/components/ui/link";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import { IdentityChip, IdentityRow, IdentityRowList } from "./IdentityRow";
 import { ProvenanceChip } from "./ProvenanceChip";
+
+/** How many of the directory's people this page shows before handing over to
+ *  the one built for the roster. Enough to see the sync is real. */
+const MANAGED_SHOWN = 8;
 
 /**
  * The people the directory actually put here, named.
@@ -81,7 +86,7 @@ export function DirectoryMembersSection({
           data-testid="directory-managed-members"
           empty={emptyWord({ memberCount: members.length })}
         >
-          {managed.map((member) => (
+          {managed.slice(0, MANAGED_SHOWN).map((member) => (
             <IdentityRow
               key={member.userId}
               id={member.userId}
@@ -105,6 +110,24 @@ export function DirectoryMembersSection({
             />
           ))}
         </IdentityRowList>
+      )}
+
+      {/* THE REST ARE NOT HIDDEN, they are somewhere better. A directory that
+          is working renders hundreds of rows here, and this page is about
+          whether the sync is working rather than about who is in the
+          organization — the list was long enough to bury everything under it,
+          including the tokens the page exists to issue. The Directory page is
+          the one built for the roster, with its own search and filters. */}
+      {managed.length > MANAGED_SHOWN && (
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          data-testid="directory-managed-more"
+        >
+          Showing {MANAGED_SHOWN} of {managed.length}.{" "}
+          <Link href="/settings/directory">See everyone in your directory</Link>
+          .
+        </Text>
       )}
     </VStack>
   );

@@ -85,6 +85,12 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Where a single sign-on test lands: the tester holds a session the
+  // connection has not admitted, so the orgless bootstrap is the wrong answer.
+  {
+    path: "/auth/sso-test-complete",
+    ...page(() => import("./pages/auth/sso-test-complete")),
+  },
   // Join before create (ADR-117 §6): a new account passes through here on its
   // way to making an organization. Renders nothing until D12 fills it.
   { path: "/auth/join", ...page(() => import("./pages/auth/join")) },

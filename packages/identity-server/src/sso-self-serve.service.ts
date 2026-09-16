@@ -857,6 +857,32 @@ export class SsoSelfServeService {
   }
 
   /**
+   * The word on the card.
+   *
+   * Availability is NOT required, unlike every other change here. Renaming
+   * decides nothing about who gets in, and an organization whose plan lapsed
+   * still reads these cards — leaving them looking at a name they cannot
+   * correct would be a refusal that protects nothing.
+   */
+  async rename({
+    organizationId,
+    connectionId,
+    name,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    name: string;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.connections().renameConnection({
+      ...this.command({ organizationId, connectionId, actor }),
+      name,
+    });
+  }
+
+  /**
    * Every way back in this organization has held, with who holds it.
    *
    * NOT gated on availability, and deliberately so. Registering a provider

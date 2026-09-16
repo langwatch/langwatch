@@ -379,3 +379,57 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the connection is not registered
     And nothing in the answer describes our network back to them
 
+
+  # ---------------------------------------------------------------------
+  # What it is called
+  # ---------------------------------------------------------------------
+
+  # A NAME AND NOT AN IDENTIFIER, which the engine's own row already said: a
+  # sign-in reaches a connection by its CONNECTION ID, deliberately, so that
+  # two organizations can both call theirs "okta". Nothing routes on the name,
+  # nothing is keyed by it, and no saved link breaks when it changes.
+  #
+  # It was only ever collected as "provider id" at registration, and a screen
+  # showing "identity provider: lw" beside an unchangeable value made a label
+  # look like a key nobody had better touch. So it has a verb of its own, and
+  # the verb is allowed where the others are not: every other change to a
+  # connection decides who gets in, and this one decides nothing.
+
+  @unit
+  Scenario: Renaming a connection changes the name and nothing else
+    Given a connection an organization has registered
+    When an administrator gives it another name
+    Then the connection answers to the new name
+    And its identifier is unchanged
+    And who it admits is unchanged
+
+  @unit
+  Scenario: Renaming it to what it is already called is not an event
+    Given a connection an organization has registered
+    When an administrator saves the name it already has
+    Then nothing is recorded
+
+  @unit
+  Scenario: A name is required
+    Given a connection an organization has registered
+    When an administrator saves a blank name
+    Then it is refused
+
+  @unit
+  Scenario: A connection can be renamed while it is still being set up
+    Given a connection that is not live yet
+    When an administrator gives it another name
+    Then the connection answers to the new name
+
+  @unit
+  Scenario: The rename is on the connection's own history
+    Given an administrator has renamed a connection
+    When the connection's history is read
+    Then it says what the connection was renamed to
+
+  @integration
+  Scenario: The name is offered for editing on the connection's card
+    Given an administrator who may manage single sign-on
+    When they open their connection
+    Then the name is offered for editing in place
+    And a reader who may not manage it is offered no way to change it

@@ -1,4 +1,8 @@
 import {
+  endOfLocalDay,
+  localIsoDateInDays,
+} from "~/features/sso/logic/breakGlassDates";
+import {
   Button,
   HStack,
   Input,
@@ -10,6 +14,7 @@ import {
 import { BREAK_GLASS_MAX_WINDOW_DAYS } from "@langwatch/identity";
 import type { SelfServeBreakGlassBindingView } from "@langwatch/identity-server";
 import { useState } from "react";
+import { SsoSettingsTable } from "~/features/sso/components/SsoSettingsTable";
 import { api } from "../../../utils/api";
 import { SettingsRowsSkeleton } from "../kit/SettingsSkeleton";
 import { LoadFailure, reportRefusal } from "./refusals";
@@ -74,9 +79,9 @@ export function BreakGlassSection({
           Nobody can get in without your identity provider yet.
         </Text>
       ) : (
-        // Hairlines, not a filled band — the same table the domains two
-        // steps up wear, so the two read as one screen rather than two.
-        <Table.Root size="sm" variant="line">
+        // Literally the same frame the domains table two steps up wears, so
+        // the two read as one screen rather than two.
+        <SsoSettingsTable>
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Who</Table.ColumnHeader>
@@ -96,7 +101,7 @@ export function BreakGlassSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </SsoSettingsTable>
       )}
 
       {canManage &&
@@ -116,7 +121,7 @@ export function BreakGlassSection({
               pending={grant.isPending}
               onGrant={() =>
                 grant.mutate(
-                  { organizationId, userId, expiresAtMs: endOfDay(endsOn) },
+                  { organizationId, userId, expiresAtMs: endOfLocalDay(endsOn) },
                   {
                     onSuccess: () => {
                       setUserId("");
@@ -184,8 +189,8 @@ function GrantForm({
         type="date"
         value={endsOn}
         aria-label="Until"
-        min={isoDateInDays(1)}
-        max={isoDateInDays(BREAK_GLASS_LAST_OFFERED_DAYS)}
+        min={localIsoDateInDays(1)}
+        max={localIsoDateInDays(BREAK_GLASS_LAST_OFFERED_DAYS)}
         onChange={(event) => onEndsOnChange(event.target.value)}
       />
       <Button loading={pending} disabled={!userId || !endsOn} onClick={onGrant}>
@@ -227,7 +232,19 @@ function GrantRow({
       </Table.Cell>
       <Table.Cell>
         <VStack align="start" gap={0}>
-          <Text>{new Date(binding.expiresAtMs).toLocaleDateString()}</Text>
+          {/* The month in words. `toLocaleDateString()`'s numeric default is
+              read as day-first by half the world and month-first by the
+              other half, and this table sits directly under a date input
+              that renders in the BROWSER's locale — so the two could
+              disagree about which number was the month while both were
+              "correct". A spelled month cannot be misread either way. */}
+          <Text>
+            {new Date(binding.expiresAtMs).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </Text>
           <Text fontSize="sm" color="fg.muted">
             {binding.daysRemaining} days left
           </Text>
@@ -245,7 +262,7 @@ function GrantRow({
                   {
                     organizationId,
                     bindingId: binding.bindingId,
-                    expiresAtMs: endOfDay(endsOn),
+                    expiresAtMs: endOfLocalDay(endsOn),
                   },
                   { onSuccess: onSettled, onError: reportRefusal },
                 )
@@ -313,25 +330,14 @@ const BREAK_GLASS_DEFAULT_DAYS = 30;
  */
 const BREAK_GLASS_LAST_OFFERED_DAYS = BREAK_GLASS_MAX_WINDOW_DAYS - 1;
 
-/** A date `days` from today, as the `yyyy-mm-dd` a date input speaks. */
-function isoDateInDays(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function defaultEndDate(): string {
-  return isoDateInDays(BREAK_GLASS_DEFAULT_DAYS);
-}
-
 /**
- * The END of the day somebody picked, not its beginning.
+ * Where the picker starts, when nobody has moved it.
  *
- * A grant made "until the 30th" that stopped working one minute past
- * midnight on the 30th would end a day before the date it says — and it
- * would do it on the one door that exists for when everything else has
- * failed.
+ * The date arithmetic itself — and the timezone care it needs — lives in
+ * `~/features/sso/logic/breakGlassDates`, because a local calendar date
+ * turned into an instant through UTC is what used to put this table a day
+ * ahead of the picker above it.
  */
-function endOfDay(isoDate: string): number {
-  return new Date(`${isoDate}T23:59:59.999Z`).getTime();
+function defaultEndDate(): string {
+  return localIsoDateInDays(BREAK_GLASS_DEFAULT_DAYS);
 }

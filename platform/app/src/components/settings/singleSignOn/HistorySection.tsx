@@ -1,7 +1,12 @@
-import { HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  groupHistoryByDay,
+  type HistoryDayEntry,
+} from "~/features/sso/logic/historyDays";
 import { useSSESubscription } from "~/hooks/useSSESubscription";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
+import { SettingsCard } from "../kit/SettingsCard";
 import { LoadFailure } from "./refusals";
 
 /**
@@ -25,6 +30,14 @@ import { LoadFailure } from "./refusals";
  * subscription below opens only because this component mounted and closes
  * the moment it unmounts — there is no global listener, no app-wide
  * provider and no second place in the product that opens this channel.
+ *
+ * SHAPED LIKE A LOG RATHER THAN A PARAGRAPH OF ROWS. It was a bare flex list
+ * at the page's smallest size, unframed on a page where everything else sits
+ * in a card, with the full date repeated on every line and the time given
+ * the same weight as the thing that happened. Three changes, no new data: it
+ * is framed like its neighbours, the date is stated once per day it covers,
+ * and the sentence — the part anybody came here to read — is the largest
+ * thing on the row.
  */
 export function HistorySection({
   organizationId,
@@ -62,13 +75,21 @@ export function HistorySection({
   );
 
   const rows = history.data ?? [];
+  // Read at render: the labels are "Today" and "Yesterday", which are facts
+  // about when the page is being looked at rather than about the events.
+  const days = groupHistoryByDay({ entries: rows, nowMs: Date.now() });
 
   return (
-    <VStack align="stretch" gap={2} data-testid="connection-history">
-      <Text fontWeight="600" fontSize="sm">
-        What happened to this connection
-      </Text>
-
+    /* NAMED THE WAY IT IS LOOKED FOR. It read "What happened to this
+       connection", which is what it holds and not what anybody scans for —
+       somebody hunting the audit trail searches the page for "log" or
+       "history" and slid straight past a sentence. The sentence keeps its
+       job as the card's hint, where it says what the list is. */
+    <SettingsCard
+      title="Event log"
+      hint="What happened to this connection, newest first."
+      data-testid="connection-history"
+    >
       {history.isLoading && <Skeleton height="16px" width="60%" />}
 
       {/* A read that failed is not a connection with no history — the two
@@ -85,60 +106,114 @@ export function HistorySection({
         </Text>
       )}
 
-      {rows.map((entry) => (
-        <HistoryRow key={entry.eventId} entry={entry} />
-      ))}
-    </VStack>
+      <VStack align="stretch" gap={3}>
+        {days.map((day) => (
+          <Box key={day.key}>
+            <Text
+              fontSize="11.5px"
+              fontWeight="600"
+              color="fg.muted"
+              paddingBottom={1.5}
+            >
+              {day.label}
+            </Text>
+            <VStack align="stretch" gap={0}>
+              {day.entries.map((entry, index) => (
+                <HistoryRow
+                  key={entry.eventId}
+                  entry={entry}
+                  last={index === day.entries.length - 1}
+                />
+              ))}
+            </VStack>
+          </Box>
+        ))}
+      </VStack>
+    </SettingsCard>
   );
 }
 
-interface HistoryEntryRow {
-  eventId: string;
-  occurredAtMs: number;
-  summary: string;
-  carriedOver: boolean;
-}
-
 /**
- * One column of time, the same width on every row.
+ * The clock, without the date beside it.
  *
- * `toLocaleString()` gave a different LENGTH per row — a one-digit day or
- * hour is a character shorter — so the sentences beside it started in
- * slightly different places and the list read as ragged. Two-digit fields fix
- * the character count and `tabular-nums` fixes the character width, which
- * between them make the column align without a guessed `minWidth` holding it
- * open. The reader's own locale still decides the ORDER of the fields.
+ * The day is the heading above the group now, so a row states only the time
+ * it happened at. `tabular-nums` and two-digit fields between them fix both
+ * the character count and the character width, which is what makes a column
+ * of times line up without a guessed `minWidth` holding it open. The
+ * reader's own locale still decides how it is written.
  */
-const STAMP_FORMAT: Intl.DateTimeFormatOptions = {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
+const TIME_FORMAT: Intl.DateTimeFormatOptions = {
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
 };
 
-function HistoryRow({ entry }: { entry: HistoryEntryRow }) {
+/**
+ * One thing that happened, on a rail.
+ *
+ * The rail is the same language the setup steps above it already speak — a
+ * dot per event and a hairline joining them — which is what turns a list of
+ * sentences into a sequence. It is decoration over the order the rows are
+ * already in, so it is hidden from a reader who is being read to.
+ */
+function HistoryRow({
+  entry,
+  last,
+}: {
+  entry: HistoryDayEntry;
+  last: boolean;
+}) {
   return (
-    <HStack gap={3} align="start" fontSize="xs">
-      <Text
-        color="fg.muted"
+    <HStack gap={3} align="stretch" data-testid="connection-history-entry">
+      <VStack
+        gap={0}
+        width="7px"
         flexShrink={0}
-        whiteSpace="nowrap"
-        fontVariantNumeric="tabular-nums"
+        paddingTop="7px"
+        aria-hidden="true"
       >
-        {new Date(entry.occurredAtMs).toLocaleString(undefined, STAMP_FORMAT)}
-      </Text>
-      <Text>{entry.summary}</Text>
-      {/* Named rather than hidden: the weaker evidence an earlier
-          configuration carried must never become invisible (D05
-          amendment) — a fact the migration produced says so beside it. */}
-      {entry.carriedOver && (
-        <IdentityChip
-          label="Carried over"
-          title="From your earlier configuration"
+        <Box
+          width="7px"
+          height="7px"
+          borderRadius="full"
+          background="border.emphasized"
+          flexShrink={0}
         />
-      )}
+        {!last && <Box flex={1} width="1px" background="border.muted" />}
+      </VStack>
+      <HStack
+        gap={3}
+        align="start"
+        paddingBottom={last ? 0 : 2.5}
+        minWidth={0}
+        flex={1}
+      >
+        <Text
+          fontSize="11.5px"
+          color="fg.muted"
+          flexShrink={0}
+          whiteSpace="nowrap"
+          fontVariantNumeric="tabular-nums"
+          lineHeight="1.5"
+        >
+          {new Date(entry.occurredAtMs).toLocaleTimeString(
+            undefined,
+            TIME_FORMAT,
+          )}
+        </Text>
+        <Text fontSize="13px" lineHeight="1.5" minWidth={0}>
+          {entry.summary}
+        </Text>
+        {/* Named rather than hidden: the weaker evidence an earlier
+            configuration carried must never become invisible (D05
+            amendment) — a fact the migration produced says so beside it. */}
+        {entry.carriedOver && (
+          <IdentityChip
+            label="Carried over"
+            title="From your earlier configuration"
+          />
+        )}
+      </HStack>
     </HStack>
   );
 }

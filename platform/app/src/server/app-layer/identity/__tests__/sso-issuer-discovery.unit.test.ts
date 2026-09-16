@@ -1,4 +1,6 @@
+import { Response } from "undici";
 import { describe, expect, it } from "vitest";
+import type { EgressFetch } from "../public-egress";
 import { HttpSsoIssuerDiscovery } from "../sso-issuer-discovery";
 
 /**
@@ -35,10 +37,10 @@ function discoveryAnswering({
   resolveTo?: (host: string) => Promise<string[]>;
 } = {}) {
   const asked: string[] = [];
-  const fetchImpl = (async (input: RequestInfo | URL) => {
-    asked.push(String(input));
+  const fetchImpl: EgressFetch = async (url) => {
+    asked.push(url);
     return respond();
-  }) as typeof fetch;
+  };
   return {
     discovery: new HttpSsoIssuerDiscovery(fetchImpl, resolveTo),
     asked,

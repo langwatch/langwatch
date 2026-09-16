@@ -491,6 +491,31 @@ export const ssoSetupRouter = createTRPCRouter({
     }),
 
   /**
+   * The word on the card.
+   *
+   * `sso:manage` but NOT the enterprise assertion the changes around it
+   * carry: a rename decides nothing about who signs in, and an organization
+   * whose plan lapsed still reads these cards. Refusing it would leave them
+   * looking at a name they cannot correct, which protects nobody.
+   *
+   * The name is audited in full — it is the word the card will show, and
+   * "who changed what this is called, and when" is exactly what the history
+   * beside it is for.
+   */
+  rename: protectedProcedure
+    .input(connectionInput.extend({ name: z.string().trim().min(1).max(120) }))
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({ ctx, action: "rename", args: input });
+      return ssoSelfServe().rename({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        name: input.name,
+        actor,
+      });
+    }),
+
+  /**
    * The ways back in this organization holds, with who holds them and their
    * dates.
    *

@@ -35,6 +35,9 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("../../../utils/auth-client", () => ({
   authClient: { signIn: { sso: vi.fn() } },
+  // The test sign-in names the reader's own address in one of its refusals,
+  // so the hook reads the session.
+  useSession: () => ({ data: { user: { email: "ana@acme.com" } } }),
 }));
 
 vi.mock("../../../utils/api", () => {
@@ -68,6 +71,8 @@ vi.mock("../../../utils/api", () => {
         claimDomain: idle(),
         removeDomain: idle(),
         activate: idle(),
+        // The name on the summary card is editable in place now.
+        rename: idle(),
         grantBreakGlass: idle(),
         renewBreakGlass: idle(),
         revokeBreakGlass: idle(),

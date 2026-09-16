@@ -1,6 +1,7 @@
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -8,6 +9,7 @@ import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   connectionActivatedPayloadSchema,
   connectionArrivalPolicySetPayloadSchema,
+  connectionRenamedPayloadSchema,
   connectionDiscardedPayloadSchema,
   connectionRegisteredPayloadSchema,
   connectionResumedPayloadSchema,
@@ -204,6 +206,15 @@ export type ConnectionArrivalPolicySetEvent = z.infer<
   typeof connectionArrivalPolicySetEventSchema
 >;
 
+/** The word on the card, changed. Decides nothing about who gets in. */
+export const connectionRenamedEventSchema = EventSchema.extend({
+  type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
+  data: connectionRenamedPayloadSchema,
+});
+export type ConnectionRenamedEvent = z.infer<
+  typeof connectionRenamedEventSchema
+>;
+
 /*
  * WHAT A RE-CHECK SAW (ADR-123). These three had no wire schema at all: the
  * aggregate states them, the fold reads them, and the pipeline's union did
@@ -256,6 +267,7 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
   connectionArrivalPolicySetEventSchema,
+  connectionRenamedEventSchema,
   domainProofWaveredEventSchema,
   domainProofLapsedEventSchema,
   domainProofRecoveredEventSchema,

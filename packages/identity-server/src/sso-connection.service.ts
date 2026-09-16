@@ -48,11 +48,14 @@ import {
   type ResumeConnectionCommandData,
   resumeConnectionCommandDataSchema,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
   SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   selectMigrationRouteCommandDataSchema,
   type SetArrivalPolicyCommandData,
   setArrivalPolicyCommandDataSchema,
+  renameConnectionCommandDataSchema,
+  type RenameConnectionCommandData,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionFact,
@@ -289,6 +292,17 @@ export class SsoConnectionService {
     return this.commit(
       { type: SET_ARRIVAL_POLICY_COMMAND_TYPE, data },
       await this.guards.setArrivalPolicy(data),
+    );
+  }
+
+  /** The word on the card (ADR-117). Changes nothing about who gets in. */
+  async renameConnection(
+    input: RenameConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = renameConnectionCommandDataSchema.parse(input);
+    return this.commit(
+      { type: RENAME_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.renameConnection(data),
     );
   }
 

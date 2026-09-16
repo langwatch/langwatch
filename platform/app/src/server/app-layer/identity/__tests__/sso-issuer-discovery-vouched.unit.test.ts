@@ -15,7 +15,9 @@
  *
  * Corresponds to specs/identity/sso-connection-lifecycle.feature.
  */
+import { Response } from "undici";
 import { describe, expect, it, vi } from "vitest";
+import type { EgressFetch } from "../public-egress";
 import { HttpSsoIssuerDiscovery } from "../sso-issuer-discovery";
 
 const DISCOVERY_DOCUMENT = {
@@ -26,21 +28,21 @@ const DISCOVERY_DOCUMENT = {
 /** A fetch that answers one discovery document and records where it was asked. */
 function fetchAnswering(document: unknown) {
   const calls: string[] = [];
-  const fetchImpl = vi.fn(async (url: string | URL) => {
-    calls.push(url.toString());
+  const fetchImpl = vi.fn<EgressFetch>(async (url) => {
+    calls.push(url);
     return new Response(JSON.stringify(document), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
   });
-  return { fetchImpl: fetchImpl as unknown as typeof fetch, calls };
+  return { fetchImpl, calls };
 }
 
 /** A fetch that redirects the first hop somewhere else, then answers. */
 function fetchRedirectingTo(location: string) {
   const calls: string[] = [];
-  const fetchImpl = vi.fn(async (url: string | URL) => {
-    calls.push(url.toString());
+  const fetchImpl = vi.fn<EgressFetch>(async (url) => {
+    calls.push(url);
     if (calls.length === 1) {
       return new Response(null, { status: 302, headers: { location } });
     }
@@ -49,7 +51,7 @@ function fetchRedirectingTo(location: string) {
       headers: { "content-type": "application/json" },
     });
   });
-  return { fetchImpl: fetchImpl as unknown as typeof fetch, calls };
+  return { fetchImpl, calls };
 }
 
 describe("given an issuer that answers inside a private network", () => {

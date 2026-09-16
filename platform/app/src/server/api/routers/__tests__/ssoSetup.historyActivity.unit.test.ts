@@ -6,8 +6,8 @@
  * router, gated exactly like the read it refreshes, and never a global
  * channel.
  *
- * Corresponds to specs/identity/sso-connection-history.feature, "Live
- * updates".
+ * Corresponds to specs/identity/sso-connection-history.feature — the "Live
+ * updates" scenarios, and the permission the read and the signal share.
  */
 import { authzDeclarationOf } from "@langwatch/authz";
 import { describe, expect, it, vi } from "vitest";
@@ -34,6 +34,15 @@ const stubBetterAuthAdapter = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  // Read at module load by the better-auth request hooks on this router's
+  // import graph (GAC-09). Locks nobody: these suites assert nothing about
+  // lock-out, and a mock that omits the export fails the whole file at
+  // collection rather than at an assertion.
+  signInLockout: () => ({
+    refuseIfLockedOut: async () => void 0,
+    recordFailure: async () => void 0,
+    recordSuccess: async () => void 0,
+  }),
   deploymentOffersPasskeys: () => false,
   addressRoutesToConnection: async () => false,
   clearSignUpConfirmationPending: async () => void 0,
@@ -173,21 +182,21 @@ describe("given the activity subscription's own poll loop", () => {
 });
 
 describe("given the router declaration itself", () => {
+  const procedures = (
+    ssoSetupRouter as unknown as {
+      _def: {
+        procedures: Record<string, { _def?: { middlewares?: unknown[] } }>;
+      };
+    }
+  )._def.procedures;
+
+  const declarationFor = (path: string) =>
+    (procedures[path]?._def?.middlewares ?? [])
+      .map((middleware) => authzDeclarationOf(middleware))
+      .find((found) => found !== null) ?? null;
+
   /** @scenario "The live subscription is gated exactly like the read it refreshes" */
   it("requires the same permission as getHistory, not a weaker one", () => {
-    const procedures = (
-      ssoSetupRouter as unknown as {
-        _def: {
-          procedures: Record<string, { _def?: { middlewares?: unknown[] } }>;
-        };
-      }
-    )._def.procedures;
-
-    const declarationFor = (path: string) =>
-      (procedures[path]?._def?.middlewares ?? [])
-        .map((middleware) => authzDeclarationOf(middleware))
-        .find((found) => found !== null) ?? null;
-
     const historyDeclaration = declarationFor("getHistory");
     const activityDeclaration = declarationFor("onHistoryActivity");
 
@@ -196,5 +205,29 @@ describe("given the router declaration itself", () => {
       permission: "sso:manage",
     });
     expect(activityDeclaration).toEqual(historyDeclaration);
+  });
+
+  /** @scenario "Seeing the history takes managing single sign-on, not only seeing it" */
+  it("holds the history to sso:manage while the overview and the setup journey stay at sso:view", () => {
+    // THE HISTORY IS A STRONGER DISCLOSURE THAN THE STATE. It is close to an
+    // audit trail of every actor who has touched the connection — a claim's
+    // rejection note, an attestation's — so somebody who may only SEE single
+    // sign-on is refused it.
+    expect(declarationFor("getHistory")).toMatchObject({
+      kind: "permission",
+      permission: "sso:manage",
+    });
+
+    // And that same reader is refused nothing else on this surface: the two
+    // reads that answer "where does the connection stand" are still theirs.
+    // Asserted together, because the scenario is the CONTRAST — a change that
+    // lifted every read to `sso:manage` would satisfy the assertion above on
+    // its own while quietly closing the page to security reviewers.
+    for (const read of ["getSetup", "getMigrationProgress"]) {
+      expect(declarationFor(read)).toMatchObject({
+        kind: "permission",
+        permission: "sso:view",
+      });
+    }
   });
 });

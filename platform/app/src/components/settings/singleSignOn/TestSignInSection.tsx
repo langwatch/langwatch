@@ -1,9 +1,14 @@
-import { Alert, Button, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, Code, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { TestFromAnotherBrowser } from "~/features/sso/components/TestFromAnotherBrowser";
 import { TestSignInFailureNotice } from "~/features/sso/components/TestSignInFailureNotice";
 import { useTestSignIn } from "~/features/sso/hooks/useTestSignIn";
+import {
+  type TestSignInAddressNote,
+  testSignInAddressNote,
+} from "~/features/sso/logic/testSignInAddress";
+import { useSession } from "~/utils/auth-client";
 
 /**
  * Proving the connection carries a real person.
@@ -17,13 +22,23 @@ export function TestSignInSection({
   providerName,
   canManage,
   testSignIn,
+  connectionState,
+  verifiedDomains,
 }: {
   connectionId: string;
   providerName: string;
   canManage: boolean;
   testSignIn: SelfServeGoLiveView["testSignIn"];
+  connectionState: string;
+  verifiedDomains: readonly string[];
 }) {
   const { start, sending, failure } = useTestSignIn({ connectionId });
+  const { data: session } = useSession();
+  const addressNote = testSignInAddressNote({
+    connectionState,
+    verifiedDomains,
+    yourAddress: session?.user?.email,
+  });
 
   return (
     <VStack align="stretch" gap={3}>
@@ -33,6 +48,15 @@ export function TestSignInSection({
         that proves the connection carries a real person — not a setting we can
         tick for you.
       </Text>
+      {/* BEFORE the button, and above a failure that has already happened:
+          this is the thing that stops the next attempt being wasted the same
+          way as the last one. */}
+      {addressNote && (
+        <TestSignInAddressNotice
+          note={addressNote}
+          providerName={providerName}
+        />
+      )}
       {failure && <TestSignInFailureNotice failure={failure} />}
       {testSignIn.done && (
         <Alert.Root status="success">
@@ -60,6 +84,65 @@ export function TestSignInSection({
           exercises a path most of the organization will never take. */}
       {canManage && <TestFromAnotherBrowser />}
     </VStack>
+  );
+}
+
+/**
+ * Which address this test will actually accept, said before it is pressed.
+ *
+ * The one-address rule is the least guessable thing about the setup journey:
+ * a connection that is not live yet accepts only the address belonging to
+ * whoever registered it, so signing in at the provider as anybody else — or
+ * as an address on the very domain the connection is being built for — comes
+ * back refused. Somebody reading that refusal has already spent a round trip
+ * to their provider to learn it.
+ *
+ * It escalates from a note to a warning at the point we can SEE the mismatch:
+ * the reader's own address is on none of the domains this connection has
+ * proved, so whatever the provider asserts is unlikely to be the one address
+ * that would work.
+ */
+function TestSignInAddressNotice({
+  note,
+  providerName,
+}: {
+  note: TestSignInAddressNote;
+  providerName: string;
+}) {
+  return (
+    <Alert.Root status={note.tone} data-testid="test-sign-in-address-note">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {note.addressIsOffDomain
+            ? "Your account is not on this connection's domain"
+            : "Only one address can sign in while this is being set up"}
+        </Alert.Title>
+        <Alert.Description>
+          <VStack align="stretch" gap={2}>
+            <Text fontSize="sm">
+              Until the domain is verified and the connection is live, this test
+              accepts one address: the one on the LangWatch account that
+              registered the connection. Yours is{" "}
+              <Code fontSize="xs">{note.yourAddress}</Code>. If {providerName}{" "}
+              signs you in as anything else, it will be refused.
+            </Text>
+            {note.addressIsOffDomain && (
+              <Text fontSize="sm">
+                This connection is set up for{" "}
+                {note.connectionDomains.join(", ")}, so an address there will
+                not be accepted until it goes live. Three ways forward: sign in
+                at {providerName} as{" "}
+                <Code fontSize="xs">{note.yourAddress}</Code>; add the address{" "}
+                {providerName} does sign you in as to your LangWatch account and
+                verify it; or verify the domain, which opens the connection to
+                everybody on it.
+              </Text>
+            )}
+          </VStack>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

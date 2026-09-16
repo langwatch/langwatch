@@ -161,12 +161,21 @@ function authFor(metadata: string) {
         trustEmailVerified: true,
         disableImplicitSignUp: false,
         saml: { allowIdpInitiated: true },
-        resolveUser: async (input) =>
-          assertion.decide({
+        // The same translation the real seam makes (`config/plugins.ts`):
+        // the gate states its refusals as handled errors, and this is where
+        // one becomes the `{action, code}` the plugin understands. Returned
+        // rather than thrown, because `resolveSSOUser` catches and answers
+        // `SSO_USER_RESOLUTION_FAILED` with the cause discarded.
+        resolveUser: async (input) => {
+          const decision = await assertion.decide({
             providerId: input.providerId,
             accountId: input.accountKey.accountId,
             email: input.providerUser.email,
-          }),
+          });
+          return decision.action === "continue"
+            ? decision
+            : ({ action: "reject", code: decision.error.code } as const);
+        },
       }),
     ],
   });

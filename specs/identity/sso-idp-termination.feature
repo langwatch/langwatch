@@ -253,12 +253,34 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     But an administrator of "acme" signing in to test it is carried through
     And that is the sign-in going live rests on
 
+  # NARROWED, deliberately. This rule used to read "every refusal at the door
+  # says the same thing" and meant it literally, which is how seven distinct
+  # causes came to share one code - and that code was the CREDENTIAL refusal,
+  # so the one sentence it said was "that email or password is wrong" to people
+  # who had never typed a password.
+  #
+  # The property worth keeping is the existence oracle, not uniformity for its
+  # own sake: a refusal must not tell a caller which connection identifiers are
+  # real. The refusals that report the caller's OWN assertion or their own
+  # organization's configuration now name themselves, because a refusal nobody
+  # can act on is not a security property, it is a dead end. Which is which is
+  # specs/identity/sso-assertion-refusals.feature.
+
   @unit
-  Scenario: Every refusal at the door says the same thing
-    Given an assertion is refused for any reason
-    When the person is sent back
-    Then the reason names no cause
+  Scenario: A refusal about what exists here says nothing
+    Given an assertion naming a connection we do not hold
+    And an assertion naming something that is not a connection at all
+    When each person is sent back
+    Then both are refused with the same code
     And which check refused them is not something the caller learns
+
+  @unit
+  Scenario: No refusal at the door claims a password was wrong
+    Given an assertion is refused for any reason
+    When the person reads what they are told
+    Then it does not mention a password
+    # Single sign-on has its own general refusal rather than borrowing the
+    # credential screen's, whose words have to keep meaning exactly one thing.
 
   @unit
   Scenario: A connection whose claim an operator turned down carries nobody

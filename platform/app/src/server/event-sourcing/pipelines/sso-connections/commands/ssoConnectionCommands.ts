@@ -59,6 +59,9 @@ import {
   type SuspendConnectionCommandData,
   selectMigrationRouteCommandDataSchema,
   setArrivalPolicyCommandDataSchema,
+  renameConnectionCommandDataSchema,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  type RenameConnectionCommandData,
   suspendConnectionCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
@@ -285,6 +288,14 @@ export const SetArrivalPolicyCommand = connectionCommand({
   verb: "setArrivalPolicy",
 });
 export type SetArrivalPolicyPayload = SetArrivalPolicyCommandData;
+
+export const RenameConnectionCommand = connectionCommand({
+  type: RENAME_CONNECTION_COMMAND_TYPE,
+  schema: renameConnectionCommandDataSchema,
+  description: "Change what a connection is called",
+  verb: "renameConnection",
+});
+export type RenameConnectionPayload = RenameConnectionCommandData;
 
 export const RecordDomainProofAbsentCommand = connectionCommand({
   type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,

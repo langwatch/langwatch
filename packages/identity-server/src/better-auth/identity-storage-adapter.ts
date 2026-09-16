@@ -10,6 +10,7 @@ import type {
   CleanedWhere,
   CustomAdapter,
   DBAdapter,
+  DBTransactionAdapter,
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
@@ -125,6 +126,26 @@ export interface IdentityStorageAdapterDeps {
    * byte-for-byte what the stock adapter did.
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
+  /**
+   * ONE real Postgres transaction, with the legacy engine rebound to it.
+   *
+   * Required rather than optional, and for the reason every other dependency
+   * here is: better-auth's single sign-on plugin decides whether to run
+   * `resolveUser` at all by asking whether `transaction` is a function, and a
+   * dependency nobody wired would answer that question "no" while looking
+   * wired. The callback runs INSIDE the transaction and everything that
+   * reaches the engine it is handed runs there too; the transaction commits
+   * when the callback returns and rolls back when it throws, with the throw
+   * passed through rather than swallowed.
+   *
+   * Postgres only, and deliberately so — see `## Transaction` on
+   * `createIdentityStorageAdapter` for what that does and does not span.
+   */
+  postgresTransaction: <R>(
+    work: (
+      legacyEngine: (options: BetterAuthOptions) => DBAdapter,
+    ) => Promise<R>,
+  ) => Promise<R>;
   passkeyRemoval: PasskeyRemovalPort;
   accounts: IdentityAccountsPort;
   resolution: IdentityResolutionPort;
@@ -208,23 +229,66 @@ export interface PasskeyRemovalPort {
  *
  * ## Transaction
  *
- * `transaction` is left unset, which makes the factory hand better-auth the
- * as-is passthrough — no real transaction, the same thing the application
- * ran with the stock `prismaAdapter`. The identity branch invents no
- * cross-branch transactional promise, and preserving the existing behavior
- * exactly is the point.
+ * `transaction` is a REAL Postgres transaction, and it spans the Postgres
+ * side ONLY. What it covers is everything better-auth issues through this
+ * adapter while the callback runs and that lands on the legacy engine: the
+ * `SsoProvider` row, `User`, `Session`, `Account`. What it does not cover is
+ * the identity branch — its facts are appended to the event store, a
+ * different database, and the Postgres rows its own ports hold
+ * (`Identifier`, `AccountCredential`) are written on the base connection
+ * rather than on this transaction's. No transaction can span the two stores,
+ * and the branch keeps the guarantee event sourcing offers instead: a
+ * command is atomic at its append and replaying it is idempotent.
+ *
+ * The narrower promise is the one better-auth's single sign-on plugin
+ * actually needs, and it is why this is no longer left unset. The plugin
+ * refuses `resolveUser` outright unless `adapterConfig.transaction` is a
+ * function, because it locks the `SsoProvider` row for the length of a link
+ * by issuing a no-op update against it and then checks the provider's
+ * identity boundary has not moved underneath the ceremony. A row lock only
+ * holds inside a transaction, so the factory's as-is passthrough would not
+ * merely forgo atomicity: it would leave that check reading a provider
+ * somebody could re-point mid-link. `SsoProvider` is a Postgres table, so a
+ * Postgres transaction gives the lock exactly the meaning it asks for.
+ *
+ * The shape is better-auth's own Prisma adapter's, verbatim: open the
+ * transaction, build a SECOND adapter around the engine bound to it, and
+ * hand that to the callback. The inner adapter declares no `transaction` of
+ * its own, so a nested `runWithTransaction` joins the open one rather than
+ * asking Prisma for an interactive transaction inside an interactive
+ * transaction, which its client cannot give.
  */
 export function createIdentityStorageAdapter(
   deps: IdentityStorageAdapterDeps,
 ): AdapterFactory<BetterAuthOptions> {
-  return (options) =>
-    createAdapterFactory({
-      config: identityAdapterConfig,
-      adapter: identityCustomAdapter({
-        ...deps,
-        legacy: deps.legacyEngine(options),
-      }),
-    })(options);
+  return (options) => {
+    /**
+     * One adapter over one engine. Called again per transaction, with the
+     * engine rebound, which is what puts the work inside the callback on the
+     * transaction instead of on the base connection.
+     */
+    const over = (
+      legacyEngine: (options: BetterAuthOptions) => DBAdapter,
+      config: AdapterFactoryConfig,
+    ): DBAdapter =>
+      createAdapterFactory({
+        config,
+        adapter: identityCustomAdapter({
+          ...deps,
+          legacy: legacyEngine(options),
+        }),
+      })(options);
+
+    return over(deps.legacyEngine, {
+      ...identityAdapterConfig,
+      transaction: <R>(
+        callback: (trx: DBTransactionAdapter<BetterAuthOptions>) => Promise<R>,
+      ): Promise<R> =>
+        deps.postgresTransaction((legacyEngine) =>
+          callback(over(legacyEngine, identityAdapterConfig)),
+        ),
+    });
+  };
 }
 
 /**

@@ -2327,6 +2327,29 @@ const presentations = {
     describe: () =>
       "It may have expired or already been used. Request a new one and open the newest email.",
   },
+  identity_session_max_lifetime_too_short: {
+    // The maximum length has to be readable ALONGSIDE the idle timeout, since
+    // that is the only way the mistake this refuses ever gets made — two
+    // numbers typed into the same form, one of which quietly disables the
+    // other.
+    title: "The maximum session length is shorter than the idle timeout",
+    describe: () =>
+      "A session would always hit the maximum before it could ever go idle. Raise the maximum, or lower the idle timeout, so both can apply.",
+  },
+  identity_sign_in_locked_out: {
+    // Deliberately says NOTHING about the account: not whether it exists, not
+    // whether the password was right, not how many attempts are left. An
+    // address nobody holds is answered with these exact words, which is what
+    // keeps a lock-out from naming the addresses worth attacking.
+    //
+    // It does say the two things the person needs — that waiting is the
+    // remedy, and that a reset is the shortcut — because somebody locked out
+    // of their own account with no idea what to do next simply contacts
+    // support, and the point of the copy is to prevent that.
+    title: "Too many sign-in attempts",
+    describe: () =>
+      "Wait a little while and try again. Resetting your password from the sign-in screen also lets you straight back in.",
+  },
   identity_sign_in_refused: {
     // Says nothing about which half was wrong, and nothing about whether the
     // address has an account. The two are indistinguishable by design
@@ -2563,6 +2586,69 @@ const presentations = {
     title: "Setting single sign-on up yourself isn't switched on yet",
     describe: () =>
       "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+  // The single sign-on gate's refusals
+  // (specs/identity/sso-assertion-refusals.feature).
+  //
+  // WRITTEN FOR THE PERSON BOUNCED TO THE SIGN-IN SCREEN, who is usually not
+  // the person who can fix any of this — so each one says which kind of thing
+  // is wrong and who to ask, and none of them says "check your settings" to
+  // somebody with no settings to check. The administrator reads the same codes
+  // on the single sign-on settings screen, where they are rendered as the
+  // remedy instead; see `useTestSignIn`.
+  sso_sign_in_refused: {
+    // The general one, for the causes we will not name. It must not borrow a
+    // word from the credential refusal: nobody on this path typed a password,
+    // and `identity_sign_in_refused` has to keep meaning exactly one thing.
+    title: "Your sign-in wasn't accepted",
+    describe: () =>
+      "Your identity provider signed you in, but LangWatch would not accept it. Ask whoever manages single sign-on for your organization.",
+  },
+  sso_test_arrival_cannot_create_organization: {
+    // The reader is an administrator two steps from finishing their own
+    // setup, wearing somebody else's sign-in. What they need is to be told
+    // the test WORKED — the screen they landed on implies it did not — and
+    // that the way on is back to their own account, not forward into a new
+    // organization. Naming no mechanism: "the connection is not live yet" is
+    // the whole of the reason and the thing they are about to fix.
+    title: "That sign-in was a test, so there is nothing to set up here",
+    describe: () =>
+      "Your identity provider signed you in, which is what the test was for. It signed you in as someone who is not a member of your organization yet, because the connection is not turned on. Sign back in as yourself to finish turning it on — creating an organization here would leave your setup behind in the first one.",
+  },
+  sso_assertion_without_address: {
+    // Names the missing thing rather than the mechanism: "release the email
+    // claim" is what the administrator needs and what they will read on the
+    // settings screen, and it is not something this reader can act on.
+    title: "Your identity provider didn't send an email address",
+    describe: () =>
+      "It signed you in without one, and LangWatch has nothing to match to an account. Ask whoever manages single sign-on to include your email address.",
+  },
+  sso_setup_address_mismatch: {
+    // NAMES THE ADDRESS, NOT THE LIFECYCLE. The previous wording led with
+    // "single sign-on isn't finished being set up", which is true and useless
+    // — and actively confusing for the one reader most likely to see it, the
+    // administrator running the test sign-in that setup asked them for. They
+    // are told they cannot do the thing they are being told to do.
+    //
+    // Still names nobody: which address would have worked is not a fact this
+    // screen's reader is entitled to. The administrator gets that on the
+    // settings screen, where they are already signed in as the account that
+    // holds it.
+    title: "That address can't sign in through this connection yet",
+    describe: () =>
+      "Your organization is still setting single sign-on up, and until its domain is verified this connection only accepts the address of the person setting it up. Sign in the way you did before, or ask whoever is setting it up.",
+  },
+  sso_domain_not_verified: {
+    title: "That address isn't on a verified domain",
+    describe: () =>
+      "Your organization hasn't verified the domain of the address your identity provider sent. Ask whoever manages single sign-on to verify it.",
+  },
+  sso_domain_proof_lapsed: {
+    // Says why a colleague can sign in and this reader cannot, because that
+    // is the question a lapsed proof actually produces.
+    title: "Your organization's domain verification has lapsed",
+    describe: () =>
+      "People who already sign in this way are unaffected, but it can't vouch for a new account until the record is published again. Ask whoever manages single sign-on to republish it.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",

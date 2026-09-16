@@ -12,6 +12,7 @@ import type { StateProjectionStore } from "../../../projections/stateProjection.
 import {
   type ConnectionActivatedEvent,
   type ConnectionArrivalPolicySetEvent,
+  type ConnectionRenamedEvent,
   type ConnectionDiscardedEvent,
   type ConnectionRegisteredEvent,
   type ConnectionResumedEvent,
@@ -19,6 +20,7 @@ import {
   type ConnectionTornDownEvent,
   connectionActivatedEventSchema,
   connectionArrivalPolicySetEventSchema,
+  connectionRenamedEventSchema,
   connectionDiscardedEventSchema,
   connectionRegisteredEventSchema,
   connectionResumedEventSchema,
@@ -91,6 +93,7 @@ export const ssoConnectionEvents = [
   teardownRequestedEventSchema,
   connectionTornDownEventSchema,
   connectionArrivalPolicySetEventSchema,
+  connectionRenamedEventSchema,
   domainProofWaveredEventSchema,
   domainProofLapsedEventSchema,
   domainProofRecoveredEventSchema,
@@ -325,6 +328,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionArrivalPolicySet(
     event: ConnectionArrivalPolicySetEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionRenamed(
+    event: ConnectionRenamedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

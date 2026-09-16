@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Card,
   HStack,
@@ -11,7 +12,7 @@ import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
-import { Copy } from "lucide-react";
+import { Copy, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import {
   arrivalAnswerLabel,
@@ -36,6 +37,7 @@ import { SettingsCard } from "./kit/SettingsCard";
 import { SettingsRowsSkeleton } from "./kit/SettingsSkeleton";
 import { ArrivalsSection } from "./singleSignOn/ArrivalsSection";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
+import { ConnectionNameRow } from "./singleSignOn/ConnectionNameRow";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { HistorySection } from "./singleSignOn/HistorySection";
@@ -203,7 +205,12 @@ function ConnectedJourney({
           migration={view.migration}
         />
       )}
-      <ConnectionSummary connection={connection} goLive={goLive} />
+      <ConnectionSummary
+        organizationId={organizationId}
+        connection={connection}
+        goLive={goLive}
+        canManage={canManage}
+      />
 
       <SetupJourneySteps
         organizationId={organizationId}
@@ -500,11 +507,23 @@ function RemoveConnectionSection({
   });
 
   return (
-    <Card.Root borderColor="red.muted">
+    /* A DANGER ZONE THAT LOOKS LIKE EVERY OTHER CARD IS NOT ONE. A hairline
+       in red and a red heading were the entire signal, and at a glance that
+       is no signal — the region read as one more settings card until the
+       words were read, which is the wrong order for the only control on this
+       page that ends people's sign-in. The wash is what makes it a region
+       rather than a card; the mark beside the heading is what carries the
+       same meaning to a reader who does not get the colour. */
+    <Card.Root borderColor="red.muted" background="red.subtle">
       <Card.Body paddingX={4} paddingY={3.5} gap={3}>
-        <Text fontSize="13.5px" fontWeight="semibold" color="red.fg">
-          Danger zone
-        </Text>
+        <HStack gap={2} align="center">
+          <Box color="red.fg" display="flex" flexShrink={0} aria-hidden="true">
+            <TriangleAlert size={14} />
+          </Box>
+          <Text fontSize="13.5px" fontWeight="semibold" color="red.fg">
+            Danger zone
+          </Text>
+        </HStack>
         <HStack
           justify="space-between"
           align={{ base: "stretch", sm: "center" }}
@@ -571,11 +590,15 @@ function RemoveConnectionSection({
  * the exact moment they were about to test it.
  */
 function ConnectionSummary({
+  organizationId,
   connection,
   goLive,
+  canManage,
 }: {
+  organizationId: string;
   connection: NonNullable<SelfServeSetupView["connection"]>;
   goLive: SelfServeGoLiveView | null;
+  canManage: boolean;
 }) {
   const chip = connectionStatusChipFor({ state: connection.state });
 
@@ -616,49 +639,77 @@ function ConnectionSummary({
       }
     >
       <SettingList>
-        <SettingRow label="Identity provider">
-          <VStack align="start" gap={0} minWidth={0}>
-            <Text fontSize="sm">{connection.providerId}</Text>
-            {connection.issuer && (
-              <HStack gap={1} minWidth={0} maxWidth="full">
-                {/* The scheme is chrome, not information — every issuer here
-                    is https, so the display drops it. The whole address is on
-                    the hover, and the button puts it on the clipboard. */}
-                <Text
-                  fontFamily="mono"
-                  fontSize="xs"
-                  color="fg.muted"
-                  truncate
-                  maxWidth="full"
-                  title={connection.issuer}
-                >
-                  {connection.issuer.replace(/^https?:\/\//, "")}
-                </Text>
-                <IconButton
-                  aria-label="Copy issuer address"
-                  size="xs"
-                  variant="ghost"
-                  flexShrink={0}
-                  color="fg.subtle"
-                  _hover={{ color: "fg.muted" }}
-                  onClick={copyIssuer}
-                >
-                  <Copy size={12} />
-                </IconButton>
-              </HStack>
-            )}
-          </VStack>
+        {/* "Name" rather than "Identity provider": the card's own title
+            already says which protocol this is, and what sat here was never
+            an identifier — see `ConnectionNameRow`. */}
+        {/* A ROW EACH, WHERE THE ISSUER USED TO HANG UNDER THE NAME. They are
+            two different facts — one the customer picks and can change, one
+            the provider fixes — and stacking the second inside the first left
+            this card with a single row. A half-and-half grid renders one row
+            as a label marooned against one edge and its value against the
+            other, which is the stretched field this card was reported as.
+            Given a row each they land on the same line as every other
+            settings card in the cluster. */}
+        <SettingRow
+          label="Name"
+          hint="Yours to change. It renames nothing at your provider."
+        >
+          <ConnectionNameRow
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+            name={connection.providerId}
+            canManage={canManage}
+          />
         </SettingRow>
+        {connection.issuer && (
+          <SettingRow
+            label="Issuer"
+            hint="The address your provider identifies itself by."
+          >
+            <HStack gap={1} minWidth={0} maxWidth="full">
+              {/* The scheme is chrome, not information — every issuer here
+                  is https, so the display drops it. The whole address is on
+                  the hover, and the button puts it on the clipboard. */}
+              <Text
+                fontFamily="mono"
+                fontSize="xs"
+                color="fg.muted"
+                truncate
+                maxWidth="full"
+                title={connection.issuer}
+              >
+                {connection.issuer.replace(/^https?:\/\//, "")}
+              </Text>
+              <IconButton
+                aria-label="Copy issuer address"
+                size="xs"
+                variant="ghost"
+                flexShrink={0}
+                color="fg.subtle"
+                _hover={{ color: "fg.muted" }}
+                onClick={copyIssuer}
+              >
+                <Copy size={12} />
+              </IconButton>
+            </HStack>
+          </SettingRow>
+        )}
       </SettingList>
-      {/* WHAT TURNING IT ON DID, and the way back. The chip says the
-          connection is active; what it cannot fit is that this is the
-          moment everybody's sign-in actually moved, and that the
-          administrator can move it back themselves. */}
+      {/* WHAT TURNING IT ON DID, and the way back — the REAL one. This used
+          to promise "turn the connection off to move them back, it takes
+          effect immediately", and there is no such control on this page or
+          anywhere else the customer can reach: suspending is deliberately an
+          operator's lever (specs/identity/sso-activation.feature), and the
+          only control here SCHEDULES a removal with a grace period. An
+          administrator who read that sentence and then went looking for the
+          switch found the danger zone instead. */}
       {goLive?.activated && (
         <Text fontSize="xs" color="fg.muted" lineHeight="1.6">
           People with an address at your proved domains now sign in through your
-          identity provider. Turn the connection off to move them back — it
-          takes effect immediately.
+          identity provider. Anybody holding a way back in can still sign in
+          directly. To undo this, remove the connection below — sign-in keeps
+          working through a grace period, and we refuse it while it would
+          leave somebody with no way in.
         </Text>
       )}
     </SettingsCard>
@@ -740,6 +791,8 @@ function SetupJourneySteps({
           providerName={connection.providerId}
           canManage={canManage}
           testSignIn={goLive?.testSignIn ?? { done: false, atMs: null }}
+          connectionState={connection.state}
+          verifiedDomains={connection.verifiedDomains}
         />
       </SetupStep>
 

@@ -3,7 +3,7 @@ import {
   isStableAuthError,
   normalizeErrorCode,
   STABLE_AUTH_ERRORS,
-} from "../../../pages/auth/error";
+} from "../../../features/auth/logic/signInErrorCodes";
 
 describe("normalizeErrorCode", () => {
   describe("when given null or undefined", () => {

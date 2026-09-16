@@ -16,6 +16,7 @@ import type {
 } from "@langwatch/identity-server";
 import { Check, KeyRound, RefreshCw } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { SsoSettingsTable } from "~/features/sso/components/SsoSettingsTable";
 import { domainNextStepFor } from "~/features/sso/logic/domainNextStep";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "../../../utils/api";
@@ -81,10 +82,11 @@ export function DomainsSection({
           .
         </Text>
       ) : (
-        // Hairlines, not a filled band. The default header wears a solid
-        // fill, which on a three-row table reads as a heavier object than the
-        // thing it labels — and the rows underneath it are the content.
-        <Table.Root size="sm" variant="line">
+        // Hairlines inside, one outline around: the default header wears a
+        // solid fill, which on a three-row table reads as a heavier object
+        // than the thing it labels — and the rows underneath it are the
+        // content. The frame is shared with the break-glass table below.
+        <SsoSettingsTable>
           <Table.Header>
             <Table.Row background="transparent">
               <Table.ColumnHeader>Domain</Table.ColumnHeader>
@@ -115,7 +117,7 @@ export function DomainsSection({
               />
             ))}
           </Table.Body>
-        </Table.Root>
+        </SsoSettingsTable>
       )}
 
       {canManage && (

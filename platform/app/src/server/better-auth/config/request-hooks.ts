@@ -40,7 +40,37 @@ export interface RequestHooksDeps {
    *  Asked at the credential boundary so a deployment that issues its own
    *  passwords still cannot hand one to somebody their company signs in. */
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
+  /** Locking an address after repeated failures (GAC-09). */
+  signInLockout: () => SignInAttemptCounter;
 }
+
+/**
+ * The part of the lock-out service these hooks use.
+ *
+ * Narrower than the service on purpose: a request hook may refuse an attempt
+ * and record how it went, and must not be able to release a hold - that is an
+ * administrator's act, and it belongs on a surface with a permission on it.
+ */
+export interface SignInAttemptCounter {
+  refuseIfLockedOut(args: { identifier: string }): Promise<void>;
+  recordFailure(args: { identifier: string }): Promise<void>;
+  recordSuccess(args: { identifier: string }): Promise<void>;
+}
+
+/**
+ * The paths where a sign-in is ATTEMPTED with an address in hand (GAC-09).
+ * Spec: specs/identity/org-account-lockout.feature.
+ *
+ * Only the password path, and the spec says why at length: this counter is
+ * keyed on the address, and the second-step endpoints carry no address - a
+ * wrong one-time code arrives with a pending ceremony and nothing naming
+ * whose it is. Those keep the two-step plugin's own per-account lock, which
+ * has been there since D06.
+ */
+const LOCKOUT_COUNTED_SUFFIXES = ["/sign-in/email"] as const;
+
+const isLockoutCountedPath = (pathname: string): boolean =>
+  LOCKOUT_COUNTED_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
 
 /**
  * Whether a licensed deployment should refuse this credential route, the
@@ -305,6 +335,46 @@ async function enforceFederationRoutes({
  *     OAuth-born with no password, so reset is the inbox-proof
  *     self-recovery door (Decision 4 exception).
  */
+/**
+ * Records how a sign-in attempt went (GAC-09).
+ *
+ * Its own failure is swallowed, and that is the right trade in both
+ * directions. A counter that could not be written must not turn somebody's
+ * correct password into an error, and it must not turn a wrong one into a
+ * success either - the endpoint has already answered by the time this runs,
+ * so neither outcome is changed by anything here. What is lost is a count,
+ * and the log line is what makes that findable.
+ */
+async function countSignInAttempt({
+  ctx,
+  signInLockout,
+}: {
+  ctx: {
+    request?: { url?: string };
+    body?: unknown;
+    context?: { returned?: unknown };
+  };
+  signInLockout: () => SignInAttemptCounter;
+}): Promise<void> {
+  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const identifier = submittedAddress(ctx.body);
+  if (identifier === null) return;
+
+  const refused = ctx.context?.returned instanceof APIError;
+  try {
+    await (refused
+      ? signInLockout().recordFailure({ identifier })
+      : signInLockout().recordSuccess({ identifier }));
+  } catch (error) {
+    logger.warn(
+      { error, refused },
+      "could not record how a sign-in attempt went; the attempt itself already answered",
+    );
+  }
+}
+
 export function requestHooks({
   refuseIfItClosesTheLastDoor,
   requiringOrganizations,
@@ -313,12 +383,27 @@ export function requestHooks({
   twoStepCeremonies,
   signInAfterPasswordReset,
   addressRoutesToConnection,
+  signInLockout,
 }: RequestHooksDeps): BetterAuthOptions["hooks"] {
   return {
     before: createAuthMiddleware(async (ctx) => {
       const url = ctx.request?.url ?? "";
       const pathname = normalizedRequestPathname(url);
       const endpointPath = ctx.path ?? pathname;
+
+      // GAC-09, and FIRST of the checks here, because a locked address must
+      // not get a free credential comparison out of every attempt: running
+      // the password check before the lock would let somebody keep testing
+      // passwords for as long as they liked and simply not be told the
+      // answer, with the timing of the response telling them anyway.
+      const attemptedAddress = isLockoutCountedPath(pathname)
+        ? submittedAddress(ctx.body)
+        : null;
+      if (attemptedAddress !== null) {
+        await signInLockout().refuseIfLockedOut({
+          identifier: attemptedAddress,
+        });
+      }
 
       // Local account creation belongs to `user.register`, which writes the
       // pending-confirmation latch and sends its continuation email. Leaving
@@ -389,6 +474,12 @@ export function requestHooks({
       // `password-reset-session.ts` for why the callback and the hook split
       // the job between them.
       await signInAfterPasswordReset(ctx as never);
+      // GAC-09: how the attempt went. Counted HERE rather than optimistically
+      // in the before hook because after-hooks run for refusals too —
+      // better-auth puts the `APIError` in `returned` rather than throwing
+      // past them — so the outcome is known exactly, and a correct password
+      // is never counted as a failure.
+      await countSignInAttempt({ ctx, signInLockout });
     }),
   };
 }

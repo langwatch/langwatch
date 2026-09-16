@@ -21,7 +21,7 @@
  * tree in to prove neither.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -305,10 +305,16 @@ describe("the directory provisioning page", () => {
 
       expect(screen.getByText("Sam Patel lost access")).toBeTruthy();
       expect(screen.getByText("Removed")).toBeTruthy();
+      // THE AUTHOR IS STATED ONCE, NOT ON EVERY ROW. `author` is a constant
+      // — always the directory, never a person, which is the whole point of
+      // the list — so printing it per row repeated the section heading up to
+      // fifty times. The attribution still has to be here; it is just here
+      // once.
       expect(
-        screen.getByText(
-          `Your identity provider · ${new Date(T0 + 2_000).toLocaleString()}`,
-        ),
+        screen.getByText("Recent changes from your identity provider"),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(new Date(T0 + 2_000).toLocaleString()),
       ).toBeTruthy();
     });
   });
@@ -352,8 +358,22 @@ describe("the directory provisioning page", () => {
         />,
       );
 
-      // Not disabled — absent. There is no button on this panel at all.
-      expect(screen.queryAllByRole("button")).toEqual([]);
+      // Not disabled — absent. The panel offers no way to re-run a push, and
+      // the only controls on it disclose things that are already here: the
+      // raw request log, and the rest of a change list capped at eight.
+      // Asserted as an allowlist rather than "no buttons at all", so a Retry
+      // appearing later still fails this.
+      const offered = screen
+        .queryAllByRole("button")
+        .map((control) => control.textContent?.trim() ?? "");
+      for (const label of offered) {
+        expect(label).toMatch(
+          /what your identity provider sent|Show \d+ more|Show fewer/,
+        );
+      }
+      expect(offered.some((label) => /retry|re-?run|try again/i.test(label))).toBe(
+        false,
+      );
       expect(
         screen.getAllByText(
           /next push re-asserts everything it still believes/i,
@@ -529,6 +549,12 @@ describe("given a connection the directory has been pushing to", () => {
 
       // The fixture has more than one running connection, and each card
       // carries its own list. The first is this connection's.
+      // CLOSED BY DEFAULT since the page was reported as saying the same
+      // thing three times: the raw requests are the lowest altitude and the
+      // narrowest audience, so they are the ones that fold.
+      const [toggle] = screen.getAllByTestId("directory-requests-toggle");
+      if (!toggle) throw new Error("no request-log disclosure rendered");
+      fireEvent.click(toggle);
       const [requests] = screen.getAllByTestId("directory-requests");
       if (!requests) throw new Error("no requests list rendered");
       // "users", not "Users" and never "Users/:id": the stored form keeps a
@@ -559,6 +585,12 @@ describe("given a connection the directory has been pushing to", () => {
         />,
       );
 
+      // CLOSED BY DEFAULT since the page was reported as saying the same
+      // thing three times: the raw requests are the lowest altitude and the
+      // narrowest audience, so they are the ones that fold.
+      const [toggle] = screen.getAllByTestId("directory-requests-toggle");
+      if (!toggle) throw new Error("no request-log disclosure rendered");
+      fireEvent.click(toggle);
       const [requests] = screen.getAllByTestId("directory-requests");
       if (!requests) throw new Error("no requests list rendered");
       // Requests age out of a retention window, so the words are about what
@@ -599,6 +631,12 @@ describe("given a connection the directory has been pushing to", () => {
         />,
       );
 
+      // CLOSED BY DEFAULT since the page was reported as saying the same
+      // thing three times: the raw requests are the lowest altitude and the
+      // narrowest audience, so they are the ones that fold.
+      const [toggle] = screen.getAllByTestId("directory-requests-toggle");
+      if (!toggle) throw new Error("no request-log disclosure rendered");
+      fireEvent.click(toggle);
       const [requests] = screen.getAllByTestId("directory-requests");
       if (!requests) throw new Error("no requests list rendered");
       expect(
@@ -630,6 +668,12 @@ describe("given a connection the directory has been pushing to", () => {
         />,
       );
 
+      // CLOSED BY DEFAULT since the page was reported as saying the same
+      // thing three times: the raw requests are the lowest altitude and the
+      // narrowest audience, so they are the ones that fold.
+      const [toggle] = screen.getAllByTestId("directory-requests-toggle");
+      if (!toggle) throw new Error("no request-log disclosure rendered");
+      fireEvent.click(toggle);
       const [requests] = screen.getAllByTestId("directory-requests");
       if (!requests) throw new Error("no requests list rendered");
       expect(within(requests).queryByText(/No requests recorded/)).toBeNull();
@@ -653,6 +697,12 @@ describe("given a connection the directory has been pushing to", () => {
 
       // The fixture has more than one running connection, and each card
       // carries its own list. The first is this connection's.
+      // CLOSED BY DEFAULT since the page was reported as saying the same
+      // thing three times: the raw requests are the lowest altitude and the
+      // narrowest audience, so they are the ones that fold.
+      const [toggle] = screen.getAllByTestId("directory-requests-toggle");
+      if (!toggle) throw new Error("no request-log disclosure rendered");
+      fireEvent.click(toggle);
       const [requests] = screen.getAllByTestId("directory-requests");
       if (!requests) throw new Error("no requests list rendered");
       expect(within(requests).getByText(/thirty days/i)).toBeTruthy();

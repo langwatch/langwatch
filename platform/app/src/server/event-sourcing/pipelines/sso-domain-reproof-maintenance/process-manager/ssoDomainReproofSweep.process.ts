@@ -1,31 +1,15 @@
-/**
- * The sweep that re-reads the records proving domains (ADR-123 — see
- * specs/identity/sso-domain-verification.feature).
- *
- * An in-process interval loop, the same shape as `breakGlassExpiryWorker`
- * next to it: there is no per-organization calendar to keep and no row to
- * schedule against, only "read every proved domain's record again and say
- * what changed".
- *
- * A missed tick costs a late waver, never a wrong one. The clock a domain
- * lapses on is written on the wavering fact and compared at the moment a
- * check runs, so a worker that was down over a weekend produces a lapse on
- * the first tick after it comes back rather than a lapse that silently
- * happened while nobody was looking — and a resolver of ours that could not
- * answer produces nothing at all, which is the property the whole design
- * rests on.
- */
-
 import type { SsoDomainReproofOutcome } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { ssoDomainReproof } from "~/server/app-layer/identity/runtime";
-import {
-  captureException,
-  toError,
-  withScope,
-} from "~/utils/posthogErrorCapture";
+import { z } from "zod";
 
-const logger = createLogger("langwatch:workers:ssoDomainReproofWorker");
+import type {
+  IntentSpec,
+  WakeHandler,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+
+const logger = createLogger("langwatch:identity:sso-domain-reproof:sweep");
+
+export const SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME = "ssoDomainReproofSweep";
 
 /**
  * Every eight hours — three reads of a domain a day.
@@ -37,11 +21,48 @@ const logger = createLogger("langwatch:workers:ssoDomainReproofWorker");
  * customer could perceive and would multiply the lookups a large deployment
  * makes against other people's nameservers.
  */
-export const SSO_DOMAIN_REPROOF_INTERVAL_MS = 8 * 60 * 60 * 1000;
+export const SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000;
 
-export interface SsoDomainReproofWorkerHandle {
-  stop(): void;
+/**
+ * Outbox rows this process writes are bookkeeping, one per tick, pruned on the
+ * same schedule every other recurring process uses.
+ */
+const SWEEP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const ssoDomainReproofSweepSchema = z.object({
+  scheduledFor: z.number().int(),
+});
+
+export interface SsoDomainReproofSweepState {
+  lastSweepAt: number | null;
 }
+
+export interface SsoDomainReproofSweepDeps {
+  sweep: () => Promise<SsoDomainReproofOutcome>;
+  deleteDispatchedBefore: (params: {
+    processName: string;
+    before: number;
+  }) => Promise<number>;
+  now?: () => number;
+}
+
+type SsoDomainReproofSweepIntents = {
+  sweep: IntentSpec<typeof ssoDomainReproofSweepSchema>;
+};
+
+/**
+ * Wake handlers must be pure and synchronous, with no I/O and no clock read,
+ * because the commit that persists this evolution is what fences racing
+ * workers. The DNS re-reads run as an intent instead, behind the outbox
+ * lease.
+ */
+export const ssoDomainReproofSweepWake: WakeHandler<
+  SsoDomainReproofSweepState,
+  SsoDomainReproofSweepIntents
+> = (_state, ctx) => ({
+  state: { lastSweepAt: ctx.at },
+  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+});
 
 /**
  * What one sweep is worth saying out loud.
@@ -89,43 +110,25 @@ function report(outcome: SsoDomainReproofOutcome): void {
   }
 }
 
-export function startSsoDomainReproofWorker():
-  | SsoDomainReproofWorkerHandle
-  | undefined {
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
+export function runSsoDomainReproofSweep({
+  sweep,
+  deleteDispatchedBefore,
+  now,
+}: SsoDomainReproofSweepDeps) {
+  return async (): Promise<void> => {
+    const startedAt = (now ?? Date.now)();
+    report(await sweep());
 
-  const tick = async () => {
-    if (stopped) return;
     try {
-      report(await ssoDomainReproof().sweep());
+      await deleteDispatchedBefore({
+        processName: SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+        before: startedAt - SWEEP_ROW_RETENTION_MS,
+      });
     } catch (error) {
       logger.warn(
-        { error },
-        "domain verification sweep failed (will retry on the next interval)",
+        { error: error instanceof Error ? error.message : String(error) },
+        "SSO domain reproof outbox retention failed",
       );
-      await withScope(async (scope) => {
-        scope.setTag?.("worker", "ssoDomainReproof");
-        captureException(toError(error));
-      });
     }
-    if (!stopped) {
-      timer = setTimeout(() => void tick(), SSO_DOMAIN_REPROOF_INTERVAL_MS);
-    }
-  };
-
-  // Five minutes in rather than at boot. The first tick makes outbound DNS
-  // lookups and writes to the ledger, and a pod restarting in a crash loop
-  // should not do either before it has stayed up long enough to be trusted
-  // with them.
-  timer = setTimeout(() => void tick(), 5 * 60_000);
-  logger.info("sso domain re-proof worker started");
-
-  return {
-    stop() {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-      logger.info("sso domain re-proof worker stopped");
-    },
   };
 }

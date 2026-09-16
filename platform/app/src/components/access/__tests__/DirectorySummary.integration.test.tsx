@@ -127,7 +127,11 @@ describe("given an organization whose directory is syncing", () => {
       // The explanation is the tile's own visible line now, not a hover.
       expect(
         screen.getByText(
-          /removing them from your directory will not remove them here/,
+          // The consequence, which is the whole of what the number is for.
+          // It names no arrival route: the sentence used to list two, and on
+          // a real organization none of the people it described had come
+          // either way.
+          /removing them there will not remove them here/,
         ),
       ).toBeInTheDocument();
     });

@@ -1,4 +1,6 @@
+import { Response } from "undici";
 import { describe, expect, it } from "vitest";
+import type { EgressFetch } from "../public-egress";
 import { HttpsDomainProofFileLookup } from "../sso-domain-file-lookup";
 
 /**
@@ -19,10 +21,10 @@ function lookupAnswering(response: () => Promise<Response>): {
   asked: string[];
 } {
   const asked: string[] = [];
-  const fetchImpl = (async (input: RequestInfo | URL) => {
-    asked.push(String(input));
+  const fetchImpl: EgressFetch = async (url) => {
+    asked.push(url);
     return response();
-  }) as typeof fetch;
+  };
   // Resolves to a public address unless a test says otherwise, so no case
   // here touches DNS.
   return {
@@ -133,14 +135,11 @@ describe("given a name whose answer changes between the check and the socket", (
       // pinned to, so a second answer never reaches a socket.
       const answers = [["93.184.216.34"], ["127.0.0.1"]];
       let call = 0;
-      const seen: (RequestInit & { dispatcher?: unknown })[] = [];
-      const fetchImpl = (async (
-        _input: RequestInfo | URL,
-        init?: RequestInit,
-      ) => {
-        seen.push(init ?? {});
+      const seen: Parameters<EgressFetch>[1][] = [];
+      const fetchImpl: EgressFetch = async (_url, init) => {
+        seen.push(init);
         return respond(200, "lw-token-123");
-      }) as typeof fetch;
+      };
 
       const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => {
         const answer = answers[Math.min(call, answers.length - 1)];
@@ -167,10 +166,10 @@ describe("given a name whose answer changes between the check and the socket", (
       // thing an attacker can do to a check — and a transient EAI_AGAIN
       // under resolver load did it by accident.
       const asked: string[] = [];
-      const fetchImpl = (async (input: RequestInfo | URL) => {
-        asked.push(String(input));
+      const fetchImpl: EgressFetch = async (url) => {
+        asked.push(url);
         return respond(200, "lw-token-123");
-      }) as typeof fetch;
+      };
 
       const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => {
         throw Object.assign(new Error("resolver is busy"), {
@@ -341,10 +340,10 @@ describe("given a fetch aimed somewhere on our own network", () => {
       // is a perfectly well-formed public hostname, and whether it answers
       // with 10.0.0.5 is a fact about DNS at request time.
       const asked: string[] = [];
-      const fetchImpl = (async (input: RequestInfo | URL) => {
-        asked.push(String(input));
+      const fetchImpl: EgressFetch = async (url) => {
+        asked.push(url);
         return respond(200, "lw-token-123");
-      }) as typeof fetch;
+      };
       const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => [
         "10.0.0.5",
       ]);
@@ -362,7 +361,7 @@ describe("given a fetch aimed somewhere on our own network", () => {
     });
 
     it("refuses a name that answers with one public and one private address", async () => {
-      const fetchImpl = (async () => respond(200, "x")) as typeof fetch;
+      const fetchImpl: EgressFetch = async () => respond(200, "x");
       const lookup = new HttpsDomainProofFileLookup(fetchImpl, async () => [
         "93.184.216.34",
         "127.0.0.1",

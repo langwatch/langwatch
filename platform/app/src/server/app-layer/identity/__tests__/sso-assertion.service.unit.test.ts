@@ -1,8 +1,40 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * The log the gate writes its reason to.
+ *
+ * Stubbed rather than ignored because WRITING IT DOWN IS HALF THE FEATURE.
+ * Before this, seven distinct causes shared one code and produced no server
+ * log line at all, so the only record of which check had refused somebody was
+ * a code in their address bar — and that code was the same for all seven.
+ * Asserting on the line is the only way to keep that from happening again.
+ */
+const { loggerStub } = vi.hoisted(() => ({
+  loggerStub: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn(),
+  },
+}));
+
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, createLogger: () => loggerStub };
+});
+
 import {
   type SignInConnection,
   SsoAssertionService,
 } from "../sso-assertion.service";
+
+beforeEach(() => {
+  loggerStub.info.mockClear();
+  loggerStub.warn.mockClear();
+  loggerStub.error.mockClear();
+});
 
 /**
  * Whether an assertion from a customer's identity provider may become a
@@ -98,16 +130,24 @@ const serviceOver = ({
           candidate.address === email.trim().toLowerCase(),
       ),
   );
+  const requestReproof = vi.fn().mockResolvedValue(undefined);
   return {
     service: new SsoAssertionService({
       connections: { findConnectionForSignIn },
       memberships: { findRegistrantAtAddress, findBoundMemberIdentity },
+      reproof: { requestReproof },
     }),
     findConnectionForSignIn,
     findRegistrantAtAddress,
     findBoundMemberIdentity,
+    requestReproof,
   };
 };
+
+/** The code a refusal answers with, or how it continued. */
+const codeOf = (
+  decision: Awaited<ReturnType<SsoAssertionService["decide"]>>,
+) => (decision.action === "reject" ? decision.error.code : "continued");
 
 describe("given a live connection", () => {
   describe("when it asserts an address on a domain it proved", () => {
@@ -363,6 +403,7 @@ describe("given a connection that is not live yet", () => {
 
 describe("given an assertion that names no connection we hold", () => {
   describe("when it reaches the gate", () => {
+    /** @scenario "No such connection is held" */
     it("refuses an id that is shaped like a connection but is not one", async () => {
       const { service } = serviceOver({ row: null });
       const decision = await service.decide({
@@ -372,6 +413,7 @@ describe("given an assertion that names no connection we hold", () => {
       expect(decision.action).toBe("reject");
     });
 
+    /** @scenario "The named provider is not a connection at all" */
     it("refuses an id that is not a connection id at all", async () => {
       const { service, findConnectionForSignIn } = serviceOver({
         row: connection(),
@@ -408,34 +450,434 @@ describe("given an address the gate cannot read a domain from", () => {
 });
 
 describe("given several different reasons to refuse", () => {
-  describe("when each is refused", () => {
-    /** @scenario "Every refusal at the door says the same thing" */
-    it("answers one code, so the refusal names no cause", async () => {
+  describe("when the cause would answer whether something exists here", () => {
+    /** @scenario "A refusal about what exists here says nothing" */
+    it("answers them identically, so no connection identifier is confirmed", async () => {
       const causes = await Promise.all([
+        // A connection identifier we hold no row for.
+        serviceOver({ row: null }).service.decide({
+          providerId: CONNECTION_ID,
+          email: "ana@acme.com",
+        }),
+        // Not a connection identifier at all.
+        serviceOver({ row: connection() }).service.decide({
+          providerId: "google",
+          email: "ana@acme.com",
+        }),
+        // A connection recording nobody as having registered it. Ours to go
+        // and fix, and never the caller's to hear about.
+        serviceOver({
+          row: connection({ state: "DRAFT", createdBy: null }),
+        }).service.decide({
+          providerId: CONNECTION_ID,
+          email: "ana@acme.com",
+        }),
+      ]);
+
+      // Distinguishing these would turn the gate into a way to find out which
+      // connection identifiers are real.
+      expect(new Set(causes.map(codeOf))).toEqual(
+        new Set(["sso_sign_in_refused"]),
+      );
+    });
+  });
+
+  describe("when the cause is the caller's own assertion or configuration", () => {
+    /** @scenario "The identity provider released no email address" */
+    it("says the provider sent no address", async () => {
+      // Authenticated successfully, released nothing to match on. The single
+      // most common enterprise misconfiguration there is, and a fact about
+      // their own assertion rather than anything of ours.
+      expect(
+        codeOf(
+          await serviceOver({ row: connection() }).service.decide({
+            providerId: CONNECTION_ID,
+            email: null,
+          }),
+        ),
+      ).toBe("sso_assertion_without_address");
+    });
+
+    /** @scenario "The asserted domain is not one the connection has proved" */
+    it("says the domain is not verified for this connection", async () => {
+      expect(
+        codeOf(
+          await serviceOver({ row: connection() }).service.decide({
+            providerId: CONNECTION_ID,
+            email: "x@no.test",
+          }),
+        ),
+      ).toBe("sso_domain_not_verified");
+    });
+
+    /** @scenario "The provider asserted an address the connection cannot carry yet" */
+    it("says the address was not the registrant's, naming nobody", async () => {
+      // No `members`, so the directory answers nobody: this is somebody who
+      // is not the registrant. The refusal names the address as the cause
+      // rather than the connection's lifecycle — the reader is often the
+      // administrator running the test that setup asked them for, and
+      // "still being set up" tells them they may not do what they are being
+      // told to do — while still naming no address and nobody.
+      const decision = await serviceOver({
+        row: connection({ state: "DRAFT" }),
+      }).service.decide({
+        providerId: CONNECTION_ID,
+        email: "x@acme.com",
+      });
+
+      expect(codeOf(decision)).toBe("sso_setup_address_mismatch");
+      // The registrant's identifier appears nowhere in what crosses back.
+      expect(JSON.stringify(decision)).not.toContain(REGISTRAR_ID);
+    });
+
+    /** @scenario "The domain's proof has lapsed and this account is new" */
+    it("says the domain's verification has lapsed", async () => {
+      expect(
+        codeOf(
+          await serviceOver({
+            row: connection({
+              lapsedDomains: ["acme.com"],
+              domainVerifications: [
+                { ...DOMAIN_PROOF, proofState: "LAPSED" as const },
+              ],
+            }),
+          }).service.decide({
+            providerId: CONNECTION_ID,
+            accountId: "subject-newcomer",
+            email: "newhire@acme.com",
+          }),
+        ),
+      ).toBe("sso_domain_proof_lapsed");
+    });
+
+    /** @scenario "The opaque refusal is not the credential refusal" */
+    /** @scenario "No refusal at the door claims a password was wrong" */
+    it("never borrows the credential refusal's code", async () => {
+      // `identity_sign_in_refused` means "that email or password is wrong",
+      // and every one of these reached the gate without a password existing.
+      // It is also load-bearing on the credential screen, where it has to
+      // keep meaning exactly one thing.
+      const everyRefusal = await Promise.all([
         serviceOver({ row: null }).service.decide({
           providerId: CONNECTION_ID,
           email: "ana@acme.com",
         }),
         serviceOver({ row: connection() }).service.decide({
           providerId: CONNECTION_ID,
+          email: null,
+        }),
+        serviceOver({ row: connection() }).service.decide({
+          providerId: CONNECTION_ID,
           email: "x@no.test",
         }),
-        // No `members`, which is the default: this case is refused for the
-        // connection's state, and a member list would not change the answer.
         serviceOver({ row: connection({ state: "DRAFT" }) }).service.decide({
           providerId: CONNECTION_ID,
           email: "x@acme.com",
         }),
       ]);
 
-      const codes = new Set(
-        causes.map((decision) =>
-          decision.action === "reject" ? decision.code : "continued",
-        ),
+      expect(everyRefusal.map(codeOf)).not.toContain(
+        "identity_sign_in_refused",
       );
-      // An unauthenticated caller learns that they were refused and nothing
-      // about which of the checks refused them.
-      expect(codes).toEqual(new Set(["identity_sign_in_refused"]));
+    });
+  });
+
+  describe("when the reason is carried alongside the refusal", () => {
+    it("names which of the checks refused, for the log to read", async () => {
+      const { service } = serviceOver({ row: connection({ state: "DRAFT" }) });
+      const decision = await service.decide({
+        providerId: CONNECTION_ID,
+        email: "x@acme.com",
+      });
+
+      expect(decision).toMatchObject({
+        action: "reject",
+        reason: "setup-address-mismatch",
+      });
+    });
+  });
+});
+
+describe("given any refusal at all", () => {
+  describe("when it is made", () => {
+    /** @scenario "Every refusal logs which of the seven it was" */
+    it("writes down the reason, the connection and the domain", async () => {
+      // The half that was missing entirely. Seven causes shared one code and
+      // produced no log line, so which check had refused somebody existed
+      // nowhere a reader could reach — the only copy was in an address bar.
+      const { service } = serviceOver({ row: connection({ state: "DRAFT" }) });
+
+      await service.decide({
+        providerId: CONNECTION_ID,
+        email: "x@acme.com",
+      });
+
+      expect(loggerStub.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "setup-address-mismatch",
+          providerId: CONNECTION_ID,
+          organizationId: "org_acme",
+          domain: "acme.com",
+        }),
+        expect.stringContaining("refused"),
+      );
+    });
+
+    it("keeps the asserted address out of the line", async () => {
+      // Every one of the reasons is about the domain, the connection or the
+      // organization, so the full address identifies no cause the domain does
+      // not — and the addresses reaching this gate belong to people who may
+      // have no account here at all.
+      const { service } = serviceOver({ row: connection({ state: "DRAFT" }) });
+
+      await service.decide({
+        providerId: CONNECTION_ID,
+        email: "someone@acme.com",
+      });
+
+      expect(JSON.stringify(loggerStub.info.mock.calls)).not.toContain(
+        "someone@acme.com",
+      );
+    });
+
+    /** @scenario "A connection with no registrant recorded is logged as our fault" */
+    it("logs a connection with no registrant at error, not as routine", async () => {
+      // OURS, not theirs. A row in this state should not exist: the customer
+      // cannot act on it and is told nothing about it, but it is not a
+      // refusal to shrug at either — it is one to go and fix.
+      const { service } = serviceOver({
+        row: connection({ state: "DRAFT", createdBy: null }),
+      });
+
+      const decision = await service.decide({
+        providerId: CONNECTION_ID,
+        email: "ana@acme.com",
+      });
+
+      expect(loggerStub.error).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "connection-has-no-registrant" }),
+        expect.any(String),
+      );
+      // Loud for us, silent for them.
+      expect(codeOf(decision)).toBe("sso_sign_in_refused");
+    });
+  });
+});
+
+describe("given a domain whose published record has lapsed", () => {
+  const lapsed = () =>
+    connection({
+      lapsedDomains: ["acme.com"],
+      domainVerifications: [{ ...DOMAIN_PROOF, proofState: "LAPSED" as const }],
+    });
+
+  describe("when somebody new is refused because of it", () => {
+    /** @scenario "The gate asks for a re-read when it refuses somebody new" */
+    it("asks for that domain's record to be read again", async () => {
+      // The refusal is evidence somebody is being turned away right now,
+      // which the eight-hourly sweep has no way to know — and the record is
+      // very often simply back.
+      const { service, requestReproof } = serviceOver({ row: lapsed() });
+
+      await service.decide({
+        providerId: CONNECTION_ID,
+        accountId: "subject-newcomer",
+        email: "newhire@acme.com",
+      });
+
+      expect(requestReproof).toHaveBeenCalledWith({
+        connectionId: CONNECTION_ID,
+        domain: "acme.com",
+      });
+    });
+
+    it("still refuses when the request itself fails", async () => {
+      // A refusal that could not ask for a re-proof is still a refusal. If
+      // this threw, a 403 carrying words somebody can act on would become a
+      // 500 carrying none.
+      const { service, requestReproof } = serviceOver({ row: lapsed() });
+      requestReproof.mockRejectedValue(new Error("outbox unavailable"));
+
+      expect(
+        codeOf(
+          await service.decide({
+            providerId: CONNECTION_ID,
+            accountId: "subject-newcomer",
+            email: "newhire@acme.com",
+          }),
+        ),
+      ).toBe("sso_domain_proof_lapsed");
+    });
+  });
+
+  describe("when somebody already bound to the connection signs in", () => {
+    /** @scenario "Somebody already bound to the connection asks for nothing" */
+    it("carries them through and asks for nothing", async () => {
+      // ADR-123: a lapsed domain keeps signing in the people already there.
+      // Nobody was turned away, so there is nothing to go and re-check.
+      const { service, requestReproof } = serviceOver({
+        row: lapsed(),
+        boundIdentities: [
+          {
+            connectionId: CONNECTION_ID,
+            accountId: "subject-known",
+            address: "ana@acme.com",
+          },
+        ],
+      });
+
+      expect(
+        await service.decide({
+          providerId: CONNECTION_ID,
+          accountId: "subject-known",
+          email: "ana@acme.com",
+        }),
+      ).toEqual({ action: "continue" });
+      expect(requestReproof).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * The deadlock: a connection that has done everything activation asks except
+ * the sign-in currently being attempted
+ * (specs/identity/sso-assertion-refusals.feature).
+ *
+ * Activation refuses without a real sign-in, and a connection that was not
+ * ACTIVE accepted exactly one address — so an administrator whose provider
+ * asserts anything other than their own LangWatch address could never finish
+ * setup. Verifying the domain, which every screen told them to do, released
+ * nothing: a proved domain was only consulted once the connection was live.
+ */
+describe("given a connection that has done everything but the sign-in", () => {
+  /** Proved, arrivals decided — the row half of go-live readiness. */
+  const readyRow = (over: Partial<SignInConnection> = {}) =>
+    connection({
+      state: "VERIFIED",
+      arrivalPolicyDecidedAtMs: 1_756_000_000_000,
+      ...over,
+    });
+
+  const serviceWithBreakGlass = ({
+    row,
+    hasLiveBreakGlass = true,
+  }: {
+    row: SignInConnection;
+    hasLiveBreakGlass?: boolean;
+  }) => {
+    const breakGlassSpy = vi.fn().mockResolvedValue(hasLiveBreakGlass);
+    return {
+      service: new SsoAssertionService({
+        connections: { findConnectionForSignIn: async () => row },
+        memberships: {
+          // Nobody: so anything carried through is carried by readiness and
+          // not by the registrant exemption quietly matching.
+          findRegistrantAtAddress: async () => false,
+          findBoundMemberIdentity: async () => false,
+        },
+        breakGlass: { hasLiveBreakGlass: breakGlassSpy },
+      }),
+      breakGlassSpy,
+    };
+  };
+
+  describe("when its identity provider asserts an address on the proved domain", () => {
+    /** @scenario "A proved domain carries the sign-in that would activate it" */
+    it("carries the sign-in through", async () => {
+      const { service } = serviceWithBreakGlass({ row: readyRow() });
+
+      expect(
+        await service.decide({
+          providerId: CONNECTION_ID,
+          email: "newhire@acme.com",
+        }),
+      ).toEqual({ action: "continue" });
+    });
+  });
+
+  describe("when nobody can get in without the identity provider", () => {
+    /** @scenario "Missing any other precondition keeps the setup rule" */
+    it("holds the door exactly as before", async () => {
+      // The break-glass grant is what stops a connection admitting people it
+      // could then strand.
+      const { service } = serviceWithBreakGlass({
+        row: readyRow(),
+        hasLiveBreakGlass: false,
+      });
+
+      expect(
+        codeOf(
+          await service.decide({
+            providerId: CONNECTION_ID,
+            email: "newhire@acme.com",
+          }),
+        ),
+      ).toBe("sso_setup_address_mismatch");
+    });
+
+    it("holds it when nobody has decided what an arrival gets, too", async () => {
+      const { service } = serviceWithBreakGlass({
+        row: readyRow({ arrivalPolicyDecidedAtMs: null }),
+      });
+
+      expect(
+        codeOf(
+          await service.decide({
+            providerId: CONNECTION_ID,
+            email: "newhire@acme.com",
+          }),
+        ),
+      ).toBe("sso_setup_address_mismatch");
+    });
+  });
+
+  describe("when the asserted domain was never proved", () => {
+    /** @scenario "An unproved domain is never carried by readiness" */
+    it("is refused however ready everything else is", async () => {
+      // The proof is the entire basis for trusting the provider's word that
+      // an address is real, so no amount of other readiness substitutes.
+      const { service, breakGlassSpy } = serviceWithBreakGlass({
+        row: readyRow({ verifiedDomains: [], domainVerifications: [] }),
+      });
+
+      expect(
+        codeOf(
+          await service.decide({
+            providerId: CONNECTION_ID,
+            email: "newhire@acme.com",
+          }),
+        ),
+      ).toBe("sso_setup_address_mismatch");
+      // And the cheap in-memory fact answered it, so nothing was read.
+      expect(breakGlassSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a connection that is already live", () => {
+  describe("when anybody signs in through it", () => {
+    /** @scenario "A live connection asks nothing extra" */
+    it("asks the database no readiness question", async () => {
+      // This runs on every single sign-on request in the product, so an
+      // extra read here would be a tax on all of them for a rule that only
+      // matters before activation.
+      const breakGlassSpy = vi.fn().mockResolvedValue(true);
+      const service = new SsoAssertionService({
+        connections: { findConnectionForSignIn: async () => connection() },
+        memberships: {
+          findRegistrantAtAddress: async () => false,
+          findBoundMemberIdentity: async () => false,
+        },
+        breakGlass: { hasLiveBreakGlass: breakGlassSpy },
+      });
+
+      expect(
+        await service.decide({
+          providerId: CONNECTION_ID,
+          email: "ana@acme.com",
+        }),
+      ).toEqual({ action: "continue" });
+      expect(breakGlassSpy).not.toHaveBeenCalled();
     });
   });
 });

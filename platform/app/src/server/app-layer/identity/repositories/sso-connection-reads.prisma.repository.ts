@@ -143,6 +143,10 @@ export class PrismaSsoConnectionReadRepository
       domainVerifications: state.domainVerifications,
       lapsedDomains: row.lapsedDomains,
       arrivalPolicy: state.arrivalPolicy,
+      // Read for the go-live readiness the assertion gate asks about: a
+      // connection that has done everything but the sign-in is trusted for
+      // the sign-in that would complete it.
+      arrivalPolicyDecidedAtMs: state.arrivalPolicyDecidedAtMs,
       createdBy: state.createdBy,
       source: state.source,
       providerId: state.idpMetadata.providerId,

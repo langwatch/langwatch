@@ -20,6 +20,7 @@ function serviceResolving(addresses: string[]) {
   const service = new SsoConnectionBackofficeService({
     reads: {} as never,
     connections: () => ({ registerConnection }) as never,
+    history: {} as never,
     resolveHost: async () => addresses,
   });
   return { service, registerConnection };

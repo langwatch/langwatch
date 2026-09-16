@@ -20,9 +20,6 @@ describe("resolveWorkerBootPlan", () => {
       "spend-spike-anomaly",
       "usage-stats",
       "realtime-session-poller",
-      "break-glass-expiry",
-      "sso-domain-reproof",
-      "scim-request-log-retention",
     ]);
   });
 

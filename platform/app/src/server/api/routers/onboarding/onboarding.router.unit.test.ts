@@ -387,4 +387,5 @@ describe("onboarding.initializeOrganization", () => {
       expect(mockCaptureException).toHaveBeenCalledWith(error);
     });
   });
+
 });

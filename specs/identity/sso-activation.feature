@@ -208,6 +208,90 @@ Feature: Going live with your own identity provider, without asking us
     But they are not a member until an administrator answers
 
   # ---------------------------------------------------------------------
+  # Where the test sign-in leaves you
+  # ---------------------------------------------------------------------
+
+  # THE ONE ARRIVAL THAT IS ALWAYS EARLY. Going live needs a test sign-in, and
+  # a test sign-in happens while the connection is still VERIFIED - so the
+  # arrival gate, which admits nobody before ACTIVE, drops it every time. The
+  # tester is left authenticated, holding no membership, and the orgless
+  # landing sends them to the screen that creates an organization: the "handed
+  # a brand new workspace of their own" outcome the decided-arrivals
+  # precondition exists to prevent, reached by the one sign-in the checklist
+  # itself demands.
+  #
+  # The arrival rule is unchanged - nobody is provisioned before the
+  # connection is live. What changes is that the product stops treating the
+  # tester as a fresh signup. The connection they came through is named by the
+  # account the sign-in left behind, and a connection that is not live is the
+  # whole of the evidence. Nothing travels back from the provider to say so:
+  # a query parameter the browser sets is not evidence, because the browser
+  # is who we would be asking.
+
+  @unit
+  Scenario: A sign-in through a connection that is not live yet is a test arrival
+    Given somebody holds an account through a connection that is not live
+    When the server is asked where they stand
+    Then they are answered as somebody testing a connection
+    And the connection and the organization it belongs to are named
+
+  @unit
+  Scenario: A sign-in through a live connection is not a test arrival
+    Given somebody holds an account through a connection that is live
+    When the server is asked where they stand
+    Then they are not answered as somebody testing a connection
+
+  # NOT LIVE IS NOT THE SAME AS BEING SET UP. A discarded, rejected,
+  # suspended or torn-down connection is every bit as much "not ACTIVE" as one
+  # half-way through its ceremonies, and somebody holding an account through
+  # one of those has no setup to go back and finish. Answering for them would
+  # tell them to complete something that no longer exists and refuse them an
+  # organization for good, which is a worse dead end than the one this
+  # replaced.
+
+  @unit
+  Scenario: A connection that was abandoned strands nobody
+    Given somebody holds an account through a connection that was discarded
+    When the server is asked where they stand
+    Then they are not answered as somebody testing a connection
+    And the ordinary way out of belonging to no organization is still open
+
+  @unit
+  Scenario: The browser's own say-so is not what decides it
+    Given somebody holds no account through any connection
+    When their browser claims the sign-in was a test
+    Then they are not answered as somebody testing a connection
+
+  @unit
+  Scenario: A test arrival is not sent to the screen that creates an organization
+    Given somebody belongs to no organization
+    When they arrived through a connection that is not live
+    Then they are sent to what happened to their test sign-in
+    But somebody who simply has no organization yet still reaches the screen
+    that creates one
+
+  @unit
+  Scenario: Nobody is sent anywhere while the question is still out
+    Given somebody belongs to no organization
+    When it is not known yet whether they arrived through a connection
+    Then they are sent nowhere until it is
+
+  @integration
+  Scenario: A test arrival is told the test worked and offered the way back
+    Given an administrator has signed in through a connection that is not live
+    When they land on what happened
+    Then they are told the test sign-in worked
+    And they are told which address the session is now held as
+    And they are offered the way back to their own account
+
+  @unit
+  Scenario: A test arrival cannot create an organization
+    Given somebody signed in through a connection that is not live yet
+    When they ask to create an organization
+    Then it is refused with code sso_test_arrival_cannot_create_organization
+    And no organization is created
+
+  # ---------------------------------------------------------------------
   # A way back in
   # ---------------------------------------------------------------------
 
@@ -333,6 +417,20 @@ Feature: Going live with your own identity provider, without asking us
   # ---------------------------------------------------------------------
   # Going live
   # ---------------------------------------------------------------------
+
+  # THE SECOND HALF OF THE ERRAND IS ON ANOTHER PAGE, reading another query.
+  # Going live is what makes a connection able to carry a provisioning token,
+  # and the dialog that issues one decides what to offer from a read this
+  # screen never touched — so the connection just turned on was still
+  # remembered as not live, and the dialog said so, with a page reload as the
+  # only way forward.
+
+  @integration
+  Scenario: A connection just turned on can carry a provisioning token without a reload
+    Given an administrator has turned their connection on
+    When they go on to set up provisioning
+    Then the connection is offered as one that can carry a token
+    And they do not have to reload the page first
 
   @unit
   Scenario: Going live with all three preconditions met turns the connection on

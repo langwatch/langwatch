@@ -60,6 +60,45 @@ export type SsoConnectionLifecycleState = z.infer<
 >;
 
 /**
+ * The states on the way to ACTIVE, and nothing else.
+ *
+ * AN ALLOWLIST, DELIBERATELY. The question this answers — "is somebody who
+ * signed in through this connection part-way through setting it up?" — reads
+ * naturally as "is it not live yet", and that spelling is wrong in a way that
+ * strands people: DISCARDED, SUSPENDED, TEARDOWN_PENDING and TORN_DOWN are
+ * every one of them "not ACTIVE", and somebody holding an account through one
+ * of those has no setup to go back and finish. Treating them as mid-setup
+ * tells them to complete something that no longer exists, and refuses them
+ * the ordinary way out of belonging to nothing.
+ *
+ * REJECTED is left out for a different reason, and not because it is over —
+ * a rejected claim may be claimed again (see the lifecycle note above). It is
+ * out because the next move belongs to a LangWatch operator rather than to
+ * the customer, so telling them to go and finish it points at a door only
+ * somebody else can open.
+ *
+ * So this names the five states a connection passes through on its way to
+ * deciding sign-ins. A state not named here — including any added later — is
+ * not a setup in progress, which leaves the person on the ordinary path
+ * rather than in a screen with no exit.
+ */
+const SSO_CONNECTION_SETUP_STATES: readonly SsoConnectionLifecycleState[] = [
+  "DRAFT",
+  "CLAIMED",
+  "APPROVED",
+  "VERIFICATION_PENDING",
+  "VERIFIED",
+];
+
+const SETUP_STATE_SET = new Set<string>(SSO_CONNECTION_SETUP_STATES);
+
+/** Whether a connection is still being set up, as opposed to live, refused,
+ *  suspended or gone. */
+export function isSsoConnectionInSetup(state: string): boolean {
+  return SETUP_STATE_SET.has(state);
+}
+
+/**
  * How a domain claim is proved. Self-hosted installations that cannot
  * publish a TXT record prove ownership with their license token instead.
  *
@@ -371,6 +410,18 @@ export const TEARDOWN_REQUESTED_EVENT_TYPE =
   "lw.identity.teardown_requested" as const;
 export const CONNECTION_TORN_DOWN_EVENT_TYPE =
   "lw.identity.connection_torn_down" as const;
+/**
+ * The connection's name, changed.
+ *
+ * A NAME AND NOT AN IDENTIFIER, which the engine's own row already knew: a
+ * sign-in reaches a provider by CONNECTION ID, deliberately, so that two
+ * organizations can both call theirs `okta`. Nothing routes on this string,
+ * nothing is keyed by it, and no saved link breaks when it changes — it is
+ * the word an administrator reads on a card, and it was only ever called
+ * `providerId` because registration happened to collect it under that name.
+ */
+export const CONNECTION_RENAMED_EVENT_TYPE =
+  "lw.identity.connection_renamed" as const;
 /** Who this connection admits, changed after registration stated it. */
 export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
   "lw.identity.connection_arrival_policy_set" as const;
@@ -402,6 +453,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   TEARDOWN_REQUESTED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+  CONNECTION_RENAMED_EVENT_TYPE,
   REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE,
   MIGRATION_ROUTE_SELECTED_EVENT_TYPE,
   MIGRATION_FINALIZATION_STARTED_EVENT_TYPE,
@@ -661,6 +713,15 @@ export const connectionTornDownPayloadSchema = z.object({
   ...sourced,
 });
 
+export const connectionRenamedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  /** Trimmed and non-empty: a connection with a blank name is one whose card
+   *  has nothing on it, and the cards are the only place it is read. */
+  name: z.string().trim().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 export const connectionArrivalPolicySetPayloadSchema = z.object({
   connectionId: z.string().min(1),
   policy: ssoArrivalPolicySchema,
@@ -745,6 +806,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
     data: connectionArrivalPolicySetPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTION_RENAMED_EVENT_TYPE),
+    data: connectionRenamedPayloadSchema,
   }),
   z.object({
     type: z.literal(REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE),
@@ -1354,6 +1419,13 @@ export function reduceSsoConnection({
       };
     case CONNECTION_TORN_DOWN_EVENT_TYPE:
       return { ...touched, state: "TORN_DOWN", tearDownAfterMs: null };
+    case CONNECTION_RENAMED_EVENT_TYPE:
+      // Folded onto the metadata the name already lived in, rather than into
+      // a field beside it: one string, one reader, nothing to keep in step.
+      return {
+        ...touched,
+        idpMetadata: { ...touched.idpMetadata, providerId: fact.data.name },
+      };
     case CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE:
       return {
         ...touched,

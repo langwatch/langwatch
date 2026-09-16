@@ -57,6 +57,7 @@ vi.mock(
       beforeUserDelete: async () => undefined,
     }),
     identityEmail: () => ({ resolveEmail: async () => null }),
+    ssoTestArrival: () => ({ standingFor: async () => null }),
     identityService: () => ({}),
     signInLinkEvidence: () => ({
       refusalForLink: async () => null,
@@ -118,6 +119,7 @@ vi.mock(
     ssoAssertion: () => ({}),
     ssoBreakGlass: () => ({}),
     ssoConnectionBackoffice: () => ({}),
+    ssoConnectionHistory: () => ({}),
     ssoConnections: () => ({}),
     ssoDomainClaimQueue: () => ({}),
     ssoDomainReproof: () => ({}),
@@ -153,6 +155,15 @@ vi.mock(
     lastWayInGuard: () => ({}),
     credentialAccounts: () => ({}),
     sessionMinter: () => ({}),
+    // Org sign-in security surface (account lockout, session binding). Not
+    // reached by this suite, stubbed inert for the same reason as the rest.
+    forgetSignInSecurityPolicies: () => undefined,
+    sessionBound: () => ({}),
+    signInLockout: () => ({}),
+    signInSecurityMembership: () => ({}),
+    signInSecurityReleaseEvidence: () => ({}),
+    signInSecuritySessions: () => ({}),
+    signInSecuritySettings: () => ({}),
   }),
 );
 

@@ -87,6 +87,16 @@ export const COMPLETE_TEARDOWN_COMMAND_TYPE =
 export const SET_ARRIVAL_POLICY_COMMAND_TYPE =
   "lw.identity.set_arrival_policy" as const;
 /**
+ * Renaming a connection, which changes nothing but the word on the card.
+ *
+ * Its own verb rather than a field on some broader "edit": everything else
+ * about a connection decides who gets in, and this decides nothing at all.
+ * Keeping them apart is what lets the guard allow a rename in states where
+ * it refuses every other change.
+ */
+export const RENAME_CONNECTION_COMMAND_TYPE =
+  "lw.identity.rename_connection" as const;
+/**
  * The one command that STATES HISTORY rather than commanding a change: the
  * grandfather migration's, which records what an organization's `ssoDomain`
  * and `ssoProvider` strings have been doing all along as the history a
@@ -119,6 +129,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   REQUEST_TEARDOWN_COMMAND_TYPE,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType =
@@ -360,6 +371,15 @@ export type CompleteTeardownCommandData = z.infer<
 export const setArrivalPolicyCommandDataSchema = commandDataSchema({
   policy: ssoArrivalPolicySchema,
 });
+
+/** The word on the card, and nothing else (ADR-117). Trimmed, non-empty, and
+ *  bounded so a name stays a name rather than a paragraph. */
+export const renameConnectionCommandDataSchema = commandDataSchema({
+  name: z.string().trim().min(1).max(120),
+});
+export type RenameConnectionCommandData = z.infer<
+  typeof renameConnectionCommandDataSchema
+>;
 export type SetArrivalPolicyCommandData = z.infer<
   typeof setArrivalPolicyCommandDataSchema
 >;
@@ -462,6 +482,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof SET_ARRIVAL_POLICY_COMMAND_TYPE;
       data: SetArrivalPolicyCommandData;
+    }
+  | {
+      type: typeof RENAME_CONNECTION_COMMAND_TYPE;
+      data: RenameConnectionCommandData;
     }
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;
