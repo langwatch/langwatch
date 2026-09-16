@@ -447,6 +447,40 @@ The same measurement applies to most of `fallible-result-naming`'s remaining 890
 `service-classes` (296) and `package-boundaries` (374). Those are shape, not
 contract, and a lane can finish one without deciding what absence means.
 
+## REGRESSION FOUND, NOT OURS TO FIX: three governance errors lost their throws
+
+`apps/ui/src/model/errors/__tests__/codes.unit.test.ts` is **red** (1 of 8 in
+that file; 260 of 261 across the whole `__tests__/errors` directory pass, so this
+is the only breach):
+
+    These codes are in APP_ERROR_CODES but nothing raises them:
+      ingestion_template_not_found
+      invalid_source_type
+      platform_template_immutable
+
+**Cause, confirmed by `git show`, not inferred.** `727bf95e8c` (2026-09-16 16:49,
+"governance's twenty-five rest routes move onto the standard declaration") deleted
+every throw site for all three and nothing replaced them. The three strings now
+appear in exactly two files in the whole tree - `packages/handled-error/src/app-codes.ts`
+and `presentation.ts` - so the registration and the customer copy survive and the
+errors do not.
+
+**Why this is worse than a red test.** Because the copy is still registered, it
+does NOT surface as the missing-entry typecheck failure CLAUDE.md describes. It
+surfaces as a customer asking for a template that does not exist and getting a
+generic "unknown error" plus a trace id where they used to get named, actionable
+copy - the exact case CLAUDE.md calls a bug in the feature rather than a gap in
+the error system.
+
+Two legitimate fixes, not equivalent: put the throws back in the handlers if those
+cases should still refuse, or delete the codes and their `presentation.ts` entries
+if the migration dropped them deliberately. The test asks which; it does not
+assert the first.
+
+**Owned by the concurrent apidiff/governance session and reported to it.** This
+drive has touched none of `enterprise/**`, `packages/handled-error/**` or that
+test.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
