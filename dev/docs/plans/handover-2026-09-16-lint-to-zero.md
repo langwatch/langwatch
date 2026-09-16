@@ -12,7 +12,8 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 ## SCOREBOARD — session of 2026-09-16 (background job 4a7a3221)
 
     lint at session start   7,166
-    lint now                6,610
+    lint now                6,499
+    typecheck (3 apps)         65   none of them from this drive's lanes
 
 What the remaining 6,610 is made of, and this is the number that decides how the
 drive ends:
@@ -34,10 +35,25 @@ dropped refinement - the one way that wave could ship a real bug - and carries
 none: 196 `.extend`/`.merge` removed, 154 `.shape` spreads, 37 `safeExtend`, zero
 `refine` removed. Its one `as X` cast was replaced with a type guard before commit.
 
-**Left uncommitted on purpose:** `modules/dataset/contract` - the lane edited 5
-files there before a scope correction reached it, and its fixes now sit on top of
-the concurrent apidiff session's in-progress content. Reverting uncommitted work
-is what cost this drive the langy lane; untangling it belongs to that session.
+**`modules/dataset/contract` was held back on a wrong attribution, then committed.**
+It was dirty when the lane started, and this coordinator read "dirty" as "owned by
+the apidiff session". That session checked its own diff and had never touched
+`modules/dataset` at all - a THIRD session is live in this checkout too (job
+2e744849: `tools/thuishaven`, `services/idpsim`, `services/mailsim`,
+`specs/setup/**`), and every session commits as the same git user, so authorship
+cannot separate them. **Dirty does not identify an owner; read the diff content.**
+Verified independently (15 extend/merge/omit removed, 3 shape spreads, 9
+safeExtend, no refinement dropped, no cast) and committed.
+
+**A latent boot defect came out of that exchange.**
+`modules/server-module-members.generated.ts` had been regenerated partway: trace
+had gained `redis` but not `rateLimiter`, and analytics, auth, langy, prompt and
+scenario had gained nothing, while all six apps' committed `static readonly reads`
+name them. ADR-144 supplies exactly the declared union at boot **or refuses by
+member name**, so a short list is a refusal waiting for whichever process boots
+it. Regenerated and committed (`c1d551f3f2`), then checked the other way round -
+parsing each app's own `reads` and comparing module by module rather than trusting
+the generator that had just written the file. Zero disagreements.
 
 **Running:** `comment-w11`, `temporal-w1`, `condition-shape-w1`.
 **Queued, manifests written:** `trace-layout-w1` (feature-source-layout, 158 in
