@@ -48,4 +48,29 @@ survives, the count falls, and the comment is silently detached from what it
 documents. One lane cleared 19 findings that way; the slice was fully lint-clean
 and provably comment-only and still wrong. No other check can see it.
 
+## `count-splits.py` — the general form of that check
+
+`count-orphans.py` only ever matched a **single-line** `/** … */` before the
+blank line. A lane found the gap: it split a *multi-line* JSDoc from a `//`
+section divider beneath it, which clears the finding the same way and the regex
+cannot see it.
+
+```bash
+python3 dev/scripts/comment-sweep/count-splits.py --files <slice.tsv>
+python3 dev/scripts/comment-sweep/count-splits.py --commit SHA
+```
+
+It reports every blank line the diff *inserted between two comment lines*, which
+is the gaming pattern in general: `comment-block-size` counts adjacent comment
+lines as one block, so a blank line halves the count while changing no prose.
+Exit 1 if any are found. Run it instead of relying on the orphan regex alone;
+keep both, since they fail on different inputs.
+
+A real one this caught, in a case where the block turned out to be residue from
+a move: the JSDoc for `fillServerOnlyTraceSources` had been left behind in
+`evaluation-execution.service.ts` when the method moved to
+`evaluation-data.service.ts`, and in the stale build output it had re-attached
+to `runEvaluation` — documenting a different method entirely. The fix was
+deleting it, not dividing it.
+
 Both accept a slice file in either `<count>\t<path>` or bare-path form.
