@@ -49,8 +49,7 @@
   },
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc -p tsconfig.type-tests.json",
-    "test": "vitest",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/actor": "workspace:*",

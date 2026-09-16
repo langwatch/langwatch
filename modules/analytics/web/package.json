@@ -80,7 +80,6 @@
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run",
     "test:browser": "vitest run -c vitest.browser.config.ts"
   },
   "dependencies": {

@@ -57,8 +57,7 @@
     "build": "NODE_ENV=production vite build --configLoader runner",
     "typecheck": "node ../../dev/scripts/typecheck-app.mjs ./tsconfig.declarations.json tsconfig.test.json",
     "typecheck:fast": "pnpm -w typecheck:declarations --project apps/ui/tsconfig.declarations.json && tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",

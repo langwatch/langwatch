@@ -44,7 +44,6 @@
     "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",
     "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
-    "test:unit": "vitest run",
     "pretest:integration": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

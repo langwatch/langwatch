@@ -217,7 +217,7 @@ pnpm build
 
 ```bash
 pnpm test        # Run all tests
-pnpm test:unit   # Unit tests only
+pnpm test   # Unit tests only
 ```
 
 ### Local testing

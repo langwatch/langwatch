@@ -15,8 +15,7 @@
     "dev:hot": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.hot.ts",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/observability": "workspace:*",

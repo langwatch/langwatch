@@ -466,7 +466,7 @@ jobs:
       # (drafts run [1]).
       - name: Run @langwatch/api unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/api run test:unit
+        run: pnpm --filter @langwatch/api run test
 
       # Same reason as @langwatch/api above: a package suite is not reachable
       # from an application's vitest root, so without a step naming it, it runs
@@ -474,7 +474,7 @@ jobs:
       # because they gate this job.
       - name: Run @langwatch/redis-client unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/redis-client run test:unit
+        run: pnpm --filter @langwatch/redis-client run test
 
       # Same reason again. This one decides the level and the shape of every
       # request record the fleet emits, so a suite that never runs is the worst
@@ -482,7 +482,7 @@ jobs:
       # someone reads a dashboard and finds it empty.
       - name: Run @langwatch/observability unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/observability run test:unit
+        run: pnpm --filter @langwatch/observability run test
 
       # Same reason again. This package owns the retry classifier, the
       # concurrency limiter and the tenant routing every ClickHouse statement
@@ -491,7 +491,7 @@ jobs:
       # query client, the router) would otherwise ship untested.
       - name: Run @langwatch/clickhouse-client unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/clickhouse-client run test:unit
+        run: pnpm --filter @langwatch/clickhouse-client run test
 
       # @langwatch/redaction is the canonical secret and PII scrubber the
       # ingestion pipeline runs on every attribute, and the CLI ships a
@@ -501,7 +501,7 @@ jobs:
       # the product's own record ids.
       - name: Run @langwatch/redaction unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/redaction run test:unit
+        run: pnpm --filter @langwatch/redaction run test
 
       - name: Typecheck @langwatch/redaction
         if: matrix.app == 'platform-api'
@@ -572,7 +572,7 @@ jobs:
       # the only thing that pins the encoding, and it ran nowhere.
       - name: Run @langwatch/platform-api-client unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/platform-api-client run test:unit
+        run: pnpm --filter @langwatch/platform-api-client run test
 
       - name: Typecheck @langwatch/platform-api-client
         if: matrix.app == 'platform-api'
@@ -584,7 +584,7 @@ jobs:
       # from an application's vitest root.
       - name: Run @langwatch/trace-web unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/trace-web run test:unit
+        run: pnpm --filter @langwatch/trace-web run test
 
       - name: Typecheck @langwatch/trace-web
         if: matrix.app == 'platform-api'

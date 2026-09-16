@@ -26,32 +26,33 @@
       "default": "./src/trace-view-state.ts"
     },
     "./surfaces/annotation-queue-session": {
-      "langwatch-declaration-source": "./src/annotation-queue-session.ts",
-      "types": "./dist/annotation-queue-session.d.ts",
-      "default": "./src/annotation-queue-session.ts"
+      "langwatch-declaration-source": "./src/surfaces/annotation-queue-session/index.ts",
+      "types": "./dist/surfaces/annotation-queue-session/index.d.ts",
+      "default": "./src/surfaces/annotation-queue-session/index.ts"
     },
     "./surfaces/trace-filters": {
-      "langwatch-declaration-source": "./src/trace-filters.ts",
-      "types": "./dist/trace-filters.d.ts",
-      "default": "./src/trace-filters.ts"
+      "langwatch-declaration-source": "./src/surfaces/trace-filters/index.ts",
+      "types": "./dist/surfaces/trace-filters/index.d.ts",
+      "default": "./src/surfaces/trace-filters/index.ts"
     },
     "./surfaces/trace-origins": {
-      "langwatch-declaration-source": "./src/trace-origins.ts",
-      "types": "./dist/trace-origins.d.ts",
-      "default": "./src/trace-origins.ts"
+      "langwatch-declaration-source": "./src/surfaces/trace-origins/index.ts",
+      "types": "./dist/surfaces/trace-origins/index.d.ts",
+      "default": "./src/surfaces/trace-origins/index.ts"
     },
     "./surfaces/trace-selection": {
-      "langwatch-declaration-source": "./src/trace-selection.ts",
-      "types": "./dist/trace-selection.d.ts",
-      "default": "./src/trace-selection.ts"
+      "langwatch-declaration-source": "./src/surfaces/trace-selection/index.ts",
+      "types": "./dist/surfaces/trace-selection/index.d.ts",
+      "default": "./src/surfaces/trace-selection/index.ts"
     },
     "./traces": {
       "types": "./dist/traces.d.ts",
       "default": "./src/traces.ts"
     },
     "./screens/traces": {
-      "types": "./dist/traces.d.ts",
-      "default": "./src/traces.ts"
+      "langwatch-declaration-source": "./src/screens/traces/index.ts",
+      "types": "./dist/screens/traces/index.d.ts",
+      "default": "./src/screens/traces/index.ts"
     },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
@@ -188,35 +189,10 @@
       "types": "./dist/ui/elements/scenario-role.d.ts",
       "default": "./src/ui/elements/scenario-role.tsx"
     },
-    "./screens/traces": {
-      "langwatch-declaration-source": "./src/screens/traces/index.ts",
-      "types": "./dist/screens/traces/index.d.ts",
-      "default": "./src/screens/traces/index.ts"
-    },
     "./surfaces/format-milliseconds": {
       "langwatch-declaration-source": "./src/model/format-milliseconds.ts",
       "types": "./dist/model/format-milliseconds.d.ts",
       "default": "./src/model/format-milliseconds.ts"
-    },
-    "./surfaces/trace-selection": {
-      "langwatch-declaration-source": "./src/surfaces/trace-selection/index.ts",
-      "types": "./dist/surfaces/trace-selection/index.d.ts",
-      "default": "./src/surfaces/trace-selection/index.ts"
-    },
-    "./surfaces/trace-filters": {
-      "langwatch-declaration-source": "./src/surfaces/trace-filters/index.ts",
-      "types": "./dist/surfaces/trace-filters/index.d.ts",
-      "default": "./src/surfaces/trace-filters/index.ts"
-    },
-    "./surfaces/trace-origins": {
-      "langwatch-declaration-source": "./src/surfaces/trace-origins/index.ts",
-      "types": "./dist/surfaces/trace-origins/index.d.ts",
-      "default": "./src/surfaces/trace-origins/index.ts"
-    },
-    "./surfaces/annotation-queue-session": {
-      "langwatch-declaration-source": "./src/surfaces/annotation-queue-session/index.ts",
-      "types": "./dist/surfaces/annotation-queue-session/index.d.ts",
-      "default": "./src/surfaces/annotation-queue-session/index.ts"
     },
     "./surfaces/conversation": {
       "langwatch-declaration-source": "./src/ui/sections/conversation/index.ts",
@@ -225,7 +201,7 @@
     }
   },
   "scripts": {
-    "test:unit": "vitest run",
+    "test": "vitest run",
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit"
   },
   "dependencies": {

@@ -13,7 +13,7 @@ pnpm exec oxlint --config .oxlintrc.jsonc $P
 pnpm --filter @langwatch/architecture-enforcer check:feature-parity 2>&1 | grep -A6 "$P/specs"
 for pkg in contract server web; do pnpm --filter @langwatch/$F-$pkg typecheck; done
 for pkg in contract server web; do pnpm --filter @langwatch/$F-$pkg test 2>&1 | grep -E "Tests |Test Files"; done
-pnpm --filter @langwatch/architecture-enforcer test:unit tests/frontend-boundary.unit.test.ts 2>&1 | grep -E "Tests |$P"
+pnpm --filter @langwatch/architecture-enforcer test tests/frontend-boundary.unit.test.ts 2>&1 | grep -E "Tests |$P"
 
 # over-abstraction detectors: identity functions, same-name delegation, with file:line
 uvx --from ast-grep-cli==0.42.3 ast-grep scan -c dev/lint/ast-grep/sgconfig.yml \

@@ -33,7 +33,6 @@
     "prisma:generate": "prisma generate --config ./prisma.config.ts && node scripts/generate-table-catalogue.mjs",
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:seed": "node --experimental-transform-types --env-file-if-exists=../../.env prisma/seed.ts"
   },

@@ -54,7 +54,7 @@ details. Do not "fix" this.
 
 ```bash
 pnpm --filter @langwatch/mail dev          # the studio, http://localhost:5566
-pnpm --filter @langwatch/mail test:unit    # add -u after a deliberate copy change
+pnpm --filter @langwatch/mail test    # add -u after a deliberate copy change
 cd packages/mail && pnpm -s typecheck
 ```
 

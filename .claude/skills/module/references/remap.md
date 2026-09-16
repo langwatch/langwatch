@@ -32,8 +32,8 @@ broken.
 
 ```bash
 grep -o '"test[a-z:]*"' modules/<f>/server/package.json   # find the script name first
-pnpm --filter @langwatch/<f>-server test:unit                        # or `test` when there is no test:unit
-pnpm --filter @langwatch/<f>-contract test:unit
+pnpm --filter @langwatch/<f>-server test                        # or `test` when there is no test
+pnpm --filter @langwatch/<f>-contract test
 ```
 
 Before and after. Paste both summary lines. "Before" is what proves a red file was

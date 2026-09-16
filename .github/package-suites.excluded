@@ -20,8 +20,8 @@
 # what a reviewer reads.
 
 @langwatch/platform-api  # this workflow runs the three applications' suites in their own jobs
-@langwatch/worker
-@langwatch/ui
+@langwatch/worker  # same job runs the three applications' suites separately
+@langwatch/ui  # same job runs the three applications' suites separately
 langwatch  # sdk-javascript-ci.yml runs the TypeScript SDK's suite
 @langwatch/mcp-server  # mcp-javascript-ci.yml runs it
 @langwatch/agent-plugin  # agent-plugin-ci.yml runs it

@@ -30,7 +30,6 @@
     "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",
     "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
-    "test:unit": "vitest run",
     "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
     "check:gateway-control-plane": "node --experimental-transform-types scripts/check-gateway-control-plane.ts"
   },

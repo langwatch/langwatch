@@ -18,8 +18,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/secrets": "workspace:*",

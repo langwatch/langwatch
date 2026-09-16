@@ -99,7 +99,7 @@ Adding a REST endpoint or a tRPC procedure is `references/transport.md`.
 
 ```bash
 pnpm --filter @langwatch/<f>-contract test && pnpm --filter @langwatch/<f>-server test && pnpm --filter @langwatch/<f>-web test
-pnpm --filter @langwatch/platform-api test:unit src/features/<f>/__tests__/<f>.composition.integration.test.ts
+pnpm --filter @langwatch/platform-api test src/features/<f>/__tests__/<f>.composition.integration.test.ts
 pnpm --filter @langwatch/<f>-server typecheck && pnpm --filter @langwatch/platform-api typecheck && pnpm --filter @langwatch/ui typecheck
 ```
 

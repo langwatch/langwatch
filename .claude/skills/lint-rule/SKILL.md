@@ -71,7 +71,7 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
    `{ version, features: [{ id, subjects }] }`; pass `files` for anything else.
    `afterAll(() => workspace.cleanup())`.
 
-2. Run it: `pnpm --filter @langwatch/oxlint-rules test:unit tests/rules/<rule>.unit.test.mjs`.
+2. Run it: `pnpm --filter @langwatch/oxlint-rules test tests/rules/<rule>.unit.test.mjs`.
 3. Write `packages/oxlint-rules/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
    `classify(context)` through the `applies` predicate — never parse the filename yourself,
    and never re-derive what `classify` already computed.

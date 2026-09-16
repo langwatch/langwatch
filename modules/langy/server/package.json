@@ -68,7 +68,6 @@
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },

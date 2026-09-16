@@ -7,8 +7,7 @@
   "scripts": {
     "capture": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "pixelmatch": "^7.2.0",

@@ -24,8 +24,7 @@
   },
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
-    "test": "vitest",
-    "test:unit": "vitest run",
+    "test": "vitest run",
     "bench": "vitest bench --run"
   },
   "dependencies": {

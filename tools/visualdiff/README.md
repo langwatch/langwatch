@@ -291,7 +291,7 @@ reads goes to its stderr, so the protocol never has to tell prose from data.
 go build ./cmd/visualdiff
 go test ./tools/visualdiff/... ./tools/havenrun/...
 golangci-lint run ./tools/visualdiff/... ./cmd/visualdiff/... ./tools/havenrun/...
-pnpm --filter @langwatch/visual-diff-runner test:unit
+pnpm --filter @langwatch/visual-diff-runner test
 ```
 
 No `Makefile` target names `visualdiff`, `5670` or `5680` - the ports the

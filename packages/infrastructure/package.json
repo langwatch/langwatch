@@ -22,8 +22,7 @@
   },
   "scripts": {
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

@@ -8,7 +8,7 @@ shell: each takes a machine-wide slot. Never boot `pnpm dev` to verify.
 
 ```bash
 pnpm --filter @langwatch/<pkg> test                       # the package suite
-pnpm --filter @langwatch/<pkg> test:unit <path>           # one file (no extra `run`: the script already says it)
+pnpm --filter @langwatch/<pkg> test <path>           # one file (no extra `run`: the script already says it)
 pnpm --filter @langwatch/<pkg> test:integration           # only packages whose vitest.integration.config.ts declares a datastore
 pnpm --filter @langwatch/<pkg> typecheck                  # the package's own tsconfig
 ```
@@ -19,7 +19,7 @@ and the `typecheck` of every workspace package that depends on it
 (`pnpm --filter "...@langwatch/<pkg>" --filter "!@langwatch/platform-api" --filter "!@langwatch/worker" --filter "!@langwatch/ui" typecheck`),
 the lint count for the rule you serve, and a last grep that prints nothing. Paste each.
 
-Every workspace package declares `typecheck`, `test` and `test:unit`. Use the script, not
+Every workspace package declares `typecheck`, `test` and `test`. Use the script, not
 `exec tsc -p tsconfig.json`: the script names the right project, and the bin shim queues a
 whole-tree `tsc` reached any other way. Package names: `@langwatch/<f>-contract`,
 `-server`, `-web`; `@langwatch/platform-api` (apps/api), `@langwatch/worker`,
@@ -34,7 +34,7 @@ interrupted run, sweep with `pkill -f "vitest/dist/workers"`.
 ```bash
 pnpm --filter @langwatch/architecture-enforcer lint
 pnpm --filter @langwatch/architecture-enforcer check:feature-parity
-pnpm --filter @langwatch/architecture-enforcer test:unit tests/frontend-boundary.unit.test.ts
+pnpm --filter @langwatch/architecture-enforcer test tests/frontend-boundary.unit.test.ts
 ```
 
 `lint` runs the CLI in `packages/architecture-enforcer/src/cli.ts`; the oxlint half runs
@@ -47,9 +47,9 @@ scoped to that file and says nothing about the run. See `.claude/skills/spec-bin
 ## Registries, when you touched them
 
 ```bash
-pnpm --filter @langwatch/ui test:unit tests/installed-ui-features.unit.test.ts tests/installed-ui-drawers.unit.test.ts tests/installed-ui-drawers.integration.test.tsx
-pnpm --filter @langwatch/worker test:unit src/features/__tests__/worker-feature-catalogue.unit.test.ts
-pnpm --filter @langwatch/worker test:unit src/app/__tests__/worker-capability-mount.composition.unit.test.ts
+pnpm --filter @langwatch/ui test tests/installed-ui-features.unit.test.ts tests/installed-ui-drawers.unit.test.ts tests/installed-ui-drawers.integration.test.tsx
+pnpm --filter @langwatch/worker test src/features/__tests__/worker-feature-catalogue.unit.test.ts
+pnpm --filter @langwatch/worker test src/app/__tests__/worker-capability-mount.composition.unit.test.ts
 pnpm --filter @langwatch/runtime-composition typecheck      # regenerates nothing; fails if feature-names.generated.ts lags catalogue.json
 ```
 

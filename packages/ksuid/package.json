@@ -52,7 +52,6 @@
     "build": "tsup && tsc -p tsconfig.publish.json",
     "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run",
     "prepublishOnly": "pnpm build"
   },
   "devDependencies": {

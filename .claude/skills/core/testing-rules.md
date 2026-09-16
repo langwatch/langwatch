@@ -14,7 +14,7 @@ several GB per run, multiplied by every agent running one.
 The form is:
 
 ```
-VITEST_MAX_WORKERS=2 pnpm --filter <package> test:unit <paths>
+VITEST_MAX_WORKERS=2 pnpm --filter <package> test <paths>
 ```
 
 Prefix that with `rtk` when the machine has it — `rtk` is optional here, so drop
