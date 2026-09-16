@@ -24,12 +24,9 @@ const harness = vi.hoisted(() => ({
     spendOverTime: undefined as unknown,
   },
   /**
-   * The ranked model read's answer. `undefined` means it has not answered.
-   *
-   * On the billed router rather than the activity monitor: this panel reads
-   * the same rollup the lanes above it read, which is where pulled bills land.
-   * Pointed at the metered traces it reported an empty window over a table
-   * that held every model the organization had been billed for.
+   * The ranked model read's answer; `undefined` means it hasn't answered.
+   * On the billed router, not the activity monitor — this panel reads the
+   * same rollup the lanes above it read, where pulled bills land.
    */
   modelSpend: undefined as unknown,
   modelSpendFails: false,
@@ -48,10 +45,9 @@ const harness = vi.hoisted(() => ({
    */
   providers: [] as unknown[],
   /**
-   * Not yet implemented: the per-(day, provider) read. It is the one thing the
-   * screen could never answer — it could say what a provider cost over a
-   * quarter and what the organization spent on a given day, and had no way to
-   * say which provider caused a day that stood out.
+   * Not yet implemented: the per-(day, provider) read — the one thing the
+   * screen could never answer: what a provider cost over a quarter, or what
+   * the org spent on a day, but never which provider caused a day that stood out.
    */
   dailyByProvider: undefined as unknown,
   /** Not yet implemented: the records behind one day at one provider. */
@@ -361,12 +357,10 @@ describe("the cost breakdown panels", () => {
       // The adoption card and every read-backed panel are unanswered here, so
       // the screen may not show "0" or claim the window held nothing.
       expect(screen.queryByText("0")).not.toBeInTheDocument();
-      // SCOPED TO THE PANELS THAT HAVE A READ. The agent breakdowns and the
-      // two count panels have none yet — they are drawn in both modes so the
-      // screen keeps its shape when a reader turns samples off, and outside
-      // sample mode they carry a stated placeholder. A page-wide search for
-      // the sentence now finds theirs and says nothing about the panels this
-      // is actually about.
+      // SCOPED TO THE PANELS THAT HAVE A READ: the agent breakdowns and the
+      // two count panels have none yet, carrying a stated placeholder
+      // instead so the screen keeps its shape with samples off — a
+      // page-wide search for the sentence would find theirs instead.
       for (const title of [
         "Cost over time",
         "Cost by department",
@@ -427,10 +421,9 @@ describe("the cost breakdown panels", () => {
   });
 
   /**
-   * The adoption headcount is the one figure here that cannot say "unmeasured"
-   * — the activity summary types it as a plain number and zero-fills it when
-   * nothing is connected. So these two cases send the SAME zero and differ
-   * only in whether a source is behind it, which is the whole rule.
+   * The adoption headcount can't say "unmeasured" — the activity summary
+   * types it as a plain number, zero-filled when nothing is connected. These
+   * two cases send the SAME zero, differing only in whether a source backs it.
    */
   describe("given the activity read answers zero active people", () => {
     beforeEach(() => {

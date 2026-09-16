@@ -10,10 +10,9 @@ interface Props {
 }
 
 /**
- * Full-page enterprise gate. Renders children when the active plan is
- * Enterprise; otherwise renders an upsell card with a link to the
- * subscription page. Skeleton during plan-load to avoid flashing the
- * gate before the actual tier resolves.
+ * Full-page enterprise gate: renders children on the Enterprise plan,
+ * otherwise an upsell card linking to the subscription page. Skeleton
+ * during plan-load to avoid flashing the gate before the tier resolves.
  */
 export function EnterpriseLockedSurface({ children, featureName, description }: Props) {
   const { isEnterprise, isLoading } = useGovernanceHost().plan();

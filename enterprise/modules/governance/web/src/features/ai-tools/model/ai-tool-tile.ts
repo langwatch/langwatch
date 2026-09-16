@@ -9,11 +9,9 @@ export interface CodingAssistantConfig {
   setupDocsUrl?: string;
   helperText?: string;
   /**
-   * CLI path policy folded into the tile (replaces the standalone
-   * PlatformToolPolicy table). Both default to `true` when absent. The
-   * "cursor" assistant forces `allowOtelDirect = false` (GUI-only, no
-   * terminal OTLP env reaches the agent panel). Read by cliBootstrap to
-   * derive the login `toolPolicies` map.
+   * CLI path policy folded into the tile. Both default to `true` when
+   * absent; "cursor" forces `allowOtelDirect = false` (GUI-only — no
+   * terminal OTLP reaches the agent panel). Read by cliBootstrap.
    */
   allowVk?: boolean;
   allowOtelDirect?: boolean;
@@ -61,11 +59,9 @@ export interface AiToolEntry {
    */
   iconKey?: string;
   /**
-   * Prefix-discriminated icon source (5aaa232d3):
-   *   "preset:claude_code" / "preset:codex" / ... → built-in icon
-   *   "data:image/svg+xml;base64,..."             → admin-uploaded
-   *   null/undefined                              → fall back to iconKey
-   *                                                  or type-default
+   * Prefix-discriminated icon source: `preset:*` is a built-in icon,
+   * `data:image/svg+xml;base64,...` is admin-uploaded, and null/undefined
+   * falls back to iconKey or the type-default.
    */
   iconAsset?: string | null;
   order: number;

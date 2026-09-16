@@ -11,10 +11,8 @@ import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 
 /**
  * The overview: a greeting, the inline palette, the ways in, and the two
- * lists that fill once there is something in them. Reads nothing itself —
- * former activity-monitor panels now live on the pages that own them.
- * Ported from `.../pages/governance/index.tsx` (main); guards drop, this
- * branch guards at the route.
+ * lists that fill once there is something in them. Reads nothing itself;
+ * guards at the route, not the page.
  */
 function GovernanceOverviewPage() {
   const host = useGovernanceHost();

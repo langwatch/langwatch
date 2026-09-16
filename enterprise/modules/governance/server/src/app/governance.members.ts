@@ -258,12 +258,9 @@ export interface GatewayBudgetLedger {
 }
 
 /**
- * Folded together from the now-split ocsf-export.port.ts,
- * admin-workspace-view-audit.port.ts and governance-setup-state.port.ts: each
- * remainder, once its repository interface moved to repositories/audit/, fell
- * under the twenty-line fragment-file floor on its own. All three are small
- * read-side signal ports the installation adapter takes as optional
- * members, so they sit together here rather than as three stubs.
+ * Three small read-side signal ports (OCSF export, workspace-view audit,
+ * setup state) grouped here because each alone falls under the twenty-line
+ * fragment-file floor.
  */
 export interface GovernanceOcsfEventsReader {
   findAll(input: {
@@ -484,12 +481,9 @@ export interface GovernanceObjectStore {
     signal?: AbortSignal;
     limit: number;
     /**
-     * The keys to read, and whether the store held more than this run may take.
-     *
-     * `isTruncated` is returned rather than inferred by the caller from
-     * `keys.length`: a listing that happens to hold exactly the cap is
-     * indistinguishable from one cut short by it, and the caller would have to
-     * re-derive a rule that already lives here.
+     * `isTruncated` is returned rather than inferred from `keys.length`: a
+     * listing that exactly hits the cap is indistinguishable from one cut
+     * short by it, and inferring it would re-derive a rule that lives here.
      */
   }): Promise<{ keys: string[]; isTruncated: boolean }>;
 
@@ -505,12 +499,9 @@ export interface GovernanceObjectStore {
 }
 
 /**
- * The two project reads Governance makes: the tenant a pull writes under, and
- * the hidden per-organization project every receiver ensures.
- *
- * Stated here in contract types rather than taken off the project feature's
- * server package, so composing it stays the process's job. The project
- * capability satisfies it as it stands.
+ * The two project reads Governance makes: the tenant a pull writes under,
+ * and the hidden per-organization project every receiver ensures. Stated
+ * here rather than taken off the project feature, so composing stays the process's job.
  */
 export interface GovernanceProjectDirectory {
   findWithTeam(id: string): Promise<ProjectWithTeam | null>;
@@ -572,11 +563,8 @@ export type GovernanceTraceSummary = {
 
 /**
  * The event these subscribers actually receive. They mount on the trace
- * pipeline and nowhere else, so `Event<unknown>` understated it: the origin
- * guard discriminates on `type`, and against `unknown` every such check
- * silently compiled while the guard could never narrow. This package already
- * depends on `@langwatch/trace-contract`, so naming the real union costs
- * nothing and is what lets the guard type-check at its call site.
+ * pipeline only, so `Event<unknown>` understated it — the guard discriminates
+ * on `type`, which `unknown` would let silently compile without narrowing.
  */
 export type GovernanceTraceEvent = TraceProcessingEvent;
 
@@ -803,10 +791,9 @@ export interface IngestionKeyCapability {
 }
 
 /**
- * Folded in from the now-deleted personal-virtual-key.port.ts: the two files
- * both concern the personal-key/personal-usage domain, and the issuer port
- * alone was under the twenty-line fragment-file floor once its repository
- * sibling moved to repositories/directory/.
+ * Personal-key/personal-usage domain: the issuer port alone falls under the
+ * twenty-line fragment-file floor once its repository sibling moves to
+ * repositories/directory/.
  */
 export interface PersonalVirtualKeyIssuer {
   issue(input: {
@@ -900,10 +887,9 @@ export type PulledUsageLedgerRow = {
 };
 
 /**
- * What one look at one day's cost found. `reportDrift` rides on the look rather
- * than taking a day back, because saying a disagreement is real means naming
- * the cells it was found in, and a second call would compare the day again and
- * report figures this look never saw.
+ * What one look at one day's cost found. `reportDrift` rides on the look,
+ * not a day back, since a second call would re-compare and report figures
+ * this look never saw.
  */
 export interface CostRollupDayLook {
   /** Cells where the summary and the events state different money. */

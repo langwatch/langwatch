@@ -35,11 +35,9 @@ export const personalIngestionKeySchema = z
 export type PersonalIngestionKey = z.infer<typeof personalIngestionKeySchema>;
 
 /**
- * The source types a personal key may be minted for: the tools the CLI wraps
- * or captures, each stamped as `langwatch.source`. The personal mint is capped
- * per source type, so an open set would make the cap meaningless — a device
- * session could hold the cap again under every value it invents. A new tool
- * joins here when the CLI learns to wrap it.
+ * The source types a personal key may be minted for, each stamped as
+ * `langwatch.source`. Capped per type — an open set would let a device
+ * mint past the cap under every value it invents.
  */
 export const PERSONAL_INGEST_SOURCE_TYPES = [
   "claude_code",
@@ -53,9 +51,8 @@ export const PERSONAL_INGEST_SOURCE_TYPES = [
 
 /**
  * Live personal ingest keys one workspace may hold per (sourceType, template).
- * Sized for a person's real machines with room to spare: a few laptops, a few
- * cloud machines, and the forks of a golden image that share their parent's
- * key rather than minting their own.
+ * Sized for real machines with room to spare — laptops, cloud machines, and
+ * golden-image forks that share their parent's key rather than mint one.
  */
 export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 32;
 

@@ -6,13 +6,9 @@ export const PULLED_USAGE_AGGREGATE_TYPE = "pulled_usage" as const;
 export const PULLED_USAGE_EVENT_TYPES = {
   OBSERVED: "lw.obs.pulled_usage.observed",
   /**
-   * Withdraws what one restatement key holds in the cell it currently sits in.
-   *
-   * Emitted when a provider reissues a charge under a dimension the
-   * restatement key deliberately excludes -- the currency, the agent, the
-   * spender it named. Those land in a DIFFERENT rollup cell, so without this
-   * the first version is left behind holding its money with nothing to say it
-   * was superseded, and a total across the day carries the one bill twice.
+   * Withdraws what one restatement key holds in its cell — a provider
+   * reissuing a charge under an excluded dimension lands in a different cell
+   * and can double the day's total unless this fires.
    */
   RETRACTED: "lw.obs.pulled_usage.retracted",
 } as const;
@@ -30,11 +26,9 @@ export const PULLED_USAGE_COST_STATUS = {
   ESTIMATE: "estimate",
 } as const;
 /**
- * The currency every pulled-usage producer reported before money carried one.
- *
- * One constant rather than a literal repeated at each seam: the schema default,
- * the pricing fallback and the legacy read below all have to agree, and three
- * copies of `"USD"` is three chances for them to stop agreeing.
+ * Currency every pulled-usage producer reported before money carried one.
+ * One constant, not a literal, so the schema default, pricing fallback and
+ * legacy read can't quietly disagree.
  */
 export const PULLED_USAGE_DEFAULT_CURRENCY_CODE = "USD" as const;
 
@@ -86,42 +80,9 @@ export const pulledUsageObservedEventSchema = governanceEventEnvelopeSchema.exte
 });
 
 /**
- * `PulledUsageRetracted` — withdraws what one restatement key holds in the
- * cell it currently sits in (challenge settlement 9).
- *
- * The restatement key deliberately excludes the currency, the agent and the
- * spender, so a provider reissuing the same charge under any of those files it
- * in a DIFFERENT rollup cell. The first version is then left behind holding
- * its money with nothing to say it was superseded, and a total across the day
- * carries the one bill twice. This is what says so.
- *
- * It carries the RETRACTED cell's dimensions, not the reissued one's: the
- * dimensions are the cell's address, so a retraction routed by the new
- * currency would empty the wrong cell and leave both versions live.
- *
- * `occurredAtMs` is the day the retraction CORRECTS, never the day the
- * correction arrived. The daily comparator re-derives a day from the events
- * falling inside it, so a retraction dated to its own arrival is never read
- * for the day it fixes, and that day is reported as drifting for as long as it
- * is kept.
- *
- * `costNanoMinor` is stated as zero rather than omitted, and that is
- * load-bearing rather than decoration. Nothing parses these events on the read
- * path: the fold and the comparator read the data object directly through
- * `readPulledUsageMoney`, which falls back to reading the amount out of
- * `costNanoUsd` in dollars when `costNanoMinor` is absent. A retraction that
- * omitted it would therefore address the DOLLAR cell and leave the euro one
- * live.
- *
- * For the same reason the three address dimensions below are REQUIRED here
- * while the observation above defaults them. That default is right there and
- * wrong here: an observation's default reads an append-only history written
- * before those fields existed, and this event type has no such history — it is
- * new, so every one of them is written by a producer that knows the answer.
- * A defaulted dimension on a retraction is not a lenient read of the past, it
- * is a wrong address in the present: it would empty the USD or the
- * blank-dimension cell and leave the cell it meant to withdraw still charged,
- * which is the double-counting this event exists to prevent.
+ * `PulledUsageRetracted` withdraws what one restatement key holds in its
+ * cell (challenge settlement 9). `costNanoMinor` is zero rather than omitted
+ * because `readPulledUsageMoney` falls back to `costNanoUsd` when absent.
  */
 export const pulledUsageRetractedEventDataSchema = z
   .object({

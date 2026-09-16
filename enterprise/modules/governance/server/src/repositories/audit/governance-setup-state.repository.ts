@@ -12,10 +12,9 @@ export abstract class GovernanceSetupStateRepository {
 }
 
 /**
- * Folded in from the now-deleted ocsf-export.repository.ts: both are single
- * one-method audit-read interfaces, and neither cleared the twenty-line
- * fragment- floor once the OCSF export service kept its own reader,
- * GovernanceOcsfEventsReader, on the module Infrastructure.
+ * Single-method audit-read interface (OCSF export) — under the twenty-line
+ * fragment-file floor on its own; `GovernanceOcsfEventsReader` covers the
+ * larger reader.
  */
 export abstract class GovernanceOcsfExportRepository {
   abstract findGovernanceTenantId(organizationId: string): Promise<string | null>;

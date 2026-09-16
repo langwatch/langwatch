@@ -189,10 +189,8 @@ export class IngestionKeyService {
 
   /**
    * What became of one of the caller's own personal ingest keys, by the lookup
-   * id embedded in its token. The CLI asks before it re-mints a key the
-   * collector rejected: a key the cap retired or a rotation replaced may be
-   * re-minted, a key a person revoked may not. Null when no such key belongs to
-   * this user here, which is also what another user's key reads as.
+   * id in its token. A cap-retired or rotated key may be re-minted; a
+   * person-revoked one may not. Null for no such key, same as another user's.
    */
   async tryDescribePersonalKey(input: {
     userId: string;

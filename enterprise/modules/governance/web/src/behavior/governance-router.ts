@@ -41,10 +41,9 @@ export function useGovernanceRouter(): GovernanceRouter {
 }
 
 /**
- * `useSearchParams`, over the host reading rather than the router.
- *
- * The setter takes react-router's two forms — the next params, or a function
- * handed the current ones — because the call sites use both.
+ * `useSearchParams`, over the host reading rather than the router. The
+ * setter takes react-router's two forms — next params, or a function handed
+ * the current ones — because call sites use both.
  */
 export type GovernanceSearchParamsUpdate =
   | URLSearchParams

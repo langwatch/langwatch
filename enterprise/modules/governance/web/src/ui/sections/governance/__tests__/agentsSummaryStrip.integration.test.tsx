@@ -91,11 +91,9 @@ function renderAgentsAt(initialEntries: string[] = ["/governance/agents"]) {
 }
 
 /**
- * Whether `first` is painted before `second`.
- *
- * `compareDocumentPosition` answers document order, which is what "above the
- * agents" means in a column layout and what a screenshot would otherwise have
- * to be trusted for.
+ * Whether `first` is painted before `second` — `compareDocumentPosition`
+ * answers document order, which is what "above the agents" means in a
+ * column layout, and what a screenshot would otherwise have to be trusted for.
  */
 function comesBefore(first: Element, second: Element): boolean {
   return Boolean(

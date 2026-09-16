@@ -151,11 +151,9 @@ const PROVIDER_DAY_ROWS = [
 ];
 
 /**
- * The card the panel lives in, found by its heading.
- *
- * Scoped rather than searched page-wide because the unrefreshed marker is what
- * EVERY panel on this screen shows for a failed read, so an unscoped search
- * for it passes on a neighbour's failure.
+ * The card the panel lives in, found by its heading — scoped, not searched
+ * page-wide, because the unrefreshed marker is what EVERY panel here shows
+ * for a failed read, so an unscoped search passes on a neighbour's failure.
  */
 const providerDayPanel = () => {
   const card = screen

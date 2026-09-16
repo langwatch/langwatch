@@ -42,12 +42,9 @@ export type GovernanceSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: since the
- * wire message of a handled error is its code slug, a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it — the raw `error` travels, never a
+ * screen-composed sentence, since the wire message of a handled error is
+ * its code slug. `fallbackTitle` names the action that failed.
  */
 export type GovernanceFailureNotice = {
   error: unknown;
@@ -67,13 +64,6 @@ export type GovernancePlan = {
   isLoading: boolean;
 };
 
-/**
- * The one thing a screen is handed.
- *
- * Methods rather than an object of loose functions, so the adapter is a class
- * the frontend feature constructs once and a test double is an obvious object
- * literal.
- */
 /** The reader, as much of them as a greeting needs. */
 export type GovernanceActor = {
   id: string;
@@ -81,6 +71,11 @@ export type GovernanceActor = {
   email: string | null;
 };
 
+/**
+ * The one thing a screen is handed — methods rather than loose functions,
+ * so the adapter is a class the frontend feature constructs once, and a
+ * test double is an obvious object literal.
+ */
 export abstract class GovernanceHostPort {
   /** The organization and project this page is about. */
   abstract scope(): GovernanceScope;
@@ -130,10 +125,9 @@ const GovernanceHostContext = createContext<GovernanceHostPort | undefined>(void
 export const GovernanceHostProvider = GovernanceHostContext.Provider;
 
 /**
- * The application this screen is running in.
- *
- * Missing means the screen was mounted outside its frontend feature, which is a
- * composition fault rather than something the screen can degrade around.
+ * The application this screen is running in. Missing means it was mounted
+ * outside its frontend feature — a composition fault, not something the
+ * screen can degrade around.
  */
 export function useGovernanceHost(): GovernanceHostPort {
   const host = useContext(GovernanceHostContext);

@@ -19,10 +19,9 @@ const harness = vi.hoisted(() => ({
   realFigures: false,
   spendersFail: false,
   /**
-   * The over-time read answering a row per day with nothing spent on any of
-   * them, which is what an empty window actually looks like on the wire —
-   * days are the read's own axis and it emits them whether or not anything
-   * landed on one.
+   * The over-time read answering a row per day with nothing spent on any —
+   * what an empty window looks like on the wire, since days are the read's
+   * own axis and it emits them whether or not anything landed on one.
    */
   overTimeAnswersEmptyDays: false,
 }));

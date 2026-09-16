@@ -7,10 +7,9 @@ import { useCallback, useSyncExternalStore } from "react";
 export const SAMPLE_CHOICE_KEY = "governance.sample";
 
 /**
- * The answer when the browser will not keep one. A browser with site data
- * blocked throws on the accessor itself, and a sample toggle is not worth
- * taking a page down for — so the choice lives in the tab's memory instead and
- * is simply forgotten on reload.
+ * The answer when the browser will not keep one — a browser with site data
+ * blocked throws on the accessor itself, not worth taking a page down for.
+ * Lives in the tab's memory instead, forgotten on reload.
  */
 let fallbackOptIn: boolean | null = null;
 
@@ -18,11 +17,9 @@ let fallbackOptIn: boolean | null = null;
 const listeners = new Set<() => void>();
 
 /**
- * Read the choice back, or `null` when the reader has not made one.
- *
- * Read through to storage on every call rather than cached, so that the answer
- * has exactly one home. It returns a primitive, which is what
- * `useSyncExternalStore` needs to compare cheaply.
+ * Read the choice back, or `null` when the reader has not made one. Reads
+ * through to storage every call, never cached, so the answer has exactly
+ * one home; returns a primitive for `useSyncExternalStore` to compare cheaply.
  */
 export function readSampleChoice(): boolean | null {
   try {

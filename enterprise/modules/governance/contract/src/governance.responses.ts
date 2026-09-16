@@ -1,9 +1,7 @@
 /**
- * What a governance write answers when the write itself is the whole answer.
- *
- * One flag, deliberately: an archive, an assignment or a policy change has no
- * fact to hand back that the caller did not already send, and answering the
- * changed row would invite a screen to read it instead of refetching.
+ * What a governance write answers when the write itself is the whole
+ * answer — one flag, deliberately, so a screen refetches instead of trusting
+ * a returned row that invites staleness.
  */
 import { z } from "zod";
 

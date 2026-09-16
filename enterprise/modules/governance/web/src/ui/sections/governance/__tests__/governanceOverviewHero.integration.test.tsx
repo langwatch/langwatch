@@ -259,9 +259,8 @@ async function projectHomeAskMeasure(): Promise<string> {
 
 /**
  * The width the nearest ancestor bounds `node` to, as the browser computed
- * it. Walked upwards because the measure is set on a wrapper several levels
- * above whatever the test found by role, and which level that is belongs to
- * the layout rather than to this assertion.
+ * it — walked upwards since the measure sits several levels above what the
+ * test found by role, a level that belongs to the layout, not this assertion.
  */
 function boxedAncestorWidth(
   node: HTMLElement,
@@ -422,12 +421,10 @@ describe("governance overview", () => {
       for (const { path, tab } of destinations) {
         const tabs = await tabsOfPage(path);
         if (tabs === null) {
-          // A page with no tab bar is held to more than a page with one: it
-          // must not be addressed with a tab at all. A tab a page cannot read
-          // is dead weight in the address that outlives whoever put it there,
-          // and it reads as deliberate to the next person to open the file.
-          // Compared as a pair so a failure names the page rather than only
-          // reporting that some string was not null.
+          // A page with no tab bar is held to more: it must not be addressed
+          // with a tab at all — a tab a page can't read is dead weight that
+          // reads as deliberate to the next person. Compared as a pair so a
+          // failure names the page, not just report a string wasn't null.
           expect({ path, tab }).toEqual({ path, tab: null });
           continue;
         }
@@ -607,12 +604,10 @@ describe("governance overview", () => {
       expect(row).toHaveAttribute("href", "/governance/people");
       expect(row).toHaveTextContent("Engineering");
 
-      // The kind is a chip rather than a second column of prose: its own
-      // element, stamped by the same house recipe the severities use. jsdom
-      // applies none of that recipe's CSS, so the class is all there is to read
-      // here. The scenario's other half — that the chip keeps its width while
-      // the name gives way — needs layout, which jsdom has none of. It is
-      // asserted in
+      // The kind is a chip, its own element stamped by the house recipe the
+      // severities use; jsdom applies none of that CSS, so the class is all
+      // there is to read here. The other half — width held while the name
+      // gives way — needs layout jsdom lacks; asserted in
       // src/components/governance/home/__tests__/homeActivityChip.browser.test.tsx.
       const kind = screen.getByText("Directory");
       expect(row).toContainElement(kind);

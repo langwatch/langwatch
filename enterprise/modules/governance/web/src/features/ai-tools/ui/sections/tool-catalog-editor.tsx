@@ -212,14 +212,11 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
         </HStack>
       )}
       {(isCatalogEmpty || showImport) && (
-        // Semantic orange, not the raw palette: `orange.50/300/600` are fixed
-        // light-mode values, so in dark mode this panel kept a cream
-        // background while its text stayed on the `fg`/`fg.muted` tokens that
-        // do flip — white on cream, 1.01:1. The semantic triple (_app.tsx)
-        // flips instead, taking the heading to 10.49:1 and the body to 7.39:1.
-        // Light mode is untouched to the eye: the fill moves orange.50 ->
-        // orange.100, which is 1.05:1 of difference, and the icon gets better
-        // (3.26:1 -> 8.16:1) because orange.fg is darker than orange.600.
+        // Semantic orange, not the raw palette: fixed light-mode values kept a
+        // cream background whose text stayed non-flipping in dark mode (white
+        // on cream, 1.01:1). The semantic triple (_app.tsx) flips it to
+        // 10.49:1 heading / 7.39:1 body; light mode moves orange.50 →
+        // orange.100 (1.05:1), and the icon improves 3.26:1 → 8.16:1.
         <Box
           borderWidth="1px"
           borderColor="orange.emphasized"
@@ -475,10 +472,9 @@ function SortableCatalogCard({
 }
 
 /**
- * Maps a tile's stored scope into ScopeChipPicker entries for the badge.
- * Org-wide → one ORGANIZATION chip; department-scoped → one DEPARTMENT
- * chip per department, names resolved from the departments list (falls
- * back to the bare id when a name is missing, e.g. an archived dept).
+ * Maps a tile's stored scope into ScopeChipPicker entries: org-wide → one
+ * ORGANIZATION chip; department-scoped → one DEPARTMENT chip per
+ * department, falling back to the bare id when a name is missing.
  */
 function scopeChipsFor(
   entry: AiToolEntry,

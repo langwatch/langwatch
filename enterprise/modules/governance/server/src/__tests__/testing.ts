@@ -1,8 +1,7 @@
 /**
- * Test-only access for Governance characterization suites: the collaborators a
- * suite needs, built here over the endpoints the suite owns. The repositories
- * and services themselves stay private to the feature server — a suite states
- * which substrates it has, not which classes to construct.
+ * Test-only access for Governance characterization suites: the collaborators
+ * a suite needs, built here. Repositories and services stay private to the
+ * feature server — a suite states which substrates it has, not which classes to construct.
  */
 import type { GovernanceClickHouseResolver } from "../app/governance.members.ts";
 import {

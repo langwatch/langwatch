@@ -286,10 +286,9 @@ export const aiToolProviderAvailabilitySchema = z
   .strict();
 
 /**
- * The OTLP endpoint the Claude Code tile auto-fills, or null when the
- * organization has published no `claude_code` source yet. Only the URL is
- * disclosed — no source name, scope or secret — because the bearer token is
- * what gates the write and the URL resolves publicly per source id anyway.
+ * The OTLP endpoint the Claude Code tile auto-fills, or null when no
+ * `claude_code` source is published yet. Only the URL is disclosed — no
+ * name, scope or secret — because the bearer token gates the write.
  */
 export const aiToolOtlpEndpointSchema = z.object({ endpoint: z.string().nullable() }).strict();
 

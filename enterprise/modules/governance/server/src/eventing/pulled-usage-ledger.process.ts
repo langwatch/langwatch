@@ -12,11 +12,9 @@ import {
 import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
 
 /**
- * What this item is worth in the ledger's dollars, or null when nobody can say.
- *
- * An item billed in dollars needs no conversion — the amount IS the dollar
- * amount. An item billed in anything else can only be stated in dollars by the
- * biller, and we never invent a rate to stand in for one it did not publish.
+ * What this item is worth in the ledger's dollars, or null when nobody can
+ * say. An item billed in dollars needs no conversion; anything else can only
+ * be stated in dollars by the biller — we never invent a rate it didn't publish.
  */
 function ledgerAmountNanoUsd(record: PulledUsageObservedEventData): number | null {
   if (record.currencyCode === PULLED_USAGE_DEFAULT_CURRENCY_CODE) {
@@ -49,12 +47,9 @@ export class PulledUsageLedgerProcess {
         )
         .on(PULLED_USAGE_EVENT_TYPES.OBSERVED, (state, record, context) => {
           const costNanoUsd = ledgerAmountNanoUsd(record);
-          // The ledger column is nano-DOLLARS. An item billed in another
-          // currency that the biller published no conversion for has no honest
-          // value to put in it: writing the native figure would file euros as
-          // dollars, and writing 0 would report real spend as free. It gets no
-          // ledger row, and the daily cost rollup — which keys by currency and
-          // keeps the full amount — is where that money is read (ADR-128 §3).
+          // The ledger column is nano-DOLLARS; an unconverted foreign-currency
+          // item has no honest value for it, so it gets no ledger row — the
+          // daily cost rollup is where that money is read instead (ADR-128 §3).
           if (costNanoUsd === null) {
             return { state, intents: [] };
           }

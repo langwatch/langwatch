@@ -1,9 +1,7 @@
 /**
  * The hero's opening line: a time-of-day greeting, same serif voice as the
- * project home's. Ported from `.../components/home/WelcomeHeader.tsx`
- * (main), which greets by first name. The reader comes from
- * `GovernanceHostPort.currentUser()`; an absent one — not signed in, or not
- * answered yet — falls back to the anonymous greeting rather than a blank.
+ * project home's. The reader comes from `GovernanceHostPort.currentUser()`;
+ * an absent one falls back to the anonymous greeting rather than a blank.
  */
 import { Heading } from "@chakra-ui/react";
 import { useGovernanceHost } from "../../../../model/governance-host.ts";

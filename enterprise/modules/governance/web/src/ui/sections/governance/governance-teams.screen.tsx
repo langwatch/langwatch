@@ -23,11 +23,9 @@ function isSortField(v: string | string[] | undefined): v is SortField {
 }
 
 /**
- * Real <button> for keyboard nav + screen-reader announcement (Ariana
- * QA finding G13 — sort chips were divs with cursor:pointer, neither
- * Tab-focusable nor announced as controls). Inline <button> avoids
- * Chakra v3's polymorphic Box `as="button"` typing pitfall while
- * keeping the chip styling Chakra-token-driven.
+ * Real <button> for keyboard nav + screen-reader announcement (Ariana QA
+ * finding G13 — sort chips were unfocusable divs). Avoids Chakra v3's
+ * polymorphic Box `as="button"` typing pitfall while staying token-driven.
  */
 function SortChip({
   label,

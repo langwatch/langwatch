@@ -107,12 +107,9 @@ export type GovernanceRoutingPolicyOption = { id: string; name: string };
 export type GovernanceSessionPolicy = { maxSessionDurationDays: number };
 
 /**
- * The plan an organization's usage is measured against.
- *
- * Restated here rather than imported: it belongs to
- * `@langwatch/entitlement-contract`, which is neither the platform API client
- * nor this feature's contract, and `limits` is the one procedure in this map
- * whose payload no governance type describes.
+ * The plan an organization's usage is measured against. Restated here
+ * rather than imported: it belongs to `@langwatch/entitlement-contract`, and
+ * `limits` is the one procedure whose payload no governance type describes.
  */
 export type GovernancePlanInfo = {
   planSource: "license" | "subscription" | "free";
@@ -136,10 +133,9 @@ export type GovernancePlanInfo = {
 };
 
 /**
- * The limit reading with its copy already written. The sentence is composed on
- * the server because the same number appears in the sidebar, on the settings
- * page and in the approaching-limit email, and three renderings of one number
- * is how they start disagreeing.
+ * The limit reading with its copy already composed server-side — the same
+ * number appears in the sidebar, settings page and approaching-limit email,
+ * and three renderings of one number is how they start disagreeing.
  */
 export type GovernanceMessageLimitInfo = {
   status: "ok" | "warning" | "exceeded";
@@ -278,10 +274,9 @@ export type GovernanceApiMap = {
           organizationId: string;
           departmentIds?: string[];
           /**
-           * Widened on purpose. The router builds its enum from
-           * `AI_TOOL_TYPES` through a cast to `[string, ...string[]]`, so the
-           * parsed field is a plain string; `AiToolType` is assignable to it,
-           * and a variable already typed `string` is too.
+           * Widened on purpose: the router builds its enum from
+           * `AI_TOOL_TYPES` via a cast to `[string, ...string[]]`, so the
+           * parsed field is a plain string, and `AiToolType` is assignable to it.
            */
           type: string;
           displayName: string;
@@ -622,9 +617,8 @@ export const governanceApi = createModuleApi<GovernanceApiMap>();
 export type RouterOutputs = OutputsFromMap<GovernanceApiMap>;
 
 /**
- * The name the screens call it by.
- *
- * They were written against the application's `api` proxy and are moved
- * unchanged; the import line is what tells them which one they have.
+ * The name the screens call it by — they were written against the
+ * application's `api` proxy and moved unchanged; the import line is what
+ * tells them which one they have.
  */
 export const api = governanceApi;

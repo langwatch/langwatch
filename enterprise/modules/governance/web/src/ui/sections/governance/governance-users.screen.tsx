@@ -87,10 +87,9 @@ function fmtTrendPct(pct: number): string {
 }
 
 /**
- * The full ranking of people by spend. Its address redirects to the People
- * tab of /governance/people (see `legacyRedirects.tsx`); this page keeps
- * the same table for the detail page's neighbourhood and renders nothing
- * of its own.
+ * The full ranking of people by spend — its address redirects to the
+ * People tab of /governance/people (`legacyRedirects.tsx`); this page keeps
+ * the table only for the detail page's neighbourhood and renders nothing.
  */
 function GovernanceUsersListPage() {
   const router = useGovernanceRouter();

@@ -6,19 +6,15 @@ const logger = createLogger("langwatch:governance:cost-rollup:watch");
 
 /**
  * How many looks one day's comparison gets before the outbox retires it.
- *
- * Named rather than inlined into the outbox policy because the handler reads it
- * too: it has to know which look is its LAST one, and two literals would let
- * the two notions of "last" drift apart silently.
+ * Named rather than inlined into the outbox policy because the handler
+ * reads it too, so two literals can't let "last" drift apart silently.
  */
 export const COST_ROLLUP_WATCH_MAX_ATTEMPTS = 5;
 
 /**
- * A comparison disagreed with looks left, so it is not drift yet. Thrown to
- * spend a rung of the outbox ladder: the ladder is the wait, and a quiet return
- * would clear the day for good. A plain `Error`, not a `HandledError` — nothing
- * here reaches a customer, and what an operator needs is on the warn line and
- * the lag gauge, both written before this is raised.
+ * A comparison disagreed with looks left, so it is not drift yet — thrown to
+ * spend a rung of the outbox ladder; a quiet return would clear the day for
+ * good. A plain `Error`, not `HandledError`: nothing here reaches a customer.
  */
 export class CostRollupCheckUnsettledError extends Error {
   readonly day: string;
@@ -60,10 +56,9 @@ export const compareCostRollupDaySchema = z.object({
 export type CompareCostRollupDayPayload = z.infer<typeof compareCostRollupDaySchema>;
 
 /**
- * Where a disagreement becomes drift, or does not. It reads the attempt number
- * because that is the only thing separating the two: a fold that is behind
- * catches up between looks and drift does not. Failures propagate so the outbox
- * retries — a swallowed one is a check that silently did not happen.
+ * Where a disagreement becomes drift, or does not — the attempt number is
+ * the only thing separating the two, since a fold that is behind catches up
+ * between looks and drift does not. Failures propagate so the outbox retries.
  */
 export class CostRollupWatchIntent {
   private constructor(private readonly comparer: CostRollupDayComparer) {}

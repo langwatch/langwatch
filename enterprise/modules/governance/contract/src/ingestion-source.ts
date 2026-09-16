@@ -17,12 +17,9 @@ export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlE
 }
 
 /**
- * One configured source, as the admin surface reads it.
- *
- * Deliberately NOT the stored row: the secret hash, the private rotation slot
- * and the sealed credentials envelope never travel, and `parserConfig` is
- * filtered to the keys that are not one of those. Writing the wire shape down
- * is what keeps a later `select` widening from quietly putting one back.
+ * One configured source, as the admin surface reads it — deliberately NOT
+ * the stored row: the secret hash, rotation slot and credentials envelope
+ * never travel, guarding against a later `select` widening putting one back.
  */
 export const ingestionSourceDtoSchema = z
   .object({

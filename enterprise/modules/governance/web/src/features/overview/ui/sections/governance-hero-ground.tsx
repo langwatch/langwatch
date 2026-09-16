@@ -1,9 +1,6 @@
 /**
- * The lit ground the governance hero stands on — the same moving mesh the
- * project home lights its ask field with, rebuilt small rather than dragged
- * in with the carousel and Langy-store state that scope does not have here.
- * It bleeds past its own box on purpose: the hero is where the page is lit
- * from, not an object on it. Ported from `.../governance/home/GovernanceHeroGround.tsx` (main).
+ * The lit ground the governance hero stands on, bleeding past its own box
+ * on purpose — the hero is where the page is lit from, not an object on it.
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 import { Box } from "@chakra-ui/react";
@@ -27,10 +24,9 @@ const MESH = {
 } as const;
 
 /**
- * How far the light spills past the content it stands behind. Wider than the
- * lantern's own -14%: this column is narrower (900px vs. the project home's
- * 7xl), so the same percentage would squeeze the mesh into a stain rather
- * than a room. These put the ground at roughly the same pixel measure.
+ * How far the light spills past its content — wider than the lantern's own
+ * -14%, since this column (900px) is narrower than the project home's 7xl,
+ * so the same percentage would squeeze the mesh into a stain, not a room.
  */
 const BLEED_INLINE = { base: "-12%", md: "-30%" };
 const BLEED_BLOCK = { base: "-30%", md: "-45%" };

@@ -268,12 +268,9 @@ describe("the agents sync control", () => {
 
   describe("given a connected provider that is not scheduled to be asked", () => {
     /**
-     * The service asks only the sources the scheduler will pull, so a press
-     * can record NOTHING while a provider is plainly connected. That is not
-     * a request, and the page must not remember it as one: latching
-     * `hasAsked` here would disable the control with "already asked" over a
-     * press that asked nobody, and "Asked 0 providers" is a sentence that
-     * reads as the page counting wrong.
+     * The service asks only sources the scheduler will pull, so a press can
+     * record NOTHING while a provider is connected — not a request, so
+     * latching `hasAsked` would disable the control over a press that asked nobody.
      */
     beforeEach(() => {
       harness.queryResults["governanceAgents.syncSources"] = { data: [GENIE] };

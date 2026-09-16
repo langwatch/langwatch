@@ -20,10 +20,9 @@ const logger = createLogger("langwatch:governance:cost-rollup:watch");
 export const COST_ROLLUP_WATCH_PROCESS_NAME = "costRollupWatch" as const;
 
 /**
- * A cron rather than a period because the check is a wall-clock appointment —
- * "04:23 UTC", not "24 hours after whatever armed it". Nothing schedules a row:
- * the expression is a time formula, and the only thing written is the instant
- * on the process instance.
+ * A cron rather than a period: the check is a wall-clock appointment —
+ * "04:23 UTC", not "24 hours after whatever armed it". Only the instant on
+ * the process instance is ever written.
  */
 const COST_ROLLUP_WATCH_CRON = "23 4 * * *";
 const COST_ROLLUP_WATCH_TIMEZONE = "UTC";
@@ -35,17 +34,15 @@ export interface CostRollupWatchState {
   /** UTC `YYYY-MM-DD`, in the order they were first marked. Set semantics. */
   pendingDays: string[];
   /**
-   * Duplicates the instance's own `nextWakeAt` on purpose: an evolution states
-   * its wake outright rather than amending one, so a handler that cannot read
-   * the armed moment out of its own state would re-arm on every charge. It also
-   * makes "days marked with nothing armed" a state an assertion can find.
+   * Duplicates the instance's own `nextWakeAt` on purpose: a handler that
+   * cannot read the armed moment out of its own state would re-arm on every
+   * charge, and it makes "days marked with nothing armed" a state a test can find.
    */
   armedAt: number | null;
   /**
-   * Days ever newly marked, never reset — not even by a check. It is part of
-   * what identifies a comparison request: a redelivered wake carries the same
-   * count and stays a repeat, while a day marked again moves it and asks a new
-   * question.
+   * Days ever newly marked, never reset — not even by a check. Part of what
+   * identifies a comparison request: a redelivered wake carries the same
+   * count and stays a repeat; a new mark moves it and asks a new question.
    */
   marks: number;
 }
@@ -57,10 +54,9 @@ const INITIAL_COST_ROLLUP_WATCH_STATE: CostRollupWatchState = {
 };
 
 /**
- * The UTC day a charge falls on, or null when it carries no moment anyone can
- * name. Refusing is the only honest option: a day derived from a garbage
- * timestamp is written onto the pending list permanently — only a check clears
- * it — and is then compared against a summary holding nothing, forever.
+ * The UTC day a charge falls on, or null when it carries no moment anyone
+ * can name. A day derived from garbage would sit on the pending list
+ * permanently, compared against a summary holding nothing, forever.
  */
 function findChargeDay(occurredAtMs: unknown): string | null {
   const isNameableMoment =
@@ -81,10 +77,9 @@ export function nextCostRollupCheckAt(after: number): number {
 }
 
 /**
- * The slot comes from WALL CLOCK, never the charge's own moment: a booking date
- * days ahead would otherwise silence the organization until the date it names.
- * An armed check is kept as it is, INCLUDING one already overdue — re-arming
- * would push the days it holds out by another night.
+ * The slot comes from WALL CLOCK, never the charge's own moment — a booking
+ * date days ahead would otherwise silence the organization until then. An
+ * already-overdue check is kept as is; re-arming would push it out a night.
  */
 function markCostRollupDay({
   state,
@@ -122,11 +117,8 @@ type PulledUsageChargeEvent =
 
 /**
  * The daily cost drift check, driven by the charges instead of by a clock
- * (ADR-128). One instance per ORGANIZATION — that is what `keyBy` buys, and it
- * doubles as the subscriber's queue group. It never repairs anything: finding
- * drift counts it and logs it. And drift is the outbox ladder's verdict, not
- * one comparison's, because a summary seconds behind and a summary that is
- * wrong are the same picture at the moment of looking.
+ * (ADR-128). One instance per ORGANIZATION via `keyBy`; it never repairs
+ * anything, only counts and logs drift as the outbox ladder's verdict.
  */
 export class CostRollupWatchProcess {
   private constructor(

@@ -88,12 +88,9 @@ export class PersonalUsageDashboardService {
   }
 
   /**
-   * The three reads behind one screen, issued together.
-   *
-   * They answer different questions and ClickHouse multiplexes them happily —
-   * a caller awaiting them in sequence pays three round trips for one screen.
-   * That is a fact about the store rather than about a door, so it is decided
-   * here rather than in whichever door happens to ask.
+   * The three reads behind one screen, issued together — ClickHouse
+   * multiplexes them happily, but awaiting them in sequence pays three round
+   * trips for one screen, a fact about the store decided here, not per caller.
    */
   async rollup(query: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
     const [summary, dailyBuckets, breakdownByModel] = await Promise.all([

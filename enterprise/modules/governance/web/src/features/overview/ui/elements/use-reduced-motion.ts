@@ -1,8 +1,7 @@
 /**
- * Whether the reader's system asks for less motion, read live. Main's
- * `GovernanceHeroGround` reads this from a platform-app hook this package may
- * not import, and no workspace package exposes an equivalent yet, so this is
- * the minimal `prefers-reduced-motion` media-query hook.
+ * Whether the reader's system asks for less motion, read live — the
+ * minimal `prefers-reduced-motion` media-query hook, since no workspace
+ * package exposes an equivalent this one may import yet.
  */
 import { useEffect, useState } from "react";
 

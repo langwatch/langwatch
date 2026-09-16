@@ -14,12 +14,9 @@ import {
 
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 /**
- * Wire shape returned by `api.activityMonitor.spendOverTime` — see
- * Sergey's lane-S touch list (item 3). Daily UTC buckets, one row per
- * bucket, with a flat `series` array per row carrying spend per group
- * (team / user / model). The chart pivots this into Recharts'
- * "wide" data shape (one column per series) under the hood so a key
- * with no spend on a given day still renders 0 in the stacked area.
+ * Wire shape returned by `api.activityMonitor.spendOverTime`: daily UTC
+ * buckets with a flat `series` array per group (team / user / model),
+ * pivoted into Recharts' "wide" shape, zero-filling groups with no spend.
  */
 export interface SpendOverTimeBucket {
   bucketIso: string;

@@ -110,12 +110,9 @@ import type {
 } from "./platform-tool-policy.ts";
 
 /**
- * The one public Governance capability. The deliberately explicit operation
- * names keep transport code from receiving a grab-bag of independently
- * constructed services, while retaining the existing domain vocabulary.
- *
- * Smaller implementation services are private to the server package and must
- * not be placed on App or request context.
+ * The one public Governance capability, with deliberately explicit operation
+ * names rather than a grab-bag of independently constructed services. Smaller
+ * services stay private to the server package — never on App or request context.
  */
 export interface GovernanceApi {
   anomalyRuleList(organizationId: string): Promise<AnomalyRule[]>;
@@ -231,10 +228,8 @@ export interface GovernanceApi {
   }): Promise<GovernanceIngestionSource>;
   /**
    * Of the trace destinations these sources point at, the ones still live in
-   * this organization. The admin surfaces need the complement — a destination
-   * that is absent has stopped routing — and cannot derive it from the project
-   * list they already hold, because a project outside the reader's own teams
-   * is equally absent and is not archived at all.
+   * this organization — the admin surface needs the complement, since a
+   * project outside the reader's own teams is absent without being archived.
    */
   ingestionSourceLiveTraceProjectIds(
     sources: readonly { traceProjectId?: string | null }[],

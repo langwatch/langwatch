@@ -9,12 +9,9 @@ import { GOVERNANCE_SUMMARY_UNMEASURED } from "./governance-summary-bar.tsx";
 export type GovernanceSummaryTone = "good" | "attention" | "bad" | "neutral";
 
 /**
- * The dot's colour.
- *
- * Three of the four come from the section's own status palette rather than
- * being chosen again here. "Neutral" is the one this file adds, for a status
- * that is neither healthy nor a problem — idle is the standing example — and
- * it is deliberately the quietest thing on the card.
+ * The dot's colour. Three of the four come from the section's own status
+ * palette; "Neutral" is the one this file adds, for a status that is
+ * neither healthy nor a problem (idle) — deliberately the quietest thing on the card.
  */
 const TONE_DOT: Record<GovernanceSummaryTone, string> = {
   good: "green.solid",
@@ -24,11 +21,9 @@ const TONE_DOT: Record<GovernanceSummaryTone, string> = {
 };
 
 /**
- * A row of small cards that wraps.
- *
- * Each card grows equally and none falls below a readable width, so three
- * cards fill a wide screen and four become two-and-two on a narrow one without
- * the row being told how many it holds.
+ * A row of small cards that wraps: each grows equally and none falls below
+ * a readable width, so three fill a wide screen and four become
+ * two-and-two on a narrow one, without the row being told how many it holds.
  */
 export function GovernanceSummaryCards({
   children,
@@ -42,12 +37,9 @@ export function GovernanceSummaryCards({
 }
 
 /**
- * One card, named by an eyebrow.
- *
- * The eyebrow is the card's only fixed piece. It is set in the section's
- * uppercase chrome voice because it names a region rather than saying
- * anything, and everything that says something sits beneath it at full
- * strength.
+ * One card, named by an eyebrow — the card's only fixed piece, set in the
+ * section's uppercase chrome voice because it names a region rather than
+ * saying anything; everything that says something sits beneath it at full strength.
  */
 export function GovernanceSummaryCard({
   eyebrow,
@@ -113,12 +105,9 @@ export function GovernanceSummaryStatusRow({
 }
 
 /**
- * One line of a ranking: a name on the left, its share on the right.
- *
- * The share is right-aligned and tabular so a column of them can be compared
- * down the edge, which is the only reason to rank things in the first place.
- * The name truncates rather than wrapping, because a two-line name would break
- * the alignment the ranking is read by.
+ * One line of a ranking: a name on the left, its share right-aligned and
+ * tabular so a column of them compares down the edge. The name truncates
+ * rather than wrapping, since a two-line name would break that alignment.
  */
 export function GovernanceSummaryRankRow({
   label,

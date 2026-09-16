@@ -3,12 +3,9 @@ import { Heading, Text, VStack } from "@chakra-ui/react";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
 
 /**
- * Placeholder for the Billed view: the page and its nav item ship behind
- * `release_ui_governance_billed_cost_enabled` ahead of the spend views,
- * so the rail shape lands before the data does. No queries, no state.
- *
- * Spec: specs/ai-gateway/governance/governance-home-routing.feature
- * (the billed-cost flag section).
+ * Placeholder for the Billed view: ships behind
+ * `release_ui_governance_billed_cost_enabled` ahead of the spend views.
+ * Spec: specs/ai-gateway/governance/governance-home-routing.feature (billed-cost section).
  */
 function BilledPage() {
   return (

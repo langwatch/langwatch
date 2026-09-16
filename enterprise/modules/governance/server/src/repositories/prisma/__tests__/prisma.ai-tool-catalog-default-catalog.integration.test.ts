@@ -1,6 +1,5 @@
 /**
  * @vitest-environment node
- *
  * Every org gets the standard AI tool set automatically (zero-touch default catalog).
  * Guard is conservative: any existing AiToolEntry means admin owns it. Hits real Postgres.
  * Spec: specs/ai-governance/personal-portal/default-catalog.feature

@@ -688,10 +688,9 @@ describe("the filter row", () => {
 });
 
 /**
- * Chakra emits one hashed class per element, so a button's size and variant are
- * not readable off the DOM - but two buttons built the same way get the SAME
- * hash. Rendering references beside the page is therefore a real assertion
- * about how the header's actions were built, not a proxy for one.
+ * Chakra emits one hashed class per element, unreadable as size/variant off
+ * the DOM — but two buttons built the same way get the SAME hash.
+ * Rendering references beside the page is a real assertion, not a proxy.
  */
 function ButtonReferences() {
   return (
@@ -1062,12 +1061,10 @@ describe("the summary strip above the tabs", () => {
 
     /** @scenario "A summary figure the page cannot measure reads as an em dash" */
     it("draws an em dash for a read that was never made, not only one still running", () => {
-      // The harder half, and the one a loading flag cannot catch. The spend
-      // read is skipped outright for a reader without `activityMonitor:view`
-      // and for a non-Enterprise organization, so it is never loading and
-      // never will be. Counting the identity half alone would have printed a
-      // confident population directly under the permission notice on the
-      // table below.
+      // The harder half, one a loading flag can't catch: the spend read is
+      // skipped outright without `activityMonitor:view` or on a
+      // non-Enterprise org, so it's never loading. Counting the identity
+      // half alone would print a confident population under the permission notice.
       harness.answers["governancePeople.list"] = { data: [] };
       harness.answers["departments.list"] = { data: [] };
       // No entry at all for the spend read: the shape a disabled query has.

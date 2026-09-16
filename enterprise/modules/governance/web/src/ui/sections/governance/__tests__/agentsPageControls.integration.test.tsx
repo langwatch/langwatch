@@ -183,10 +183,9 @@ async function pickFilter(chipLabel: string, option: string) {
 }
 
 /**
- * One agent card, by the name printed on it.
- *
- * Scoped to the cards, because the summary strip above them names the biggest
- * spenders too and a page-wide text query would find whichever came first.
+ * One agent card, by the name printed on it — scoped to the cards, because
+ * the summary strip above them names the biggest spenders too, and a
+ * page-wide text query would find whichever came first.
  */
 function cardNamed(name: string): HTMLElement {
   const card = screen
@@ -197,10 +196,9 @@ function cardNamed(name: string): HTMLElement {
 }
 
 /**
- * One agent row of the list, by the name printed on it. The name is on the
- * row as a data attribute as well as in its first cell, because the row also
- * carries model names and an owner and a text search would find whichever
- * came first.
+ * One agent row of the list, by the name printed on it — also a data
+ * attribute on the row, not just its first cell, since the row carries
+ * model names and an owner and a text search would find whichever came first.
  */
 function rowNamed(name: string): HTMLElement {
   const row = screen
@@ -944,11 +942,9 @@ describe("the agents filter chips", () => {
 });
 
 /**
- * The two layouts.
- *
- * The list is what the page opens on and the cards are the option, which is
- * the shape of every test here: the default is asserted without asking for it,
- * and the grid is asked for by address.
+ * The two layouts — the list is what the page opens on, the cards are the
+ * option. Every test here follows that shape: the default is asserted
+ * without asking for it, and the grid is asked for by address.
  */
 describe("the agents layouts", () => {
   describe("when a governance viewer opens the page", () => {

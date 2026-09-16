@@ -1,10 +1,7 @@
 /**
- * The contract's `isPushSourceType` (secret-bearing sources) and this
- * catalogue's `needsIngestSecret` must agree. They live in different modules —
- * the catalogue is this browser bundle's, the classification is the feature
- * contract's — so this test is the guard rather than a shared constant.
- *
- * If it fails, a source type was added to one side but not the other.
+ * The contract's `isPushSourceType` and this catalogue's
+ * `needsIngestSecret` must agree, or a source type was added to one side
+ * but not the other — the guard, since they live in different modules.
  */
 
 import { isPushSourceType } from "@langwatch/enterprise-governance-contract";

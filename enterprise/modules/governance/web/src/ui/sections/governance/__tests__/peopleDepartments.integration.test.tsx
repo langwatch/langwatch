@@ -115,10 +115,9 @@ const discovered = (over: Record<string, unknown>) => ({
 });
 
 /**
- * The page is two tabs. Everyone the providers named sits on the merged table
- * on the People tab (the default address); the departments their directories
- * named sit on the Departments tab, on the same table as the ones the
- * administrator created.
+ * The page is two tabs: everyone the providers named sits on the merged
+ * People tab (the default address); departments their directories named
+ * sit on the Departments tab, alongside the ones the admin created.
  */
 const renderPage = (entry = "/governance/people") =>
   render(

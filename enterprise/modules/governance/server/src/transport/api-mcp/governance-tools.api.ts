@@ -14,21 +14,17 @@ type ToolCallback = (
 
 /**
  * Structural shape we use from the McpServer instance returned by
- * `@langwatch/mcp-server.createMcpServer`. The .d.ts in that package
- * intentionally narrows McpServer to keep the langwatch app's typecheck
- * cheap; we mirror that narrow shape here so callers can pass the same
- * value verbatim without an `as` cast.
+ * `@langwatch/mcp-server.createMcpServer`, mirroring that package's narrow
+ * `.d.ts` so callers can pass the same value verbatim without an `as` cast.
  */
 type McpServerLike = {
   tool(name: string, description: string, inputSchema: ZodRawShape, cb: ToolCallback): unknown;
 };
 
 /**
- * Whether the caller holds a permission on an organization.
- *
- * Injected rather than imported: the decision belongs to the process's own
- * AuthZ graph, and a tool surface that reached for a global one would be
- * asking a different engine than the request path beside it.
+ * Whether the caller holds a permission on an organization. Injected rather
+ * than imported: the decision belongs to the process's own AuthZ graph, not
+ * a global one the request path beside it doesn't share.
  */
 export abstract class GovernanceMcpPermissionProbe {
   abstract holdsOrganizationPermission(input: {

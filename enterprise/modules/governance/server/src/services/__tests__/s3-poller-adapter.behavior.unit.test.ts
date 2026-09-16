@@ -1,6 +1,5 @@
 /**
- * Unit coverage for S3PollingPullerAdapter, hitting a stubbed S3 client (no real AWS) so
- * the test can exercise the parser/cursor/error paths without testcontainers.
+ * Unit coverage for S3PollingPullerAdapter on a stubbed S3 client (no testcontainers).
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */

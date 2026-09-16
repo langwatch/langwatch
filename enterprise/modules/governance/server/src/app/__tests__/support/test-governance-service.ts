@@ -4,11 +4,9 @@ const unsupported = <Method>(): Method =>
   (() => Promise.reject(new Error("not used by this test"))) as Method;
 
 /**
- * Complete Governance boundary for tests that only exercise a few methods.
- *
- * The same shape as {@link ../support/test-project-api.ts}: every member
- * of the contract is present and refuses, so a test that reaches one it did
- * not mean to reach fails loudly instead of reading `undefined`.
+ * Complete Governance boundary for tests that only exercise a few methods,
+ * shaped like {@link ../support/test-project-api.ts}: every member is
+ * present and refuses, so an unintended call fails loudly, not `undefined`.
  */
 export class TestGovernanceService implements GovernanceApi {
   activityEventsForSource = unsupported<GovernanceApi["activityEventsForSource"]>();

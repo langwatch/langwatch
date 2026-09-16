@@ -25,10 +25,8 @@ function activityMonitor(prisma: unknown) {
 
 /**
  * A value ClickHouse's `toString(sum(Float64))` actually produces for a
- * sub-cent spend. `Number("0.000044999999999999996")` gives
- * `0.000044999999999999996`, which is representable, but accumulating
- * several of those as floats drifts in a way that the string-→nano-→string
- * round-trip does not.
+ * sub-cent spend — `Number("0.000044999999999999996")` is representable,
+ * but accumulating floats drifts in a way string-→nano-→string does not.
  */
 const CH_FLOAT64_SPEND = "0.000044999999999999996";
 

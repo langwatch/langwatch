@@ -111,12 +111,9 @@ function useAddAgentDeepLink() {
 }
 
 /**
- * One empty state, given the page's own words.
- *
- * Every one of these carries an action, because the dashed box it replaces
- * left the reader exactly where they were. The copy lives in `emptyStates.ts`
- * and the shape is shared with the inventory; see
- * `~/components/governance/empty`.
+ * One empty state, given the page's own words — every one carries an
+ * action, because the dashed box it replaces left the reader exactly where
+ * they were. Copy lives in `emptyStates.ts`; shape shared with the inventory.
  */
 function AgentsEmptyState({
   copy,
@@ -128,9 +125,8 @@ function AgentsEmptyState({
   onAct: () => void;
   /**
    * The pane's action is a second doorway to a control in the header, so it
-   * has to be shut whenever that control is. An empty state offering a press
-   * the header has already disabled is the same defect as a live button that
-   * silently does nothing, moved down the page.
+   * has to be shut whenever that control is — otherwise it offers a press
+   * the header already disabled, the same defect moved down the page.
    */
   actionDisabled?: boolean;
   testId: string;
@@ -197,12 +193,10 @@ function useAgentSync({
   );
   const mutation = api.governanceAgents.requestListing.useMutation({
     onSuccess: (result) => {
-      // Zero is not an ask. The service only asks the sources the scheduler
-      // will pull, so a provider can be connected and still leave this at
-      // zero — and then nothing was recorded, nothing will answer, and there
-      // is nothing for a reload to show. Latching `hasAsked` here would put
-      // the control into "already asked, reload to see" over a press that
-      // asked nobody, and "Asked 0 providers" reads as the page miscounting.
+      // Zero is not an ask: the service only asks sources the scheduler
+      // will pull, so a connected provider can still leave this at zero.
+      // Latching `hasAsked` here would tell the reader to reload for an
+      // answer that will never come, and "Asked 0 providers" would read as miscounting.
       if (result.requested === 0) {
         toaster.create({
           title: "Nothing to ask",
@@ -283,11 +277,9 @@ function AgentsPane({
   sample: boolean;
   isLoading: boolean;
   /**
-   * What to show when the organization holds no agents at all, decided by the
-   * page rather than here. Which nothing this is depends on whether a provider
-   * that can list agents is connected, which is a read this pane does not
-   * make; the words and the press travel together so a state cannot arrive
-   * with the other page's action attached to it.
+   * What to show when the organization holds no agents, decided by the page
+   * (a read this pane doesn't make). Words and press travel together so a
+   * state can't arrive with the wrong page's action attached.
    */
   noAgents: {
     copy: GovernanceEmptyStateCopy;
@@ -475,14 +467,11 @@ function AgentsPage() {
             {showControls && (
               <AgentsLayoutControl layout={layout} onChange={selectLayout} />
             )}
-            {/* Ghost, so the one outlined control in this row stays the action
-                that creates something of the organization's own — the same
-                arrangement the people header uses for `Run match pass`.
-                It is rendered for every reader rather than gated on the manage
-                grant, which is where this departs from that header: a reader
-                who cannot press it is the one least able to work out why the
-                page will not refresh, and a disabled control that says so
-                tells them, where an absent one does not. */}
+            {/* Ghost, so the one outlined control in this row stays the
+                action that creates something of the organization's own — the
+                same arrangement as `Run match pass`. Rendered for every
+                reader, not gated on the manage grant, so a reader who can't
+                press it still sees why the page won't refresh. */}
             <GovernanceSyncButton
               label="Sync agents"
               state={sync.state}
@@ -495,12 +484,10 @@ function AgentsPage() {
               size="sm"
             />
             {/* The action that creates this page's own thing, drawn as the
-                house header button — outline, small, leading plus glyph, the
-                same control /settings/model-providers uses for "Add Model
-                Provider". It was a solid orange button until the section-wide
-                pass that took solid orange off these pages; the brand accent
-                now marks only the sample affordances, which is the one thing
-                on the screen it needs to distinguish.
+                house header button — outline, small, leading plus glyph,
+                the same control /settings/model-providers uses for "Add
+                Model Provider". The brand accent marks only the sample
+                affordances, the one thing on this screen it must distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
             <PageLayout.HeaderButton onClick={openRegister}>
               <Plus size={14} />

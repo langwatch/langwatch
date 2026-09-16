@@ -23,11 +23,9 @@ function CatalogTabs({
       variant="line"
       defaultValue="tool-tiles"
       // lazyMount only (no unmountOnExit): the Ingestion Templates tab
-      // renders drawers (EditOttlDrawer, CreateTemplateDrawer) with
-      // their own local form state (OTTL statements, new-template
-      // fields). Unmounting that tab while a drawer is open would
-      // destroy in-progress edits, so we avoid unmountOnExit for the
-      // whole Root and only skip mounting tabs that were never opened.
+      // renders drawers with their own local form state. Unmounting that
+      // tab while a drawer is open would destroy in-progress edits, so we
+      // skip mounting tabs that were never opened instead.
       lazyMount
     >
       <Tabs.List>

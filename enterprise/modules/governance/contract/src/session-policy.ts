@@ -1,8 +1,7 @@
 /**
- * The one session knob an organization admin sets, as a schema.
- *
- * Zero means unbounded. The upper bound is enforced by the service rather than
- * stated here, so the refusal and the copy that explains it stay in one place.
+ * The one session knob an organization admin sets. Zero means unbounded;
+ * the upper bound is enforced by the service, not here, so the refusal and
+ * its copy stay in one place.
  */
 import { z } from "zod";
 

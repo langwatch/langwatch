@@ -25,10 +25,9 @@ export function useAiToolCatalog({
   const utils = api.useUtils();
 
   /**
-   * Delete is permanent, so it routes through a confirm dialog. `null` means
-   * no pending deletion; a non-null entry is the tool awaiting confirmation.
-   * The dialog itself belongs to the caller — a hook returns state, never
-   * markup — so both surfaces word the warning in their own terms.
+   * Delete is permanent, routed through a confirm dialog. `null` means no
+   * pending deletion; a non-null entry awaits confirmation. The dialog
+   * belongs to the caller — a hook returns state, never markup.
    */
   const [pendingDelete, setPendingDelete] = useState<AiToolEntry | null>(null);
 
@@ -71,12 +70,9 @@ export function useAiToolCatalog({
      */
     entries: (adminListQuery.data ?? []) as unknown as AiToolEntry[],
     /**
-     * Whether the read has actually answered.
-     *
-     * `entries` defaults to an empty array so a renderer never has to guard,
-     * and that default is a lie about an unanswered read: a caller counting it
-     * would report "0 tools" for a registry it has not seen. This is the flag
-     * that separates the two, and every count of this list is gated on it.
+     * Whether the read has actually answered. `entries` defaults to an
+     * empty array so a renderer never has to guard — but a caller counting
+     * it would report "0 tools" for a registry it hasn't seen without this flag.
      */
     loaded: adminListQuery.data !== undefined,
     isLoading: adminListQuery.isLoading,
@@ -84,8 +80,7 @@ export function useAiToolCatalog({
     /**
      * The query itself, for the one caller that writes the cache directly:
      * the editor's drag-to-reorder paints the new order before the mutation
-     * lands, and `setData` needs the router's own payload type, which only
-     * the query carries.
+     * lands, needing the router's own payload type only the query carries.
      */
     query: adminListQuery,
     setEnabled: ({ id, enabled }: { id: string; enabled: boolean }) =>

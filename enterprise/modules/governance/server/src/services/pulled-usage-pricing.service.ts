@@ -16,11 +16,9 @@ export type PulledUsageQuantities = {
 };
 
 /**
- * A provider that hands us a cost, in a currency of its own choosing.
- *
- * The amount and the code that names it arrive together and are consumed
- * together. Splitting them across two call sites is how a euro figure gets
- * reported as dollars: neither half is wrong on its own, and the pair is.
+ * A provider that hands us a cost, in a currency of its own choosing. The
+ * amount and the code naming it arrive and are consumed together — split
+ * across two call sites, a euro figure reads as dollars.
  */
 export type ProviderReportedPriceInput = {
   basis: typeof PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED;

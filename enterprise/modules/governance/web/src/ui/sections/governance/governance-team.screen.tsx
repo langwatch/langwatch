@@ -40,13 +40,10 @@ function GovernanceTeamDetailPage() {
   const { organization, organizations, hasAnyPermission } = useGovernanceScope();
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
-  // Resolve the team's first project slug for the bird's-eye drill-in
-  // link. Teams typically have a primary project (or a small set);
-  // navigating to /[projectSlug]/traces lands the admin on the team's
-  // workspace via the existing project-shell. No "viewing as admin" banner
-  // comes with it: that banner keys off a PERSONAL workspace owned by
-  // somebody else (see DashboardPageBody), and an org team is not one, so a
-  // team drill-through is silent and unlogged.
+  // Resolve the team's first project slug for the bird's-eye drill-in link,
+  // landing on the team's workspace via the existing project-shell. No
+  // "viewing as admin" banner: that keys off a PERSONAL workspace owned by
+  // someone else, and an org team isn't one, so this drill-through is silent.
   const teamProjectSlug =
     organizations?.flatMap((org) => org.teams ?? []).find((t) => t.id === teamId)?.projects?.[0]
       ?.slug ?? null;

@@ -97,15 +97,11 @@ function InboxEmptyBrief({
 }) {
   return (
     <>
-      {/* Langy's own empty state on Langy's own material. The surface is
-            the one the home briefing wears (`langy-root`, hairline, no
-            shadow, the panel's palette in dark); inside it, the panel's
-            empty-state grammar: the bare mark, the serif display line, one
-            quiet sentence, then the keys — see
-            features/langy/components/EmptyState.tsx. The scope also paints
-            the mark in currentColor (langyTheme.css), which is why the card
-            carries no gradient defs: outside it the mark would fill from a
-            paint server only the Langy panel mounts. */}
+      {/* Langy's own empty state on Langy's own material — the surface the
+            home briefing wears (`langy-root`, hairline, no shadow, dark
+            panel palette), with the panel's own empty-state grid: mark,
+            serif display line, one sentence, then the keys. No gradient
+            defs: outside the Langy panel, currentColor has no paint server. */}
       {/* The surface wraps its card in a full-width scope box, so the
             card centres as a block (auto margins), not as a flex item. */}
       <LangyPanelSurface

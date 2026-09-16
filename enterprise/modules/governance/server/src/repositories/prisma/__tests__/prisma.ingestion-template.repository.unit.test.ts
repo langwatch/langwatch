@@ -29,11 +29,9 @@ function storedRow(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * A transaction client whose two writes are recorded.
- *
- * The template row and its audit row are written in ONE transaction on
- * purpose: an audit trail that can be missing for a write that happened is not
- * an audit trail, and the only place that is decided is here.
+ * A transaction client whose two writes are recorded. Template row and
+ * audit row are written in ONE transaction — an audit trail that can be
+ * missing for a write that happened is not an audit trail.
  */
 function transactionalPrisma(
   options: {
@@ -114,12 +112,9 @@ describe("PrismaIngestionTemplateRepository", () => {
   });
 
   /**
-   * Ported from
-   * `platform/app/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`
-   * and `governance-audit-surface.integration.test.ts`, which reached these two
-   * facts through HTTP and real Postgres. The facts are this repository's — it
-   * is the only place the audit row is composed — so they are proved here, over
-   * a recorded transaction, rather than by a suite that needs a database.
+   * These facts are this repository's — it is the only place the audit row
+   * is composed — so they're proved here over a recorded transaction, not
+   * by a suite needing a database.
    */
   describe("when an organization template is created", () => {
     /** @scenario "Ingestion template authoring is tenant safe and auditable" */
@@ -187,10 +182,9 @@ describe("PrismaIngestionTemplateRepository", () => {
 
   describe("when an organization template is archived", () => {
     /**
-     * Soft, not hard: the ingestion keys already handed out keep landing
-     * traces, and the row simply stops being listed. `archivedAt` plus
-     * `enabled: false` is what takes it out of both listings, whose `where`
-     * clauses filter on exactly those two.
+     * Soft, not hard: already-issued ingestion keys keep landing traces.
+     * `archivedAt` plus `enabled: false` takes the row out of both listings,
+     * whose `where` clauses filter on exactly those two.
      */
     it("stamps the archival and takes the row out of the listings", async () => {
       const prisma = transactionalPrisma({ existing: storedRow() });

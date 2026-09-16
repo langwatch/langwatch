@@ -4,11 +4,9 @@ import { Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 /**
- * What a figure reads as when nothing measured it.
- *
- * An em dash, never a zero and never a spinner. Zero is a measurement and
- * would be a lie; a spinner says the page is still working when it has
- * finished and simply has no answer.
+ * What a figure reads as when nothing measured it: an em dash, never a
+ * zero (a measurement, and a lie here) and never a spinner (the page is
+ * done, it just has no answer).
  */
 export const GOVERNANCE_SUMMARY_UNMEASURED = "—";
 
@@ -61,13 +59,10 @@ export function GovernanceSummaryBar({
         {items.map((item) => (
           <VStack
             key={item.key}
-            // Each figure addressable on its own, because the figure and its
-            // label are separate text nodes: a test asserting "not 0 tools"
-            // against the whole strip matches no single node and passes
-            // whatever the tools figure says, and one asserting an em dash
-            // anywhere in the strip is satisfied by a dash belonging to a
-            // different pane. Both were live here. A caller that gives the
-            // strip no test id gets no per-item ones either.
+            // Each figure addressable on its own: figure and label are
+            // separate text nodes, so a whole-strip assertion like "not 0
+            // tools" or "an em dash somewhere" can match the wrong pane. A
+            // caller with no test id gets no per-item ones either.
             data-testid={testId ? `${testId}-${item.key}` : undefined}
             gap={1}
             align="center"

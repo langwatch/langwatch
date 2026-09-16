@@ -52,50 +52,26 @@ export type PullResult = {
   errorCount: number;
   /**
    * Whether this run reached the end of what it set out to read.
-   *
-   * `"truncated"` means the run stopped at a limit — a page budget, a file
-   * count, a deadline — with more waiting. It is NOT a failure: the money and
-   * the events already gathered are kept, and `cursor` still advances over
-   * them. It exists because a run that stopped early and a run that drained
-   * the source otherwise leave through the same exit, so a source stuck
-   * half-read is indistinguishable from a source that is simply quiet.
-   *
-   * Optional: an adapter that says nothing is read as `"complete"`, which is
-   * what every adapter meant before the field existed.
+   * `"truncated"` means it stopped at a limit with more waiting — NOT a
+   * failure; `cursor` still advances. Optional: absent reads as `"complete"`.
    */
   completeness?: "complete" | "truncated";
   /**
-   * Set when this run's `errorCount` includes a page it could not read AT ALL.
-   *
-   * There are two shapes for a nonzero `errorCount`, and this is the third
-   * thing that can happen: an adapter that could not read a page but HAD
-   * already read earlier ones may bank them — return the advanced cursor, the
-   * events it has, and this flag — rather than throw the lot away. The events
-   * are written and the position is persisted, exactly like skipped input, but
-   * the source must NOT read as working: without this flag a source refused
-   * part-way through every run holds a failure count of zero forever and never
-   * turns red. Say so here and the fold counts the failure while keeping the
-   * progress.
-   *
-   * Only for a page nobody could read. Input an adapter deliberately steps
-   * over belongs in `errorCount` alone.
+   * Set when `errorCount` includes a page that could not be read AT ALL,
+   * distinct from input an adapter deliberately skipped. Without it, a
+   * source refused part-way through a run reports zero failures forever.
    */
   unreadPage?: true;
   /**
-   * The instant this run is known to have read up to, ISO 8601.
-   *
-   * Distinct from the instant the run finished, and that distinction is the
-   * whole point: the run clock advances on every attempt, so a source stuck
-   * re-reading the same half would look like progress. This value does not
-   * move until the read does.
+   * The instant this run is known to have read up to, ISO 8601 — distinct
+   * from when the run finished: this value doesn't move until the read
+   * does, so a source stuck re-reading the same half can't look like progress.
    */
   readThroughAt?: string;
   /**
-   * Stable codes for things the run continued through rather than failed on.
-   *
-   * A degradation a reader of the source needs to know about — "the money is
-   * here but nobody is attributed to it" — has to survive as data. A log line
-   * cannot be shown to someone looking at the source.
+   * Stable codes for things the run continued through rather than failed
+   * on — a degradation the source's reader needs to see has to survive as
+   * data; a log line can't be shown to them.
    */
   notices?: string[];
 };
@@ -136,10 +112,9 @@ export type AnthropicAdminPullConfig = z.infer<typeof anthropicAdminPullConfigSc
 
 export const OPENAI_ADMIN_ADAPTER_ID = "openai_admin" as const;
 /**
- * Beside its Anthropic sibling, and for the same reason: nothing validates a
- * pullConfig at save time, so the composer that writes one and the puller that
- * reads it have to agree, and a test can only check that if both can name the
- * schema. Not `.strict()`, for the reason given above it.
+ * Beside its Anthropic sibling: nothing validates a pullConfig at save time,
+ * so the composer that writes one and the puller that reads it must agree.
+ * Not `.strict()`, for the reason given on that sibling.
  */
 export const openaiAdminPullConfigSchema = z.object({
   adapter: z.literal(OPENAI_ADMIN_ADAPTER_ID),
@@ -174,9 +149,8 @@ export const pulledUsageHintSchema = z
     costUsd: z.string().optional(),
     /**
      * Which currency costUsd is in, ISO 4217. Absent means dollars.
-     * Deliberately NOT a dimension: dimensions are the restatement
-     * identity, so a re-denominated period would mint a fresh key and
-     * add its correction beside the figure it corrects.
+     * Deliberately NOT a dimension — a re-denominated period would mint a
+     * fresh key instead of correcting the figure it's meant to fix.
      */
     currency: z.string().length(3).optional(),
     /**

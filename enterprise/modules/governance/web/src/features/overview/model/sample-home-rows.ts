@@ -1,8 +1,6 @@
 /**
  * The two invented lists an overview carries while empty — insights and
- * recent activity — marked `sample` beside their labels. Ported from
- * `.../governance/home/sampleHomeRows.ts` (main); required by, but not
- * itself in the manifest's port list for, `../ui/sections/governance-home-sections.tsx`.
+ * recent activity — marked `sample` beside their labels.
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 

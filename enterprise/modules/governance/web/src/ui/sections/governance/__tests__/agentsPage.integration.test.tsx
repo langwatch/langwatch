@@ -22,12 +22,9 @@ const harness = vi.hoisted(() => ({
    */
   queryResults: {} as Record<string, Record<string, unknown>>,
   /**
-   * The resolved organization, or undefined while it is still resolving.
-   *
-   * Settable because that window is a real state of the page and not a
-   * hypothetical: every governance read is disabled until this resolves, and a
-   * disabled query reports `isLoading: false`, so the page can be asked to
-   * render before it knows whose agents it is showing.
+   * The resolved organization, or undefined while it is still resolving —
+   * settable because that window is real: every governance read is disabled
+   * until this resolves, and a disabled query reports `isLoading: false`.
    */
   organization: undefined as
     | { id: string; slug: string; name: string; teams: unknown[] }

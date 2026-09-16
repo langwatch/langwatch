@@ -427,12 +427,9 @@ describe("IngestionSourceService", () => {
   });
 
   /**
-   * Pull-mode and pure-S3 sources never receive inbound pushes, so the
-   * `lw_is_*` ingest secret is dead weight. s3_custom is the exception: it
-   * uses the webhook callback path authenticated by ingest secret.
-   *
-   * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
-   *       "Pull-source key suppression — #7616"
+   * Pull-mode and pure-S3 sources never receive inbound pushes, so
+   * `lw_is_*` is dead weight; s3_custom alone uses the webhook callback.
+   * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature (#7616)
    */
   describe("pull-source key suppression (#7616)", () => {
     describe("when createSource is called", () => {

@@ -566,13 +566,10 @@ describe("the governance cost screen", () => {
       expect(within(billed).getByText("—")).toBeInTheDocument();
 
       const note = within(billed).getByTestId("cost-lane-billed-note");
-      // What the screen actually knows, and all it knows: part of this lane
-      // holds no dollar figure. Two different causes produce that — spend the
-      // provider billed in another currency, and spend read on a day when
-      // cost recording was off — and copy naming a currency states a false
-      // reason for the second, which a reader checking the invoice finds
-      // wrong. Money billed in euros that we DO hold a figure for now has a
-      // euro line of its own and is no longer a reason to withhold anything.
+      // All the screen knows: part of this lane holds no dollar figure, for
+      // either of two causes — billed in another currency, or read on a day
+      // cost recording was off. Copy naming a currency would state a false
+      // reason for the second. Euros we DO hold a figure for get their own line.
       expect(note).toHaveTextContent(/we hold no dollar figure for part of/i);
       expect(note).not.toHaveTextContent(/rather than US dollars/i);
       expect(note).not.toHaveTextContent(/billed in EUR/i);
@@ -718,13 +715,10 @@ describe("the governance cost screen", () => {
       expect(euros).toBeInTheDocument();
       expect(readableStrings(euros).join(" ")).toMatch(/40/);
 
-      // Nothing on the screen adds the two. 140 is what a rate of exactly one
-      // would produce — but rejecting 140 alone only rules out that one rate,
-      // and a conversion at 1.08 renders $143.20 through the same assertion
-      // untouched. So the lane is read for EVERY money figure standing in it
-      // and the whole list is pinned: one dollar figure, which is the dollars,
-      // and one named-currency figure, which is the euros. A third of any size
-      // fails, whatever rate produced it.
+      // Nothing on the screen adds the two: rejecting 140 alone only rules
+      // out a rate of exactly one, since 1.08 still renders $143.20 through
+      // the same assertion. So every money figure is read and the list is
+      // pinned to one dollar and one named-currency figure — a third fails.
       const lane = screen.getByTestId("cost-lane-billed");
       const spoken = lane.textContent ?? "";
       expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual(["$100.00"]);

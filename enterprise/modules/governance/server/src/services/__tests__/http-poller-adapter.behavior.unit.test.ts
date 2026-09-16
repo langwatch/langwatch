@@ -355,11 +355,8 @@ describe("HttpPollingPullerAdapter", () => {
 
   /**
    * Spec: specs/ai-gateway/governance/ingestion-sources.feature
-   *
-   * This adapter is one of the two scheduled sources that used to let a
-   * provider's wait fall on the floor: a 429 landed in the generic 4xx branch,
-   * which ends the run correctly and throws away the header saying when it is
-   * safe to come back.
+   * A 429 used to land in the generic 4xx branch, ending the run and
+   * discarding the header saying when it's safe to retry.
    */
   describe("given a provider answering that too many requests were made", () => {
     /** @scenario "A provider that says too many requests were made is asked only once in that run" */
