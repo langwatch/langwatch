@@ -665,6 +665,63 @@ describe("evaluatePreconditions()", () => {
     });
   });
 
+  describe("given a precondition: metadata.value matches_regex '^prod' with a conflicting canonical and bare key", () => {
+    const preconditions = [
+      {
+        field: "metadata.value" as const,
+        key: "env",
+        rule: "matches_regex" as const,
+        value: "^prod",
+      },
+    ];
+
+    describe("when only the bare OTEL attribute satisfies the pattern", () => {
+      it("matches on that candidate instead of the serialized pair", () => {
+        // The resolver hands back both candidates when they disagree, so the
+        // regex has to be tested against each one. Testing only the
+        // serialized list would anchor `^prod` against `["staging","prod…"]`
+        // and lose a match that ClickHouse counts.
+        const traceData = makeTraceData({
+          customMetadata: { env: "staging" },
+          attributes: { env: "production" },
+        });
+        expect(evaluatePreconditions({ traceData, preconditions })).toBe(true);
+      });
+    });
+
+    describe("when neither candidate satisfies the pattern", () => {
+      it("does not match", () => {
+        const traceData = makeTraceData({
+          customMetadata: { env: "staging" },
+          attributes: { env: "development" },
+        });
+        expect(evaluatePreconditions({ traceData, preconditions })).toBe(false);
+      });
+    });
+  });
+
+  describe("given a precondition: spans.model matches_regex '^gpt-4'", () => {
+    const preconditions = [
+      {
+        field: "spans.model" as const,
+        rule: "matches_regex" as const,
+        value: "^gpt-4",
+      },
+    ];
+
+    describe("when the trace carries a list of span models", () => {
+      it("anchors against each model rather than the serialized list", () => {
+        // Array fields reach this rule for labels, prompt ids, span types,
+        // span models and topics. Testing only JSON.stringify(value) meant an
+        // anchored pattern was matched against a string starting with `[`.
+        const traceData = makeTraceData({
+          spanModels: ["claude-sonnet-4", "gpt-4o"],
+        });
+        expect(evaluatePreconditions({ traceData, preconditions })).toBe(true);
+      });
+    });
+  });
+
   // ── Multiple preconditions (AND logic) ──
   describe("given preconditions: traces.origin is 'application' AND input contains 'help'", () => {
     const preconditions = [
