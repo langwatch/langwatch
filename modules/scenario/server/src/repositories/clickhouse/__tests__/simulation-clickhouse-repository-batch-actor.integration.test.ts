@@ -120,7 +120,7 @@ integration("who started a batch", () => {
         makeRunRow({ scenarioSetId, batchRunId, metadata: startedBy("user_lena", "user") }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -160,7 +160,7 @@ integration("who started a batch", () => {
         }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -181,7 +181,7 @@ integration("who started a batch", () => {
       const batchRunId = `batch-null-actor-${nanoid()}`;
       await insertRows([makeRunRow({ scenarioSetId, batchRunId, metadata: null })]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -208,7 +208,7 @@ integration("who started a batch", () => {
         makeRunRow({ scenarioSetId, batchRunId: unnamed, metadata: null }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -245,7 +245,7 @@ integration("the cost of reading who started a batch", () => {
       });
       const recordingRepo = SimulationClickHouseRepository.create(async () => recordingClient);
 
-      const result = await recordingRepo.getBatchHistoryForScenarioSet({
+      const result = await recordingRepo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,

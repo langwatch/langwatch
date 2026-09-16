@@ -21,16 +21,16 @@ import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execu
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
 export type ScenarioPrefetchLookups = {
-  scenario: ReturnType<ScenarioExecutionLookupService["tryFetchScenario"]>;
+  scenario: ReturnType<ScenarioExecutionLookupService["fetchScenario"]>;
   project: ReturnType<ScenarioExecutionLookupService["fetchProject"]>;
-  adapter: ReturnType<ScenarioTargetPrefetchService["tryFetch"]>;
-  suite: ReturnType<ScenarioExecutionLookupService["tryFetchSuite"]>;
+  adapter: ReturnType<ScenarioTargetPrefetchService["fetch"]>;
+  suite: ReturnType<ScenarioExecutionLookupService["fetchSuite"]>;
 };
 
 type ScenarioResult = NonNullable<
-  Awaited<ReturnType<ScenarioExecutionLookupService["tryFetchScenario"]>>
+  Awaited<ReturnType<ScenarioExecutionLookupService["fetchScenario"]>>
 >;
-type SuiteOverrides = Awaited<ReturnType<ScenarioExecutionLookupService["tryFetchSuite"]>>;
+type SuiteOverrides = Awaited<ReturnType<ScenarioExecutionLookupService["fetchSuite"]>>;
 
 type ValidatedLookups =
   | {
@@ -139,9 +139,9 @@ export class ScenarioPrefetchCompletionService {
     context: ScenarioExecutionPrefetchInput["context"],
     target: TargetConfig,
     lookups: {
-      scenario: Awaited<ReturnType<ScenarioExecutionLookupService["tryFetchScenario"]>>;
+      scenario: Awaited<ReturnType<ScenarioExecutionLookupService["fetchScenario"]>>;
       project: Awaited<ReturnType<ScenarioExecutionLookupService["fetchProject"]>>;
-      adapter: Awaited<ReturnType<ScenarioTargetPrefetchService["tryFetch"]>>;
+      adapter: Awaited<ReturnType<ScenarioTargetPrefetchService["fetch"]>>;
       suite: SuiteOverrides;
     },
   ): ValidatedLookups {

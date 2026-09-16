@@ -47,7 +47,7 @@ describe("MemorySuiteRunRepository", () => {
 
         await repository.storeProjection(projection, { tenantId });
 
-        await expect(repository.tryGetProjection("batch_1", { tenantId })).resolves.toEqual(
+        await expect(repository.findProjection("batch_1", { tenantId })).resolves.toEqual(
           projection,
         );
         await expect(

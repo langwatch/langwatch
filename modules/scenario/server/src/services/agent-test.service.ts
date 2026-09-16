@@ -181,7 +181,7 @@ export class AgentTestService {
     projectId: string;
     target: TargetConfig;
   }): Promise<AdapterRead> {
-    const result = await this.targetPrefetch.tryFetch({
+    const result = await this.targetPrefetch.fetch({
       projectId: input.projectId,
       target: input.target,
       runSecretValues: {},

@@ -57,7 +57,7 @@ export class RedisScenarioTabStoreRepository implements ScenarioTabStore {
     await this.connection.set(input.key, input.url, "EX", input.ttlSeconds);
   }
 
-  async tryTakePending(key: string): Promise<string | null> {
+  async takePending(key: string): Promise<string | null> {
     try {
       return await this.connection.getdel(key);
     } catch (error) {

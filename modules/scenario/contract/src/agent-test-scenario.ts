@@ -33,7 +33,13 @@ export function isAgentTestScenarioId(scenarioId: string): boolean {
  * The scenario definition of an agent test run, as the child receives it.
  * The situation is what the run drawer shows as the description.
  */
-export function agentTestScenarioConfig({ agentName }: { agentName: string }) {
+export function agentTestScenarioConfig({ agentName }: { agentName: string }): {
+  id: string;
+  name: string;
+  situation: string;
+  criteria: string[];
+  labels: string[];
+} {
   return {
     id: AGENT_TEST_SCENARIO_ID,
     name: `Test ${agentName}`,

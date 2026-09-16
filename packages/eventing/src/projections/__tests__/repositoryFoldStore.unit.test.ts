@@ -30,7 +30,7 @@ function makeMockRepo(): ProjectionStore<Projection<TestData>> & {
     storeProjection: vi.fn(async (projection: Projection<TestData>) => {
       mock.storedProjections.push(projection);
     }),
-    tryGetProjection: vi.fn(async () => mock.getResult),
+    findProjection: vi.fn(async () => mock.getResult),
   };
   return mock;
 }
@@ -284,7 +284,7 @@ describe("RepositoryFoldStore", () => {
 
       await store.tryGet("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
 
-      expect(repo.tryGetProjection).toHaveBeenCalledWith(
+      expect(repo.findProjection).toHaveBeenCalledWith(
         "agg-1",
         expect.objectContaining({ tenantId: "tenant-99" }),
       );

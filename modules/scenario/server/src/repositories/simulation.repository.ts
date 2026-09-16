@@ -39,43 +39,43 @@ export type AllSimulationSuitesRunData =
 
 /** Simulation's own persistence port. No consumer receives this through App. */
 export abstract class SimulationRepository {
-  abstract getScenarioSetsData(
+  abstract findScenarioSetsData(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationSetData[]>;
   abstract findScenarioRunData(
     input: SimulationScenarioRunInput,
   ): Promise<SimulationRunData | null>;
-  abstract getBatchHistoryForScenarioSet(
+  abstract findBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory>;
   abstract findBatchSummary(
     input: SimulationBatchSummaryInput,
   ): Promise<SimulationBatchSummary | null>;
-  abstract getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;
-  abstract getRunDataForScenarioSet(
+  abstract findRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData>;
+  abstract findRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }>;
-  abstract getAllRunDataForScenarioSet(
+  abstract findAllRunDataForScenarioSet(
     input: SimulationScenarioSetInput,
   ): Promise<SimulationRunData[]>;
-  abstract getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
-  abstract getExternalSetSummaries(
+  abstract findBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
+  abstract findExternalSetSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]>;
-  abstract getInternalSuiteSummaries(
+  abstract findInternalSuiteSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]>;
-  abstract getLastResultSummaries(
+  abstract findLastResultSummaries(
     input: SimulationLastResultSummariesInput,
   ): Promise<SimulationLastResultSummary[]>;
-  abstract getRunDataForAllSuites(
+  abstract findRunDataForAllSuites(
     input: SimulationAllSuitesInput,
   ): Promise<AllSimulationSuitesRunData>;
   abstract findLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number>;
   abstract findAllRunIdsForSet(
     input: SimulationScenarioSetInput,
   ): Promise<{ runIds: string[]; reachedCap: boolean }>;
-  abstract getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
+  abstract findDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   abstract findRunsForExport(
     input: SimulationExportRunsInput,
@@ -84,44 +84,44 @@ export abstract class SimulationRepository {
 
 /** Deliberate disabled-store implementation for local and test composition. */
 export class NullSimulationRepository extends SimulationRepository {
-  async getScenarioSetsData(): Promise<SimulationSetData[]> {
+  async findScenarioSetsData(): Promise<SimulationSetData[]> {
     return [];
   }
   async findScenarioRunData(): Promise<SimulationRunData | null> {
     return null;
   }
-  async getBatchHistoryForScenarioSet(): Promise<SimulationBatchHistory> {
+  async findBatchHistoryForScenarioSet(): Promise<SimulationBatchHistory> {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
   }
   async findBatchSummary(): Promise<SimulationBatchSummary | null> {
     return null;
   }
-  async getRunDataForBatchRun(): Promise<SimulationBatchRunData> {
+  async findRunDataForBatchRun(): Promise<SimulationBatchRunData> {
     return { changed: true, lastUpdatedAt: 0, runs: [] };
   }
-  async getRunDataForScenarioSet(): Promise<{
+  async findRunDataForScenarioSet(): Promise<{
     runs: SimulationRunData[];
     nextCursor?: string;
     hasMore: boolean;
   }> {
     return { runs: [], hasMore: false };
   }
-  async getAllRunDataForScenarioSet(): Promise<SimulationRunData[]> {
+  async findAllRunDataForScenarioSet(): Promise<SimulationRunData[]> {
     return [];
   }
-  async getBatchRunCountForScenarioSet(): Promise<number> {
+  async findBatchRunCountForScenarioSet(): Promise<number> {
     return 0;
   }
-  async getExternalSetSummaries(): Promise<SimulationExternalSetSummary[]> {
+  async findExternalSetSummaries(): Promise<SimulationExternalSetSummary[]> {
     return [];
   }
-  async getInternalSuiteSummaries(): Promise<SimulationExternalSetSummary[]> {
+  async findInternalSuiteSummaries(): Promise<SimulationExternalSetSummary[]> {
     return [];
   }
-  async getLastResultSummaries(): Promise<SimulationLastResultSummary[]> {
+  async findLastResultSummaries(): Promise<SimulationLastResultSummary[]> {
     return [];
   }
-  async getRunDataForAllSuites(): Promise<AllSimulationSuitesRunData> {
+  async findRunDataForAllSuites(): Promise<AllSimulationSuitesRunData> {
     return {
       changed: true,
       lastUpdatedAt: 0,
@@ -136,7 +136,7 @@ export class NullSimulationRepository extends SimulationRepository {
   async findAllRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> {
     return { runIds: [], reachedCap: false };
   }
-  async getDistinctExternalSetIds(): Promise<Set<string>> {
+  async findDistinctExternalSetIds(): Promise<Set<string>> {
     return new Set();
   }
   async countRunsForExport(): Promise<number> {

@@ -31,6 +31,7 @@ import {
   projectRestFacts,
   resolver,
   type PlatformUrlBuilder,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:scenario-events");
@@ -61,7 +62,11 @@ export function createScenarioEventsRest(options: {
    *  environment here: a feature receives typed configuration, and the
    *  composition root is the one place that parses it. */
   platformUrl: PlatformUrlBuilder;
-}) {
+}): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ScenarioApi>;
+}> {
   const { simulations, scenarioTabs, broadcast, extractInlineMedia, platformUrl } = options;
 
   return (

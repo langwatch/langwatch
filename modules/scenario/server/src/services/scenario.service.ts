@@ -106,7 +106,7 @@ export class ScenarioService {
    * race, and Postgres aborts the transaction on that violation.
    */
   private async ensureDefaultTestSuiteId(projectId: string): Promise<string> {
-    const existing = await this.options.repository.tryFindDefaultTestSuite({ projectId });
+    const existing = await this.options.repository.findDefaultTestSuite({ projectId });
     if (existing) {return existing.id;}
 
     const created = await this.options.repository.createDefaultTestSuite({
@@ -251,7 +251,7 @@ export class ScenarioService {
 
   async archive(input: ScenarioIdInput): Promise<Scenario> {
     const parsed = scenarioIdInputSchema.parse(input);
-    const scenario = await this.options.repository.tryArchive({
+    const scenario = await this.options.repository.archive({
       ...parsed,
       archivedAt: this.options.clock.now(),
     });
@@ -293,7 +293,7 @@ export class ScenarioService {
   }
 
   findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
-    return this.options.repository.tryFindTestSuite(scenarioTestSuiteIdInputSchema.parse(input));
+    return this.options.repository.findTestSuite(scenarioTestSuiteIdInputSchema.parse(input));
   }
 
   listTestSuites(input: {
@@ -323,7 +323,7 @@ export class ScenarioService {
   getTestSuiteRunDefinition(
     input: ScenarioTestSuiteIdInput,
   ): Promise<ScenarioTestSuiteRunDefinition> {
-    return this.options.repository.getTestSuiteRunDefinition(
+    return this.options.repository.findTestSuiteRunDefinition(
       scenarioTestSuiteIdInputSchema.parse(input),
     );
   }

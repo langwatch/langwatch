@@ -144,7 +144,7 @@ export abstract class ResultAtomsRepository {
   /** The number every run carries inside its plan, oldest first, over the window. */
   abstract findRunOrdinals(filter: ResultsFilter): Promise<RunOrdinalRow[]>;
   /** The stat strip counts, over every atom in scope. */
-  abstract tryAggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null>;
+  abstract aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null>;
   /** One row per group, folded so volume never reaches the client. */
   abstract aggregateGroups(input: {
     filter: ResultsFilter;
@@ -689,7 +689,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
   }
 
   /** The stat strip counts, over every atom in scope. */
-  async tryAggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null> {
+  async aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null> {
     if (isEmptyScope(filter)) return null;
     const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
     const rows = await this.queryRows<RawTotalsRow>(

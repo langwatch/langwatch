@@ -8,6 +8,7 @@ import {
   ScenarioApi,
   ScenarioNotFoundError,
   type Scenario,
+  type ScenarioParameterDefinition,
   scenarioLegacyErrorBodySchema,
   scenarioRestResponseWithPlatformUrlSchema,
   scenarioRestVersionListResponseSchema,
@@ -27,6 +28,7 @@ import {
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   resolver,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:scenarios");
@@ -59,7 +61,20 @@ function scenarioUpdateData(
   ) as Partial<z.infer<typeof scenarioRestUpdateSchema>>;
 }
 
-function toScenarioResponse(scenario: Scenario) {
+function toScenarioResponse(scenario: Scenario): {
+  id: string;
+  name: string;
+  situation: string;
+  criteria: string[];
+  labels: string[];
+  parameters: ScenarioParameterDefinition[];
+  simulatorModel: string | null;
+  judgeModel: string | null;
+  maxTurns: number | null;
+  minTurns: number | null;
+  testSuiteId: string | null;
+  fields: Scenario["fields"];
+} {
   return {
     id: scenario.id,
     name: scenario.name,
@@ -92,7 +107,11 @@ const scenarioNotFoundResponse = {
  * REST for the scenarios (test cases) a project defines, and their version
  * history. `platformUrl` is resolved through `ScenarioApi.platformUrl`.
  */
-export function createScenarioRest() {
+export function createScenarioRest(): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ScenarioApi>;
+}> {
   const withPlatformUrl = (app: ScenarioApi, scenario: Scenario, projectSlug: string) => ({
     ...toScenarioResponse(scenario),
     platformUrl: app.platformUrl({ projectSlug, path: scenarioEditorPath(scenario.id) }),

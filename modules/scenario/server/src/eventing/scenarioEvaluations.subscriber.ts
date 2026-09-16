@@ -8,7 +8,7 @@ import type {
   SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
 import { isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId } from "@langwatch/suite-contract";
+import { extractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger(
   "langwatch:simulation-processing:scenario-evaluations",
@@ -112,7 +112,7 @@ export function createScenarioEvaluationsSubscriber(
       });
       if (!evaluatedScenarioId) return;
 
-      const planId = scenarioSetId ? tryExtractSuiteId(scenarioSetId) : null;
+      const planId = scenarioSetId ? extractSuiteId(scenarioSetId) : null;
       const evaluators =
         event.data.evaluators ??
         (await deps.loadRunAttachments({

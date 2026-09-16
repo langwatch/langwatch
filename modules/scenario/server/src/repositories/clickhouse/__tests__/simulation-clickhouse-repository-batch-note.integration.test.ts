@@ -116,7 +116,7 @@ integration("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -160,7 +160,7 @@ integration("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -198,7 +198,7 @@ integration("the note of a batch", () => {
         }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -244,7 +244,7 @@ integration("the note of a batch", () => {
         makeRunRow({ scenarioSetId, batchRunId: unnoted, metadata: null }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -272,7 +272,7 @@ integration("a batch produced by an SDK or CI run", () => {
         }),
       ]);
 
-      const result = await repo.getBatchHistoryForScenarioSet({
+      const result = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -335,7 +335,7 @@ integration("the cost of reading the note", () => {
       });
       const recordingRepo = SimulationClickHouseRepository.create(async () => recordingClient);
 
-      const result = await recordingRepo.getBatchHistoryForScenarioSet({
+      const result = await recordingRepo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,

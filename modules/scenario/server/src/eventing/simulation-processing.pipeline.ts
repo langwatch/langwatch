@@ -5,6 +5,8 @@ import {
   type AppendStore,
   type FoldProjectionStore,
   type ProcessManagerApplier,
+  type Projection,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
 import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
@@ -51,56 +53,70 @@ export interface SimulationProcessingPipelineDeps {
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
 }
 
-export class SimulationProcessingPipelineAdapter {
-  static create(deps: SimulationProcessingPipelineDeps) {
-    const commands = SimulationProcessingCommandsAdapter.create();
+function buildSimulationProcessingPipelineDefinition(
+  deps: SimulationProcessingPipelineDeps,
+): SimulationProcessingPipelineDefinition {
+  const commands = SimulationProcessingCommandsAdapter.create();
 
-    return definePipeline<SimulationProcessingEvent>({
-      name: "simulation_processing",
-      aggregate: defineAggregate({
-        type: "simulation_run",
-        events: defineEvents(SIMULATION_PROCESSING_EVENT_TYPES),
-      }),
-    })
-      .withClickHouseFoldProjection(
-        SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore }),
-      )
-      .withClickHouseMapProjection(
-        SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore }),
-      )
-      .withEventSubscriber(
-        "snapshotUpdateBroadcast",
-        createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
-      )
-      .withEventSubscriber("suiteRunSync", createSuiteRunSyncSubscriber(deps.suiteRunSync))
-      .withEventSubscriber(
-        "traceMetricsSync",
-        createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
-      )
-      .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
-      .withCommand("queueRun", commands.queueRun)
-      .withCommand("startRun", commands.startRun)
-      .withCommand("messageSnapshot", commands.messageSnapshot)
-      .withCommand("textMessageStart", commands.textMessageStart)
-      .withCommand("textMessageEnd", commands.textMessageEnd)
-      .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
-      .withCommandInstance(
-        "recordEvaluations",
-        RecordEvaluationsCommand,
-        deps.recordEvaluationsCommand,
-      )
-      .withCommand("cancelRun", commands.cancelRun)
-      .withCommand("deleteRun", commands.deleteRun)
-      .withCommand("recordAgentInstance", commands.recordAgentInstance)
-      .withCommandInstance(
-        "computeRunMetrics",
-        ComputeRunMetricsCommand,
-        deps.computeRunMetricsCommand,
-        {
-          deduplication: { makeId: ComputeRunMetricsCommand.makeJobId, ttlMs: 60_000 },
-        },
-      )
-      .build();
+  return definePipeline<SimulationProcessingEvent>({
+    name: "simulation_processing",
+    aggregate: defineAggregate({
+      type: "simulation_run",
+      events: defineEvents(SIMULATION_PROCESSING_EVENT_TYPES),
+    }),
+  })
+    .withClickHouseFoldProjection(
+      SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore }),
+    )
+    .withClickHouseMapProjection(
+      SimulationRunMetricsMapProjection.create({ store: deps.simulationRunMetricsStore }),
+    )
+    .withEventSubscriber(
+      "snapshotUpdateBroadcast",
+      createSnapshotUpdateBroadcastSubscriber(deps.snapshotUpdateBroadcast),
+    )
+    .withEventSubscriber("suiteRunSync", createSuiteRunSyncSubscriber(deps.suiteRunSync))
+    .withEventSubscriber(
+      "traceMetricsSync",
+      createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
+    )
+    .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
+    .withCommand("queueRun", commands.queueRun)
+    .withCommand("startRun", commands.startRun)
+    .withCommand("messageSnapshot", commands.messageSnapshot)
+    .withCommand("textMessageStart", commands.textMessageStart)
+    .withCommand("textMessageEnd", commands.textMessageEnd)
+    .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
+    .withCommandInstance(
+      "recordEvaluations",
+      RecordEvaluationsCommand,
+      deps.recordEvaluationsCommand,
+    )
+    .withCommand("cancelRun", commands.cancelRun)
+    .withCommand("deleteRun", commands.deleteRun)
+    .withCommand("recordAgentInstance", commands.recordAgentInstance)
+    .withCommandInstance(
+      "computeRunMetrics",
+      ComputeRunMetricsCommand,
+      deps.computeRunMetricsCommand,
+      {
+        deduplication: { makeId: ComputeRunMetricsCommand.makeJobId, ttlMs: 60_000 },
+      },
+    )
+    .build();
+}
+
+/** The pipeline `SimulationProcessingPipelineAdapter.create` answers; commands
+ * left `any`, as `AuthzPipeline` and `AnyPipelineDefinition` do. */
+export type SimulationProcessingPipelineDefinition = StaticPipelineDefinition<
+  SimulationProcessingEvent,
+  Record<string, Projection>,
+  any
+>;
+
+export class SimulationProcessingPipelineAdapter {
+  static create(deps: SimulationProcessingPipelineDeps): SimulationProcessingPipelineDefinition {
+    return buildSimulationProcessingPipelineDefinition(deps);
   }
 
   private constructor() {}

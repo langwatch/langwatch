@@ -113,7 +113,7 @@ integration("getRunDataForScenarioSet() message truncation", () => {
         }),
       );
 
-      const result = await repo.getRunDataForScenarioSet({
+      const result = await repo.findRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -137,7 +137,7 @@ integration("getRunDataForScenarioSet() message truncation", () => {
         }),
       );
 
-      const result = await repo.getRunDataForScenarioSet({
+      const result = await repo.findRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -163,7 +163,7 @@ integration("getRunDataForScenarioSet() message truncation", () => {
         }),
       );
 
-      const result = await repo.getRunDataForScenarioSet({
+      const result = await repo.findRunDataForScenarioSet({
         projectId: tenantId,
         scenarioSetId,
         limit: 10,
@@ -189,7 +189,7 @@ integration("getRunDataForScenarioSet() message truncation", () => {
         }),
       );
 
-      const result = await repo.getRunDataForBatchRun({
+      const result = await repo.findRunDataForBatchRun({
         projectId: tenantId,
         batchRunId,
       });

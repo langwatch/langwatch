@@ -49,7 +49,7 @@ export class ScenarioTargetPrefetchService {
     private readonly workflowMappings: ScenarioWorkflowMappingService,
   ) {}
 
-  async tryFetch({
+  async fetch({
     projectId,
     target,
     runSecretValues,

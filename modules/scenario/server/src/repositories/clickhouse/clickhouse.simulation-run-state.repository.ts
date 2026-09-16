@@ -210,11 +210,11 @@ export class ClickHouseSimulationRunStateRepository<
     };
   }
 
-  async tryGetProjection(
+  async findProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
-    EventUtils.validateTenantId(context, "SimulationRunStateRepositoryClickHouse.tryGetProjection");
+    EventUtils.validateTenantId(context, "SimulationRunStateRepositoryClickHouse.findProjection");
 
     const scenarioRunId = String(aggregateId);
 
@@ -288,7 +288,7 @@ export class ClickHouseSimulationRunStateRepository<
         "Failed to get projection from ClickHouse",
       );
       throw new StoreError(
-        "tryGetProjection",
+        "findProjection",
         "SimulationRunStateRepositoryClickHouse",
         `Failed to get projection for scenario run ${scenarioRunId}: ${errorMessage}`,
         classifyClickHouseError(error),
@@ -342,7 +342,7 @@ export class ClickHouseSimulationRunStateRepository<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        // The fold reads this row back via `tryGetProjection` on a state-store
+        // The fold reads this row back via `findProjection` on a state-store
         // miss, so the write must be visible before returning — without the
         // wait, the next event folds from empty and drops the run's identity
         // fields (ScenarioId, BatchRunId, ScenarioSetId) from set/batch listings.

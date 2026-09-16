@@ -23,6 +23,7 @@ import {
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   resolver,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 
 const logger = createLogger("langwatch:api:simulation-runs");
@@ -40,7 +41,21 @@ export type ScenarioRunPlatformUrlBuilder = (args: {
  * Adds the completion flag the API exposes on top of the stored counts.
  * An empty batch is never complete: it has nothing that settled.
  */
-function toBatchSummaryResponse(batch: BatchSummary) {
+function toBatchSummaryResponse(batch: BatchSummary): {
+  batchRunId: string;
+  totalCount: number;
+  passCount: number;
+  failCount: number;
+  runningCount: number;
+  settledCount: number;
+  stalledCount: number;
+  lastRunAt: number;
+  lastUpdatedAt: number;
+  firstCompletedAt: number | null;
+  allCompletedAt: number | null;
+  isComplete: boolean;
+  note: string | null;
+} {
   return {
     batchRunId: batch.batchRunId,
     totalCount: batch.totalCount,
@@ -63,7 +78,18 @@ function toBatchSummaryResponse(batch: BatchSummary) {
  * the run's metadata, and the metadata itself stays out of the response: its
  * layout is internal, the fields are the contract.
  */
-function toRunResponse(run: ScenarioRunData) {
+function toRunResponse(run: ScenarioRunData): Omit<
+  ScenarioRunData,
+  "metadata" | "results" | "messages" | "name" | "description" | "updatedAt"
+> & {
+  name: string | null;
+  description: string | null;
+  results: NonNullable<ScenarioRunData["results"]> | null;
+  updatedAt: number;
+  messages: { role: string; content: string }[];
+  note: string | null;
+  scenarioVersion: number | null;
+} {
   const { metadata, results, messages, ...rest } = run;
   return {
     ...rest,
@@ -92,7 +118,11 @@ const notFoundResponse = {
  * REST for the runs a simulation produced. `platformUrl` and
  * `findBatchSummary` are both resolved off `ScenarioApi`.
  */
-export function createSimulationRunsRest() {
+export function createSimulationRunsRest(): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ScenarioApi>;
+}> {
   const withPlatformUrl = (app: ScenarioApi, run: ScenarioRunData, projectSlug: string) => ({
     ...toRunResponse(run),
     platformUrl: app.platformUrl({ projectSlug, path: `/simulations/${run.scenarioRunId}` }),

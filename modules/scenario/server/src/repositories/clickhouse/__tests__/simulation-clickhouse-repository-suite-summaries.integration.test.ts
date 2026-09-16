@@ -107,7 +107,7 @@ integration("a test suite's runs in the results view", () => {
         makeRunRow({ scenarioSetId: setId, batchRunId: `batch-${nanoid(6)}`, metadata: null }),
       ]);
 
-      const summaries = await repo.getInternalSuiteSummaries({ projectId: tenantId });
+      const summaries = await repo.findInternalSuiteSummaries({ projectId: tenantId });
 
       const suiteSummary = summaries.find((summary) => summary.scenarioSetId === setId);
       expect(suiteSummary).toBeDefined();
@@ -124,7 +124,7 @@ integration("a test suite's runs in the results view", () => {
         makeRunRow({ scenarioSetId: setId, batchRunId, metadata: null }),
       ]);
 
-      const history = await repo.getBatchHistoryForScenarioSet({
+      const history = await repo.findBatchHistoryForScenarioSet({
         projectId: tenantId,
         scenarioSetId: setId,
         limit: 10,
@@ -145,7 +145,7 @@ integration("a test suite's runs in the results view", () => {
         makeRunRow({ scenarioSetId: setId, batchRunId: `batch-ext-${nanoid(6)}`, metadata: null }),
       ]);
 
-      const external = await repo.getExternalSetSummaries({ projectId: tenantId });
+      const external = await repo.findExternalSetSummaries({ projectId: tenantId });
 
       expect(external.map((summary) => summary.scenarioSetId)).not.toContain(setId);
     });

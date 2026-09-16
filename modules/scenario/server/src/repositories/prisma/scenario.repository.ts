@@ -265,7 +265,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     });
   }
 
-  async tryArchive(input: {
+  async archive(input: {
     id: string;
     projectId: string;
     archivedAt: Date;
@@ -462,7 +462,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return rows.map(mapTestSuite);
   }
 
-  async tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+  async findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
     const row = await this.database.simulationSuite.findFirst({
       where: {
         id: input.testSuiteId,
@@ -511,7 +511,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return mapTestSuite(row);
   }
 
-  async getTestSuiteRunDefinition(
+  async findTestSuiteRunDefinition(
     input: ScenarioTestSuiteIdInput,
   ): Promise<ScenarioTestSuiteRunDefinition> {
     return this.database.$transaction(async (transaction) => {
@@ -776,7 +776,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     });
   }
 
-  async tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
+  async findDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
     return this.database.simulationSuite.findFirst({
       where: {
         projectId: input.projectId,
@@ -797,7 +797,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       // Either a concurrent write created the Default suite, or another suite of
       // this project already owns the "default" slug. Reading first tells the two
       // apart, and costs one query on a path that runs once per project.
-      const raced = await this.tryFindDefaultTestSuite(input);
+      const raced = await this.findDefaultTestSuite(input);
       if (raced) return raced;
       return await this.insertDefaultTestSuite({
         ...input,

@@ -8,7 +8,7 @@ export type GatedVerdict = "success" | "failure" | "inconclusive";
  * Whether one evaluator result fails the run on its own: a required
  * evaluator that failed, or that errored before it could decide.
  */
-export function evaluationFailsRun(evaluation: ScenarioEvaluationResult) {
+export function evaluationFailsRun(evaluation: ScenarioEvaluationResult): boolean {
   return (
     evaluation.required &&
     (evaluation.status === "failed" || evaluation.status === "error")

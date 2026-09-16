@@ -21,7 +21,10 @@ import { FinishRunCommand } from "../../eventing/finish-run.commands.ts";
 import { RecordEvaluationsCommand } from "../../eventing/recordEvaluations.command.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
 import { SimulationService as SimulationServiceClass } from "../../services/simulation.service.ts";
-import { SimulationProcessingPipelineAdapter } from "../../eventing/simulation-processing.pipeline.ts";
+import {
+  SimulationProcessingPipelineAdapter,
+  type SimulationProcessingPipelineDefinition,
+} from "../../eventing/simulation-processing.pipeline.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -143,7 +146,9 @@ class ProducerOnlySimulationExecution extends SimulationExecutionRepository {
  * `processName` names the refusal, so a stand-in reached by accident says which process reached it
  * rather than reporting an anonymous failure.
  */
-function buildSimulationProcessingProducerPipeline(input: { processName: string }) {
+function buildSimulationProcessingProducerPipeline(input: {
+  processName: string;
+}): SimulationProcessingPipelineDefinition {
   const { processName } = input;
   const execution = new ProducerOnlySimulationExecution(processName);
   const simulations: SimulationService = SimulationServiceClass.create(
@@ -207,7 +212,7 @@ export class ClickhouseSimulationProcessingProducerRepository {
 
   private constructor(private readonly options: { processName: string }) {}
 
-  build() {
+  build(): SimulationProcessingPipelineDefinition {
     return buildSimulationProcessingProducerPipeline(this.options);
   }
 }

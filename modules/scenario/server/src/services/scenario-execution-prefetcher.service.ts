@@ -176,18 +176,18 @@ export class ScenarioExecutionPrefetcherService {
     const { context, target } = input;
 
     return {
-      scenario: this.lookups.tryFetchScenario({
+      scenario: this.lookups.fetchScenario({
         projectId: context.projectId,
         scenarioId: context.scenarioId,
         suppliedParameters: context.parameters,
       }),
       project: this.lookups.fetchProject(context.projectId),
-      adapter: this.targets.tryFetch({
+      adapter: this.targets.fetch({
         projectId: context.projectId,
         target,
         runSecretValues,
       }),
-      suite: this.lookups.tryFetchSuite({ setId: context.setId, projectId: context.projectId }),
+      suite: this.lookups.fetchSuite({ setId: context.setId, projectId: context.projectId }),
     };
   }
 }

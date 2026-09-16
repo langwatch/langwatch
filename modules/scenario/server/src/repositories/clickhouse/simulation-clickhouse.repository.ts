@@ -301,7 +301,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Math.min(Math.max(1, limit), ceiling);
   }
 
-  static tryStartedAtBoundsForPage(
+  static startedAtBoundsForPage(
     rows: { MinStartedAt: string; MaxStartedAt: string }[],
   ): { minMs: number; maxMs: number } | null {
     let minMs = Number.POSITIVE_INFINITY;
@@ -359,7 +359,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return result.json<T>();
   }
 
-  async getScenarioSetsData({
+  async findScenarioSetsData({
     projectId,
     startDate,
     endDate,
@@ -437,7 +437,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return mapClickHouseRowToScenarioRunData(row);
   }
 
-  async getBatchHistoryForScenarioSet({
+  async findBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 8,
@@ -530,7 +530,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // runs windowed/hit; no usable range runs unbounded/unwindowed (the old
     // silent widening, now counted). fallback "none": step 1 already bounded
     // these batches, so an empty windowed read is a genuine empty page.
-    const startedAtBounds = SimulationClickHouseRepository.tryStartedAtBoundsForPage(pageRows);
+    const startedAtBounds = SimulationClickHouseRepository.startedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await queryWindowed<PreviewItemRow[]>({
@@ -673,7 +673,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     };
   }
 
-  async getRunDataForBatchRun({
+  async findRunDataForBatchRun({
     projectId,
     scenarioSetId,
     batchRunId,
@@ -741,7 +741,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return { changed: true, lastUpdatedAt, runs };
   }
 
-  async getBatchRunCountForScenarioSet({
+  async findBatchRunCountForScenarioSet({
     projectId,
     scenarioSetId,
     startDate,
@@ -771,7 +771,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
 
-  async getAllRunDataForScenarioSet({
+  async findAllRunDataForScenarioSet({
     projectId,
     scenarioSetId,
   }: {
@@ -803,7 +803,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
-  async getRunDataForScenarioSet({
+  async findRunDataForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 20,
@@ -1011,7 +1011,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     };
   }
 
-  async getRunDataForAllSuites({
+  async findRunDataForAllSuites({
     projectId,
     limit = 20,
     cursor,
@@ -1152,7 +1152,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Number(rows[0]?.LastUpdatedAt ?? "0");
   }
 
-  async getExternalSetSummaries(params: {
+  async findExternalSetSummaries(params: {
     projectId: string;
     startDate?: number;
     endDate?: number;
@@ -1160,7 +1160,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return this.getSetSummaries({ ...params, filter: "external" });
   }
 
-  async getInternalSuiteSummaries(params: {
+  async findInternalSuiteSummaries(params: {
     projectId: string;
     startDate?: number;
     endDate?: number;
@@ -1254,7 +1254,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
    * last-result cells. "Latest" via argMax(UpdatedAt) on deduped runs; the
    * dedup subquery keeps ArchivedAt honest since older versions carry NULL.
    */
-  async getLastResultSummaries({
+  async findLastResultSummaries({
     projectId,
     scenarioIds,
     startDate,
@@ -1363,7 +1363,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
   }
 
-  async getDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
+  async findDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
     const [firstProjectId] = projectIds;
     if (!firstProjectId) {
       return new Set();
@@ -1431,7 +1431,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
   /**
    * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
-   * reading RUN_COLUMNS (not LIST_COLUMNS), unlike getRunDataForAllSuites which is capped.
+   * reading RUN_COLUMNS (not LIST_COLUMNS), unlike findRunDataForAllSuites which is capped.
    */
   async findRunsForExport({
     projectId,

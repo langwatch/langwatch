@@ -9,7 +9,7 @@ import {
   withoutParameterNames,
 } from "@langwatch/scenario-contract";
 import type { ScenarioService } from "./scenario.service.ts";
-import { tryExtractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
+import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioConfig } from "@langwatch/scenario-contract";
 
@@ -36,7 +36,7 @@ export class ScenarioExecutionLookupService {
     },
   ) {}
 
-  async tryFetchScenario({
+  async fetchScenario({
     projectId,
     scenarioId,
     suppliedParameters,
@@ -117,14 +117,14 @@ export class ScenarioExecutionLookupService {
     return { success: true, data: { apiKey: project.apiKey } };
   }
 
-  async tryFetchSuite({
+  async fetchSuite({
     setId,
     projectId,
   }: {
     setId: string;
     projectId: string;
   }): Promise<Suite | null> {
-    const suiteId = tryExtractSuiteId(setId);
+    const suiteId = extractSuiteId(setId);
     if (!suiteId) {
       return null;
     }

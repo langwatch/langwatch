@@ -3,7 +3,12 @@
  * Broadcasts progress; permission from body projectId. See scenario-run-export.feature.
  */
 import { deferredScope } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type AppRestBroadcast } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type AppRestBroadcast,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -105,7 +110,13 @@ export function createScenarioRunExportRest<
   TRequest extends ScenarioRunExportRequestFields,
   TRequestRaw,
   TSession extends Readonly<{ user: Readonly<{ id: string }> }>,
->(ports: ScenarioRunExportRestPorts<TRequest, TRequestRaw, TSession>) {
+>(
+  ports: ScenarioRunExportRestPorts<TRequest, TRequestRaw, TSession>,
+): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ScenarioApi>;
+}> {
   return defineRestRouter(ScenarioApi)
     .withNamespace("export/scenario-runs")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -238,7 +249,7 @@ function buildExportStream<TRequest extends ScenarioRunExportRequestFields>({
   totalCount: number;
   signal: AbortSignal;
   broadcast: AppRestBroadcast;
-}) {
+}): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const publish = (payload: Record<string, unknown>) =>
     void broadcast.broadcastToTenant(

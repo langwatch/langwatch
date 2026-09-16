@@ -18,7 +18,7 @@ import type {
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
 import { simulationRunQueuedEventDataSchema } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId } from "@langwatch/suite-contract";
+import { extractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger("langwatch:simulation-processing:queue-run");
 
@@ -93,7 +93,7 @@ export class QueueRunCommand
         projectId: tenantId,
         scenarioId: data.scenarioId,
         planId: data.scenarioSetId
-          ? tryExtractSuiteId(data.scenarioSetId)
+          ? extractSuiteId(data.scenarioSetId)
           : null,
       });
     } catch (error) {

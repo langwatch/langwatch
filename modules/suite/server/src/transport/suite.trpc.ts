@@ -5,7 +5,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { SuiteApi, suiteTrpc, tryExtractSuiteId } from "@langwatch/suite-contract";
+import { SuiteApi, suiteTrpc, extractSuiteId } from "@langwatch/suite-contract";
 import type {
   SimulationExternalSetSummary,
   SuiteRunSummary,
@@ -146,7 +146,7 @@ function tallyBySuite(
   summaries: readonly SimulationExternalSetSummary[],
 ): Record<string, SuiteRunSummary> {
   const rows = summaries.flatMap((summary) => {
-    const suiteId = tryExtractSuiteId(summary.scenarioSetId);
+    const suiteId = extractSuiteId(summary.scenarioSetId);
 
     return suiteId
       ? [

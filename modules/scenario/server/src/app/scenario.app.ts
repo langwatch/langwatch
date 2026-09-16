@@ -884,5 +884,5 @@ export interface ScenarioTabStore {
 
   setPending(input: { key: string; url: string; ttlSeconds: number }): Promise<void>;
 
-  tryTakePending(key: string): Promise<string | null>;
+  takePending(key: string): Promise<string | null>;
 }

@@ -6,7 +6,7 @@ import {
   type ResultsOverview,
   type RunTarget,
 } from "@langwatch/scenario-contract";
-import { getSuiteSetId, tryExtractSuiteId } from "@langwatch/suite-contract";
+import { extractSuiteId, getSuiteSetId } from "@langwatch/suite-contract";
 import {
   MAX_TREND_POINTS,
   type RawGroupRow,
@@ -158,7 +158,7 @@ export class ResultAtomsService {
     });
 
     const [totalsRow, groupRows, trendRows, seriesRows, plans] = await Promise.all([
-      this.repository.tryAggregateTotals(scopedFilter),
+      this.repository.aggregateTotals(scopedFilter),
       this.repository.aggregateGroups({ filter: scopedFilter, groupBy }),
       this.repository.aggregateTrend({ filter: scopedFilter, groupBy }),
       this.repository.aggregateSeries({ filter: scopedFilter, bucketSeconds }),
@@ -284,7 +284,7 @@ export const __testing = {
   planFor,
   foldTrend,
   fillSeries,
-  tryExtractSuiteId,
+  extractSuiteId,
   rate,
   bucketSecondsFor: ResultAtomsService.bucketSecondsFor,
 };

@@ -56,7 +56,7 @@ export interface ProjectionStore<ProjectionType extends Projection = Projection>
   /**
    * Retrieves a projection for an aggregate; validates tenant isolation.
    */
-  tryGetProjection(
+  findProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null>;

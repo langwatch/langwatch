@@ -729,7 +729,7 @@ integration("the cost of an atom", () => {
         }),
       ]);
 
-      const totals = await repo.tryAggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
+      const totals = await repo.aggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
 
       expect(Number(totals?.CostTotal)).toBeCloseTo(0.5, 6);
       expect(Number(totals?.CostUnknown)).toBe(1);
@@ -1436,8 +1436,8 @@ integration("aggregateGroups", () => {
         makeRow({ batchRunId, scenarioSetId: setId, status: "FAILED" }),
       ]);
 
-      const all = await repo.tryAggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
-      const failedOnly = await repo.tryAggregateTotals(
+      const all = await repo.aggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
+      const failedOnly = await repo.aggregateTotals(
         baseFilter({ scenarioSetIds: [setId], outcome: "failed" }),
       );
 

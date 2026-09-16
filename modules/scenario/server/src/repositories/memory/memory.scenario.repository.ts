@@ -130,7 +130,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     throw new Error("Version history is not exercised by this repository double");
   }
 
-  async tryArchive(input: {
+  async archive(input: {
     id: string;
     projectId: string;
     archivedAt: Date;
@@ -150,7 +150,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const archived: string[] = [];
     const missing: string[] = [];
     for (const id of input.ids) {
-      const row = await this.tryArchive({
+      const row = await this.archive({
         id,
         projectId: input.projectId,
         archivedAt: input.archivedAt,
@@ -266,7 +266,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     );
   }
 
-  tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+  findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
     const testSuite = this.testSuites.get(input.testSuiteId);
     return Promise.resolve(
       testSuite?.projectId === input.projectId && testSuite.archivedAt === null ? testSuite : null,
@@ -278,7 +278,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   }
 
   async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
-    const testSuite = await this.tryFindTestSuite(input);
+    const testSuite = await this.findTestSuite(input);
     if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
 
     const { testSuiteId: _, projectId: __, ...changes } = input;
@@ -287,10 +287,10 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return updated;
   }
 
-  async getTestSuiteRunDefinition(
+  async findTestSuiteRunDefinition(
     input: ScenarioTestSuiteIdInput,
   ): Promise<ScenarioTestSuiteRunDefinition> {
-    const testSuite = await this.tryFindTestSuite(input);
+    const testSuite = await this.findTestSuite(input);
     if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
 
     return { testSuite, scenarioIds: testSuite.scenarioIds };
@@ -308,7 +308,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return archived;
   }
 
-  async tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
+  async findDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null> {
     for (const suite of this.testSuites.values()) {
       if (
         suite.projectId === input.projectId &&
@@ -325,7 +325,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     projectId: string;
     id: string;
   }): Promise<{ id: string }> {
-    const existing = await this.tryFindDefaultTestSuite(input);
+    const existing = await this.findDefaultTestSuite(input);
     if (existing) return existing;
     const created = await this.createTestSuite({
       id: input.id,

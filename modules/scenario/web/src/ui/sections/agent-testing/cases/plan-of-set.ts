@@ -4,7 +4,7 @@
  */
 
 import { isInternalSetId } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId } from "@langwatch/suite-contract";
+import { extractSuiteId } from "@langwatch/suite-contract";
 import { toExternalPlanSlug } from "../../../../behavior/agent-testing/results/run-plans.ts";
 
 /** The plan of one run set: the name a row reads and the address it opens. */
@@ -19,7 +19,7 @@ export function planOfSet({
   planBySuiteId: ReadonlyMap<string, PlanIdentity>;
 }): PlanIdentity | null {
   if (!scenarioSetId) return null;
-  const suiteId = tryExtractSuiteId(scenarioSetId);
+  const suiteId = extractSuiteId(scenarioSetId);
   if (suiteId) return planBySuiteId.get(suiteId) ?? null;
   // The reserved sets of the platform are not run plans and the Results tab
   // lists none of them, so a run of one has nothing to open.

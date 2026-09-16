@@ -71,7 +71,7 @@ const fetchFor = (
   service: ScenarioTargetPrefetchService,
   type: TargetConfig["type"],
   runSecretValues: Record<string, string> = {},
-) => service.tryFetch({ projectId: PROJECT_ID, target: target(type), runSecretValues });
+) => service.fetch({ projectId: PROJECT_ID, target: target(type), runSecretValues });
 
 describe("ScenarioTargetPrefetchService.tryFetch", () => {
   describe("given a prompt target", () => {

@@ -5,7 +5,7 @@ import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 
 import { buildFailureResults } from "@langwatch/scenario-contract";
 import type { RunEvaluators } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId } from "@langwatch/suite-contract";
+import { extractSuiteId } from "@langwatch/suite-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
@@ -276,7 +276,7 @@ export class FinishRunAdapter implements CommandHandler<
       return await this.deps.loadRunAttachments({
         projectId: tenantId,
         scenarioId,
-        planId: scenarioSetId ? tryExtractSuiteId(scenarioSetId) : null,
+        planId: scenarioSetId ? extractSuiteId(scenarioSetId) : null,
       });
     } catch (error) {
       logger.warn(

@@ -160,7 +160,7 @@ integration("the batch-scoped run list", () => {
           makeRunRow({ scenarioSetId, batchRunId: `batch-other-${nanoid()}` }),
         ]);
 
-        const result = await repo.getRunDataForBatchRun({ projectId: tenantId, batchRunId });
+        const result = await repo.findRunDataForBatchRun({ projectId: tenantId, batchRunId });
 
         expect(result.changed).toBe(true);
         if (!result.changed) throw new Error("expected changed");
@@ -183,7 +183,7 @@ integration("the batch-scoped run list", () => {
           }),
         ]);
 
-        const result = await repo.getRunDataForBatchRun({
+        const result = await repo.findRunDataForBatchRun({
           projectId: tenantId,
           scenarioSetId,
           batchRunId,
@@ -216,7 +216,7 @@ integration("the batch-scoped run list", () => {
           makeRunRow({ scenarioSetId: `set-named-${nanoid()}`, batchRunId }),
         ]);
 
-        const result = await repo.getRunDataForBatchRun({
+        const result = await repo.findRunDataForBatchRun({
           projectId: tenantId,
           scenarioSetId: "",
           batchRunId,

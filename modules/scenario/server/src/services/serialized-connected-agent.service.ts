@@ -135,7 +135,7 @@ export class SerializedConnectedAgentAdapter extends SerializedAgent {
     return this.served;
   }
 
-  async call(input: AgentInput) {
+  async call(input: AgentInput): Promise<string> {
     const { headers: propagation } = injectTraceContextHeaders({ headers: {} });
     const traceparent = propagation.traceparent ?? null;
     const body = JSON.stringify({

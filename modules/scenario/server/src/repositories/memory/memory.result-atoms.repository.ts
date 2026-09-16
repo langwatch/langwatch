@@ -15,7 +15,7 @@ export class MemoryResultAtomsRepository extends ResultAtomsRepository {
   findRunOrdinals(): ReturnType<ResultAtomsRepository["findRunOrdinals"]> {
     return this.refuse();
   }
-  tryAggregateTotals(): ReturnType<ResultAtomsRepository["tryAggregateTotals"]> {
+  aggregateTotals(): ReturnType<ResultAtomsRepository["aggregateTotals"]> {
     return this.refuse();
   }
   aggregateGroups(): ReturnType<ResultAtomsRepository["aggregateGroups"]> {

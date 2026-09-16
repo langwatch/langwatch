@@ -71,7 +71,13 @@ function positiveWholeSecondsAsMs({
 }
 
 /** Same clamp as {@link positiveWholeSecondsAsMs}, but the value is already milliseconds. */
-function positiveMs({ value, fallbackMs }: { value: number | undefined; fallbackMs: number }) {
+function positiveMs({
+  value,
+  fallbackMs,
+}: {
+  value: number | undefined;
+  fallbackMs: number;
+}): number {
   if (value === undefined || !Number.isFinite(value) || value <= 0) {
     return fallbackMs;
   }

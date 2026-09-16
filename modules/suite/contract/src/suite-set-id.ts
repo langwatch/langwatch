@@ -9,7 +9,7 @@ export function getSuiteSetId(suiteId: string): string {
   return `${INTERNAL_SET_PREFIX}${suiteId}${SUITE_SET_SUFFIX}`;
 }
 
-export function tryExtractSuiteId(setId: string): string | null {
+export function extractSuiteId(setId: string): string | null {
   if (!isSuiteSetId(setId)) return null;
   return setId.slice(INTERNAL_SET_PREFIX.length, -SUITE_SET_SUFFIX.length);
 }

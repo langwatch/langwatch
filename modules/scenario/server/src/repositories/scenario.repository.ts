@@ -51,7 +51,7 @@ export abstract class ScenarioRepository {
   ): Promise<ScenarioVersionSummary[]>;
   abstract findVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail>;
   abstract restoreVersion(input: ScenarioVersionRestoreInput): Promise<Scenario>;
-  abstract tryArchive(input: {
+  abstract archive(input: {
     id: string;
     projectId: string;
     archivedAt: Date;
@@ -93,14 +93,14 @@ export abstract class ScenarioRepository {
   abstract createTestSuite(
     input: ScenarioTestSuiteCreateInput & { id: string },
   ): Promise<ScenarioTestSuite>;
-  abstract tryFindTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
+  abstract findTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null>;
   abstract findTestSuites(input: {
     projectId: string;
     includeArchived?: boolean;
   }): Promise<ScenarioTestSuite[]>;
   abstract renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite>;
   abstract updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite>;
-  abstract getTestSuiteRunDefinition(
+  abstract findTestSuiteRunDefinition(
     input: ScenarioTestSuiteIdInput,
   ): Promise<ScenarioTestSuiteRunDefinition>;
   abstract archiveTestSuite(
@@ -112,7 +112,7 @@ export abstract class ScenarioRepository {
    * a reserved label, so a person-named "Default" IS the project's Default.
    * The oldest wins when a project holds two.
    */
-  abstract tryFindDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null>;
+  abstract findDefaultTestSuite(input: { projectId: string }): Promise<{ id: string } | null>;
 
   /**
    * Creates the project's Default test suite, or answers the id of one a

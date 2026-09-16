@@ -39,7 +39,7 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       ).resolves.toMatchObject({ id, name: "Refund a duplicate charge" });
 
       const archivedAt = new Date();
-      await repository.tryArchive({ id, projectId: PROJECT_ID, archivedAt });
+      await repository.archive({ id, projectId: PROJECT_ID, archivedAt });
 
       await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toBeNull();
       await expect(
@@ -91,7 +91,7 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       expect(updated.fields).toEqual(updatedFields);
       expect(updated.evaluators).toEqual(evaluators);
       await expect(
-        repository.tryFindTestSuite({ testSuiteId: created.id, projectId: PROJECT_ID }),
+        repository.findTestSuite({ testSuiteId: created.id, projectId: PROJECT_ID }),
       ).resolves.toMatchObject({ fields: updatedFields, evaluators });
     });
   });

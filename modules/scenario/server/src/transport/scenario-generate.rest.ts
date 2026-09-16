@@ -4,7 +4,11 @@
  * permission is asked against the BODY's `projectId` (`deferredScope`, ADR-045).
  */
 import { deferredScope } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   ScenarioApi,
   scenarioGenerateResultSchema,
@@ -107,7 +111,11 @@ const DOOR_REASON =
 /** `/api/scenario/generate`, bound to one process's ports. */
 export function createScenarioGenerateRest<TSession extends ScenarioGenerateRestSession>(
   ports: ScenarioGenerateRestPorts<TSession>,
-) {
+): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ScenarioApi>;
+}> {
   return defineRestRouter(ScenarioApi)
     .withNamespace("scenario")
     .withVersion(MANAGEMENT_API_VERSION)

@@ -144,7 +144,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     }
 
     try {
-      return await store.tryTakePending(key);
+      return await store.takePending(key);
     } catch (error) {
       logger.warn(
         { error, projectId: input.projectId },

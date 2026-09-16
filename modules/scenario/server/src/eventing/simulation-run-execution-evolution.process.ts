@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import type { EventHandler, ProcessHandlerContext, WakeHandler } from "@langwatch/eventing";
+import type {
+  EventHandler,
+  ProcessEvolution,
+  ProcessHandlerContext,
+  ProcessIntent,
+  WakeHandler,
+} from "@langwatch/eventing";
 import {
   runAwaitsEvaluations,
   runParameterValuesSchema,
@@ -370,7 +376,7 @@ export class SimulationRunExecutionEvolution {
     }
   }
 
-  static finishCancelledIntent(ctx: Ctx) {
+  static finishCancelledIntent(ctx: Ctx): ProcessIntent {
     return ctx.intents.finish(finishCancelledKey(ctx.key), {
       scenarioRunId: ctx.key,
       projectId: ctx.projectId,
@@ -407,7 +413,7 @@ export class SimulationRunExecutionEvolution {
     ctx: Ctx;
     base: SimulationRunExecutionProcessState;
     error: string;
-  }) {
+  }): ProcessEvolution<SimulationRunExecutionProcessState> {
     return {
       state: { ...base, phase: "terminal" as const },
       nextWakeAt: null,
@@ -432,7 +438,7 @@ export class SimulationRunExecutionEvolution {
     ctx: Parameters<
       WakeHandler<SimulationRunExecutionProcessState, SimulationRunExecutionIntents>
     >[1],
-  ) {
+  ): ProcessEvolution<SimulationRunExecutionProcessState> {
     const finishedAtMs = state.finishedAtMs ?? ctx.now;
     if (ctx.now - finishedAtMs < EVALUATION_DEADLINE_MS) {
       return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
