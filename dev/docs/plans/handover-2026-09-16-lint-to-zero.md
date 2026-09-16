@@ -447,39 +447,41 @@ The same measurement applies to most of `fallible-result-naming`'s remaining 890
 `service-classes` (296) and `package-boundaries` (374). Those are shape, not
 contract, and a lane can finish one without deciding what absence means.
 
-## REGRESSION FOUND, NOT OURS TO FIX: three governance errors lost their throws
+## A REGRESSION THIS SESSION REPORTED AND GOT WRONG (read this before trusting a grep)
 
-`apps/ui/src/model/errors/__tests__/codes.unit.test.ts` is **red** (1 of 8 in
-that file; 260 of 261 across the whole `__tests__/errors` directory pass, so this
-is the only breach):
+`codes.unit.test.ts` was red on three codes nothing raised -
+`ingestion_template_not_found`, `invalid_source_type`,
+`platform_template_immutable`. This coordinator traced them to `727bf95e8c`,
+saw the throw sites deleted, found the strings surviving only in
+`app-codes.ts` and `presentation.ts`, and reported a customer-facing regression:
+named refusals degraded to "unknown error".
 
-    These codes are in APP_ERROR_CODES but nothing raises them:
-      ingestion_template_not_found
-      invalid_source_type
-      platform_template_immutable
+**That conclusion was wrong.** `727bf95e8c` replaced raw
+`new HandledError("<code>", ...)` throws with named subclasses in
+`contract/src/ingestion-template.ts` that raise **different** codes:
 
-**Cause, confirmed by `git show`, not inferred.** `727bf95e8c` (2026-09-16 16:49,
-"governance's twenty-five rest routes move onto the standard declaration") deleted
-every throw site for all three and nothing replaced them. The three strings now
-appear in exactly two files in the whole tree - `packages/handled-error/src/app-codes.ts`
-and `presentation.ts` - so the registration and the customer copy survive and the
-errors do not.
+    TemplateNotFoundError extends NotFoundError        -> template_not_found
+    PlatformTemplateImmutableError extends HandledError -> template_immutable
+    InvalidSourceTypeError extends ValidationError      -> validation_error
 
-**Why this is worse than a red test.** Because the copy is still registered, it
-does NOT surface as the missing-entry typecheck failure CLAUDE.md describes. It
-surfaces as a customer asking for a template that does not exist and getting a
-generic "unknown error" plus a trace id where they used to get named, actionable
-copy - the exact case CLAUDE.md calls a bug in the feature rather than a gap in
-the error system.
+`ingestion-template.service.ts` throws `TemplateNotFoundError` at five sites, and
+all three live codes carry copy. A customer asking for a missing template reads
+"Ingestion template not found". No refusal ever lost its words. The three old
+codes were residue - registered, with copy, unreachable - and the apidiff session
+removed them (`f2903dca53`); the guard is 8/8 and the strings are gone.
 
-Two legitimate fixes, not equivalent: put the throws back in the handlers if those
-cases should still refuse, or delete the codes and their `presentation.ts` entries
-if the migration dropped them deliberately. The test asks which; it does not
-assert the first.
+**The error to learn from:** "nothing raises this string" and "this refusal lost
+its words" are different claims, and only the first was checked. An equivalent
+error under a renamed code is exactly what had happened, and it is the common case
+after an error-shape migration. Trace the behaviour, not the identifier.
 
-**Owned by the concurrent apidiff/governance session and reported to it.** This
-drive has touched none of `enterprise/**`, `packages/handled-error/**` or that
-test.
+**A grep trap that caused a false negative on the same investigation:**
+`presentation.ts` uses **unquoted** object keys (`template_not_found: {`), so a
+search for `"template_not_found"` with quotes finds nothing and reads as "no copy
+registered". The peer hit this three times in one session - also on import
+specifiers carrying `.ts`, and on a contract index re-exporting through 40 star
+exports. Same shape as this repository's other silent-success traps: the check
+tested a spelling and reported it as a fact.
 
 ## THE REPOSITORY'S OWN INVARIANT SUITE IS RED: 77 failures, 23 files
 
