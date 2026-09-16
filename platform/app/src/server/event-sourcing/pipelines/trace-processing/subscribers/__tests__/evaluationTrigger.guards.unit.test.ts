@@ -3,11 +3,24 @@ import type { MonitorSummary } from "~/server/app-layer/monitors/repositories/mo
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import type { TraceProcessingEvent } from "../../schemas/events";
+import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import {
   createEvaluationTriggerSubscriber,
   type EvaluationTriggerSubscriberDeps,
 } from "../evaluationTrigger.subscriber";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
+
+/**
+ * Reads the prom-client counter so assertions stay delta-based and isolated
+ * from whatever else in the suite has already incremented it.
+ */
+async function readBlockedCounter(reason: string): Promise<number> {
+  const metric = await (evaluatorLoopBlockedCounter as any).get();
+  for (const v of metric.values ?? []) {
+    if (v.labels?.reason === reason) return v.value as number;
+  }
+  return 0;
+}
 
 function makeEvent(
   overrides: Partial<TraceProcessingEvent> = {},
@@ -259,6 +272,7 @@ describe("evaluationTrigger subscriber", () => {
      * reported "no loop" and the trace was evaluated, producing another
      * evaluator trace. Guard the deferred path off the fold state instead.
      */
+    /** @scenario "origin_resolved on a trace with accumulated depth does not trigger evaluations" */
     it("does not dispatch evaluations", async () => {
       const monitor = makeMonitor();
       const deps = createDeps();
@@ -280,11 +294,15 @@ describe("evaluationTrigger subscriber", () => {
         },
       );
 
+      const before = await readBlockedCounter("depth_fold");
+
       await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(await readBlockedCounter("depth_fold")).toBe(before + 1);
     });
 
+    /** @scenario "origin_resolved on a trace with no accumulated depth still triggers evaluations" */
     it("still dispatches for an application-origin trace", async () => {
       const monitor = makeMonitor();
       const deps = createDeps();
@@ -303,6 +321,39 @@ describe("evaluationTrigger subscriber", () => {
       await subscriber.spec.handler(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A manual evaluation run inside the deferred window suppresses that trace's evaluations" */
+    it("also skips an application trace polluted by an evaluator child span", async () => {
+      const monitor = makeMonitor();
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "application" },
+      } as unknown as Partial<TraceProcessingEvent>);
+      // A manual evaluation run against a not-yet-resolved application trace
+      // lands evaluator child spans on it. Fold accumulation is first-wins, so
+      // their depth sticks, and origin_resolved rewrites the folded origin to
+      // "application" — nothing left distinguishes this from an evaluator-born
+      // trace. Pinned as an accepted tradeoff, not as desired behaviour: see
+      // the @known-limitation scenario for the reasoning and the way out.
+      const context = makeContext(
+        {},
+        {
+          "langwatch.origin": "application",
+          "langwatch.reserved.causality_depth": "1",
+        },
+      );
+
+      await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
     });
   });
 });

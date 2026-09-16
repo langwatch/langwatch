@@ -222,6 +222,16 @@ const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
  * in for exactly this reason. Depth stays the sole hard rule here, same as on
  * the span path: origin remains a user-configurable precondition, never a
  * hardcoded subscriber guard.
+ *
+ * Known limitation: fold accumulation is first-wins, so a depth stamped by an
+ * evaluator child span on an otherwise-application trace is sticky, and
+ * `origin_resolved` rewrites the folded origin to "application" — so this
+ * cannot tell that trace apart from an evaluator-born one and will skip its
+ * evaluations. Reachable only via a manual evaluation run inside the deferred
+ * window. See the @known-limitation scenario in
+ * specs/monitors/online-evaluator-loop-prevention.feature.
+ *
+ * Exported for unit testing.
  */
 export function detectCausalityLoopFromFoldState(
   foldState: TraceSummaryData,

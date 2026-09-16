@@ -91,6 +91,48 @@ Feature: Online-evaluator infinite-loop prevention
     And a warning is logged that the guard is disabled
 
   # ============================================================================
+  # Deferred-origin dispatch: the path with no span to inspect.
+  #
+  # Evaluator-emitted traces have no root span, so their origin is not resolved
+  # while spans arrive. The originGate subscriber resolves it afterwards and
+  # emits origin_resolved, which carries no span payload — so the per-span
+  # depth check cannot run and dispatch used to proceed unguarded. The fold
+  # state is the only evidence available on this path, so the accumulation
+  # service folds causality_depth in and the guard reads it from there.
+  # ============================================================================
+
+  @integration @unit @loop-prevention @depth-fold
+  Scenario: origin_resolved on a trace with accumulated depth does not trigger evaluations
+    Given a trace whose fold state carries "langwatch.reserved.causality_depth" = "1"
+    And the project has an enabled ON_MESSAGE monitor with no preconditions
+    When the evaluationTrigger subscriber fires for the origin_resolved event
+    Then no executeEvaluation command is dispatched
+    And the loop-blocked counter is incremented with reason="depth_fold"
+
+  @integration @unit @loop-prevention @depth-fold
+  Scenario: origin_resolved on a trace with no accumulated depth still triggers evaluations
+    Given a trace whose fold state carries no causality depth
+    And the project has an enabled ON_MESSAGE monitor with no preconditions
+    When the evaluationTrigger subscriber fires for the origin_resolved event
+    Then one executeEvaluation command is dispatched per monitor
+
+  @unit @loop-prevention @depth-fold @known-limitation
+  Scenario: A manual evaluation run inside the deferred window suppresses that trace's evaluations
+    Given an application trace whose origin has not yet resolved
+    And an operator starts a manual evaluation run against that trace
+    And the evaluator's child spans land on the same trace carrying depth=1
+    When the deferred origin_resolved event fires for that trace
+    Then no executeEvaluation command is dispatched
+    # Accepted tradeoff, not desired behaviour. Fold accumulation is
+    # first-wins, so a depth stamped by an evaluator child is sticky for the
+    # life of the trace, and origin_resolved rewrites the folded origin to
+    # "application" — leaving no signal that separates this trace from an
+    # evaluator-born one. Blast radius is one trace missing one round of
+    # monitors, recoverable by re-running; the alternative is leaving the
+    # self-sustaining evaluator loop open. Revisit by making the fold depth a
+    # key-specific max and scoping accumulation to evaluator-origin spans.
+
+  # ============================================================================
   # TS-side dispatch: traceparent + parent-span context propagation to nlpgo.
   #
   # The eval-execution service runs in TS. It calls nlpgoFetch to dispatch
