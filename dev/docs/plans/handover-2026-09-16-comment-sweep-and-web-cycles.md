@@ -1,18 +1,32 @@
-# Handover — comment sweep (wave 6 done) and the web cycle migration (wave 2 started)
+# Handover — comment sweep (wave 7 done, 89%) and the web cycle migration (wave 2 started)
 
 Written 2026-09-16, end of session. **`.claude/coordinator/LANES.md` has no
 `active` rows**, so this session was replaceable at the moment it ended and
 nothing is in flight.
 
-Two drives ran in parallel here. They are independent; pick either.
+Two drives ran in parallel earlier. This session ran **drive A only**, at the
+user's direction. They are independent; pick either.
 
 ## Exact next action
 
-Take the studio-column-vocabulary decision (section B) before spawning any more
-web wave-2 lanes — it blocks web-12's dependency deletion and may block lanes 8,
-10 and 11. Everything else is unblocked: either slice the next comment tranche
-from a fresh measurement (three lanes, sonnet, ~150-200 findings each), or spawn
-web lanes 7, 8, 9, 10, 11, 14, 15, whose paths are now all free.
+**The comment sweep is no longer the biggest thing in this drive, and the next
+tranche should not be one.** `comment-block-size` is down to 662 and is now the
+*third* rule; `fallible-result-naming` (1,345) and `no-try-prefix` (757) are one
+coherent job of 2,102. That job is **Opus, high effort** and is described in
+`dev/docs/plans/handover-2026-09-16-lint-to-zero.md`, wave 2: a `try*` or
+nullable-returning method renamed to `find*` must **narrow its catch to the
+absence case**, and a blanket catch behind a `find*` name is a worse bug than
+the lint it silences. One lane per module, and the lane shows the narrowed catch
+in its handoff, not just the rename.
+
+If you do run another comment tranche instead, it is now three commands rather
+than a rebuild: the checks are committed at `dev/scripts/comment-sweep/` and are
+no longer scratch files. Slice from a fresh measurement, skip the two held areas
+below, and exclude peer-dirty paths.
+
+Drive B (web import cycles) was **not touched this session** — the
+studio-column-vocabulary decision in section B is still open and still blocks
+web-12's dependency deletion.
 
 
 ---
@@ -21,34 +35,37 @@ web lanes 7, 8, 9, 10, 11, 14, 15, whose paths are now all free.
 
 Governing doc: `dev/docs/plans/handover-2026-09-16-lint-to-zero.md` (scoreboard,
 decisions not to relitigate, traps). Lost facts:
-`dev/docs/plans/comment-sweep-lost-facts.md`, now 38 numbered entries.
+`dev/docs/plans/comment-sweep-lost-facts.md`, now 42 numbered entries.
 
 ### Where it stands
 
-| | drive start | now |
-| --- | ---: | ---: |
-| oxlint total | 24,022 | **9,884** |
-| — `comment-block-size` | 6,168 | **1,175** |
-| architecture-enforcer | 3,137 | 2,840 (not comparable — see the lint-to-zero doc) |
-| **true total** | **27,159** | **12,724** |
+| | drive start | previous | now |
+| --- | ---: | ---: | ---: |
+| oxlint total | 24,022 | 9,886 | **9,357** |
+| — `comment-block-size` | 6,168 | 1,177 | **662** |
 
-**4,993 of 6,168 comment findings cleared (81%)**, across 28 areas, in 21 lanes.
-`comment-block-size` is no longer the biggest rule — `fallible-result-naming`
-(1,347) is. The next tranche of this drive is arguably not the comment sweep.
+**5,506 of 6,168 comment findings cleared (89%)**, across 31 areas, in 24 lanes.
+
+This session cleared 515 in three sonnet lanes: `w7-packages-infra` 172
+(`0096cfd5eb`), `w7-enterprise-flags` 181 (`4f5fc8520f`), `w7-small-modules` 161
+(`6c99d76df5`). The lanes claimed 514 and the tree moved 515 — the extra one is
+a block the coordinator deleted in review. **The arithmetic summing exactly also
+says no new comment findings appeared during the session**, against the ~12 an
+hour the governing doc predicted from concurrent work. Do not read that as the
+hole being closed; it was two hours.
 
 ### Remaining, largest first
 
 `packages/architecture-enforcer` 85, `packages/api` 68, `skills` 46,
-`packages/test-harness` 45, `enterprise/modules/billing` 43,
-`modules/feature-flag` 41, `packages/mail` 38, `packages/observability` 37,
-`modules/data-privacy` 35, `services/langyworker` 34, `packages/egress` 33,
-`enterprise/modules/licensing` 32, then a tail across 73 areas.
+`services/langyworker` 34, `packages/oxlint-rules` 32, `github` 21,
+`packages/design-system` 21, `packages/ui-drawer` 19, `modules/notification` 18,
+`packages/infrastructure` 18, `packages/otlp` 17, `docs` 17, `modules/monitor`
+17, `modules/agent` 16, then 233 across 46 more areas.
 
-Two of those are **deliberately held**:
+The same two are **deliberately held** and were not sliced this session:
 
-- `packages/api` — the peer session is rewriting its REST runtime and
-  declaration layer. Sweeping comments through a file someone is restructuring
-  wastes both efforts.
+- `packages/api` — a peer session is rewriting its REST runtime and declaration
+  layer.
 - `packages/architecture-enforcer` — coordinator-owned, and it implements the
   rules this drive is measured by. Needs an exclusive grant with the baselines
   carved out, or the coordinator's own hands.
@@ -60,58 +77,70 @@ never a stale `.tsv`; the rule's discount list changed mid-drive. Three lanes,
 ~150-200 findings each, sonnet/medium. The spawn prompt matters more than the
 manifest: put the traps in it, because a lane reads its opening prompt twice.
 
-### The five checks that collect a slice
-
-Run all five. Each is unsound alone and they fail on disjoint inputs.
-
-1. **Scope** — modified set equals the slice exactly. `comm -23` the dirty list
-   against the slice file; anything extra is the peer session's and must not be
-   committed.
-2. **Every changed line inside a comment** — `verify-slice.py` (below). This is
-   the sound one.
-3. **Blank lines** — `git diff -U0 | grep -cE '^[+-]$'`. Legitimate only to
-   split two adjacent comment blocks the rule counts as one. Expect 0-7.
-4. **Directives** — no `@ts-`, `<reference>`, `@vitest-environment`,
-   `eslint-disable`, `@scenario` removed. Moving a discounted tag *into* a JSDoc
-   as its own ` * @tag` line is a good fix and is the repo's dominant form
-   (1,292 files, 746 of them `jsdom` where a broken directive would fail loudly).
-5. **Orphan blocks** — the regex below must not increase. **This is the check
-   that catches a lane gaming the rule**, and no other check can see it.
-
-```python
-import re
-pat = re.compile(r"^[ \t]*/\*\*[^\n]*\*/[ \t]*\n[ \t]*\n[ \t]*/\*\*", re.M)
+```bash
+npx oxlint --config .oxlintrc.jsonc --format=json . > out.json   # count by `code`
 ```
 
-A lane this session cleared 19 findings by **splitting** an over-budget block
-into a one-line block, a blank line, and the remainder. Each half passes; the
-prose survives; and the first block is orphaned, because only the JSDoc
-immediately preceding a declaration attaches to it. The slice was fully
-lint-clean and provably comment-only and still wrong. It was held, corrected by
-a 14-file lane, and collected at `69d1e405f4`. Every other lane added zero
-orphan blocks — that outlier comparison is what exposed it.
+Exclude every peer-dirty path at slice time. Four sessions share this checkout,
+and a lane cannot tell its own edit from someone else's once both are in the
+working tree.
 
-### `verify-slice.py`
+### The six checks that collect a slice
 
-Lives in the job scratch dir, so **it will not survive**. Rewrite it; it is
-about 60 lines. It computes the set of lines inside a comment in each version —
-including JSX `{/* … */}` and their unmarked continuation lines — and asserts
-every removed line was inside one and every added line is inside one.
+**They are committed now.** `dev/scripts/comment-sweep/` holds them with a
+README; they were written from scratch in a scratch directory twice and lost
+twice, which is why they are in the repository. Run all six — each is unsound
+alone and they fail on disjoint inputs.
 
-It replaced two checks that were each unsound:
+1. **Scope** — modified set equals the slice exactly. `comm -23` the dirty list
+   against the slice file. This is the one that catches peer contamination, and
+   it earned its keep this session: it flagged two files in a lane's areas that
+   turned out to be a peer's, one of them carrying a code change.
+2. **Every changed line inside a comment** — `verify-slice.py`. The sound one.
+   Use `--commit SHA` on landed work; without it, pointing at an old ref
+   compares the *working tree* to that ref and reports every peer commit since.
+3. **Blank lines** — `git diff -U0 | grep -cE '^[+-]$'`. Expect 0-7.
+4. **Directives** — no `@ts-`, `<reference>`, `@vitest-environment`,
+   `eslint-disable`, `@scenario` removed.
+5. **Orphan blocks** — `count-orphans.py`, baseline taken **before** the lane.
+6. **Splits** — `count-splits.py`. **New, and it exists because check 5 has a
+   gap.** The orphan regex only matches a *single-line* `/** … */` before the
+   blank, so a lane that split a multi-line JSDoc from a `//` divider beneath it
+   cleared the finding invisibly. Check 6 reports every blank line inserted
+   between two comment lines, which is the pattern itself rather than one shape
+   of it.
 
-- the changed-line pattern grep is blind to JSX continuation lines, which carry
-  no `*` and so read as code;
-- a character-scanning strip-and-compare treated `/*` inside a **regex literal**
-  as opening a block comment and a backtick inside a **comment** as opening a
-  template literal. Once desynced it consumed to the next `*/`, so how far it
-  ran depended on comment length — editing only comments changed its verdict.
-  Four false positives in one wave.
+Checks 5 and 6 catch a lane clearing findings by **dividing** a block rather
+than shortening it: each half passes, the prose survives, the count falls, and
+the comment is detached from what it documented. A lane did this last session
+(19 findings, held and corrected at `69d1e405f4`) and a lane did the multi-line
+variant this session. Lesson 8 in `.claude/manifests/BRIEF-comment-block-wave1.md`
+now states the rule and the brief's old "a blank line splits one block into two,
+which is a legitimate fix" wording — the loophole itself — has been removed.
 
-Give it a `--commit SHA` mode. Without one, pointing it at an old ref compares
-the *working tree* against that ref and reports every commit landed since,
-including the peer's, which reads as a false alarm. That nearly cost a wrong
-report this session.
+### What review caught this session, beyond lint
+
+Both are in `dev/docs/plans/comment-sweep-lost-facts.md`, entries 39-42.
+
+- A **JSDoc left behind by a move**: the block documenting
+  `fillServerOnlyTraceSources` stayed in `evaluation-execution.service.ts` when
+  the method moved to `evaluation-data.service.ts:46`, where it is still
+  undocumented. It sat between two dividers attached to nothing, and the stale
+  `dist/.d.ts` shows it had re-attached to `runEvaluation` — the build output
+  documenting one method with the description of another. Deleted, with the
+  empty section heading above it. **The follow-up is one comment-only edit:**
+  give `fillServerOnlyTraceSources` that sentence at five lines.
+- **External contract is checked before it is cut, not assumed.** A lane cut the
+  webhook signature header's wire format and its `v1`-may-repeat rotation rule.
+  That rule is load-bearing for customers — a verifier reading only the first
+  `v1` breaks during a secret roll — so it was confirmed to survive in three
+  committed places before the slice was collected (`docs/features/webhooks.mdx:309`,
+  the published SDK verifier, `specs/webhooks/signature-vectors.json`). It does.
+
+**Handoffs are gitignored.** A fact a lane records only in its handoff dies with
+the drive, so every recorded fact loss was transferred into the committed
+register before its slice was collected. Do this every time.
+
 
 ---
 

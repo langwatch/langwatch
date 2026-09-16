@@ -11,17 +11,22 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | handover written | wave 4 | wave 5 | now (wave 6 landed) |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 9,208 | 8,695 | **8,242** |
-| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,636** |
-| oxlint total | 24,022 | 14,884 | 10,840 | 10,327 | **9,878** |
-| — of which `comment-block-size` | 6,168 | 6,168 | 2,119 | 1,593 | **1,170** |
-| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **13,680** | **13,167** | **12,718** |
+| | drive start | handover written | wave 4 | wave 5 | wave 6 | now (wave 7 landed) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| oxlint errors | 6,075 | 13,253 | 9,208 | 8,695 | **8,242** | 7,721 |
+| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,636** | 1,636 |
+| oxlint total | 24,022 | 14,884 | 10,840 | 10,327 | **9,878** | **9,357** |
+| — of which `comment-block-size` | 6,168 | 6,168 | 2,119 | 1,593 | **1,170** | **662** |
+| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 | 2,840 (see note) | 2,840 (see note) |
+| **true total** | **27,159** | **17,645** | **13,680** | **13,167** | **12,718** | **12,197** |
 
-Down 14,441 from the drive's start. The comment sweep has cleared **4,998 of
-6,168, or 81%**, across twenty-eight areas.
+Down 14,962 from the drive's start. The comment sweep has cleared **5,506 of
+6,168, or 89%**, across thirty-one areas.
+
+**Wave 7 (this session): 515 cleared in three sonnet lanes**, committed at
+`0096cfd5eb`, `4f5fc8520f` and `6c99d76df5`. `comment-block-size` is now the
+**third** rule, behind `fallible-result-naming` (1,345) and `no-try-prefix`
+(757). Wave 2 below is the next tranche, and it is Opus work, not Sonnet.
 
 **Two milestones this wave.** The whole-tree total is below 10,000 for the first
 time in the drive. And `comment-block-size` is no longer the largest rule —
