@@ -35,7 +35,7 @@
     "typecheck:declarations": "node dev/scripts/typecheck-declarations.mjs",
     "typecheck:fast": "node dev/scripts/check-queue.mjs node dev/scripts/typecheck.mjs --fast",
     "typecheck:one": "node dev/scripts/typecheck-one.mjs",
-    "typecheck:all": "pnpm --workspace-concurrency=1 -r --filter \"!@langwatch/server\" typecheck",
+    "typecheck:all": "pnpm --workspace-concurrency=1 -r --no-bail --filter \"!@langwatch/server\" typecheck",
     "check:ts-budget": "pnpm --filter @langwatch/architecture-enforcer check:ts-budget",
     "check:node-resolution": "node dev/scripts/check-node-resolution.mjs",
     "sync:references": "node dev/scripts/sync-tsconfig-references.mjs --write",
