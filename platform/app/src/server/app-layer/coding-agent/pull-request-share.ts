@@ -290,13 +290,20 @@ function shareOfPullRequest({
  * name, and names like `main` or a repeated `fix/...` collide readily.
  *
  * The ledger is what supplies the missing half: its entries carry a whole
- * context, so the branches it weighed under another repository are known. A
- * first branch the ledger weighed only elsewhere leaves this repository's
- * unstamped bucket unowned. A first branch the ledger never weighed at all
- * (declared, then departed before spending anything) is not evidence of
- * another repository, and falls through to `perBranch` — which answers
- * undefined for a branch with no pull request here, the case that rule was
- * written for.
+ * context and are ordered first seen first, so the first of them carrying the
+ * first branch's NAME is the repository that branch was first declared under.
+ * When that is another repository, this repository's unstamped bucket is left
+ * unowned — including when the session later worked a branch of the same name
+ * here, since the pre-declaration usage still belongs behind the earlier one.
+ * A first branch the ledger never weighed at all (declared, then departed
+ * before spending anything) is not evidence of another repository, and falls
+ * through to `perBranch` — which answers undefined for a branch with no pull
+ * request here, the case that rule was written for.
+ *
+ * Only the row's record is ordered. On the legacy fact-row ledger the rows are
+ * per-context aggregates that carry no ordering, so a branch name worked under
+ * two repositories resolves to whichever row the query returned first. Every
+ * session folded since 00097 carries the record and answers exactly.
  *
  * A SATURATED record is the last case. The fold stops opening contexts at
  * `MAX_USAGE_CONTEXTS`, so a session past that bound keeps charging calls to
@@ -335,11 +342,21 @@ function unstampedWinnerOf({
   const firstBranch = declaredBranches[0];
   if (firstBranch === undefined) return undefined;
 
-  const named = declared.filter((usage) => usage.branch === firstBranch);
-  const namedHere = named.some((usage) =>
-    isStampedOnRepository({ usage, repositoryHost, repositoryFullName }),
-  );
-  if (named.length > 0 && !namedHere) return undefined;
+  // The FIRST entry carrying that branch name, not any of them: the record is
+  // ordered first seen first, so a session that worked a branch name here and
+  // under another repository is answered by whichever came first, which is
+  // the one the pre-declaration usage belongs behind.
+  const firstNamed = declared.find((usage) => usage.branch === firstBranch);
+  if (
+    firstNamed !== undefined &&
+    !isStampedOnRepository({
+      usage: firstNamed,
+      repositoryHost,
+      repositoryFullName,
+    })
+  ) {
+    return undefined;
+  }
   return perBranch.get(firstBranch);
 }
 

@@ -451,6 +451,13 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     Then it reports only what was spent under its own declaration
 
   @unit
+  Scenario: A branch name worked in two repositories follows whichever declared it first
+    Given a session that spent most of its tokens before its first declaration
+    And it declared that branch name under another repository first, and under this one later
+    When this repository's pull request for that branch is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
   Scenario: Usage a saturated record could not place is charged to no pull request
     Given a session whose usage record is full, so later contexts went unrecorded
     And two of its declared branches have a live pull request

@@ -1868,6 +1868,54 @@ describe("PullRequestUsageService with the session row's per-context record", ()
     });
   });
 
+  describe("given a session that worked the same branch name in two repositories", () => {
+    // The sharp version of the case above: "feat/linkage" is weighed under
+    // BOTH repositories, so the name appearing on this one proves nothing.
+    // The record is ordered first seen first, and it saw other/tools first,
+    // so the pre-declaration usage still belongs behind that one.
+    const fixture = () => ({
+      pullRequests: twoPullRequests(),
+      sessions: [
+        sessionRow({
+          agent: "codex",
+          gitBranches: ["feat/linkage", "feat/next"],
+          inputTokens: 1_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 10,
+          usageByContext: [
+            {
+              ...recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+              repositoryOwner: "other",
+              repositoryName: "tools",
+            },
+            recorded("feat/linkage", { inputTokens: 20, costUsd: 0.2 }),
+            recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+          ],
+        }),
+      ],
+    });
+
+    /** @scenario "A branch name worked in two repositories follows whichever declared it first" */
+    it("keeps the undeclared usage behind the repository that declared the name first", async () => {
+      const first = await serviceWith(fixture()).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture()).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      // Pull request 7 still earns what was spent on ITS feat/linkage, and
+      // nothing of the 940 the session spent before declaring anything.
+      expect(first.totals.inputTokens).toBe(20);
+      expect(first.totals.costUsd).toBeCloseTo(0.2, 10);
+      expect(second.totals.inputTokens).toBe(30);
+      expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+    });
+  });
+
   describe("given a session whose usage record saturated", () => {
     // The fold stops opening contexts at MAX_USAGE_CONTEXTS, so the gap
     // between the counters and the record holds both what came before the
