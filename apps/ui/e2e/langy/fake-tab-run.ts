@@ -1,8 +1,7 @@
 /**
- * The fake workbench tab's run half: posting the page's own execute request
- * and draining the stream into the store. Split out of `fake-workbench-tab.ts`
- * so the tab's wiring stays readable; what is stood in for is the page's SSE
- * client, which needs an origin the browser supplies.
+ * The fake workbench tab's run half: posts the page's execute request and
+ * drains the stream into the store, standing in for the page's SSE client,
+ * which needs an origin the browser supplies.
  */
 import { buildExecutionRequest } from "@langwatch/experiment-contract";
 import { foldEvaluationEvent } from "@langwatch/experiment-web/surfaces/workbench-results-fold";
@@ -30,12 +29,6 @@ export interface FakeTabRun {
   failure?: string;
 }
 
-/**
- * Drain one run into the store and into `runs`.
- *
- * `saveNow` is passed in rather than imported: the cells a run produces belong
- * on the server too, and the page gets there through its autosave debounce.
- */
 /** The events one SSE frame carries, skipping anything that is not one. */
 function eventsInFrame(frame: string): EvaluationV3Event[] {
   const events: EvaluationV3Event[] = [];
@@ -54,11 +47,9 @@ function eventsInFrame(frame: string): EvaluationV3Event[] {
 }
 
 /**
- * Fold one event into the store, the way the page's own results hook does.
- * Folding rather than ignoring the stream is what makes a candidate-only
- * comparison run possible: `buildExecutionRequest` and `workbench.getState`
- * both read projected results, so a tab that never folds would answer
- * differently from the page it stands in for.
+ * Folds one event into the store, the way the page's results hook does —
+ * `buildExecutionRequest` and `workbench.getState` both read projected
+ * results, so a tab that never folds would answer differently.
  */
 function foldIntoStore(event: EvaluationV3Event): void {
   useEvaluationsV3Store.setState((current) => ({
@@ -101,11 +92,9 @@ type StreamOutcome = {
 };
 
 /**
- * Post the execute request and read the stream to its end.
- *
- * The page's own `fetchSSE` needs an origin the browser supplies, so this is
- * the one piece of the page that is stood in for rather than imported. Every
- * event still goes to `onEvent` in arrival order.
+ * Posts the execute request and reads the stream to its end, standing in
+ * for the page's own `fetchSSE` (which needs a browser-supplied origin).
+ * Every event still goes to `onEvent` in arrival order.
  */
 async function streamRunEvents({
   cookie,

@@ -35,14 +35,10 @@ function persistDismissed(workspaceLabel: string): void {
 }
 
 export function AdminViewingAsBanner({ workspaceLabel }: { workspaceLabel: string }) {
-  // Two visual states:
-  //   - full   — first paint on a fresh workspace view, the loud
-  //              "this is not your data" alert.
-  //   - mini   — after dismiss within the 24h window: a small "👁
-  //              someone-else · Exit" chip that stays out of the way
-  //              but keeps the persistent reminder. Cannot be hidden
-  //              entirely; the governance team's bar is "always
-  //              visible signal, even if compressed".
+  // Two visual states: full on first paint (the loud "this is not your
+  // data" alert), mini after 24h-dismiss (a small persistent chip). Never
+  // fully hidden — the governance team's bar is "always visible signal,
+  // even if compressed".
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     setCollapsed(loadDismissed(workspaceLabel));

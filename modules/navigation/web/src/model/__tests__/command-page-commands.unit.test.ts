@@ -4,11 +4,9 @@ import { getPageCommands, pageCommandRegistry } from "../command-page-commands.t
 import type { Command } from "../command-bar-types.ts";
 
 /**
- * The registry ships empty — the legacy Traces page was the only page that
- * ever registered commands, and it is gone. What still has to work is the
- * lookup: a concrete URL (`/acme/widgets`) has to resolve to the entry
- * registered under the route pattern (`/[project]/widgets`), whatever the
- * project slug and whether or not the path carries a trailing slash.
+ * The registry ships empty — the legacy Traces page was the only
+ * registrant, and it's gone. What must still work is lookup: a URL
+ * resolves under its route pattern, whatever slug or trailing slash.
  */
 const widgetCommands: Command[] = [
   {

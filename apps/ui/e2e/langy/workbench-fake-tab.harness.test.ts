@@ -1,9 +1,7 @@
 /**
- * The fake workbench tab's run path, exercised directly — no scenario,
- * judge, simulator, or Langy turn, so a failure here is the harness or run
- * pipeline, not the agent. Pins the scoped-comparison seeding rule: running
- * one column with the other already filled must not report "Waiting on
- * <column>" over verdicts nobody asked to re-run (both carrier shapes).
+ * The fake workbench tab's run path, exercised directly — a failure here
+ * is the harness, not the agent. Pins the rule that a filled column must
+ * not report "Waiting on <column>" for verdicts nobody asked to re-run.
  */
 
 import { describe, expect, it } from "vitest";

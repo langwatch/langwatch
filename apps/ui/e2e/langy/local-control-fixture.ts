@@ -275,6 +275,7 @@ async function pointSdkAtThisCheckout({
  * install makes it real: Langy runs the project's own checks, and a folder
  * with no dependencies would have it install them and grade the wrong thing.
  */
+
 /** How many finished runs keep their folder on disk. */
 const DEMO_REPOS_KEPT = 4;
 
@@ -760,10 +761,8 @@ export function answerOfTurn(messages: StoredMessage[], turnId: string): StoredM
 }
 
 /**
- * The line that says what the developer answered on a permission card.
- *
- * Written in the developer's own voice, and bracketed, so the judge reads it
- * as an action taken in the panel rather than as something said in the chat.
+ * What the developer answered, in their own voice and bracketed, so the
+ * judge reads it as a panel action rather than chat.
  */
 export function permissionAnswerNote(ask: PermissionAsk): string {
   const where = ask.answeredIn === "terminal" ? "in the terminal" : "in the panel";
@@ -778,11 +777,9 @@ export function permissionAnswerNote(ask: PermissionAsk): string {
 }
 
 /**
- * What a scenario is told when the turn it was about to grade failed.
- *
- * A failed turn stores no answer of its own, and taking the answer before it
- * puts the previous turn in front of the judge, which reads as a pass. The run
- * ends here instead, with the reason the record holds.
+ * What a scenario is told when the turn it was about to grade failed. A
+ * failed turn stores no answer of its own, and taking the previous one would
+ * put it in front of the judge as a pass.
  */
 export function turnFailureMessage({
   turnId,
@@ -809,12 +806,9 @@ interface StreamEntry {
 }
 
 /**
- * Reads one turn's live stream and reports its entries.
- *
- * The suite's adapter already reads the stream of the turn it started, but a
- * folder that connects starts the NEXT turn on its own, and that turn's cards
- * have to be answered too. A second reader on the same turn is harmless: the
- * subscription is a read, and every answer is keyed on its wait id.
+ * Reads one turn's live stream. A connected folder can start the next turn on
+ * its own, so more than one reader may exist per turn; that's harmless since
+ * the subscription only reads, keyed by wait id.
  */
 async function readTurnEntries({
   cookie,
@@ -867,12 +861,9 @@ async function readTurnEntries({
 }
 
 /**
- * Watch the conversation and answer its cards as the developer would.
- *
- * The watcher polls the conversation for the turn in flight, opens that turn's
- * live stream, and answers every permission and question card it sees. It is
- * the user's hand: nothing it does is available to Langy, and every answer is
- * recorded so a test can assert what was asked before it asks a judge.
+ * Answers a conversation's cards as the developer would: the user's hand,
+ * invisible to Langy, with every answer recorded so a test can assert what
+ * was asked before it asks a judge.
  */
 export function watchLangyConversation({
   adapter,
@@ -1102,11 +1093,9 @@ export function watchLangyConversation({
   };
 
   /**
-   * Read a turn's answer, waiting for it to be stored.
-   *
-   * A turn that has just gone idle may have no answer row yet: the fold that
-   * clears `currentTurnId` and the projection that writes the message consume
-   * the same event on separate queues.
+   * Waits for a turn's answer to be stored: the fold that clears
+   * `currentTurnId` and the projection that writes the message consume the
+   * same event on separate queues, so a newly idle turn may have no row yet.
    */
   const readTurnAnswer = async ({
     turnId,
@@ -1316,11 +1305,9 @@ export interface DemoApp {
 }
 
 /**
- * Starts the demo application from the shared folder, connected to the
- * platform, in its own terminal (not a child of the test) since Langy
- * restarts it through the folder. Credentials go in the folder's own `.env`
- * — the shell Langy restarts in — including the model key, without which the
- * demo's own tests can't pass whatever Langy writes.
+ * Its own terminal, not the test's, since Langy restarts it through the
+ * folder — whose own `.env` also carries the model key, without which the
+ * demo's tests can't pass whatever Langy writes.
  */
 export async function startDemoApp({
   repo,
@@ -1424,11 +1411,9 @@ export async function readAgent(name: string): Promise<{
 }
 
 /**
- * The process ids listening on one port, out of `lsof -nP -iTCP:<port>`.
- *
- * `-t` is not used because the same output is parsed for a person reading the
- * log, and because an empty answer must read as "nothing there" rather than as
- * a parse that went wrong.
+ * Process ids listening on one port, from `lsof -nP -iTCP:<port>`. Skips
+ * `-t` since the same output is read by a person in the log, and an empty
+ * answer must read as "nothing there", not a parse gone wrong.
  */
 export function listeningPids(lsofOutput: string): number[] {
   const pids = new Set<number>();
@@ -1440,12 +1425,9 @@ export function listeningPids(lsofOutput: string): number[] {
 }
 
 /**
- * The process ids whose working directory is inside one folder, out of
- * `lsof -d cwd -Fpn`.
- *
- * The field output is a stream of records: `p<pid>`, then `f<fd>`, then
- * `n<path>`. A process is this run's when the path it names is the folder or
- * anything under it.
+ * Process ids working in one folder, from `lsof -d cwd -Fpn`'s `p<pid>` /
+ * `n<path>` record stream — matched when the path is the folder or
+ * something under it.
  */
 export function pidsRunningIn({
   lsofOutput,
@@ -1491,12 +1473,9 @@ function endProcess(pid: number): void {
 }
 
 /**
- * Everything this run started on the machine, ended.
- *
- * A background process Langy starts outlives the command line on purpose
- * (specs/typescript-sdk/cli-langy-share-control.feature), so the scenario has
- * to end it itself. Left alone, the demo server of one run holds its port and
- * serves a folder that the next run has already deleted.
+ * Ends everything this run started: a background process Langy starts
+ * outlives the command line on purpose (cli-langy-share-control.feature), so
+ * left alone it holds a port and serves a folder the next run has deleted.
  */
 export function killScenarioProcesses({ port, root }: { port?: number; root?: string }): void {
   const pids = new Set<number>();

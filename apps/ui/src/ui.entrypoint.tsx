@@ -40,10 +40,9 @@ function UiNoFooter() {
 function useNoNavigationTracking() {}
 
 /**
- * Read and validated once, at boot, before the first render: every feature's
- * own web schema parses the slice it acts on, so a browser never draws a
- * screen over a value its feature would have refused. The hook below only
- * hands back what boot already resolved.
+ * Read and validated once, at boot, before the first render: every
+ * feature's own web schema parses the slice it acts on, so a browser
+ * never draws a screen over a value its feature would have refused.
  */
 let publicEnvironment: PublicEnvironment | undefined;
 function resolveBootPublicEnvironment(): PublicEnvironment {

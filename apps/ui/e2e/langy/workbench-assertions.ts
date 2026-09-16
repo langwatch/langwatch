@@ -49,11 +49,9 @@ export async function readBaselineTarget({
 }
 
 /**
- * The workbench a finished improvement loop leaves behind.
- *
- * The baseline column is byte-identical, at least one candidate prompt column
- * exists carrying a draft, the evaluator is wired onto a candidate rather than
- * only onto the original, and at least one run was recorded.
+ * The workbench a finished improvement loop leaves behind: baseline
+ * byte-identical, a candidate column carrying a draft, the evaluator wired
+ * onto a candidate not just the original, and at least one run recorded.
  */
 export async function expectOptimizedWorkbench({
   slug,
@@ -130,11 +128,9 @@ export async function readRunEvaluations({
 }
 
 /**
- * A run that really scored something.
- *
- * This is what turns "a subset ran" from a judge opinion into a fact: a row the
- * evaluator processed, carrying a number or a verdict. A run that only recorded
- * skips and errors passes every shape-only check and measures nothing.
+ * A run that really scored something: a row the evaluator processed,
+ * carrying a number or a verdict — not just skips and errors, which pass
+ * every shape-only check while measuring nothing.
  */
 export async function expectRunHasRealScores({
   slug,
@@ -182,11 +178,9 @@ const verdictsOf = ({
     }));
 
 /**
- * A comparison that judged what it was asked to, with nothing left waiting.
- *
- * `MissingVariantOutput` and the "Waiting on …" sentence both come from
- * `comparisonSkipMessage` in the orchestrator, and either one means the run
- * asked the judge to compare an output it was never given.
+ * A comparison that judged what it was asked to. `MissingVariantOutput`
+ * and "Waiting on …" both come from `comparisonSkipMessage`, meaning the
+ * run asked the judge to compare an output it was never given.
  */
 export function expectComparisonScored({
   run,

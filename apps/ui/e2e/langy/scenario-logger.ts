@@ -91,10 +91,9 @@ export async function runScenarioAndLog({
 const writtenSlugs = new Set<string>();
 
 /**
- * The file one transcript lands in. A test running several scenarios once wrote them all to
- * the same name, so a passing test could leave a FAIL transcript on disk — the closing run was
- * graded on criteria the asserted one never carried. The first run keeps the plain name; later
- * ones carry the run's own name.
+ * The file one transcript lands in: running several scenarios once wrote
+ * them all to the same name, so a pass could leave a stale FAIL transcript
+ * behind. The first run keeps the plain name; later ones carry their own.
  */
 function uniqueSlug({
   testName,

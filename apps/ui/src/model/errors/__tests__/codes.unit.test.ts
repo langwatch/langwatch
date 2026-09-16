@@ -25,13 +25,10 @@ const ROOTS = [
   // `ee` was a root until `4faa77c658` moved governance and SCIM into
   // `enterprise`, which is walked below.
   join(PACKAGE_ROOT, "../../packages"),
-  // And the trees the features themselves moved into, which is now most of
-  // the product. Without these the guard walked the three applications and the
-  // shared packages while every module's errors — the majority of the codes
-  // this registry carries copy for — went unseen, so it reported hundreds of
-  // live codes as dead copy and could not have caught a genuinely dead one
-  // among them. `enterprise` covers both its modules and its composition
-  // packages.
+  // And the trees the features moved into — most of the product. Without
+  // them, every module's errors (most of this registry) go unseen, so the
+  // guard reports live codes as dead and can't catch genuinely dead ones.
+  // `enterprise` covers its modules and composition packages too.
   join(PACKAGE_ROOT, "../../modules"),
   join(PACKAGE_ROOT, "../../enterprise"),
 ].filter((root) => existsSync(root));
@@ -156,19 +153,16 @@ function declaredCodes(): Set<string> {
 }
 
 /**
- * Raised by better-auth on a route we mount but do not translate, so it reaches
- * the client spelled its way — which no CODE_PATTERN matches. Listed so
- * "nothing raises this" does not fire on live copy.
- * `MFA_REQUIRED_BY_ORGANIZATION` is absent because its route has no successor
- * here yet, so its copy was removed rather than left reading as coverage.
+ * Raised by better-auth on a route we don't translate, reaching the client
+ * unmatched by any CODE_PATTERN — listed so it doesn't fire as "nothing
+ * raises this". (`MFA_REQUIRED_BY_ORGANIZATION` was removed, not missed.)
  */
 const BETTER_AUTH_PASSTHROUGH_CODES = new Set(["LAST_WAY_IN"]);
 
 /**
- * Codes raised without customer copy. The first block below became visible when
- * the scan was widened to `modules/` and `enterprise/` — not new drift, they
- * were uncopied all along and the guard could not see them. Each is a code a
- * customer can reach with no words written for it.
+ * Codes raised without customer copy. The block below is not new drift —
+ * it became visible once the scan widened to `modules/` and `enterprise/`;
+ * these were uncopied all along and previously invisible to the guard.
  */
 const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "agent_already_exists",
@@ -251,10 +245,9 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
 ]);
 
 /**
- * Raised in a shape this scan cannot see: a plain `Error` whose message is the
- * slug, a `TRPCError` carrying it as a message, or a code the browser only
- * READS. Not dead copy — live refusals wearing the wrong clothes, which leave
- * this list by becoming handled errors.
+ * Raised in a shape this scan can't see — a plain `Error`/`TRPCError`
+ * message, or a code the browser only READS. Not dead copy: live refusals
+ * wearing the wrong clothes, which leave this list by becoming handled errors.
  */
 const RAISED_IN_AN_UNSCANNABLE_SHAPE = new Set<string>([
   "budget_not_found",
@@ -264,10 +257,9 @@ const RAISED_IN_AN_UNSCANNABLE_SHAPE = new Set<string>([
 ]);
 
 /**
- * Copy that outlived the code raising it. Renames left the last four behind;
- * the rest became visible when the scan widened to `modules/` and
- * `enterprise/`. Each is a deletion candidate once its owner confirms the
- * error is gone for good rather than waiting on a port.
+ * Copy that outlived the code raising it — a deletion candidate once its
+ * owner confirms the error is gone for good, not waiting on a port. Renames
+ * left the last four behind; the rest surfaced when the scan widened.
  */
 const DEAD_COPY_BACKLOG = new Set<string>([
   // Not dead, waiting: `presentation.datasetSearch.unit.test.ts` pins this

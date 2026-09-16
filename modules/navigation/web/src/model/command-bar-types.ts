@@ -23,9 +23,8 @@ export interface Command {
   action?: () => void;
   /**
    * Release flag that decides whether the command is offered, and the value
-   * the command needs. A destination that replaces another one is offered on
-   * `enabled: true`, and the one it replaces on `enabled: false`, so Quick
-   * Search never lists two routes to the same work.
+   * it needs: a replacement is offered on `enabled: true`, the one it
+   * replaces on `enabled: false`, so Quick Search never lists both.
    */
   featureFlag?: { flag: FrontendFeatureFlag; enabled: boolean };
 }

@@ -1,17 +1,13 @@
 /**
- * Quality regression set for Langy — one scenario per measured production
- * defect (from prod `LangyConversationTurnProjection`, not a hunch), so each
- * fails today and turns green only when the issue is fixed. Complements
- * langy-dogfood.scenario.test.ts (named flows) and langy.scenario.test.ts
- * (broad coverage); kept separate so the quality bar can be watched on its own.
+ * Quality regression set for Langy: one scenario per measured production
+ * defect (`LangyConversationTurnProjection`), failing until fixed. Kept
+ * separate from langy-dogfood/langy.scenario so the bar is watched alone.
  */
 
 /**
- * SIDE EFFECTS: the monitor scenario creates a real monitor + evaluator
- * (named `e2e-quality-*`) against whichever project is configured. The
- * monitor is deleted afterwards — left running it would keep evaluating the
- * project's live traffic and cost real money; the evaluator it hangs off is
- * inert and left behind as the evidence trail.
+ * SIDE EFFECTS: creates a real monitor + evaluator (`e2e-quality-*`) against
+ * the configured project. The monitor is deleted after — left running it'd
+ * evaluate live traffic and cost money; the evaluator stays as evidence.
  */
 
 import { randomUUID } from "node:crypto";
@@ -217,10 +213,9 @@ describe("Langy quality bar", () => {
   });
 
   /**
-   * #1100 — the stock coding-agent persona leaks back in and narrates reading
-   * or editing a file against a workspace that was never cloned. Source work
-   * itself is in scope (the `github` skill clones and works there); what must
-   * not happen is narrating a file Langy never actually obtained.
+   * #1100 — the stock coding-agent persona narrates reading/editing a file
+   * against a workspace never cloned. Source work is fine (`github` skill
+   * clones); narrating a file Langy never obtained is not.
    */
   describe("when the user asks Langy to edit source it has not cloned", () => {
     it("does not narrate a checkout it never obtained", async () => {

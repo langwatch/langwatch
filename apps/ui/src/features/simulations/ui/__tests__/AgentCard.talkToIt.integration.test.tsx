@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * "Talk to it" is offered on a voice agent's card menu only while the
  * project's release_voice_agents_enabled flag is on.
- *
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

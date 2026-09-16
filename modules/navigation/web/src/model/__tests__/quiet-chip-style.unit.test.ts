@@ -1,9 +1,7 @@
 /**
- * The enterprise pill and the Quick Search key cap share one chip
- * style, so neither can drift back to a colour of its own.
- *
- * Specs: specs/navigation/product-sidebars.feature,
- *        specs/navigation/settings-shell-v2.feature
+ * The enterprise pill and the Quick Search key cap share one chip style,
+ * so neither can drift back to a colour of its own (product-sidebars.feature,
+ * settings-shell-v2.feature).
  */
 
 import { describe, expect, it } from "vitest";

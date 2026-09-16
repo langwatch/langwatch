@@ -14,12 +14,9 @@ import {
 import type { SearchResult } from "../model/command-bar-types.ts";
 
 /**
- * Detect if the query is an entity ID and return navigation info.
- * Exported for testing.
- *
- * Trace/span hits route to the v2 page so command-bar destinations
- * match the v2 traces UI everyone is on. Direct in-app navigation
- * (table click, menu) stays separate by design.
+ * Detects whether the query is an entity ID and returns navigation info.
+ * Trace/span hits route to the v2 page so destinations match the v2
+ * traces UI everyone is on; direct in-app navigation stays separate.
  */
 export function detectEntityId({
   query,

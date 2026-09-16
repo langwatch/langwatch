@@ -59,11 +59,9 @@ type VoiceAgentDraft = {
 };
 
 /**
- * What actually reaches sessionStorage. The phone number is deliberately absent:
- * it is a personal identifier and CodeQL flags storing it in clear text, so the
- * draft never persists it. A saved phone target still shows its number on reopen
- * (that comes from the agent record), so only an unsaved, in-progress number is
- * lost across the detour to add a key.
+ * What reaches sessionStorage: the phone number is deliberately absent (a
+ * personal identifier CodeQL flags storing in clear text). Only an
+ * unsaved, in-progress number is lost — a saved one reloads from the record.
  */
 type PersistedVoiceAgentDraft = Omit<VoiceAgentDraft, "phoneNumber">;
 
@@ -218,12 +216,9 @@ function hasElevenLabsKeyIn(
 }
 
 /**
- * Whether the project has a Twilio provider that can dial a phone target.
- * Unlike {@link hasElevenLabsKeyIn}, `isSystem` alone cannot satisfy this: a
- * system row's `enabled` flag only reflects `TWILIO_AUTH_TOKEN`, and the
- * server never fills in a system row's customKeys, so it carries no signal
- * for the other two fields. All three are required to place a call, so the
- * option is offered only when a row's own customKeys carry all three.
+ * Whether the project has a Twilio provider that can dial. Unlike
+ * {@link hasElevenLabsKeyIn}, `isSystem` alone doesn't qualify — all three
+ * fields must come from the row's own customKeys; a system row never has them.
  */
 function hasTwilioKeyIn(
   providers: readonly Record<string, unknown>[],
@@ -460,12 +455,9 @@ function useVoiceAgentData({
 }
 
 /**
- * Create or update the voice agent from the current form, when valid.
- *
- * `agentId` is the editor's own prop id (an existing agent opened for edit);
- * `createdAgentRowId` is the row "Talk to it" created mid-session for a
- * still-unsaved draft. Once either is set, Save must update that row rather
- * than insert a duplicate (#20).
+ * Creates or updates the voice agent when valid. `agentId` is the editor's
+ * own prop; `createdAgentRowId` is a mid-session "Talk to it" row — once
+ * either is set, Save updates that row rather than inserting a duplicate (#20).
  */
 function submitVoiceAgent({
   projectId,
@@ -915,11 +907,9 @@ function VoiceAgentTalkView({
 }
 
 /**
- * The transports offered in the "Reached via" select. Every transport is
- * always rendered as an option; phone is disabled and labelled "Unavailable"
- * until the project has a Twilio provider in Settings > Model Providers, but
- * an agent already configured as phone keeps its own transport selectable
- * (the gate is on the OPTION, not on an existing target).
+ * Transports for "Reached via": always rendered, but phone is disabled and
+ * labelled "Unavailable" until Twilio is configured — unless the agent is
+ * already set to phone, since the gate is on the OPTION, not an existing target.
  */
 function transportOptionsFor({
   hasTwilioKey,

@@ -125,10 +125,9 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
 }
 
 /**
- * The run link the done view offers, or undefined when there is no run to link.
- * Only a "Call it myself" call writes a run (#8020), and that path always
- * learns its set from the finish response, so a run id without a set never
- * occurs; a drawer call has an empty run id and links nowhere.
+ * The run link the done view offers, or undefined when there's none: only
+ * a "Call it myself" call writes a run (#8020) and always learns its set,
+ * so a run id without a set never occurs; a drawer call links nowhere.
  */
 function runHrefOf({
   state,
@@ -278,11 +277,9 @@ async function runEndCall({
 }
 
 /**
- * Chromium exposes the document's effective Permissions-Policy. When it says
- * the microphone is off for this page, getUserMedia rejects without a prompt,
- * so we tell the user that instead of asking them to allow something the
- * browser never offered. Other browsers return undefined here and fall
- * through to the plain request.
+ * Chromium exposes the document's effective Permissions-Policy: when the
+ * mic is off for this page, getUserMedia rejects without a prompt, so this
+ * names that instead of asking to allow something never offered.
  */
 function isMicBlockedByPolicy(): boolean {
   const policy = (
@@ -559,10 +556,9 @@ function useTalkToItCall(props: TalkToItPanelProps) {
 }
 
 /**
- * The browser call panel: idle → connecting → live → saving → done, with mic,
- * mint and fetch failures surfaced as the AC copy. Transport-agnostic — it
- * opens the call through the client registry and never names a vendor.
- *
+ * The browser call panel: idle → connecting → live → saving → done, with
+ * mic, mint and fetch failures surfaced as AC copy. Transport-agnostic —
+ * opens the call through the client registry, never names a vendor.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 export function TalkToItPanel(props: TalkToItPanelProps) {

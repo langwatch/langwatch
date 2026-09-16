@@ -1,9 +1,7 @@
 /**
- * A failure that never reached the server at all — not a refusal, not a bug.
- * A false positive is worse than a false negative here: calling a real server
- * refusal "we can't reach the server" hides a fault we could have named. So a
- * failure only counts as unreachable when it has BOTH marks — a message that
- * matches a known browser transport failure, AND no sign of a response at all.
+ * A failure that never reached the server — not a refusal, not a bug. A
+ * false positive is worse than a false negative, so this only counts as
+ * unreachable with BOTH marks: a known transport message, and no response.
  */
 
 /** What each engine says when a fetch never completed. */
@@ -19,18 +17,16 @@ const TRANSPORT_FAILURES = [
 ];
 
 /**
- * What an intermediary returns when it could not get an answer out of us: a
- * proxy in front of a rolling deploy (haven locally, an ingress in prod)
- * answers 502/503/504 with an empty body while the app behind it is still
- * coming up — "nothing answered" wearing an HTTP status.
+ * What an intermediary returns when it got no answer from us: a proxy in
+ * front of a rolling deploy (haven locally, an ingress in prod) answers
+ * 502/503/504 with an empty body — "nothing answered" wearing a status.
  */
 const NO_UPSTREAM_STATUSES = [502, 503, 504];
 
 /**
- * Whether this failure never got an answer.
- *
- * Also true when the browser itself says it is offline, which is the one case
- * we can be certain about without inspecting anything.
+ * Whether this failure never got an answer — also true when the browser
+ * itself says it is offline, the one case we can be certain about without
+ * inspecting anything.
  */
 export function isServerUnreachable(error: unknown): boolean {
   if (!error) return false;
@@ -71,10 +67,9 @@ function messageOf(error: unknown): string | null {
 }
 
 /**
- * The status of the raw reply, when one arrived without a tRPC envelope.
- * `data` is where tRPC puts an answer it could parse; a 502 with an empty
- * body has none, so this reads the Response the link hangs off `meta`
- * (`@trpc/client` 11: `meta: { response }`) instead.
+ * The raw reply's status when it arrived without a tRPC envelope: `data` is
+ * where tRPC puts a parsed answer, so an empty 502 has none, and this reads
+ * the Response the link hangs off `meta` instead (`@trpc/client` 11).
  */
 function responseStatusOf(error: unknown): number | null {
   if (!error || typeof error !== "object") return null;

@@ -3,9 +3,8 @@ import { useSideMenuDensity } from "./side-menu-density.tsx";
 
 /**
  * The heading above a group of sidebar menu items ("OBSERVE",
- * "ORGANIZATION"). One component for the current chrome and the
- * navigation-v2 sidebars, so the two cannot drift; it reads its size
- * from the menu density in context.
+ * "ORGANIZATION"): one component for the current chrome and navigation-v2
+ * sidebars, so the two cannot drift; reads its size from menu density.
  */
 export function SideMenuSectionLabel({ label }: { label: string }) {
   const { sectionLabel } = useSideMenuDensity();

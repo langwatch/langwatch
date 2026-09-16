@@ -36,10 +36,9 @@ export type ShellPageBodyProps = {
 export { planManagementHref };
 
 /**
- * The organization role that carries administrative reach across every team.
- *
- * The wire's own spelling: the enum it came from is Prisma's, which a governed
- * web package may not import.
+ * The organization role that carries administrative reach across every
+ * team, spelled the wire's own way: the enum it came from is Prisma's,
+ * which a governed web package may not import.
  */
 const ORGANIZATION_ADMIN_ROLE = "ADMIN";
 

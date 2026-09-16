@@ -1,7 +1,6 @@
 /**
- * The improvement loop with the workbench OPEN in front of the user. Unlike
- * other suites (no page attached), this attaches a fake workbench tab so
- * dispatched actions are claimed by a page; the tab closes halfway through
+ * The improvement loop with the workbench OPEN, via a fake workbench tab
+ * (unlike other suites, which attach no page) that closes halfway through
  * so the run covers both the page and backend legs.
  */
 
@@ -110,12 +109,9 @@ describe("Langy on a workbench the user is watching", () => {
                   handover.dispatches = langy.state.toolOutputs.length;
                   await tab.close();
                 },
-                // Work the closed page cannot possibly have done already. The
-                // agent now finishes the whole loop inside its first turn, so a
-                // bare "keep going" is answered with a summary and nothing is
-                // dispatched: the handover the test exists to cover is never
-                // reached. Naming one more variant keeps the loop running past
-                // the close without changing what the loop is.
+                // Work the closed page cannot possibly have done already: a bare "keep
+                // going" now finishes in one turn with a summary and nothing dispatched,
+                // so naming a variant keeps the loop running without changing what it is.
                 scenario.user(
                   "I'm stepping away. keep going: try one more variant and tell me how it lands",
                 ),

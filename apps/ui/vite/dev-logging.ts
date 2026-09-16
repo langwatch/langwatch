@@ -2,10 +2,8 @@ import type { Logger, LogLevel, LogType } from "vite";
 
 /**
  * The dev server's lane, writing the same structured JSON every other lane
- * writes (dev/docs/best_practices/dev-log-format.md) instead of Vite's own
- * two-digit clock and `[vite]` tag - haven and `pnpm dev` render it for a
- * person, same as any other lane. Also collapses a proxy failure to one line
- * instead of a stack repeated per request.
+ * writes (dev-log-format.md) instead of Vite's own clock and `[vite]` tag.
+ * Also collapses a proxy failure to one line instead of a repeated stack.
  */
 
 export interface DevLogSink {

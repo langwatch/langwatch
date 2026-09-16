@@ -12,11 +12,9 @@ export function useCommandBarKeyboard(
   handleCopyLink: () => void,
   isMac: boolean,
   /**
-   * Hand what is typed to Langy, on Tab.
-   *
-   * Omitted for a reader who cannot start a Langy turn, and the key then falls
-   * through to its normal job of moving focus: a shortcut that silently does
-   * nothing is worse than one that was never offered.
+   * Hand what is typed to Langy, on Tab — omitted for a reader who cannot
+   * start a Langy turn, so the key falls through to moving focus: a
+   * shortcut that silently does nothing is worse than none at all.
    */
   onAskLangy?: () => void,
 ) {

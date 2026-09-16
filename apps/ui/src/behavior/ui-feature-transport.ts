@@ -1,8 +1,7 @@
 /**
  * The browser transport a feature package's hooks run on: one tRPC client
  * per application, HTTP split by `skipBatch`, subscriptions same-origin SSE.
- * Rationale and pins: dev/docs/adr/128-public-rest-and-internal-trpc.md, the
- * subscription-wire appendix.
+ * See ADR-128 (public REST / internal tRPC), subscription-wire appendix.
  */
 
 import { type ModuleApiClient, type ModuleApiMap, type RouterFromMap } from "@langwatch/api/web";

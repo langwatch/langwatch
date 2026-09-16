@@ -1,10 +1,7 @@
 /**
- * Where an in-place organization switch lands.
- *
- * Written HERE rather than moved, for the same reason as the shell-route
- * suite beside it: the platform test was swept before the module travelled.
- *
- * Spec: specs/navigation/navigation-v2-landing.feature
+ * Where an in-place organization switch lands. Written HERE rather than
+ * moved, for the same reason as the shell-route suite beside it: the
+ * platform test was swept before the module travelled.
  */
 
 import { describe, expect, it } from "vitest";

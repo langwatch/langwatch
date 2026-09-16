@@ -29,13 +29,10 @@ export function UiApiWaitingGate({
 }) {
   const queryClient = useQueryClient();
 
-  // The session read the shell already owns, watched rather than run. A second
-  // `useQuery` on the same key would carry its own `queryFn` and, mounting
-  // later, would be the one the cache refetched with — this gate would then be
-  // answering its own question.
-  // Filtered to the session's own entry: the cache is the whole application's,
-  // and waking this gate on every read anywhere would re-render the routed page
-  // under it once per query event.
+  // The session read the shell already owns, watched rather than run: a
+  // second `useQuery` would mount its own `queryFn` and end up being the
+  // one refetched, answering its own question. Filtered to the session's
+  // own entry, or every cache read would re-render the routed page.
   const subscribe = useCallback(
     (listener: () => void) => {
       const hash = hashKey(UI_SESSION_QUERY_KEY);

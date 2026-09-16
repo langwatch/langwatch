@@ -1,8 +1,6 @@
 /**
- * The harness reads of the local-control suite.
- *
- * These pin the pure part of the fixture. The rest of it needs a live stack,
- * so it is only ever exercised by the scenario files.
+ * The harness reads of the local-control suite: pins the pure part of the
+ * fixture. The rest needs a live stack, so only scenario files exercise it.
  */
 
 import { describe, expect, it } from "vitest";

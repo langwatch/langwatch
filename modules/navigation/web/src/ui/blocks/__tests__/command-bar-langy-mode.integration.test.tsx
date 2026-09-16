@@ -5,11 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommandBarLangyMode } from "../command-bar-langy-mode.tsx";
 
 /**
- * The mark the HOST hands over, standing in for the assistant's own.
- *
- * It carries the class the real one does, because what this suite pins is that
- * whatever the host handed is drawn in the composer — not which drawing it is.
- * The assistant's package owns the mark, and a shell package may not import it.
+ * The mark the HOST hands over, standing in for the assistant's own,
+ * which a shell package may not import: this pins that whatever the
+ * host handed is drawn, not which drawing it is.
  */
 const HOST_LANGY_MARK = <span className="langy-mark" aria-hidden />;
 

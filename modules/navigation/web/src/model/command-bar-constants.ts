@@ -1,11 +1,4 @@
 /**
- * Command Bar Constants
- *
- * Centralized configuration for the command bar feature.
- * Extracted from CommandBar.tsx for maintainability and testability.
- */
-
-/**
  * Icon color mapping for different item types.
  * Maps feature/entity keys to Chakra UI color tokens.
  */

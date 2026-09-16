@@ -57,9 +57,8 @@ function toPickItems(groups: ProjectPickGroup[]): ProjectPickItem[] {
 
 /**
  * The items the popup offers for a query, grouped for rendering and flat
- * for the collection the keyboard walks. A running search hides the
- * create entries: they match no project, and a list of results is not
- * the place to start a different action from.
+ * for the keyboard-walked collection. A running search hides the create
+ * entries, since a list of results is not the place to start elsewhere.
  */
 export function useProjectPickItems({
   groups,

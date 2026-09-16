@@ -1,7 +1,6 @@
 /**
- * `GovernanceHost` read the organization graph without checking for a refusal, so a failed
- * `organization.getAll` left the governance screens with no organization and no error — same
- * gap `TraceHost` and `OrganizationHost` had.
+ * `GovernanceHost` read the organization graph without checking for a
+ * refusal, so a failed `organization.getAll` left it with no error at all.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */

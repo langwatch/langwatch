@@ -24,9 +24,8 @@ const model = openai("gpt-5-mini");
 
 /**
  * The failing-traces flows need errored APPLICATION traces to exist: Langy
- * correctly excludes simulation/langy origins (its own runs and this suite's),
- * so on a clean project "no failed traces" is a true answer and the drill
- * scenario has nothing to drill into.
+ * correctly excludes simulation/langy origins, so a clean project's "no
+ * failed traces" is true and the drill scenario has nothing to drill into.
  */
 const FIXTURE_RUN_STAMP = String(Math.floor(Date.now() / 60_000));
 

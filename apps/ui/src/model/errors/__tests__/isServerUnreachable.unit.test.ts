@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 import { isServerUnreachable } from "../isServerUnreachable";
 
 /**
- * The one distinction the error surface makes before it reaches for the
- * registry: did anything answer? Our copy for an unrecognised failure
- * promises "we've been notified", and a request that never left the browser
- * notified nobody.
+ * The one distinction the error surface makes before the registry: did
+ * anything answer? Our copy for an unrecognised failure promises "we've
+ * been notified" — a request that never left the browser notified nobody.
  */
 describe("given a failure that never reached the server", () => {
   describe("when the browser says the fetch did not complete", () => {
@@ -74,11 +73,9 @@ describe("given no failure at all", () => {
 });
 
 /**
- * The proxy in front of a rolling deploy. Captured from haven: with the api
- * lane down, `POST /api/trpc/auth.route` answers 502 with an EMPTY body, so
- * there is no envelope to parse and the message is whatever the JSON parser
- * said. Before this, that read as a named fault and sent somebody who was
- * part-way through signing in back to a signed-out page with an apology.
+ * The proxy in front of a rolling deploy, captured from haven: an api lane
+ * down answers 502 with an EMPTY body, so there's no envelope and the
+ * message is whatever the JSON parser said.
  */
 describe("given an intermediary answering while the app is still coming up", () => {
   it.each([

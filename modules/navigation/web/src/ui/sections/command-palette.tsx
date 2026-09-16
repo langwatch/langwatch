@@ -33,10 +33,9 @@ const RESULTS_PANEL_MIN_HEIGHT = 180;
 const RESULTS_PANEL_VIEWPORT_MARGIN = 24;
 
 /**
- * Where this palette is mounted.
- *
- * `dialog` is the one Cmd+K raises over the page. `inline` is the one the
- * project home sets in the middle of the page, at hero size, always there.
+ * Where this palette is mounted: `dialog` is the one Cmd+K raises over the
+ * page; `inline` is the one project home sets mid-page, at hero size,
+ * always there.
  */
 export type CommandPaletteSurface = "dialog" | "inline";
 
@@ -58,10 +57,9 @@ export function CommandPalette({
 }: {
   surface: CommandPaletteSurface;
   /**
-   * Whether the palette is the thing the reader is using right now. The dialog
-   * passes its open state, the inline field whether it holds focus. Selection
-   * and Langy mode reset when this goes false, so the palette is never resumed
-   * halfway through something.
+   * Whether the palette is what the reader is using right now (the dialog's
+   * open state, or whether the inline field holds focus). Selection and
+   * Langy mode reset when this goes false, so nothing resumes halfway.
    */
   active: boolean;
   query: string;
@@ -82,10 +80,9 @@ export function CommandPalette({
   const host = useNavigationHost();
 
   /**
-   * The inline results panel hangs off the bottom of the ask field, so how
-   * much room it has depends entirely on where that field sits — which moves
-   * with the viewport. Measured rather than guessed at: a fixed `vh` cap that
-   * looks right on a laptop still runs off the bottom of a short window.
+   * The inline panel hangs off the ask field, so its room depends on where
+   * that field sits. Measured rather than guessed: a fixed `vh` cap that
+   * looks right on a laptop runs off a short window.
    */
   const panelRef = useRef<HTMLDivElement>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
@@ -113,10 +110,9 @@ export function CommandPalette({
   }, [inline, active]);
 
   /**
-   * The home's ask field and Langy's own panel are two ways to say the same
-   * thing, and offering both at once is the page talking over itself. While
-   * the field is in use, a minimised Langy stands down — the peek sinks away
-   * on its own close animation rather than sitting under the results.
+   * The ask field and Langy's own panel say the same thing, so offering
+   * both is the page talking over itself: a minimised Langy stands down
+   * while the field is in use, sinking away on its own close animation.
    */
   const langy = host.langy();
   const setHomeAskOpen = langy?.setHomeAskOpen;

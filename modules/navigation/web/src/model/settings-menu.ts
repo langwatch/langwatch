@@ -44,10 +44,9 @@ export interface SettingsMenuItem {
   /** Only the exact address marks the item active (group index pages). */
   isExactMatch?: boolean;
   /**
-   * Further addresses this entry answers for, matched exactly. Ops keeps
-   * a set of old addresses that redirect onto a page another entry owns,
-   * and naming them here marks the right entry while the redirect runs
-   * and tells the reachability test the address has an owner.
+   * Old addresses that now redirect onto a page another entry owns, named
+   * here so the redirect still lights the right entry and the reachability
+   * test sees an owner.
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
@@ -70,10 +69,9 @@ export function isSettingsMenuItemActive({
 
 export interface SettingsMenuGroup {
   /**
-   * Identifies the group in the collapse-state storage key, so a copy edit to
-   * `label` never drops a reader's open and closed sections. The `settings-`
-   * prefix keeps it clear of the product sidebar sections, which share that
-   * key space and already claim plain names like `ops`.
+   * Identifies the group in the collapse-state storage key, so a `label`
+   * edit never drops a reader's open/closed state. The `settings-` prefix
+   * keeps it clear of the product sidebar, which shares that key space.
    */
   id: string;
   label: string;
@@ -81,12 +79,9 @@ export interface SettingsMenuGroup {
 }
 
 /**
- * The gates every group builder reads.
- *
- * `hasPermission` takes a plain string rather than `platform/app`'s `Permission`
- * union: the union is declared in that application's server tree, which a
- * governed web package may not import, and every use below is an equality
- * check against a literal this file already spells out.
+ * The gates every group builder reads. `hasPermission` takes a plain string,
+ * not `platform/app`'s `Permission` union — that union lives in the app's
+ * server tree, which a governed web package may not import.
  */
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
@@ -266,22 +261,16 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
 }
 
 /**
- * The entry the operations attention badge sits on.
- *
- * The badge counts blocked groups and dead-lettered jobs, which is what the
- * Dashboard entry opens onto — the legacy sidebar put the same number on the
- * same link. Named here rather than matched in the renderer so the entry and
- * its badge cannot drift apart when the address moves.
+ * The entry the operations attention badge sits on (the legacy sidebar put
+ * the same badge on the same link). Named here, not matched in the
+ * renderer, so the entry and badge can't drift apart when the address moves.
  */
 export const OPS_ATTENTION_HREF = "/ops";
 
 /**
- * Every internal ops page, in one list. This is the only place the ops
- * pages are offered in the new navigation modes, so a page missing here
- * cannot be reached from the menu at all. `opsMenuReachability` pins it
- * against the route table.
- *
- * Spec: specs/navigation/ops-navigation-v2.feature
+ * Every internal ops page — the only place they're offered in the new
+ * navigation, so a page missing here can't be reached from the menu.
+ * `opsMenuReachability` pins it against the route table (ops-navigation-v2).
  */
 export function opsGroup(): SettingsMenuGroup {
   return {
@@ -300,13 +289,9 @@ export function opsGroup(): SettingsMenuGroup {
       {
         label: "Event Sourcing",
         href: "/ops/event-sourcing",
-        // Addresses this workspace owns that do not sit under its prefix.
-        // The scheduler one redirects onto the schedules section; the other
-        // three are sections of the workspace reached from its own rail —
-        // the payload store and Deja View as pages, projection replay as the
-        // drawer that address redirects to. Naming them here is what keeps
-        // this entry lit while the reader is inside the workspace, and what
-        // tells the reachability test the addresses have an owner.
+        // Addresses this workspace owns outside its own prefix. Naming them
+        // here keeps this entry lit while the reader is inside the
+        // workspace, and tells the reachability test they have an owner.
         alsoActiveAt: ["/ops/scheduler", "/ops/projections", "/ops/blobs", "/ops/dejaview"],
         icon: Workflow,
       },

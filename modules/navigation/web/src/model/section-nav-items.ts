@@ -21,10 +21,9 @@ import {
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 
 /**
- * The Gateway and Governance section navigations as data. The legacy
- * SectionNavigationLayout rails and the navigation-v2 product sidebars
- * both render from these lists, so the two presentations cannot drift.
- * Icons are component references, never JSX.
+ * The Gateway and Governance section navigations as data: both the legacy
+ * rails and navigation-v2 sidebars render from these lists, so the two
+ * presentations cannot drift. Icons are component references, never JSX.
  */
 export interface SectionNavItemData {
   label: string;

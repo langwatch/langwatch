@@ -1,10 +1,7 @@
 /**
- * The ElevenLabs Conversational AI browser client.
- *
- * This is the ONE browser module that names ElevenLabs or imports its SDK.
- * The panel speaks only of a {@link VoiceTransportClient}: it hands over a
- * signed URL and a set of handlers, and gets back a session it can hang up.
- * The key never reaches here — the server minted the signed URL.
+ * The ElevenLabs Conversational AI browser client — the ONE browser module
+ * that names ElevenLabs or imports its SDK. The key never reaches here,
+ * since the server minted the signed URL.
  */
 
 import { Conversation } from "@elevenlabs/client";

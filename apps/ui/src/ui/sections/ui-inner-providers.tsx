@@ -64,14 +64,10 @@ export function createUiInnerProvider({
               isDevelopment,
             })}
           >
-            {/* Always wrap in PostHogProvider with the module singleton —
-                `usePostHog()` initializes it from the HTML boot configuration,
-                so conditionally wrapping on that initialization changes the
-                element type at this position and React unmounts + remounts
-                the ENTIRE routed page subtree shortly after boot. That
-                remount wiped in-flight page state (#5550: /invite/accept
-                dead-ended on the loading screen). The uninitialized
-                singleton is inert when no POSTHOG_KEY is configured. */}
+            {/* Always wrap in PostHogProvider with the module singleton: conditionally
+                wrapping changes the element type here, so React unmounts and remounts
+                the ENTIRE routed page after boot, wiping in-flight state (#5550). The
+                uninitialized singleton is inert with no POSTHOG_KEY configured. */}
             <PostHogProvider client={posthog}>{children}</PostHogProvider>
           </AnalyticsProvider>
           <Toaster />

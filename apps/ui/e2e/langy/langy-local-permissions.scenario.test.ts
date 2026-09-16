@@ -1,9 +1,7 @@
 /**
- * The folder boundary and the developer's answers, with the real command
- * line enforcing both (ADR-129, specs/langy/langy-local-permissions.feature).
- * Three rules: a refused path's denial reaches the model as the tool result;
- * a denied command is not re-run in that turn; and a session-allowed pattern
- * holds across turns with no repeat ask.
+ * The folder boundary and the developer's answers, enforced by the real
+ * command line: denial reaches the model, a denied command isn't re-run,
+ * and an allowed pattern holds across turns (ADR-129, langy-local-permissions.feature).
  */
 
 import { openai } from "@ai-sdk/openai";
@@ -75,14 +73,10 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
         const seenTurns: string[] = [];
         let asksBeforeSecondRun = -1;
 
-        // The developer is already in the terminal, so the FIRST command that
-        // reaches for the project's own tool is theirs to answer there, on the
-        // default option, which is the session grant.
-        //
-        // Reserved before the run rather than beside the message that asks for
-        // the tests: the first change Langy makes already runs `uv`, the panel
-        // would grant that pattern for the session, and the later command
-        // would then raise no card at all for the terminal to answer.
+        // The developer answers the FIRST `uv` command in their terminal, on the
+        // session-grant default — reserved before the run, not beside the
+        // request, since Langy's first change already runs `uv` and would
+        // otherwise grab that session grant through the panel first.
         watcher.leaveNextPermissionToTerminal(/\buv\b/);
         /** The one ask the developer answers in their terminal. */
         const terminalAnswer: Promise<string> = terminal
@@ -95,10 +89,9 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
           });
 
         /**
-         * Put the developer's card answers in the record. The fixture answers
-         * through the panel's own mutation, which the graded conversation
-         * cannot see — without these lines a criterion about what Langy did
-         * after a grant or denial has nothing to read.
+         * Puts the developer's card answers in the record: the fixture
+         * answers through the panel's own mutation, invisible to the graded
+         * conversation, so a criterion about a grant/denial needs this.
          */
         const developerAnswers = async (executor: {
           message: (message: never) => Promise<unknown>;

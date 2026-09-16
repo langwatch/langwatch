@@ -1,10 +1,7 @@
 /**
- * The fake workbench tab's document half: reading the saved row into the store,
- * and writing it back the way the page's autosave does.
- *
- * Split out of `fake-workbench-tab.ts` so the tab's wiring stays readable; the
- * behaviour is the page's, and `fake-workbench-tab.ts` documents which parts of
- * the page are stood in for.
+ * The fake workbench tab's document half: reads the saved row into the
+ * store and writes it back the way the page's autosave does. See
+ * `fake-workbench-tab.ts` for which parts of the page this stands in for.
  */
 import { useEvaluationsV3Store } from "@langwatch/experiment-web/surfaces/workbench-store";
 import { extractPersistedState } from "@langwatch/experiment-contract";
@@ -66,11 +63,9 @@ export function createFakeTabDocument({
   };
 
   /**
-   * The page's `saveNow`, minus the debounce and the badge.
-   *
-   * Every claimed action saves before it answers, which is what `saveOrRefuse`
-   * guarantees on the real page anyway: the 1.5s autosave debounce there only
-   * covers typing.
+   * The page's `saveNow`, minus the debounce and the badge — every claimed
+   * action saves before it answers, matching what `saveOrRefuse` guarantees
+   * on the real page (the 1.5s autosave debounce there only covers typing).
    */
   const saveNow = async (): Promise<SaveOutcome> => {
     const state = useEvaluationsV3Store.getState();
@@ -116,21 +111,9 @@ export function createFakeTabDocument({
   };
 
   /**
-   * Catch up with a write that landed somewhere else, before touching anything.
-   *
-   * The real page does this through `useWorkbenchUpdateListener`: a workbench
-   * with nothing unsaved reloads silently when someone else writes, and only a
-   * page holding an unsaved edit banners instead. This tab has no broadcast to
-   * listen to, but it saves before it answers every action, so BETWEEN actions
-   * it is always the clean case, which is exactly the case that reloads.
-   *
-   * Without this, the first action the agent sent down the backend path left the
-   * tab a version behind, and it then refused every later action for the rest of
-   * the conversation. That is not what the customer's page does, and a suite
-   * that reproduced it would be measuring the stand-in rather than the leg.
-   *
-   * The refusal itself is untouched: a save refused DURING an action still
-   * refuses that action, because the tab is holding an unsaved edit right then.
+   * Catches up with a write that landed elsewhere, the way
+   * `useWorkbenchUpdateListener` does on the real page: no broadcast here,
+   * but saving before every answer keeps between-actions always clean.
    */
   const catchUpIfBehind = async (): Promise<void> => {
     if (!useEvaluationsV3Store.getState().staleWorkbench) return;

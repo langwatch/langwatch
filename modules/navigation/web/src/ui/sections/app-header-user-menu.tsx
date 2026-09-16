@@ -29,10 +29,9 @@ const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
 const NAVIGATION_MODES = Object.keys(NAVIGATION_MODE_LABELS) as NavigationMode[];
 
 /**
- * The menu's own header line: "Name (email)" where there is a name, and just
- * the email where there is not. An account with no name used to read as
- * "null (email)" or an empty leading pair of parentheses — either way,
- * furniture around the one thing that actually identifies the account.
+ * The menu's own header line: "Name (email)" where there is a name, else
+ * just the email. A nameless account used to read as "null (email)" or
+ * empty parentheses — furniture around the one identifying fact.
  */
 function accountMenuTitle(user: Pick<NavigationUser, "name" | "email">): string {
   const email = user.email ?? "";

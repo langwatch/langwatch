@@ -818,9 +818,9 @@ describe("Langy via HTTP wrapper", () => {
       try {
         expect(newOnes.length).toBeGreaterThan(0);
       } finally {
-        // A live monitor evaluates every ingested trace, and any leftover in the shared project changes what
-        // later evaluation scenarios find (they see a matching resource and correctly ask reuse-versus-create,
-        // a branch their criteria do not describe).
+        // A live monitor evaluates every ingested trace, and any leftover in the shared project
+        // changes what later evaluation scenarios find (they see a matching resource and
+        // correctly ask reuse-versus-create, a branch their criteria do not describe).
         const leftoverMonitors = (await listMonitors()).filter((m) => !beforeIds.has(m.id));
         const monitorResults = await Promise.allSettled(
           leftoverMonitors.map((m) => deleteMonitor(m.id)),

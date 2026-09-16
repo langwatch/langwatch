@@ -13,19 +13,16 @@ import { NavigationLink } from "../elements/navigation-link.tsx";
 const MENU_ITEM_HEIGHT = "32px";
 
 /**
- * The plan shape that has no per-message cap to draw a bar against.
- *
- * The wire carries the Prisma enum's own spelling; the enum itself belongs to
- * a package this one may not import.
+ * The plan shape with no per-message cap to draw a bar against. The wire
+ * carries the Prisma enum's own spelling; the enum itself belongs to a
+ * package this one may not import.
  */
 const SEAT_EVENT_PRICING = "SEAT_EVENT";
 
 /**
- * Above this, a plan is unlimited and the bar has nothing to fill.
- *
- * `@langwatch/enterprise-billing-contract`'s `UNLIMITED_MESSAGES` in the module
- * this moved from — an enterprise contract a core web package should not take a
- * dependency on to read one sentinel.
+ * Above this, a plan is unlimited and the bar has nothing to fill — pinned
+ * rather than imported from `@langwatch/enterprise-billing-contract`'s
+ * `UNLIMITED_MESSAGES`, an enterprise dependency this core package avoids.
  */
 const UNLIMITED_MESSAGES = 999_999_999;
 

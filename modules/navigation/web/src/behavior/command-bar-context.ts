@@ -8,10 +8,9 @@ interface CommandBarContextValue {
   query: string;
   setQuery: (query: string) => void;
   /**
-   * Tell the provider that this page already shows the palette in place.
-   *
-   * Where one is mounted, Cmd+K puts the caret in it rather than raising a
-   * second, identical bar over the top of it. Returns the unregister function.
+   * Tell the provider that this page already shows the palette in place:
+   * Cmd+K puts the caret in it instead of raising a second bar over the
+   * top. Returns the unregister function.
    */
   registerInlinePalette: (focus: () => void) => () => void;
 }

@@ -525,12 +525,9 @@ describe("the product-switcher top bar", () => {
 
     /** @scenario A multi-org user switches organization in place from the org-scoped switcher */
     it("switches organization in place and lands somewhere valid in the new organization", async () => {
-      // The settings detour carries no product (`activeProductId` is null
-      // there), so the shared `resolveOrgSwitchDestination` resolver falls
-      // through to the target organization's own project home rather than a
-      // product home — the same fallback every other in-place org switch
-      // uses, kept in lockstep with `resolve-org-switch-destination.unit.test.ts`
-      // rather than special-cased for settings.
+      // The settings detour carries no product (`activeProductId` is null),
+      // so the resolver falls through to the org's project home rather than
+      // a product home — kept in lockstep with resolve-org-switch-destination.unit.test.ts.
       const user = userEvent.setup();
       renderShell({ readings: { pathname: "/settings", organizations: [orgA, orgB] } });
 

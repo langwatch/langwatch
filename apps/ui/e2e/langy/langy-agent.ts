@@ -49,11 +49,9 @@ export interface LangySessionState {
    * tripped the gate must reach the stream before the gate cancels it. */
   toolCommands: string[];
   /**
-   * Every settled tool card's NAME, in order.
-   *
-   * A scenario that has to prove a tool did NOT run reads this: the negative
-   * is on no reply, and a judge asked "did it call code_access" is guessing
-   * from prose.
+   * Every settled tool card's NAME, in order — reads this to prove a tool
+   * did NOT run: the negative is no reply, and asking a judge "did it call
+   * code_access" is guessing from prose.
    */
   toolNames: string[];
   /**

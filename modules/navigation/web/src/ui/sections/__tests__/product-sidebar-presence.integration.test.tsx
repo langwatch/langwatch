@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The broadcast preference belongs to the account dropdown, not to the left
- * navigation — including on the one surface where presence is live.
- *
- * Spec: specs/traces-v2/presence-toggle-placement.feature
+ * The broadcast preference belongs to the account dropdown, not to the
+ * left navigation, including on the one surface where presence is live
+ * (presence-toggle-placement.feature).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

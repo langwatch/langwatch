@@ -45,11 +45,9 @@ describe("entityRegistry", () => {
 
 /**
  * @see specs/navigation/command-bar-agent-address.feature
- *
- * The palette used to write `?drawer.open=agentViewer` for every agent it
- * found — a drawer name that has never been in any registry and has never had
- * a component. The reader pressed enter, the address bar changed, and nothing
- * opened. These pin the three real editors and the two cases that have none.
+ * The palette used to write `?drawer.open=agentViewer`, a drawer name
+ * with no registry entry and no component — enter did nothing. Pins the
+ * three real editors and the two cases that have none.
  */
 describe("given an agent found in the command bar", () => {
   describe("when its kind has an editor", () => {

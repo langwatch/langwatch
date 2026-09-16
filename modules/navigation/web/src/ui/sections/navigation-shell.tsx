@@ -91,12 +91,9 @@ export function NavigationShell({
 }
 
 /**
- * The document's title, composed from the project and the open destination.
- *
- * `<Head><title>` in the module this moved from, which is a `next/head` shim
- * a governed web package may not import and a browser has no equivalent of.
- * The host writes it and hands back the way to put it back, so a shell that
- * unmounts leaves the title it found.
+ * The document's title, composed from the project and the open
+ * destination — moved off a `next/head` shim a governed package may not
+ * import. The host writes it and restores what a shell found on unmount.
  */
 function ShellTitle({
   pageTitle,

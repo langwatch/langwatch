@@ -196,10 +196,9 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
     ]);
 
     /**
-     * The two things we can always offer, for any string at all. They are not
-     * matches, and must never outrank one — see the ordering note in
-     * `useCommandBarItems`, which this has to mirror exactly or the running
-     * keyboard index stops agreeing with what is on screen.
+     * The two things we can always offer, for any string — not matches,
+     * and must never outrank one. Must mirror `useCommandBarItems`'s
+     * ordering, or the keyboard index disagrees with the screen.
      */
     const fallbackGroups = useMemo<GroupConfig[]>(() => {
       const groups: GroupConfig[] = [];

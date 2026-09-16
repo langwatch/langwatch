@@ -3,11 +3,9 @@ import type { NavigationProject } from "./navigation-host.ts";
 const PROJECT_PLACEHOLDER = "[project]";
 
 /**
- * Where a sidebar item points, or why it cannot point anywhere yet. A project
- * is created for most signups but not all of them, and a destination inside a
- * project has nowhere to go until there is one. Sending those items somewhere
- * else instead makes the whole rail lie about what it does, so they carry a
- * reason and stay put.
+ * Where a sidebar item points, or why it cannot point anywhere yet: a
+ * project is created for most signups but not all, and such a destination
+ * has nowhere to go until there is one — so it carries a reason and stays put.
  */
 export type ProjectScopedDestination =
   | { href: string; unavailableReason?: undefined }

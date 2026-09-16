@@ -1,8 +1,7 @@
 /**
- * Where the account dropdown offers the presence toggle.
- *
- * Presence is broadcast from the Trace Explorer and nowhere else, so the row
- * is offered there and absent everywhere else rather than shown inert.
+ * Where the account dropdown offers the presence toggle: presence is
+ * broadcast from the Trace Explorer and nowhere else, so the row is
+ * offered there and absent everywhere else rather than shown inert.
  */
 
 const TRACES_ROUTE_PATTERN = "/:project/traces";

@@ -12,10 +12,9 @@ interface CommandBarInputProps {
   onBlur?: () => void;
   placeholder?: string;
   /**
-   * `dialog` is the size the field is in the raised bar. `hero` is the size it
-   * is when the home mounts it as the thing the page is for: the same field,
-   * set larger, because a field that IS the page cannot be typeset like one
-   * row of a dropdown.
+   * `dialog` is the field's size in the raised bar; `hero` is its size when
+   * home mounts it as the page itself — set larger, since a field that IS
+   * the page cannot be typeset like a dropdown row.
    */
   size?: "dialog" | "hero";
 }

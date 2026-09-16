@@ -28,10 +28,9 @@ export interface ObservedAction {
 }
 
 /**
- * The two calls the page makes on the server for one action.
- *
- * `complete` records what the tab answered before it posts, so the record holds
- * the answer even when the completion itself fails.
+ * The two calls the page makes on the server for one action. `complete`
+ * records what the tab answered before it posts, so the record holds the
+ * answer even when the completion itself fails.
  */
 function actionTransport({
   cookie,
@@ -70,11 +69,9 @@ function actionTransport({
 }
 
 /**
- * A settled action goes on one of two lists, and an assertion reads both.
- *
- * A dropped action carries the reason it was not run, because "the tab did
- * nothing" otherwise reads the same as "the tab never saw the action", and the
- * two are different failures.
+ * A settled action goes on one of two lists. A dropped one carries the
+ * reason it wasn't run — "the tab did nothing" otherwise reads the same
+ * as "the tab never saw it", and those are different failures.
  */
 function fileOutcome({
   record,

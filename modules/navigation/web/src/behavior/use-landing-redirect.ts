@@ -20,12 +20,9 @@ interface ResolvedHome {
 }
 
 /**
- * The home-resolver query, flattened so the pickers read plain values.
- *
- * The procedure answers `PersonaResolution` with every field set, so the
- * only absent value is `undefined` while the query is still pending. The
- * parameter says exactly that: an answer means the fields are there, and
- * `isReady` therefore means resolved, never "resolved to nothing".
+ * The home-resolver query, flattened so the pickers read plain values: the
+ * procedure sets every field once it answers, so `isReady` means resolved,
+ * never "resolved to nothing".
  */
 function toResolvedHome(query: {
   data:
@@ -65,10 +62,9 @@ interface LandingInput {
 }
 
 /**
- * Where `/` goes. The per-organization product memory outranks the
- * server resolver, which is the deliberate ADR-038 deviation. Falls
- * through to the safety nets. Null means nothing has an answer yet, so
- * the page stays on the loading screen.
+ * Where `/` goes: per-organization product memory outranks the server
+ * resolver (the deliberate ADR-038 deviation), falling through to the
+ * safety nets. Null means nothing has an answer yet — stay on loading.
  */
 function landingDestination(input: LandingInput): string | null {
   return productLandingDestination(input) ?? fallbackDestination(input);

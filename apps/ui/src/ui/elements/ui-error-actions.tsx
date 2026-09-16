@@ -72,14 +72,9 @@ export function UiErrorActions({ docsUrl, traceId }: UiErrorActionsProps) {
           <ExternalLinkIcon width={10} height={10} />
         </Link>
       )}
-      {/*
-        No clipboard API — an insecure origin (a self-hosted instance on plain
-        http), or a browser that withholds it. The id is the only handle a
-        customer has to give support, so it is shown as text rather than
-        withheld along with the button that would have copied it. `hasFailed`
-        is the same predicament arrived at the other way: the API exists, so
-        the button rendered, but the write was refused.
-      */}
+      {/* No clipboard API (insecure origin, or a browser that withholds it) means
+          the id is shown as text instead of hidden behind a copy button. `hasFailed`
+          is the same case reached differently: the API exists but the write failed. */}
       {traceId && (!canCopy || hasFailed) && (
         <chakra.span userSelect="all">Error ID: {traceId}</chakra.span>
       )}

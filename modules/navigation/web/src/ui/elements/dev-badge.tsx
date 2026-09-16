@@ -1,11 +1,9 @@
 import { Text } from "@chakra-ui/react";
 
 /**
- * The DEV pill in the top bar of a development build.
- *
- * Shared by the legacy chrome and the navigation-v2 shells. Both draw the
- * same top bar while the two modes ship together, so a style change here
- * must reach both at once rather than leaving one of them behind.
+ * The DEV pill in the top bar of a development build, shared by the
+ * legacy chrome and navigation-v2 shells: both draw the same top bar
+ * while the two modes ship together, so a style change must reach both.
  */
 export function DevBadge() {
   return (

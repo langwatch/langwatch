@@ -50,12 +50,9 @@ function MeScopeChip() {
 const PROJECT_SEARCH_THRESHOLD = 8;
 
 /**
- * The LLM Ops scope: the current project as a chip, opening a menu with
- * the organization's projects (and a per-team create entry where the
- * user can create one). Organization choice lives in its own control,
- * so this menu stays within the current organization. Past
- * PROJECT_SEARCH_THRESHOLD projects the menu becomes a combobox that
- * opens with a focused search field.
+ * The LLM Ops scope: the current project as a chip, opening a menu of the
+ * organization's projects (plus a per-team create entry). Organization
+ * choice lives in its own control, so this menu stays within the current one.
  */
 function ProjectScopeMenu() {
   const host = useNavigationHost();
@@ -153,12 +150,9 @@ function ProjectMenu({
 }
 
 /**
- * The product-native scope in the product-switcher top bar: LLM Ops
- * shows the project chip, Me shows the user with a Personal badge, and
- * the organization-wide products (Gateway, Governance) show nothing,
- * because the organization control already says it all.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * The product-native scope in the top bar: LLM Ops shows the project chip,
+ * Me shows a Personal badge, and organization-wide products (Gateway,
+ * Governance) show nothing — the organization control already says it all.
  */
 export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
   // Each scope renders its own leading divider, so a scope that has

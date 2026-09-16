@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
  * The recency rule behind the project's coding-agent destinations.
- *
  * @see specs/coding-agent/project-menu-links.feature
  */
 import { describe, expect, it } from "vitest";

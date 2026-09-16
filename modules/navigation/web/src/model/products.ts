@@ -85,19 +85,17 @@ export function isOrganizationScopedProduct(id: ProductId | null): boolean {
 
 /**
  * Whether an address is a top-level base or sits under it, matched on the
- * segment boundary. A plain `startsWith` would read a project named
- * "metadata" as the Me product and "settings-team" as Settings, because a
- * project slug is a top-level address and those names are not reserved.
+ * segment boundary — a plain `startsWith` would read a project slug like
+ * "metadata" as the Me product, since slugs aren't reserved names.
  */
 export function isPathUnder({ pathname, base }: { pathname: string; base: string }): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
 /**
- * Which product a browser address belongs to, or null for everything that
- * is not a product page (settings, ops, auth, onboarding, the root).
- * Landing memory writes through this, so a null keeps the previous
- * product remembered; visiting Settings never becomes "where I was".
+ * Which product a browser address belongs to, or null for a non-product
+ * page (settings, ops, auth, onboarding, root). Landing memory writes
+ * through this, so a null keeps the previous product remembered.
  */
 export function productFromPathname(pathname: string): ProductId | null {
   if (isPathUnder({ pathname, base: "/me" })) return "me";

@@ -1,8 +1,7 @@
 /**
- * The other half of the code access card: the developer picks GitHub and asks
- * to be remembered, so the next conversation never sees the card again, and
- * clearing the choice brings it back (ADR-129). No command line runs here,
- * because GitHub is the path that needs none.
+ * The other half of the code access card: picking GitHub and asking to be
+ * remembered means the next conversation never sees the card again
+ * (ADR-129); clearing the choice brings it back. No command line runs here.
  */
 
 import { openai } from "@ai-sdk/openai";

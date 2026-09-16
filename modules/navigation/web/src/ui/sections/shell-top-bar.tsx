@@ -23,10 +23,9 @@ interface ShellTopBarProps {
 }
 
 /**
- * The navigation-v2 top bar: the organization and the product-native
- * scope on the left, the account controls on the right. In
- * "product-switcher" the logo and the product dropdown lead the left
- * side; in "icon-rail" the rail carries them and they are hidden here.
+ * The navigation-v2 top bar: organization and product-native scope on
+ * the left, account controls on the right. In "product-switcher" the
+ * logo and dropdown lead; in "icon-rail" the rail carries them instead.
  */
 export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProps) {
   const { user, activeProductId, isDevelopment } = state;

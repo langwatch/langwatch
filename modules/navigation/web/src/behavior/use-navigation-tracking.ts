@@ -6,11 +6,8 @@ import { productFromPathname } from "../model/products.ts";
 
 /**
  * The navigation write points, mounted once in InnerProviders: keep the
- * per-organization product memory current, and capture the page the
- * user left when entering Settings so its back entry can return there.
- *
- * Specs: specs/navigation/navigation-v2-product-memory.feature
- *        specs/navigation/navigation-v2-landing.feature
+ * per-organization product memory current, and capture the page left
+ * when entering Settings so its back entry can return there.
  */
 export function useNavigationTracking(): void {
   const host = useNavigationHost();

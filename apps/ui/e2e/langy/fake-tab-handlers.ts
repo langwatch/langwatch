@@ -1,10 +1,7 @@
 /**
- * The fake workbench tab's handler table: one entry per workbench action, built
- * from the same manifest the page builds from.
- *
- * Every transform-backed action goes through the manifest rather than being
- * listed here, so an action added to the manifest is answered by this tab too.
- * The three that are not plain transforms state themselves.
+ * The fake workbench tab's handler table, built from the same manifest
+ * the page uses: a transform-backed action goes through the manifest, not
+ * listed here, so a new manifest action is answered too.
  */
 
 import {

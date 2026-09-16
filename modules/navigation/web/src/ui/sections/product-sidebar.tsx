@@ -39,9 +39,8 @@ export type SidebarSurface = ProductId | "settings";
 
 /**
  * Quick Search as the first sidebar entry in the navigation-v2 shells,
- * opening the same command bar the header trigger and Cmd+K open.
- *
- * Spec: specs/navigation/product-sidebars.feature
+ * opening the same command bar the header trigger and Cmd+K open
+ * (product-sidebars.feature).
  */
 function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
   const commandBar = useNavigationHost().commandBar();
@@ -77,10 +76,9 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 }
 
 /**
- * The pinned utility block at the bottom of every navigation-v2 sidebar:
- * usage, Settings, Support (with the human chat folded in) and the theme
- * control. The Settings sidebar drops its own entry, since the back
- * entry above already frames it.
+ * The pinned utility block at the bottom of every sidebar: usage, Settings,
+ * Support and the theme control. The Settings sidebar drops its own entry
+ * since the back entry above already frames it.
  */
 function SidebarBottomBlock({
   showExpanded,
@@ -125,10 +123,7 @@ function SidebarBottomBlock({
 
 /**
  * The way out of Settings: back to the page the user came from in this
- * tab, else the remembered product's home. First entry of the Settings
- * sidebar.
- *
- * Spec: specs/navigation/settings-shell-v2.feature
+ * tab, else the remembered product's home (settings-shell-v2.feature).
  */
 function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   const organization = useNavigationHost().organization();
@@ -215,8 +210,6 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
 /**
  * The Gateway and Governance sidebar bodies: the same registry data the
  * legacy section rails render, promoted to first-class sidebar entries.
- * Ungrouped entries list flat first; each `group` then lists under its own
- * collapsible label, in the order the groups first appear in the data.
  */
 function SectionItemsNav({
   items,
@@ -290,11 +283,9 @@ function ProductSidebarBody({
 }
 
 /**
- * Everything inside the sidebar column: the way back on Settings, Quick
- * Search, the surface's own pages, and the bottom block pinned under
- * them. Laid out at the expanded width whatever the column is showing,
- * so a collapsing column slides the same content out of view instead of
- * reflowing it. The mobile menu reuses it at the full viewport width.
+ * Everything inside the sidebar column, laid out at the expanded width
+ * whatever the column shows, so collapsing slides it out of view instead
+ * of reflowing it. The mobile menu reuses it at full viewport width.
  */
 export function SidebarContent({
   surface,
@@ -328,14 +319,9 @@ export function SidebarContent({
         </Box>
       )}
 
-      {/* The scroll region spans the full column and carries the
-          horizontal inset itself, so its scrollbar runs against the
-          content panel instead of floating a padding away from it.
-
-          Its edges meet the rules above and below it, so the entries are
-          cut exactly at a line rather than a few pixels before it. The
-          space that holds them off those lines is padding in here, which
-          the entries travel through as the menu moves. */}
+      {/* Padding lives on this region, not its children, so the scrollbar
+          runs against the content panel and entries are cut exactly at
+          the rules above and below rather than a few pixels short. */}
       <VStack
         ref={scrollRegionRef}
         data-testid="sidebar-scroll-region"

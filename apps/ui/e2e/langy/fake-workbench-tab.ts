@@ -37,11 +37,9 @@ export interface FakeWorkbenchTab {
 }
 
 /**
- * The store is a module singleton, so there is one tab per process.
- *
- * `isOpening` is claimed before the first `await` of `openFakeWorkbenchTab`:
- * `openTab` itself is only set at the end, so two overlapping opens would both
- * pass a check made on it alone and both attach to the same board.
+ * The store is a module singleton: one tab per process. `isOpening` is
+ * claimed before the first `await`, since `openTab` itself is only set at
+ * the end — two overlapping opens would both pass a check on it alone.
  */
 let openTab: FakeWorkbenchTab | null = null;
 let isOpening = false;
@@ -101,12 +99,9 @@ async function open({
   };
 
   /**
-   * Start a run and answer with its id, never with its result — the page's own
-   * helper, so the id budget and the settle rule are the page's too.
-   *
-   * The drain is tracked rather than returned: the tab keeps draining after the
-   * action is answered, which is what makes the run visible to the assertions
-   * while `workbench.run` stays inside its 30 second dispatch budget.
+   * Starts a run and answers with its id, never its result: tracked rather
+   * than returned, since the tab keeps draining after the action answers,
+   * keeping `workbench.run` inside its 30-second dispatch budget.
    */
   const startRun = (scope: ExecutionScope): Promise<string | undefined> =>
     startAndIdentifyRun({

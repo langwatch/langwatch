@@ -9,11 +9,9 @@ import {
 } from "@langwatch/design-system/popover";
 
 /**
- * Flags a feature as legacy with an inline, dismissable explanation so we
- * can steer users toward the replacement without a hard cutover. The
- * popover (rather than a tooltip) lets the message carry links to the new
- * surface, and the open-on-hover/focus/click behaviour keeps it reachable
- * by both pointer and keyboard.
+ * Flags a feature as legacy with an inline, dismissable explanation, so
+ * we can steer toward the replacement without a hard cutover. A popover,
+ * not a tooltip, so the message can carry links to the new surface.
  */
 export function LegacyPill({
   children,

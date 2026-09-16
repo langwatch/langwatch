@@ -76,10 +76,9 @@ interface CodingAgentLinks {
 }
 
 /**
- * Coding-agent destinations are grown by the project rather than configured.
- * Each one needs its own recent signal, so a project that records sessions but
- * has no pull request linked yet gets Sessions alone, and both go away again
- * once their signal falls out of the window.
+ * Coding-agent destinations are grown by the project, not configured:
+ * each needs its own recent signal, so sessions-only or PR-only both
+ * appear alone, and each fades once its signal falls out of the window.
  */
 function useCodingAgentLinks(): CodingAgentLinks {
   const host = useNavigationHost();

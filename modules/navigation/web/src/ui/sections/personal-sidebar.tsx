@@ -23,10 +23,9 @@ import { isPathUnder } from "../../model/products.ts";
 import { SideMenuLink } from "../blocks/side-menu-link.tsx";
 
 /**
- * The advanced features a reader turned on in their personal workspace.
- *
- * Default-empty storage means an existing reader sees Traces only; the bundle
- * checkbox in `/me/configure` flips them on with one atomic write.
+ * The advanced features a reader turned on in their personal workspace:
+ * default-empty storage means an existing reader sees Traces only, until
+ * the bundle checkbox in `/me/configure` flips them on atomically.
  */
 interface PersonalWorkspaceFeatures {
   evaluations?: boolean;

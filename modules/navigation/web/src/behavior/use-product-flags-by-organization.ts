@@ -2,20 +2,16 @@ import { navigationApi } from "./navigation-api.ts";
 import type { ProductId } from "../model/products.ts";
 
 /**
- * How long a flag answer is trusted before it is asked again.
- *
- * `platform/app`'s `useFeatureFlag` exported this and the hook read it from
- * there; five minutes, restated here because that module no longer exists.
+ * How long a flag answer is trusted before it is asked again: 5 minutes,
+ * restated here because `platform/app`'s `useFeatureFlag` (which used to
+ * export it) no longer exists.
  */
 const CLIENT_FLAG_STALE_TIME_MS = 5 * 60_000;
 
 /**
- * Product reachability per organization. The organization switch needs the
- * TARGET organization's reachable products, and these flags are the only
- * per-organization gates resolvable from the top bar (permissions stay
- * page-enforced). Returns a lookup for one organization id.
- *
- * Spec: specs/navigation/product-switcher-navigation.feature
+ * Product reachability per organization: the org switch needs the TARGET
+ * org's reachable products — the only per-org gates resolvable from the
+ * top bar (permissions stay page-enforced; product-switcher-navigation.feature).
  */
 export function useProductFlagsByOrganization({
   organizationIds,

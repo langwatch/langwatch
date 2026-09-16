@@ -1,9 +1,7 @@
 /**
- * Whether this application serves the Prompt Studio playground chat.
- *
- * It does: the API process mounts the prompt playground's execution door
- * (`POST /api/prompt-playground/<version>/prompt.execute`), which is what the
- * Conversation tab posts to.
+ * Whether this application serves the Prompt Studio playground chat: yes
+ * — the API mounts the execution door the Conversation tab posts to
+ * (`POST /api/prompt-playground/<version>/prompt.execute`).
  */
 
 import type { PromptPlaygroundChatAvailability } from "@langwatch/prompt-web/prompt-studio";

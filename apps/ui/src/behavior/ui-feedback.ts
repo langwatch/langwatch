@@ -68,12 +68,10 @@ export function resolveUiFailureCopy({
   title,
   description,
 }: UiFailureNotice): ResolvedUiFailureCopy {
-  // NOTHING ANSWERED, so there is no code to look up and no trace id to offer.
-  // Deliberately AHEAD of the registry, which is what its own doc comment asks
-  // for: the registry answers "which refusal was this", and this answers the
-  // prior question of whether we were refused at all. `isServerUnreachable` is
-  // conservative by construction — anything carrying a status or a code counts
-  // as an answer — so a named refusal can never be repainted as this.
+  // NOTHING ANSWERED: deliberately AHEAD of the registry, which answers "which
+  // refusal was this" — this answers whether we were refused at all.
+  // `isServerUnreachable` is conservative by construction, so a named refusal
+  // can never be repainted as this.
   if (isServerUnreachable(error)) {
     return {
       title: SERVER_UNREACHABLE_COPY.title,

@@ -29,11 +29,9 @@ type ReadRefusal = {
 };
 
 /**
- * Whether this failed read means nothing answered, rather than something
- * answering with a refusal. A thrown error is the browser's own (fetch
- * never completed); an error object is unreachable only when its status is
- * a gateway's own and it carries no error code, since a code means
- * something named the cause and was reached.
+ * Whether this failed read means nothing answered, not a refusal. A
+ * thrown error is the browser's own; an error object is unreachable only
+ * with a gateway status and no error code — a code means something was reached.
  */
 export function isUiApiUnreachable(error: unknown): boolean {
   if (error === null || error === void 0) return false;
@@ -73,10 +71,9 @@ const probeUiApiHealth: HealthProbe = async (path) => {
 };
 
 /**
- * Polls the API's health route while the shell is waiting, and reports the one
- * moment that matters: the API answered. The caller re-runs the session read;
- * nothing here reloads the document, because a reload would lose the address
- * the reader asked for.
+ * Polls the API's health route while the shell waits, reporting the one
+ * moment that matters: the API answered. The caller re-runs the session
+ * read; nothing here reloads, since that would lose the requested address.
  */
 export function useUiApiWait({
   waiting,

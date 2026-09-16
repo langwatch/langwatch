@@ -38,11 +38,9 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
 }
 
 /**
- * Where a search hit on an agent goes.
- *
- * With no editor for its kind — and from the id-paste path, which carries no
- * kind at all — the agents list is the honest destination: the reader lands
- * where every agent is, rather than on an address that opens nothing.
+ * Where a search hit on an agent goes: with no editor for its kind, or from
+ * the id-paste path which carries no kind at all, the agents list is the
+ * honest destination rather than an address that opens nothing.
  */
 export function agentPath({
   projectSlug,
@@ -76,12 +74,8 @@ export interface EntityConfig {
 }
 
 /**
- * Registry of entity types for ID-based navigation.
- * Centralizes entity configuration to avoid hardcoding throughout the codebase.
- *
- * To add a new entity type:
- * 1. Add a new EntityConfig to this array
- * 2. Update SearchResult["type"] in types.ts if needed
+ * Registry of entity types for ID-based navigation — add a new
+ * `EntityConfig` here (and update `SearchResult["type"]` if needed).
  */
 export const entityRegistry: EntityConfig[] = [
   {

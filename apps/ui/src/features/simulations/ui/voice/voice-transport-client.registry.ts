@@ -1,9 +1,7 @@
 /**
- * Browser registry of voice transports: one client per transport, so the panel
- * never imports a vendor symbol. A later transport (phone) is a new entry here.
- *
- * The mirror of the server's `voice-transport.registry.ts`: the server mints
- * the signed URL, the client opens the call from it.
+ * Browser registry of voice transports: one client per transport, so the
+ * panel never imports a vendor symbol. Mirrors the server's
+ * `voice-transport.registry.ts`, which mints the signed URL this opens.
  */
 
 import type { VoiceTransport } from "@langwatch/scenario-contract";
@@ -39,10 +37,9 @@ export interface VoiceTransportClient {
 }
 
 /**
- * Not every transport has a browser client: a phone target is dialled from the
- * voice worker, not the browser, so it has no "Talk to it" client at all. The
- * registry is a partial map, and {@link getVoiceTransportClient} returns
- * `undefined` for a transport with no browser call.
+ * Not every transport has a browser client: a phone target is dialled from
+ * the voice worker, not the browser. The registry is a partial map;
+ * {@link getVoiceTransportClient} returns `undefined` for such a transport.
  */
 export const voiceTransportClientRegistry: Partial<
   Record<VoiceTransport, VoiceTransportClient>

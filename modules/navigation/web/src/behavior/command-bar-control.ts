@@ -17,12 +17,9 @@ export function registerCommandBarControl(control: CommandBarControl): () => voi
 }
 
 /**
- * Opens the palette, if this document has one.
- *
- * A no-op when nothing is mounted rather than a throw: the sidebar's Quick
- * Search row is drawn from the host's answer, and a host that answers with a
- * palette it has not mounted yet is a race, not a bug worth crashing a chrome
- * over.
+ * Opens the palette, if this document has one: a no-op when nothing is
+ * mounted, since a host answering with a palette it hasn't mounted yet is
+ * a race, not a bug worth crashing a chrome over.
  */
 export function openCommandBar(): void {
   mounted?.open();

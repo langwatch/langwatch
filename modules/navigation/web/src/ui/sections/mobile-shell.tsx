@@ -83,11 +83,9 @@ export function MobileShell({
 }
 
 /**
- * The compact bar: logo, product, the product's own scope, and the menu
- * button. LLM Ops keeps the organization out of the bar so the project
- * chip has the room; the organization-wide products carry the
- * organization control instead. The same bar heads the overlay, where
- * the button becomes the way to close it.
+ * The compact bar: logo, product, scope, and the menu button. LLM Ops
+ * keeps the organization out for room; other products carry it instead.
+ * Heads the overlay too, where the button closes it.
  */
 function MobileTopBar({
   activeProductId,
@@ -146,11 +144,9 @@ function MobileTopBar({
 }
 
 /**
- * The full-screen menu: the same bar on top with the close button, the
- * organization and the product scope side by side under it (so a
- * multi-organization user can switch both from here), then the
- * product's pages and the pinned bottom block the desktop sidebar
- * carries.
+ * The full-screen menu: the top bar with a close button, org and product
+ * scope side by side (so a multi-org user can switch both here), then the
+ * product's pages and the desktop sidebar's pinned bottom block.
  */
 function MobileMenuOverlay({
   state,
