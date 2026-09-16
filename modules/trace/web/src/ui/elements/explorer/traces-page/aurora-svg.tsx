@@ -161,7 +161,7 @@ export const AuroraSvg: React.FC<AuroraSvgProps> = ({ idSuffix = "" }) => (
       }
       /*
        * Aurora curtain blend mode is theme-conditional. "screen" adds light
-       * over dark — perfect on dark backgrounds, but on a light background
+       * over dark: perfect on dark backgrounds, but on a light background
        * it washes the curtains out to invisible white. Default to "multiply"
        * so the cyan/blue curtains tint the light surface; switch to
        * "screen" only when html.dark is set (Chakra v3's class-based

@@ -933,7 +933,7 @@ const MarkdownConversationView: React.FC<{
         flexShrink={0}
       >
         <Text textStyle="xs" color="fg.muted">
-          Rendered for reading — Copy gives you the raw markdown source.
+          Rendered for reading: Copy gives you the raw markdown source.
         </Text>
         <Box flex={1} />
         <Button size="xs" variant="outline" colorPalette="blue" onClick={handleCopy}>

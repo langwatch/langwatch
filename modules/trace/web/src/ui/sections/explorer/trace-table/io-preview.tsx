@@ -436,7 +436,7 @@ const CompactMissingRow: React.FC<{
       color="fg.subtle"
       fontStyle="italic"
     >
-      — no {direction} recorded
+      No {direction} recorded
     </Text>
   </HStack>
 );
@@ -583,7 +583,7 @@ const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ di
       color="fg.subtle"
       fontStyle="italic"
     >
-      — no {direction} recorded
+      No {direction} recorded
     </Text>
   </HStack>
 );

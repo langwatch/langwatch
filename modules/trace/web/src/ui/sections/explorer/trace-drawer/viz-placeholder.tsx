@@ -119,7 +119,7 @@ const TABS: VizTabDef[] = [
     shortcut: "1",
     palette: "blue",
     description:
-      "Spans laid out by start time with parent/child indentation — best for tracing causality top-down.",
+      "Spans laid out by start time with parent/child indentation: best for tracing causality top-down.",
   },
   {
     value: "flame",
@@ -128,7 +128,7 @@ const TABS: VizTabDef[] = [
     shortcut: "2",
     palette: "orange",
     description:
-      "Spans laid out by depth with width proportional to duration — best for spotting hot paths and time-skewed children.",
+      "Spans laid out by depth with width proportional to duration: best for spotting hot paths and time-skewed children.",
   },
   {
     value: "topology",
@@ -137,7 +137,7 @@ const TABS: VizTabDef[] = [
     shortcut: "3",
     palette: "purple",
     description:
-      "Service/agent graph showing what calls what — best for understanding system structure at a glance.",
+      "Service/agent graph showing what calls what: best for understanding system structure at a glance.",
   },
   {
     value: "sequence",
@@ -146,7 +146,7 @@ const TABS: VizTabDef[] = [
     shortcut: "4",
     palette: "teal",
     description:
-      "Chat-style turn order between actors — best for replaying multi-agent conversations.",
+      "Chat-style turn order between actors: best for replaying multi-agent conversations.",
   },
 ];
 

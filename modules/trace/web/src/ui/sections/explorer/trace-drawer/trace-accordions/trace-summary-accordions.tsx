@@ -323,7 +323,7 @@ function MissingIORow({
         {label}
       </Text>
       <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
-        — no {mode} recorded
+        No {mode} recorded
       </Text>
     </HStack>
   );

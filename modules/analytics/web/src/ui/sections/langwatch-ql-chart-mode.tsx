@@ -178,7 +178,7 @@ function PolicyAcceptsReference() {
           <Text as="span" fontFamily="mono" fontSize="11px" color="fg">
             query_result
           </Text>{" "}
-          — the rows the query returned.
+          , the rows the query returned.
         </Text>
         <Text>
           Every mark except{" "}
@@ -187,7 +187,7 @@ function PolicyAcceptsReference() {
           </Text>
           , which loads remote resources.
         </Text>
-        <Text>Reviewed transforms — {ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.</Text>
+        <Text>Reviewed transforms: {ALLOWED_VEGA_LITE_TRANSFORMS.join(", ")}.</Text>
         <Text>
           Expressions over{" "}
           <Text as="span" fontFamily="mono" fontSize="11px" color="fg">
@@ -376,7 +376,7 @@ function SpecificationView({
             Chart specification
           </Text>
           <Text fontSize="10.5px" color="fg.subtle">
-            Vega-Lite v6 · the example follows each new result until you edit — your edits are never
+            Vega-Lite v6 · the example follows each new result until you edit: your edits are never
             overwritten
           </Text>
           <Box flex="1" />

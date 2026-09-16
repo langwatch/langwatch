@@ -146,7 +146,7 @@ function ViolationList({ failure }: { failure: LangWatchQLFailure }) {
 function StaleNotice({ onRun }: { onRun: () => void }) {
   return (
     <Text fontSize="12.5px" color="fg.muted" data-testid="lwql-stale-notice" role="status">
-      The statement changed after this ran —{" "}
+      The statement changed after this ran:{" "}
       <Button
         variant="plain"
         size="xs"
@@ -187,7 +187,7 @@ function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
       </Text>
       <Text fontSize="12px" color="fg.muted" lineHeight="1.5">
         Showing the first {formatNumber(result.statistics.rowsReturned)} rows. The rest of the
-        answer did not fit in the response — aggregate or narrow the query to see it.
+        answer did not fit in the response. Aggregate or narrow the query to see it.
       </Text>
     </HStack>
   );
@@ -204,7 +204,7 @@ function EmptyState({ onInsertExample }: { onInsertExample?: () => void }) {
         Nothing has run yet
       </Text>
       <Text fontSize="12.5px" color="fg.muted" lineHeight="1.6" maxWidth="420px">
-        The LangWatchQL datasets on the left are ready — open one to see what a row means and what
+        The LangWatchQL datasets on the left are ready. Open one to see what a row means and what
         you can select. Nothing runs until you press <strong>Run query</strong>.
       </Text>
       {onInsertExample && (

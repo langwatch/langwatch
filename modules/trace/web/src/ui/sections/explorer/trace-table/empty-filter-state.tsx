@@ -37,9 +37,9 @@ function emptyContent({
 }): EmptyContent {
   if (activeLensId === "errors") {
     return {
-      title: "No errors here — lucky you",
+      title: "No errors here, lucky you",
       description:
-        "Not a single failure in this window. Either your stack is having a flawless day, or nothing's actually reporting errors yet — worth a glance at your integration to be sure it's wired up.",
+        "Not a single failure in this window. Either your stack is having a flawless day, or nothing's actually reporting errors yet, worth a glance at your integration to be sure it's wired up.",
     };
   }
   if (activeLensId === "conversations") {
@@ -76,7 +76,7 @@ function emptyContent({
   return {
     title: "Nothing in this range",
     description:
-      "Try a wider time window, or expand your query — your traces might just be outside this view.",
+      "Try a wider time window, or expand your query. Your traces might just be outside this view.",
   };
 }
 

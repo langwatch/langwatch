@@ -789,7 +789,7 @@ function askAffordance({
   return {
     askAiNeedsProviderPrimer: !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders,
     askAiSampleDisabledReason: isSamplePreview
-      ? `${askLabel} works on your real traces — not on the sample data.`
+      ? `${askLabel} works on your real traces, not on the sample data.`
       : undefined,
     askLabel,
   };

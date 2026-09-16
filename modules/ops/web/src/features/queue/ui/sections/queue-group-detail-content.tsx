@@ -176,7 +176,7 @@ export function GroupDetailContent({
   if (!detail) {
     return (
       <Text textStyle="sm" color="fg.muted" data-testid="group-detail-missing">
-        This group no longer exists — its jobs completed and it was cleaned up, or it was drained.
+        This group no longer exists. Its jobs completed and it was cleaned up, or it was drained.
         The table refreshes every few seconds, so a finished group can linger there briefly.
       </Text>
     );

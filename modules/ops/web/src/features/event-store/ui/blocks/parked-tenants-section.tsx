@@ -38,7 +38,7 @@ export function ParkedTenantsSection({
         </HStack>
         <Text textStyle="xs" color="fg.muted" marginTop={1}>
           These tenants are at their in-flight capacity limit. Their work is waiting its turn so
-          other tenants keep moving — nothing has failed.
+          other tenants keep moving. Nothing has failed.
         </Text>
       </Box>
       <Table.ScrollArea>

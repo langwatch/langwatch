@@ -44,7 +44,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     return (
       <Box paddingX={2} paddingY={3}>
         <Text textStyle="xs" color="fg.muted">
-          Span carries prompt metadata but no parseable handle or variables — likely an incomplete
+          Span carries prompt metadata but no parseable handle or variables, likely an incomplete
           SDK emit.
         </Text>
       </Box>

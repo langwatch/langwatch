@@ -93,7 +93,7 @@ export function KeyboardShortcutsHelp({
                 Keyboard Shortcuts
               </Heading>
               <Text textStyle="xs" color="fg.muted">
-                Press any key — watch it light up below.
+                Press any key. Watch it light up below.
               </Text>
             </VStack>
           </HStack>

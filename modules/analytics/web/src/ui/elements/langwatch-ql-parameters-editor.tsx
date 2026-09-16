@@ -339,7 +339,7 @@ export function LangWatchQLParametersEditor({
 
       <ParameterAlert title="Give these parameters a value" names={missingParameters} />
       <ParameterAlert
-        title="Remove these — the time window above sets them"
+        title="Remove these: the time window above sets them"
         names={reservedParameters}
       />
 

@@ -205,8 +205,8 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({ trigger }
               </Text>
             </HStack>
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              Ask AI uses your own model provider keys to translate plain English into trace queries
-              — &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow checkout traces with eval
+              Ask AI uses your own model provider keys to translate plain English into trace queries:
+              &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow checkout traces with eval
               scores under 0.5&rdquo;. Add a provider to unlock it.
             </Text>
             <NextLink href="/settings/model-providers" style={{ display: "block" }}>

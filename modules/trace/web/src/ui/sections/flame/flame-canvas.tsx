@@ -256,7 +256,7 @@ export function FlameCanvas({
         {hiddenSpanCount > 0 && (
           <Flex justify="center" paddingY={1}>
             <Text textStyle="xs" color="fg.subtle">
-              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to display — zoom
+              {hiddenSpanCount} span{hiddenSpanCount !== 1 ? "s" : ""} too small to display: zoom
               in to see
             </Text>
           </Flex>

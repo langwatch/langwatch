@@ -244,7 +244,7 @@ const DisabledRangeVisual: React.FC<{
   onClear: () => void;
 }> = ({ value, format, isActive, onClear }) => (
   <VStack align="stretch" gap={1.5}>
-    <Tooltip content="Can't change the range — every trace shares this value.">
+    <Tooltip content="Can't change the range: every trace shares this value.">
       <Box
         position="relative"
         height="20px"

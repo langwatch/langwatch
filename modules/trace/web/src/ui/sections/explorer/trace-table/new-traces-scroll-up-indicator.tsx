@@ -76,8 +76,8 @@ export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProp
 
   const ariaLabel =
     liveUpdatesMode === "ask"
-      ? `${count} new trace${count === 1 ? "" : "s"} buffered — click to load`
-      : `${count} new trace${count === 1 ? "" : "s"} above — scroll up`;
+      ? `${count} new trace${count === 1 ? "" : "s"} buffered: click to load`
+      : `${count} new trace${count === 1 ? "" : "s"} above: scroll up`;
 
   return (
     <Box

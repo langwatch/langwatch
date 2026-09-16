@@ -367,7 +367,7 @@ function ProjectEditDrawer({
               </Field.Root>
               <SectionHeading>Project S3</SectionHeading>
               <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them back. Leave blank to
+                Credentials below are write-only. The server never reads them back. Leave blank to
                 keep the stored value; type to replace.
               </Text>
               <Field.Root>

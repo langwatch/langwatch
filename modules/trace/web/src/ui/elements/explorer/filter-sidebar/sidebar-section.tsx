@@ -151,7 +151,7 @@ const SidebarSectionInner: React.FC<SidebarSectionProps> = ({
               width={DRAG_HANDLE_HIT_AREA}
               height={DRAG_HANDLE_HIT_AREA}
               flexShrink={0}
-              aria-label={`Reorder ${title} — press Space to pick up, then arrow keys`}
+              aria-label={`Reorder ${title}: press Space to pick up, then arrow keys`}
               title="Drag, or press Space to pick up with the keyboard"
               onClick={(e) => e.stopPropagation()}
             >

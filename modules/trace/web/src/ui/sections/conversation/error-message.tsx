@@ -44,7 +44,7 @@ function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
     case "rate_limit":
       return "The model provider is rate-limiting this project, or the account behind it has no allowance left.";
     case "bad_request":
-      return "The model provider rejected the request — usually a parameter this model doesn't support, or a conversation past its context limit.";
+      return "The model provider rejected the request, usually a parameter this model doesn't support, or a conversation past its context limit.";
     case "connection":
       return "We couldn't reach the model provider.";
     default:

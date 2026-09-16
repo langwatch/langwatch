@@ -154,7 +154,7 @@ function SchedulerConfirmations({
         onConfirm={() => onSetActive(false)}
         isLoading={busy}
         title="Pause this schedule?"
-        description={`${target} will stop running for ${project} until you resume it. A run already in progress continues — pausing does not cancel it.`}
+        description={`${target} will stop running for ${project} until you resume it. A run already in progress continues. Pausing does not cancel it.`}
       >
         <TargetIdentity targetId={targetId} />
       </ConfirmDialog>

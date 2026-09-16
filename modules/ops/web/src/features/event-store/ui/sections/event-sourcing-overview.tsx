@@ -74,7 +74,7 @@ function DeadLetterBanner({
           </Box>
           <Box flex={1}>
             <Text textStyle="sm" fontWeight="medium">
-              {total} dead {total === 1 ? "message" : "messages"} — this work will not run again
+              {total} dead {total === 1 ? "message" : "messages"}: this work will not run again
               until an operator redrives it
             </Text>
             <Text textStyle="xs" color="fg.muted" marginTop={1}>
@@ -114,7 +114,7 @@ function HealthLine({
   if (troubledCount === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        All {processCount} processes are keeping up — no overdue wakes, lapsed leases, or backed-up
+        All {processCount} processes are keeping up: no overdue wakes, lapsed leases, or backed-up
         pending messages.
       </Text>
     );

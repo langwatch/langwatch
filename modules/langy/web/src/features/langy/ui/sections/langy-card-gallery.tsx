@@ -397,7 +397,7 @@ export function LangyCardGallery() {
                     id: "trace_2917dd709ecc",
                     startedAt: TRACE_FIXTURE_NOW - 12 * 60_000,
                     input: "Draft a reply to this email",
-                    output: "Sure — here's a draft you can send.",
+                    output: "Sure, here's a draft you can send.",
                     totalTimeMs: 3_120,
                     totalCost: 0.0067,
                   }),

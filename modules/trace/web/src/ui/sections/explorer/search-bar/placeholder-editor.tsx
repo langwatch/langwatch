@@ -275,7 +275,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   style={{ cursor: "pointer" }}
                   title={
                     richLabel
-                      ? `${tok.field}:${tok.value} — click to change value`
+                      ? `${tok.field}:${tok.value}, click to change value`
                       : "Click to change value"
                   }
                   onMouseDown={(event) => {

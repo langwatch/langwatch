@@ -89,7 +89,7 @@ export function LangyTraceSampleCard({ input, output, digest, projectSlug }: Cap
         projectSlug={projectSlug ?? null}
       >
         <Text textStyle="xs" color="fg.muted">
-          Couldn&apos;t read this result — open the Trace Explorer to see it.
+          Couldn&apos;t read this result. Open the Trace Explorer to see it.
         </Text>
       </TraceSampleShell>
     );
@@ -226,7 +226,7 @@ function HydratedTraceSampleCard({
         title={total !== null ? headline({ total, shown: 0 }) : "Traces"}
       >
         <Text textStyle="xs" color="fg.muted">
-          Couldn&apos;t load these traces right now — open the Trace Explorer to see them.
+          Couldn&apos;t load these traces right now. Open the Trace Explorer to see them.
         </Text>
       </TraceSampleShell>
     );

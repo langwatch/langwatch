@@ -35,7 +35,7 @@ function ProcessOutboxDeadRow({
       borderBottomColor="border"
     >
       <Text textStyle="sm" fontWeight="medium" color="red.500">
-        Process outbox — {total} dead message{total !== 1 ? "s" : ""}
+        Process outbox: {total} dead message{total !== 1 ? "s" : ""}
       </Text>
       <Text textStyle="xs" color="fg.muted">
         {byProcess
@@ -374,7 +374,7 @@ function DlqCardHeader({
       {groupCount > 0 && (
         <>
           <Text textStyle="sm" fontWeight="medium" color="orange.500">
-            Dead Letter Queue — {isFiltering ? `${shownCount} of ` : ""}
+            Dead Letter Queue: {isFiltering ? `${shownCount} of ` : ""}
             {groupCount} group{groupCount !== 1 ? "s" : ""}
           </Text>
           <Input

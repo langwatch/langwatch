@@ -7,7 +7,7 @@ import { LinkedStat } from "../elements/linked-stat.tsx";
 
 /** Percentiles measured over sample count (rolling, not time window); width varies
  * with throughput. */
-const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE_SIZE} completed jobs — a rolling sample, not a time window.`;
+const LATENCY_BASIS = `Processing time across each queue's last ${LATENCY_SAMPLE_SIZE} completed jobs (a rolling sample, not a time window).`;
 
 /** Headline figures on ONE row. Redis as one tile (three figures read together);
  * avoids orphaning eleventh tile. */

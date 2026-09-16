@@ -194,7 +194,7 @@ export function ProcessInstanceContent({
   if (!detail) {
     return (
       <Text textStyle="sm" color="fg.muted" data-testid="process-instance-missing">
-        This process instance no longer exists — retention reaped it, or it was never started for
+        This process instance no longer exists. Retention reaped it, or it was never started for
         this key.
       </Text>
     );

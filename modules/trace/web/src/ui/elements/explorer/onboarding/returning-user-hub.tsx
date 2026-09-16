@@ -52,7 +52,7 @@ export function ReturningUserHub({ onJump }: ReturningUserHubProps): React.React
         Welcome back.
       </Heading>
       <Text color="fg.muted" textStyle="md" lineHeight="1.65" maxWidth="48ch">
-        Want a hand with a specific bit? Pick one — or click around the table.
+        Want a hand with a specific bit? Pick one, or click around the table.
       </Text>
       <HStack gap={2} width="full" align="stretch" justify="center">
         {RETURNING_USER_HUB_OPTIONS.map((opt) => (

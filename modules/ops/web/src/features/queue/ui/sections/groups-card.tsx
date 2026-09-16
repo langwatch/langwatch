@@ -52,7 +52,7 @@ function GroupsPlaceholder({ isLoading, anyGroups }: { isLoading: boolean; anyGr
   return (
     <Box padding={4}>
       <Text textStyle="xs" color="fg.muted">
-        {anyGroups ? "No groups match current filters." : "No groups \u2014 queues are idle."}
+        {anyGroups ? "No groups match current filters." : "No groups. Queues are idle."}
       </Text>
     </Box>
   );

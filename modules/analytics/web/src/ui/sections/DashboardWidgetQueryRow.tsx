@@ -187,7 +187,7 @@ function QueryNameField({
           if (e.key === "Enter") edit.commit();
           if (e.key === "Escape") edit.cancel();
         }}
-        placeholder="query name — the LW.query(name, params) handle"
+        placeholder="query name: the LW.query(name, params) handle"
         borderColor={nameError ? "red.400" : undefined}
         width="auto"
         minWidth="140px"

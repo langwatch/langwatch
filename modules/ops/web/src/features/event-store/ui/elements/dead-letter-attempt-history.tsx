@@ -12,7 +12,7 @@ export function DeadLetterAttemptHistory({
   if (attempts.length === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        No recorded attempts — this message was retired before failures were recorded per attempt.
+        No recorded attempts. This message was retired before failures were recorded per attempt.
       </Text>
     );
   }

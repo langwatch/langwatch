@@ -108,7 +108,7 @@ export function QueryBreakdownChips() {
   return (
     <VStack gap={2} align="stretch" maxWidth="640px">
       <Text textStyle="2xs" color="fg.muted" textAlign="center">
-        Active filters — click × on any chip to drop just that piece.
+        Active filters: click × on any chip to drop just that piece.
       </Text>
       <HStack gap={1.5} flexWrap="wrap" justify="center">
         {entries.map((entry) => (

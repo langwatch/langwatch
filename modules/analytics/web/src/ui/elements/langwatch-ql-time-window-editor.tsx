@@ -204,7 +204,7 @@ export function LangWatchQLTimeWindowEditor({
       )}
 
       <Text fontSize="12px" color="fg.muted">
-        Values are UTC, and the period is half-open — write{" "}
+        Values are UTC, and the period is half-open: write{" "}
         {`>= {${LWQL_PERIOD_START_PARAMETER}:DateTime} AND < {${LWQL_PERIOD_END_PARAMETER}:DateTime}`}
         .
       </Text>

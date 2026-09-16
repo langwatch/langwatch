@@ -430,7 +430,7 @@ function logsSection(ctx: SpanSectionContext): ReactNode {
             if (summary !== null) delete attributes["event.name"];
             if (log.bodyRedacted) {
               attributes.body = log.bodyVisibleTo
-                ? `[redacted — visible to ${log.bodyVisibleTo}]`
+                ? `[redacted: visible to ${log.bodyVisibleTo}]`
                 : "[redacted]";
             } else if (log.body && log.body !== eventName) {
               // Same check the redaction layer applies: some events stamp the

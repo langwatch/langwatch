@@ -41,7 +41,7 @@ function TruncationBanner() {
         Partial result
       </Text>
       <Text fontSize="11px" color="fg.muted">
-        The rest did not fit — aggregate or narrow the query to see it.
+        The rest did not fit. Aggregate or narrow the query to see it.
       </Text>
     </HStack>
   );

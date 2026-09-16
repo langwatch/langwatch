@@ -237,7 +237,7 @@ export const TreeRow = memo(function TreeRow({
         {isCollapsed && hiddenDescendantCount > 0 && (
           <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
         )}
-        {logCount > 0 && <TipCell label="Logs" value={`${logCount} — click to view`} />}
+        {logCount > 0 && <TipCell label="Logs" value={`${logCount}, click to view`} />}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {/* Always rendered so the tooltip grid keeps a stable row count
             between spans — root spans show "none" instead of dropping

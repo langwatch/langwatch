@@ -211,7 +211,7 @@ describe("IOPreview missing-side placeholders", () => {
         const { getByTestId, container } = renderWithPlaceholders("hello claudinho", null);
 
         expect(container.textContent).toContain("hello claudinho");
-        expect(getByTestId("io-preview-missing-output").textContent).toBe("— no output recorded");
+        expect(getByTestId("io-preview-missing-output").textContent).toBe("No output recorded");
       });
     });
 
@@ -241,7 +241,7 @@ describe("IOPreview missing-side placeholders", () => {
       it("renders the no-input placeholder before the output", () => {
         const { getByTestId } = renderWithPlaceholders(null, "done!");
 
-        expect(getByTestId("io-preview-missing-input").textContent).toBe("— no input recorded");
+        expect(getByTestId("io-preview-missing-input").textContent).toBe("No input recorded");
       });
     });
   });

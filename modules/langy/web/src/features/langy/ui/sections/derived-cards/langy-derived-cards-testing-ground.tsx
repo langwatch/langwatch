@@ -25,7 +25,7 @@ import type { ChoicesRefRow } from "../../../behavior/derived-cards/use-choices-
 const TIMESERIES: LangyDerivedCard = {
   kind: "timeseries",
   blockId: "gallery-ts",
-  title: "Cost per day — derived from the dataset",
+  title: "Cost per day (derived from the dataset)",
   unit: "usd",
   series: [
     {
@@ -53,7 +53,7 @@ const TIMESERIES: LangyDerivedCard = {
 const TABLE: LangyDerivedCard = {
   kind: "table",
   blockId: "gallery-table",
-  title: "Failures by model — derived grouping",
+  title: "Failures by model (derived grouping)",
   columns: ["model", "failures", "share"],
   rows: [
     ["gpt-5-mini", 41, "58%"],
@@ -110,7 +110,7 @@ const CHOICES: LangyDerivedChoicesCard = {
 const CHOICES_REFS: LangyDerivedChoicesCard = {
   kind: "choices",
   blockId: "gallery-choices-refs",
-  question: "Options grounded in real entities — hydrated as the viewer",
+  question: "Options grounded in real entities, hydrated as the viewer",
   options: [
     {
       id: "live",
@@ -206,7 +206,7 @@ function StreamingPlayground() {
         <LangyDerivedCardView card={preview.card} forming={!done} />
       ) : (
         <Text textStyle="2xs" color="fg.subtle">
-          No preview yet — nothing shown until a prefix validates.
+          No preview yet. Nothing shown until a prefix validates.
         </Text>
       )}
       <Box
@@ -303,35 +303,35 @@ function ChoicesPlayground({
 export function LangyDerivedCardsTestingGround() {
   return (
     <VStack align="stretch" gap={4}>
-      <Labeled label="Progressive preview — the real reducer, chunk by chunk">
+      <Labeled label="Progressive preview: the real reducer, chunk by chunk">
         <StreamingPlayground />
       </Labeled>
 
-      <Labeled label="Derived timeseries — comparison headline, explore + verify hints">
+      <Labeled label="Derived timeseries: comparison headline, explore + verify hints">
         <VerifyDemo />
       </Labeled>
 
-      <Labeled label="Derived table — ragged rows render short, never fail">
+      <Labeled label="Derived table: ragged rows render short, never fail">
         <LangyDerivedCardView card={TABLE} />
       </Labeled>
 
-      <Labeled label="Derived stats — numeric figures roll up">
+      <Labeled label="Derived stats: numeric figures roll up">
         <LangyDerivedCardView card={STATS_NUMERIC} />
       </Labeled>
 
-      <Labeled label="Derived stats — readings on one scale draw as a comparison">
+      <Labeled label="Derived stats: readings on one scale draw as a comparison">
         <LangyDerivedCardView card={STATS_COMPARISON} />
       </Labeled>
 
-      <Labeled label="Derived stats — mixed values fall back to the grid">
+      <Labeled label="Derived stats: mixed values fall back to the grid">
         <LangyDerivedCardView card={STATS_MIXED} />
       </Labeled>
 
-      <Labeled label="Forming chrome — what a mid-stream card wears">
+      <Labeled label="Forming chrome: what a mid-stream card wears">
         <LangyDerivedCardView card={STATS_NUMERIC} forming />
       </Labeled>
 
-      <Labeled label="Failed block — the disclosure, never silence (expand it)">
+      <Labeled label="Failed block: the disclosure, never silence (expand it)">
         <LangyFailedCard
           part={{
             type: "langy-card-failed",
@@ -341,11 +341,11 @@ export function LangyDerivedCardsTestingGround() {
         />
       </Labeled>
 
-      <Labeled label="Choices — answer it, supersede it, reset it">
+      <Labeled label="Choices: answer it, supersede it, reset it">
         <ChoicesPlayground card={CHOICES} />
       </Labeled>
 
-      <Labeled label="Choices — multi-select with Answer">
+      <Labeled label="Choices: multi-select with Answer">
         <ChoicesPlayground
           card={{
             ...CHOICES,
@@ -356,7 +356,7 @@ export function LangyDerivedCardsTestingGround() {
         />
       </Labeled>
 
-      <Labeled label="Choices — Other allows a free-text answer">
+      <Labeled label="Choices: Other allows a free-text answer">
         <ChoicesPlayground
           card={{
             ...CHOICES,
@@ -366,11 +366,11 @@ export function LangyDerivedCardsTestingGround() {
         />
       </Labeled>
 
-      <Labeled label="Choices — entity refs: live row and dead (disabled) row">
+      <Labeled label="Choices (entity refs): live row and dead (disabled) row">
         <ChoicesPlayground card={CHOICES_REFS} refRowsOverride={REF_ROWS} />
       </Labeled>
 
-      <Labeled label="Choices — forming (never answerable mid-stream)">
+      <Labeled label="Choices: forming (never answerable mid-stream)">
         <LangyChoicesCard card={CHOICES} lockState={{ status: "open" }} forming />
       </Labeled>
     </VStack>
@@ -386,7 +386,7 @@ function VerifyDemo() {
       {sent ? (
         <HStack gap={1.5}>
           <Text textStyle="2xs" color="green.fg">
-            Would send: &quot;Verify &quot;Cost per day — derived from the dataset&quot; with a real
+            Would send: &quot;Verify &quot;Cost per day (derived from the dataset)&quot; with a real
             analytics query…&quot;
           </Text>
           <Button size="xs" variant="ghost" onClick={() => setSent(false)}>

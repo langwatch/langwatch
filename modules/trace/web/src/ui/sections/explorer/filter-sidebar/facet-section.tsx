@@ -313,7 +313,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
               textTransform="none"
               letterSpacing="normal"
               flexShrink={0}
-              title="These values are combined with OR — traces matching any of them are shown"
+              title="These values are combined with OR: traces matching any of them are shown"
               data-testid="facet-any-of-hint"
             >
               any of
@@ -534,7 +534,7 @@ const ExpandToggle: React.FC<ExpandToggleProps> = ({
         // so the hint points at the always-on search input (which
         // doubles as Enter-to-filter for arbitrary values).
         <Text textStyle="xs" color="fg.subtle" paddingX={1} paddingY={0.5}>
-          {beyondExpanded}+ rare values aren't shown — type a value and press Enter to filter.
+          {beyondExpanded}+ rare values aren't shown. Type a value and press Enter to filter.
         </Text>
       )}
       <LinkButton onClick={onShowLess}>Show less</LinkButton>

@@ -46,7 +46,7 @@ export const LiveIndicator: React.FC = () => {
   const isSamplePreview = usePreviewTracesActive();
   const liveRefreshTooltip = isRefreshing ? "Refreshing…" : "Refresh traces";
   const refreshTooltip = isSamplePreview
-    ? "Refresh is disabled — sample data doesn't change."
+    ? "Refresh is disabled: sample data doesn't change."
     : liveRefreshTooltip;
 
   // In `ask` mode the dot is solid blue: SSE is on (so we know new rows exist) but the
@@ -134,7 +134,7 @@ function describeMode({
     case "live":
       return `${describeSseState(sseState, lastEventAt)}. ${cycle}`;
     case "ask":
-      return `Live updates buffered — the floating "N new" pill appears when fresh rows arrive. ${cycle}`;
+      return `Live updates buffered: the floating "N new" pill appears when fresh rows arrive. ${cycle}`;
     case "paused":
       return `Live updates paused. ${cycle}`;
   }

@@ -99,9 +99,9 @@ function MessageMetaRow({
           size="xs"
           colorPalette="orange"
           variant="subtle"
-          title="The dispatch lease expired without a completion. The outbox lease is not renewed mid-delivery, so the dispatcher died — or is still delivering."
+          title="The dispatch lease expired without a completion. The outbox lease is not renewed mid-delivery, so the dispatcher died, or is still delivering."
         >
-          lease lapsed — dispatcher died or still delivering
+          lease lapsed: dispatcher died or still delivering
         </Badge>
       )}
       {traceHref && (

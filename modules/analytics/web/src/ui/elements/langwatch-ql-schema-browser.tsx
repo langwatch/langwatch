@@ -366,7 +366,7 @@ function TimeWindowNote() {
         Time window
       </Text>
       <Text fontSize="12px" color="fg.muted" marginTop={1}>
-        {`Declare {${LWQL_PERIOD_START_PARAMETER}:DateTime} and {${LWQL_PERIOD_END_PARAMETER}:DateTime} and the page — or the dashboard this chart is later placed on — fills them with the period it is showing. The interval is half-open, so write >= {${LWQL_PERIOD_START_PARAMETER}:DateTime} AND < {${LWQL_PERIOD_END_PARAMETER}:DateTime}. A query that declares neither runs over all time and says so.`}
+        {`Declare {${LWQL_PERIOD_START_PARAMETER}:DateTime} and {${LWQL_PERIOD_END_PARAMETER}:DateTime} and the page (or the dashboard this chart is later placed on) fills them with the period it is showing. The interval is half-open, so write >= {${LWQL_PERIOD_START_PARAMETER}:DateTime} AND < {${LWQL_PERIOD_END_PARAMETER}:DateTime}. A query that declares neither runs over all time and says so.`}
       </Text>
     </Box>
   );

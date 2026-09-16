@@ -120,7 +120,7 @@ function stripBackdropBg({
     style?.background !== undefined || style?.backgroundColor !== undefined;
   if (isDevelopment && (setsPropBackground || setsStyleBackground)) {
     console.warn(
-      "[Dialog] backdropProps.bg/background/backgroundColor is ignored — the backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
+      "[Dialog] backdropProps.bg/background/backgroundColor is ignored. The backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
     );
   }
   return {

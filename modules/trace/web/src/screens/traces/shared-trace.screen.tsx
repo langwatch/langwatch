@@ -90,7 +90,7 @@ function SharePageSignUpInvitation() {
     <VStack gap={3} width="full" paddingTop={2}>
       <Separator />
       <Text fontSize="14px" color="fg.muted" maxWidth="420px">
-        LangWatch shows you what your AI agents actually did — every call, its cost, and where it
+        LangWatch shows you what your AI agents actually did: every call, its cost, and where it
         went wrong.
       </Text>
       <VStack gap={2}>

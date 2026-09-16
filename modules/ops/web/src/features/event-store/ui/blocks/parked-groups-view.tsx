@@ -31,7 +31,7 @@ export function ParkedGroupsView({
   if (isError) {
     return (
       <Text textStyle="xs" color="red.500" paddingX={6} paddingY={3}>
-        Could not load this tenant's parked groups. The count above still stands — do not read this
+        Could not load this tenant's parked groups. The count above still stands. Do not read this
         as cleared.
       </Text>
     );
@@ -40,7 +40,7 @@ export function ParkedGroupsView({
   if (groups.length === 0) {
     return (
       <Text textStyle="xs" color="fg.muted" paddingX={6} paddingY={3}>
-        This tenant dropped below its limit — nothing is parked any more.
+        This tenant dropped below its limit. Nothing is parked any more.
       </Text>
     );
   }

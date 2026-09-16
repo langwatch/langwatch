@@ -36,7 +36,7 @@ export const GroupRow = memo(function GroupRow({
 
   return (
     <Tooltip
-      content={`${group.count} identical sibling spans folded — click to ${
+      content={`${group.count} identical sibling spans folded: click to ${
         isExpanded ? "collapse" : "expand"
       }`}
       positioning={{ placement: "right" }}

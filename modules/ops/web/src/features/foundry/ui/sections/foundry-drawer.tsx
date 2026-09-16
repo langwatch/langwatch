@@ -254,7 +254,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
                         fontWeight="medium"
                         mb={0.5}
                       >
-                        {copied ? "Trace ID copied!" : "Trace sent — click to copy ID"}
+                        {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
                       </Text>
                       <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
                         {lastTraceId}

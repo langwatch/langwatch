@@ -261,7 +261,7 @@ function buildSelectedPromptChipDef(
           {selectedId}
         </Text>
         <Text textStyle="2xs" color="fg.muted">
-          Pin set on the span. Resolved to a different concrete prompt at runtime — see the
+          Pin set on the span. Resolved to a different concrete prompt at runtime. See the
           &ldquo;last used&rdquo; chip for what actually ran.
         </Text>
       </VStack>
@@ -377,7 +377,7 @@ function LastUsedPromptTooltip({
         <HStack gap={1.5} paddingTop={1.5} borderTopWidth="1px" borderColor="border.muted">
           <Icon as={LuTriangleAlert} boxSize={3} color="yellow.fg" />
           <Text textStyle="2xs" color="yellow.fg">
-            Out of date — current latest is v{state.latestVersion}.
+            Out of date: current latest is v{state.latestVersion}.
           </Text>
         </HStack>
       )}

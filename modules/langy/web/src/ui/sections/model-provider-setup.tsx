@@ -45,8 +45,8 @@ export function LangyModelProviderSetup({
   return (
     <VStack align="stretch" gap={4}>
       <Text textStyle="xs" color="fg.muted">
-        Langy answers on a model you provide. Add a provider key here and it works straight away —
-        you can add more later in settings.
+        Langy answers on a model you provide. Add a provider key here and it works straight away.
+        You can add more later in settings.
       </Text>
 
       <HStack gap={2} wrap="wrap">

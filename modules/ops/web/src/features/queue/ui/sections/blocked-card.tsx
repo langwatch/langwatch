@@ -103,7 +103,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
             flexWrap="wrap"
           >
             <Text textStyle="sm" fontWeight="medium" color="red.500">
-              Blocked — {blocked.totalBlocked} groups, {clusters.length} error patterns
+              Blocked: {blocked.totalBlocked} groups, {clusters.length} error patterns
             </Text>
             <Spacer />
             {hasAccess && (

@@ -23,7 +23,7 @@ export const DrawerGlow: React.FC = () => (
     @keyframes tracesTourSidebarGlow {
       /*
         The sidebar lives inside an outer HStack with overflow:hidden,
-        so any *outer* box-shadow gets clipped on three sides — the
+        so any *outer* box-shadow gets clipped on three sides: the
         previous glow only ever read as a thin line on the right edge.
         We compose the highlight from inset layers exclusively (a
         coloured outline plus a soft inner halo that fades from the

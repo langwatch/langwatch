@@ -79,7 +79,7 @@ function describeMissingDatasets({
   returned: number;
 }): string {
   if (unavailable)
-    return "Couldn't load these datasets right now \u2014 open Datasets to see them.";
+    return "Couldn't load these datasets right now. Open Datasets to see them.";
   return returned === 1
     ? "This dataset is no longer available."
     : "These datasets are no longer available.";

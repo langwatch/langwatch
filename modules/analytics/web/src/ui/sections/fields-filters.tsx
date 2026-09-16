@@ -766,7 +766,7 @@ function ListSelection({
 
         {isEmpty && (
           <Text fontSize="sm" paddingX={1} paddingY={2}>
-            No values yet — filters fill in as traces arrive.
+            No values yet. Filters fill in as traces arrive.
           </Text>
         )}
         {filterData.isLoading &&

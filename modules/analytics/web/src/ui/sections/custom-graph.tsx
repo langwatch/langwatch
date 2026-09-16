@@ -657,7 +657,7 @@ const CustomGraph_ = React.memo(
                   title={timeseriesErrorDescription}
                 >
                   <Badge colorPalette="red" variant="solid" fontSize="xs">
-                    Refresh failed — click to retry
+                    Refresh failed: click to retry
                   </Badge>
                 </button>
               )}
@@ -683,7 +683,7 @@ const CustomGraph_ = React.memo(
                         ))}
                       </HStack>
                       <Text textStyle="xs" color="fg.subtle">
-                        No data — try adjusting the date range
+                        No data. Try adjusting the date range.
                       </Text>
                     </VStack>
                   ))

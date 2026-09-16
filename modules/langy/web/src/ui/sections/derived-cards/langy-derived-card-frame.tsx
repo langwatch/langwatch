@@ -12,7 +12,7 @@ import { langyThinkingShimmerStyles } from "../../../model/values/langy-shimmer.
 /** The provenance line, and the longer answer behind it. */
 const MADE_BY_LANGY_LABEL = "Made by Langy";
 const MADE_BY_LANGY_HINT =
-  "Langy put this view together from data it read in your project. The figures are yours — how they are grouped and drawn is Langy's suggestion, so give it a look before you pass it on.";
+  "Langy put this view together from data it read in your project. The figures are yours: how they are grouped and drawn is Langy's suggestion, so give it a look before you pass it on.";
 
 export function LangyDerivedCardFrame({
   title,
