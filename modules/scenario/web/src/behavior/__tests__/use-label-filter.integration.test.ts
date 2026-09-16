@@ -6,7 +6,7 @@ import { useScenarioLabelFilter as useLabelFilter } from "../use-scenario-label-
 import { describe, expect, it } from "vitest";
 
 describe("useLabelFilter()", () => {
-  describe("allLabels extraction", () => {
+  describe("given the allLabels return value", () => {
     it("returns empty array when scenarios is undefined", () => {
       const { result } = renderHook(() => useLabelFilter(undefined));
 
@@ -39,7 +39,7 @@ describe("useLabelFilter()", () => {
     });
   });
 
-  describe("activeLabels", () => {
+  describe("given the activeLabels return value", () => {
     it("returns empty array initially", () => {
       const { result } = renderHook(() => useLabelFilter([]));
 
@@ -57,7 +57,7 @@ describe("useLabelFilter()", () => {
     });
   });
 
-  describe("handleLabelToggle", () => {
+  describe("handleLabelToggle()", () => {
     it("adds label when not active", () => {
       const { result } = renderHook(() => useLabelFilter([]));
 
@@ -124,7 +124,7 @@ describe("useLabelFilter()", () => {
     });
   });
 
-  describe("columnFilters", () => {
+  describe("given the columnFilters return value", () => {
     it("preserves other filters when toggling labels", () => {
       const { result } = renderHook(() => useLabelFilter([]));
 

@@ -23,7 +23,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 2: Topic and field-discovery queries access only specific attributes
   // -------------------------------------------------------------------------
-  describe("topic and field-discovery query attribute access", () => {
+  describe("given a topic or field-discovery query", () => {
     /**
      * Read the actual production source of clickhouse-trace.service.ts and
      * extract the method bodies for findTopicCounts and findDistinctFieldNames.
@@ -72,7 +72,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 3: Topic counting query includes a LIMIT clause
   // -------------------------------------------------------------------------
-  describe("topic counting query LIMIT clause", () => {
+  describe("given the topic counting query's LIMIT clause", () => {
     const traceServicePath = traceReadSourcePath();
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
@@ -92,7 +92,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 4: Field discovery query includes a LIMIT clause
   // -------------------------------------------------------------------------
-  describe("field discovery query LIMIT clause", () => {
+  describe("given the field discovery query's LIMIT clause", () => {
     const traceServicePath = traceReadSourcePath();
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
@@ -129,7 +129,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 5: All query execution paths include memory safety settings
   // -------------------------------------------------------------------------
-  describe("memory safety settings on query execution paths", () => {
+  describe("given query execution paths", () => {
     describe("when the trace service source is inspected", () => {
       it("resolves every client through the injected per-tenant resolver", () => {
         const source = fs.readFileSync(traceReadSourcePath(), "utf-8");

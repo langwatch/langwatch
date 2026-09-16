@@ -44,7 +44,7 @@ function emptyState(): TraceSummaryData {
 }
 
 describe("SpanCostService — bundled (non-billable) cost classification", () => {
-  describe("isSpanCostNonBillable", () => {
+  describe("isSpanCostNonBillable()", () => {
     describe("given only a resource-level marker", () => {
       it("treats the resource marker as the span's default", () => {
         expect(
@@ -62,7 +62,7 @@ describe("SpanCostService — bundled (non-billable) cost classification", () =>
     });
   });
 
-  describe("accumulateTokens", () => {
+  describe("accumulateTokens()", () => {
     describe("when the span is bundled (resource marker set)", () => {
       /** @scenario "The bundled cost split is preserved when the non-billable marker is hidden" */
       it("routes the whole span cost into nonBilledCost", () => {

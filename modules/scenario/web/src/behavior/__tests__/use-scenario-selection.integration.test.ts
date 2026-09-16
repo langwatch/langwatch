@@ -108,7 +108,7 @@ describe("useScenarioSelection()", () => {
     });
   });
 
-  describe("selectedIds", () => {
+  describe("given the selectedIds return value", () => {
     describe("when no scenarios are selected", () => {
       it("returns an empty array", () => {
         const { result } = renderHook(() => useScenarioSelection());
@@ -135,7 +135,7 @@ describe("useScenarioSelection()", () => {
     });
   });
 
-  describe("selectionCount", () => {
+  describe("given the selectionCount return value", () => {
     describe("when 2 scenarios are selected", () => {
       it("returns 2", () => {
         const { result } = renderHook(() => useScenarioSelection());
@@ -160,7 +160,7 @@ describe("useScenarioSelection()", () => {
     });
   });
 
-  describe("rowSelection (TanStack Table compatibility)", () => {
+  describe("given the rowSelection return value for TanStack Table", () => {
     describe("when scenarios are selected", () => {
       it("exposes rowSelection as Record<string, boolean>", () => {
         const { result } = renderHook(() => useScenarioSelection());

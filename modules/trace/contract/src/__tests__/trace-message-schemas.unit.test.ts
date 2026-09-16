@@ -364,7 +364,7 @@ describe("messageSchemas", () => {
     });
   });
 
-  describe("detectMessageFormat", () => {
+  describe("detectMessageFormat()", () => {
     describe("when messages are in OpenAI/OpenTelemetry format", () => {
       it("detects OpenAI format", () => {
         const messages = [

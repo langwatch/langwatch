@@ -25,7 +25,7 @@ const node = (
 });
 
 describe("controlFlow helpers", () => {
-  describe("isBranchSourceHandle", () => {
+  describe("isBranchSourceHandle()", () => {
     it("matches the if/else branch handles", () => {
       expect(isBranchSourceHandle("outputs.true")).toBe(true);
       expect(isBranchSourceHandle("outputs.false")).toBe(true);
@@ -38,7 +38,7 @@ describe("controlFlow helpers", () => {
     });
   });
 
-  describe("isBranchConnectionOrigin", () => {
+  describe("isBranchConnectionOrigin()", () => {
     it("is true only for a branch handle on an if/else node", () => {
       expect(
         isBranchConnectionOrigin({
@@ -61,7 +61,7 @@ describe("controlFlow helpers", () => {
     });
   });
 
-  describe("nodeHasGateInput", () => {
+  describe("nodeHasGateInput()", () => {
     it("detects an existing gate input", () => {
       expect(nodeHasGateInput(node("c", "code", [{ identifier: "gate", type: "bool" }]))).toBe(
         true,
@@ -72,7 +72,7 @@ describe("controlFlow helpers", () => {
     });
   });
 
-  describe("showsTemporaryGate", () => {
+  describe("showsTemporaryGate()", () => {
     /** @scenario The temporary gate is not offered when the node already has one */
     it("offers a temporary gate only to connectable nodes without one", () => {
       const sourceId = "gate";
@@ -97,7 +97,7 @@ describe("controlFlow helpers", () => {
     });
   });
 
-  describe("isConnectionAllowed", () => {
+  describe("isConnectionAllowed()", () => {
     const nodes = [
       node("gate", "if_else"),
       node("code", "code", [

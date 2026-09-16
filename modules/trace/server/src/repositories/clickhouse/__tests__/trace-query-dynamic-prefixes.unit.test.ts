@@ -9,7 +9,7 @@ function translate(query: string) {
 }
 
 describe("dynamic attribute prefix translation", () => {
-  describe("trace.attribute.<key>", () => {
+  describe("given a trace.attribute.<key> prefix", () => {
     it("emits a direct equality on trace_summaries.Attributes[key]", () => {
       const result = translate("trace.attribute.langwatch.user.id:user-1");
       expect(result).not.toBeNull();
@@ -38,7 +38,7 @@ describe("dynamic attribute prefix translation", () => {
     });
   });
 
-  describe("span.attribute.<key>", () => {
+  describe("given a span.attribute.<key> prefix", () => {
     it("answers via a partition-pruned subquery on stored_spans", () => {
       const result = translate("span.attribute.gen_ai.request.model:gpt-5-mini");
       expect(result).not.toBeNull();
@@ -56,7 +56,7 @@ describe("dynamic attribute prefix translation", () => {
     });
   });
 
-  describe("event.attribute.<key>", () => {
+  describe("given an event.attribute.<key> prefix", () => {
     it("answers via arrayExists on Events.Attributes", () => {
       const result = translate("event.attribute.exception.type:ValueError");
       expect(result).not.toBeNull();
@@ -86,7 +86,7 @@ describe("dynamic attribute prefix translation", () => {
     });
   });
 
-  describe("key validation", () => {
+  describe("given a key to validate", () => {
     it("rejects keys with disallowed characters", () => {
       expect(() => translate("span.attribute.foo bar:value")).toThrow();
       expect(() => translate('trace.attribute.foo"bar:value')).toThrow();
@@ -105,7 +105,7 @@ describe("dynamic attribute prefix translation", () => {
     });
   });
 
-  describe("combined", () => {
+  describe("given multiple namespaced prefixes", () => {
     it("composes namespaced prefixes through AND/OR", () => {
       const result = translate(
         "trace.attribute.langwatch.user.id:u-1 AND span.attribute.gen_ai.request.model:gpt-5-mini",

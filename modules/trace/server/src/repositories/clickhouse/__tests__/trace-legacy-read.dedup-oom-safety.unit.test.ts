@@ -120,7 +120,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // span-storage.clickhouse.repository.ts (app-layer): getSpansByTraceId
   // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getSpansByTraceId() (app-layer)", () => {
+  describe("SpanStorageClickHouseRepository.getSpansByTraceId()", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "findSpansByTraceId");
@@ -146,7 +146,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // span-storage.clickhouse.repository.ts (app-layer): getEventsByTraceId
   // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getEventsByTraceId() (app-layer)", () => {
+  describe("SpanStorageClickHouseRepository.getEventsByTraceId()", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "findEventsByTraceId");
@@ -172,7 +172,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // span-storage.clickhouse.repository.ts (app-layer): getTraceEventsByTraceId
   // ---------------------------------------------------------------------------
-  describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId() (app-layer)", () => {
+  describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId()", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
     const body = extractMethodBody(spanStorageSource, "findTraceEventsByTraceId");
@@ -209,7 +209,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // clickhouse.aggregation-builder.mapper.ts: dedupedTraceSummaries (@regression #3158)
   // ---------------------------------------------------------------------------
-  describe("dedupedTraceSummaries() (analytics)", () => {
+  describe("dedupedTraceSummaries()", () => {
     const aggregationBuilderPath = path.join(
       repoRoot(),
       "modules/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
@@ -232,7 +232,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // simulation.clickhouse.repository.ts: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
-  describe("SimulationClickHouseRepository (entire file)", () => {
+  describe("SimulationClickHouseRepository", () => {
     const simulationRepoPath = path.join(
       repoRoot(),
       "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts",
@@ -247,7 +247,7 @@ describe("trace dedup OOM safety", () => {
   // ---------------------------------------------------------------------------
   // Canonical Experiment run repository: entire file (@regression #3158)
   // ---------------------------------------------------------------------------
-  describe("ClickHouseExperimentRunRepository (entire file)", () => {
+  describe("ClickHouseExperimentRunRepository", () => {
     const experimentRunServicePath = path.join(
       repoRoot(),
       "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",

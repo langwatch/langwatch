@@ -123,7 +123,7 @@ describe("ClickHouseSpanAttributeKeysFacetAdapter.buildSpanAttributeKeysFacetQue
     });
   });
 
-  describe("excludes empty keys from the result", () => {
+  describe("when a key is empty", () => {
     it("filters out '' rows in the outer WHERE", () => {
       const query =
         ClickHouseSpanAttributeKeysFacetAdapter.buildSpanAttributeKeysFacetQuery(baseCtx);
@@ -131,7 +131,7 @@ describe("ClickHouseSpanAttributeKeysFacetAdapter.buildSpanAttributeKeysFacetQue
     });
   });
 
-  describe("excludes reserved namespace keys from user-visible facet results", () => {
+  describe("when a key is in the reserved namespace", () => {
     /** @scenario Reserved namespace is excluded from user-visible facet enumeration */
     it("filters out keys starting with 'langwatch.reserved.' in the outer WHERE", () => {
       // Reserved keys (e.g. langwatch.reserved.eventref.langwatch.output) are
@@ -157,7 +157,7 @@ describe("ClickHouseSpanAttributeKeysFacetAdapter.buildSpanAttributeKeysFacetQue
     });
   });
 
-  describe("memory safety", () => {
+  describe("given the SpanAttributes values column", () => {
     it("never reads the SpanAttributes values column", () => {
       // Both the projection and the empty-map filter must stay on the keys
       // subcolumn. Touching the full `SpanAttributes` Map anywhere pulls the

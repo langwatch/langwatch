@@ -5,7 +5,7 @@ import { createPromptServiceForTest } from "../repositories/prisma/__tests__/pro
 
 describe("PromptService", () => {
   describe("updatePrompt()", () => {
-    describe("happy path", () => {
+    describe("given a valid update request", () => {
       let promptService: PromptService;
       const updateConfigAndCreateVersion = vi.fn();
 

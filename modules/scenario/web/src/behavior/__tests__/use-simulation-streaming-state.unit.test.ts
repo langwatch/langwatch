@@ -219,7 +219,7 @@ describe("createStreamingStore()", () => {
   // -----------------------------------------------------------------------
   // Early delta TTL cleanup
   // -----------------------------------------------------------------------
-  describe("early delta TTL cleanup", () => {
+  describe("given an orphaned delta past its TTL", () => {
     it("removes orphaned deltas after TTL expires", () => {
       store.appendDelta("orphan", "data");
 
@@ -237,7 +237,7 @@ describe("createStreamingStore()", () => {
   // -----------------------------------------------------------------------
   // RAF batching
   // -----------------------------------------------------------------------
-  describe("RAF batching", () => {
+  describe("given notifications batched via requestAnimationFrame", () => {
     it("schedules notification via requestAnimationFrame", () => {
       store.upsert("m1", makeMsg({ messageId: "m1" }));
 

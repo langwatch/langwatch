@@ -60,7 +60,7 @@ describe("TraceIOExtractionService", () => {
     });
   });
 
-  describe("extractRichIOFromSpan", () => {
+  describe("extractRichIOFromSpan()", () => {
     describe("when langwatch.input is a JSON object with 'input' key", () => {
       it("extracts the text from the input key", () => {
         const span = createTestSpan({
@@ -212,7 +212,7 @@ describe("TraceIOExtractionService", () => {
       });
     });
 
-    describe("ranking: fallback must never shadow a semantic match on another span", () => {
+    describe("given a span with a fallback-only shape alongside one with a semantic match", () => {
       it("extractLastOutput prefers the span with a semantic content match even when another span is fallback-only", () => {
         // Span A has real content. Span B has an unrecognized shape. Without
         // the semantic/fallback split, B could shadow A by finishing later.
@@ -472,7 +472,7 @@ describe("TraceIOExtractionService", () => {
   // a generic {type:"text", text:"<JSON of the real block>"} envelope. The
   // extractor unwraps that shape at ingest time; these tests pin both the
   // unwrap behavior AND the conservative rules protecting legitimate text.
-  describe("normalization of double-wrapped typed blocks", () => {
+  describe("given a double-wrapped typed block", () => {
     describe("when assistant content wraps a thinking block in a text envelope", () => {
       it("unwraps the thinking block on the raw output", () => {
         const span = createTestSpan({

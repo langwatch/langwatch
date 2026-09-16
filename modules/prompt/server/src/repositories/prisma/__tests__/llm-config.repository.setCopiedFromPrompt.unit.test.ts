@@ -14,7 +14,7 @@ describe("PrismaLlmConfigRepository", () => {
     repository = PrismaLlmConfigRepository.create({ prisma });
   });
 
-  describe("setCopiedFromPrompt", () => {
+  describe("setCopiedFromPrompt()", () => {
     describe("given a copy that was just created in a project", () => {
       it("records the prompt it was copied from", async () => {
         await repository.setCopiedFromPrompt({

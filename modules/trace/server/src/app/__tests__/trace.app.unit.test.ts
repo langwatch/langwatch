@@ -156,7 +156,7 @@ function harness(
 }
 
 describe("TraceApp", () => {
-  describe("findTrace", () => {
+  describe("findTrace()", () => {
     describe("given a read that shows the content it fetches", () => {
       it("resolves the trace in full rather than serving the stored preview", async () => {
         const { app, tryGetById } = harness();
@@ -223,7 +223,7 @@ describe("TraceApp", () => {
     });
   });
 
-  describe("readEvaluations", () => {
+  describe("readEvaluations()", () => {
     it("asks for exactly the trace ids it was given", async () => {
       const verdicts: Record<string, Evaluation[]> = { "trace-1": [] };
       const { app, getEvaluationsMultiple } = harness({
@@ -241,7 +241,7 @@ describe("TraceApp", () => {
     });
   });
 
-  describe("the partition-pruning hint", () => {
+  describe("readSpans()", () => {
     describe("given a caller that knows when the trace occurred", () => {
       it("passes the hint on the span read", async () => {
         const { app, spanReads } = harness();
@@ -277,7 +277,7 @@ describe("TraceApp", () => {
     });
   });
 
-  describe("isTraceWindowRedacted", () => {
+  describe("isTraceWindowRedacted()", () => {
     describe("given a plan with no visibility window", () => {
       it("answers not redacted without reading the summary at all", async () => {
         const { app, getByTraceId } = harness();
@@ -349,7 +349,7 @@ describe("TraceApp", () => {
     });
   });
 
-  describe("readSampleTraces", () => {
+  describe("readSampleTraces()", () => {
     const query = { projectId: "project-1", startDate: 1_000, endDate: 2_000 };
 
     describe("given a page of matching traces", () => {

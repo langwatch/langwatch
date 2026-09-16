@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 
 describe("LlmConfigRepository", () => {
-  describe("getAllWithLatestVersion", () => {
+  describe("getAllWithLatestVersion()", () => {
     describe("when parsing config versions", () => {
       it.todo("filters out configs that throw parsing errors");
       it.todo("throws error when config has no versions");
@@ -9,7 +9,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("findConfigByIdOrHandleWithLatestVersion", () => {
+  describe("findConfigByIdOrHandleWithLatestVersion()", () => {
     describe("when version parameters provided", () => {
       it.todo("filters by version when version param provided");
       it.todo("filters by versionId when versionId param provided");
@@ -22,7 +22,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("createConfigWithInitialVersion", () => {
+  describe("createConfigWithInitialVersion()", () => {
     describe("when authorId validation", () => {
       it.todo("throws error when authorId mismatch between config and version");
       it.todo("accepts matching authorIds");
@@ -43,7 +43,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("createHandle", () => {
+  describe("createHandle()", () => {
     describe("when scope is PROJECT", () => {
       it.todo("returns {projectId}/{handle} format");
     });
@@ -53,7 +53,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("removeHandlePrefixes", () => {
+  describe("removeHandlePrefixes()", () => {
     describe("when handle has project prefix", () => {
       it.todo("removes {projectId}/ prefix");
     });
@@ -71,7 +71,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("compareConfigContent", () => {
+  describe("compareConfigContent()", () => {
     describe("when comparing config content", () => {
       it.todo("returns isEqual true when content matches");
       it.todo("returns isEqual false and differences when content differs");

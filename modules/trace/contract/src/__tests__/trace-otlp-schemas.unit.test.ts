@@ -13,7 +13,7 @@ function expectParsed<T>(schema: ZodType<T>, input: unknown): T {
 }
 
 describe("otlp schemas", () => {
-  describe("idSchema", () => {
+  describe("idSchema()", () => {
     describe("when parsing string IDs", () => {
       it("passes through string IDs unchanged", () => {
         const traceId = "abc123def456";
@@ -93,7 +93,7 @@ describe("otlp schemas", () => {
     });
   });
 
-  describe("spanSchema", () => {
+  describe("spanSchema()", () => {
     function makeValidSpan(overrides: Record<string, unknown> = {}) {
       return {
         traceId: "aaaa0000000000000000000000000001",
@@ -156,7 +156,7 @@ describe("otlp schemas", () => {
     });
   });
 
-  describe("anyValueSchema bytesValue", () => {
+  describe("given a bytesValue field", () => {
     describe("when value has a Uint8Array bytesValue", () => {
       it("validates successfully", () => {
         const value = { bytesValue: new Uint8Array([1, 2, 3]) };
@@ -192,7 +192,7 @@ describe("otlp schemas", () => {
     });
   });
 
-  describe("bytesSchema", () => {
+  describe("bytesSchema()", () => {
     it("validates Uint8Array instances", () => {
       const bytes = new Uint8Array([1, 2, 3]);
 

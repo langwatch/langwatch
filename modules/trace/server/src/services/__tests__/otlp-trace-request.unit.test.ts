@@ -3,7 +3,7 @@ import type { OtlpAnyValue } from "@langwatch/trace-contract";
 import { OtlpTraceRequestService } from "../otlp-trace-request.service.ts";
 
 describe("traceRequest.utils", () => {
-  describe("normalizeOtlpAttributes", () => {
+  describe("normalizeOtlpAttributes()", () => {
     describe("when attributes contain flattened array patterns", () => {
       /** @scenario "Flattened array-pattern attributes reconstruct into objects" */
       it("reconstructs consecutive indexed arrays into objects", () => {
@@ -319,7 +319,7 @@ describe("traceRequest.utils", () => {
       });
     });
 
-    describe("edge cases", () => {
+    describe("given multiple separate arrays in the same input", () => {
       it("handles multiple separate arrays in same input", () => {
         const attributes = [
           {
@@ -369,7 +369,7 @@ describe("traceRequest.utils", () => {
     });
   });
 
-  describe("normalizeOtlpAnyValue", () => {
+  describe("normalizeOtlpAnyValue()", () => {
     describe("when value is a scalar", () => {
       it("flattens stringValue with rootKey", () => {
         const result = OtlpTraceRequestService.normalizeOtlpAnyValue(
@@ -672,7 +672,7 @@ describe("traceRequest.utils", () => {
     });
   });
 
-  describe("reconstructFlattenedArrays", () => {
+  describe("reconstructFlattenedArrays()", () => {
     // These test the reconstruction by feeding pre-flattened keys through normalizeOtlpAttributes
 
     describe("when items have heterogeneous shapes", () => {
@@ -784,7 +784,7 @@ describe("traceRequest.utils", () => {
     });
   });
 
-  describe("normalizeOtlpAttributes -- real-world SDK patterns", () => {
+  describe("given real-world SDK attribute patterns", () => {
     describe("when receiving Traceloop/OpenLLMetry llm.input_messages", () => {
       it("reconstructs homogeneous message arrays into JSON", () => {
         // These come as pre-flattened keys from the Traceloop SDK

@@ -197,7 +197,7 @@ describe("CodexCanonicaliserService.applyLog", () => {
     });
   });
 
-  describe("CodexCanonicaliserService.apply (span side)", () => {
+  describe("given a codex_cli_rs span", () => {
     it("lifts codex.turn.token_usage.* + model + turn.id off the codex_cli_rs session_task.turn span", () => {
       const ctx = createExtractorContext(
         {

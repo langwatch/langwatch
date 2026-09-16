@@ -8,7 +8,7 @@ const node = (id: string) => {
 };
 
 describe("customEvaluatorTemplate", () => {
-  describe("the entry point", () => {
+  describe("given the entry point node", () => {
     /** @scenario Custom evaluator template entry exposes only a question input */
     it("exposes only a question output", () => {
       expect((node("entry").data as { outputs: unknown }).outputs).toEqual([
@@ -22,7 +22,7 @@ describe("customEvaluatorTemplate", () => {
     });
   });
 
-  describe("the sample LLM node", () => {
+  describe("given the sample LLM node", () => {
     /** @scenario Custom evaluator template LLM input is named input */
     it("takes a single input named input", () => {
       expect((node("llm_call").data as { inputs: unknown }).inputs).toEqual([
@@ -42,7 +42,7 @@ describe("customEvaluatorTemplate", () => {
     });
   });
 
-  describe("the end node", () => {
+  describe("given the end node", () => {
     /** @scenario Custom evaluator template lists details first on the end node */
     it("puts details first so the reasoning edge does not cross the verdict", () => {
       expect(
@@ -53,7 +53,7 @@ describe("customEvaluatorTemplate", () => {
     });
   });
 
-  describe("the wiring", () => {
+  describe("given the template's edges", () => {
     /** @scenario Custom evaluator template wires reasoning into the end details */
     it("connects the LLM reasoning to the end details", () => {
       expect(customEvaluatorTemplate.edges).toContainEqual(
@@ -78,7 +78,7 @@ describe("customEvaluatorTemplate", () => {
     });
   });
 
-  describe("the node set", () => {
+  describe("given the template's node set", () => {
     /** @scenario Custom evaluator template has no extra ExactMatch evaluator */
     it("has only the entry, sample LLM and end nodes", () => {
       expect(customEvaluatorTemplate.nodes.map((n) => n.id).sort()).toEqual([

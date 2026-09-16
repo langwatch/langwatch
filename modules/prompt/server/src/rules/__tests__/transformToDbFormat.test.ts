@@ -16,7 +16,7 @@ const SNAKE_CASE_PARAMS = {
 };
 
 describe("transformToDbFormat", () => {
-  describe("buildCamelToSnakeMapping", () => {
+  describe("buildCamelToSnakeMapping()", () => {
     it("includes all expected LLM parameter mappings", () => {
       const mapping = buildCamelToSnakeMapping();
 
@@ -44,7 +44,7 @@ describe("transformToDbFormat", () => {
     });
   });
 
-  describe("transformCamelToSnake", () => {
+  describe("transformCamelToSnake()", () => {
     it("converts maxTokens to max_tokens when defined", () => {
       const input = { ...BASE_CONFIG, maxTokens: 1000 };
       const result = transformCamelToSnake(input);
@@ -125,7 +125,7 @@ describe("transformToDbFormat", () => {
     });
 
     // Unified reasoning field tests
-    describe("unified reasoning field", () => {
+    describe("when reasoning is set", () => {
       it("passes through reasoning field unchanged (no conversion needed)", () => {
         const input = { ...BASE_CONFIG, reasoning: "high" };
         const result = transformCamelToSnake(input);

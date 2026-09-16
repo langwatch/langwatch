@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MODULES } from "../model/studio-registry.ts";
 
 describe("Optimization Studio Registry", () => {
-  describe("signature (Prompt) defaults", () => {
+  describe("given the signature (Prompt) module", () => {
     const { signature } = MODULES;
 
     it("has input field named 'input'", () => {
@@ -40,7 +40,7 @@ describe("Optimization Studio Registry", () => {
     });
   });
 
-  describe("code block defaults", () => {
+  describe("given the code block module", () => {
     const { code } = MODULES;
 
     it("has input field named 'input'", () => {
@@ -108,7 +108,7 @@ describe("Optimization Studio Registry", () => {
     });
   });
 
-  describe("if/else block defaults", () => {
+  describe("given the if/else block module", () => {
     const { ifElse } = MODULES;
 
     /** @scenario If/Else is available in the node palette */
@@ -132,7 +132,7 @@ describe("Optimization Studio Registry", () => {
     });
   });
 
-  describe("unified naming consistency", () => {
+  describe("given every module in the registry", () => {
     it("signature and code use same input/output naming", () => {
       const { signature, code } = MODULES;
 

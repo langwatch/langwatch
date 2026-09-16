@@ -189,7 +189,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
     });
   });
 
-  describe("codex.sse_event lift", () => {
+  describe("given a codex.sse_event record", () => {
     /**
      * Codex emits cost-bearing turns as codex.sse_event with model +
      * token counts + conversation.id + user.email. No cost field on the
@@ -240,7 +240,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
     });
   });
 
-  describe("codex.conversation_starts lift", () => {
+  describe("given a codex.conversation_starts record", () => {
     it("lifts model + principal even before the first sse_event arrives", () => {
       const projection = makeProjection();
       const state = createInitState();
@@ -261,7 +261,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
     });
   });
 
-  describe("gemini / gen_ai.* defensive lift", () => {
+  describe("given a gemini gen_ai.* record", () => {
     it("lifts every gen_ai canonical field a gemini log carries", () => {
       const projection = makeProjection();
       const state = createInitState();
@@ -305,7 +305,7 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
   // trace.models / trace.totalPromptTokenCount / trace.totalCompletionTokenCount
   // directly. For Path B log-only emitters that stay on the log path (codex,
   // gemini) the mirror lifts those columns off the canonical log attrs.
-  describe("top-level column mirror from log lifts", () => {
+  describe("when a log-only emitter reaches the log fold", () => {
     const codexTurn = (model: string, inTok: string, outTok: string): LogRecordReceivedEvent =>
       makeLogEvent(
         {

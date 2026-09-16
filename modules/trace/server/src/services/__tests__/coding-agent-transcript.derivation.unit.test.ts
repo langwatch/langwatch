@@ -224,7 +224,7 @@ describe("buildCodingAgentTranscript", () => {
     });
   });
 
-  describe("totals", () => {
+  describe("given multiple model calls in the loop", () => {
     it("sum the whole loop, not just its last hop", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [modelSpan({ atMs: 1_000 }), modelSpan({ atMs: 2_000 })],

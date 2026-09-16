@@ -62,7 +62,7 @@ function makeEdge({
 }
 
 describe("workflowStoreCore", () => {
-  describe("removeInvalidEdges", () => {
+  describe("removeInvalidEdges()", () => {
     describe("when edges reference valid nodes and handles", () => {
       it("keeps the edges", () => {
         const nodes = [
@@ -220,7 +220,7 @@ describe("workflowStoreCore", () => {
     });
   });
 
-  describe("setNode", () => {
+  describe("setNode()", () => {
     let testStore: StoreApi<WorkflowStore>;
 
     beforeEach(() => {
@@ -492,7 +492,7 @@ describe("workflowStoreCore", () => {
     });
   });
 
-  describe("isDraggingNode", () => {
+  describe("isDraggingNode()", () => {
     let testStore: StoreApi<WorkflowStore>;
 
     beforeEach(() => {
@@ -521,7 +521,7 @@ describe("workflowStoreCore", () => {
     });
   });
 
-  describe("updateInputFields entry-point preservation", () => {
+  describe("updateInputFields()", () => {
     // The hook rewrites the entrypoint signature in-place when a user
     // adds/removes input fields on a code node. New templates use Python's
     // `__call__` over torch/dspy's `forward`, but legacy `forward` code must
@@ -668,7 +668,7 @@ describe("workflowStoreCore", () => {
     });
   });
 
-  describe("hasPendingChanges (regression: #2270)", () => {
+  describe("hasPendingChanges()", () => {
     let testStore: StoreApi<WorkflowStore>;
 
     beforeEach(() => {

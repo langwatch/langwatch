@@ -42,7 +42,7 @@ function makeRAGSpan(overrides: Partial<RAGSpan> = {}): RAGSpan {
 }
 
 describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
-  describe("identity fields", () => {
+  describe("given the span's identity fields", () => {
     it("maps span_id to spanContext().spanId", () => {
       const span = makeBaseSpan({ span_id: "abc-123" });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
@@ -61,7 +61,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("parent hierarchy", () => {
+  describe("given a parent span hierarchy", () => {
     it("maps parent_id to parentSpanContext.spanId", () => {
       const span = makeBaseSpan({ parent_id: "parent-1" });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
@@ -84,7 +84,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("name", () => {
+  describe("given the span name", () => {
     it("uses span name", () => {
       const span = makeBaseSpan({ name: "my-operation" });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
@@ -104,7 +104,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("timestamps", () => {
+  describe("given span timestamps", () => {
     it("converts started_at (ms) to HrTime [seconds, nanoseconds]", () => {
       const span = makeBaseSpan({
         timestamps: { started_at: 1700000001500, finished_at: 1700000002000 },
@@ -148,7 +148,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("span type to kind mapping", () => {
+  describe("given a span type", () => {
     const testCases: [SpanTypes, SpanKind][] = [
       ["server", SpanKind.SERVER],
       ["client", SpanKind.CLIENT],
@@ -182,7 +182,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("input mapping", () => {
+  describe("given span input", () => {
     it("maps chat_messages input to gen_ai.input.messages", () => {
       const messages = [
         { role: "user", content: "Hello" },
@@ -235,7 +235,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("output mapping", () => {
+  describe("given span output", () => {
     it("maps chat_messages output to gen_ai.output.messages", () => {
       const messages = [{ role: "assistant", content: "Response" }];
       const span = makeBaseSpan({
@@ -278,7 +278,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("LLM span fields", () => {
+  describe("given an LLM span", () => {
     it("maps model to gen_ai.request.model", () => {
       const span = makeLLMSpan({ model: "gpt-5-mini" });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
@@ -304,7 +304,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("params mapping", () => {
+  describe("given span params", () => {
     it("maps temperature to gen_ai.request.temperature", () => {
       const span = makeBaseSpan({ params: { temperature: 0.7 } });
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(span);
@@ -341,7 +341,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("metrics mapping", () => {
+  describe("given span metrics", () => {
     it("maps prompt_tokens", () => {
       const span = makeBaseSpan({
         metrics: { prompt_tokens: 100, completion_tokens: null },
@@ -385,7 +385,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("RAG span contexts", () => {
+  describe("given RAG span contexts", () => {
     it("maps contexts to retrieval.documents as JSON", () => {
       const contexts = [{ document_id: "d1", chunk_id: "c1", content: "doc content" }];
       const span = makeRAGSpan({ contexts });
@@ -411,7 +411,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("given a span error", () => {
     it("maps error to status code ERROR with message", () => {
       const span = makeBaseSpan({
         error: {
@@ -439,7 +439,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("stub fields", () => {
+  describe("given stub fields", () => {
     it("returns empty links array", () => {
       const result = TraceReadableSpanService.langwatchSpanToReadableSpan(makeBaseSpan());
       expect(result.links).toEqual([]);
@@ -474,7 +474,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("complete LLM span", () => {
+  describe("given a complete LLM span", () => {
     it("converts a fully-populated LLM span with all fields", () => {
       const span: LLMSpan = {
         span_id: "llm-span-1",
@@ -537,7 +537,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("complete RAG span", () => {
+  describe("given a complete RAG span", () => {
     it("converts a fully-populated RAG span with all fields", () => {
       const span: RAGSpan = {
         span_id: "rag-span-1",
@@ -571,7 +571,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("error span", () => {
+  describe("given an error span", () => {
     it("converts a span with an error status", () => {
       const span = makeBaseSpan({
         name: "failing-operation",
@@ -589,7 +589,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("params flattening", () => {
+  describe("given nested params", () => {
     it("flattens nested params to dot-notation attributes", () => {
       const span = makeBaseSpan({
         params: {
@@ -802,7 +802,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("given multiple spans mapped at once", () => {
     it("handles empty spans array via map", () => {
       const spans: Span[] = [];
       const results = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);

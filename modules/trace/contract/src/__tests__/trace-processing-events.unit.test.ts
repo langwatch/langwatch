@@ -13,7 +13,7 @@ import {
 } from "@langwatch/trace-contract";
 
 describe("events schemas", () => {
-  describe("spanReferencedPayloadSchema", () => {
+  describe("spanReferencedPayloadSchema()", () => {
     describe("when a job staged under the previous wire shape arrives", () => {
       /**
        * Deliberately ALL literals (no shared constants) so wire-string or
@@ -51,7 +51,7 @@ describe("events schemas", () => {
     });
   });
 
-  describe("topicAssignedEventDataSchema", () => {
+  describe("topicAssignedEventDataSchema()", () => {
     it("validates complete topic assignment data", () => {
       const data = {
         topicId: "topic-123",
@@ -105,7 +105,7 @@ describe("events schemas", () => {
     });
   });
 
-  describe("topicAssignedEventSchema", () => {
+  describe("topicAssignedEventSchema()", () => {
     it("validates complete topic assigned event", () => {
       const event = {
         id: "event-123",
@@ -166,7 +166,7 @@ describe("events schemas", () => {
     });
   });
 
-  describe("isTopicAssignedEvent type guard", () => {
+  describe("isTopicAssignedEvent()", () => {
     it("returns true for TopicAssignedEvent", () => {
       const event = {
         id: "event-123",
@@ -200,7 +200,7 @@ describe("events schemas", () => {
     });
   });
 
-  describe("isSpanReceivedEvent type guard", () => {
+  describe("isSpanReceivedEvent()", () => {
     it("returns true for SpanReceivedEvent type", () => {
       const event = {
         type: SPAN_RECEIVED_EVENT_TYPE,

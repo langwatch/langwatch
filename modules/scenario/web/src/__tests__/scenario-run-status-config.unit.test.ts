@@ -10,7 +10,7 @@ import {
 const allStatuses = Object.values(ScenarioRunStatus);
 
 describe("scenario-run-status-config", () => {
-  describe("SCENARIO_RUN_STATUS_ICONS", () => {
+  describe("given the SCENARIO_RUN_STATUS_ICONS map", () => {
     describe("when checking coverage of ScenarioRunStatus values", () => {
       /** @scenario Lucide-react icon mapping is colocated with the status config */
       it("exports a lucide-react icon for every ScenarioRunStatus value", () => {
@@ -28,7 +28,7 @@ describe("scenario-run-status-config", () => {
     });
   });
 
-  describe("SCENARIO_RUN_STATUS_CONFIG", () => {
+  describe("given the SCENARIO_RUN_STATUS_CONFIG map", () => {
     describe("when looking up config for each ScenarioRunStatus value", () => {
       /** @scenario Config covers every ScenarioRunStatus value */
       it("covers every ScenarioRunStatus value", () => {
@@ -80,7 +80,7 @@ describe("scenario-run-status-config", () => {
     });
   });
 
-  describe("getIconAndColor", () => {
+  describe("getIconAndColor()", () => {
     describe("when called with undefined status", () => {
       it("returns the PENDING icon and PENDING fgColor", () => {
         const result = getIconAndColor(undefined);

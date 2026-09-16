@@ -225,7 +225,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
   });
 
-  describe("search filtering across suites and external sets", () => {
+  describe("given a mix of suites and external sets", () => {
     const suites = [
       makeSuite({
         id: "suite_1",
@@ -355,7 +355,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     });
   });
 
-  describe("ordering", () => {
+  describe("given external sets with different last-run timestamps", () => {
     it("displays external sets ordered by most recent run first", () => {
       // Backend returns sets ordered by most recent run first
       const externalSets = [
@@ -759,7 +759,7 @@ describe("<SuiteSidebar/>", () => {
     });
   });
 
-  describe("three-dot context menu", () => {
+  describe("given a suite item's three-dot menu", () => {
     const suites = [makeSuite({ id: "suite_1", name: "Critical Path" })];
 
     describe("when hovering over a suite item", () => {
@@ -855,7 +855,7 @@ describe("<SuiteSidebar/>", () => {
     });
   });
 
-  describe("collapsible sidebar", () => {
+  describe("given the collapsible sidebar", () => {
     const suites = [
       makeSuite({
         id: "suite_1",

@@ -487,7 +487,7 @@ describe("<ScenarioFormDrawer/>", () => {
   });
 
   describe("when user clicks save-and-run", () => {
-    describe("from edit mode (existing scenario)", () => {
+    describe("given edit mode (existing scenario)", () => {
       beforeEach(() => {
         mocks.mockDrawerParams = { scenarioId: "existing-scenario-id" };
         mocks.mockGetByIdData = {
@@ -577,7 +577,7 @@ describe("<ScenarioFormDrawer/>", () => {
       });
     });
 
-    describe("from create mode (new scenario)", () => {
+    describe("given create mode (new scenario)", () => {
       beforeEach(() => {
         mocks.mockDrawerParams = {};
         mocks.mockGetByIdData = null;

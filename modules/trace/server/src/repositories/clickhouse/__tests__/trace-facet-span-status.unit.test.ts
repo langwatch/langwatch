@@ -10,7 +10,7 @@ describe("ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET", () => {
     expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.key).toBe("spanStatus");
   });
 
-  describe("status code expression", () => {
+  describe("given the status code expression", () => {
     it("maps OTel status code 2 to 'error'", () => {
       expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toContain(
         "= 2, 'error'",

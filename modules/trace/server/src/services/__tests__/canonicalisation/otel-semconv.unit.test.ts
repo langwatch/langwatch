@@ -21,7 +21,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Core attributes
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with core attributes", () => {
+  describe("given an inference span with core attributes", () => {
     /** @scenario "A span following the OTel GenAI semantic conventions canonicalises its model and response metadata" */
     it("preserves gen_ai.operation.name, provider, model, and response metadata", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
@@ -51,7 +51,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Request parameters
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with request parameters", () => {
+  describe("given an inference span with request parameters", () => {
     it("preserves temperature, max_tokens, top_p, penalties, seed, stop_sequences", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -84,7 +84,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Usage tokens
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with usage tokens", () => {
+  describe("given an inference span with usage tokens", () => {
     it("preserves gen_ai.usage.input_tokens and output_tokens", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -316,7 +316,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Input messages (parts-based format, v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with parts-based input messages", () => {
+  describe("given an inference span with parts-based input messages", () => {
     it("preserves text parts in gen_ai.input.messages", () => {
       const inputMessages = [
         {
@@ -450,7 +450,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Output messages (parts-based format, v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with parts-based output messages", () => {
+  describe("given an inference span with parts-based output messages", () => {
     it("preserves text output with finish_reason", () => {
       const outputMessages = [
         {
@@ -559,7 +559,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — System instructions (v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with gen_ai.system_instructions", () => {
+  describe("given an inference span with gen_ai.system_instructions", () => {
     it("extracts text from content-block array", () => {
       const instructions = [{ type: "text", content: "You are a helpful assistant." }];
 
@@ -595,7 +595,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Tool definitions
   // ─────────────────────────────────────────────────────────────────────────
-  describe("inference span with tool definitions", () => {
+  describe("given an inference span with tool definitions", () => {
     it("preserves gen_ai.tool.definitions", () => {
       const toolDefs = [
         {
@@ -625,7 +625,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Execute Tool Span
   // ─────────────────────────────────────────────────────────────────────────
-  describe("execute_tool span", () => {
+  describe("given an execute_tool span", () => {
     it("preserves tool span attributes", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -654,7 +654,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Embeddings Span
   // ─────────────────────────────────────────────────────────────────────────
-  describe("embeddings span", () => {
+  describe("given an embeddings span", () => {
     it("preserves embeddings-specific attributes", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {
@@ -699,7 +699,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Full realistic inference span (integration-level)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("full realistic inference span", () => {
+  describe("given a full realistic inference span", () => {
     it("handles a complete OpenAI-style chat span with all attributes", () => {
       const inputMessages = [
         {
@@ -792,7 +792,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Legacy content format (pre-v1.38.0 — string content, no parts)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("legacy content format (pre-v1.38.0, no parts wrapper)", () => {
+  describe("given the legacy content format (pre-v1.38.0, no parts wrapper)", () => {
     it("handles input messages with direct string content", () => {
       const inputMessages = [
         { role: "system", content: "Be concise." },
@@ -838,7 +838,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Agent span (v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
-  describe("agent span", () => {
+  describe("given an agent span", () => {
     it("preserves agent-related attributes", () => {
       const result = canonicalisation.canonicalizeSpanAttributes({
         spanAttributes: {

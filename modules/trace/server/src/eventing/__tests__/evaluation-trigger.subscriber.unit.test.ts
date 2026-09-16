@@ -714,7 +714,7 @@ describe("detectCausalityLoop (pure) — verbatim spec titles", () => {
 });
 
 describe("createEvaluationTriggerSubscriber — causality depth (handler-level)", () => {
-  describe("loop prevention via per-span causality_depth", () => {
+  describe("given a span carrying causality_depth", () => {
     /** @scenario Incoming span with causality_depth=0 still triggers evaluations */
     it("dispatches when inbound span has causality_depth=0", async () => {
       const { built, dispatch } = subscriber({});

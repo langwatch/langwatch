@@ -7,7 +7,7 @@ import { createExtractorContext } from "./test-helpers.ts";
 describe("LangWatchCanonicaliserService", () => {
   const extractor = LangWatchCanonicaliserService.create();
 
-  describe("metadata JSON promotion", () => {
+  describe("given metadata JSON on the span", () => {
     describe("when metadata JSON contains user_id", () => {
       it("promotes to langwatch.user.id via setAttrIfAbsent", () => {
         const ctx = createExtractorContext({
@@ -109,7 +109,7 @@ describe("LangWatchCanonicaliserService", () => {
     });
   });
 
-  describe("evaluation events (langwatch.evaluation.custom)", () => {
+  describe("given langwatch.evaluation.custom events", () => {
     describe("when span has a langwatch.evaluation.custom event", () => {
       it("maps first evaluation to GenAI semconv attributes", () => {
         const ctx = createExtractorContext({}, void 0, [
@@ -192,7 +192,7 @@ describe("LangWatchCanonicaliserService", () => {
     });
   });
 
-  describe("RAG contexts promotion", () => {
+  describe("given RAG contexts on the span", () => {
     describe("when span has langwatch.rag.contexts (canonical key)", () => {
       it("promotes to canonical output", () => {
         const contexts = [{ document_id: "doc-1", chunk_id: "chunk-1", content: "hello world" }];

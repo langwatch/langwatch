@@ -231,7 +231,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
       });
     });
 
-    describe("scrollId / pagination cursor handling", () => {
+    describe("given a scrollId pagination cursor", () => {
       const cursorTimestamp = 1700000000000;
       const cursorTraceId = "trace-cursor";
 

@@ -220,7 +220,7 @@ describe("parse LRU cache", () => {
 });
 
 describe("parse operator matrix", () => {
-  describe("comparison operators", () => {
+  describe("given a comparison operator", () => {
     it.each([
       [">", "cost:>5", ":>", 5],
       [">=", "cost:>=5", ":>=", 5],
@@ -243,7 +243,7 @@ describe("parse operator matrix", () => {
     });
   });
 
-  describe("range form", () => {
+  describe("given a range-form value", () => {
     it("parses `field:[low TO high]` as a Tag with a RangeExpression", () => {
       const tag = parseRangeTag("cost:[1 TO 10]");
       expect(tag.expression.range.min).toBe(1);
@@ -263,7 +263,7 @@ describe("parse operator matrix", () => {
     });
   });
 
-  describe("quoted values", () => {
+  describe("given a quoted value", () => {
     it("preserves spaces inside double-quoted values", () => {
       const tag = parseLiteralTag('model:"gpt-4 turbo"');
       expect(tag.expression.value).toBe("gpt-4 turbo");
@@ -295,7 +295,7 @@ describe("parse operator matrix", () => {
     });
   });
 
-  describe("wildcards", () => {
+  describe("given a wildcard value", () => {
     it.each([
       ["trailing", "model:gpt-*", "gpt-*"],
       ["leading", "model:*-mini", "*-mini"],
@@ -306,7 +306,7 @@ describe("parse operator matrix", () => {
     });
   });
 
-  describe("special characters in unquoted values", () => {
+  describe("given special characters in an unquoted value", () => {
     it("accepts `@` mid-value (e.g. emails)", () => {
       const tag = parseLiteralTag("user:foo@bar.com");
       expect(tag.expression.value).toBe("foo@bar.com");
@@ -330,7 +330,7 @@ describe("parse operator matrix", () => {
     });
   });
 
-  describe("boolean operator forms", () => {
+  describe("given a boolean operator", () => {
     it("uppercase AND/OR/NOT are recognised as boolean operators", () => {
       const a = parse("status:error AND model:gpt-5-mini");
       expect(a.type).toBe("LogicalExpression");
@@ -584,7 +584,7 @@ describe("getRangeValue", () => {
 });
 
 describe("toggleFacetInQuery", () => {
-  describe("starting from an empty query", () => {
+  describe("given an empty query", () => {
     it("appends the clause as-is when transitioning neutral → include", () => {
       expect(
         toggleFacetInQuery({
@@ -621,7 +621,7 @@ describe("toggleFacetInQuery", () => {
     });
   });
 
-  describe("starting from include", () => {
+  describe("given the value is currently included", () => {
     it("flips include → exclude (rewrites the same value as `NOT`)", () => {
       expect(
         toggleFacetInQuery({
@@ -634,7 +634,7 @@ describe("toggleFacetInQuery", () => {
     });
   });
 
-  describe("starting from exclude", () => {
+  describe("given the value is currently excluded", () => {
     it("collapses back to neutral (drops the clause entirely)", () => {
       expect(
         toggleFacetInQuery({
@@ -647,7 +647,7 @@ describe("toggleFacetInQuery", () => {
     });
   });
 
-  describe("alongside other clauses", () => {
+  describe("given other clauses in the query", () => {
     it("appends with AND when the query already has content", () => {
       expect(
         toggleFacetInQuery({
@@ -713,7 +713,7 @@ describe("toggleFacetInQuery", () => {
 });
 
 describe("setRangeInQuery", () => {
-  describe("starting from an empty query", () => {
+  describe("given an empty query", () => {
     it("inserts the range clause", () => {
       expect(
         setRangeInQuery({
@@ -750,7 +750,7 @@ describe("setRangeInQuery", () => {
     });
   });
 
-  describe("alongside unrelated clauses", () => {
+  describe("given unrelated clauses in the query", () => {
     it("preserves the unrelated clauses and appends the range with AND", () => {
       expect(
         setRangeInQuery({

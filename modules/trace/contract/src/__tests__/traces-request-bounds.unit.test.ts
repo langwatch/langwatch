@@ -24,7 +24,7 @@ const inputOf = (procedure: string) => {
 };
 
 describe("traces request-bound schemas", () => {
-  describe("traceFilterInputSchema.pageSize", () => {
+  describe("given the pageSize field", () => {
     const filter = { projectId: "p1", startDate: 1_000, endDate: 2_000 };
 
     it("refuses a page size above the enterprise ceiling", () => {

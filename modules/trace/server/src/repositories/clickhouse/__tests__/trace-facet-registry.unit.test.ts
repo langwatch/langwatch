@@ -47,7 +47,7 @@ describe("ClickHouseFacetRegistryAdapter.FACET_REGISTRY shape", () => {
     expect(dupes, `duplicate facet keys: ${dupes}`).toEqual([]);
   });
 
-  describe("label casing", () => {
+  describe("given a facet label", () => {
     // Acronyms are expected to stay uppercase mid-label ("Contains AI", an
     // eventual "API key", etc.). Detect them with a lookbehind so the rule
     // catches accidental Title Case ("Span Type") but not legitimate
@@ -94,7 +94,7 @@ describe("ClickHouseFacetRegistryAdapter.FACET_REGISTRY shape", () => {
     );
   });
 
-  describe("Subjects-axis facets", () => {
+  describe("given a subjects-axis facet", () => {
     it("registers `customer` as an expression-categorical on trace_summaries", () => {
       const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find((d) => d.key === "customer");
       expect(def?.kind).toBe("categorical");
@@ -124,7 +124,7 @@ describe("ClickHouseFacetRegistryAdapter.FACET_REGISTRY shape", () => {
     });
   });
 
-  describe("event-attribute discovery", () => {
+  describe("given the eventAttributeKeys facet", () => {
     it("registers `eventAttributeKeys` as a dynamic_keys facet on stored_spans", () => {
       const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
         (d) => d.key === "eventAttributeKeys",
