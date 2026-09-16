@@ -47,6 +47,9 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // Several suites here mock modules, and with isolation off those mocks
+    // leaked across files: 2 runs in 5 failed on a cross-file collision.
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
     },

@@ -844,6 +844,8 @@ describe("detachIdentifier strands guard", () => {
 
   describe("when the passkey is the only verified way in", () => {
     /** @scenario "Removing the last way in is refused" */
+    /** @scenario "Removing the last confirmed address is refused before it is clicked" */
+    /** @scenario "The detach route refuses the last way in whatever the screen drew" */
     it("refuses with identity_detach_strands_user and leaves the passkey working", async () => {
       const heads = new InMemoryHeads();
       const passkey = fact({
@@ -866,6 +868,7 @@ describe("detachIdentifier strands guard", () => {
 
   describe("when only passkeys would be left", () => {
     /** @scenario "Removing is refused when nothing is left to recover with" */
+    /** @scenario "Removing is refused where only passkeys and no address would be left" */
     it("refuses because losing the other would leave no way back", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(
@@ -945,6 +948,7 @@ describe("detachIdentifier strands guard", () => {
       expect(heads.heads.get(USER)?.identifiers.idf_email_keep?.state).toBe("VERIFIED");
     });
 
+    /** @scenario "An address nobody could have signed in with stays removable" */
     it("does not refuse an unverified identifier, which strands nobody", async () => {
       const heads = new InMemoryHeads();
       heads.heads.set(

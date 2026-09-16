@@ -9,10 +9,19 @@ import {
   type PersonalWorkspaceScreenName,
 } from "@langwatch/user-web/personal-workspace";
 import { useEffect, type ComponentType } from "react";
+import { Navigate } from "react-router";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { PersonalWorkspaceHost } from "./personal-workspace-host";
+
+/**
+ * Authentication became Security (#7631 on main). Kept alive for bookmarks
+ * and old links rather than left to 404 — not a second settings implementation.
+ */
+function AuthenticationSettingsRedirect() {
+  return <Navigate to="/settings/security" replace />;
+}
 
 /** Feature flag for personal workspace pages (AI Governance). */
 const PERSONAL_WORKSPACE_FLAG = "release_ui_ai_governance_enabled";
@@ -47,10 +56,14 @@ function personalWorkspacePage(screen: PersonalWorkspaceScreenName, { title }: {
 
 export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
   "pages/settings/authentication": uiPage({
+    screen: async () => ({ default: AuthenticationSettingsRedirect }),
+    host: PersonalWorkspaceHost,
+  }),
+  "pages/settings/security": uiPage({
     screen: async () => ({
       default: withDocumentTitle(
-        "Authentication · LangWatch",
-        (await personalWorkspaceScreens.authentication()).default as ComponentType,
+        "Security · LangWatch",
+        (await personalWorkspaceScreens.security()).default as ComponentType,
       ),
     }),
     host: PersonalWorkspaceHost,

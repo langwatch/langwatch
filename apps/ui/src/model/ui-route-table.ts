@@ -241,6 +241,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/authentication",
           },
           {
+            path: "/settings/security",
+            page: "pages/settings/security",
+          },
+          {
             path: "/settings/groups",
             page: "pages/settings/groups",
           },
