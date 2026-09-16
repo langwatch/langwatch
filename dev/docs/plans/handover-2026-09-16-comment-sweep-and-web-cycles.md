@@ -9,22 +9,15 @@ user's direction. They are independent; pick either.
 
 ## Exact next action
 
-**The comment sweep is no longer the biggest thing in this drive, and the next
-tranche should not be one.** `comment-block-size` is down to 662 and is now the
-*third* rule; `fallible-result-naming` (1,345) and `no-try-prefix` (757) are one
-coherent job of 2,102. That job is **Opus, high effort** and is described in
-`dev/docs/plans/handover-2026-09-16-lint-to-zero.md`, wave 2: a `try*` or
-nullable-returning method renamed to `find*` must **narrow its catch to the
-absence case**, and a blanket catch behind a `find*` name is a worse bug than
-the lint it silences. One lane per module, and the lane shows the narrowed catch
-in its handoff, not just the rename.
+**Wave 8 (the fallible-naming family) is started, not finished.** 145 of 2,104
+cleared. The next tranche is **class C**, and it has a ruling already - read
+"The naming ruling" below before writing its manifest, because a previous
+attempt at this family was reverted wholesale for getting it wrong.
 
-If you do run another comment tranche instead, it is now three commands rather
-than a rebuild: the checks are committed at `dev/scripts/comment-sweep/` and are
-no longer scratch files. Slice from a fresh measurement, skip the two held areas
-below, and exclude peer-dirty paths.
+Then: `comment-block-size` still has 659, with `packages/api` and
+`packages/architecture-enforcer` still deliberately held.
 
-Drive B (web import cycles) was **not touched this session** — the
+Drive B (web import cycles) was **not touched in this session** - the
 studio-column-vocabulary decision in section B is still open and still blocks
 web-12's dependency deletion.
 
@@ -140,6 +133,116 @@ Both are in `dev/docs/plans/comment-sweep-lost-facts.md`, entries 39-42.
 **Handoffs are gitignored.** A fact a lane records only in its handoff dies with
 the drive, so every recorded fact loss was transferred into the committed
 register before its slice was collected. Do this every time.
+
+
+---
+
+## C. The fallible-naming family - wave 8, and the ruling that governs it
+
+| | drive start | now |
+| --- | ---: | ---: |
+| `fallible-result-naming` + `no-try-prefix` | 2,104 | **1,959** |
+| oxlint total | 9,886 (session start) | **9,170** |
+
+Landed: `c859531848` (29 hedges -> 5, 79 files) and `f4d4c4bdce` (83 files across
+github, project, user, suite). Served surface verified unchanged on both.
+
+### The naming ruling - read this before writing any manifest for this family
+
+**A `try*` name drops its prefix. `find*` is only for a lookup that may find
+nothing.** `find` is not a suffix meaning "returns `T | null`".
+
+The first attempt at this wave was **stopped by the user and reverted
+wholesale** - 249 wrong lines across 73 files - for renaming non-lookups to
+`find*`: `findSafeRegex` (compiles a pattern), `findJsonArray` / `findJsonValue`
+/ `findContentArray` (parse and coerce), `findGroupKeyParts` (derives).
+
+The rule was never asking for that, **and its message says so**: the hedges
+branch names the replacement outright - "`tryCompileSafeRegex` hedges ... Name it
+`compileSafeRegex` and make the body throw" - and likewise `tryGet` -> `get`,
+`trySafeJsonParse` -> `safeJsonParse`. The `find<Noun>` wording belongs to the
+*no-try-prefix* message, where it is conditional on the thing genuinely
+answering with absence. **Read which message fired.** The correct second attempt
+produced `parseGithubPullRequestEvent`, `verifyInstallState`, `consumeNonce`,
+`mintTurnToken`, `resolveInstallationForRepository` - each keeping its own verb.
+
+`findRefreshToken` and `findPaths` are **correct** `find*` names: both look
+something up.
+
+### The six shapes, measured
+
+| class | count | what it is |
+| --- | ---: | --- |
+| A | 757 | `try*` rename, no catch claimed |
+| C | 688 | nullable - needs `find*` or make it throw. **The next tranche.** |
+| B | 429 | repository `get*`/`list*` -> `find*` (legitimate: repositories answer `find*`) |
+| D | 175 | add an explicit return type |
+| E | 24 | redundant `try` prefix, body unchanged |
+| F | 29 | hedges - a real catch to narrow. **Done.** |
+
+The governing doc calls the whole family "Opus, high effort - this is not a
+rename". Measured, only class F was. The rule's own census found **96.2% of
+flagged `try*` sites have no catch at all**. One opus lane took the 29; sonnet
+took the rest. Route the next tranche the same way.
+
+### When a plain throw is itself a regression
+
+Where the failure you stop swallowing is **stored data we wrote that no longer
+decodes**, a bare `SyntaxError` at the boundary becomes "unknown error" plus a
+trace id - worse than the null it replaced, which at least led the caller
+somewhere. Follow the existing convention (`avatar_image_unreadable`,
+`model_provider_credentials_unreadable`): a `HandledError` subclass in the
+module's `contract/src/<module>.errors.ts`, the code added **sorted** to
+`app-codes.ts`, a `presentation.ts` entry, and `fault: "platform"` set
+explicitly. `langy_local_record_unreadable` is the worked example.
+
+It does **not** apply to infra failure - the store unreachable - which stays a
+plain `Error`. Nor anywhere the remediation will not fit in one sentence.
+
+### And a throw amplifies through lists
+
+langy's list paths loop over ids calling `read()`. Making `read` throw meant one
+corrupt record failed a whole listing. **The user's ruling: a single-record read
+throws; a list skips the corrupt member and logs it at warn with the id.** The
+catch is narrowed with `instanceof` so a Redis outage still propagates. Look for
+this shape in every module this family touches next.
+
+### Traps this wave paid for
+
+- **`tslsp-cli diagnostics` cannot be trusted after a rename.** It reported clean
+  on two broken files. A rename-APPLY corrupted an unrelated line in
+  `prisma.github-pull-requests.repository.ts`, garbling two parameters into
+  stray text. Only `typecheck:one` and vitest caught it. **Run the package's real
+  typecheck before calling a batch done.**
+- **A peer session is doing this same family's work concurrently**, in
+  `enterprise/modules/governance`. Select a slice by content fingerprint and
+  reconcile it against the lane's own file counts; a directory sweep will
+  collect their work.
+- **Excluding a peer-dirty file from a revert is not safe** when a lane renamed
+  a symbol that file calls. It leaves a dangling call site. That happened here
+  (`model-provider.app.ts`) and cost a round trip to find.
+- **Renames must be checked against the served surface.**
+  `dev/scripts/wire/served-surface.py --diff HEAD <paths>` diffs REST routes and
+  tRPC procedures; `getProject` is an operation id as well as a method name.
+
+### Deferred, needing one lane that owns all three paths
+
+`packages/eventing`'s `getKey`, `tryGetProjection` and `tryGet` span
+`modules/suite` + `modules/scenario` + `packages/eventing`, and
+`tryExtractSuiteId` reaches `modules/scenario`. A lane owning only one of those
+will half-land the rename.
+
+### Pre-existing defects found, not caused
+
+- `modules/langy/server/tsconfig.build.json` pointed at `./src/subscribers/`,
+  moved to `./src/eventing/` by ADR-137. The package could not typecheck at all
+  (TS6053 aborted the load), so **langy-server's typecheck has been vacuously
+  passing**. Repointed in `c859531848`; that exposed 6 real errors in 4 untouched
+  test files.
+- `modules/user/server/src/transport/user-avatar.rest.ts` declares its door as
+  `browser` while its declaration test expects `session`. Both clean at HEAD.
+- `TestOrganizationService` / `OrganizationApi` fixture drift, 55+ missing
+  members across several github and suite fixtures.
 
 
 ---
