@@ -213,11 +213,20 @@ const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
 /**
  * Causality-loop detection for events that carry no span payload.
  *
- * Evaluator-emitted traces have no root span, so their origin is not resolved
- * while spans arrive; the originGate subscriber resolves it afterwards and
- * emits `origin_resolved`. That event has no span to inspect, so the per-span
- * depth check above cannot run, and dispatch used to proceed unguarded — the
- * evaluator then evaluated its own output, producing another such trace.
+ * A trace whose origin never settles from its spans is resolved afterwards by
+ * the originGate subscriber, which emits `origin_resolved`. That event has no
+ * span to inspect, so the per-span depth check above cannot run, and dispatch
+ * used to proceed unguarded.
+ *
+ * Reachability caveat, measured not assumed: nlpgo stamps an explicit
+ * `langwatch.origin` on the spans it emits, and hoistOrigin accepts an
+ * explicit origin from any span, root or not
+ * (trace-origin.service.ts:129-155). A trace whose evaluator spans carry that
+ * attribute therefore settles its origin on the first span,
+ * `needsOriginResolution` returns false (originGate.subscriber.ts:39), and it
+ * never takes this path at all — the span check above is what guards it. This
+ * path covers the remainder: a trace carrying a causality depth whose origin
+ * did not settle from any span it received.
  *
  * On this path the fold state is the only evidence available, so we read the
  * accumulated causality depth, which the attribute accumulation service folds
@@ -225,13 +234,12 @@ const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
  * the span path: origin remains a user-configurable precondition, never a
  * hardcoded subscriber guard.
  *
- * Known limitation: fold accumulation is first-wins, so a depth stamped by an
- * evaluator child span on an otherwise-application trace is sticky, and
- * `origin_resolved` rewrites the folded origin to "application" — so this
- * cannot tell that trace apart from an evaluator-born one and will skip its
- * evaluations. Reachable only via a manual evaluation run inside the deferred
- * window. See the @known-limitation scenario in
- * specs/monitors/online-evaluator-loop-prevention.feature.
+ * Known limitation: the folded depth is a max across spans, so any evaluator
+ * child span landing on an otherwise-application trace raises it for the life
+ * of that trace, and this guard cannot tell such a trace apart from an
+ * evaluator-born one — it will skip its evaluations. Reachable only via a
+ * manual evaluation run inside the deferred window. See the @known-limitation
+ * scenario in specs/monitors/online-evaluator-loop-prevention.feature.
  *
  * Exported for unit testing.
  */
