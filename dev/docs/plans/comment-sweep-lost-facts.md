@@ -628,3 +628,71 @@ already recorded. Neither check is sound alone — the changed-line pattern chec
 is blind to JSX `{/* */}` continuation lines, and the strip-and-compare check is
 blind to backticks and regex literals. Run both and reconcile the disagreements
 by hand; that is what the pair is for.
+
+## Wave 5 — `clickhouse-client`, `group-queue`, `redaction`
+
+The densest slice of the drive (212 findings over 76 files) and the one with the
+highest proportion of rules learned from incidents. Five cuts worth keeping.
+
+28. **The measured size of the vendor-error-routing incident.**
+    `packages/clickhouse-client/src/logging.ts` header. The two rules and their
+    one-line reasons survive; the magnitude does not — routing vendor-client
+    errors to the application's error level was **roughly half of one service's
+    entire error volume**. A rule with a number behind it survives a "do we
+    still need this?" review; the same rule without one does not.
+
+29. **The fix for the aggregating-dimension guard.**
+    `packages/clickhouse-client/src/tasks/__tests__/aggregatingDimensionGuard.unit.test.ts`.
+    Gone: the concrete remedy `SimpleAggregateFunction(max, T)` and the
+    MATERIALIZED/ALIAS exemption. The guard still fails loudly, but whoever
+    trips it now rediscovers the fix from ClickHouse documentation rather than
+    reading it next to the assertion that fired.
+
+30. **Why a cleanly-terminated hang is not counted as a crash.**
+    `packages/group-queue/src/scripts.ts`, `CLAIM_GUARD_LUA`. Gone: the
+    SIGTERM-versus-SIGKILL race — a hang that is SIGTERM'd cleanly is not
+    counted, because the retirement tombstone lands before the platform's
+    SIGKILL — along with the pin to `groupQueue.workerLiveness.unit.test.ts`.
+    The same file's `DRAIN_GROUP_LUA` also lost why bytes are measured from the
+    envelope's recorded size rather than raw `#value`: a compressed body
+    understates memory. Both are concurrency guarantees whose reasons are
+    invisible in the Lua.
+
+31. **A dependency deliberately not taken.**
+    `packages/redaction/src/contentRedaction.ts` header. Gone: nothing here
+    names `PROVENANCE_ATTR_API_KEY_ID`, **because doing so would drag in an
+    ingest route**. An absence with a reason is not recoverable by reading the
+    file — there is nothing there to read. This is the shape of comment most
+    worth keeping and easiest to cut, since it documents what the code does
+    *not* do.
+
+32. **`BLOB_RELEASE_GRACE_TTL_SECONDS` and "lazy does not mean four days".**
+    `packages/group-queue/src/blobLeases.ts` class doc. Partially recoverable —
+    `blobConstants.ts` still documents the constant — but the cross-reference
+    and the framing that bounds what "lazy" is allowed to mean are gone.
+
+### How CHECK 2 actually fails, and the check that replaces it
+
+`comment-only.py` flagged `tenantGuard.ts` and `secrets.ts` as code changes.
+Both are comment-only; all 179 changed lines across them are comment-shaped and
+their non-comment lines are byte-identical to HEAD.
+
+The cause is now understood rather than guessed. The stripper walks characters
+and treats `/` + `*` as opening a block comment and a quote as opening a string
+— **inside regex literals too**. `tenantGuard.ts` holds
+`/(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i` and a `"/*"` string literal;
+once the scanner desyncs it consumes until the next `*/`, and *how far that
+reaches depends on the length of the comments*. So editing comments changes its
+output even when no code moved. Backticks in comments desync it the same way.
+
+**Use this instead** — robust, and it is what settled both files:
+
+```bash
+git show "HEAD:$f" | grep -vE '^[[:space:]]*(\*|/\*\*|\*/|//)' > a
+grep -vE '^[[:space:]]*(\*|/\*\*|\*/|//)' "$f" > b
+diff a b     # empty => every change is confined to comment-shaped lines
+```
+
+It has one theoretical hole of its own — a multi-line template literal whose
+lines begin with `*` or `//` — so it is a better second opinion, not a proof.
+The pair still has to disagree in public and be reconciled by hand.
