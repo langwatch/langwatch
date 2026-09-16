@@ -1,22 +1,10 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { resetBaselineCache } from "../../src/baseline.mjs";
+import { afterAll, describe, expect, it } from "vitest";
 import { cognitiveComplexityRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
-// The baseline case writes a real baseline file into the fixture workspace,
-// and a fixture workspace outlives the test that wrote it. Clearing the file
-// as well as the cache keeps that case from silently baselining -- and so
-// passing vacuously -- every case declared after it.
-afterEach(() => {
-  workspace.write(
-    "packages/architecture-enforcer/src/oxlint-baseline.json",
-    JSON.stringify({ version: 0, entries: [] }),
-  );
-  resetBaselineCache();
-});
 
 function report(code, options = []) {
   return runRule(cognitiveComplexityRule, { code, cwd: workspace.cwd, filename: "x.ts", options });
@@ -61,21 +49,6 @@ describe("given a function", () => {
     });
   });
 
-  describe("when the file is baselined for cognitive-complexity", () => {
-    /** @scenario "A baselined file reports nothing" */
-    it("reports nothing even past the maximum", () => {
-      workspace.write(
-        "packages/architecture-enforcer/src/oxlint-baseline.json",
-        JSON.stringify({
-          version: 0,
-          entries: [{ key: "cognitive-complexity|x.ts", measured: "2026-09-06" }],
-        }),
-      );
-      resetBaselineCache();
-
-      expect(report(ifChain(6))).toEqual([]);
-    });
-  });
   describe("when the score is spread over many nested constructs", () => {
     // The shape this rule got wrong: a poll loop scoring 25, with five
     // constructs tied at delta 3. Attribution by single-node delta named

@@ -2,16 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { planLiteralsRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const BASELINED = "enterprise/modules/billing/contract/src/plan-limits.ts";
-
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
-  files: {
-    "packages/architecture-enforcer/src/oxlint-baseline.json": JSON.stringify({
-      version: 0,
-      entries: [{ key: `plan-literals|${BASELINED}`, measured: "2026-09-07" }],
-    }),
-  },
 });
 
 afterAll(() => workspace.cleanup());
@@ -103,13 +95,6 @@ describe("given a file the rule does not govern", () => {
           "modules/agent/server/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
-    });
-  });
-
-  describe("when the file carries a baseline entry", () => {
-    /** @scenario "A file on the debt register is left alone" */
-    it("reports nothing", () => {
-      expect(ids("const plan = { maxMembers: 2, canPublish: true };", BASELINED)).toEqual([]);
     });
   });
 });

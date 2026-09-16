@@ -2,16 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { prismaContainmentRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const BASELINED = "modules/agent/server/src/services/legacy.service.ts";
-
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
-  files: {
-    "packages/architecture-enforcer/src/oxlint-baseline.json": JSON.stringify({
-      version: 0,
-      entries: [{ key: `prisma-containment|${BASELINED}`, measured: "2026-09-15" }],
-    }),
-  },
 });
 
 afterAll(() => workspace.cleanup());
@@ -125,15 +117,6 @@ describe("given a feature package file", () => {
       );
 
       expect(found.map((e) => e.messageId)).toEqual(["featurePrismaClient"]);
-    });
-  });
-
-  describe("when the file carries a baseline entry", () => {
-    /** @scenario "A file on the debt register is left alone" */
-    it("reports nothing", () => {
-      expect(
-        report(BASELINED, 'import { PrismaClient } from "@langwatch/prisma-client/generated";'),
-      ).toEqual([]);
     });
   });
 });

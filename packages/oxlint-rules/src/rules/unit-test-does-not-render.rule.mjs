@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A test that renders a component and mocks its boundaries is an
@@ -33,10 +32,6 @@ export const unitTestDoesNotRenderRule = defineRule({
     },
   },
   create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "unit-test-does-not-render" })) {
-      return {};
-    }
-
     // Reported once per file: the file's name, not the number of imports, is
     // the defect.
     let reported = false;

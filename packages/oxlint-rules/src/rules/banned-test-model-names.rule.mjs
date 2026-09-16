@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A test/fixture/scenario/seed that names a specific OpenAI model must use
@@ -89,11 +88,6 @@ export const bannedTestModelNamesRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file)) return {};
-    if (
-      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "banned-test-model-names" })
-    ) {
-      return {};
-    }
 
     const source = context.sourceCode.text;
 

@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A title states what the test does ("checks local first"), not a prediction
@@ -87,15 +86,6 @@ export const testDescriptionIsAnActionRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file)) return {};
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "test-description-is-an-action",
-      })
-    ) {
-      return {};
-    }
 
     return {
       CallExpression(node) {

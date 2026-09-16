@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A `describe` whose sibling `it`/`test` bodies share a 3+ statement prefix
@@ -127,11 +126,7 @@ export const sharedSetupIsAHookRule = defineRule({
         + " `describe` and delete them from each test.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "shared-setup-is-a-hook" })) {
-      return {};
-    }
-
+  create(context, _file) {
     const source = context.sourceCode.text;
 
     return {

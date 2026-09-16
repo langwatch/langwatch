@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // dev/docs/best_practices/copywriting.md bans the em dash from anything a
@@ -47,11 +46,7 @@ export const emDashInCopyRule = defineRule({
       fix: "Replace the em dash with a comma, a colon, or parentheses.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "em-dash-in-copy" })) {
-      return {};
-    }
-
+  create(context, _file) {
     function check(node, text) {
       if (!hasEmDashInProse(text)) return;
       context.report({ node, messageId: "emDashInCopy", data: { excerpt: excerptAround(text) } });

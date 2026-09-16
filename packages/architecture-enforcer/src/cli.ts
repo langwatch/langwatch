@@ -12,7 +12,6 @@ import {
   lintComposedExportsBaseline,
   lintFeatureLayouts,
   lintManifests,
-  lintOxlintBaseline,
   lintPolicies,
   lintServiceCeilings,
   lintStrictPortModules,
@@ -45,7 +44,6 @@ const VALUE_FLAGS = new Set([
   "--root",
   "--baseline-reference-dir",
   "--boundary-edge-baseline-reference",
-  "--oxlint-baseline-reference",
   "--composed-exports-baseline-reference",
 ]);
 
@@ -175,11 +173,6 @@ function shrinkFindings(options: CliOptions, snapshot: WorkspaceSnapshot): Shrin
 
   const boundaryEdges = lintBoundaryEdgeBaseline(root, edges, boundaryEdgeReference(options));
 
-  const oxlint = lintOxlintBaseline(
-    root,
-    reference(options, "--oxlint-baseline-reference", "oxlint-baseline.json"),
-  );
-
   const composedExports = lintComposedExportsBaseline(
     root,
     reference(options, "--composed-exports-baseline-reference", "composed-exports-baseline.json"),
@@ -189,7 +182,6 @@ function shrinkFindings(options: CliOptions, snapshot: WorkspaceSnapshot): Shrin
 
   const findings = [
     ...boundaryEdges.violations,
-    ...oxlint.violations,
     ...composedExports.violations,
     ...lintServiceCeilings(snapshot),
     ...lintStrictPortModules(snapshot),

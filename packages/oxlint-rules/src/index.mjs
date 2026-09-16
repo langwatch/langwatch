@@ -1,5 +1,4 @@
 export { childNodes, walk } from "./ast.mjs";
-export { isBaselined, loadBaseline, resetBaselineCache, validateBaseline } from "./baseline.mjs";
 export {
   classify,
   normalizedFilename,

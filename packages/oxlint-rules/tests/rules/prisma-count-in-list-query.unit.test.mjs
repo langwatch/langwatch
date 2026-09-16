@@ -1,12 +1,10 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { resetBaselineCache } from "../../src/baseline.mjs";
+import { afterAll, describe, expect, it } from "vitest";
 import { prismaCountInListQueryRule } from "../../src/rules/prisma-count-in-list-query.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
-afterEach(() => resetBaselineCache());
 
 const REPOSITORY = "modules/agent/server/src/repositories/prisma/agent.repository.ts";
 const SERVICE = "modules/agent/server/src/services/agent.service.ts";
@@ -109,30 +107,5 @@ describe("given a file outside the Prisma seam", () => {
     );
 
     expect(found).toEqual([]);
-  });
-});
-
-describe("given a file baselined for prisma-count-in-list-query", () => {
-  it("reports nothing even though its findMany includes a relation _count", () => {
-    workspace.write(
-      "packages/architecture-enforcer/src/oxlint-baseline.json",
-      JSON.stringify({
-        version: 0,
-        entries: [{ key: `prisma-count-in-list-query|${REPOSITORY}`, measured: "2026-09-15" }],
-      }),
-    );
-    resetBaselineCache();
-
-    expect(
-      report(
-        "class AgentRepository {\n" +
-          "  findMany() {\n" +
-          "    return this.client.agent.findMany({\n" +
-          "      include: { _count: true },\n" +
-          "    });\n" +
-          "  }\n" +
-          "}",
-      ),
-    ).toEqual([]);
   });
 });

@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Swallowing a failure is a decision, and a decision that is not written down
@@ -16,11 +15,7 @@ export const emptyCatchRule = defineRule({
       fix: "Rethrow it, log it with the trace id, or return the value the caller gets when this fails.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "empty-catch" })) {
-      return {};
-    }
-
+  create(context, _file) {
     return {
       CatchClause(node) {
         // A comment is not a statement, so a block holding only one is empty

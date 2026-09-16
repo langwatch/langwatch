@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // The process side installs, mounts and composes modules; it never grows its
@@ -40,11 +39,6 @@ export const featureSideHoldsNoAppRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file.workspacePath)) return {};
-    if (
-      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "feature-side-holds-no-app" })
-    ) {
-      return {};
-    }
 
     const check = (node) => {
       const name = node.id?.name;

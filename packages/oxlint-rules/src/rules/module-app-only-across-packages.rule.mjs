@@ -1,5 +1,4 @@
 import { dirname, relative, resolve, sep } from "node:path";
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Ruling (Alex, 2026-09-10): outside its own package a module is its App,
@@ -71,16 +70,6 @@ export const moduleAppOnlyAcrossPackagesRule = defineRule({
     },
   },
   create(context, file) {
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "module-app-only-across-packages",
-      })
-    ) {
-      return {};
-    }
-
     return {
       ImportDeclaration(node) {
         if (node.source?.type !== "Literal" || typeof node.source.value !== "string") return;

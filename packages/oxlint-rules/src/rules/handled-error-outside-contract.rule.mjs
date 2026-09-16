@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A service throws a HandledError subclass and a client reads its `code`, so
@@ -30,15 +29,6 @@ export const handledErrorOutsideContractRule = defineRule({
   },
   create(context, file) {
     const module = moduleOf(file.workspacePath);
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "handled-error-outside-contract",
-      })
-    ) {
-      return {};
-    }
 
     function check(node) {
       if (node.superClass?.type !== "Identifier" || node.superClass.name !== "HandledError") return;

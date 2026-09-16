@@ -1,5 +1,4 @@
 import { childNodes } from "../ast.mjs";
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // SonarSource cognitive complexity: a structural +1 per control-flow break,
@@ -248,11 +247,6 @@ export const cognitiveComplexityRule = defineRule({
   create(context, file, { max }) {
     const check = (node) => {
       if (isNestedFunction(node)) return;
-      if (
-        isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "cognitive-complexity" })
-      ) {
-        return;
-      }
       const { blocks, concentrated, heaviest, score: complexity } = cognitiveComplexity(node);
       if (complexity <= max) return;
       context.report({

@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Documented production incident: Prisma builds `_count` as an uncorrelated
@@ -56,11 +55,7 @@ export const prismaCountInListQueryRule = defineRule({
       fix: "Drop `_count` from the query and run a second `groupBy` count restricted to the listed row ids.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "prisma-count-in-list-query" })) {
-      return {};
-    }
-
+  create(context, _file) {
     return {
       CallExpression(node) {
         const callee = node.callee;

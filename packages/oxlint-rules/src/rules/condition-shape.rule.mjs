@@ -1,5 +1,4 @@
 import { walk } from "../ast.mjs";
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A condition is readable at a glance or it is named. What costs a reader is
@@ -76,9 +75,6 @@ export const conditionShapeRule = defineRule({
   create(context, file, { maxCalls, maxHops, maxOperators }) {
     const check = (test) => {
       if (!test) return;
-      if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "condition-shape" })) {
-        return;
-      }
 
       const shape = conditionShape(test);
       // Naming `a.b.c.length > 0` restates it and tells the reader nothing, so

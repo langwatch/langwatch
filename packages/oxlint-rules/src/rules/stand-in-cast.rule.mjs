@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // `x as unknown as T` and `x as any` are a type hole with a comment attached.
@@ -54,10 +53,6 @@ export const standInCastRule = defineRule({
     },
   },
   create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "stand-in-cast" })) {
-      return {};
-    }
-
     const doubleCastId = file.isTest ? "doubleCastInTest" : "doubleCast";
     const anyCastId = file.isTest ? "anyCastInTest" : "anyCast";
 

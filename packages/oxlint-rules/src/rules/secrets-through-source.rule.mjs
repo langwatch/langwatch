@@ -1,5 +1,4 @@
 import registry from "@langwatch/secrets/keys.json" with { type: "json" };
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A secret arrives through the SecretSource chain the boot seam resolves, so
@@ -57,11 +56,6 @@ export const secretsThroughSourceRule = defineRule({
   create(context, file) {
     if (isNonProductionSource(file.workspacePath)) return {};
     if (isSecretResolutionSite(file.workspacePath)) return {};
-    if (
-      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "secrets-through-source" })
-    ) {
-      return {};
-    }
 
     return {
       MemberExpression(node) {

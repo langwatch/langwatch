@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 import { isEnvironmentObject, staticPropertyName } from "./secrets-through-source.rule.mjs";
 
@@ -45,16 +44,6 @@ export const serviceLoadsItsOwnConfigRule = defineRule({
     },
   },
   create(context, file) {
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "service-loads-its-own-config",
-      })
-    ) {
-      return {};
-    }
-
     function reportFunction(node, name) {
       context.report({ node, messageId: "configFunction", data: { name, path: file.workspacePath } });
     }

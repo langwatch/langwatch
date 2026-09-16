@@ -186,12 +186,6 @@ export {
 } from "./policies/quality/composed-exports.ts";
 export type { ComposedExportSubject } from "./policies/quality/composed-exports.ts";
 export {
-  OXLINT_BASELINE,
-  lintOxlintBaseline,
-  oxlintBaselineFile,
-  readOxlintBaseline,
-} from "./policies/quality/oxlint-baseline-check.ts";
-export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
   planFilenameMigration,

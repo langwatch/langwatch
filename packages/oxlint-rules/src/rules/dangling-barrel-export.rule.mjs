@@ -1,6 +1,5 @@
 import { statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A codemod moves a file, the barrel keeps pointing at the path it left, and
@@ -116,12 +115,6 @@ export const danglingBarrelExportRule = defineRule({
     },
   },
   create(context, file) {
-    if (
-      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "dangling-barrel-export" })
-    ) {
-      return {};
-    }
-
     const from = dirname(file.filename);
 
     const check = (node, messageId) => {

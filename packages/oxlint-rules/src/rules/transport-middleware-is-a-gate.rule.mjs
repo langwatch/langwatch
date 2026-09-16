@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A middleware fact carries credentials, audit, rate limits and body format -
@@ -63,15 +62,6 @@ export const transportMiddlewareIsAGateRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file.workspacePath)) return {};
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "transport-middleware-is-a-gate",
-      })
-    ) {
-      return {};
-    }
 
     return {
       CallExpression(node) {

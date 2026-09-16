@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 import { unwrap } from "./zod-schema-origin.mjs";
 
@@ -74,9 +73,6 @@ export const schemaOutsideContractRule = defineRule({
   },
   create(context, file) {
     const module = moduleOf(file.workspacePath);
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "schema-outside-contract" })) {
-      return {};
-    }
 
     return {
       Program(program) {

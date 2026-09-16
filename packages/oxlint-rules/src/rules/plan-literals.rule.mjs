@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Plan facts are stated once, in @langwatch/plans. One limit field in an
@@ -82,11 +81,7 @@ export const planLiteralsRule = defineRule({
       fix: 'Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about.',
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "plan-literals" })) {
-      return {};
-    }
-
+  create(context, _file) {
     return {
       ObjectExpression(node) {
         const fields = statedFields(node);

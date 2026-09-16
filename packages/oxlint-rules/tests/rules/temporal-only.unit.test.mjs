@@ -2,16 +2,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { temporalOnlyRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const BASELINED = "modules/agent/server/src/services/legacy.service.ts";
-
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
-  files: {
-    "packages/architecture-enforcer/src/oxlint-baseline.json": JSON.stringify({
-      version: 0,
-      entries: [{ key: `temporal-only|${BASELINED}`, measured: "2026-09-06" }],
-    }),
-  },
 });
 
 afterAll(() => workspace.cleanup());
@@ -132,13 +124,6 @@ describe("given a file outside the governed source", () => {
           "modules/agent/server/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
-    });
-  });
-
-  describe("when the file carries a baseline entry", () => {
-    /** @scenario "A file on the debt register is left alone" */
-    it("reports nothing", () => {
-      expect(ids("const at = new Date();", BASELINED)).toEqual([]);
     });
   });
 

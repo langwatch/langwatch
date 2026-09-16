@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Dynamic import() hides dependencies. Allowed only: CLI startup path (~30ms
@@ -35,11 +34,6 @@ export const noInlineDynamicImportRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file)) return {};
-    if (
-      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "no-inline-dynamic-import" })
-    ) {
-      return {};
-    }
 
     return {
       ImportExpression(node) {

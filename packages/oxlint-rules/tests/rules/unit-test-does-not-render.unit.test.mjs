@@ -1,12 +1,10 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { resetBaselineCache } from "../../src/baseline.mjs";
+import { afterAll, describe, expect, it } from "vitest";
 import { unitTestDoesNotRenderRule } from "../../src/rules/unit-test-does-not-render.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
-afterEach(() => resetBaselineCache());
 
 function report(code, filename) {
   return runRule(unitTestDoesNotRenderRule, { code, cwd: workspace.cwd, filename });
@@ -71,24 +69,5 @@ describe("given a .integration.test.tsx file", () => {
     );
 
     expect(found).toEqual([]);
-  });
-});
-
-describe("given a file baselined for unit-test-does-not-render", () => {
-  const filename = "modules/agent/web/src/ui/blocks/__tests__/agent-card.unit.test.tsx";
-
-  it("reports nothing even though it imports a renderer", () => {
-    workspace.write(
-      "packages/architecture-enforcer/src/oxlint-baseline.json",
-      JSON.stringify({
-        version: 0,
-        entries: [{ key: `unit-test-does-not-render|${filename}`, measured: "2026-09-15" }],
-      }),
-    );
-    resetBaselineCache();
-
-    expect(
-      report('import { render } from "@testing-library/react";\ntest("x", () => {});', filename),
-    ).toEqual([]);
   });
 });

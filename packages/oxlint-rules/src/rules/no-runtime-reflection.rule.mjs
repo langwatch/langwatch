@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A module's shape is read at compile time, not discovered at runtime: no
@@ -55,9 +54,6 @@ export const noRuntimeReflectionRule = defineRule({
   },
   create(context, file) {
     if (!isGoverned(file.workspacePath)) return {};
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "no-runtime-reflection" })) {
-      return {};
-    }
     const source = context.sourceCode.text;
 
     return {

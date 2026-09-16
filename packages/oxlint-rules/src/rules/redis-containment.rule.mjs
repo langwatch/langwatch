@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Redis gets the containment Prisma and ClickHouse already have: only the
@@ -105,9 +104,6 @@ export const redisContainmentRule = defineRule({
     const pkg = redisPackageOf(file.workspacePath);
     if (!pkg) return {};
     if (isStrictRedisAdapter(pkg)) return {};
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "redis-containment" })) {
-      return {};
-    }
 
     const check = (node) => {
       const specifier = importedSpecifier(node);

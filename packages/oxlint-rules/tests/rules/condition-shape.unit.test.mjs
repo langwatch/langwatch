@@ -1,5 +1,4 @@
-import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { resetBaselineCache } from "../../src/baseline.mjs";
+import { afterAll, describe, expect, it } from "vitest";
 import { conditionShapeRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -8,7 +7,6 @@ const workspace = createFixtureWorkspace({
 });
 
 afterAll(() => workspace.cleanup());
-afterEach(() => resetBaselineCache());
 
 const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
@@ -113,22 +111,6 @@ describe("given a strict feature service module", () => {
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
-    });
-  });
-
-  describe("when the file is baselined for condition-shape", () => {
-    /** @scenario "A baselined file reports nothing" */
-    it("reports nothing even past every limit", () => {
-      workspace.write(
-        "packages/architecture-enforcer/src/oxlint-baseline.json",
-        JSON.stringify({
-          version: 0,
-          entries: [{ key: `condition-shape|${SERVICE}`, measured: "2026-09-06" }],
-        }),
-      );
-      resetBaselineCache();
-
-      expect(report(DEEP_AND_COMBINING)).toEqual([]);
     });
   });
 

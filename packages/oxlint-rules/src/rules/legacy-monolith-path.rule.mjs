@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // `platform/app` was the monolith that `apps/*` and `modules/*` replaced, and
@@ -22,11 +21,7 @@ export const legacyMonolithPathRule = defineRule({
       fix: "Find where the code lives now by searching its basename across `modules/*/{contract,server,web}/src`, `packages/*/src` and `apps/*/src`, then re-point this specifier at that package.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "legacy-monolith-path" })) {
-      return {};
-    }
-
+  create(context, _file) {
     // One visitor: an import source IS a string literal, so this catches the
     // specifier and the loose path in a script or a config object in one pass.
     return {

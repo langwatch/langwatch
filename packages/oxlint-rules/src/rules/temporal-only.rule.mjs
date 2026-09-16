@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // One clock. `Date` survives only where a boundary refuses anything else: the
@@ -102,11 +101,7 @@ export const temporalOnlyRule = defineRule({
       fix: "Declare it `Temporal.Instant` from @langwatch/time, or `string` when the value only ever comes off the wire, and convert with `toDate()` at the Prisma or SDK boundary.",
     },
   },
-  create(context, file) {
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "temporal-only" })) {
-      return {};
-    }
-
+  create(context, _file) {
     return {
       NewExpression(node) {
         if (node.callee?.type !== "Identifier" || node.callee.name !== "Date") return;

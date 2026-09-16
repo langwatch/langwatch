@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A route holds a request, not a table. Everything a transport declaration
@@ -77,17 +76,7 @@ export const transportImportsARepositoryRule = defineRule({
       fix: "Take the module's app as the dependency and call a service method on it.",
     },
   },
-  create(context, file) {
-    if (
-      isBaselined({
-        cwd: context.cwd,
-        file: file.workspacePath,
-        rule: "transport-imports-a-repository",
-      })
-    ) {
-      return {};
-    }
-
+  create(context, _file) {
     return {
       ImportDeclaration(node) {
         const specifier = specifierOf(node);

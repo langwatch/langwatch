@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 const PRISMA_ROOT = "@langwatch/prisma-client";
@@ -146,12 +145,6 @@ export const prismaContainmentRule = defineRule({
   create(context, file) {
     const pkg = prismaPackageOf(file.workspacePath);
     if (!pkg || !isPrismaProductionSource(pkg.relative)) return {};
-    // The same shrink-only register `clickhouse-containment` and
-    // `redis-containment` read, so the three stores record their standing debt
-    // one way instead of one rule failing the build where its siblings do not.
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "prisma-containment" })) {
-      return {};
-    }
     const adapter = isStrictPrismaAdapter(pkg);
 
     const check = (node) => {

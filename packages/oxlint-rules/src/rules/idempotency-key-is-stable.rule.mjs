@@ -1,4 +1,3 @@
-import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 import { assignedFieldNameOf, idempotencyKeyTargetOf, mintedSourceOf } from "./idempotency-key.mjs";
 
@@ -68,14 +67,7 @@ export const idempotencyKeyIsStableRule = defineRule({
       fix: "Derive it from the request's own content, or bind it once for the operation it identifies — `useState(() => crypto.randomUUID())` for a form, a key threaded from the caller for a mutation — and pass that binding here.",
     },
   },
-  create(context, file) {
-    const baselined = isBaselined({
-      cwd: context.cwd,
-      file: file.workspacePath,
-      rule: "idempotency-key-is-stable",
-    });
-    if (baselined) return {};
-
+  create(context, _file) {
     const check = (node) => {
       const target = idempotencyKeyTargetOf(node);
       if (!target) return;

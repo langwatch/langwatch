@@ -32,7 +32,6 @@ import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.
 import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
 import { lintDeclarations } from "./quality/declarations.ts";
 import { lintInfrastructureMembers } from "./quality/infrastructure-member-unused.ts";
-import { lintOxlintBaseline } from "./quality/oxlint-baseline-check.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintUnusedModuleExports } from "./quality/unused-module-export.ts";
@@ -268,11 +267,5 @@ export const POLICIES: readonly PolicyDefinition[] = [
     spec: "specs/api-package-surface.feature",
     baseline: "composed-exports-baseline.json",
     run: lintComposedExports,
-  }),
-  definePolicy({
-    id: "oxlint",
-    spec: LINT_BASELINES,
-    baseline: "oxlint-baseline.json",
-    run: (snapshot) => lintOxlintBaseline(snapshot.root).violations,
   }),
 ];
