@@ -254,6 +254,49 @@ Typecheck held at its **114-error / 40-file** baseline throughout; verify
 against that number, not zero, and compare the error-code distribution and the
 erroring file set, not just the count.
 
+## HALF THE LINT DEBT IS SUPPRESSED, PERMANENTLY, AND UNMETERED (2026-09-16)
+
+The counter everyone quotes is `7,166`. Beside it, in
+`packages/architecture-enforcer/src/oxlint-baseline.json`, sit **6,925
+`rule|file` rows across 37 rules**. The real debt is roughly twice the number on
+the scoreboard.
+
+That alone would be a reporting problem. The defect is what the rows do:
+
+- **Zero of the 6,925 entries carry an `expires`.**
+- **Zero carry a `count`.**
+
+Both fields exist in the schema (`baseline.ts:23`), and the growth check reads
+`entry.count` (`baseline.ts:345`). The ratchet is built and wired to nothing.
+Suppression resolves to a `Set` of `rule|file` keys, so a baselined file is
+exempt from that rule **forever**, and may accumulate **unlimited new
+violations** without a single finding. That is not a baseline. It is a per-file
+deletion of the rule, dated and checked in.
+
+Verified, not inferred: 28 files report `langwatch(stand-in-cast)` findings; 955
+files are baselined for it; **the two sets share no file**. Three production
+(non-test) baselined files carrying 18, 15 and 13 casts each report zero.
+
+| rule | files with visible findings | files suppressed | note |
+| --- | --- | --- | --- |
+| `no-port-vocabulary` | 206 | **1,432** | the architecture guide's own ports/adapters ban, 87% off |
+| `stand-in-cast` | 28 | **955** (163 non-test) | catches `as X` hiding a type error |
+| `cognitive-complexity` | 226 | 773 | |
+| `condition-shape` | 368 | 500 | |
+| `no-nested-ternary` | **0** | 292 | enforces nothing, anywhere |
+| `shared-setup-is-a-hook` | **0** | 168 | enforces nothing, anywhere |
+
+**The highest-impact change available on this drive is not a new rule and not a
+grinding wave.** It is populating `count` on the existing entries so a baselined
+file cannot silently grow, which converts 6,925 permanent exemptions into a
+ratchet at the cost of one script run. Un-baseline `stand-in-cast` first when
+you do: it is the rule that would have caught this drive's two rename
+regressions, and 792 of its 955 rows are test files, which are the cheap half.
+
+**Blocked, not forgotten:** `packages/architecture-enforcer/src/baseline.ts`
+carries a `comment-block-size` finding, so lane `comment-w11` is editing it.
+Do this the moment that lane is collected.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
