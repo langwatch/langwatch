@@ -271,6 +271,22 @@ export class TraceAttributeAccumulationService {
     const origin = stringAttr(spanAttrs, "langwatch.origin");
     if (origin) result["langwatch.origin"] = origin;
 
+    // Causality depth must survive into the fold state: events that carry no
+    // span payload (origin_resolved) have no other way to see it, and the
+    // evaluation-trigger loop guard reads it there. Reserved keys are exempt
+    // from analytics trimming and skipped by the filter builders, so this is
+    // not user-visible.
+    // Arrives as an int on the OTLP path and as a string on others, so accept
+    // both and store the canonical decimal form.
+    const causalityDepth = spanAttrs["langwatch.reserved.causality_depth"];
+    const causalityDepthNum =
+      typeof causalityDepth === "number" || typeof causalityDepth === "string"
+        ? Number(causalityDepth)
+        : NaN;
+    if (Number.isFinite(causalityDepthNum))
+      result["langwatch.reserved.causality_depth"] =
+        String(causalityDepthNum);
+
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
     if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
 

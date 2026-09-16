@@ -76,7 +76,8 @@ export function createEvaluationTriggerSubscriber(
       const { tenantId, aggregateId: traceId, state: foldState } = context;
 
       if (hasReachedProcessingCap({ tenantId, traceId, foldState })) return;
-      if (await causalityLoopGuardFired({ event, tenantId, traceId })) return;
+      if (await causalityLoopGuardFired({ event, tenantId, traceId, foldState }))
+        return;
 
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.
       await dispatchEvaluations({
@@ -142,6 +143,11 @@ function hasReachedProcessingCap({
  * >= 1, it was emitted by an evaluator workflow (or downstream
  * of one). Skip dispatch.
  *
+ * Events that carry no span (`origin_resolved`, the deferred-origin
+ * path) have no attribute to read, so they are checked against the
+ * fold state instead — see `detectCausalityLoopFromFoldState`. That
+ * path previously had no check at all.
+ *
  * A fresh app-origin span on the same trace (depth 0) still
  * triggers normally — re-runs are allowed, only eval spans are
  * blocked.
@@ -161,10 +167,12 @@ async function causalityLoopGuardFired({
   event,
   tenantId,
   traceId,
+  foldState,
 }: {
   event: TraceProcessingEvent;
   tenantId: string;
   traceId: string;
+  foldState: TraceSummaryData;
 }): Promise<boolean> {
   const guardDisabled = await featureFlagService.isEnabled(
     CAUSALITY_LOOP_GUARD_DISABLED_FLAG,
@@ -185,11 +193,9 @@ async function causalityLoopGuardFired({
     return false;
   }
 
-  if (!isSpanReceivedEvent(event)) return false;
-
-  const reason = detectCausalityLoop({
-    spanAttributes: event.data.span.attributes,
-  });
+  const reason = isSpanReceivedEvent(event)
+    ? detectCausalityLoop({ spanAttributes: event.data.span.attributes })
+    : detectCausalityLoopFromFoldState(foldState);
   if (!reason) return false;
 
   recordLoopBlocked(reason);
@@ -201,6 +207,32 @@ async function causalityLoopGuardFired({
 }
 
 const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
+
+/**
+ * Causality-loop detection for events that carry no span payload.
+ *
+ * Evaluator-emitted traces have no root span, so their origin is not resolved
+ * while spans arrive; the originGate subscriber resolves it afterwards and
+ * emits `origin_resolved`. That event has no span to inspect, so the per-span
+ * depth check above cannot run, and dispatch used to proceed unguarded — the
+ * evaluator then evaluated its own output, producing another such trace.
+ *
+ * On this path the fold state is the only evidence available, so we read the
+ * accumulated causality depth, which the attribute accumulation service folds
+ * in for exactly this reason. Depth stays the sole hard rule here, same as on
+ * the span path: origin remains a user-configurable precondition, never a
+ * hardcoded subscriber guard.
+ */
+export function detectCausalityLoopFromFoldState(
+  foldState: TraceSummaryData,
+): "depth_fold" | null {
+  const attrs = foldState.attributes ?? {};
+
+  const depth = Number(attrs[CAUSALITY_DEPTH_ATTR]);
+  if (Number.isFinite(depth) && depth >= 1) return "depth_fold";
+
+  return null;
+}
 
 /**
  * Causality-loop detection on a single incoming span_received event.

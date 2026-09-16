@@ -307,4 +307,39 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
       ).toEqual([]);
     });
   });
+
+  describe("when a span carries a causality depth", () => {
+    /**
+     * The evaluation-trigger loop guard reads this key off the fold state on
+     * events that carry no span payload (origin_resolved). If accumulation
+     * drops it, evaluator-emitted traces dispatch unguarded and evaluate
+     * their own output.
+     */
+    it("folds an integer depth into the trace attributes", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": 1 },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+
+    it("folds a string depth into the trace attributes", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "2" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBe("2");
+    });
+
+    it("drops a non-numeric depth", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "deep" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+  });
 });

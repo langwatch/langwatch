@@ -249,4 +249,60 @@ describe("evaluationTrigger subscriber", () => {
       expect(payload.evaluatorName).toBe("Legacy Monitor");
     });
   });
+
+  describe("when an evaluator-origin trace dispatches via origin_resolved", () => {
+    /**
+     * Evaluator-emitted traces have no root span, so their origin is not
+     * resolved on span_received — the originGate subscriber resolves it later
+     * and emits origin_resolved. The causality loop guard only inspects the
+     * span payload, which that event does not carry, so before the fix it
+     * reported "no loop" and the trace was evaluated, producing another
+     * evaluator trace. Guard the deferred path off the fold state instead.
+     */
+    it("does not dispatch evaluations", async () => {
+      const monitor = makeMonitor();
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "evaluation" },
+      } as unknown as Partial<TraceProcessingEvent>);
+      const context = makeContext(
+        {},
+        {
+          "langwatch.origin": "evaluation",
+          "langwatch.reserved.causality_depth": "1",
+        },
+      );
+
+      await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    it("still dispatches for an application-origin trace", async () => {
+      const monitor = makeMonitor();
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "application" },
+      } as unknown as Partial<TraceProcessingEvent>);
+      const context = makeContext();
+
+      await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+    });
+  });
 });
