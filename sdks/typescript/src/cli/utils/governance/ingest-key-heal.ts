@@ -128,6 +128,14 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * the user's, never overwritten, and a request that carried no bearer at all
  * was rejected for another reason).
  *
+ * A token read out of the AGENT'S OWN WIRING is the one exception to that
+ * cached-key identity check (`rejectedTokenSource: "wiring"`, #7958): the
+ * cache and the wiring can drift, and the drifted wired key is exactly the
+ * credential the agent's exporter is dying on. It was written by
+ * `installTelemetryWiring`, so replacing it is this device's to do — the
+ * revocation gate below still runs against it, so a key a person revoked
+ * stays dead either way.
+ *
  * Withholds the repair when the platform says a person revoked the cached
  * key, or recorded no cause for the revoke. A revoke from the API-keys page
  * is a decision about this device, and a device that minted its way past it
@@ -145,11 +153,19 @@ const TOOL_BY_AGENT: Record<string, string> = {
 export async function healRevokedIngestKey({
   agent,
   rejectedToken,
+  rejectedTokenSource = "cache",
   deps = REAL_DEPS,
 }: {
   agent: string;
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
+  /**
+   * Where the rejected bearer was read from. `"cache"` (the default) is the
+   * CLI's own config and demands identity with the cached key; `"wiring"`
+   * says the caller read it out of the agent's wired settings file, where
+   * drift from the cache is the very defect being repaired (#7958).
+   */
+  rejectedTokenSource?: "cache" | "wiring";
   deps?: HealDeps;
 }): Promise<HealOutcome> {
   const tool = TOOL_BY_AGENT[agent];
@@ -159,13 +175,19 @@ export async function healRevokedIngestKey({
   if (!deps.isLoggedIn(cfg)) return DECLINED;
   if (cfg.tool_project_keys?.[tool]?.secret) return DECLINED;
 
-  // Only the cached personal key is ours to replace, and only when it is
-  // demonstrably the credential that was rejected. A 401 the device carried
-  // no bearer for, or carried someone else's, is not this key's failure.
+  // Only a key this device wrote is ours to replace. For the cache source
+  // that means identity with the cached personal key: a 401 the device
+  // carried no bearer for, or carried someone else's, is not this key's
+  // failure. For the wiring source the bearer came out of the settings file
+  // `installTelemetryWiring` maintains, which is the same ownership — there
+  // the check is only that a bearer exists at all.
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
-  if (!cached || rejectedToken !== cached) return DECLINED;
+  if (!rejectedToken) return DECLINED;
+  if (rejectedTokenSource === "cache" && (!cached || rejectedToken !== cached)) {
+    return DECLINED;
+  }
 
-  const blocked = await revocationBlocksHeal({ cfg, cached, deps });
+  const blocked = await revocationBlocksHeal({ cfg, rejected: rejectedToken, deps });
   if (blocked) return blocked;
 
   const resolved = await deps.resolveLiveIngestionKey({
@@ -195,14 +217,15 @@ export async function healRevokedIngestKey({
  */
 async function revocationBlocksHeal({
   cfg,
-  cached,
+  rejected,
   deps,
 }: {
   cfg: GovernanceConfig;
-  cached: string;
+  /** The rejected bearer itself — cached or wired, whichever 401'd. */
+  rejected: string;
   deps: HealDeps;
 }): Promise<HealOutcome | null> {
-  const lookupId = extractLookupIdFromToken(cached);
+  const lookupId = extractLookupIdFromToken(rejected);
   if (!lookupId) return null;
 
   const described = await deps
