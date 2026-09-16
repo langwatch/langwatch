@@ -16,19 +16,27 @@
  * typed into a shell is out of scope, tracked as #8132). The comparison is
  * against the run's start, stamped once before the child is spawned.
  *
- * The window has one honest limit: a SECOND pi the user starts by hand, in
- * another terminal, while this run is going, also has a fresh modification time
- * and is captured too. pi writes no launching-process marker, so the alternative
- * on this axis is tightening to files created after the run started, which drops
- * every resumed session because a resumed file already existed.
+ * The window has one limit: a SECOND pi the user starts by hand, in another
+ * terminal, while this run is going, also has a fresh modification time and is
+ * captured too.
  *
- * The session header carries `cwd`, the directory pi ran in
- * (`pi-session-file.ts:100`), and nothing here reads it. It is not a free
- * narrowing, which is why it is unused rather than pending: the case it would
- * have to catch is a second terminal in the same project, where `cwd` matches,
- * and the header is written once at session creation, so a session resumed from
- * elsewhere still reports its original directory and would be dropped. Both
- * narrowings cost the same category they are meant to protect.
+ * That limit is ours, not pi's. pi ships `--session-id`, which sets both the
+ * session id and the file name, so a launcher can choose the id before spawning
+ * and match on it exactly afterwards. Verified against 0.85.1: passing
+ * `--session-id <uuid>` produced `<timestamp>_<uuid>.jsonl` with that id in the
+ * header. `--name` persists a launcher-supplied string as a `session_info` row,
+ * and `--session-dir` isolates a launcher's sessions entirely. The wrapper
+ * passes none of them. Keying capture on an id instead of a time window is the
+ * better design and is tracked as #8161, kept out of this change because it
+ * changes what capture matches on rather than how it filters.
+ *
+ * Within the time window, the alternative on this axis is tightening to files
+ * created after the run started, which drops every resumed session because a
+ * resumed file already existed. The header's `cwd` (`pi-session-file.ts:100`)
+ * does not rescue that: the common collision is a second terminal in the same
+ * project, where `cwd` matches, and the header is written once at creation, so
+ * a session resumed from elsewhere reports its original directory and would be
+ * dropped too.
  *
  * #8132 is a different problem, and points the other way: it wants plain `pi`
  * runs captured, not excluded.

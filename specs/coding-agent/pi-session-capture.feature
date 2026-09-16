@@ -200,17 +200,26 @@ Feature: pi session capture
   # then dropped individually. See the header of pi-capture.ts, which states
   # that mtime is not a sound question on its own.
   #
-  # pi writes no marker saying which process launched it, so a second pi the
-  # user starts by hand during this run writes rows on the same clock and is
-  # captured. The session header carries cwd, the directory pi ran in, and
-  # nothing reads it. It is not a free narrowing: the case it would have to
-  # catch is a second terminal in the same project, where cwd is identical, and
-  # the header is written once at session creation, so a session resumed from
-  # a different directory still reports the original one and would be dropped.
-  # Tightening the file stamp instead, to files created after the run started,
-  # would drop every resumed session, because a resumed file already existed.
-  # Both narrowings cost the same category, which is why the over-capture is
-  # the side we err on.
+  # A second pi the user starts by hand during this run writes rows on the same
+  # clock, so the time window alone captures it too.
+  #
+  # This is a choice we have not revisited, not a limit pi imposes. pi ships
+  # --session-id, which sets the session id and the file name, so a launcher
+  # can pick the id up front and later match on it exactly. It also ships
+  # --name, which persists a launcher-supplied string as a session_info row,
+  # and --session-dir, which isolates a launcher's sessions entirely. The
+  # wrapper passes none of them, so capture falls back to a time window and
+  # takes whatever else wrote in it. Replacing the window with an exact id is
+  # the better design and is tracked as #8161; it is out of scope here because
+  # it changes what capture is keyed on, not just how it is filtered.
+  #
+  # Given the time window we do use, over-capture is the deliberate side. The
+  # alternative, tightening the file stamp to files created after the run
+  # started, would drop every resumed session, because a resumed file already
+  # existed. The header's cwd would not rescue it: the common collision is a
+  # second terminal in the same project, where cwd matches, and the header is
+  # written once at creation, so a session resumed from elsewhere still
+  # reports its original directory and would be dropped too.
   # Both halves are asserted, never just the absence: a run that captured
   # nothing at all would satisfy the absence on its own.
   @unit
