@@ -2,6 +2,7 @@ package apidiff
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -305,7 +306,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 
 	client := &http.Client{Timeout: probe.timeout}
 	fmt.Fprintf(out.stderr, "fetching %s from both instances\n", SpecPath)
-	specs, err := fetchBothSpecs(ctx, client, probe)
+	specs, err := fetchBothSpecs(ctx, client, probe, out.stderr)
 	if err != nil {
 		fmt.Fprintln(out.stderr, err)
 		return exitError
@@ -394,13 +395,77 @@ type fetchedSpecs struct {
 	aBytes, bBytes []byte
 }
 
-func fetchBothSpecs(ctx context.Context, client *http.Client, probe *probeFlags) (*fetchedSpecs, error) {
+// specSettleTimeout is how long an instance whose lane already reported ready
+// gets to actually serve its document. Readiness is a lane listening; serving
+// is the proxy route registered and the application answering, and those are
+// seconds to minutes apart on a cold monolith. A run that fetched exactly once
+// died at exit 2 on a 502 the next attempt would not have seen (run
+// 20260916-094406), so the first fetch settles rather than decides.
+const specSettleTimeout = 5 * time.Minute
+
+// specSettleInterval is how often the settle re-asks. A variable so a test
+// can shrink it; nothing but a test ever assigns it.
+var specSettleInterval = 5 * time.Second
+
+// notServingYet reports whether err is the instance not being reachable yet
+// rather than the instance answering with something wrong. A transport error
+// means nothing answered at all; a gateway status means the proxy answered
+// for an upstream it could not reach. Every other status is the instance's
+// own answer, and waiting cannot change it.
+func notServingYet(err error) bool {
+	var status *SpecStatusError
+	if errors.As(err, &status) {
+		return status.Status == http.StatusBadGateway ||
+			status.Status == http.StatusServiceUnavailable ||
+			status.Status == http.StatusGatewayTimeout
+	}
+	return true
+}
+
+// fetchSpecSettled fetches one instance's spec, waiting out the window between
+// its lane reporting ready and the application actually serving. Progress is
+// reported rather than going silent, the same way the boot wait does.
+func fetchSpecSettled(
+	ctx context.Context,
+	client *http.Client,
+	baseURL string,
+	progress io.Writer,
+) (map[string]any, []byte, error) {
+	deadline := time.Now().Add(specSettleTimeout)
+	for attempt := 1; ; attempt++ {
+		document, body, err := FetchSpec(ctx, client, baseURL)
+		if err == nil {
+			if attempt > 1 {
+				fmt.Fprintf(progress, "spec from %s served on attempt %d\n", baseURL, attempt)
+			}
+			return document, body, nil
+		}
+		if !notServingYet(err) || ctx.Err() != nil || !time.Now().Before(deadline) {
+			return nil, nil, err
+		}
+		if attempt == 1 || attempt%6 == 0 {
+			fmt.Fprintf(progress, "waiting for %s to serve %s (%v)\n", baseURL, SpecPath, err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		case <-time.After(specSettleInterval):
+		}
+	}
+}
+
+func fetchBothSpecs(
+	ctx context.Context,
+	client *http.Client,
+	probe *probeFlags,
+	progress io.Writer,
+) (*fetchedSpecs, error) {
 	specs := &fetchedSpecs{}
 	var err error
-	if specs.a, specs.aBytes, err = FetchSpec(ctx, client, probe.a); err != nil {
+	if specs.a, specs.aBytes, err = fetchSpecSettled(ctx, client, probe.a, progress); err != nil {
 		return nil, err
 	}
-	if specs.b, specs.bBytes, err = FetchSpec(ctx, client, probe.b); err != nil {
+	if specs.b, specs.bBytes, err = fetchSpecSettled(ctx, client, probe.b, progress); err != nil {
 		return nil, err
 	}
 	return specs, nil

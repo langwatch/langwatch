@@ -94,6 +94,18 @@ func (operation Operation) SidePaths() (sideA, sideB string) {
 	return sideA, sideB
 }
 
+// SpecStatusError is a served response that was not 200, carrying the status
+// so a caller can tell an instance that is not reachable yet - a proxy route
+// not yet registered answers 502 - from one answering with something wrong.
+type SpecStatusError struct {
+	BaseURL string
+	Status  int
+}
+
+func (err *SpecStatusError) Error() string {
+	return fmt.Sprintf("fetch spec from %s: status %d", err.BaseURL, err.Status)
+}
+
 // FetchSpec GETs the served OpenAPI document from a running instance and
 // returns both the parsed document and the raw bytes.
 func FetchSpec(ctx context.Context, client *http.Client, baseURL string) (map[string]any, []byte, error) {
@@ -111,7 +123,7 @@ func FetchSpec(ctx context.Context, client *http.Client, baseURL string) (map[st
 		return nil, nil, fmt.Errorf("read spec from %s: %w", baseURL, err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return nil, nil, fmt.Errorf("fetch spec from %s: status %d", baseURL, response.StatusCode)
+		return nil, nil, &SpecStatusError{BaseURL: baseURL, Status: response.StatusCode}
 	}
 	document, err := decodeObject(body)
 	if err != nil {

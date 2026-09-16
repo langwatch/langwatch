@@ -106,6 +106,13 @@ Feature: apidiff boots its instances through haven
       And its base URL is the app hostname haven allocated for that stack, the same address visualdiff uses
 
     @unit
+    Scenario: A ready lane that is not serving yet is waited out, not failed
+      Given an instance whose lane haven has already reported ready
+      When the run fetches the served OpenAPI document and the proxy answers for an upstream it cannot reach yet
+      Then the fetch is retried until the document is served or the settle window passes
+      And a status the instance answered for itself, such as 404, fails the run at once without waiting
+
+    @unit
     Scenario: A monolith base's failure tail reads the app lane
       Given the main instance is the monolith layout and its stack never becomes ready
       When the run gives up
