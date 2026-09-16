@@ -527,6 +527,49 @@ declarations gate that had silently stopped running - and it is larger than
 either. Most of it is branch state from the concurrent refactors, not one
 session's doing.
 
+## THE BASELINE IS NOW BLOCKING THE WORK, NOT JUST HIDING IT
+
+`temporal-w1` deferred 78 findings with a reason for each, and one group is new
+evidence about the ledger rather than about Temporal:
+
+> **Locked to a baselined interface** - the interface itself is a
+> `temporal-only|<file>` entry in `oxlint-baseline.json`. Tracked debt outside
+> this wave, not mine to touch unilaterally.
+
+`user.repository.ts` (4 sites), `scenario.app.ts`'s `ScenarioClock` and
+`scenario.repository.ts`'s `archivedAt` (4 more) are all blocked this way: the
+concrete implementations are flagged, the interface that forces their shape is
+baselined, and a lane cannot fix the implementation without changing an interface
+the ledger says is exempt.
+
+So the baseline is not only invisible debt that can grow unmetered - **it is
+preventing its own resolution.** Any wave that meets a baselined interface stops
+there, correctly, and the finding stays on the visible side of the counter
+forever. That is a second, independent argument for making the ledger
+countable and expiring, beside the one in the section above.
+
+### The other deferred groups, for whoever runs the follow-up wave
+
+  fail-soft parsing        `period-selector.tsx`, `chartsLib/index.ts`,
+                           `useDashboardWidgetChartNavigate.ts` - untrusted input,
+                           `Instant.from` would throw where `new Date` degraded.
+                           These should stay deferred, not be scheduled.
+  too wide for one wave    `memory.webhook-database.ts` (10) and
+                           `memory.organization.database.ts` (16, consumed by four
+                           repositories) - a row type spread by `{ ...row }` into a
+                           Date-requiring contract across several files at once.
+  no test coverage         `webhook-retention.repository.ts` (5) - nothing exercises
+                           `pruneDeliveries` on either backend. Write the test first.
+  intentional union        `organization.members.ts`'s `displayStatus` - the Prisma
+                           adapter narrows deliberately; the composition build says so.
+
+**One deferred item is already closed.** `organization-management.rest.ts`'s
+`dateOf` was flagged as "a wire-boundary helper the rule's two-name exemption list
+does not recognise". It was `const dateOf = (value: Instant): Date => toDate(value)`
+- an alias adding nothing. The lane was right to refuse renaming it to dodge the
+rule and right that it could not decide the question; the answer was neither
+renaming nor widening the list, but deleting the wrapper (`265dc626e1`).
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
