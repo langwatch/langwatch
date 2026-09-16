@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { nowInstant } from "@langwatch/time";
 
 import { analyticsApi } from "./analytics-api.ts";
 import { createLangWatchQLExecute } from "./lwql-execute.ts";
@@ -64,7 +65,7 @@ export function useDashboardWidgetExecutor(
   // window computed once at mount; a dashboard card passes its own via
   // `overrides.timeWindow` instead, tracking the grid's period control.
   const [mountWindow] = useState<{ start: number; end: number }>(() => {
-    const end = Date.now();
+    const end = nowInstant().epochMilliseconds;
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
@@ -118,21 +119,21 @@ export function useDashboardWidgetExecutor(
           title: "Unknown query",
           message: `This widget has no query named "${queryName}".`,
         };
-        recordRun(queryName, { ranAt: Date.now(), error });
+        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error });
         throw error;
       }
       const validation = validateDashboardWidgetQueryParams({ query, params });
       if (!validation.ok) {
-        recordRun(queryName, { ranAt: Date.now(), error: validation.error });
+        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
         throw validation.error;
       }
       try {
         const result = await runValidated(query, validation.params, signal);
-        recordRun(queryName, { ranAt: Date.now(), result });
+        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, result });
         return result;
       } catch (error) {
         const shaped = toChartQueryError(error);
-        recordRun(queryName, { ranAt: Date.now(), error: shaped });
+        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: shaped });
         throw shaped;
       }
     },
@@ -151,15 +152,15 @@ export function useDashboardWidgetExecutor(
         params: {},
       });
       if (!validation.ok) {
-        recordRun(query.name, { ranAt: Date.now(), error: validation.error });
+        recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
         return;
       }
       try {
         const result = await runValidated(query, validation.params);
-        recordRun(query.name, { ranAt: Date.now(), result });
+        recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, result });
       } catch (error) {
         recordRun(query.name, {
-          ranAt: Date.now(),
+          ranAt: nowInstant().epochMilliseconds,
           error: toChartQueryError(error),
         });
       }

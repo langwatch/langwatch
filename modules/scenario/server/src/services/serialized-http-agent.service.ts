@@ -6,6 +6,7 @@
 
 import { createLogger, type Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import { nowInstant } from "@langwatch/time";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import {
@@ -328,7 +329,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgent {
     body: string,
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const loggedUrl = this.scrub(redactUrlForLogs(url));
     const redactedHeaders = this.headersForLogs(headers);
     let response;
@@ -353,7 +354,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgent {
           method,
           errorClass,
           message,
-          durationMs: Date.now() - startedAt,
+          durationMs: nowInstant().epochMilliseconds - startedAt,
           headers: redactedHeaders,
         },
         "http call failed",
@@ -365,7 +366,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgent {
       });
     }
 
-    const durationMs = Date.now() - startedAt;
+    const durationMs = nowInstant().epochMilliseconds - startedAt;
 
     if (!response.ok) {
       await this.failOnErrorResponse({

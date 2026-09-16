@@ -1,6 +1,14 @@
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { differenceInCalendarDays, format, startOfDay, subDays } from "@langwatch/time";
+import {
+  differenceInCalendarDays,
+  format,
+  nowInstant,
+  startOfDay,
+  subDays,
+  Temporal,
+  toDate,
+} from "@langwatch/time";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
@@ -56,7 +64,9 @@ export const computeRelativeWindow = (presetKey: RelativePresetKey, now: Date): 
   }
 
   if (preset.minutes !== null) {
-    const startDate = new Date(now.getTime() - preset.minutes * 60 * 1000);
+    const startDate = toDate(
+      Temporal.Instant.fromEpochMilliseconds(now.getTime() - preset.minutes * 60 * 1000),
+    );
     return { startDate, endDate: now };
   }
 
@@ -113,7 +123,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   // The useMemo below excludes `now` from its deps, so the returned `period`
   // stays referentially stable across renders unless query params change.
   // Page re-mounts (refresh, route change) get a fresh `now` for free.
-  const now = new Date();
+  const now = toDate(nowInstant());
 
   const queryPeriod = router.query.period;
   const queryStartDate = router.query.startDate;
@@ -135,10 +145,10 @@ export const usePeriodSelector = (defaultNDays = 30) => {
   const setPeriod = useCallback(
     (startDate: Date, endDate: Date) => {
       const hasValidEnd = endDate instanceof Date && !isNaN(endDate.getTime());
-      const validEndDate = hasValidEnd ? endDate : new Date();
+      const validEndDate = hasValidEnd ? endDate : toDate(nowInstant());
 
       const hasValidStart = startDate instanceof Date && !isNaN(startDate.getTime());
-      let validStartDate = hasValidStart ? startDate : new Date();
+      let validStartDate = hasValidStart ? startDate : toDate(nowInstant());
 
       if (validStartDate > validEndDate) {
         validStartDate = validEndDate;
@@ -221,7 +231,7 @@ export const matchPeriodPreset = ({
 }): (typeof RELATIVE_PRESETS)[number] | undefined => {
   if (mode !== "relative") return undefined;
 
-  const matchedByDays = getPresetForRange(startDate, endDate, new Date());
+  const matchedByDays = getPresetForRange(startDate, endDate, toDate(nowInstant()));
   if (matchedByDays) return matchedByDays;
 
   const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);

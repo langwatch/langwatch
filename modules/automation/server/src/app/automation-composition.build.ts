@@ -381,7 +381,7 @@ class RedisAutomationCallCounter implements AutomationCallCounter {
     const ttl = await this.redis.ttl(redisKey);
     return {
       allowed: count <= input.max,
-      resetAt: Date.now() + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
+      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
     };
   }
 }

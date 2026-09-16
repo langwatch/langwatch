@@ -7,6 +7,7 @@ import {
   type UpdateTriggerCommand,
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
+import { nowInstant, toDate } from "@langwatch/time";
 import { TriggerRepository, type ReportScheduleTarget } from "../trigger.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -73,7 +74,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
   async updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
     const row = await this.findById(input);
     if (row === null) return;
-    this.write({ ...row, lastRunAt: new Date() });
+    this.write({ ...row, lastRunAt: toDate(nowInstant()) });
   }
 
   async findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
@@ -123,7 +124,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
 
   create(input: CreateTriggerCommand): Promise<Trigger> {
     const command: Record<string, unknown> = { ...input };
-    const now = new Date();
+    const now = toDate(nowInstant());
     const row = triggerSchema.parse({
       active: true,
       deleted: false,
@@ -155,7 +156,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
       triggerId: input.id,
       projectId: input.projectId,
     });
-    const row = triggerSchema.parse({ ...stored, ...changes, updatedAt: new Date() });
+    const row = triggerSchema.parse({ ...stored, ...changes, updatedAt: toDate(nowInstant()) });
     this.write(row);
     return row;
   }

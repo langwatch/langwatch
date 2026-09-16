@@ -1,5 +1,6 @@
 import type { EmailSuppression } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
+import { nowInstant, toDate } from "@langwatch/time";
 import { EmailSuppressionRepository } from "../email-suppression.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -44,7 +45,7 @@ export class MemoryEmailSuppressionRepository extends EmailSuppressionRepository
       email: input.email,
       triggerId: input.triggerId,
       reason: input.reason,
-      createdAt: new Date(),
+      createdAt: toDate(nowInstant()),
     };
     this.memory.suppressions.push(row);
     return Promise.resolve(row);

@@ -7,6 +7,7 @@ import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant } from "@langwatch/time";
 import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
 
@@ -198,7 +199,7 @@ class RedisUserRateLimiter {
 
     return {
       allowed: count <= input.max,
-      resetAt: Date.now() + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
+      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
     };
   };
 }

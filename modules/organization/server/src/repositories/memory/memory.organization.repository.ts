@@ -6,6 +6,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -58,7 +59,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organization.s3SecretAccessKey = input.s3SecretAccessKey;
     }
     if (input.s3Bucket !== undefined) organization.s3Bucket = input.s3Bucket || null;
-    organization.updatedAt = new Date();
+    organization.updatedAt = toDate(nowInstant());
   }
 
   async getOldestTeamId(organizationId: string): Promise<string> {
@@ -112,7 +113,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       input.workspace.displayName?.trim() ||
       input.workspace.displayEmail?.split("@")[0] ||
       "user";
-    const now = new Date();
+    const now = toDate(nowInstant());
     const team: MemoryTeamRow = {
       id: input.resources.teamId,
       name: `${displayLabel}'s Workspace`,

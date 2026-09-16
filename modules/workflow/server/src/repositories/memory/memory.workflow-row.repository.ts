@@ -3,6 +3,7 @@
  * same store the lifecycle repository reads, so a copy row here is a
  * workflow the lifecycle can commit a version against, like the Prisma pair.
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import type { Workflow } from "@langwatch/workflow-contract";
 import {
   WorkflowRowRepository,
@@ -20,7 +21,7 @@ export class WorkflowRowMemoryRepository extends WorkflowRowRepository {
   }
 
   create(input: WorkflowRowDraft): Promise<void> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const workflow: Workflow = {
       ...input,
       latestVersionId: null,

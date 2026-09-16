@@ -21,7 +21,7 @@ import type { AutomationSettlementLedger } from "../repositories/automation-sett
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import { AutomationPersistActionService } from "../services/persist-action.service.ts";
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
-import { type Instant, Temporal } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 function unavailable(): never {
   throw new Error("unused test capability");
@@ -234,8 +234,8 @@ export class SettlementProjectService extends TestProjectApi {
     kind: "application",
     firstMessage: false,
     integrated: true,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+    createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+    updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     userLinkTemplate: null,
     traceSharingEnabled: false,
     presenceEnabled: false,

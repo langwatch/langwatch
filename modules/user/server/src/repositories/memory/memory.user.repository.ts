@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import {
   createdUserSchema,
   userAccountInfoSchema,
@@ -123,15 +123,17 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
+    const dismissedAt = this.#database.user(id)?.passkeyNudgeDismissedAt ?? null;
+
     return userPasskeyNudgeStatusSchema.parse({
       hasPasskey: this.#database.passkeyCount(id) > 0,
-      dismissedAt: this.#database.user(id)?.passkeyNudgeDismissedAt ?? null,
+      dismissedAt: dismissedAt ? toDate(dismissedAt) : null,
     });
   }
 
   async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void> {
     const row = this.#require(input.id);
-    this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: input.dismissedAt });
+    this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: fromDate(input.dismissedAt) });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -140,7 +142,7 @@ export class MemoryUserRepository implements UserRepository {
       ...row,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.email === undefined ? {} : { email: input.email }),
-      updatedAt: toDate(nowInstant()),
+      updatedAt: nowInstant(),
     };
     this.#database.writeUser(updated);
 
@@ -150,7 +152,7 @@ export class MemoryUserRepository implements UserRepository {
   async findAccountInfo(id: string): Promise<UserAccountInfo | null> {
     const row = this.#database.user(id);
 
-    return row ? userAccountInfoSchema.parse({ createdAt: row.createdAt }) : null;
+    return row ? userAccountInfoSchema.parse({ createdAt: toDate(row.createdAt) }) : null;
   }
 
   async findSsoStatus(id: string): Promise<UserSsoStatus> {
@@ -164,7 +166,9 @@ export class MemoryUserRepository implements UserRepository {
 
     return userTourPreferenceSchema.parse({
       dismissed: row.tracesExplorerTourDismissedAt !== null,
-      dismissedAt: row.tracesExplorerTourDismissedAt,
+      dismissedAt: row.tracesExplorerTourDismissedAt
+        ? toDate(row.tracesExplorerTourDismissedAt)
+        : null,
     });
   }
 
@@ -173,14 +177,17 @@ export class MemoryUserRepository implements UserRepository {
     dismissedAt: Date;
   }): Promise<UserTourPreference> {
     const row = this.#require(input.id);
-    this.#database.writeUser({ ...row, tracesExplorerTourDismissedAt: input.dismissedAt });
+    this.#database.writeUser({
+      ...row,
+      tracesExplorerTourDismissedAt: fromDate(input.dismissedAt),
+    });
 
     return userTourPreferenceSchema.parse({ dismissed: true, dismissedAt: input.dismissedAt });
   }
 
   async setLastLoginAt(input: { id: string; lastLoginAt: Date }): Promise<void> {
     const row = this.#require(input.id);
-    this.#database.writeUser({ ...row, lastLoginAt: input.lastLoginAt });
+    this.#database.writeUser({ ...row, lastLoginAt: fromDate(input.lastLoginAt) });
   }
 
   async findLastHomePath(id: string): Promise<string | null> {
@@ -197,7 +204,10 @@ export class MemoryUserRepository implements UserRepository {
     deactivatedAt: Date | null;
   }): Promise<UserProfile> {
     const row = this.#require(input.id);
-    const updated: MemoryUserRow = { ...row, deactivatedAt: input.deactivatedAt };
+    const updated: MemoryUserRow = {
+      ...row,
+      deactivatedAt: input.deactivatedAt ? fromDate(input.deactivatedAt) : null,
+    };
     this.#database.writeUser(updated);
 
     return userProfileSchema.parse(profileOf(updated));
@@ -222,7 +232,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   #insertUser(input: { name: string | null; email: string }): MemoryUserRow {
-    const stamp = toDate(nowInstant());
+    const stamp = nowInstant();
     const row: MemoryUserRow = {
       id: generate(USER_KSUID_RESOURCE).toString(),
       name: input.name,
@@ -260,21 +270,7 @@ export class MemoryUserRepository implements UserRepository {
   }
 }
 
-function profileOf(
-  row: MemoryUserRow,
-): Pick<
-  MemoryUserRow,
-  | "id"
-  | "name"
-  | "email"
-  | "emailVerified"
-  | "image"
-  | "pendingSsoSetup"
-  | "createdAt"
-  | "updatedAt"
-  | "lastLoginAt"
-  | "deactivatedAt"
-> {
+function profileOf(row: MemoryUserRow): UserProfile {
   return {
     id: row.id,
     name: row.name,
@@ -282,20 +278,19 @@ function profileOf(
     emailVerified: row.emailVerified,
     image: row.image,
     pendingSsoSetup: row.pendingSsoSetup,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    lastLoginAt: row.lastLoginAt,
-    deactivatedAt: row.deactivatedAt,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+    lastLoginAt: row.lastLoginAt ? toDate(row.lastLoginAt) : null,
+    deactivatedAt: row.deactivatedAt ? toDate(row.deactivatedAt) : null,
   };
 }
 
-function fullOf(
-  row: MemoryUserRow,
-): ReturnType<typeof profileOf> &
-  Pick<MemoryUserRow, "lastHomePath" | "tracesExplorerTourDismissedAt"> {
+function fullOf(row: MemoryUserRow): UserFullProfile {
   return {
     ...profileOf(row),
     lastHomePath: row.lastHomePath,
-    tracesExplorerTourDismissedAt: row.tracesExplorerTourDismissedAt,
+    tracesExplorerTourDismissedAt: row.tracesExplorerTourDismissedAt
+      ? toDate(row.tracesExplorerTourDismissedAt)
+      : null,
   };
 }

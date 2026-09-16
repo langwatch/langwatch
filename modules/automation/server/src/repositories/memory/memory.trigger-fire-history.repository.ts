@@ -4,7 +4,7 @@ import type {
   TriggerFireStats,
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
-import type { Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 import { TriggerFireHistoryRepository } from "../trigger-fire-history.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -29,9 +29,8 @@ export class MemoryTriggerFireHistoryRepository extends TriggerFireHistoryReposi
       id: generate("triggerfire").toString(),
       triggerId: input.triggerId,
       customGraphId: input.customGraphId,
-      createdAt: new Date(input.createdAt.epochMilliseconds),
-      resolvedAt:
-        input.resolvedAt === null ? null : new Date(input.resolvedAt.epochMilliseconds),
+      createdAt: toDate(input.createdAt),
+      resolvedAt: input.resolvedAt === null ? null : toDate(input.resolvedAt),
     };
     this.memory.fires.push({ ...row, projectId: input.projectId });
     return Promise.resolve(row);

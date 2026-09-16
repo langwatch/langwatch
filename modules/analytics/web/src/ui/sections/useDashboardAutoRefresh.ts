@@ -14,6 +14,8 @@ import {
   useState,
 } from "react";
 
+import { nowInstant } from "@langwatch/time";
+
 export const DASHBOARD_AUTO_REFRESH_OPTIONS = ["off", "1m", "5m"] as const;
 export type DashboardAutoRefreshOption =
   (typeof DASHBOARD_AUTO_REFRESH_OPTIONS)[number];
@@ -79,12 +81,12 @@ export function useDashboardAutoRefresh({
     readStoredAutoRefreshOption,
   );
   const [refreshedAt, setRefreshedAt] = useState<number | undefined>(undefined);
-  const lastTickAt = useRef<number>(Date.now());
+  const lastTickAt = useRef<number>(nowInstant().epochMilliseconds);
   const onTickRef = useRef(onTick);
   onTickRef.current = onTick;
 
   const tick = useCallback(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     lastTickAt.current = now;
     setRefreshedAt(now);
     onTickRef.current?.();
@@ -119,11 +121,11 @@ export function useDashboardAutoRefresh({
         stop();
         return;
       }
-      if (Date.now() - lastTickAt.current >= intervalMs) tick();
+      if (nowInstant().epochMilliseconds - lastTickAt.current >= intervalMs) tick();
       start();
     };
 
-    lastTickAt.current = Date.now();
+    lastTickAt.current = nowInstant().epochMilliseconds;
     if (!isHidden()) start();
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {

@@ -11,6 +11,7 @@ import {
 } from "@langwatch/api/rest";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
+import { format, nowInstant } from "@langwatch/time";
 import { resolveRequestBound } from "@langwatch/plans";
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
@@ -173,7 +174,7 @@ export function createScenarioRunExportRest<
       const exportId = ports.newExportId();
       const broadcast = ports.broadcast();
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = format(nowInstant().epochMilliseconds, "yyyy-MM-dd", { timeZone: "UTC" });
       // Content-Disposition's filename is a quoted-string. projectId is only
       // constrained to `z.string()`, so a quote in it would close the quote and
       // let the caller append parameters. Server-generated ids never contain

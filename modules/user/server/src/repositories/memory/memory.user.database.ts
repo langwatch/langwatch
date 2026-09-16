@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 /**
  * The rows the two user repositories share — one store rather than two,
  * since they share the `Account` table: a credential `createCredentialUser`
@@ -10,13 +12,13 @@ export type MemoryUserRow = {
   emailVerified: boolean;
   image: string | null;
   pendingSsoSetup: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastLoginAt: Date | null;
-  deactivatedAt: Date | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  lastLoginAt: Instant | null;
+  deactivatedAt: Instant | null;
   lastHomePath: string | null;
-  tracesExplorerTourDismissedAt: Date | null;
-  passkeyNudgeDismissedAt: Date | null;
+  tracesExplorerTourDismissedAt: Instant | null;
+  passkeyNudgeDismissedAt: Instant | null;
 };
 
 export type MemoryUserAccountRow = {

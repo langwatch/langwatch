@@ -19,6 +19,7 @@ import type { Logger } from "@langwatch/observability";
 import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
@@ -194,7 +195,7 @@ class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
     input: Readonly<{ key: string; windowSeconds: number; max: number; count?: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
     const counter = `organization:invite:rate-limit:${input.key}`;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const count = input.count ?? 1;
     const used = count === 1 ? await this.redis.incr(counter) : await this.redis.incrby(counter, count);
     if (used === count) await this.redis.expire(counter, input.windowSeconds);
@@ -325,7 +326,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     const expiration =
       invite.expiration === null || invite.expiration instanceof Date
         ? invite.expiration
-        : new Date(invite.expiration.epochMilliseconds);
+        : toDate(invite.expiration);
     return resolveInviteDisplayStatus({ status: invite.status, expiration });
   }
 

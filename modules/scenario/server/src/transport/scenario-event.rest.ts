@@ -4,6 +4,7 @@
  * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
  */
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   SimulationRunNotFoundError,
   DEFAULT_SET_ID,
@@ -276,7 +277,7 @@ async function dispatchSimulationEvent(
   const basePayload = {
     tenantId: projectId,
     scenarioRunId: event.scenarioRunId,
-    occurredAt: event.timestamp ?? Date.now(),
+    occurredAt: event.timestamp ?? nowInstant().epochMilliseconds,
   };
 
   if (event.type === ScenarioEventType.RUN_STARTED) {
@@ -365,7 +366,7 @@ export async function archiveScenarioRun({
   await simulations.deleteRun({
     tenantId: projectId,
     scenarioRunId,
-    occurredAt: Date.now(),
+    occurredAt: nowInstant().epochMilliseconds,
   });
 
   return { archived: 1, failed: 0, scenarioRunId };
@@ -395,7 +396,7 @@ export async function archiveScenarioSetRuns({
     scenarioSetId,
   });
 
-  const now = Date.now();
+  const now = nowInstant().epochMilliseconds;
   let archived = 0;
   let failed = 0;
 

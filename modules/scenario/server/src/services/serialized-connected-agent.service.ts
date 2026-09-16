@@ -6,6 +6,7 @@
 
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import { nowInstant } from "@langwatch/time";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { BUSY_RETRY_AFTER_MS } from "@langwatch/agent-contract";
@@ -153,17 +154,17 @@ export class SerializedConnectedAgentAdapter extends SerializedAgent {
       ...(traceparent ? { traceparent } : {}),
     };
 
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const budgetEndsAt = startedAt + BUSY_RETRY_BUDGET_MS;
     for (;;) {
       const response = await this.post({ url, headers, body });
-      if (response.status === 429 && Date.now() < budgetEndsAt) {
+      if (response.status === 429 && nowInstant().epochMilliseconds < budgetEndsAt) {
         const retryAfterMs = retryAfterMsOf(response.headers.get("retry-after"));
         // Jitter spreads the retries of a batch of scenarios that all hit a
         // full agent at the same moment.
         const waitMs = Math.min(
           retryAfterMs + Math.floor(Math.random() * retryAfterMs),
-          budgetEndsAt - Date.now(),
+          budgetEndsAt - nowInstant().epochMilliseconds,
         );
         this.logger.info(
           { agentId: this.config.agentId, waitMs },
@@ -189,7 +190,7 @@ export class SerializedConnectedAgentAdapter extends SerializedAgent {
         {
           agentId: this.config.agentId,
           instance: payload.instance,
-          durationMs: Date.now() - startedAt,
+          durationMs: nowInstant().epochMilliseconds - startedAt,
         },
         "connected agent call ok",
       );

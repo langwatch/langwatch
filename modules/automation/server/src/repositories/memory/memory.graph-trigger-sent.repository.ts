@@ -111,7 +111,7 @@ export class MemoryGraphTriggerSentRepository extends GraphTriggerSentRepository
   markResolvedById(params: { id: string; projectId: string; now: Instant }): Promise<void> {
     for (const row of this.memory.graphTriggerSent) {
       if (row.id !== params.id || row.projectId !== params.projectId) continue;
-      row.resolvedAt = new Date(params.now.epochMilliseconds);
+      row.resolvedAt = params.now;
     }
     return Promise.resolve();
   }

@@ -6,6 +6,7 @@ import {
   type OrganizationGroup,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { GroupRepository, type OrganizationGroupWithMemberCount } from "../group.repository.ts";
 import type { MemoryGroupRow, MemoryOrganizationDatabase } from "./memory.organization.database.ts";
 
@@ -115,7 +116,7 @@ export class MemoryGroupRepository extends GroupRepository {
     slug: string;
     memberIds: string[];
   }): Promise<OrganizationGroup> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const row: MemoryGroupRow = {
       id: input.groupId,
       organizationId: input.organizationId,
@@ -141,7 +142,7 @@ export class MemoryGroupRepository extends GroupRepository {
     if (!row) throw new GroupNotFoundError(input.groupId);
     row.name = input.name;
     row.slug = input.slug;
-    row.updatedAt = new Date();
+    row.updatedAt = toDate(nowInstant());
     return toGroup(row);
   }
 
@@ -195,7 +196,7 @@ export class MemoryGroupRepository extends GroupRepository {
     }
     for (const userId of input.memberUserIdsToRemove) row.memberIds.delete(userId);
     for (const userId of input.memberUserIdsToAdd) row.memberIds.add(userId);
-    row.updatedAt = new Date();
+    row.updatedAt = toDate(nowInstant());
   }
 
   private groupsOf(organizationId: string): MemoryGroupRow[] {

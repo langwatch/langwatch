@@ -8,7 +8,7 @@ import {
   type WebhookDestinationKind,
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
-import { nowInstant, toDate, fromDate, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, fromDate, Temporal, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
 import type { WebhookEndpointServiceOptions } from "../webhook-endpoint.repository.ts";
 import type { WebhookDestinationConfig } from "../../services/webhook-destination.service.ts";
@@ -449,7 +449,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       ...endpoint,
       secretEncrypted: this.#options.secrets.encrypt(secret),
       previousSecretEncrypted: endpoint.secretEncrypted,
-      previousSecretExpiresAt: new Date(now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS),
+      previousSecretExpiresAt: toDate(
+        Temporal.Instant.fromEpochMilliseconds(now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS),
+      ),
       updatedAt: now,
     });
 
@@ -479,7 +481,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         ...endpoint,
         status: "DISABLED",
         disabledReason: WEBHOOK_DISABLED_REASON_MANUAL,
-        disabledAt: new Date(),
+        disabledAt: toDate(nowInstant()),
         updatedAt: toDate(nowInstant()),
       }),
     );
@@ -489,7 +491,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     const endpoint = this.#live(params);
     this.#database.putEndpoint({
       ...endpoint,
-      archivedAt: new Date(),
+      archivedAt: toDate(nowInstant()),
       status: "DISABLED",
       updatedAt: toDate(nowInstant()),
     });
@@ -659,31 +661,41 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
 
     const failingSince = endpoint.failingSince ?? now;
     this.#database.putEndpoint({ ...endpoint, failingSince, lastFailureAt: now, updatedAt: now });
-    await this.#autoDisableIfStreakExpired({ organizationId: params.organizationId, endpointId: endpoint.id, failingSince, now });
+    await this.#autoDisableIfStreakExpired({
+      organizationId: params.organizationId,
+      endpointId: endpoint.id,
+      failingSince: fromDate(failingSince),
+      now: fromDate(now),
+    });
   }
 
   async #autoDisableIfStreakExpired(params: {
     organizationId: string;
     endpointId: string;
-    failingSince: Date;
-    now: Date;
+    failingSince: Instant;
+    now: Instant;
   }): Promise<void> {
-    if (params.now.getTime() - params.failingSince.getTime() < WEBHOOK_AUTO_DISABLE_AFTER_MS) return;
+    if (
+      params.now.epochMilliseconds - params.failingSince.epochMilliseconds <
+      WEBHOOK_AUTO_DISABLE_AFTER_MS
+    ) {
+      return;
+    }
     const endpoint = this.#database.findEndpoint(params.endpointId);
     if (!endpoint || endpoint.status !== "ACTIVE") return;
     this.#database.putEndpoint({
       ...endpoint,
       status: "DISABLED",
       disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
-      disabledAt: params.now,
-      updatedAt: params.now,
+      disabledAt: toDate(params.now),
+      updatedAt: toDate(params.now),
     });
     try {
       await this.#options.notifyAutoDisabled?.({
         organizationId: params.organizationId,
         endpointId: endpoint.id,
         destination: this.#policy.describeDestination(endpoint),
-        failingSince: fromDate(params.failingSince),
+        failingSince: params.failingSince,
       });
     } catch {
       // A notification failure never undoes the disable; the caller sees no

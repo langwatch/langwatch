@@ -5,6 +5,7 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   generateBatchRunId,
   generateScenarioRunId,
@@ -27,14 +28,14 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Resolves an optional window to concrete values: the last 30 days by default. */
 const resolveDateRange = (input: { startDate?: number; endDate?: number }) => ({
-  startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
-  endDate: input.endDate ?? Date.now(),
+  startDate: input.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
+  endDate: input.endDate ?? nowInstant().epochMilliseconds,
 });
 
 /** The Results tab's own window, whose end stays open on a live view. */
 const resultsWindow = <Filter extends { startDate?: number }>(filter: Filter) => ({
   ...filter,
-  startDate: filter.startDate ?? Date.now() - THIRTY_DAYS_MS,
+  startDate: filter.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
 });
 
 /**
@@ -390,7 +391,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
     if (presence?.parkedNavigate) {
       // The same envelope the broadcast path emits, so the client parses one
       // shape rather than two.
-      yield { event: JSON.stringify(presence.parkedNavigate), timestamp: Date.now() };
+      yield { event: JSON.stringify(presence.parkedNavigate), timestamp: nowInstant().epochMilliseconds };
     }
 
     try {
@@ -412,7 +413,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(({ app, input }) =>
     app.getCodeScenarios({
       projectId: input.projectId,
-      startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+      startDate: input.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
       endDate: input.endDate,
     }),
   )
@@ -422,7 +423,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(({ app, input }) =>
     app.getRunTargets({
       projectId: input.projectId,
-      startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+      startDate: input.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
       endDate: input.endDate,
     }),
   )

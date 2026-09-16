@@ -24,6 +24,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
+import { Temporal, toDate } from "@langwatch/time";
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
 
@@ -51,8 +52,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       version: 1,
       lastUpdatedById: scenarioInput.lastUpdatedById ?? null,
       archivedAt: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
+      createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+      updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     };
     this.rows.set(row.id, row);
     return row;
@@ -111,7 +112,11 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       projectId: _____,
       ...data
     } = input;
-    const row = { ...existing, ...data, updatedAt: new Date(1) };
+    const row = {
+      ...existing,
+      ...data,
+      updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(1)),
+    };
     this.rows.set(row.id, row);
     return row;
   }
@@ -251,8 +256,8 @@ export class MemoryScenarioRepository extends ScenarioRepository {
       fields: input.fields ?? [],
       evaluators: input.evaluators ?? [],
       archivedAt: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
+      createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+      updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     };
     this.testSuites.set(testSuite.id, testSuite);
     return testSuite;
@@ -282,7 +287,11 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     if (!testSuite) throw new ScenarioTestSuiteNotFoundError();
 
     const { testSuiteId: _, projectId: __, ...changes } = input;
-    const updated = { ...testSuite, ...changes, updatedAt: new Date(1) };
+    const updated = {
+      ...testSuite,
+      ...changes,
+      updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(1)),
+    };
     this.testSuites.set(updated.id, updated);
     return updated;
   }

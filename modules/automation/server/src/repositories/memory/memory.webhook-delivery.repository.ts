@@ -1,6 +1,6 @@
 import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { WebhookDeliveryRepository } from "../webhook-delivery.repository.ts";
 import type { MemoryAutomationStore } from "./memory.automation.store.ts";
 
@@ -28,7 +28,7 @@ export class MemoryWebhookDeliveryRepository extends WebhookDeliveryRepository {
         error: input.error ?? null,
         response: input.response ?? null,
         outcome: input.outcome,
-        firedAt: new Date(),
+        firedAt: toDate(nowInstant()),
       },
     });
     return Promise.resolve();

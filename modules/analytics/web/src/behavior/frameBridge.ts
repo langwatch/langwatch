@@ -26,6 +26,7 @@ import type {
   LwLogMessage,
 } from "../model/dashboard-widget/bridgeProtocol.ts";
 import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/bridgeProtocol.ts";
+import { nowInstant } from "@langwatch/time";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
@@ -110,7 +111,7 @@ export function createFrameBridge(
     if (document.visibilityState === "visible") {
       // Fresh grace period: a backlog of misses accrued while hidden/
       // throttled must not read as instant silence.
-      lastHeartbeatAt = Date.now();
+      lastHeartbeatAt = nowInstant().epochMilliseconds;
     }
   };
 
@@ -184,7 +185,7 @@ export function createFrameBridge(
     const message = event.data as FrameToParentMessage | undefined;
     switch (message?.type) {
       case "lw:heartbeat":
-        lastHeartbeatAt = Date.now();
+        lastHeartbeatAt = nowInstant().epochMilliseconds;
         return;
       case "lw:query":
         handleQuery(message.requestId, message.queryName, message.params ?? {});
@@ -231,7 +232,7 @@ export function createFrameBridge(
       "*",
       [channel.port2],
     );
-    lastHeartbeatAt = Date.now();
+    lastHeartbeatAt = nowInstant().epochMilliseconds;
     document.addEventListener("visibilitychange", onVisibilityChange);
     watchdog = setInterval(() => {
       // Suspended while hidden: background-tab timer throttling hits both
@@ -239,7 +240,7 @@ export function createFrameBridge(
       // frame. onVisibilityChange resets lastHeartbeatAt on return, giving a
       // fresh window before the check below can fire again.
       if (document.visibilityState === "hidden") return;
-      if (Date.now() - lastHeartbeatAt > CHART_FRAME_HEARTBEAT_TIMEOUT_MS) {
+      if (nowInstant().epochMilliseconds - lastHeartbeatAt > CHART_FRAME_HEARTBEAT_TIMEOUT_MS) {
         onLog({
           level: "error",
           source: "bridge",

@@ -31,6 +31,7 @@ import type {
   UpdateMemberRoleResult,
   UpdateTeamMemberRoleInput,
 } from "../organization-membership.repository.ts";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type {
   MemoryOrganizationDatabase,
   MemoryOrganizationRow,
@@ -88,8 +89,8 @@ function toUser(row: MemoryUserRow): User {
     pendingSsoSetup: false,
     userHashKey: null,
     twoFactorEnabled: false,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+    createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+    updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     lastLoginAt: null,
     deactivatedAt: row.deactivatedAt,
     lastHomePath: null,
@@ -138,7 +139,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
-    const now = new Date();
+    const now = toDate(nowInstant());
     this.memory.organizations.set(input.orgId, {
       id: input.orgId,
       name: input.orgName,
@@ -188,7 +189,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
-    const now = new Date();
+    const now = toDate(nowInstant());
     this.memory.organizations.set(input.orgId, {
       id: input.orgId,
       name: input.orgName,
@@ -386,7 +387,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       ...this.memory.teamUsers.filter((candidate) => candidate.userId !== userId),
     );
 
-    const archivedAt = new Date();
+    const archivedAt = toDate(nowInstant());
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
       team.archivedAt = archivedAt;
@@ -403,8 +404,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       const activeAdmins = this.activeAdminCount(input.organizationId);
       if (activeAdmins <= 1) throw new CannotDisableLastAdminError();
     }
-    row.disabledAt = input.disabled ? new Date() : null;
-    row.updatedAt = new Date();
+    row.disabledAt = input.disabled ? toDate(nowInstant()) : null;
+    row.updatedAt = toDate(nowInstant());
   }
 
   async tryFindPersonalTeamInScopes(params: {
@@ -475,7 +476,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       }
     }
     row.role = role;
-    row.updatedAt = new Date();
+    row.updatedAt = toDate(nowInstant());
 
     const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     for (const update of effectiveTeamRoleUpdates) {
@@ -485,7 +486,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       if (!teamUser) continue;
       teamUser.role = update.role as TeamUserRole;
       teamUser.customRoleId = update.customRoleId ?? null;
-      teamUser.updatedAt = new Date();
+      teamUser.updatedAt = toDate(nowInstant());
     }
 
     if (this.activeAdminCount(organizationId, { includeDisabled: true }) === 0) {
@@ -505,7 +506,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!teamUser) throw new MemberNotFoundError(userId);
     teamUser.role = (customRoleId ? "CUSTOM" : role) as TeamUserRole;
     teamUser.customRoleId = customRoleId ?? null;
-    teamUser.updatedAt = new Date();
+    teamUser.updatedAt = toDate(nowInstant());
   }
 
   async getAuditLogs(
@@ -757,7 +758,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     slug: string;
     organizationId: string;
   }): MemoryTeamRow {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const team: MemoryTeamRow = {
       id: input.teamId,
       name: input.name,

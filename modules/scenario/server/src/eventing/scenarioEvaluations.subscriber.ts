@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { SubscriberSpec } from "@langwatch/eventing";
 import { SIMULATION_RUN_EVENT_TYPES, UNGRADED_RUN_STATUSES } from "@langwatch/scenario-contract";
 import type {
@@ -82,7 +83,7 @@ function jobPayloadOf({
     ...(evaluators.definitions && { definitions: evaluators.definitions }),
     traceIds: traceIds ?? [],
     attempt: 1,
-    occurredAt: Date.now(),
+    occurredAt: nowInstant().epochMilliseconds,
   };
 }
 

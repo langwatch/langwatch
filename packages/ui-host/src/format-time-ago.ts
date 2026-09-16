@@ -20,11 +20,10 @@ export function formatTimeAgo(
   maxHours = RELATIVE_WINDOW_HOURS,
 ): string | undefined {
   if (!timestamp) return void 0;
-  const at = new Date(timestamp);
-  if (at.getTime() < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours) {
-    return format(at, dateFormat);
+  if (timestamp < nowInstant().epochMilliseconds - 1000 * 60 * 60 * maxHours) {
+    return format(timestamp, dateFormat);
   }
-  return formatDistanceToNow(at, { addSuffix: true });
+  return formatDistanceToNow(timestamp, { addSuffix: true });
 }
 
 /** The same instant in the space a table row has: "2m ago", "1h ago". */

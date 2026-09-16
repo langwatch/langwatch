@@ -6,6 +6,7 @@ import {
   type OrganizationTeam,
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { TeamRepository } from "../team.repository.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
 
@@ -93,7 +94,7 @@ export class MemoryTeamRepository extends TeamRepository {
       (row) => row.slug === input.slug,
     );
     if (duplicate) throw new TeamSlugConflictError();
-    const now = new Date();
+    const now = toDate(nowInstant());
     const team: MemoryTeamRow = {
       id: input.teamId,
       name: input.name,
@@ -118,7 +119,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const row = this.memory.teams.get(team.id);
     if (!row) throw new TeamNotFoundError(input.teamId);
     if (input.name !== undefined) row.name = input.name;
-    row.updatedAt = new Date();
+    row.updatedAt = toDate(nowInstant());
     return toOrganizationTeam(row);
   }
 
@@ -126,7 +127,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const team = await this.get(input);
     const row = this.memory.teams.get(team.id);
     if (!row) throw new TeamNotFoundError(input.teamId);
-    row.archivedAt = new Date();
+    row.archivedAt = toDate(nowInstant());
     return toOrganizationTeam(row);
   }
 
@@ -172,7 +173,7 @@ export class MemoryTeamRepository extends TeamRepository {
   async fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
-    expectedUpdatedAt: Date;
+    expectedUpdatedAt: OrganizationTeam["updatedAt"];
     name?: string;
   }): Promise<OrganizationTeam> {
     const row = this.memory.teams.get(input.teamId);
@@ -183,7 +184,7 @@ export class MemoryTeamRepository extends TeamRepository {
       throw new TeamMembershipChangedError(input.teamId);
     }
     if (input.name !== undefined) row.name = input.name;
-    row.updatedAt = new Date();
+    row.updatedAt = toDate(nowInstant());
     return toOrganizationTeam(row);
   }
 

@@ -3,6 +3,7 @@
  * same contract the Prisma tier answers: a missing row is null, an archived
  * workflow is invisible unless asked for, and a DSL-less version reads as an empty graph.
  */
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   workflowDslSchema,
   type Workflow,
@@ -81,7 +82,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
 
   archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
     const workflow = this.#requireWorkflow({ id: input.workflowId, projectId: input.projectId });
-    this.store.workflows.set(workflow.id, { ...workflow, archivedAt: new Date() });
+    this.store.workflows.set(workflow.id, { ...workflow, archivedAt: toDate(nowInstant()) });
 
     return Promise.resolve({ id: workflow.id });
   }
@@ -191,7 +192,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
   }
 
   createWorkflow(input: PersistWorkflowInput): Promise<WorkflowWithVersion> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const workflow: Workflow = {
       id: input.id,
       projectId: input.projectId,
@@ -220,14 +221,14 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     data: Record<string, unknown>;
   }): Promise<Workflow> {
     const workflow = this.#requireWorkflow(input);
-    const updated = { ...workflow, ...input.data, updatedAt: new Date() } as Workflow;
+    const updated = { ...workflow, ...input.data, updatedAt: toDate(nowInstant()) } as Workflow;
     this.store.workflows.set(workflow.id, updated);
 
     return Promise.resolve(updated);
   }
 
   createVersion(input: PersistWorkflowVersionInput): Promise<WorkflowVersion> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const version: WorkflowVersion = {
       id: input.id,
       workflowId: input.workflowId,
@@ -259,7 +260,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
       authorId: input.authorId ?? existing.authorId,
       parentId: input.parentId,
       dsl: input.dsl,
-      updatedAt: new Date(),
+      updatedAt: toDate(nowInstant()),
     };
     this.store.versions.set(updated.id, updated);
 
@@ -277,7 +278,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
       ...workflow,
       currentVersionId: input.currentVersionId,
       ...(input.latestVersionId === undefined ? {} : { latestVersionId: input.latestVersionId }),
-      updatedAt: new Date(),
+      updatedAt: toDate(nowInstant()),
     });
 
     return Promise.resolve();
@@ -294,7 +295,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
       ...workflow,
       publishedId: input.versionId,
       ...(input.actorId ? { publishedById: input.actorId } : {}),
-      updatedAt: new Date(),
+      updatedAt: toDate(nowInstant()),
     };
     this.store.workflows.set(published.id, published);
 

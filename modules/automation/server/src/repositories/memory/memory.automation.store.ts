@@ -5,6 +5,7 @@ import type {
   TriggerFire,
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
+import type { Instant } from "@langwatch/time";
 import type { AnalyticsMetricSource } from "../graph-trigger-sent.repository.ts";
 
 /** One claimed send: the row `claimSend` writes once per trigger and trace. */
@@ -21,7 +22,7 @@ export interface StoredGraphTriggerSent {
   projectId: string;
   customGraphId: string;
   source: AnalyticsMetricSource | undefined;
-  resolvedAt: Date | null;
+  resolvedAt: Instant | null;
 }
 
 /** One webhook attempt, with the project it belongs to beside the wire row. */

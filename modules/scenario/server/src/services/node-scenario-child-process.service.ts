@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { spawn, type ChildProcess } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -116,7 +117,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
       sourcePath: this.options.config.sourcePath,
       sourceRoots: this.options.config.sourceRoots,
     });
-    const spawnStartedAt = Date.now();
+    const spawnStartedAt = nowInstant().epochMilliseconds;
     log("info", "Spawning scenario child process", {
       command: spawnConfig.command,
       args: spawnConfig.args,
@@ -129,7 +130,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
     });
     log("info", "Child process spawned", {
       pid: child.pid,
-      spawnMs: Date.now() - spawnStartedAt,
+      spawnMs: nowInstant().epochMilliseconds - spawnStartedAt,
     });
 
     this.options.pool.registerChild(input.jobData.scenarioRunId, child);

@@ -18,6 +18,7 @@ import {
   voiceAgentExternalId,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
+import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 /**
@@ -205,7 +206,7 @@ export function createVoiceSessionInfrastructureFromServices({
         conversationId,
       )}/audio?projectId=${encodeURIComponent(projectId)}`,
     signSessionToken,
-    now: () => Date.now(),
+    now: () => nowInstant().epochMilliseconds,
     newSessionId: () => nanoid(),
   };
 }
