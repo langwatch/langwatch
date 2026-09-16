@@ -27,10 +27,12 @@ import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPException } from "hono/http-exception";
 import { moduleApi } from "@langwatch/runtime-composition";
 
 import { OtlpIngestSourceBillingUnavailableError } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import { resolveRequestBound } from "@langwatch/plans";
 
 /** The project a receiver writes into. */
 export type OtlpIngestProject = Readonly<{
@@ -374,8 +376,8 @@ async function handleTracesRequest(
   rawBytes: Uint8Array,
   ports: OtlpIngestRestMembers,
 ): Promise<RestRawResult> {
-  // Auth first - a 401 must not pay for body decompression, and the body is
-  // irrelevant while we do not know who is calling.
+  // Auth runs before decompression, but the raw-body middleware has already
+  // buffered the wire body — the declared body cap is what keeps a 401 cheap.
   const authenticated = await authenticate(request, ports.otlpCredential, loggerTraces);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
@@ -578,6 +580,13 @@ const PUBLIC_ACCESS = {
   reason: AUTH_REASON,
 };
 
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+/** Wire-body cap for all three receivers; the decompressed cap is separate. */
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
+
 export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withNamespace("otel")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -585,6 +594,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
 
   .post("/traces", "ingestOtlpTraces")
   .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
@@ -598,6 +608,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
 
   .post("/logs", "ingestOtlpLogs")
   .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
@@ -611,6 +622,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
 
   .post("/metrics", "ingestOtlpMetrics")
   .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })

@@ -6,11 +6,19 @@ import { deferredScope } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type AppRestBroadcast } from "@langwatch/api/rest";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
+import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
 
 const logger = createLogger("langwatch:api:export-scenario-runs");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 /** What this route reads out of an export request; the rest is forwarded. */
 export type ScenarioRunExportRequestFields = Readonly<{
@@ -105,6 +113,7 @@ export function createScenarioRunExportRest<
 
     .post("/download", "downloadScenarioRunExport")
     .withRawBody("text", { mediaType: "application/json" })
+    .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
     .withAccess(deferredScope({ reason: DOOR_REASON }))
     .withRawResponse({ produces: "text/csv" })
     .withDocs({ description: "Stream a project's simulation run history as gzipped CSV" })

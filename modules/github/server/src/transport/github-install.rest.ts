@@ -16,9 +16,11 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 /** Who is signed in, as this process resolves a browser session. */
 export type GithubInstallSession = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -56,6 +58,12 @@ export interface GithubInstallApi {
 export const GithubInstallApi = moduleApi<GithubInstallApi>("github");
 
 const logger = createLogger("langwatch:api:github");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 // /install is session-gated in-handler: it requires a logged-in user and an
 // org-membership check before signing state and redirecting to GitHub.
@@ -106,6 +114,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
   // The body IS the evidence: the HMAC is computed over the exact bytes GitHub
   // sent, spacing included, so nothing parses it first.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
   .withRawResponse({ produces: ["application/json"] })
   .handle(async ({ app, request, raw }) => receiveWebhook({ app, request, raw }))
@@ -122,6 +131,7 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
 
   .post("/api/github-langy/webhook", "receiveGithubWebhookOnLegacyPath")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: WEBHOOK_PUBLIC_REASON }))
   .withRawResponse({ produces: ["application/json"] })
   .handle(async ({ app, request, raw }) => receiveWebhook({ app, request, raw }))

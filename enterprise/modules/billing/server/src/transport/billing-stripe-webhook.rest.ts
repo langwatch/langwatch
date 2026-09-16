@@ -6,12 +6,20 @@
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
+import { HTTPException } from "hono/http-exception";
 import type Stripe from "stripe";
 
 import type { HandleEventResult } from "../services/billing-stripe-webhook.service.ts";
 
 const logger = createLogger("langwatch:billing:stripe-webhook");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** The bodies this route writes for itself, and the headers Hono gave them. */
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
@@ -51,6 +59,7 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
   // The signature is computed over these bytes: a parse-then-reserialise
   // verifies nothing.
   .withRawBody("bytes")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(
     publicRoute({
       reason:

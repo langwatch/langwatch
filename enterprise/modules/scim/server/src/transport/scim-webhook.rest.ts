@@ -12,11 +12,19 @@
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
+import { resolveRequestBound } from "@langwatch/plans";
+import { HTTPException } from "hono/http-exception";
 
 import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "../rules/scim-webhook-signature.rules.ts";
 
 /** The headers the intake's own bodies are written with. */
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** One of the four sentences a refused delivery reads in Auth0's log. */
 function refusal(status: 400 | 401 | 403 | 404, error: string): RestRawAnswer {
@@ -37,6 +45,7 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
   // The HMAC is computed over these exact characters, so nothing parses them
   // first: a parse-then-reserialise verifies nothing.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(
     publicRoute({
       reason:

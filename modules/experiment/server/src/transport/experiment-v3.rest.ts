@@ -15,6 +15,7 @@ import {
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -31,6 +32,7 @@ import {
   type ExecutionScope,
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import type { ExperimentApp } from "#app/experiment.app";
 import type {
@@ -45,6 +47,12 @@ import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.proce
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /**
  * Everything the workbench's ten doors reach that `ExperimentApi` does not
@@ -204,6 +212,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
   // is left.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("evaluations:create")
   .withRawResponse({ produces: ["application/json", "text/event-stream"] })
   .withDocs({

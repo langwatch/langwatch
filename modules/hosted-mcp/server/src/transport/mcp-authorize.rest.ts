@@ -10,7 +10,9 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import type {
   McpApprovalOutcome,
@@ -23,6 +25,12 @@ export interface McpAuthorizeApi {
 }
 
 export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>("hosted-mcp");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** The signed-in person behind the request, as the mounting process resolves one. */
 export const mcpAuthorizeApprover = defineRestMiddleware(
@@ -74,6 +82,7 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
   // this route words itself, and may owe the client at its own registered
   // redirect URI, rather than one a validation envelope can express.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(
     publicRoute({
       reason:

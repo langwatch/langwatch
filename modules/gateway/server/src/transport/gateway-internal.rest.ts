@@ -25,12 +25,14 @@ import {
 } from "@langwatch/gateway-contract";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, MiddlewareHandler, Next } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPException } from "hono/http-exception";
 
 import {
   VirtualKeyCryptoAdapter,
@@ -58,6 +60,12 @@ import type { VirtualKeyService } from "../services/virtual-key.service.ts";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const PRODUCES_JSON = "application/json";
 
@@ -727,6 +735,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
   // §4.1 — resolve a raw virtual key to a signed JWT and its current revision.
   .post("/api/internal/gateway/resolve-key", "gatewayInternalResolveKey")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -803,6 +812,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
 
   .post("/api/internal/gateway/codex/refresh", "gatewayInternalCodexRefresh")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -957,6 +967,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
 
   .post("/api/internal/gateway/guardrail/check", "gatewayInternalGuardrailCheck")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -1065,6 +1076,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
 
   .post("/api/internal/gateway/spend-commands", "gatewayInternalSpendCommands")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -1110,6 +1122,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
   // ── realtime voice sessions (ADR-097) ─────────────────────────────────
   .post("/api/internal/gateway/realtime-sessions", "gatewayInternalReserveRealtimeSession")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -1160,6 +1173,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
   )
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })
@@ -1214,6 +1228,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
   )
   .withParams(gatewayInternalSessionParamsSchema)
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: GATEWAY_INTERNAL_GATE }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })

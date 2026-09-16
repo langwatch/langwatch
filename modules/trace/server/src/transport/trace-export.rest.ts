@@ -13,11 +13,20 @@ import {
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
+import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
 
 const logger = createLogger("langwatch:api:export-traces");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+/** Export requests carry filters, not payloads; the bulk cap leaves headroom. */
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 const SESSION_REASON =
   "the process's session port resolves the signed-in person and this handler checks " +
@@ -183,6 +192,7 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
 
   .post("/api/export/traces/download", "downloadTraceExport")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(deferredScope({ reason: SESSION_REASON }))
   .withRawResponse({ produces: "application/octet-stream" })
   .withDocs({ hide: true })

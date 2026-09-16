@@ -13,6 +13,7 @@ import { dSPyStepRESTParamsSchema, ExperimentApi } from "@langwatch/experiment-c
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import { LOG_DSPY_STEPS } from "../rules/experiment-openapi.rules.ts";
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
@@ -26,6 +27,10 @@ const DOOR_REASON =
   "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
 
 const logger = createLogger("langwatch:experiment:dspy");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** Bodies up to 20MB: a single optimizer batch carries every example it saw. */
 const MAX_BODY_BYTES = 20 * 1024 * 1024;
@@ -54,7 +59,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
-  .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
   .withDocs(LOG_DSPY_STEPS)
   .withMiddleware(dspyStepsCaller)
   .handle(async ({ app, raw }, caller) => {

@@ -41,6 +41,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",

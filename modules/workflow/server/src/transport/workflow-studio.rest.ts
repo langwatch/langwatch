@@ -18,9 +18,17 @@ import {
   WorkflowApi,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 const logger = createLogger("langwatch:workflows");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** The signed-in person behind the request, as the mounting process resolves one. */
 export const workflowStudioSession = defineRestMiddleware(
@@ -99,6 +107,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   // session it resolved.
   .post("/api/workflows/code-completion", "completeWorkflowCode")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: SESSION_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: "application/json" })
   .withMiddleware(workflowStudioSession)
@@ -142,6 +151,7 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: SESSION_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: ["text/event-stream", "application/json"] })
   .withDocs({ requestBody: { schema: workflowStudioRestEventSchema } })

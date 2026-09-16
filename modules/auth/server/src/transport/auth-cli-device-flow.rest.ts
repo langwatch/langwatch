@@ -13,9 +13,11 @@ import {
 } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import type { AuthDirectory } from "./auth-directory.ts";
 import {
@@ -27,6 +29,12 @@ import {
 } from "../services/cli-device-session.service.ts";
 
 const logger = createLogger("langwatch:auth-cli");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
 
@@ -207,6 +215,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
   .post("/api/auth/cli/device-code", "startCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw }) => {
@@ -233,12 +242,14 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
   .post("/api/auth/cli/exchange", "exchangeCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw }) => exchange({ app, raw }))
 
   .post("/api/auth/cli/refresh", "refreshCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw }) => refresh({ app, raw }))
@@ -283,12 +294,14 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
   .post("/api/auth/cli/approve", "approveCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw, request }) => approve({ app, raw, request }))
 
   .post("/api/auth/cli/deny", "denyCliDeviceCode")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw, request }) => {
@@ -317,6 +330,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
    */
   .post("/api/auth/cli/logout", "endCliDeviceSession")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(CLI_DEVICE_FLOW_DOOR)
   .withRawResponse({ produces: JSON_MEDIA_TYPE })
   .handle(async ({ app, raw }) => logout({ app, raw }))

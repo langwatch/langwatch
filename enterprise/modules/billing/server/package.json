@@ -49,6 +49,7 @@
     "@slack/webhook": "catalog:",
     "@trpc/server": "catalog:",
     "geoip-country": "^5.0.202607010001",
+    "hono": "catalog:",
     "ioredis": "catalog:",
     "nanoid": "catalog:",
     "posthog-node": "catalog:",

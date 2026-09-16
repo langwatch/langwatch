@@ -12,11 +12,19 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { OpsApi, opsExplainRequestSchema, type OpsExplainAnswer } from "@langwatch/ops-contract";
+import { resolveRequestBound } from "@langwatch/plans";
+import { HTTPException } from "hono/http-exception";
 
 /** Every body this route writes, in the sentences the operator tool parses. */
 const OPERATOR_ANSWERS =
   "the operator tool reads a status and a message: 401, 400, 502 and 503 and the EXPLAIN " +
   "rows all keep the exact bodies the agent already parses";
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /**
  * `/api/ops/clickhouse/explain`, at the one fixed path the operator tool
@@ -32,6 +40,7 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
   // bespoke `{ message }` the agent already reads, at the field path that
   // failed, which no validation envelope can express.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withDocs({
     summary: "Explain a ClickHouse query as the read-only operator account",
     description: OPERATOR_ANSWERS,

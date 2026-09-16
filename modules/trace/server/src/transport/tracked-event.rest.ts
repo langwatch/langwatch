@@ -20,9 +20,18 @@ import {
 } from "@langwatch/api/rest";
 import { publicRoute } from "@langwatch/api/access";
 import { moduleApi } from "@langwatch/runtime-composition";
+import { resolveRequestBound } from "@langwatch/plans";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:api:events");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+/** Telemetry posts; the bulk cap is the ceiling a misbehaving SDK can hit. */
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 const trackEventResponseSchema = z.object({
   message: z.literal("Event tracked"),
@@ -77,6 +86,7 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
 
   .post("/track", "trackEvent")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withPermission("traces:create")
   .withOutput(trackEventResponseSchema)
   .withDocs({

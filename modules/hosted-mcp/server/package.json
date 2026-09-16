@@ -28,8 +28,10 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@modelcontextprotocol/sdk": "catalog:",
+    "hono": "catalog:",
     "ioredis": "catalog:",
     "zod": "catalog:"
   },

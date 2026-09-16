@@ -11,8 +11,10 @@ import {
   scenarioGenerateRequestSchema,
 } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { generateObject, type LanguageModel } from "ai";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import {
@@ -21,6 +23,12 @@ import {
 } from "../rules/scenario-generate-nlpgo-error.rules.ts";
 
 const logger = createLogger("langwatch:api:scenario:generate");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** The signed-in person this door reads. */
 export type ScenarioGenerateRestSession = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -102,6 +110,7 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
 
     .post("/generate", "generateScenario")
     .withRawBody("text", { mediaType: "application/json" })
+    .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
     .withAccess(deferredScope({ reason: DOOR_REASON }))
     .withRawResponse({ produces: "application/json" })
     .withDocs({ description: "Generate or refine a scenario with the author-assist model" })

@@ -11,12 +11,20 @@ import {
   resolver,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import {
   analyticsTimeseriesRestBodySchema,
   analyticsTimeseriesResponseSchema,
 } from "./analytics.rest.ts";
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** The two shapes this door answers a refusal in, as it has always sent them. */
 const legacySentenceErrorSchema = z.object({
@@ -41,6 +49,7 @@ export const analyticsLegacyRest = defineRestRouter(AnalyticsApi)
 
   .post("/api/analytics", "postApiAnalytics")
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("analytics:view")
   .responds({ 200: analyticsTimeseriesResponseSchema, 400: legacySentenceErrorSchema })
   .withDocs({

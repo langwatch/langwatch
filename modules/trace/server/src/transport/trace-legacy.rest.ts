@@ -15,6 +15,7 @@ import {
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { resolveRequestBound } from "@langwatch/plans";
+import { HTTPException } from "hono/http-exception";
 import {
   traceFormatQuerySchema,
   traceLegacyIdParamsSchema,
@@ -35,6 +36,13 @@ const PRODUCES_JSON = "application/json";
  * explicit size is clamped to the caller's tier by the application, not here.
  */
 const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+/** Search filters can name many ids; the bulk cap is the ceiling they get. */
+const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
 
 /** A resolved project credential, or the refusal this family publishes. */
 export type TraceLegacyCredential =
@@ -302,6 +310,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // schema, so a malformed payload earns the sentence a deployed SDK parses.
   .post("/api/trace/search", "searchLegacyTraces")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: READ_REASON }))
   .withRawResponse({ produces: PRODUCES_JSON })
   .withDocs({ hide: true })

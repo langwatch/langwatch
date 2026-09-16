@@ -8,7 +8,9 @@ import { zodErrorMessage } from "@langwatch/config";
 import { ExperimentApi, experimentInitBodySchema } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
+import { HTTPException } from "hono/http-exception";
 
 import { INIT_EXPERIMENT } from "../rules/experiment-openapi.rules.ts";
 
@@ -21,6 +23,12 @@ const DOOR_REASON =
   "the process's credential port resolves the project this key may act in and enforces experiments:manage as its ceiling before the handler runs";
 
 const logger = createLogger("langwatch:experiment:init");
+
+/** The 413 a body past its cap earns, in the plain sentence it has always been. */
+const payloadTooLarge = (): Error =>
+  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
+
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /**
  * The project this request resolved to, bound by the process after its own
@@ -62,6 +70,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   // on a bad body - built by `zodErrorMessage` from the schema's own failure -
   // which a validated input cannot hand back.
   .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withDocs(INIT_EXPERIMENT)
