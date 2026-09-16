@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- * The tracked-event family is only reachable if the MODULE declares it. It was
- * written, exported from `index.ts`, and declared by nobody, so every
- * `POST /api/events/track` a released SDK sent answered 404 while the code to
- * serve it sat in the tree — apidiff read the address as removed against main
- * (run 20260916-101543). This pins the declaration, not the handler.
+ * A family is only reachable if the MODULE declares it: both these addresses
+ * were written, exported, and declared by nobody, so a released SDK was
+ * answered 404 by a tree that held the code. Pins the declaration, not the handler.
  */
 import { describe, expect, it } from "vitest";
 
@@ -26,15 +24,24 @@ describe("the tracked-event family", () => {
 
   describe("given the legacy `/api/track_event` alias", () => {
     /**
-     * The alias replays the request into the canonical route rather than
-     * handling it a second time, so it needs an app member that can dispatch a
-     * `Request` back into the mounted family. Nothing in the repository
-     * implements that yet — `experimentV3AliasRest` is the same shape and is
-     * unmounted for the same reason — so the alias stays undeclared instead of
-     * being mounted over a member that would throw on every call.
+     * The alias answers for itself over the canonical route's own handler, the
+     * way the monolith shared one service between the two addresses, so it
+     * needs no member that can dispatch a `Request` back into a mounted family.
      */
-    it("stays undeclared until an app can replay a request into the canonical route", () => {
-      expect(traceServer.transports).not.toContain(trackedEventLegacyPathRest);
+    it("is declared, so a pre-rename SDK release still reaches the family", () => {
+      expect(traceServer.transports).toContain(trackedEventLegacyPathRest);
+    });
+
+    it("reads the same credential and asks the same permission as the canonical route", () => {
+      const alias = trackedEventLegacyPathRest.router();
+      const canonical = declaration.routes[0]!;
+
+      expect(alias.credential).toBe("project");
+      expect(alias.routes[0]!.permission).toBe(canonical.permission);
+    });
+
+    it("stays out of the published document", () => {
+      expect(trackedEventLegacyPathRest.router().routes[0]!.docs?.hide).toBe(true);
     });
   });
 });

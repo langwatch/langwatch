@@ -18,7 +18,6 @@ import {
   resolver,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { publicRoute } from "@langwatch/api/access";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
@@ -79,6 +78,55 @@ export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";
 /** The URL this family actually registers. */
 export const TRACKED_EVENT_CANONICAL_PATH = "/api/events/track";
 
+/**
+ * What both addresses do. One body behind two routes, the way the monolith
+ * shared a service between `/api/track_event` and the canonical route, so the
+ * older name cannot drift from the newer one.
+ */
+async function recordTrackedEvent({
+  app,
+  raw,
+  scope,
+}: {
+  app: TrackedEventMembers;
+  raw: string | Uint8Array | undefined;
+  scope: Readonly<{ id: string }>;
+}): Promise<{ message: "Event tracked" }> {
+  let rawBody: Record<string, unknown>;
+  try {
+    rawBody = JSON.parse(raw as string) as Record<string, unknown>;
+  } catch {
+    throw new TrackedEventRejectedError("Bad request");
+  }
+
+  let body: TrackEventRESTParamsValidator;
+  try {
+    body = trackEventRESTParamsValidatorSchema.parse(rawBody);
+  } catch (error) {
+    logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
+    app.reportError(error);
+    throw new TrackedEventRejectedError(app.describeValidationError(error));
+  }
+
+  try {
+    app.assertPredefinedEventPayload(rawBody);
+  } catch (error) {
+    logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
+    app.reportError(error);
+    throw new TrackedEventRejectedError(app.describeValidationError(error));
+  }
+
+  const eventId = body.event_id ?? app.generateEventId();
+
+  try {
+    await app.recordTrackedEvent({ project: { id: scope.id }, body, eventId });
+  } catch (error) {
+    logger.error({ error }, "unable to dispatch tracked event span");
+  }
+
+  return { message: "Event tracked" as const };
+}
+
 export const trackedEventRest = defineRestRouter(TrackedEventApi)
   .withNamespace("events")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -107,75 +155,27 @@ export const trackedEventRest = defineRestRouter(TrackedEventApi)
       },
     },
   })
-  .handle(async ({ app, raw, scope }) => {
-    let rawBody: Record<string, unknown>;
-    try {
-      rawBody = JSON.parse(raw as string) as Record<string, unknown>;
-    } catch {
-      throw new TrackedEventRejectedError("Bad request");
-    }
-
-    let body: TrackEventRESTParamsValidator;
-    try {
-      body = trackEventRESTParamsValidatorSchema.parse(rawBody);
-    } catch (error) {
-      logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
-      app.reportError(error);
-      throw new TrackedEventRejectedError(app.describeValidationError(error));
-    }
-
-    try {
-      app.assertPredefinedEventPayload(rawBody);
-    } catch (error) {
-      logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
-      app.reportError(error);
-      throw new TrackedEventRejectedError(app.describeValidationError(error));
-    }
-
-    const eventId = body.event_id ?? app.generateEventId();
-
-    try {
-      await app.recordTrackedEvent({ project: { id: scope.id }, body, eventId });
-    } catch (error) {
-      logger.error({ error }, "unable to dispatch tracked event span");
-    }
-
-    return { message: "Event tracked" as const };
-  })
+  .handle(recordTrackedEvent)
 
   .build();
 
-/** The `/api/track_event` alias: the one thing it does is forward. */
-export interface TrackedEventLegacyPathApi {
-  forward(request: Request): Promise<Response>;
-}
-
-export const TrackedEventLegacyPathApi = moduleApi<TrackedEventLegacyPathApi>("trace");
-
 /**
- * `POST /api/track_event` - the family's older name, re-dispatched. TERMINATES
- * NOTHING: the canonical route authenticates the forwarded request exactly as
- * a direct one.
+ * `POST /api/track_event` - the older name, over the same body. It reads the
+ * same credential and asks the same permission, so re-dispatching into the
+ * canonical route would only buy a second trip through the runtime.
  */
-export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventLegacyPathApi)
+export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
   .withNamespace("track-event-legacy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
+  .withCredential("project")
   .post(TRACKED_EVENT_LEGACY_PATH, "trackEventLegacyAlias")
-  .withAccess(
-    publicRoute({
-      reason:
-        "the alias forwards the request into the canonical route, which authenticates it " +
-        "exactly as it would a direct call",
-    }),
-  )
-  .withRawResponse({ produces: "application/json" })
+  .withRawBody("text", { mediaType: "application/json" })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
+  .withPermission("traces:create")
+  .withOutput(trackEventResponseSchema)
   .withDocs({ hide: true })
-  .handle(({ app, request }): Promise<Response> => {
-    const url = new URL(request.url);
-    url.pathname = TRACKED_EVENT_CANONICAL_PATH;
-    return app.forward(new Request(url.toString(), request));
-  })
+  .handle(recordTrackedEvent)
   .build();
 
 export const trackedEventRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>

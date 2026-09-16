@@ -54,10 +54,10 @@ Feature: Tracked-event validation answers the caller
 
   # The endpoint has two URLs. `POST /api/track_event` predates
   # `POST /api/events/track` and every pre-rename SDK release still posts to
-  # it, so the pair has to stay one endpoint: the legacy URL replays the
-  # request against the canonical route rather than being a second handler,
-  # because two handlers over one recorder drift the first time one of them
-  # gains a check the other does not.
+  # it, so the pair has to stay one endpoint. Both routes are declared over one
+  # handler function rather than one replaying into the other: the thing to
+  # avoid is two bodies drifting once one gains a check the other does not, and
+  # sharing the body prevents that without a second trip through the runtime.
 
   @integration
   Scenario: The legacy URL reaches the same recorder as the canonical one
