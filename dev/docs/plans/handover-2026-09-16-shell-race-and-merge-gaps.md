@@ -9,66 +9,105 @@ acting on anything I said in conversation.
 
 ---
 
-## 0. State, rewritten 2026-09-16 01:0x
+## 0. State, rewritten 2026-09-16 ~02:2x
 
-This section is the snapshot. Where it contradicts a section below it, it wins.
+This section is the snapshot. Where it contradicts a section below, it wins.
 
-**Committed since this document was written.** `52814ec2d8` - the
-`belongsToNoOrganization` port that section 2 described as applied-but-uncommitted,
-plus this document. Its doc comment was cut first: `comment-block-size` now errors
-at 6 lines **including** the `/**` and `*/` delimiters, so the budget is 5 and
-nothing suppresses it. Verified before committing: the new unit test 4/4,
-`typecheck:one @langwatch/navigation-web` clean, oxlint clean on both new files,
-no merge or rebase marker, zero unmerged entries. The two remaining
-`comment-block-size` errors in `use-landing-redirect.ts` are pre-existing in HEAD
-and were left alone.
+### Committed this session, in order
 
-**The dirty count is not this drive's.** 128 files, belonging to at least three
-other live sessions in this shared checkout: a lint-to-zero coordinator with five
-comment-sweep lanes (`sdks/typescript`, `modules/{analytics,trace,scenario,gateway}`),
-a haven TUI and simulators drive (`tools/thuishaven`, `services/{mailsim,idpsim}`,
-`specs/setup/haven-*.feature`), and the request-bounds config work. Commit by
-explicit pathspec only, and never `git stash` - the stash stack is global and
-`stash@{0}` currently holds another session's mail-sink work.
+| Commit | What |
+| --- | --- |
+| `52814ec2d8` | the `belongsToNoOrganization` port section 2 left uncommitted |
+| `e37f782919` | every `/ops/*` address draws inside `UiAppChrome` again; the four orphaned governance screens registered in `governanceScreens` |
+| `ca969cd14d` | the four governance routes + loaders; `navigation-destinations-are-routed` widened to the governance and gateway nav families |
+| `31c529165c` | `/settings/profile` answers; `specs/settings/profile.feature` 0/29 -> 16/29 |
+| `26c5c7cad2` | the operator identity lookup's server read half; `platform-ops-identity-lookup.feature` 0/32 -> 13/32 |
+| `05bce7849f` | `/settings/security` with the `/settings/authentication` redirect; `authentication-settings.feature` 3/27 -> 10/27; the user-web suite's flake fixed |
+
+Every commit was made by explicit pathspec, boot-checked after, and its package
+checks re-run by the coordinator rather than taken on the lane's word. **Three
+lane claims did not survive that** - see "what to distrust" below.
+
+### Decisions taken, so nobody re-asks them
+
+1. **The governance four were dropped by the merge, not retired** (section 3a).
+   Evidence: main serves all four, `governanceNavItems` links at all four, and
+   `governance-platform-placeholders.feature` describes them as deliberate Preview
+   screens with `@integration` scenarios already bound. They got routes.
+2. **`/settings/security` follows main's arrangement, redirect shim included**
+   (user's decision). The branch is no longer a generation behind on account
+   settings.
+3. **The identity lookup's `history` panel and `waiting.proposals` both read
+   through `@langwatch/eventing`'s existing `EventRepository`**, per person by
+   aggregate stream. No new ClickHouse dependency (eventing is already a
+   dependency and its ClickHouse adapter already exists), and no new Postgres
+   projection (`identifier-aggregate.ts`: a proposal changes no head *on
+   purpose*). One mechanism answers both, because `LINK_PROPOSED` is a
+   person-stream fact. Recorded in section 0 of that lane's handoff.
+4. **Self-service identity procedures stay in `modules/user/server`** and the
+   `identity.*` namespace is not split. `user.trpc.ts:141` says why in its own
+   comment.
+
+### What to distrust, and why
+
+A lane's own report was wrong three times tonight. Re-run the checks yourself at
+collection; it is one command and it caught all three.
+
+- `settings-profile-port` said oxlint "failed to load, another session broke the
+  plugin" and hand-checked instead. The plugin was fine and
+  `packages/oxlint-rules/` was not even dirty; the real run found **five errors in
+  that lane's own new files** (`temporal-only` on two `Date` fields and a
+  `new Date(...)`, `array-type` on two `ReadonlyArray<T>`). Fixed at collection.
+  **A hand-check is not a lint run.**
+- `settings-security-port` estimated its flake at "1 in 3-5 runs". Measured: **2
+  failures in 5**, and 6 consecutive clean runs after `isolate: true`. The
+  test-harness config documents that escape hatch in as many words at
+  `packages/test-harness/src/vitest-config.ts:23`.
+- `identity-lookup-server-reads` reported `partial` honestly but gave **no parity
+  number**, which was its completion criterion. Measured: 13/32 against a target
+  of 17 - the shortfall being exactly the two panels it blocked on.
+
+And once in the other direction: `identity-trpc-transport` stopped `blocked`
+without writing code and **corrected the coordinator twice** (see section 8).
+That is the protocol working, not a lane failing.
+
+### The tree
+
+**The dirty count is not this drive's.** The lint-to-zero session has five
+comment-sweep lanes live (`sdks/typescript`, `modules/{analytics,trace,scenario,gateway}`),
+and a haven TUI and simulators drive holds `tools/thuishaven`,
+`services/{mailsim,idpsim}` and `specs/setup/haven-*.feature`. Commit by explicit
+pathspec only. **Never `git stash`** - the stack is global and `stash@{0}` holds
+another session's mail-sink work.
+
+**`pnpm-lock.yaml` is dirty and was deliberately NOT committed.** It already
+carries `26c5c7cad2`'s `@langwatch/audit-log-contract` entry for
+`modules/identity/server`, but it is tangled with a `packages/ui-host` change
+belonging to somebody else. Whoever owns those lines should commit it; until then
+a `--frozen-lockfile` install would fail on that dependency.
 
 **The gap to origin/main: 4 commits behind, 2920 ahead**, merge-base
-`c5999477f1`. The four are `c2f6eebe1d` (voice) and three identity PRs -
-`c87c46d17f` #8143, `118929d09c` #8148, `51577b8e19` #8149 - which land in exactly
-the area section 3b says the merge never re-homed. Deliberately not merged while
-six lanes and three sessions are live in this checkout; it waits until they are
-collected.
+`c5999477f1`. Three of the four are identity PRs (#8143, #8148, #8149) landing in
+exactly the area section 3b covers. Deliberately not merged while six lanes and
+four sessions were live. **Merge it before the identity work goes further**, or
+those lanes port against a tree the merge is about to move.
 
-**Lanes.** Roster is `.claude/coordinator/LANES.md`; read it, do not trust this
-line. At the time of writing: `ui-route-surface-repair` (sonnet) and
-`settings-profile-port` (sonnet) active. `.claude/manifests/settings-security-port.md`
-is written and waiting - spawn it once the profile lane is collected, not
-alongside it: the two share the api seam, the host port and the export surface,
-and sequencing them is cheaper than four shared files.
+**`apps/ui/src/model/ui-route-table.ts` is now coordinator-shared**
+(`COORDINATOR.md` section 6): three lanes wanted an entry within one hour.
 
-**`apps/ui/src/model/ui-route-table.ts` is now a coordinator-shared file**
-(`COORDINATOR.md` section 6). Three lanes wanted an entry in it within one hour.
-A lane may hold it exclusively for one slice, and the roster row says so when it
-does; otherwise the lines come through handoff section 10.
+### Two holes in the guards, one closed
 
-**A hole nothing else in this document names.**
-`apps/ui/src/model/__tests__/navigation-destinations-are-routed.unit.test.ts:66`
-reads `Object.values(projectNavItems)` and nothing else. That is why four dead
-governance links passed 107 green tests. `governanceNavItems` and
-`gatewayNavItems` are both already exported from `@langwatch/navigation-web/chrome`
-beside it. The route-surface lane is widening it to those two families and proving
-the widening bites; **settings is the next family to add**, and it is deliberately
-not in that change because `/settings/profile` and `/settings/security` are
-genuinely absent and would turn the suite red for a gap that lane is not fixing.
+`navigation-destinations-are-routed.unit.test.ts` read `projectNavItems` **and
+nothing else**, which is why four dead governance links passed 107 green tests. It
+now reads the governance and gateway families too, proven to bite by removing a
+route and watching it fail in both readings (107 tests -> 145).
 
-**Parity numbers for the section 3b work, measured rather than estimated:**
-
-    specs/settings/profile.feature                  0/29 scenarios bound
-    specs/identity/authentication-settings.feature  3/27
-    specs/settings/change-password-auth0.feature    19/19  (done - leave it)
-
-53 unbound scenarios, which is why section 3b is two lanes and not an afternoon.
-Whole-repository parity is FAIL at 1723 unbound; that is not this drive's number.
-Filter the tool to one file and read its `N/M` line.
+Still open: **`/annotations` is in `feature-map.json` and routed nowhere**, and
+`feature-map-links-are-routed.unit.test.ts` is red about it - confirmed
+pre-existing by restoring HEAD's route table. And the destinations test still does
+not read the **settings** family; adding it is correct only once
+`/settings/profile` and `/settings/security` are both complete, or it goes red for
+gaps nobody is fixing.
 
 ---
 
@@ -348,36 +387,69 @@ Ranked, if someone takes this on:
 
 ## 6. Next actions
 
-Items 1 to 3 of the original list are in flight or decided; what is left:
+Sections 3a and 4 are **done and committed**. Section 3b is half done. What is
+left, in the order I would take it:
 
-1. **Collect `ui-route-surface-repair`** - the four governance routes, the ops
-   block moved inside `UiAppChrome`, and the destinations test widened. Its
-   completion criterion includes proving the widened test fails when a route
-   entry is removed, so check that claim rather than the green tick.
-2. **Collect `settings-profile-port`**, apply its section-10 route-table line,
-   then spawn `.claude/manifests/settings-security-port.md` from its handoff.
-   Not alongside it: they share the api seam, the host port and the export
-   surface.
-3. **`/ops/backoffice/identity-lookup`** (§3b) - the whole feature is absent,
-   server and all, with 32 unbound scenarios. Re-read §3b: this is the largest
-   item here, not the smallest, and it needs its own lane with a server half.
-   Do not fold it into anything.
-4. **Widen the destinations test to the settings nav family**, once
-   `/settings/profile` and `/settings/security` answer. Until then it would be
-   red for a gap nobody is fixing, which is worse than narrow.
-5. **Merge the 4 commits from origin/main**, once this checkout is quiet. Three
-   of them are identity and land in the section 3b area, so the settings lanes
-   are worth finishing first - otherwise they port against a tree the merge is
-   about to move.
-6. **Round trips** (§5), starting with the 401 retry policy so hop 1 can go.
-   Unchanged and still unaddressed.
+1. **Merge the 4 commits from origin/main.** Three are identity and land in the
+   3b area. Everything below ports against a tree this merge moves, so it goes
+   first now that the lanes are collected.
+2. **Commit `pnpm-lock.yaml`** once whoever owns the `packages/ui-host` lines in
+   it is done. Until then `26c5c7cad2`'s dependency is declared but unlocked.
+3. **The MFA commit surface** (`modules/identity/{contract,server}`). The long
+   pole for `/settings/security`: seven verbs with a guard API and no way to
+   commit their facts. Carries its own architecture question - whether MFA facts
+   share the identifier ledger or get a stream of their own - which wants deciding
+   before the lane starts. Re-scope detail in
+   `.claude/manifests/identity-trpc-transport.md`, the STOP banner at the top.
+4. **The identifier read model** - one `IdentityApi` member answering every
+   identifier on a user with its confirmed state. Smaller than 3, independent of
+   it, and it unblocks the Security page's first section.
+5. **Then the identity transport**, with `modules/user/contract` in its owned
+   paths this time. Not before 4.
+6. **`/settings/profile`'s remaining 13 scenarios**: a self-service
+   `user.updateName` mutation (4 scenarios; `UserService.updateProfile` already
+   exists at `services/user.service.ts:138`), a browser-sessions backend (7; a
+   whole feature with nothing behind it - main used
+   `personalSessions.listWebSessions`, and the branch's `personalSessions.list` is
+   **CLI tokens, a different concept** that must not be reused for it), and a
+   confirmed-address read (2). Detail in
+   `.claude/handoffs/settings-profile-port.md` sections 11-12.
+7. **The identity lookup's remaining 19 scenarios**: the `history` and
+   `waiting.proposals` panels per decision 3 above, then its six guarded commands,
+   then the operator screen and its `/ops/backoffice/identity-lookup` route. Its
+   wiring is also still undone - `identityLookup` is optional on
+   `IdentityRepositories` and no backend is constructed yet; detail in that
+   lane's handoff section 9.
+8. **`/annotations`** - routed nowhere, with a red test about it. Cheapest item
+   here.
+9. **Widen the destinations test to the settings family**, once 5 and 6 land.
+10. **Round trips** (section 5). Untouched and still the biggest user-visible
+    win: the three-deep serial waterfall, one HTTP request per feature flag, and
+    `organization.getAll` fetched three times per page load on this branch.
 
-**The decision taken on 2026-09-16, so no later session re-asks it:** the
-`/settings/security` port follows main's arrangement including the
-`/settings/authentication` redirect shim, rather than keeping the branch's
-pre-rename page. Reason: the branch's standing invariant is wire-compatibility
-with main, and every future main merge would otherwise reopen the same
-collision. Recorded in `.claude/manifests/settings-security-port.md`.
+## 8. Where the coordinator was wrong, recorded so it is not repeated
+
+Two corrections from this session worth carrying forward.
+
+**I asserted a contract was complete when only half of it was.** Setting up the
+identity transport lane I checked that `identity.api.ts` declares the identifier
+verbs *and* the MFA verbs, and concluded "the contract is complete; only the
+transport declarations are missing". A declared guard API is not a committable
+operation: `IdentityCommand` (`facts.ts:370-376`) carries six members, all
+identifier verbs, and `mfaGuards()` only computes facts that nothing can stage.
+The lane found this by tracing how a procedure would actually wire, which is a
+step I skipped. **Reading an interface is not the same as following the call to
+where it commits.**
+
+**I scoped a manifest to a transport file and not to the contract that types it.**
+`identityTrpc` is defined once, in `modules/user/contract/src/user.trpc.ts:144`,
+which I put in neither the owned nor the shared list - so the lane could not
+declare a single procedure. When a manifest names a transport, it names the wire
+contract too.
+
+Both cost one lane's reading and no wasted code, because the manifest fenced the
+completeness claim as a stop condition and the lane honoured it. That is the fence
+earning its keep.
 
 ## 7. Loose ends
 
