@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  defaultPiSessionsDir,
+  defaultPiProjectSessionsDir,
+  encodePiCwdDirName,
   PI_SESSION_DIR_ENV,
   piSettingsPath,
   resolvePiSessionDir,
@@ -20,6 +21,12 @@ import {
 
 /** A throwaway HOME, so no test can read or write the real ~/.pi. */
 let home: string;
+
+/**
+ * A fixed working directory, so the default branch asserts against a known
+ * encoded folder name rather than wherever the test runner happens to start.
+ */
+const cwd = "/work/project";
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "lw-pi-session-dir-"));
@@ -136,10 +143,46 @@ describe("resolving pi's session directory", () => {
         toolArgs: [],
         env: {},
         home,
+        cwd,
       });
 
-      expect(resolved).toBe(defaultPiSessionsDir(home));
-      expect(resolved).toBe(join(home, ".pi", "agent", "sessions"));
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, home }));
+    });
+
+    /**
+     * The one that was wrong while every other test here was green: the
+     * default is not the sessions folder, it is one folder per working
+     * directory inside it, and a reader pointed at the parent sees only
+     * directories. Spelling the whole path out is the point — an assertion
+     * against `defaultPiProjectSessionsDir` alone would agree with the
+     * function however the function encoded it.
+     *
+     * @scenario "A default pi launch is read from the folder pi makes for this project"
+     */
+    it("names the per-project folder pi encodes from the working directory", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe(
+        join(home, ".pi", "agent", "sessions", "--work-project--"),
+      );
+      expect(resolved).not.toBe(join(home, ".pi", "agent", "sessions"));
+    });
+
+    /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+    it("keeps a named directory flat, the way pi uses it", async () => {
+      const resolved = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "/elsewhere/sessions"],
+        env: {},
+        home,
+        cwd: "/work/project",
+      });
+
+      expect(resolved).toBe("/elsewhere/sessions");
     });
 
     /** @scenario "A session kept somewhere other than the default place is still found" */
@@ -148,9 +191,10 @@ describe("resolving pi's session directory", () => {
         toolArgs: [],
         env: {},
         home,
+        cwd,
       });
 
-      expect(resolved).toBe(defaultPiSessionsDir(home));
+      expect(resolved).toBe(defaultPiProjectSessionsDir({ cwd, home }));
     });
   });
 
@@ -159,32 +203,32 @@ describe("resolving pi's session directory", () => {
       writeSettings('{"sessionDir": "/half-written"');
 
       await expect(
-        resolvePiSessionDir({ toolArgs: [], env: {}, home }),
-      ).resolves.toBe(defaultPiSessionsDir(home));
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
     });
 
     it("falls through when the file is not an object", async () => {
       writeSettings('"just a string"');
 
       await expect(
-        resolvePiSessionDir({ toolArgs: [], env: {}, home }),
-      ).resolves.toBe(defaultPiSessionsDir(home));
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
     });
 
     it("falls through when sessionDir is not a string", async () => {
       writeSettings(JSON.stringify({ sessionDir: 42 }));
 
       await expect(
-        resolvePiSessionDir({ toolArgs: [], env: {}, home }),
-      ).resolves.toBe(defaultPiSessionsDir(home));
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
     });
 
     it("falls through when sessionDir is blank", async () => {
       writeSettings(JSON.stringify({ sessionDir: "  " }));
 
       await expect(
-        resolvePiSessionDir({ toolArgs: [], env: {}, home }),
-      ).resolves.toBe(defaultPiSessionsDir(home));
+        resolvePiSessionDir({ toolArgs: [], env: {}, home, cwd }),
+      ).resolves.toBe(defaultPiProjectSessionsDir({ cwd, home }));
     });
 
     it("lets a broken settings file fall through to the variable, not past it", async () => {
@@ -198,6 +242,30 @@ describe("resolving pi's session directory", () => {
 
       expect(resolved).toBe("/from-env");
     });
+  });
+});
+
+describe("encoding a working directory the way pi names its folder", () => {
+  /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+  it("drops the leading separator and wraps the rest in double dashes", () => {
+    expect(encodePiCwdDirName("/work/project")).toBe("--work-project--");
+  });
+
+  /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+  it("keeps a dot in a path segment, which pi does not replace", () => {
+    expect(encodePiCwdDirName("/a/b/.claude/worktrees/c")).toBe(
+      "--a-b-.claude-worktrees-c--",
+    );
+  });
+
+  /**
+   * Both the drive colon and the separator become dashes, and a drive letter
+   * has no leading separator to drop, so `C:\` becomes `C--`. That is pi's
+   * output, not a tidy one: the first written expectation here was
+   * `--C-work-project--` and the run said otherwise.
+   */
+  it("turns a Windows separator and drive colon into dashes too", () => {
+    expect(encodePiCwdDirName("C:\\work\\project")).toBe("--C--work-project--");
   });
 });
 

@@ -837,9 +837,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 				// Stamped before the spawn: a session file untouched since then is
 				// one this run never wrote to, and belongs to nobody's launch of ours.
 				sinceMs: sessionStartMs,
+				// The working directory is not incidental here: with nothing moving
+				// pi's session directory, it is what names the folder pi writes
+				// into, and reading its parent finds only folders.
 				sessionsDir: await resolvePiSessionDir({
 					toolArgs,
 					env: process.env,
+					cwd: process.cwd(),
 				}),
 				// Events, never spans: a pi turn on both lanes would be counted twice.
 				logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,

@@ -9,6 +9,24 @@
  * `~/.pi/agent/sessions` finds nothing at all for a user who moved it — and
  * finds it silently, with no file to fail on.
  *
+ * The two branches differ in shape, and that difference is the whole reason
+ * this file has a cwd argument. A directory the user named is used exactly as
+ * given: pi writes its sessions straight into it. The default is not a
+ * directory pi writes into at all — it is the parent of one directory per
+ * working directory, named by encoding the cwd. So `~/.pi/agent/sessions`
+ * holds no session file at any time; every file is one level below it. A
+ * reader that resolves to the parent and does not descend finds nothing on a
+ * default launch, which is every user who has set nothing — verified by
+ * running the walker against a real pi installation: zero files at the parent,
+ * seven one level down.
+ *
+ * Both shapes are pi's, read from its shipped source rather than inferred:
+ * `session-manager.js` builds the encoded name in `getDefaultSessionDirPath`
+ * and takes an explicit directory unchanged
+ * (`const dir = sessionDir ? normalizePath(sessionDir) : getDefaultSessionDir(cwd)`).
+ * Resolving to pi's own per-project directory rather than widening the walk to
+ * every project also keeps capture to the sessions of the project we are in.
+ *
  * Resolution reads; it never creates. The returned directory may not exist,
  * which is the normal state of a session pi has not written yet (pi defers the
  * first write until the first assistant reply), and the caller treats an
@@ -22,7 +40,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 /** The variable pi itself reads, second in its own precedence order. */
 export const PI_SESSION_DIR_ENV = "PI_CODING_AGENT_SESSION_DIR";
@@ -35,9 +53,41 @@ export function piSettingsPath(home: string = homedir()): string {
   return join(home, ".pi", "agent", "settings.json");
 }
 
-/** Where pi writes sessions when nothing has moved them. */
-export function defaultPiSessionsDir(home: string = homedir()): string {
+/**
+ * The PARENT of pi's default per-project directories, which holds no session
+ * file itself. Callers that want somewhere to read from want
+ * {@link defaultPiProjectSessionsDir}.
+ */
+export function defaultPiSessionsRoot(home: string = homedir()): string {
   return join(home, ".pi", "agent", "sessions");
+}
+
+/**
+ * pi's name for one working directory's session folder.
+ *
+ * Copied from pi's `getDefaultSessionDirPath`: drop a single leading separator,
+ * turn every remaining separator and colon into a dash, and wrap the result in
+ * a leading and trailing double dash. The colon is in the set for Windows
+ * drive letters; on any platform the encoding is pi's, so we reproduce it
+ * whole rather than the part that happens to matter here.
+ */
+export function encodePiCwdDirName(cwd: string): string {
+  const stripped = cwd.replace(/^[/\\]/, "").replace(/[/\\:]/g, "-");
+  return `--${stripped}--`;
+}
+
+/**
+ * Where pi writes this working directory's sessions when nothing has moved
+ * them. This is the directory a reader reads; its parent never holds files.
+ */
+export function defaultPiProjectSessionsDir({
+  cwd,
+  home = homedir(),
+}: {
+  cwd: string;
+  home?: string;
+}): string {
+  return join(defaultPiSessionsRoot(home), encodePiCwdDirName(resolve(cwd)));
 }
 
 /**
@@ -96,16 +146,22 @@ export async function readSettingsSessionDir(
  * The directory to read this pi session from, highest-precedence source first.
  * Always resolves to a path; the default is the last source, so there is no
  * "not found" case for the caller to handle.
+ *
+ * A named directory is returned as named, because that is what pi does with
+ * it. Only the default gains the per-project segment, for the same reason.
  */
 export async function resolvePiSessionDir({
   toolArgs = [],
   env = process.env,
   home = homedir(),
+  cwd = process.cwd(),
 }: {
   /** The arguments passed through to pi, as given. */
   toolArgs?: readonly string[];
   env?: NodeJS.ProcessEnv;
   home?: string;
+  /** The directory pi is launched in, which names its default session folder. */
+  cwd?: string;
 } = {}): Promise<string> {
   const fromArgs = sessionDirFromArgs(toolArgs);
   if (fromArgs) return fromArgs;
@@ -116,5 +172,5 @@ export async function resolvePiSessionDir({
   const fromSettings = await readSettingsSessionDir(piSettingsPath(home));
   if (fromSettings) return fromSettings;
 
-  return defaultPiSessionsDir(home);
+  return defaultPiProjectSessionsDir({ cwd, home });
 }

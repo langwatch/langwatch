@@ -107,7 +107,24 @@ Feature: pi session capture
       | with a command flag                |
       | with a variable in the environment |
       | in pi's settings file              |
-      | nowhere, so the usual place stands |
+
+  @unit
+  # A user who has set nothing is the common case, and it used to record
+  # nothing at all. A directory the user names is a directory pi writes
+  # sessions straight into. The default is not: pi makes one folder per
+  # working directory underneath it and writes there, so the default place
+  # itself never holds a session file. Looking in it, and not below it, found
+  # no file on any tick and ended the run with nothing recorded and nothing
+  # said. Measured against a real installation before this was written: no
+  # files in the default place, seven in the folders below it.
+  #
+  # We work out the project folder rather than reading every project's, so a
+  # run still records only the sessions of the project it was started in.
+  Scenario: A default pi launch is read from the folder pi makes for this project
+    Given a user who has not moved pi's session directory
+    When we work out where to look
+    Then we look in the folder pi makes for the working directory, not its parent
+    And a directory the user named is still read exactly as named
 
   # --- Naming the agent, not the provider -----------------------------------
 

@@ -169,9 +169,12 @@ async function sessionFilesTouchedSince({
 }): Promise<string[]> {
   const touched = await findFilesModifiedSince({
     root: dir,
-    // pi keeps its sessions in one flat directory, so the walk must not
-    // descend. `maxDepth: 0` states that layout here, which is the whole
-    // point of the shared walker taking it as an argument.
+    // Flat, and only because `dir` is already the folder pi writes into
+    // rather than the parent of one folder per project. `resolvePiSessionDir`
+    // is what makes that true on a default launch; this depth is correct only
+    // alongside it, and reading `~/.pi/agent/sessions` with it found nothing
+    // at all. Widening the walk instead would have reached into every
+    // project's sessions, which is not ours to capture.
     maxDepth: 0,
     // Widened against the filesystem clock, never narrowed: see
     // FS_CLOCK_SKEW_GRACE_MS. The run's real boundary is the row window in
