@@ -66,7 +66,7 @@ describe("user app installation", () => {
         passwordHash: "hashed:first",
       });
 
-      await expect(app.tryFindById({ id: created.id })).resolves.toMatchObject({
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         email: "ada@example.com",
       });
       await expect(app.hasPassword({ id: created.id })).resolves.toBe(true);
@@ -119,7 +119,7 @@ describe("user app installation", () => {
         passwordHash: "hashed:first",
       });
 
-      await expect(second.service(UserApi).tryFindById({ id: created.id })).resolves.toBeNull();
+      await expect(second.service(UserApi).findById({ id: created.id })).resolves.toBeNull();
     } finally {
       await first.stop();
       await second.stop();

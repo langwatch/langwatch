@@ -24,11 +24,11 @@ function isRedisConnection(value: object): value is GithubRedisConnection {
  * token minter because it is the store, not a provider.
  */
 export abstract class GithubRedis {
-  abstract tryGet(key: string): Promise<string | null>;
-  abstract trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
+  abstract get(key: string): Promise<string | null>;
+  abstract set(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
   abstract delete(key: string): Promise<number>;
-  abstract tryGetDelete(key: string): Promise<string | null>;
-  abstract tryEval(
+  abstract getDelete(key: string): Promise<string | null>;
+  abstract evaluate(
     script: string,
     numKeys: number,
     ...args: string[]
@@ -49,11 +49,11 @@ export class RedisGithubAdapter extends GithubRedis {
     super();
   }
 
-  tryGet(key: string): Promise<string | null> {
+  get(key: string): Promise<string | null> {
     return this.connection.get(key);
   }
 
-  trySet(key: string, value: string, ...args: (string | number)[]): Promise<string | null> {
+  set(key: string, value: string, ...args: (string | number)[]): Promise<string | null> {
     return this.connection.set(key, value, ...args);
   }
 
@@ -61,11 +61,11 @@ export class RedisGithubAdapter extends GithubRedis {
     return this.connection.del(key);
   }
 
-  tryGetDelete(key: string): Promise<string | null> {
+  getDelete(key: string): Promise<string | null> {
     return this.connection.getdel?.(key) ?? Promise.resolve(null);
   }
 
-  tryEval(script: string, numKeys: number, ...args: string[]): Promise<number | string | null> {
+  evaluate(script: string, numKeys: number, ...args: string[]): Promise<number | string | null> {
     return this.connection.eval?.(script, numKeys, ...args) ?? Promise.resolve(null);
   }
 }

@@ -23,7 +23,7 @@ export class GithubInstallNonceRedisRepository extends GithubInstallNonceReposit
     }
 
     try {
-      await this.redis.trySet(nonceKey(input.nonce), "1", "EX", input.ttlSec);
+      await this.redis.set(nonceKey(input.nonce), "1", "EX", input.ttlSec);
       return true;
     } catch {
       return false;
@@ -37,12 +37,12 @@ export class GithubInstallNonceRedisRepository extends GithubInstallNonceReposit
 
     try {
       const key = nonceKey(nonce);
-      const deleted = await this.redis.tryGetDelete(key);
+      const deleted = await this.redis.getDelete(key);
       if (deleted !== null) {
         return true;
       }
 
-      const result = await this.redis.tryEval(
+      const result = await this.redis.evaluate(
         "local v = redis.call('GET', KEYS[1])\nif v then redis.call('DEL', KEYS[1]) return 1 else return 0 end",
         1,
         key,
@@ -51,7 +51,7 @@ export class GithubInstallNonceRedisRepository extends GithubInstallNonceReposit
         return result === 1 || result === "1";
       }
 
-      const value = await this.redis.tryGet(key);
+      const value = await this.redis.get(key);
       if (value === null) {
         return false;
       }

@@ -190,7 +190,7 @@ export class GithubPullRequestStatusService {
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestSummary | null> {
-    const covering = await this.deps.installations.tryResolveInstallationForRepository({
+    const covering = await this.deps.installations.resolveInstallationForRepository({
       organizationId,
       repositoryFullName: ref.repositoryFullName,
     });

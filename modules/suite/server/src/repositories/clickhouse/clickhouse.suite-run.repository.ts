@@ -170,7 +170,7 @@ export class ClickHouseSuiteRunRepository
     }
   }
 
-  async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+  async findSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
     const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
       tenantId: input.projectId,
       table: TABLE_NAME,
@@ -205,7 +205,7 @@ export class ClickHouseSuiteRunRepository
     return rows[0] ? ClickHouseSuiteRunRepository.mapRowToState(rows[0]) : null;
   }
 
-  async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
+  async findBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
     const limit = Math.min(input.limit ?? 50, 100);
     const scenarioSetIds = ClickHouseSuiteRunRepository.expandSetIdFilter(input.scenarioSetId);
     const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({

@@ -38,7 +38,7 @@ export class GithubInstallStateService implements GithubInstallState {
     return this.nonces.registerNonce(input);
   }
 
-  tryConsumeNonce(nonce: string): Promise<boolean | null> {
+  consumeNonce(nonce: string): Promise<boolean | null> {
     return this.nonces.consumeNonce(nonce);
   }
 
@@ -53,7 +53,7 @@ export class GithubInstallStateService implements GithubInstallState {
     return `${body}.${signature}`;
   }
 
-  tryVerify(token: string | null | undefined): GithubInstallStatePayload | null {
+  verify(token: string | null | undefined): GithubInstallStatePayload | null {
     if (!token) {
       return null;
     }

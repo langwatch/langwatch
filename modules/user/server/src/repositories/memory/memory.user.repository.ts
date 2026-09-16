@@ -49,7 +49,7 @@ export class MemoryUserRepository implements UserRepository {
     return new MemoryUserRepository(input.database);
   }
 
-  async getProfiles(userIds: string[]): Promise<UserFullProfile[]> {
+  async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
     return this.#database.usersById(userIds).map((row) => userFullProfileSchema.parse(fullOf(row)));
@@ -122,7 +122,7 @@ export class MemoryUserRepository implements UserRepository {
     return "set";
   }
 
-  async getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
+  async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
     return userPasskeyNudgeStatusSchema.parse({
       hasPasskey: this.#database.passkeyCount(id) > 0,
       dismissedAt: this.#database.user(id)?.passkeyNudgeDismissedAt ?? null,
@@ -153,13 +153,13 @@ export class MemoryUserRepository implements UserRepository {
     return row ? userAccountInfoSchema.parse({ createdAt: row.createdAt }) : null;
   }
 
-  async getSsoStatus(id: string): Promise<UserSsoStatus> {
+  async findSsoStatus(id: string): Promise<UserSsoStatus> {
     return userSsoStatusSchema.parse({
       pendingSsoSetup: this.#database.user(id)?.pendingSsoSetup ?? false,
     });
   }
 
-  async getTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
+  async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
     const row = this.#require(id);
 
     return userTourPreferenceSchema.parse({
@@ -260,7 +260,21 @@ export class MemoryUserRepository implements UserRepository {
   }
 }
 
-function profileOf(row: MemoryUserRow) {
+function profileOf(
+  row: MemoryUserRow,
+): Pick<
+  MemoryUserRow,
+  | "id"
+  | "name"
+  | "email"
+  | "emailVerified"
+  | "image"
+  | "pendingSsoSetup"
+  | "createdAt"
+  | "updatedAt"
+  | "lastLoginAt"
+  | "deactivatedAt"
+> {
   return {
     id: row.id,
     name: row.name,
@@ -275,7 +289,10 @@ function profileOf(row: MemoryUserRow) {
   };
 }
 
-function fullOf(row: MemoryUserRow) {
+function fullOf(
+  row: MemoryUserRow,
+): ReturnType<typeof profileOf> &
+  Pick<MemoryUserRow, "lastHomePath" | "tracesExplorerTourDismissedAt"> {
   return {
     ...profileOf(row),
     lastHomePath: row.lastHomePath,

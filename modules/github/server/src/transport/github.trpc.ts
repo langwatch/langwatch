@@ -33,7 +33,7 @@ export const GithubConnectionApi = moduleApi<GithubConnectionApi>("github");
  * state is read: a permission can be held at a wider scope than the one the
  * input names, and a non-member's answer must not depend on the organization.
  */
-async function requireOrganizationMember({
+async function organizationMember({
   app,
   userId,
   organizationId,
@@ -51,7 +51,7 @@ export const githubTrpcTransport = defineTrpcRouter(GithubConnectionApi, githubT
   .procedure("getConnectionStatus")
   .withPermission("organization:view")
   .handle(async ({ app, input, actor }) => {
-    await requireOrganizationMember({
+    await organizationMember({
       app,
       userId: actor.id,
       organizationId: input.organizationId,
@@ -65,7 +65,7 @@ export const githubTrpcTransport = defineTrpcRouter(GithubConnectionApi, githubT
   .procedure("listRepos")
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }) => {
-    await requireOrganizationMember({
+    await organizationMember({
       app,
       userId: actor.id,
       organizationId: input.organizationId,
@@ -97,7 +97,7 @@ export const githubTrpcTransport = defineTrpcRouter(GithubConnectionApi, githubT
   .procedure("disconnect")
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }) => {
-    await requireOrganizationMember({
+    await organizationMember({
       app,
       userId: actor.id,
       organizationId: input.organizationId,

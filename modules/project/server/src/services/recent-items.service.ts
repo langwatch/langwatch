@@ -23,7 +23,7 @@ export class RecentItemsService {
    * Get recent items the user has interacted with
    */
   async getRecentItems(params: GetRecentItemsParams): Promise<RecentItem[]> {
-    const auditLogs = await this.repository.getRecentAuditLogEntries(params);
+    const auditLogs = await this.repository.findRecentAuditLogEntries(params);
 
     // Process audit logs to extract unique entity references
     const entityMap = new Map<string, { type: RecentItemType; id: string; timestamp: Instant }>();
@@ -114,7 +114,7 @@ export class RecentItemsService {
   ): Promise<{ id: string; name: string; href: string } | null> {
     switch (type) {
       case "prompt": {
-        const prompt = await this.repository.tryGetPromptById(id, projectId);
+        const prompt = await this.repository.findPromptById(id, projectId);
         if (!prompt || prompt.deletedAt) {
           return null;
         }
@@ -124,7 +124,7 @@ export class RecentItemsService {
         return { id: prompt.id, name: prompt.name, href };
       }
       case "workflow": {
-        const workflow = await this.repository.tryGetWorkflowById(id, projectId);
+        const workflow = await this.repository.findWorkflowById(id, projectId);
         if (!workflow || workflow.archivedAt) {
           return null;
         }
@@ -134,7 +134,7 @@ export class RecentItemsService {
         return { id: workflow.id, name: workflow.name, href };
       }
       case "dataset": {
-        const dataset = await this.repository.tryGetDatasetById(id, projectId);
+        const dataset = await this.repository.findDatasetById(id, projectId);
         if (!dataset || dataset.archivedAt) {
           return null;
         }
@@ -144,7 +144,7 @@ export class RecentItemsService {
         return { id: dataset.id, name: dataset.name, href };
       }
       case "evaluation": {
-        const monitor = await this.repository.tryGetMonitorById(id, projectId);
+        const monitor = await this.repository.findMonitorById(id, projectId);
         if (!monitor) {
           return null;
         }
@@ -154,7 +154,7 @@ export class RecentItemsService {
         return { id: monitor.id, name: monitor.name, href };
       }
       case "annotation": {
-        const queue = await this.repository.tryGetAnnotationQueueById(id, projectId);
+        const queue = await this.repository.findAnnotationQueueById(id, projectId);
         if (!queue) {
           return null;
         }

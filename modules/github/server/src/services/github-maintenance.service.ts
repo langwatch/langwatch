@@ -4,6 +4,8 @@ import {
   definePipeline,
   type Event,
   type ProcessStore,
+  type Projection,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
@@ -39,7 +41,7 @@ export class EventingGithubMaintenanceAdapter {
     return new EventingGithubMaintenanceAdapter(deps);
   }
 
-  build() {
+  build(): StaticPipelineDefinition<Event, Record<string, Projection>, never> {
     const deps = this.deps;
 
     return definePipeline<Event>({

@@ -126,7 +126,7 @@ export class GithubBranchMappingService {
       return 0;
     }
 
-    const covering = await this.deps.installations.tryResolveInstallationForRepository({
+    const covering = await this.deps.installations.resolveInstallationForRepository({
       organizationId: scope.organizationId,
       repositoryFullName: scope.repositoryFullName,
     });
@@ -229,7 +229,7 @@ export class GithubBranchMappingService {
       });
     }
 
-    const existing = await this.deps.repository.tryFindBranchCheck(input.scope);
+    const existing = await this.deps.repository.findBranchCheck(input.scope);
     const hasPullRequests = input.pullRequests.length > 0;
     const attempts = hasPullRequests ? 0 : (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
@@ -257,7 +257,7 @@ export class GithubBranchMappingService {
     }
 
     const now = Temporal.Instant.fromEpochMilliseconds(nowMs(this.deps));
-    const existing = await this.deps.repository.tryFindBranchCheck(scope);
+    const existing = await this.deps.repository.findBranchCheck(scope);
     const attempts = (existing?.attempts ?? 0) + 1;
     await this.deps.repository.upsertBranchCheck({
       ...scope,

@@ -193,7 +193,7 @@ describe.each(backends)("given the $name GitHub repositories", ({ create }) => {
         leaseMs: MINUTE,
         shouldRecordDemand: false,
       });
-      const stored = await repositories.pullRequests.tryFindBranchCheck(branchKey());
+      const stored = await repositories.pullRequests.findBranchCheck(branchKey());
 
       expect(stored?.lastRequestedAt.epochMilliseconds).toBe(NOW.epochMilliseconds);
     });
@@ -249,7 +249,7 @@ describe.each(backends)("given the $name GitHub repositories", ({ create }) => {
       });
 
       expect(deleted).toEqual({ branchChecks: 1 });
-      expect(await repositories.pullRequests.tryFindBranchCheck(branchKey())).toBeNull();
+      expect(await repositories.pullRequests.findBranchCheck(branchKey())).toBeNull();
       expect(
         await repositories.pullRequests.findByNumber({
           organizationId: ORGANIZATION,

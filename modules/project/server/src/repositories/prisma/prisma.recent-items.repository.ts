@@ -25,7 +25,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
    * Get recent audit log entries for a user and project
    * Filters to only relevant entity-related actions
    */
-  async getRecentAuditLogEntries({
+  async findRecentAuditLogEntries({
     userId,
     projectId,
     limit,
@@ -55,7 +55,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
   /**
    * Get prompt by ID and projectId (required for multi-tenancy)
    */
-  async tryGetPromptById(id: string, projectId: string): Promise<RecentPromptRow | null> {
+  async findPromptById(id: string, projectId: string): Promise<RecentPromptRow | null> {
     const row = await this.prisma.llmPromptConfig.findFirst({
       where: { id, projectId },
       select: {
@@ -81,7 +81,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
   /**
    * Get workflow by ID and projectId (required for multi-tenancy)
    */
-  async tryGetWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
+  async findWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
     const row = await this.prisma.workflow.findFirst({
       where: { id, projectId },
       select: {
@@ -107,7 +107,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
   /**
    * Get dataset by ID and projectId (required for multi-tenancy)
    */
-  async tryGetDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
+  async findDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null> {
     const row = await this.prisma.dataset.findFirst({
       where: { id, projectId },
       select: {
@@ -133,7 +133,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
   /**
    * Get monitor (evaluation) by ID and projectId (required for multi-tenancy)
    */
-  async tryGetMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
+  async findMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
     const row = await this.prisma.monitor.findFirst({
       where: { id, projectId },
       select: {
@@ -155,7 +155,7 @@ export class PrismaRecentItemsRepository implements RecentItemsRepository {
   /**
    * Get annotation queue by ID and projectId (required for multi-tenancy)
    */
-  async tryGetAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
+  async findAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null> {
     const row = await this.prisma.annotationQueue.findFirst({
       where: { id, projectId },
       select: {

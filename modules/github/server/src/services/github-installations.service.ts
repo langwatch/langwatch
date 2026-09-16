@@ -86,7 +86,7 @@ export class GithubInstallationsService {
       expectedAccountLogin: input.expectedAccountLogin,
       expectedInstallationId: input.expectedInstallationId,
     });
-    const alreadyRecorded = await this.repository.tryFindByInstallationId(details.installationId);
+    const alreadyRecorded = await this.repository.findByInstallationId(details.installationId);
     if (!alreadyRecorded && !installationBelongsToFlow(details.createdAt, input.flowStartedAt)) {
       throw new GithubInstallationNotFromFlowError({
         installationId: details.installationId,
@@ -155,11 +155,11 @@ export class GithubInstallationsService {
     return this.access.listRepositoriesForOrganization(organizationId);
   }
 
-  tryResolveInstallationForRepository(input: {
+  resolveInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<{ installationId: string; repositoryId: string } | null> {
-    return this.access.tryResolveInstallationForRepository(input);
+    return this.access.resolveInstallationForRepository(input);
   }
 
   coversRepository(input: {
@@ -169,11 +169,11 @@ export class GithubInstallationsService {
     return this.access.coversRepository(input);
   }
 
-  tryMintTurnToken(input: {
+  mintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null> {
-    return this.access.tryMintTurnToken(input);
+    return this.access.mintTurnToken(input);
   }
 
   private async tryReadSelectedRepositories(details: {
@@ -200,7 +200,7 @@ export class GithubInstallationsService {
     installationId: string,
     action: GithubWebhookAction,
   ): Promise<void> {
-    const existing = await this.repository.tryFindByInstallationId(installationId);
+    const existing = await this.repository.findByInstallationId(installationId);
     if (!existing) {
       return;
     }

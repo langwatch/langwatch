@@ -22,7 +22,7 @@ const SUITE_COMMAND_DEDUP_TTL_MS = 60_000;
 /**
  * The command's own job id, required at this seam rather than optional.
  */
-function requireJobId<TPayload>(
+function jobId<TPayload>(
   commandName: string,
   makeJobId: ((payload: TPayload) => string) | undefined,
 ): (payload: TPayload) => string {
@@ -37,9 +37,8 @@ function requireJobId<TPayload>(
 /**
  * Creates the suite run processing pipeline definition.
  */
-export class SuiteRunProcessingPipelineAdapter {
-  static create(deps: SuiteRunProcessingPipelineDeps) {
-    const commands = SuiteRunCommandsAdapter.create();
+const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) => {
+  const commands = SuiteRunCommandsAdapter.create();
 
     return (
       definePipeline<SuiteRunProcessingEvent>({
@@ -60,13 +59,13 @@ export class SuiteRunProcessingPipelineAdapter {
         // flipping status to SUCCESS/FAILURE before the run has finished.
         .withCommand("startSuiteRun", commands.startSuiteRun, {
           deduplication: {
-            makeId: requireJobId("startSuiteRun", commands.startSuiteRun.makeJobId),
+            makeId: jobId("startSuiteRun", commands.startSuiteRun.makeJobId),
             ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
           },
         })
         .withCommand("recordSuiteRunItemStarted", commands.recordSuiteRunItemStarted, {
           deduplication: {
-            makeId: requireJobId(
+            makeId: jobId(
               "recordSuiteRunItemStarted",
               commands.recordSuiteRunItemStarted.makeJobId,
             ),
@@ -75,12 +74,19 @@ export class SuiteRunProcessingPipelineAdapter {
         })
         .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
           deduplication: {
-            makeId: requireJobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
+            makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
             ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
           },
         })
         .build()
-    );
+  );
+};
+
+export class SuiteRunProcessingPipelineAdapter {
+  static create(
+    deps: SuiteRunProcessingPipelineDeps,
+  ): ReturnType<typeof buildSuiteRunProcessingPipeline> {
+    return buildSuiteRunProcessingPipeline(deps);
   }
 
   private constructor() {}

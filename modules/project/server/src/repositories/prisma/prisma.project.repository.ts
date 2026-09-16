@@ -42,7 +42,7 @@ export class PrismaProjectRepository
   extends PrismaRepository.for("Project", "Team")
   implements ProjectRepository
 {
-  async listPaths(input: { projectIds: string[] }) {
+  async findPaths(input: { projectIds: string[] }) {
     const projects = await this.prisma.project.findMany({
       where: { id: { in: input.projectIds } },
       select: {
@@ -60,7 +60,7 @@ export class PrismaProjectRepository
 
   static readonly create = this.factory((prisma) => new PrismaProjectRepository(prisma));
 
-  async tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({
         where: {
@@ -72,7 +72,7 @@ export class PrismaProjectRepository
     );
   }
 
-  async tryFindInternalBySlug(slug: string): Promise<InternalProject | null> {
+  async findInternalBySlug(slug: string): Promise<InternalProject | null> {
     return this.mapInternal(await this.prisma.project.findUnique({ where: { slug } }));
   }
 
@@ -175,7 +175,7 @@ export class PrismaProjectRepository
     });
   }
 
-  async tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+  async findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       select: {
@@ -317,7 +317,7 @@ export class PrismaProjectRepository
     return rows.map((row) => this.mapProjectRequired(row));
   }
 
-  async tryFindIdentity(id: string): Promise<ProjectIdentity | null> {
+  async findIdentity(id: string): Promise<ProjectIdentity | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       select: PROJECT_IDENTITY_SELECT,
@@ -368,11 +368,11 @@ export class PrismaProjectRepository
     return rows.map((row) => this.mapProjectRequired(row));
   }
 
-  async tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
+  async findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
     return this.mapProject(await this.prisma.project.findFirst({ where: input }));
   }
 
-  tryFindActiveTeamInOrganization(input: {
+  findActiveTeamInOrganization(input: {
     teamId: string;
     organizationId: string;
   }): Promise<{ id: string; isPersonal: boolean } | null> {
@@ -382,7 +382,7 @@ export class PrismaProjectRepository
     });
   }
 
-  async tryFindLiveTraceDestination(input: {
+  async findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
   }): Promise<TraceDestinationProject | null> {
@@ -398,7 +398,7 @@ export class PrismaProjectRepository
     return row ? traceDestinationProjectSchema.parse(row) : null;
   }
 
-  async tryFindOldestGovernanceTraceDestination(
+  async findOldestGovernanceTraceDestination(
     organizationId: string,
   ): Promise<TraceDestinationProject | null> {
     const row = await this.prisma.project.findFirst({
@@ -424,7 +424,7 @@ export class PrismaProjectRepository
     });
   }
 
-  async tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+  async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     const row = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
@@ -432,7 +432,7 @@ export class PrismaProjectRepository
     return row ? traceDestinationProjectSchema.parse(row) : null;
   }
 
-  async listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+  async findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
     if (projectIds.length === 0) return [];
     const rows = await this.prisma.project.findMany({
       where: { id: { in: projectIds } },

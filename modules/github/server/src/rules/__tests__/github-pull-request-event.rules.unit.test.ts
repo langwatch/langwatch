@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { GithubPullRequestEventRules } from "../github-pull-request-event.rules.ts";
 
 const protocol = GithubPullRequestEventRules.create();
-const parseGithubPullRequestEvent = (payload: unknown) => protocol.tryParse(payload);
+const parseGithubPullRequestEvent = (payload: unknown) => protocol.parse(payload);
 
 function delivery(overrides: Record<string, unknown> = {}) {
   return {

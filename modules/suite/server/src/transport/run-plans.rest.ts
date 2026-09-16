@@ -10,6 +10,7 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { runActorFromRequest } from "@langwatch/scenario-contract";
 import {
@@ -203,7 +204,11 @@ async function archivePlan(params: {
 }
 
 /** The `/api/v1/run-plans` collection and item endpoints. */
-export function createRunPlansRest() {
+export function createRunPlansRest(): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<SuiteApi>;
+}> {
   return defineRestRouter(SuiteApi)
     .withNamespace("run-plans")
     .withVersion(MANAGEMENT_API_VERSION)

@@ -58,7 +58,7 @@ describe("MemoryProjectRepository", () => {
         id: "project_1",
         team: { id: TEAM_ID, organizationId: ORGANIZATION_ID },
       });
-      expect(await repository.listPaths({ projectIds: ["project_1"] })).toEqual([
+      expect(await repository.findPaths({ projectIds: ["project_1"] })).toEqual([
         { projectId: "project_1", fullPath: "Acme / Engineering / Checkout assistant" },
       ]);
       expect(await repository.findOrganizationId("project_1")).toBe(ORGANIZATION_ID);
@@ -84,7 +84,7 @@ describe("MemoryProjectRepository", () => {
       const { repository } = seeded();
       await repository.create(creation);
 
-      expect(await repository.tryGetWithOrgAdmin("project_1")).toEqual({
+      expect(await repository.findWithOrgAdmin("project_1")).toEqual({
         firstMessage: false,
         organizationId: ORGANIZATION_ID,
         adminUserId: "user_admin",
@@ -121,13 +121,13 @@ describe("MemoryProjectRepository", () => {
       await repository.create(creation);
       await repository.archive({ id: "project_1", organizationId: ORGANIZATION_ID });
 
-      expect(await repository.tryGetTraceDestination("project_1")).toMatchObject({
+      expect(await repository.findTraceDestination("project_1")).toMatchObject({
         id: "project_1",
         teamId: TEAM_ID,
         apiKey: "sk-lw-1",
       });
       expect(
-        await repository.tryFindLiveTraceDestination({
+        await repository.findLiveTraceDestination({
           organizationId: ORGANIZATION_ID,
           projectId: "project_1",
         }),
@@ -196,7 +196,7 @@ describe("MemoryProjectRepository", () => {
       });
 
       expect(loser).toEqual(minted);
-      expect(await repository.tryFindInternalByOrganization(ORGANIZATION_ID)).toEqual(minted);
+      expect(await repository.findInternalByOrganization(ORGANIZATION_ID)).toEqual(minted);
       expect(await repository.countLiveNonGovernanceProjects(ORGANIZATION_ID)).toBe(0);
       expect(
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),

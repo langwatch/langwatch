@@ -51,7 +51,7 @@ describe("ClickHouseSuiteRunRepository", () => {
   it("maps the complete suite run state shape", async () => {
     const { repository } = setup();
     await expect(
-      repository.tryGetSuiteRunState({
+      repository.findSuiteRunState({
         projectId: "project_1",
         batchRunId: "batch_1",
       }),
@@ -61,7 +61,7 @@ describe("ClickHouseSuiteRunRepository", () => {
   /** @scenario "Read the latest durable suite run state" */
   it("deduplicates latest state by the tenant and batch tuple", async () => {
     const { repository, query } = setup([]);
-    await repository.tryGetSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
+    await repository.findSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
     const sql = query.mock.calls[0]?.[0]?.sql as string;
     expect(sql).toContain("(t.TenantId, t.BatchRunId, t.UpdatedAt) IN");
     expect(sql).toContain("GROUP BY TenantId, BatchRunId");
@@ -131,11 +131,11 @@ describe("ClickHouseSuiteRunRepository", () => {
   /** @scenario "Read suite batch history" */
   it("preserves the default-set compatibility filter and history limits", async () => {
     const { repository, query } = setup([]);
-    await repository.getBatchHistory({
+    await repository.findBatchHistory({
       projectId: "project_1",
       scenarioSetId: "default",
     });
-    await repository.getBatchHistory({
+    await repository.findBatchHistory({
       projectId: "project_1",
       scenarioSetId: "default",
       limit: 999,

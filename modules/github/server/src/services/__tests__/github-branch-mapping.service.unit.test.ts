@@ -53,7 +53,7 @@ class FakeInstallations implements GithubInstallationLookup {
   findByInstallationId(): Promise<{ organizationId: string } | null> {
     return Promise.resolve(this.installation);
   }
-  tryResolveInstallationForRepository(): Promise<{
+  resolveInstallationForRepository(): Promise<{
     installationId: string;
     repositoryId: string;
   } | null> {
@@ -90,7 +90,7 @@ class FakeRepository extends GithubPullRequestsRepository {
   refreshSnapshot(): Promise<void> {
     return Promise.resolve();
   }
-  tryFindBranchCheck(): Promise<GithubBranchCheckRow | null> {
+  findBranchCheck(): Promise<GithubBranchCheckRow | null> {
     return Promise.resolve(this.branchCheck);
   }
   upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {

@@ -28,10 +28,10 @@ function fakeRedis(): GithubRedis & { store: Map<string, string> } {
   const store = new Map<string, string>();
   return {
     store,
-    async tryGet(k) {
+    async get(k) {
       return store.get(k) ?? null;
     },
-    async trySet(k, v, ...args) {
+    async set(k, v, ...args) {
       // NX semantics for the lock path: refuse if present.
       if (args.includes("NX") && store.has(k)) return null;
       store.set(k, String(v));
@@ -43,7 +43,7 @@ function fakeRedis(): GithubRedis & { store: Map<string, string> } {
     // Implements the compare-and-delete release script: eval(script, 1, key, token).
     // Takes the trailing arguments as the rest parameter GithubRedis declares,
     // rather than naming them, so the fake keeps the real client's shape.
-    async tryEval(_script, _numKeys, ...args) {
+    async evaluate(_script, _numKeys, ...args) {
       const [key, token] = args;
       if (key && store.get(key) === token) {
         store.delete(key);
@@ -51,7 +51,7 @@ function fakeRedis(): GithubRedis & { store: Map<string, string> } {
       }
       return 0;
     },
-    async tryGetDelete(k) {
+    async getDelete(k) {
       const value = store.get(k) ?? null;
       store.delete(k);
       return value;

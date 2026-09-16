@@ -48,11 +48,11 @@ type GetPullRequestInput = {
 class TestRedis extends GithubRedis {
   readonly store = new Map<string, string>();
 
-  tryGet(key: string): Promise<string | null> {
+  get(key: string): Promise<string | null> {
     return Promise.resolve(this.store.get(key) ?? null);
   }
 
-  trySet(key: string, value: string): Promise<string | null> {
+  set(key: string, value: string): Promise<string | null> {
     this.store.set(key, value);
     return Promise.resolve("OK");
   }
@@ -61,13 +61,13 @@ class TestRedis extends GithubRedis {
     return Promise.resolve(this.store.delete(key) ? 1 : 0);
   }
 
-  tryGetDelete(key: string): Promise<string | null> {
+  getDelete(key: string): Promise<string | null> {
     const value = this.store.get(key) ?? null;
     this.store.delete(key);
     return Promise.resolve(value);
   }
 
-  tryEval(): Promise<number | string | null> {
+  evaluate(): Promise<number | string | null> {
     return Promise.resolve(null);
   }
 }

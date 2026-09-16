@@ -352,7 +352,7 @@ async function completeInstallation({
 }): Promise<Response> {
   const service = app.github();
   const query = queryOf(request);
-  const state = service.tryVerifyInstallState(query.get("state"));
+  const state = service.verifyInstallState(query.get("state"));
   const installationId = query.get("installation_id");
 
   if (!state || !installationId) {
@@ -441,7 +441,7 @@ async function rejectUnauthorizedSetup({
 
   // Burn the single-use nonce (skipped when Redis was down at `/install`).
   if (state.nonceRegistered) {
-    const consumed = await app.github().tryConsumeInstallNonce(state.nonce);
+    const consumed = await app.github().consumeInstallNonce(state.nonce);
 
     if (consumed === false) {
       return setupError({
@@ -734,7 +734,7 @@ async function applyPullRequestEvent({
   deliveryId: string | undefined;
   service: GithubApi;
 }): Promise<void> {
-  const event = service.tryParsePullRequestEvent(payload);
+  const event = service.parsePullRequestEvent(payload);
 
   if (!event) {
     // The parser declines four different deliveries, and every one still

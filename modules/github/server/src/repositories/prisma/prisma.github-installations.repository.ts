@@ -87,7 +87,7 @@ export class PrismaGithubInstallationsRepository extends GithubInstallationsRepo
     return records.map(toRow);
   }
 
-  async tryFindByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
+  async findByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
     const record = await this.prisma.githubInstallation.findUnique({
       where: { installationId },
     });

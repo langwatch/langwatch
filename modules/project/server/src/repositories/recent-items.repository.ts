@@ -54,10 +54,10 @@ export type RecentSluggedRow = RecentEntityRow & { slug: string };
  * hydrate what it finds there.
  */
 export interface RecentItemsRepository {
-  getRecentAuditLogEntries(params: GetRecentItemsParams): Promise<AuditLog[]>;
-  tryGetPromptById(id: string, projectId: string): Promise<RecentPromptRow | null>;
-  tryGetWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
-  tryGetDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
-  tryGetMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
-  tryGetAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
+  findRecentAuditLogEntries(params: GetRecentItemsParams): Promise<AuditLog[]>;
+  findPromptById(id: string, projectId: string): Promise<RecentPromptRow | null>;
+  findWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
+  findDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
+  findMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
+  findAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
 }

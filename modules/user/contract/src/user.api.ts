@@ -58,7 +58,7 @@ import type {
 
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {
-  tryFindById(input: { id: string }): Promise<UserProfile | null>;
+  findById(input: { id: string }): Promise<UserProfile | null>;
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   personalCallerFor(input: {
     project: { isPersonal: boolean; ownerUserId: string | null };
@@ -117,8 +117,8 @@ export interface UserApi {
   setOwnAvatar(input: SetOwnAvatarInput): Promise<UserAvatarResult>;
   removeAvatar(input: RemoveUserAvatarInput): Promise<void>;
   ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace>;
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
-  tryGetLastHomePath(input: UserIdInput): Promise<string | null>;
+  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null>;
+  findLastHomePath(input: UserIdInput): Promise<string | null>;
   setLastHomePath(input: SetUserHomePathInput): Promise<void>;
 
   // -- the /me dashboard -----------------------------------------------------

@@ -393,14 +393,14 @@ export class GithubApp implements GithubApiContract {
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
     return this.#service.registerInstallNonce(input);
   }
-  tryConsumeInstallNonce(nonce: string): Promise<boolean | null> {
-    return this.#service.tryConsumeInstallNonce(nonce);
+  consumeInstallNonce(nonce: string): Promise<boolean | null> {
+    return this.#service.consumeInstallNonce(nonce);
   }
   signInstallState(payload: GithubInstallStatePayload): string {
     return this.#service.signInstallState(payload);
   }
-  tryVerifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
-    return this.#service.tryVerifyInstallState(token);
+  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
+    return this.#service.verifyInstallState(token);
   }
   popupResponseHtml(login: string): string {
     return this.#service.popupResponseHtml(login);
@@ -408,8 +408,8 @@ export class GithubApp implements GithubApiContract {
   popupErrorHtml(message: string): string {
     return this.#service.popupErrorHtml(message);
   }
-  tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return this.#service.tryParsePullRequestEvent(payload);
+  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
+    return this.#service.parsePullRequestEvent(payload);
   }
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
     return this.#service.getAllForOrganization(organizationId);
@@ -449,11 +449,11 @@ export class GithubApp implements GithubApiContract {
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.#service.listRepositoriesForOrganization(organizationId);
   }
-  tryMintTurnToken(input: {
+  mintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null> {
-    return this.#service.tryMintTurnToken(input);
+    return this.#service.mintTurnToken(input);
   }
   coversRepository(input: {
     organizationId: string;

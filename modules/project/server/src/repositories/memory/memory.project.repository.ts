@@ -46,7 +46,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return new MemoryProjectRepository(input.memory);
   }
 
-  async listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
+  async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     return input.projectIds.flatMap((projectId) => {
       const project = this.#database.findProject(projectId);
       if (!project) return [];
@@ -63,7 +63,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     });
   }
 
-  async tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     const project = this.#database
       .projects()
       .find(
@@ -76,7 +76,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return project ? this.#internal(project) : null;
   }
 
-  async tryFindInternalBySlug(slug: string): Promise<InternalProject | null> {
+  async findInternalBySlug(slug: string): Promise<InternalProject | null> {
     const project = this.#database.projects().find((row) => row.slug === slug);
     if (!project || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
 
@@ -150,7 +150,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     this.#touch(input, "lastCodingAgentPullRequestAt");
   }
 
-  async tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+  async findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
     const project = this.#database.findProject(id);
     if (!project) return null;
     const organization = this.#database.findOrganizationOf(project);
@@ -249,7 +249,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       .sort(newestFirst);
   }
 
-  async tryFindIdentity(id: string): Promise<ProjectIdentity | null> {
+  async findIdentity(id: string): Promise<ProjectIdentity | null> {
     const project = this.#database.findProject(id);
 
     return project ? this.#identity(project) : null;
@@ -286,7 +286,7 @@ export class MemoryProjectRepository implements ProjectRepository {
       .slice(0, input.limit + 1);
   }
 
-  async tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
+  async findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
     return (
       this.#database
         .projects()
@@ -294,7 +294,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     );
   }
 
-  async tryFindActiveTeamInOrganization(input: {
+  async findActiveTeamInOrganization(input: {
     teamId: string;
     organizationId: string;
   }): Promise<{ id: string; isPersonal: boolean } | null> {
@@ -306,7 +306,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return { id: team.id, isPersonal: team.isPersonal };
   }
 
-  async tryFindLiveTraceDestination(input: {
+  async findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
   }): Promise<TraceDestinationProject | null> {
@@ -322,7 +322,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     return this.#destination(project);
   }
 
-  async tryFindOldestGovernanceTraceDestination(
+  async findOldestGovernanceTraceDestination(
     organizationId: string,
   ): Promise<TraceDestinationProject | null> {
     const project = this.#database
@@ -349,13 +349,13 @@ export class MemoryProjectRepository implements ProjectRepository {
       ).length;
   }
 
-  async tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+  async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     const project = this.#database.findProject(projectId);
 
     return project ? this.#destination(project) : null;
   }
 
-  async listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+  async findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
     return projectIds.flatMap((projectId) => {
       const project = this.#database.findProject(projectId);
 

@@ -27,7 +27,7 @@ export type SetFirstUserPasswordRow = SetFirstUserPasswordInput & UserCredential
 
 /** Persistence owned by User. It never crosses the feature boundary. */
 export interface UserRepository {
-  getProfiles(userIds: string[]): Promise<UserFullProfile[]>;
+  findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
   findByEmail(email: string): Promise<UserProfile | null>;
   /** The same lookup ignoring case, for rows written before sign-in lowercased. */
@@ -37,12 +37,12 @@ export interface UserRepository {
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
   hasPassword(id: string): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
-  getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
+  findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void>;
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
-  getSsoStatus(id: string): Promise<UserSsoStatus>;
-  getTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
+  findSsoStatus(id: string): Promise<UserSsoStatus>;
+  findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   setTraceExplorerTourDismissedAt(input: {
     id: string;
     dismissedAt: Date;

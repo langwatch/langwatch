@@ -36,7 +36,7 @@ describe("PrismaProjectRepository trace destinations", () => {
       ],
     });
 
-    await expect(repository.listPaths({ projectIds: ["project-1"] })).resolves.toEqual([
+    await expect(repository.findPaths({ projectIds: ["project-1"] })).resolves.toEqual([
       { projectId: "project-1", fullPath: "Organization / Team / Project" },
     ]);
     expect(project.findMany).toHaveBeenCalledWith({
@@ -53,7 +53,7 @@ describe("PrismaProjectRepository trace destinations", () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 
     await expect(
-      repository.tryFindLiveTraceDestination({
+      repository.findLiveTraceDestination({
         organizationId: "org_1",
         projectId: destination.id,
       }),
@@ -72,7 +72,7 @@ describe("PrismaProjectRepository trace destinations", () => {
   it("finds the oldest live governance project deterministically", async () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 
-    await expect(repository.tryFindOldestGovernanceTraceDestination("org_1")).resolves.toEqual(
+    await expect(repository.findOldestGovernanceTraceDestination("org_1")).resolves.toEqual(
       destination,
     );
     expect(project.findFirst).toHaveBeenCalledWith(
@@ -104,7 +104,7 @@ describe("PrismaProjectRepository.tryGetTraceDestination", () => {
     const database = { project, team: {} } as unknown as PrismaClient;
 
     await expect(
-      PrismaProjectRepository.create({ prisma: database }).tryGetTraceDestination(archived.id),
+      PrismaProjectRepository.create({ prisma: database }).findTraceDestination(archived.id),
     ).resolves.toEqual(archived);
   });
 });
@@ -117,7 +117,7 @@ describe("PrismaProjectRepository.listTraceDestinations", () => {
     const database = { project, team: {} } as unknown as PrismaClient;
 
     await expect(
-      PrismaProjectRepository.create({ prisma: database }).listTraceDestinations([
+      PrismaProjectRepository.create({ prisma: database }).findTraceDestinations([
         first.id,
         "project_unknown",
         second.id,

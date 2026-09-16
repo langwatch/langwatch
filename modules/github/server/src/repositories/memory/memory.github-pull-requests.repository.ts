@@ -147,7 +147,7 @@ export class MemoryGithubPullRequestsRepository extends GithubPullRequestsReposi
     });
   }
 
-  async tryFindBranchCheck(params: {
+  async findBranchCheck(params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;

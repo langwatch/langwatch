@@ -75,11 +75,11 @@ export class GdprUserDataEraseRepository {
     return new GdprUserDataEraseRepository(database);
   }
 
-  tryFindUserByEmail(email: string): Promise<GdprUser | null> {
+  findUserByEmail(email: string): Promise<GdprUser | null> {
     return this.database.user.findUnique({ where: { email } });
   }
 
-  tryFindUserById(id: string): Promise<GdprUser | null> {
+  findUserById(id: string): Promise<GdprUser | null> {
     return this.database.user.findUnique({ where: { id } });
   }
 

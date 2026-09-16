@@ -88,7 +88,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
     return mapSuite(row);
   }
 
-  async list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
+  async findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     const rows = await this.database.simulationSuite.findMany({
       where: {
         projectId: input.projectId,

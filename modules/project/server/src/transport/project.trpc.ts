@@ -103,7 +103,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
     },
   })
   .handle(async ({ app, input, actor }) => {
-    await requireCreateStanding({ app, input, actor });
+    await createStanding({ app, input, actor });
 
     const project = await app.projects().create(
       {
@@ -170,7 +170,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   .procedure("update")
   .withPermission("project:update")
   .handle(async ({ app, input, actor }) => {
-    await requireTraceSharingStanding({ app, input, actor });
+    await traceSharingStanding({ app, input, actor });
 
     const updatedProject = await app.projects().updateSettings({
       projectId: input.projectId,
@@ -264,7 +264,7 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
  * naming neither an existing team nor a new one names no scope at all, so it
  * is refused before any standing is asked about.
  */
-async function requireCreateStanding({
+async function createStanding({
   app,
   input,
   actor,
@@ -299,7 +299,7 @@ async function requireCreateStanding({
  * traces, so it demands `project:manage` on top of the `project:update` the
  * declaration already resolved. Every other field on the form does not.
  */
-async function requireTraceSharingStanding({
+async function traceSharingStanding({
   app,
   input,
   actor,

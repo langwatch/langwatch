@@ -9,6 +9,7 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { runActorFromRequest, type ScenarioTestSuite } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNotFoundError } from "@langwatch/suite-contract";
@@ -208,7 +209,11 @@ async function runTestSuite(params: {
 }
 
 /** The `/api/v1/test-suites` collection, item and run endpoints. */
-export function createTestSuitesRest() {
+export function createTestSuitesRest(): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<SuiteApi>;
+}> {
   return defineRestRouter(SuiteApi)
     .withNamespace("test-suites")
     .withVersion(MANAGEMENT_API_VERSION)

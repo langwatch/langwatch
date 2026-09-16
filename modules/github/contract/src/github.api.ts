@@ -21,12 +21,12 @@ export interface GithubApi {
   getAppInstallUrl(): string;
   getInstallStateTtlMs(): number;
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean>;
-  tryConsumeInstallNonce(nonce: string): Promise<boolean | null>;
+  consumeInstallNonce(nonce: string): Promise<boolean | null>;
   signInstallState(payload: GithubInstallStatePayload): string;
-  tryVerifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null;
+  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null;
   popupResponseHtml(login: string): string;
   popupErrorHtml(message: string): string;
-  tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
+  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
   findByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean>;
@@ -49,7 +49,7 @@ export interface GithubApi {
     repositories?: GithubRepositoryRef[] | null;
   }): Promise<void>;
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]>;
-  tryMintTurnToken(input: {
+  mintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null>;

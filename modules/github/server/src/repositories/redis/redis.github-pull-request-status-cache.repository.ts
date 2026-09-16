@@ -33,7 +33,7 @@ export class GithubPullRequestStatusCacheRedisRepository extends GithubPullReque
     }
 
     try {
-      const value = await this.redis.tryGet(statusKey(input));
+      const value = await this.redis.get(statusKey(input));
 
       return isStatus(value) ? value : null;
     } catch {
@@ -51,7 +51,7 @@ export class GithubPullRequestStatusCacheRedisRepository extends GithubPullReque
     }
 
     try {
-      await this.redis.trySet(statusKey(input), input.status, "EX", STATUS_CACHE_TTL_SEC);
+      await this.redis.set(statusKey(input), input.status, "EX", STATUS_CACHE_TTL_SEC);
     } catch {
       // A status read remains valid if its cache write fails.
     }

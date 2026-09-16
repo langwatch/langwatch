@@ -133,7 +133,7 @@ describe("PrismaSuiteRepository.list", () => {
     it("asks Prisma for run_plan rows only, since kind is not a parameter", async () => {
       const { repository, findMany } = buildList();
 
-      await repository.list({ projectId: "project_1" });
+      await repository.findAll({ projectId: "project_1" });
 
       expect(findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -148,14 +148,14 @@ describe("PrismaSuiteRepository.list", () => {
     it("leaves archivedAt unfiltered only when includeArchived is set", async () => {
       const { repository, findMany } = buildList();
 
-      await repository.list({ projectId: "project_1" });
+      await repository.findAll({ projectId: "project_1" });
       expect(findMany).toHaveBeenLastCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ kind: "run_plan", archivedAt: null }),
         }),
       );
 
-      await repository.list({ projectId: "project_1", includeArchived: true });
+      await repository.findAll({ projectId: "project_1", includeArchived: true });
       const lastCall = findMany.mock.calls[1]?.[0] as { where: Record<string, unknown> };
       expect(lastCall.where).not.toHaveProperty("archivedAt");
     });

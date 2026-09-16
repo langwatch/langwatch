@@ -30,7 +30,7 @@ export class PrismaCodingAgentActivityRepository implements CodingAgentActivityR
    * `ProjectService.getOrganizationId` (`getWithTeam`, `archivedAt: null`);
    * an archived project misses with this error.
    */
-  async getOrganizationId(projectId: string): Promise<string> {
+  async findOrganizationId(projectId: string): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId, archivedAt: null },
       select: { team: { select: { organizationId: true } } },

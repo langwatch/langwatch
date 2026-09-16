@@ -94,7 +94,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     }
 
     try {
-      return await this.redis.tryGet(key);
+      return await this.redis.get(key);
     } catch {
       return null;
     }
@@ -106,7 +106,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     }
 
     try {
-      await this.redis.trySet(key, value, "EX", ttlSec);
+      await this.redis.set(key, value, "EX", ttlSec);
     } catch {
       // Cache failure does not change the provider operation's result.
     }
@@ -119,7 +119,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
 
     const token = randomBytes(16).toString("hex");
     try {
-      const result = await this.redis.trySet(key, token, "NX", "EX", LOCK_TTL_SEC);
+      const result = await this.redis.set(key, token, "NX", "EX", LOCK_TTL_SEC);
       return result === "OK" ? token : null;
     } catch {
       return null;
@@ -135,7 +135,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     const deadline = nowInstant().epochMilliseconds + LOCK_MAX_WAIT_MS;
     while (nowInstant().epochMilliseconds < deadline) {
       try {
-        const result = await this.redis.trySet(key, token, "NX", "EX", LOCK_TTL_SEC);
+        const result = await this.redis.set(key, token, "NX", "EX", LOCK_TTL_SEC);
         if (result === "OK") {
           return token;
         }
@@ -155,7 +155,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
     }
 
     try {
-      const deleted = await this.redis.tryEval(
+      const deleted = await this.redis.evaluate(
         "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
         1,
         key,
@@ -165,7 +165,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
         return;
       }
 
-      if ((await this.redis.tryGet(key)) === token) {
+      if ((await this.redis.get(key)) === token) {
         await this.redis.delete(key);
       }
     } catch {

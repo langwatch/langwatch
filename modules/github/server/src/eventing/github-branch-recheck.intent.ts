@@ -13,7 +13,7 @@ export interface GithubBranchRecheckDeps {
   processStore: ProcessStore;
 }
 
-export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps) {
+export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const rechecked = await deps.github.recheckDueBranches();
     if (rechecked > 0) {
@@ -22,7 +22,7 @@ export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps) {
   };
 }
 
-export function runGithubRetentionPrune(deps: GithubBranchRecheckDeps) {
+export function runGithubRetentionPrune(deps: GithubBranchRecheckDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const startedAt = nowInstant().epochMilliseconds;
     const { branchChecks } = await deps.github.pruneStaleBranchLinkage();

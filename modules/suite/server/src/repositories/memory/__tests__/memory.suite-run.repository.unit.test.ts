@@ -51,10 +51,10 @@ describe("MemorySuiteRunRepository", () => {
           projection,
         );
         await expect(
-          repository.tryGetSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" }),
+          repository.findSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" }),
         ).resolves.toEqual(state);
         await expect(
-          repository.getBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" }),
+          repository.findBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" }),
         ).resolves.toEqual([state]);
       });
     });
@@ -68,10 +68,10 @@ describe("MemorySuiteRunRepository", () => {
         });
 
         await expect(
-          repository.tryGetSuiteRunState({ projectId: "project_2", batchRunId: "batch_1" }),
+          repository.findSuiteRunState({ projectId: "project_2", batchRunId: "batch_1" }),
         ).resolves.toBeNull();
         await expect(
-          repository.getBatchHistory({ projectId: "project_2", scenarioSetId: "set_1" }),
+          repository.findBatchHistory({ projectId: "project_2", scenarioSetId: "set_1" }),
         ).resolves.toEqual([]);
       });
     });
@@ -91,10 +91,10 @@ describe("MemorySuiteRunRepository", () => {
         );
 
         await expect(
-          repository.getBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" }),
+          repository.findBatchHistory({ projectId: "project_1", scenarioSetId: "set_1" }),
         ).resolves.toEqual([newer, older]);
         await expect(
-          repository.getBatchHistory({
+          repository.findBatchHistory({
             projectId: "project_1",
             scenarioSetId: "set_1",
             limit: 1,
@@ -115,7 +115,7 @@ describe("MemorySuiteRunRepository", () => {
         });
 
         await expect(
-          repository.getBatchHistory({ projectId: "project_1", scenarioSetId: "default" }),
+          repository.findBatchHistory({ projectId: "project_1", scenarioSetId: "default" }),
         ).resolves.toEqual([unnamed]);
       });
     });

@@ -127,11 +127,11 @@ export class GithubFeatureService implements GithubApi {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
 
-  tryMintTurnToken(input: {
+  mintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null> {
-    return this.installations.tryMintTurnToken(input);
+    return this.installations.mintTurnToken(input);
   }
 
   coversRepository(input: {
@@ -173,16 +173,16 @@ export class GithubFeatureService implements GithubApi {
     return this.installState.registerNonce(input);
   }
 
-  tryConsumeInstallNonce(nonce: string): Promise<boolean | null> {
-    return this.installState.tryConsumeNonce(nonce);
+  consumeInstallNonce(nonce: string): Promise<boolean | null> {
+    return this.installState.consumeNonce(nonce);
   }
 
   signInstallState(payload: GithubInstallStatePayload): string {
     return this.installState.sign(payload);
   }
 
-  tryVerifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
-    return this.installState.tryVerify(token);
+  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
+    return this.installState.verify(token);
   }
 
   popupResponseHtml(login: string): string {
@@ -193,8 +193,8 @@ export class GithubFeatureService implements GithubApi {
     return this.installResponse.errorHtml(message);
   }
 
-  tryParsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
-    return this.pullRequestEvents.tryParse(payload);
+  parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
+    return this.pullRequestEvents.parse(payload);
   }
 
   requestBranchMapping(input: BranchMappingRequest): Promise<void> {

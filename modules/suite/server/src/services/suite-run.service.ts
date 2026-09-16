@@ -416,11 +416,11 @@ export class SuiteRunService {
     return { ...result, suiteId: suite.id };
   }
 
-  async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    return this.runRepository.tryGetSuiteRunState(suiteRunStateInputSchema.parse(input));
+  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+    return this.runRepository.findSuiteRunState(suiteRunStateInputSchema.parse(input));
   }
 
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    return this.runRepository.getBatchHistory(suiteBatchHistoryInputSchema.parse(input));
+    return this.runRepository.findBatchHistory(suiteBatchHistoryInputSchema.parse(input));
   }
 }

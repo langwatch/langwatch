@@ -28,9 +28,9 @@ export interface ProjectWithOrgAdmin {
 
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
-  listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
-  tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
-  tryFindInternalBySlug(slug: string): Promise<InternalProject | null>;
+  findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  findInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
+  findInternalBySlug(slug: string): Promise<InternalProject | null>;
   createInternalOrFindWinner(input: {
     id: string;
     name: string;
@@ -46,7 +46,7 @@ export interface ProjectRepository {
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
-  tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
+  findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;
@@ -64,24 +64,24 @@ export interface ProjectRepository {
   }): Promise<PaginatedProjects>;
   findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
   findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
-  tryFindIdentity(id: string): Promise<ProjectIdentity | null>;
+  findIdentity(id: string): Promise<ProjectIdentity | null>;
   findIdsByOrganization(organizationId: string): Promise<string[]>;
   findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
-  tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
-  tryFindActiveTeamInOrganization(input: {
+  findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
+  findActiveTeamInOrganization(input: {
     teamId: string;
     organizationId: string;
   }): Promise<{ id: string; isPersonal: boolean } | null>;
-  tryFindLiveTraceDestination(input: {
+  findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
   }): Promise<TraceDestinationProject | null>;
-  tryFindOldestGovernanceTraceDestination(
+  findOldestGovernanceTraceDestination(
     organizationId: string,
   ): Promise<TraceDestinationProject | null>;
   countLiveNonGovernanceProjects(organizationId: string): Promise<number>;
-  tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
-  listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
+  findTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
+  findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
   /** The live project the legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */

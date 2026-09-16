@@ -24,7 +24,7 @@ const user: UserFullProfile = {
 const ISSUER = "credential";
 
 class StubRepository implements UserRepository {
-  getProfiles = vi.fn(async () => [user]);
+  findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
   findByEmail = vi.fn(async () => user);
   findByEmailInsensitive = vi.fn(async () => user);
@@ -35,10 +35,10 @@ class StubRepository implements UserRepository {
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);
-  getPasskeyNudgeStatus = vi.fn(async () => ({ hasPasskey: false, dismissedAt: null }));
+  findPasskeyNudgeStatus = vi.fn(async () => ({ hasPasskey: false, dismissedAt: null }));
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
-  getSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
-  getTraceExplorerTourPreference = vi.fn(async () => ({
+  findSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
+  findTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
     dismissedAt: null,
   }));
@@ -90,7 +90,7 @@ describe("UserService", () => {
     await expect(service.getProfiles({ userIds: ["user-1", "user-1", "user-2"] })).resolves.toEqual(
       [user],
     );
-    expect(repository.getProfiles).toHaveBeenCalledWith(["user-1", "user-2"]);
+    expect(repository.findProfiles).toHaveBeenCalledWith(["user-1", "user-2"]);
   });
 
   it("creates a profile through its private repository", async () => {
@@ -155,7 +155,7 @@ describe("UserService", () => {
     });
     await service.dismissPasskeyNudge({ id: "user-1" });
 
-    expect(repository.getPasskeyNudgeStatus).toHaveBeenCalledWith("user-1");
+    expect(repository.findPasskeyNudgeStatus).toHaveBeenCalledWith("user-1");
     expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith({
       id: "user-1",
       dismissedAt: new Date(42),
@@ -311,7 +311,7 @@ describe("given a user whose photo came from their identity provider", () => {
         imageDataUrl: PNG,
       });
 
-      await expect(service.tryFindById({ id: "user-1" })).resolves.toMatchObject({
+      await expect(service.findById({ id: "user-1" })).resolves.toMatchObject({
         image: "/api/user-avatar/project-1/object-1",
       });
     });
@@ -336,7 +336,7 @@ describe("given a user whose photo came from their identity provider", () => {
         lastLoginAt: new Date(42),
       });
       expect(repository.setAvatar).not.toHaveBeenCalled();
-      await expect(service.tryFindById({ id: "user-1" })).resolves.toMatchObject({
+      await expect(service.findById({ id: "user-1" })).resolves.toMatchObject({
         image: "/api/user-avatar/project-1/object-1",
       });
     });
@@ -357,7 +357,7 @@ describe("given a user whose photo came from their identity provider", () => {
       expect(repository.setAvatar).toHaveBeenLastCalledWith({ id: "user-1", image: null });
       // Null, not the provider's photo: removal returns the person to the
       // fallback chain rather than resurrecting an SSO picture they replaced.
-      await expect(service.tryFindById({ id: "user-1" })).resolves.toMatchObject({ image: null });
+      await expect(service.findById({ id: "user-1" })).resolves.toMatchObject({ image: null });
     });
   });
 });

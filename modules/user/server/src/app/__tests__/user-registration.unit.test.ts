@@ -62,7 +62,7 @@ describe("registering a credential account", () => {
 
       const created = await register(app, "Joel.During@example.com");
 
-      await expect(app.tryFindById({ id: created.id })).resolves.toMatchObject({
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         email: "joel.during@example.com",
       });
     });

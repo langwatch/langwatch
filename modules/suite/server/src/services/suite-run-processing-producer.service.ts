@@ -31,7 +31,9 @@ class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
 /**
  * Builds the suite-run-processing definition for a process that only sends commands on it.
  */
-function buildSuiteRunProcessingProducerPipeline(input: { processName: string }) {
+function buildSuiteRunProcessingProducerPipeline(
+  input: { processName: string },
+): ReturnType<typeof SuiteRunProcessingPipelineAdapter.create> {
   return SuiteRunProcessingPipelineAdapter.create({
     suiteRunStateFoldStore: new ProducerOnlyFoldStore<SuiteRunStateData>(
       input.processName,
@@ -48,7 +50,7 @@ export class SuiteRunProcessingProducerAdapter {
 
   private constructor(private readonly options: { processName: string }) {}
 
-  build() {
+  build(): ReturnType<typeof buildSuiteRunProcessingProducerPipeline> {
     return buildSuiteRunProcessingProducerPipeline(this.options);
   }
 }

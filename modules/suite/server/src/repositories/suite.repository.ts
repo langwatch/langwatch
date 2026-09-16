@@ -9,7 +9,7 @@ import type {
 
 export abstract class SuiteRepository {
   abstract create(input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite>;
-  abstract list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
+  abstract findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
   abstract resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]>;
   /**
    * The scenarios a scope covers, resolved directly against the project rather than against

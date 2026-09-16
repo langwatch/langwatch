@@ -76,7 +76,7 @@ const scenario = (overrides: Partial<Scenario> = {}): Scenario =>
 function repository(overrides: Partial<SuiteRepository> = {}): SuiteRepository {
   return {
     create: vi.fn(),
-    list: vi.fn(),
+    findAll: vi.fn(),
     findById: vi.fn(),
     findBySlug: vi.fn().mockResolvedValue(null),
     update: vi.fn(),
@@ -187,7 +187,7 @@ describe("SuiteService", () => {
           repository({
             findById: vi.fn().mockResolvedValue(suite({ id: "suite_to_archive" })),
             archive,
-            list: vi.fn().mockResolvedValue([]),
+            findAll: vi.fn().mockResolvedValue([]),
           }),
         ),
       );

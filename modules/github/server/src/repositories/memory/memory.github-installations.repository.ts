@@ -33,7 +33,7 @@ export class MemoryGithubInstallationsRepository extends GithubInstallationsRepo
       .sort((left, right) => left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds);
   }
 
-  async tryFindByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
+  async findByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
     return this.#database.installations.get(installationId) ?? null;
   }
 

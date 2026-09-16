@@ -19,6 +19,7 @@ import {
   type PaginatedProjects,
   type Project,
   type ProjectIdentity,
+  type ProjectPath,
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
@@ -67,8 +68,8 @@ export abstract class ProjectDiagnostics {
 }
 
 export class ProjectService {
-  listPaths(input: { projectIds: string[] }) {
-    return this.repository.listPaths(input);
+  listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
+    return this.repository.findPaths(input);
   }
 
   private constructor(
@@ -106,13 +107,13 @@ export class ProjectService {
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
 
-    return this.repository.tryFindInternalByOrganization(parsed.organizationId);
+    return this.repository.findInternalByOrganization(parsed.organizationId);
   }
 
   async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
     const parsed = traceDestinationInputSchema.parse(input);
     if (parsed.traceProjectId) {
-      const project = await this.repository.tryFindLiveTraceDestination({
+      const project = await this.repository.findLiveTraceDestination({
         organizationId: parsed.organizationId,
         projectId: parsed.traceProjectId,
       });
@@ -124,7 +125,7 @@ export class ProjectService {
     }
 
     if (parsed.projectScopeIds.length === 1) {
-      const project = await this.repository.tryFindLiveTraceDestination({
+      const project = await this.repository.findLiveTraceDestination({
         organizationId: parsed.organizationId,
         projectId: parsed.projectScopeIds[0]!,
       });
@@ -133,7 +134,7 @@ export class ProjectService {
       }
     }
 
-    const governance = await this.repository.tryFindOldestGovernanceTraceDestination(
+    const governance = await this.repository.findOldestGovernanceTraceDestination(
       parsed.organizationId,
     );
     if (!governance) {
@@ -155,18 +156,18 @@ export class ProjectService {
   }
 
   findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
-    return this.repository.tryGetTraceDestination(traceDestinationProjectIdSchema.parse(projectId));
+    return this.repository.findTraceDestination(traceDestinationProjectIdSchema.parse(projectId));
   }
 
   listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
     const parsed = traceDestinationProjectIdsSchema.parse(projectIds);
 
-    return this.repository.listTraceDestinations([...new Set(parsed)]);
+    return this.repository.findTraceDestinations([...new Set(parsed)]);
   }
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
     const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.tryFindInternalByOrganization(parsed.organizationId);
+    const existing = await this.repository.findInternalByOrganization(parsed.organizationId);
     if (existing) {
       return existing;
     }
@@ -175,7 +176,7 @@ export class ProjectService {
       organizationId: parsed.organizationId,
     });
     const slug = `governance-${parsed.organizationId}`;
-    const bySlug = await this.repository.tryFindInternalBySlug(slug);
+    const bySlug = await this.repository.findInternalBySlug(slug);
     if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
       return bySlug;
     }
@@ -215,7 +216,7 @@ export class ProjectService {
   }
 
   findIdentity(id: string): Promise<ProjectIdentity | null> {
-    return this.repository.tryFindIdentity(id);
+    return this.repository.findIdentity(id);
   }
 
   findById(projectId: string): Promise<Project | null> {
@@ -240,7 +241,7 @@ export class ProjectService {
     teamId: string;
     organizationId: string;
   }): Promise<void> {
-    const destinationTeam = await this.repository.tryFindActiveTeamInOrganization(input);
+    const destinationTeam = await this.repository.findActiveTeamInOrganization(input);
     if (!destinationTeam) {
       throw new TeamNotInOrganizationError("Team does not belong to this organization");
     }
@@ -292,7 +293,7 @@ export class ProjectService {
     const generatedId = this.credentials.generateProjectId();
     const projectId = `project_${generatedId}`;
     const slug = ProjectSlugService.mint(input.name, generatedId);
-    const existing = await this.repository.tryFindBySlugInTeam({ slug, teamId });
+    const existing = await this.repository.findBySlugInTeam({ slug, teamId });
     if (existing) {
       throw new ProjectSlugConflictError(
         "A project with this name already exists in the selected team.",
@@ -332,7 +333,7 @@ export class ProjectService {
   }): Promise<Project> {
     const data = updateProjectInputSchema.parse(input.data);
     if (data.teamId) {
-      const team = await this.repository.tryFindActiveTeamInOrganization({
+      const team = await this.repository.findActiveTeamInOrganization({
         teamId: data.teamId,
         organizationId: input.organizationId,
       });

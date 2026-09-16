@@ -79,7 +79,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     return plan;
   }
 
-  async list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
+  async findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     return [...this.database.plans.values()]
       .filter(
         (plan) =>

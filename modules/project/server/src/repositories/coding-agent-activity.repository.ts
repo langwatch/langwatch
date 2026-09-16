@@ -5,7 +5,7 @@
  */
 export interface CodingAgentActivityRepository {
   /** The organization an active project belongs to; an archived project is not found. */
-  getOrganizationId(projectId: string): Promise<string>;
+  findOrganizationId(projectId: string): Promise<string>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void>;
   /** Stamps a project as having just had a coding-agent pull request mapped. */

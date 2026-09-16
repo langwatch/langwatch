@@ -77,7 +77,7 @@ export class SuiteService {
   }
 
   list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
-    return this.options.repository.list(input);
+    return this.options.repository.findAll(input);
   }
 
   async get(input: SuiteIdInput): Promise<Suite> {
@@ -198,8 +198,8 @@ export class SuiteService {
     return this.runs.runAll(input);
   }
 
-  async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    return this.runs.tryGetSuiteRunState(input);
+  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+    return this.runs.getSuiteRunState(input);
   }
 
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {

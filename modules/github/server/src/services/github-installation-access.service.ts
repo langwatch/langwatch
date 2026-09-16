@@ -29,7 +29,7 @@ export interface GithubInstallationLookup {
   /** The organization a webhook's installation belongs to. */
   findByInstallationId(installationId: string): Promise<{ organizationId: string } | null>;
   /** The installation and repository id that can be asked about a branch. */
-  tryResolveInstallationForRepository(input: {
+  resolveInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<{ installationId: string; repositoryId: string } | null>;
@@ -62,7 +62,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
   // credentials: the pull-request event carries the installation id, and the
   // row it names is what says which organization the delivery belongs to.
   findByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {
-    return this.repository.tryFindByInstallationId(installationId);
+    return this.repository.findByInstallationId(installationId);
   }
 
   async listRepositoriesForOrganization(organizationId: string): Promise<GithubRepositoryRef[]> {
@@ -91,7 +91,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
     return repositories;
   }
 
-  async tryResolveInstallationForRepository(input: {
+  async resolveInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<{ installationId: string; repositoryId: string } | null> {
@@ -136,7 +136,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
     });
   }
 
-  async tryMintTurnToken(input: {
+  async mintTurnToken(input: {
     organizationId: string;
     repositoryFullName?: string;
   }): Promise<GithubTurnToken | null> {

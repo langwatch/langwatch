@@ -65,7 +65,7 @@ export class PrismaUserRepository
 {
   static readonly create = this.factory((prisma) => new PrismaUserRepository(prisma));
 
-  async getProfiles(userIds: string[]): Promise<UserFullProfile[]> {
+  async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
 
     const rows = await this.prisma.user.findMany({
@@ -182,7 +182,7 @@ export class PrismaUserRepository
     return "set";
   }
 
-  async getPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
+  async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
     const [passkeyCount, user] = await Promise.all([
       this.prisma.passkey.count({ where: { userId: id } }),
       this.prisma.user.findUnique({ where: { id }, select: { passkeyNudgeDismissedAt: true } }),
@@ -221,7 +221,7 @@ export class PrismaUserRepository
     return row ? userAccountInfoSchema.parse(row) : null;
   }
 
-  async getSsoStatus(id: string): Promise<UserSsoStatus> {
+  async findSsoStatus(id: string): Promise<UserSsoStatus> {
     const row = await this.prisma.user.findUnique({
       where: { id },
       select: { pendingSsoSetup: true },
@@ -233,7 +233,7 @@ export class PrismaUserRepository
     });
   }
 
-  async getTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
+  async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
     const row = await this.prisma.user.findUniqueOrThrow({
       where: { id },
       select: { tracesExplorerTourDismissedAt: true },

@@ -469,8 +469,8 @@ export class UserApp implements UserApi {
 
   // -- the account itself ----------------------------------------------------
 
-  tryFindById(input: { id: string }): Promise<UserProfile | null> {
-    return this.#users.tryFindById(input);
+  findById(input: { id: string }): Promise<UserProfile | null> {
+    return this.#users.findById(input);
   }
 
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -535,7 +535,7 @@ export class UserApp implements UserApi {
 
   /** The same lookup from an id, resolving the address through this directory. */
   async isOperator({ userId }: { userId: string }): Promise<boolean> {
-    const profile = await this.#users.tryFindById({ id: userId });
+    const profile = await this.#users.findById({ id: userId });
 
     return this.#account.isAdmin({ email: profile?.email ?? null });
   }
@@ -841,7 +841,7 @@ export class UserApp implements UserApi {
 
     if (!allowance.allowed) throw new UserAvatarRateLimitedError();
 
-    const profile = await this.#users.tryFindById({ id: input.userId });
+    const profile = await this.#users.findById({ id: input.userId });
 
     return this.#users.setAvatar({
       userId: input.userId,
@@ -865,13 +865,13 @@ export class UserApp implements UserApi {
   }
 
   /** The user's personal workspace in one organization, or null if none yet. */
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.#account.tryFindPersonalWorkspace(input);
+  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
+    return this.#account.findPersonalWorkspace(input);
   }
 
   /** The path this user pinned as their home, or null if they pinned none. */
-  tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
-    return this.#users.tryGetLastHomePath(input);
+  findLastHomePath(input: UserIdInput): Promise<string | null> {
+    return this.#users.findLastHomePath(input);
   }
 
   /** Pins one path as this user's home. */
@@ -893,7 +893,7 @@ export class UserApp implements UserApi {
   }): Promise<UserPersonalContext> {
     await this.#assertMember({ userId, organizationId });
 
-    const profile = await this.#users.tryFindById({ id: userId });
+    const profile = await this.#users.findById({ id: userId });
     const workspace = await this.#account.ensurePersonalWorkspace({
       userId,
       organizationId,
@@ -923,7 +923,7 @@ export class UserApp implements UserApi {
     userId: string;
     organizationId: string;
   }): Promise<UserPersonalBudget> {
-    const workspace = await this.#account.tryFindPersonalWorkspace({ userId, organizationId });
+    const workspace = await this.#account.findPersonalWorkspace({ userId, organizationId });
 
     if (!workspace) return { status: "ok" };
 
@@ -971,7 +971,7 @@ export class UserApp implements UserApi {
     });
     const [organizationName, requester] = await Promise.all([
       this.#members.organizations.findName({ organizationId: input.organizationId }),
-      this.#users.tryFindById({ id: input.userId }),
+      this.#users.findById({ id: input.userId }),
     ]);
 
     try {
@@ -1013,7 +1013,7 @@ export class UserApp implements UserApi {
     organizationId: string;
   }): Promise<UserHomePagePickerState> {
     const [lastHomePath, firstProjectSlug] = await Promise.all([
-      this.#users.tryGetLastHomePath({ id: userId }),
+      this.#users.findLastHomePath({ id: userId }),
       this.#members.organizations.findFirstProjectSlug({ organizationId, userId }),
     ]);
 
@@ -1151,7 +1151,7 @@ export class UserApp implements UserApi {
 
     if (!account) throw new UserFederatedPasswordAccountMissingError(input.userId);
 
-    const profile = await this.#users.tryFindById({ id: input.userId });
+    const profile = await this.#users.findById({ id: input.userId });
 
     // Nothing the caller sent causes an account with no address, and nothing
     // they can send avoids it, so it degrades to the generic failure.

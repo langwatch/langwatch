@@ -233,7 +233,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
     });
   }
 
-  async tryFindBranchCheck({
+  async findBranchCheck({
     organizationId,
     repositoryHost,
     repositoryFullName,

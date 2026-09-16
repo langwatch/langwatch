@@ -141,7 +141,7 @@ export abstract class GithubPullRequestsRepository {
    */
   abstract refreshSnapshot(input: RefreshGithubPullRequestSnapshotInput): Promise<void>;
 
-  abstract tryFindBranchCheck(params: {
+  abstract findBranchCheck(params: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
@@ -235,7 +235,7 @@ export class NullGithubPullRequestsRepository extends GithubPullRequestsReposito
     return null;
   }
   async refreshSnapshot(_input: RefreshGithubPullRequestSnapshotInput): Promise<void> {}
-  async tryFindBranchCheck(): Promise<GithubBranchCheckRow | null> {
+  async findBranchCheck(): Promise<GithubBranchCheckRow | null> {
     return null;
   }
   async upsertBranchCheck(): Promise<void> {}

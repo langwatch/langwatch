@@ -59,7 +59,7 @@ export class TestGithubService implements GithubApi {
     return true;
   }
 
-  async tryConsumeInstallNonce(): Promise<boolean | null> {
+  async consumeInstallNonce(): Promise<boolean | null> {
     return true;
   }
 
@@ -67,7 +67,7 @@ export class TestGithubService implements GithubApi {
     return "state";
   }
 
-  tryVerifyInstallState(): GithubInstallStatePayload | null {
+  verifyInstallState(): GithubInstallStatePayload | null {
     return null;
   }
 
@@ -79,7 +79,7 @@ export class TestGithubService implements GithubApi {
     return "";
   }
 
-  tryParsePullRequestEvent(): GithubPullRequestEvent | null {
+  parsePullRequestEvent(): GithubPullRequestEvent | null {
     return null;
   }
 
@@ -113,7 +113,7 @@ export class TestGithubService implements GithubApi {
     return [];
   }
 
-  async tryMintTurnToken(): Promise<GithubTurnToken | null> {
+  async mintTurnToken(): Promise<GithubTurnToken | null> {
     return null;
   }
 

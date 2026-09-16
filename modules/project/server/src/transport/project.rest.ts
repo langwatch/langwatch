@@ -303,7 +303,10 @@ function projectResponse(
     Project,
     "id" | "name" | "slug" | "language" | "framework" | "teamId" | "createdAt" | "updatedAt"
   >,
-) {
+): Pick<
+  Project,
+  "id" | "name" | "slug" | "language" | "framework" | "teamId" | "createdAt" | "updatedAt"
+> {
   return {
     id: project.id,
     name: project.name,

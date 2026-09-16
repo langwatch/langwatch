@@ -34,7 +34,7 @@ export interface UpsertGithubInstallationInput {
 export abstract class GithubInstallationsRepository {
   abstract findAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]>;
 
-  abstract tryFindByInstallationId(installationId: string): Promise<GithubInstallationRow | null>;
+  abstract findByInstallationId(installationId: string): Promise<GithubInstallationRow | null>;
 
   abstract upsert(input: UpsertGithubInstallationInput): Promise<void>;
 
@@ -61,7 +61,7 @@ export class NullGithubInstallationsRepository extends GithubInstallationsReposi
   async findAllForOrganization(_organizationId: string): Promise<GithubInstallationRow[]> {
     return [];
   }
-  async tryFindByInstallationId(): Promise<GithubInstallationRow | null> {
+  async findByInstallationId(): Promise<GithubInstallationRow | null> {
     return null;
   }
   async upsert(): Promise<void> {}

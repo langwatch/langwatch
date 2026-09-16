@@ -34,7 +34,7 @@ export class MemorySuiteRunRepository
   }
 
   /** The latest state of one batch run, or null where none was written. */
-  async tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+  async findSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
     return this.store.get(this.getKey(input.projectId, input.batchRunId))?.data ?? null;
   }
 
@@ -43,7 +43,7 @@ export class MemorySuiteRunRepository
    * empty string name the same set (a run recorded before sets were named
    * carries neither), so a read for one finds the other, as the live store's `IN` filter does.
    */
-  async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
+  async findBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
     const wanted = new Set(
       input.scenarioSetId === "default" || input.scenarioSetId === ""
         ? ["default", ""]

@@ -48,7 +48,7 @@ export class ProjectMetadataService {
 
   async resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution> {
     try {
-      const result = await this.repository.tryGetWithOrgAdmin(projectId);
+      const result = await this.repository.findWithOrgAdmin(projectId);
       if (!result) {
         return { userId: null, organizationId: null, firstMessage: false };
       }

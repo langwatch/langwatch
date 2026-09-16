@@ -59,9 +59,9 @@ export interface GithubInstallResponse {
 export interface GithubInstallState {
   getTtlMs(): number;
   registerNonce(input: { nonce: string; ttlSec: number }): Promise<boolean>;
-  tryConsumeNonce(nonce: string): Promise<boolean | null>;
+  consumeNonce(nonce: string): Promise<boolean | null>;
   sign(payload: GithubInstallStatePayload): string;
-  tryVerify(token: string | null | undefined): GithubInstallStatePayload | null;
+  verify(token: string | null | undefined): GithubInstallStatePayload | null;
 }
 
 
@@ -78,5 +78,5 @@ export interface GithubProjectActivity {
 
 
 export interface GithubPullRequestEventParser {
-  tryParse(payload: unknown): GithubPullRequestEvent | null;
+  parse(payload: unknown): GithubPullRequestEvent | null;
 }

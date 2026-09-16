@@ -67,10 +67,10 @@ export class UserService {
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     const parsed = userProfilesInputSchema.parse(input);
 
-    return this.repository.getProfiles([...new Set(parsed.userIds)]);
+    return this.repository.findProfiles([...new Set(parsed.userIds)]);
   }
 
-  tryFindById(input: UserIdInput): Promise<UserProfile | null> {
+  findById(input: UserIdInput): Promise<UserProfile | null> {
     const parsed = userIdInputSchema.parse(input);
 
     return this.repository.findById(parsed.id);
@@ -127,7 +127,7 @@ export class UserService {
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.getPasskeyNudgeStatus(parsed.id);
+    return this.repository.findPasskeyNudgeStatus(parsed.id);
   }
 
   async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
@@ -172,13 +172,13 @@ export class UserService {
   getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.getSsoStatus(parsed.id);
+    return this.repository.findSsoStatus(parsed.id);
   }
 
   getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
 
-    return this.repository.getTraceExplorerTourPreference(parsed.id);
+    return this.repository.findTraceExplorerTourPreference(parsed.id);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
@@ -195,7 +195,7 @@ export class UserService {
     await this.repository.setLastLoginAt({ id: parsed.id, lastLoginAt: this.now() });
   }
 
-  tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
+  findLastHomePath(input: UserIdInput): Promise<string | null> {
     const parsed = userIdInputSchema.parse(input);
 
     return this.repository.findLastHomePath(parsed.id);

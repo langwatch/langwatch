@@ -71,9 +71,9 @@ function mount(
     getAppInstallUrl: () => INSTALL_URL,
     getInstallStateTtlMs: () => state.getTtlMs(),
     registerInstallNonce: async () => false,
-    tryConsumeInstallNonce: async () => true,
+    consumeInstallNonce: async () => true,
     signInstallState: (payload) => state.sign(payload),
-    tryVerifyInstallState: (token) => state.tryVerify(token),
+    verifyInstallState: (token) => state.verify(token),
     popupResponseHtml: (login) => `<p>${login}</p>`,
     popupErrorHtml: (message) => `<p>${message}</p>`,
     isOrganizationMember: async ({ userId, organizationId }) => {
@@ -92,7 +92,7 @@ function mount(
     handleWebhookEvent: async (input) => {
       webhookEvents.push({ action: input.action, installationId: input.installationId });
     },
-    tryParsePullRequestEvent: () => null,
+    parsePullRequestEvent: () => null,
     applyPullRequestEvent: async () => true,
   };
 
@@ -201,7 +201,7 @@ describe("given the GitHub installation routes", () => {
       expect(response.status).toBe(302);
       const location = new URL(response.headers.get("location") ?? "");
       expect(`${location.origin}${location.pathname}`).toBe(INSTALL_URL);
-      expect(state.tryVerify(location.searchParams.get("state"))).toMatchObject({
+      expect(state.verify(location.searchParams.get("state"))).toMatchObject({
         userId: "user_1",
         organizationId: "org_1",
       });

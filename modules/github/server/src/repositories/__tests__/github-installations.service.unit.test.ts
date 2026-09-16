@@ -40,7 +40,7 @@ function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsReposi
     findAllForOrganization: vi.fn(async (orgId: string) =>
       [...byId.values()].filter((r) => r.organizationId === orgId),
     ),
-    tryFindByInstallationId: vi.fn(async (id: string) => byId.get(id) ?? null),
+    findByInstallationId: vi.fn(async (id: string) => byId.get(id) ?? null),
     upsert: vi.fn(async (_i: UpsertGithubInstallationInput) => {}),
     // Mirrors the real unique-index semantics: the read (`byId.get`) and the
     // write (`byId.set`) below have no `await` between them, so this function
@@ -212,7 +212,7 @@ describe("recordInstallation", () => {
 
       // Exactly one org ends up owning the installation — never both, never
       // neither.
-      const winner = await repo.tryFindByInstallationId("inst-race");
+      const winner = await repo.findByInstallationId("inst-race");
       expect(["org-a", "org-b"]).toContain(winner?.organizationId);
       expect(repo.upsert).not.toHaveBeenCalled();
     });
@@ -494,7 +494,7 @@ describe("mintTurnToken", () => {
     it("returns null", async () => {
       const repo = makeRepo([row()]);
       const svc = service(repo, makeAppTokens({ configured: false }));
-      expect(await svc.tryMintTurnToken({ organizationId: "org-1" })).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
@@ -504,7 +504,7 @@ describe("mintTurnToken", () => {
     it("returns null", async () => {
       const repo = makeRepo([]);
       const svc = service(repo, makeAppTokens());
-      expect(await svc.tryMintTurnToken({ organizationId: "org-1" })).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
@@ -515,7 +515,7 @@ describe("mintTurnToken", () => {
       const repo = makeRepo([row()]);
       const mint = vi.fn(async () => ({ token: "ghs_all", expiresAt: "" }));
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
-      const result = await svc.tryMintTurnToken({ organizationId: "org-1" });
+      const result = await svc.mintTurnToken({ organizationId: "org-1" });
       expect(result?.token).toBe("ghs_all");
       expect(result?.repoScopeKey).toBe(RedisGithubAppTokenCache.computeRepoScopeKey({}));
       // No repository_ids ⇒ full installation scope.
@@ -538,7 +538,7 @@ describe("mintTurnToken", () => {
       ]);
       const mint = vi.fn(async () => ({ token: "ghs_one", expiresAt: "" }));
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
-      const result = await svc.tryMintTurnToken({
+      const result = await svc.mintTurnToken({
         organizationId: "org-1",
         repositoryFullName: "acme/service-x",
       });
@@ -562,7 +562,7 @@ describe("mintTurnToken", () => {
         }),
       ]);
       const svc = service(repo, makeAppTokens());
-      const result = await svc.tryMintTurnToken({
+      const result = await svc.mintTurnToken({
         organizationId: "org-1",
         repositoryFullName: "acme/other-repo",
       });
@@ -574,7 +574,7 @@ describe("mintTurnToken", () => {
     it("returns null", async () => {
       const repo = makeRepo([row({ suspendedAt: nowInstant() })]);
       const svc = service(repo, makeAppTokens());
-      expect(await svc.tryMintTurnToken({ organizationId: "org-1" })).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
@@ -598,7 +598,7 @@ describe("mintTurnToken", () => {
       });
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
 
-      const result = await svc.tryMintTurnToken({ organizationId: "org-1" });
+      const result = await svc.mintTurnToken({ organizationId: "org-1" });
 
       expect(result?.token).toBe("ghs_live");
       expect(repo.deleteByInstallationId).toHaveBeenCalledWith("inst-dead");
@@ -613,7 +613,7 @@ describe("mintTurnToken", () => {
       });
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
 
-      const result = await svc.tryMintTurnToken({ organizationId: "org-1" });
+      const result = await svc.mintTurnToken({ organizationId: "org-1" });
 
       expect(result).toBeNull();
       expect(repo.deleteByInstallationId).toHaveBeenCalledWith("inst-dead");
@@ -628,7 +628,7 @@ describe("mintTurnToken", () => {
       });
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
 
-      const result = await svc.tryMintTurnToken({ organizationId: "org-1" });
+      const result = await svc.mintTurnToken({ organizationId: "org-1" });
 
       expect(result).toBeNull();
       expect(repo.deleteByInstallationId).not.toHaveBeenCalled();
@@ -659,7 +659,7 @@ describe("mintTurnToken", () => {
       });
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
 
-      const result = await svc.tryMintTurnToken({
+      const result = await svc.mintTurnToken({
         organizationId: "org-1",
         repositoryFullName: "acme/service-x",
       });
@@ -703,7 +703,7 @@ describe("mintTurnToken", () => {
         }),
       );
 
-      const result = await svc.tryMintTurnToken({
+      const result = await svc.mintTurnToken({
         organizationId: "org-1",
         repositoryFullName: "acme/service-x",
       });

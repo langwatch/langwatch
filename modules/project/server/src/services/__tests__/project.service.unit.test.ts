@@ -90,19 +90,19 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 });
 
 class StubRepository implements ProjectRepository {
-  listPaths = vi.fn(async () => []);
+  findPaths = vi.fn(async () => []);
   existing: InternalProject | null = null;
-  tryFindInternalByOrganization = vi.fn(async () => this.existing);
-  tryFindInternalBySlug = vi.fn(async () => null);
+  findInternalByOrganization = vi.fn(async () => this.existing);
+  findInternalBySlug = vi.fn(async () => null);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
-  tryFindActiveTeamInOrganization = vi.fn<
+  findActiveTeamInOrganization = vi.fn<
     () => Promise<{ id: string; isPersonal: boolean } | null>
   >(async () => ({ id: "team_1", isPersonal: false }));
-  tryFindBySlugInTeam = vi.fn(async () => null);
+  findBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
-  tryFindIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
+  findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
@@ -113,7 +113,7 @@ class StubRepository implements ProjectRepository {
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
-  tryGetWithOrgAdmin = vi.fn(async () => null);
+  findWithOrgAdmin = vi.fn(async () => null);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
@@ -123,18 +123,18 @@ class StubRepository implements ProjectRepository {
     pagination: { page: 1, limit: 50, total: 1 },
   }));
   findActiveByScopes = vi.fn(async () => [applicationProject]);
-  tryFindLiveTraceDestination = vi.fn(
+  findLiveTraceDestination = vi.fn(
     async (_input: {
       organizationId: string;
       projectId: string;
     }): Promise<TraceDestinationProject | null> => null,
   );
-  tryFindOldestGovernanceTraceDestination = vi.fn(
+  findOldestGovernanceTraceDestination = vi.fn(
     async (_organizationId: string): Promise<TraceDestinationProject | null> => null,
   );
   countLiveNonGovernanceProjects = vi.fn(async () => 0);
-  tryGetTraceDestination = vi.fn(async () => null);
-  listTraceDestinations = vi.fn(async () => []);
+  findTraceDestination = vi.fn(async () => null);
+  findTraceDestinations = vi.fn(async () => []);
   findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
   rotateLegacyApiKey = vi.fn(async () => true);
   findPersonalWorkspaceOwner = vi.fn(
@@ -344,7 +344,7 @@ const createService = (
 describe("ProjectService", () => {
   it("resolves a live explicit trace destination without falling back", async () => {
     const repository = new StubRepository();
-    repository.tryFindLiveTraceDestination.mockResolvedValue(traceDestination);
+    repository.findLiveTraceDestination.mockResolvedValue(traceDestination);
 
     await expect(
       createService(repository).resolveTraceDestination({
@@ -353,7 +353,7 @@ describe("ProjectService", () => {
         traceProjectId: traceDestination.id,
       }),
     ).resolves.toEqual({ outcome: "resolved", project: traceDestination });
-    expect(repository.tryFindOldestGovernanceTraceDestination).not.toHaveBeenCalled();
+    expect(repository.findOldestGovernanceTraceDestination).not.toHaveBeenCalled();
   });
 
   it("rejects an explicit trace destination outside the live organization", async () => {
@@ -366,12 +366,12 @@ describe("ProjectService", () => {
         traceProjectId: "missing",
       }),
     ).resolves.toEqual({ outcome: "unknown" });
-    expect(repository.tryFindOldestGovernanceTraceDestination).not.toHaveBeenCalled();
+    expect(repository.findOldestGovernanceTraceDestination).not.toHaveBeenCalled();
   });
 
   it("uses the only live project scope as the trace destination", async () => {
     const repository = new StubRepository();
-    repository.tryFindLiveTraceDestination.mockResolvedValue(traceDestination);
+    repository.findLiveTraceDestination.mockResolvedValue(traceDestination);
 
     await expect(
       createService(repository).resolveTraceDestination({
@@ -383,7 +383,7 @@ describe("ProjectService", () => {
 
   it("uses the oldest governance destination when there is no alternative", async () => {
     const repository = new StubRepository();
-    repository.tryFindOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
+    repository.findOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
 
     await expect(
       createService(repository).resolveTraceDestination({
@@ -395,7 +395,7 @@ describe("ProjectService", () => {
 
   it("reports ambiguity when a governance fallback would hide live alternatives", async () => {
     const repository = new StubRepository();
-    repository.tryFindOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
+    repository.findOldestGovernanceTraceDestination.mockResolvedValue(traceDestination);
     repository.countLiveNonGovernanceProjects.mockResolvedValue(1);
 
     await expect(
@@ -515,7 +515,7 @@ describe("ProjectService", () => {
       }),
     ).resolves.toBe(applicationProject);
 
-    expect(repository.tryFindActiveTeamInOrganization).toHaveBeenCalledWith({
+    expect(repository.findActiveTeamInOrganization).toHaveBeenCalledWith({
       teamId: "team_1",
       organizationId: "org",
     });
@@ -670,7 +670,7 @@ describe("ProjectService", () => {
 
   it("does not allow an application project into a personal workspace", async () => {
     const repository = new StubRepository();
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue({
+    repository.findActiveTeamInOrganization.mockResolvedValue({
       id: "personal-team",
       isPersonal: true,
     });
@@ -697,7 +697,7 @@ describe("ProjectService", () => {
       data: { name: "Renamed" },
     });
 
-    expect(repository.tryFindActiveTeamInOrganization).not.toHaveBeenCalled();
+    expect(repository.findActiveTeamInOrganization).not.toHaveBeenCalled();
     expect(repository.update).toHaveBeenCalledWith({
       id: applicationProject.id,
       organizationId: "org",
@@ -708,7 +708,7 @@ describe("ProjectService", () => {
   /** @scenario ProjectService.update rejects archived destination team */
   it("rejects an unavailable destination team", async () => {
     const repository = new StubRepository();
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue(null);
+    repository.findActiveTeamInOrganization.mockResolvedValue(null);
 
     await expect(
       createService(repository).update({
@@ -729,7 +729,7 @@ describe("ProjectService", () => {
   }) => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(current);
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue(destination);
+    repository.findActiveTeamInOrganization.mockResolvedValue(destination);
 
     await expect(
       createService(repository).update({
@@ -762,7 +762,7 @@ describe("ProjectService", () => {
   it("moves the project to a live team in the same organization", async () => {
     const repository = new StubRepository();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue({
+    repository.findActiveTeamInOrganization.mockResolvedValue({
       id: "team_2",
       isPersonal: false,
     });
@@ -773,7 +773,7 @@ describe("ProjectService", () => {
       data: { teamId: "team_2" },
     });
 
-    expect(repository.tryFindActiveTeamInOrganization).toHaveBeenCalledWith({
+    expect(repository.findActiveTeamInOrganization).toHaveBeenCalledWith({
       teamId: "team_2",
       organizationId: "org",
     });
@@ -787,7 +787,7 @@ describe("ProjectService", () => {
   /** @scenario tRPC project.update rejects cross-org team */
   it("refuses a destination team that belongs to another organization", async () => {
     const repository = new StubRepository();
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue(null);
+    repository.findActiveTeamInOrganization.mockResolvedValue(null);
 
     await expect(
       createService(repository).update({
@@ -804,7 +804,7 @@ describe("ProjectService", () => {
     repository.findWithTeam.mockResolvedValue(
       projectWithTeam({ isPersonal: true, teamId: "personal" }),
     );
-    repository.tryFindActiveTeamInOrganization.mockResolvedValue({
+    repository.findActiveTeamInOrganization.mockResolvedValue({
       id: "personal",
       isPersonal: true,
     });

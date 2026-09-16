@@ -37,7 +37,7 @@ export class GithubPullRequestEventRules implements GithubPullRequestEventParser
   private constructor() {
   }
 
-  tryParse(payload: unknown): GithubPullRequestEvent | null {
+  parse(payload: unknown): GithubPullRequestEvent | null {
     const parsed = githubPullRequestEventSchema.safeParse(payload);
     if (!parsed.success) {
       return null;

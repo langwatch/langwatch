@@ -48,7 +48,7 @@ describe("user.deactivate", () => {
         caller: { id: created.id, operatorId: created.id, impersonated: false },
       });
 
-      await expect(app.tryFindById({ id: created.id })).resolves.toMatchObject({
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         deactivatedAt: expect.any(Date),
       });
       expect(reached).toEqual(["revokeAllBrowserSessions", "revokeCliTokensForUser"]);
@@ -86,7 +86,7 @@ describe("user.deactivate", () => {
         caller: { id: operator.id, operatorId: operator.id, impersonated: false },
       });
 
-      await expect(app.tryFindById({ id: created.id })).resolves.toMatchObject({
+      await expect(app.findById({ id: created.id })).resolves.toMatchObject({
         deactivatedAt: expect.any(Date),
       });
     });

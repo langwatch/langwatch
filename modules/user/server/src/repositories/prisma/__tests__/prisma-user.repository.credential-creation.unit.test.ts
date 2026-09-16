@@ -224,7 +224,7 @@ describe("PrismaUserRepository credential creation", () => {
     passkeyCount.mockResolvedValue(1);
     userFindUnique.mockResolvedValue({ passkeyNudgeDismissedAt: dismissedAt });
 
-    await expect(repositoryOver(database).getPasskeyNudgeStatus("user-1")).resolves.toEqual({
+    await expect(repositoryOver(database).findPasskeyNudgeStatus("user-1")).resolves.toEqual({
       hasPasskey: true,
       dismissedAt,
     });

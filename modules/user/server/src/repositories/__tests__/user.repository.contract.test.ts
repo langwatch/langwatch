@@ -24,7 +24,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(users.findById("user-nobody")).resolves.toBeNull();
       await expect(users.findByEmail(EMAIL)).resolves.toBeNull();
       await expect(users.findAccountInfo("user-nobody")).resolves.toBeNull();
-      await expect(users.getProfiles([])).resolves.toEqual([]);
+      await expect(users.findProfiles([])).resolves.toEqual([]);
     });
 
     it("reports no password for an account that does not exist", async () => {
@@ -150,7 +150,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(
         users.setTraceExplorerTourDismissedAt({ id: created.id, dismissedAt }),
       ).resolves.toEqual({ dismissed: true, dismissedAt });
-      await expect(users.getTraceExplorerTourPreference(created.id)).resolves.toEqual({
+      await expect(users.findTraceExplorerTourPreference(created.id)).resolves.toEqual({
         dismissed: true,
         dismissedAt,
       });
@@ -163,7 +163,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
       await users.setPasskeyNudgeDismissedAt({ id: created.id, dismissedAt });
 
-      await expect(users.getPasskeyNudgeStatus(created.id)).resolves.toEqual({
+      await expect(users.findPasskeyNudgeStatus(created.id)).resolves.toEqual({
         hasPasskey: false,
         dismissedAt,
       });

@@ -138,7 +138,7 @@ export class UserAccountService {
     return this.organizations.ensurePersonalWorkspace(input);
   }
 
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
+  findPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
     return this.organizations.tryFindPersonalWorkspace(input);
   }
 }

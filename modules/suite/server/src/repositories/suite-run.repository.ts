@@ -6,6 +6,6 @@ import type {
 
 /** Read-only access to the event-driven Suite run projection. */
 export abstract class SuiteRunReadRepository {
-  abstract tryGetSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null>;
-  abstract getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]>;
+  abstract findSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null>;
+  abstract findBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]>;
 }

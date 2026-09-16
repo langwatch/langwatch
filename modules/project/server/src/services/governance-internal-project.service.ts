@@ -58,14 +58,14 @@ export class GovernanceInternalProjectService extends GovernanceInternalProject 
 
   async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
     const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.tryFindInternalByOrganization(parsed.organizationId);
+    const existing = await this.repository.findInternalByOrganization(parsed.organizationId);
     if (existing) {
       return existing;
     }
 
     const teamId = await this.teams.getOldestTeamId({ organizationId: parsed.organizationId });
     const slug = `governance-${parsed.organizationId}`;
-    const bySlug = await this.repository.tryFindInternalBySlug(slug);
+    const bySlug = await this.repository.findInternalBySlug(slug);
     if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
       return bySlug;
     }

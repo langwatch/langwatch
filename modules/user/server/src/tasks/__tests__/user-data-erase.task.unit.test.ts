@@ -11,8 +11,8 @@ function emptyRepository(overrides: Record<string, unknown> = {}): GdprUserDataE
   const base: Record<string, unknown> = {
     // "email" lookup finds the user; "id" lookup (post-deletion
     // verification) finds nothing — the happy path already deleted them.
-    tryFindUserByEmail: vi.fn(async (email: string) => ({ id: "user_1", email, name: "Ada" })),
-    tryFindUserById: vi.fn(async () => null),
+    findUserByEmail: vi.fn(async (email: string) => ({ id: "user_1", email, name: "Ada" })),
+    findUserById: vi.fn(async () => null),
     findSoleOwnedOrganizations: vi.fn(async () => []),
     findSharedOrganizations: vi.fn(async () => []),
     findSoleOwnedTeams: vi.fn(async () => []),
@@ -30,7 +30,7 @@ function emptyRepository(overrides: Record<string, unknown> = {}): GdprUserDataE
 describe("runGdprUserDataErase", () => {
   describe("given no user with that email", () => {
     it("throws rather than running any deletion", async () => {
-      const repository = emptyRepository({ tryFindUserByEmail: vi.fn(async () => null) });
+      const repository = emptyRepository({ findUserByEmail: vi.fn(async () => null) });
       await expect(
         runGdprUserDataErase({ repository, email: "missing@example.com", execute: true }),
       ).rejects.toThrow("No user found with email");
@@ -88,7 +88,7 @@ describe("runGdprUserDataErase", () => {
   describe("when the user still exists after the transaction", () => {
     it("fails verification", async () => {
       const repository = emptyRepository({
-        tryFindUserById: vi.fn(async () => ({
+        findUserById: vi.fn(async () => ({
           id: "user_1",
           email: "ada@example.com",
           name: "Ada",

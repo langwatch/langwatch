@@ -79,7 +79,7 @@ const tokenSchema = z.object({
   repository_selection: z.string().optional(),
 });
 
-function tryReadRateLimit(response: Response): GithubRateLimitedError | null {
+function readRateLimit(response: Response): GithubRateLimitedError | null {
   if (response.status !== 403 && response.status !== 429) {
     return null;
   }
@@ -200,7 +200,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
         throw new GithubInstallationNotFoundError(input.installationId);
       }
 
-      const rateLimit = tryReadRateLimit(response);
+      const rateLimit = readRateLimit(response);
       if (rateLimit) {
         throw rateLimit;
       }
@@ -223,7 +223,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!response.ok) {
-        const rateLimit = tryReadRateLimit(response);
+        const rateLimit = readRateLimit(response);
         if (rateLimit) {
           throw rateLimit;
         }
@@ -285,7 +285,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
       { headers: { Authorization: `Bearer ${input.token}` } },
     );
     if (!response.ok) {
-      const rateLimit = tryReadRateLimit(response);
+      const rateLimit = readRateLimit(response);
       if (rateLimit) {
         throw rateLimit;
       }

@@ -11,6 +11,7 @@ import {
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   type RestErrorHandler,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -579,7 +580,11 @@ async function archiveSuite(params: {
  * REST for suites — the run plans a project assembles by hand, and the test
  * suites scenarios are filed into.
  */
-export function createSuitesAliasRest() {
+export function createSuitesAliasRest(): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<SuiteApi>;
+}> {
   return (
     defineRestRouter(SuiteApi)
       .withNamespace("suites")
