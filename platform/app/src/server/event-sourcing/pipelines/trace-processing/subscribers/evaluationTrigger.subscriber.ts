@@ -8,8 +8,8 @@ import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
-import { RESERVED_CAUSALITY_DEPTH } from "../projections/services/trace-attribute-accumulation.service";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
+import { RESERVED_CAUSALITY_DEPTH } from "../projections/services/trace-attribute-accumulation.service";
 import {
   MAX_PROCESSED_SPANS,
   type TraceSummaryData,
@@ -209,8 +209,6 @@ async function causalityLoopGuardFired({
   return true;
 }
 
-const CAUSALITY_DEPTH_ATTR = RESERVED_CAUSALITY_DEPTH;
-
 /**
  * Causality-loop detection for events that carry no span payload.
  *
@@ -219,15 +217,19 @@ const CAUSALITY_DEPTH_ATTR = RESERVED_CAUSALITY_DEPTH;
  * span to inspect, so the per-span depth check above cannot run, and dispatch
  * used to proceed unguarded.
  *
- * Reachability caveat, measured not assumed: nlpgo stamps an explicit
- * `langwatch.origin` on the spans it emits, and hoistOrigin accepts an
- * explicit origin from any span, root or not
- * (trace-origin.service.ts:129-155). A trace whose evaluator spans carry that
- * attribute therefore settles its origin on the first span,
- * `needsOriginResolution` returns false (originGate.subscriber.ts:39), and it
- * never takes this path at all — the span check above is what guards it. This
- * path covers the remainder: a trace carrying a causality depth whose origin
- * did not settle from any span it received.
+ * What reaches this path: nlpgo stamps the causality depth on EVERY span
+ * emitted during an evaluator run, via a span processor reading baggage on
+ * start. It stamps `langwatch.origin` on strictly fewer — only the spans it
+ * builds itself, the studio request span and the workflow node spans. A span
+ * started by other instrumentation inside that run, an HTTP client or a model
+ * SDK, therefore carries a depth and no origin.
+ *
+ * A trace whose spans all carry an explicit origin settles it on the first one
+ * (hoistOrigin takes an explicit origin from any span, root or not),
+ * `needsOriginResolution` returns false, and the trace never reaches here —
+ * the span check above guards it. This path covers the rest: a trace holding a
+ * causality depth whose origin no span settled. Pinned by the
+ * "guards a trace whose spans carry a depth but no origin" test.
  *
  * On this path the fold state is the only evidence available, so we read the
  * accumulated causality depth, which the attribute accumulation service folds
@@ -249,7 +251,7 @@ export function detectCausalityLoopFromFoldState(
 ): "depth_fold" | null {
   const attrs = foldState.attributes ?? {};
 
-  const depth = Number(attrs[CAUSALITY_DEPTH_ATTR]);
+  const depth = Number(attrs[RESERVED_CAUSALITY_DEPTH]);
   if (Number.isFinite(depth) && depth >= 1) return "depth_fold";
 
   return null;
@@ -297,7 +299,7 @@ function extractCausalityDepthFromOtlpAttrs(
 ): number {
   if (!Array.isArray(attrs)) return 0;
   for (const attr of attrs) {
-    if (attr?.key !== CAUSALITY_DEPTH_ATTR) continue;
+    if (attr?.key !== RESERVED_CAUSALITY_DEPTH) continue;
     const n = readNumericAttrValue(attr.value);
     if (n !== undefined && n > 0) return n;
   }

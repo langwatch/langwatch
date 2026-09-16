@@ -5,6 +5,7 @@ import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { TraceAttributeAccumulationService } from "../../projections/services/trace-attribute-accumulation.service";
 import { TraceOriginService } from "../../projections/services/trace-origin.service";
+import { needsOriginResolution } from "../originGate.subscriber";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 import {
@@ -397,6 +398,73 @@ describe("evaluationTrigger subscriber", () => {
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
+
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        makeMonitor(),
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "evaluation" },
+      } as unknown as Partial<TraceProcessingEvent>);
+
+      await subscriber.spec.handler(event, makeContext({}, accumulated));
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Pins that this path is reachable at all, which every other test here
+     * assumes by handing the subscriber an origin_resolved event directly.
+     *
+     * nlpgo stamps the causality depth on EVERY span it emits, through a span
+     * processor reading baggage on start (see the "Every span emitted during
+     * an nlpgo evaluator run carries causality_depth via SpanProcessor"
+     * scenario in services/nlpgo/tests/integration/causality_propagation_test.go).
+     * It stamps langwatch.origin on strictly fewer: only the spans it builds
+     * itself, the studio request span (adapters/httpapi/tracing.go:143-162)
+     * and the workflow node spans (app/engine/tracing.go:92-115). A span
+     * started by any other instrumentation inside that run — an HTTP client,
+     * a model SDK — therefore carries a depth and no origin.
+     *
+     * A trace holding only such spans folds to a depth with no origin, so
+     * needsOriginResolution stays true, no origin_resolved has fired yet, and
+     * the span-level check cannot see across spans. This path is what covers
+     * it.
+     */
+    it("guards a trace whose spans carry a depth but no origin", async () => {
+      const accumulation = new TraceAttributeAccumulationService(
+        new TraceOriginService(),
+      );
+
+      const accumulated = accumulation.accumulateAttributes({
+        state: { attributes: {} } as unknown as TraceSummaryData,
+        span: {
+          spanAttributes: {
+            // No langwatch.origin: the shape a non-nlpgo-built span has.
+            "langwatch.reserved.causality_depth": 1,
+          },
+          resourceAttributes: {},
+        } as unknown as NormalizedSpan,
+        outputSource: "span",
+        inputIsFallback: false,
+        outputIsFallback: false,
+        inputMediaRefs: null,
+        outputMediaRefs: null,
+      });
+
+      // The trace reaches the deferred path precisely because no span settled
+      // an origin for it.
+      expect(accumulated["langwatch.origin"]).toBeUndefined();
+      expect(
+        needsOriginResolution({
+          event: makeEvent({ occurredAt: Date.now() }),
+          foldState: { attributes: accumulated } as unknown as TraceSummaryData,
+        }),
+      ).toBe(true);
 
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
