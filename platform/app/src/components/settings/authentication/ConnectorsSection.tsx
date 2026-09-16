@@ -445,8 +445,8 @@ function ScimTokenDialogs({
       >
         <Dialog.Content bg="bg">
           <Dialog.Header>
-            <Dialog.Title>
-              <Heading size="md">Token issued</Heading>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Token issued
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
@@ -471,8 +471,8 @@ function ScimTokenDialogs({
       >
         <Dialog.Content bg="bg">
           <Dialog.Header>
-            <Dialog.Title>
-              <Heading size="md">Revoke this token?</Heading>
+            <Dialog.Title fontSize="md" fontWeight="500">
+              Revoke this token?
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
@@ -629,8 +629,8 @@ function GenerateTokenDialog({
     >
       <Dialog.Content bg="bg">
         <Dialog.Header>
-          <Dialog.Title>
-            <Heading size="md">Issue a provisioning token</Heading>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            Issue a provisioning token
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />

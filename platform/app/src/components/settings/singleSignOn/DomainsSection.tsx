@@ -136,6 +136,11 @@ export function DomainsSection({
             <Button
               flexShrink={0}
               loading={claim.isPending}
+              // An empty field is a question the server does not need to be
+              // asked: claiming nothing round-tripped only to come back as the
+              // generic refusal, which reads like a rejection of the domain
+              // rather than of the empty box it was never given.
+              disabled={domain.trim().length === 0}
               onClick={() =>
                 claim.mutate(
                   { organizationId, connectionId, domain },
