@@ -314,3 +314,60 @@ func TestCredentialCheckNamesWhatItCouldNotVerify(t *testing.T) {
 		t.Errorf("note %q does not say the run could not tell", check.Note)
 	}
 }
+
+// @scenario "A delete aimed at the user behind the organization bearer is retargeted"
+//
+// Run r6 of 2026-09-16 lost its organization credential here: probe #216
+// issued DELETE /api/scim/v2/Users/local-dev-admin-user, the base answered
+// 204, and the organization bearer hangs off that user. Eighteen
+// organization-door operations answered 401 on the base from that point and
+// read as differences. The project and team kinds were already protected; a
+// user was not a kind at all.
+func TestGuardSelfDestructionRetargetsTheUserBehindTheOrganizationBearer(t *testing.T) {
+	deleteUser := Operation{
+		Method: http.MethodDelete,
+		Path:   "/api/scim/v2/Users/{id}",
+		InA:    true, InB: true,
+		Params: []Param{{Name: "id", In: "path", Required: true}},
+	}
+	sideA := resolvedPath(map[string]string{"id": seededAdminUserID})
+	sideB := resolvedPath(map[string]string{"id": seededAdminUserID})
+
+	guard := GuardSelfDestruction(deleteUser, sideA, sideB)
+
+	if guard.Blocked != "" {
+		t.Fatalf("blocked = %q, want the probe to run against the sacrificial user", guard.Blocked)
+	}
+	for name, side := range map[string]resolvedParams{"candidate": sideA, "base": sideB} {
+		if got := side.pathValues["id"]; got != fixtureDoomedUserID {
+			t.Errorf("%s id = %q, want the sacrificial user %q", name, got, fixtureDoomedUserID)
+		}
+	}
+	if len(guard.Retargets) != 1 || !strings.Contains(guard.Retargets[0], seededAdminUserID) {
+		t.Errorf("retargets = %v, want one note naming %q", guard.Retargets, seededAdminUserID)
+	}
+}
+
+// @scenario "A delete aimed at the user behind the organization bearer is retargeted"
+//
+// The sacrificial user is only a substitute if it actually exists on both
+// sides and the organization-scoped directory routes can see it, so the
+// fixture SQL must create the row AND its membership of the seeded
+// organization.
+func TestProvisioningSQLCreatesTheSacrificialUserInTheSeededOrganization(t *testing.T) {
+	sql := provisioningSQL()
+
+	for _, want := range []string{
+		`INSERT INTO "User"`,
+		fixtureDoomedUserID,
+		`INSERT INTO "OrganizationUser"`,
+		seededOrganizationID,
+	} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("provisioning SQL does not contain %q", want)
+		}
+	}
+	if strings.Index(sql, `INSERT INTO "User"`) > strings.Index(sql, `INSERT INTO "OrganizationUser"`) {
+		t.Error("the user must be inserted before its organization membership, or the foreign key fails")
+	}
+}

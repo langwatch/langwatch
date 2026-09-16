@@ -29,10 +29,16 @@ const (
 	// them, so destroying one costs the run nothing.
 	fixtureDoomedProjectID = "apidiff-project-doomed"
 	fixtureDoomedTeamID    = "apidiff-team-doomed"
+	fixtureDoomedUserID    = "apidiff-user-doomed"
 
 	// fixtureDoomedProjectKey exists only because Project.apiKey is a required
 	// column. No probe ever presents it.
 	fixtureDoomedProjectKey = "sk-lw-apidiff-project-doomed-key"
+
+	// fixtureDoomedUserEmail is unique-constrained in both layouts, so it is
+	// fixed here rather than generated: two runs against a kept database must
+	// insert the same row, not a second one.
+	fixtureDoomedUserEmail = "apidiff-user-doomed@apidiff.invalid"
 )
 
 // provisioningSQL inserts the permission-probe fixtures: organization 2 with
@@ -43,6 +49,11 @@ const (
 // The sacrificial project sits in the SEEDED team rather than in the
 // sacrificial team, so a probe that destroys the team cannot take the project
 // with it and leave the next destructive probe with nothing to aim at.
+//
+// The sacrificial USER is a member of the SEEDED organization, because the
+// directory routes that can delete one are organization-scoped: a user outside
+// the organization the run authenticates in is invisible to them, and a probe
+// aimed at an invisible row would answer 404 on both sides and prove nothing.
 func provisioningSQL() string {
 	return `INSERT INTO "Organization" ("id", "name", "slug") VALUES ('` + fixtureOrg2ID + `', 'apidiff org 2', 'apidiff-org-2') ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "Team" ("id", "name", "slug", "organizationId") VALUES
@@ -53,5 +64,11 @@ INSERT INTO "Project" ("id", "name", "slug", "apiKey", "teamId", "language", "fr
   ('` + fixtureProjectBID + `', 'apidiff project B', 'apidiff-project-b', '` + ProjectKeyB + `', '` + seededTeamID + `', 'typescript', 'apidiff'),
   ('` + fixtureProjectCID + `', 'apidiff project C', 'apidiff-project-c', '` + ProjectKeyC + `', '` + fixtureTeam2ID + `', 'typescript', 'apidiff'),
   ('` + fixtureDoomedProjectID + `', 'apidiff doomed project', 'apidiff-project-doomed', '` + fixtureDoomedProjectKey + `', '` + seededTeamID + `', 'typescript', 'apidiff')
-ON CONFLICT ("id") DO NOTHING;`
+ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "User" ("id", "name", "email") VALUES
+  ('` + fixtureDoomedUserID + `', 'apidiff doomed user', '` + fixtureDoomedUserEmail + `')
+ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "OrganizationUser" ("userId", "organizationId", "role") VALUES
+  ('` + fixtureDoomedUserID + `', '` + seededOrganizationID + `', 'MEMBER')
+ON CONFLICT ("userId", "organizationId") DO NOTHING;`
 }

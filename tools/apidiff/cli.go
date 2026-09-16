@@ -45,11 +45,17 @@ func (values *stringSlice) Set(value string) error {
 
 // probeFlags holds the flags shared by `run` and `probe`.
 type probeFlags struct {
-	a               string
-	b               string
-	keys            Keys
-	timeout         time.Duration
-	settleTimeout   time.Duration
+	a             string
+	b             string
+	keys          Keys
+	timeout       time.Duration
+	settleTimeout time.Duration
+	// specSettle is how long the FIRST spec fetch waits out an instance whose
+	// lane reported ready before it is actually serving. Only `run` sets it:
+	// it booted the instance and knows a lane said ready. `probe` is handed
+	// two addresses by its caller, where nothing answering means the address
+	// is wrong, and waiting five minutes to say so helps nobody.
+	specSettle      time.Duration
 	pathPrefix      string
 	method          string
 	excludePrefixes stringSlice
@@ -239,7 +245,7 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags := flag.NewFlagSet("apidiff run", flag.ContinueOnError)
 	flags.SetOutput(out.stderr)
 	boot := BootConfig{}
-	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}}
+	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}, specSettle: specSettleTimeout}
 	flags.StringVar(&boot.MainRef, "main-ref", "origin/main", "git ref to boot as the base instance; the remote ref by default, since a local main falls behind without anyone noticing")
 	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to diff (haven path: its HEAD is checked out into its own worktree; the checkout itself is never booted)")
 	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
@@ -306,7 +312,11 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 
 	client := &http.Client{Timeout: probe.timeout}
 	fmt.Fprintf(out.stderr, "fetching %s from both instances\n", SpecPath)
-	specs, err := fetchBothSpecs(ctx, client, probe, out.stderr)
+	specs, err := fetchBothSpecs(ctx, probe, specFetch{
+		client:   client,
+		settle:   probe.specSettle,
+		progress: out.stderr,
+	})
 	if err != nil {
 		fmt.Fprintln(out.stderr, err)
 		return exitError
@@ -401,6 +411,10 @@ type fetchedSpecs struct {
 // seconds to minutes apart on a cold monolith. A run that fetched exactly once
 // died at exit 2 on a 502 the next attempt would not have seen (run
 // 20260916-094406), so the first fetch settles rather than decides.
+//
+// It is the `run` path's window only. A zero window is one attempt, which is
+// what `probe` wants: it did not boot the instance, so nothing answering means
+// the address it was handed is wrong.
 const specSettleTimeout = 5 * time.Minute
 
 // specSettleInterval is how often the settle re-asks. A variable so a test
@@ -422,30 +436,51 @@ func notServingYet(err error) bool {
 	return true
 }
 
+// specFetch is one instance's first spec fetch: where from, how long it may
+// settle before the fetch decides, and where its progress is written.
+type specFetch struct {
+	client   *http.Client
+	baseURL  string
+	settle   time.Duration
+	progress io.Writer
+}
+
+// keepWaiting reports whether this failure is worth another attempt: only an
+// instance that has not started serving yet, inside the settle window, with
+// the run not already canceled.
+func (fetch specFetch) keepWaiting(ctx context.Context, err error, deadline time.Time) bool {
+	return notServingYet(err) && ctx.Err() == nil && time.Now().Before(deadline)
+}
+
+// report writes the settle's progress: the first wait and every sixth after
+// it, so a long settle says it is still going without filling the log.
+func (fetch specFetch) report(attempt int, err error) {
+	if err == nil {
+		if attempt > 1 {
+			fmt.Fprintf(fetch.progress, "spec from %s served on attempt %d\n", fetch.baseURL, attempt)
+		}
+		return
+	}
+	if attempt == 1 || attempt%6 == 0 {
+		fmt.Fprintf(fetch.progress, "waiting for %s to serve %s (%v)\n", fetch.baseURL, SpecPath, err)
+	}
+}
+
 // fetchSpecSettled fetches one instance's spec, waiting out the window between
 // its lane reporting ready and the application actually serving. Progress is
 // reported rather than going silent, the same way the boot wait does.
-func fetchSpecSettled(
-	ctx context.Context,
-	client *http.Client,
-	baseURL string,
-	progress io.Writer,
-) (map[string]any, []byte, error) {
-	deadline := time.Now().Add(specSettleTimeout)
+func fetchSpecSettled(ctx context.Context, fetch specFetch) (map[string]any, []byte, error) {
+	deadline := time.Now().Add(fetch.settle)
 	for attempt := 1; ; attempt++ {
-		document, body, err := FetchSpec(ctx, client, baseURL)
+		document, body, err := FetchSpec(ctx, fetch.client, fetch.baseURL)
 		if err == nil {
-			if attempt > 1 {
-				fmt.Fprintf(progress, "spec from %s served on attempt %d\n", baseURL, attempt)
-			}
+			fetch.report(attempt, nil)
 			return document, body, nil
 		}
-		if !notServingYet(err) || ctx.Err() != nil || !time.Now().Before(deadline) {
+		if !fetch.keepWaiting(ctx, err, deadline) {
 			return nil, nil, err
 		}
-		if attempt == 1 || attempt%6 == 0 {
-			fmt.Fprintf(progress, "waiting for %s to serve %s (%v)\n", baseURL, SpecPath, err)
-		}
+		fetch.report(attempt, err)
 		select {
 		case <-ctx.Done():
 			return nil, nil, ctx.Err()
@@ -456,16 +491,17 @@ func fetchSpecSettled(
 
 func fetchBothSpecs(
 	ctx context.Context,
-	client *http.Client,
 	probe *probeFlags,
-	progress io.Writer,
+	fetch specFetch,
 ) (*fetchedSpecs, error) {
 	specs := &fetchedSpecs{}
 	var err error
-	if specs.a, specs.aBytes, err = fetchSpecSettled(ctx, client, probe.a, progress); err != nil {
+	fetch.baseURL = probe.a
+	if specs.a, specs.aBytes, err = fetchSpecSettled(ctx, fetch); err != nil {
 		return nil, err
 	}
-	if specs.b, specs.bBytes, err = fetchSpecSettled(ctx, client, probe.b, progress); err != nil {
+	fetch.baseURL = probe.b
+	if specs.b, specs.bBytes, err = fetchSpecSettled(ctx, fetch); err != nil {
 		return nil, err
 	}
 	return specs, nil

@@ -2,6 +2,29 @@
 
 Supersedes `dev/docs/plans/unserved-documented-operations-2026-09-14.md`.
 
+> **Correction, 2026-09-16 (later the same day): the counts below are not
+> evidence.** Every Sep-16 run — r4, r5 and r6 — exited 2 with `CREDENTIAL
+> LOST`, and r5 is the run this document was written from. r4 lost the project
+> key before the first probe; r5 and r6 lost the **organization key** partway
+> through, on the base. apidiff's own verdict says what that means: "this run's
+> counts are not comparable with any other run: probes made after the loss
+> compared a dead credential, and their agreement is not evidence."
+>
+> The cause is found and fixed. Probe #216 issued
+> `DELETE /api/scim/v2/Users/local-dev-admin-user`; the base answered 204, and
+> the organization bearer hangs off that user. Every organization-door probe
+> after it answered 401 **on the base** — teams, groups, webhooks and the
+> organization family, eighteen operations — which reads as the branch having
+> gained behaviour it has not. `self-protection.go` guarded the project, team
+> and organization kinds; a user was not a kind at all. It is one now, with a
+> sacrificial user for destructive probes to be retargeted at, so coverage is
+> kept whole. **Re-run apidiff before trusting any number in this document.**
+>
+> Read `a` as the CANDIDATE (the branch) and `b` as the BASE (main):
+> `cli.go` defines `-a` as "candidate (after)" and `-b` as "base (before)",
+> and `ledger.go` writes `SideStatus` as `[base, candidate]` from `{B, A}`.
+> Reading them the other way round inverts every finding.
+
 **The method changed, and it is stronger.** The Sep-12 and Sep-14 measurements
 diffed two OpenAPI *documents*. This one diffs two *running instances*: an
 `apidiff run` booted `origin/main` (`7b5e10e7ae`) and the branch
@@ -84,55 +107,42 @@ answers success to a dropped write, which is the failure the rule above exists
 to prevent. Making that refusal loud is a one-line change in
 `transport/tracked-event.rest.ts`, which is lane-owned at the time of writing.
 
-## The largest single behavioural cause: family error handlers are bound nowhere
+## A knowable refusal reaching the customer as "unknown"
 
-Seven modules export a per-family REST error handler —
-`trackedEventRestErrorHandler`, `scenarioRestErrorHandler`,
-`scenarioEventErrorHandler`, `simulationRunErrorHandler`, `agentRestErrorHandler`,
-`suitesAliasErrorHandler`, `scimProtocolErrorHandler`. **Every one of them is
-re-exported from its module's `index.ts` and bound by nobody.**
-`apps/api/src/app-rest/api-rest.host.ts:315` mounts every family with the same
-global fallback, `onError: familyErrors`, whose own comment calls it "the
-envelope a family that names none of its own answers a refusal in" — so the
-fallback is doing duty for every family because no family can name one.
+Four operations survive the correction above and are real. The branch answers
+`500`/`503` with `{"code":"internal_error","message":"An unknown error
+occurred"}` where main answered the code the caller can act on:
 
-The framework expects otherwise. `packages/api/src/rest/runtime.ts:632` raises a
-typed refusal precisely so "a family with an `onError` of its own must not
-answer 500 for a request every other family answers 422 for", and
-`credential.ts:349` re-exports `RestErrorHandler` "so a feature package needs no
-dependency on Hono to name the argument its `errorHandler` takes". The seam is
-missing in the middle: `defineRestRouter`'s declaration carries no
-`errorHandler` field, so nothing can travel from the module to the mount.
-
-This is measurable, and it is the branch's largest behavioural regression class.
-Every operation below answers a 500 where main answered the right code, and each
-belongs to a module whose handler is unbound:
-
-| operation | main → branch | family handler, unbound |
+| operation | main | branch |
 | --- | --- | --- |
-| `GET /api/scenarios/{id}` | 404 → **500** | `scenarioRestErrorHandler` |
-| `GET /api/scenarios/{id}/versions` | 404 → **500** | `scenarioRestErrorHandler` |
-| `GET /api/test-suites/{id}` | 404 → **500** | `suitesAliasErrorHandler` |
-| `PATCH /api/test-suites/{id}` | 404 → **500** | `suitesAliasErrorHandler` |
-| `POST /api/test-suites/{id}/run` | 404 → **500** | `suitesAliasErrorHandler` |
-| `DELETE /api/test-suites/{id}` | 200 → **500** | `suitesAliasErrorHandler` |
-| `GET /api/simulation-runs` | 200 → **503** | `simulationRunErrorHandler` |
-| `POST /api/events/track` | 400 → **500** | `trackedEventRestErrorHandler` |
+| `GET /api/scenarios/{id}` | 404 | **500** |
+| `GET /api/test-suites/{id}` | 404 | **500** |
+| `DELETE /api/test-suites/{id}` | 200 | **500** |
+| `GET /api/simulation-runs` | 200 | **503** |
 
-A customer asking for a scenario that does not exist is told "An unknown error
-occurred" instead of 404. Per `dev/docs/best_practices/error-handling.md` that
-is a bug in the feature, not a gap in the error system.
+The cause is the one `dev/docs/best_practices/error-handling.md` already names:
+these routes throw plain `Error` subclasses — `ScenarioRestNotThereError
+extends Error`, `SuiteAliasNotFoundError extends Error` — for causes we know
+and the caller can act on. A plain `Error` correctly degrades to "unknown", so
+the boundary is behaving exactly as designed; what is missing is the
+`HandledError`.
 
-**The fix is one seam, not eight ports.** Give the declaration an
-`errorHandler` (the handlers already have the right shape,
-`(boundary: RestErrorHandler) => RestErrorHandler`), and make the host use
-`declaration.errorHandler?.(familyErrors) ?? familyErrors` at
-`api-rest.host.ts:315`. Files are clean as of this writing except
-`tracked-event.rest.ts` and `gateway-platform.rest.ts`, which are lane-owned.
-Worth its own lane: it needs one design choice — whether the handler attaches on
-the router builder before `.build()` or on `defineServerModule` beside
-`withTransportFacts` — because today each handler is written *after* its
-router's `.build()` call.
+**The fix is to throw a `HandledError` with a stable `code` where we know the
+cause, and nothing else.** No new seam, no per-family renderer: throwing a
+handled error is all that is needed to return an error properly, and the
+canonical boundary already renders it with the code, meta and remediation
+intact. Each new code needs its entry in `packages/handled-error/src/app-codes.ts`
+and in the presentation registry, in the same change.
+
+The eleven per-family REST error handlers the modules export
+(`trackedEventRestErrorHandler`, `scenarioRestErrorHandler`,
+`suitesAliasErrorHandler` and the rest) are bound by nothing but their own
+tests. They predate that rule and answer bespoke `{ error }` bodies. They are
+residue to delete once the refusals above are handled errors — not a gap to
+wire up. An earlier draft of this document proposed adding a `withErrorHandler`
+seam to carry them to the mount; that was rejected, and correctly: the platform
+is deliberately consistent and simple, and this would have entrenched the shape
+the house rule replaced.
 
 ## Reclassified
 

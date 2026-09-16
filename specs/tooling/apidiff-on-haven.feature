@@ -179,3 +179,14 @@ Feature: apidiff boots its instances through haven
       Then one JSON line is appended to <work-root>/findings.jsonl naming its surface, name, kind, module, detail and capturedAt
       And the line is flushed before the next operation is probed, so a reader tailing the file sees it immediately
       And when the run finishes, a final line reports kind "run-complete" with the totals by kind
+
+  Rule: A probe never destroys the row a credential hangs off
+
+    @unit
+    Scenario: A delete aimed at the user behind the organization bearer is retargeted
+      Given the union documents a directory route that deletes a user by id
+      And the run's organization bearer token hangs off the seeded admin user
+      When the probe resolves that route's id to the seeded admin user
+      Then both sides are retargeted at the sacrificial user instead
+      And the probe still travels the same route with the same credential, so coverage is kept whole
+      And the organization bearer still authenticates when the run re-reads it at the end

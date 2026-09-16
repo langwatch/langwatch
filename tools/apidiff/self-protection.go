@@ -36,6 +36,7 @@ const (
 	seededProjectID      = "local-dev-project"
 	seededOrganizationID = "local-dev-organization"
 	seededTeamID         = "local-dev-team"
+	seededAdminUserID    = "local-dev-admin-user"
 )
 
 // identityKind groups rows that are interchangeable as a destructive probe's
@@ -49,6 +50,7 @@ const (
 	identityProject      identityKind = "project"
 	identityTeam         identityKind = "team"
 	identityOrganization identityKind = "organization"
+	identityUser         identityKind = "user"
 )
 
 // protectedIdentity is one row the RUN ITSELF depends on: its kind, and what
@@ -90,6 +92,17 @@ var protectedIdentities = map[string]protectedIdentity{
 		kind: identityOrganization,
 		role: "the organization holding the foreign-organization credential",
 	},
+	// Run r6 of 2026-09-16 deleted this row. Probe #216 issued DELETE
+	// /api/scim/v2/Users/local-dev-admin-user, the base answered 204, and the
+	// organization bearer hangs off that user — so every organization-door
+	// probe after it answered 401 on the base: teams, groups, webhooks and
+	// the organization family itself, eighteen operations reading as
+	// differences that were nothing of the kind. The project kinds above were
+	// protected and survived; a user was not a kind at all.
+	seededAdminUserID: {
+		kind: identityUser,
+		role: "the user this run's organization bearer token hangs off",
+	},
 }
 
 // sacrificialIdentities names the throwaway row a destructive probe is aimed
@@ -100,6 +113,11 @@ var protectedIdentities = map[string]protectedIdentity{
 var sacrificialIdentities = map[identityKind]string{
 	identityProject: fixtureDoomedProjectID,
 	identityTeam:    fixtureDoomedTeamID,
+	// A user twin IS a substitute where an organization twin is not: nothing
+	// authenticates as the throwaway user, so destroying it costs the run
+	// nothing, while the route, the credential and the authorization decision
+	// are the ones under test.
+	identityUser: fixtureDoomedUserID,
 }
 
 // selfDestructiveSkipPrefix opens every skip this file emits. The ledger reads
