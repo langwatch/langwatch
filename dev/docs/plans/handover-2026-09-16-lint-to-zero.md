@@ -70,6 +70,32 @@ the method is not nullable, or repositories need an explicit carve-out.
 Nothing else collides: the remainder of the rule only governs methods that can
 answer with absence, and the new convention has none.
 
+### Two documents still teach the old convention - they were not editable
+
+`de197cba63` made the new convention followable: `fallible-result-naming` no
+longer refuses a repository `get*` whose declared result is neither nullable nor
+an array, which is exactly the one-or-throw shape. Spec, rule and tests moved
+together; 66 findings closed and none opened. `CLAUDE.md` now states the rule.
+
+**Still stating the old convention, because another session holds them dirty:**
+
+    .claude/skills/architecture-guide/references/server.md:97
+      "Absence is a `find*` method returning `undefined`, and only a `find*`
+       method may carry a nullable result."
+      and :111 "Repositories use `findAll` / `findById` / ..."
+
+    dev/docs/lint-rules.md   (the rendered rule reference)
+
+The first is the one that matters: it is what the `module` and `architecture-guide`
+skills put in front of every lane, so until it is corrected a lane is told the
+superseded rule by the guide and the corrected rule by CLAUDE.md at the same
+time. Fix it the moment that file is free.
+
+Note the rule change does **not** flip the family. Enforcing the new convention
+outright would turn all ~1,217 existing nullable `find*` methods into findings,
+which is the opposite of the decision. The rule still prescribes `find*` for a
+nullable result; it simply stops blocking `get*` where absence is impossible.
+
 ### The decision wave 10 raised, and it is not a rename
 
 `modules/trace` is the inverse of `modules/gateway`. Gateway's findings were
