@@ -365,9 +365,31 @@ Narrowing the rule to exempt the lint plugin is defensible - `oxlint-rules` runs
 inside the linter, not a product process, so "receive typed config" does not
 apply to it - but **changing a rule so that your own change passes is the exact
 move this drive exists to catch**, and a coordinator must not take it alone. The
-code and the spec scenario were reverted to HEAD byte-for-byte rather than
-shipped. Ask before re-attempting; the alternative is accepting that the
-suppressed half stays uncountable.
+code and the spec scenario were reverted to HEAD byte-for-byte rather than shipped.
+
+### The sharper statement of the defect, found after that revert
+
+**Two readers of the same baseline file disagree on its schema.**
+
+`packages/architecture-enforcer/src/baseline.ts` - which governs the shape
+policies - has `liveKeys`, and it drops any entry whose `expires` date has
+passed, unconditionally, using `nowInstant()`.
+`packages/oxlint-rules/src/baseline.mjs` - which the 28 oxlint rules consult -
+has **no `expires` handling at all**; the word does not occur in the file. Its
+`validateBaseline` requires `measured` and knows nothing else.
+
+So the ledger's own schema already describes a dated ratchet, one reader
+implements it, and the reader that matters for 6,925 rows does not. That is an
+inconsistency to remove, not a feature to invent - which makes it a much easier
+decision than the environment-variable bypass, and it needs no bypass at all.
+
+**Two things to know before doing it.** It changes nothing on the day it lands:
+zero of the 6,925 entries carry an `expires`, so the ratchet only starts working
+once someone decides a schedule - and that schedule is a real decision, because
+every date chosen is a day findings reappear. And `oxlint-rules` does not depend
+on `@langwatch/time` (the one match in that package is message prose, not an
+import), so the clock read needs either that dependency or a `temporal-only`
+violation. Do not reach for `new Date()` there.
 
 Two protections that DO already exist, and should not be re-invented: the oxlint
 baseline is **shrink-only** - `growth.added` in
