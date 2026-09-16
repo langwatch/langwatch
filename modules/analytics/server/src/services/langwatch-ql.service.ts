@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   LangWatchQLBudgetOverflowMode,
   LangWatchQLProtections,
@@ -177,13 +178,13 @@ export interface LangWatchQLServiceDependencies {
   readonly views?: readonly LangWatchQLViewDefinition[];
   readonly limits?: LangWatchQLResultLimits;
   /** The clock the diagnostics ask "has this period finished yet" against. */
-  readonly now?: () => Date;
+  readonly now?: () => Instant;
 }
 
 export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly limits: LangWatchQLResultLimits;
-  private readonly now: () => Date;
+  private readonly now: () => Instant;
   private readonly validation = LangWatchQLValidationService.create();
 
   /** Releases the transport the executor holds, where it holds one. */
@@ -194,7 +195,7 @@ export class LangWatchQLService {
   private constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
     this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
-    this.now = deps.now ?? (() => new Date());
+    this.now = deps.now ?? nowInstant;
   }
 
   static create(deps: LangWatchQLServiceDependencies): LangWatchQLService {

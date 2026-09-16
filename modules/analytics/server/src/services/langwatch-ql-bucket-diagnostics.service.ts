@@ -2,6 +2,7 @@
  * The time-bucket rules: whether the periods a bucketed answer compares cover
  * the same span, and whether any bucket is missing from the axis.
  */
+import { Temporal, type Instant } from "@langwatch/time";
 import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLDiagnosticsInput } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
@@ -77,14 +78,14 @@ function comparisonPeriodDiagnostics({
   column: string;
   buckets: readonly number[];
   width: number;
-  now: Date;
+  now: Instant;
 }): LangWatchQLDiagnostic[] {
   const misaligned = buckets
     .slice(1)
     .map((value, index) => value - buckets[index]!)
     .filter((gap) => !isWholeMultiple(gap, width));
   const newest = buckets.at(-1)!;
-  const unfinished = newest + width > now.getTime();
+  const unfinished = newest + width > now.epochMilliseconds;
 
   if (misaligned.length === 0 && !unfinished) {
     return [];
@@ -107,7 +108,9 @@ function comparisonPeriodDiagnostics({
         /** The period length the rest of the result is bucketed at, in milliseconds. */
         periodMs: width,
         /** Start of the newest period, as the result reported it. */
-        newestPeriodStart: new Date(newest).toISOString(),
+        newestPeriodStart: Temporal.Instant.fromEpochMilliseconds(newest).toString({
+          smallestUnit: "millisecond",
+        }),
         /** How many gaps between periods are not a whole number of periods. */
         unevenPeriodCount: misaligned.length,
       },
@@ -143,7 +146,9 @@ function missingBucketDiagnostics({
     }
 
     missing += skipped;
-    gapsAfter.push(new Date(previous).toISOString());
+    gapsAfter.push(
+      Temporal.Instant.fromEpochMilliseconds(previous).toString({ smallestUnit: "millisecond" }),
+    );
   });
   if (missing === 0) {
     return [];

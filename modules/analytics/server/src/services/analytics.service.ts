@@ -1,5 +1,5 @@
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
-import { addDays, differenceInCalendarDays } from "@langwatch/time";
+import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
 import {
   analyticsEvaluationReadInputSchema,
   analyticsEvaluationRollupAppendBatchInputSchema,
@@ -115,7 +115,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         const cacheKey = JSON.stringify({ input: parsed, options: options ?? null });
         const cached = this.cache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
+        if (cached && cached.expiresAt > nowInstant().epochMilliseconds) {
           return cached.result;
         }
 
@@ -123,7 +123,7 @@ export class AnalyticsService extends AnalyticsServiceContract {
         const result = await this.readTimeseries(parsed, options);
         this.cache.set(cacheKey, {
           result,
-          expiresAt: Date.now() + TIMESERIES_CACHE_TTL_MS,
+          expiresAt: nowInstant().epochMilliseconds + TIMESERIES_CACHE_TTL_MS,
         });
 
         return result;

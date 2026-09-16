@@ -7,6 +7,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { Temporal } from "@langwatch/time";
 import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -1303,7 +1304,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
           },
         }),
         database,
-        now: () => new Date(`${DAY.unfinishedPeriod}T12:30:00Z`),
+        now: () => Temporal.Instant.from(`${DAY.unfinishedPeriod}T12:30:00Z`),
       });
       try {
         const result = await ask(sql);

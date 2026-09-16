@@ -5,6 +5,7 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import { fromDate, type Instant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 import type {
@@ -73,8 +74,8 @@ export interface DashboardWidget {
   readonly name: string;
   /** Already parsed against the versioned schema — never raw `Json`. */
   readonly definition: DashboardWidgetDefinition;
-  readonly createdAt: Date;
-  readonly updatedAt: Date;
+  readonly createdAt: Instant;
+  readonly updatedAt: Instant;
   /** `null` when the widget is not on a dashboard — the playground page is not one. */
   readonly dashboardId: string | null;
   readonly gridColumn: number;
@@ -326,8 +327,8 @@ export class DashboardWidgetService {
       projectId: row.projectId,
       name: row.name,
       definition: parsed.data,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      createdAt: fromDate(row.createdAt),
+      updatedAt: fromDate(row.updatedAt),
       dashboardId: row.dashboardId,
       gridColumn: row.gridColumn,
       gridRow: row.gridRow,

@@ -7,6 +7,7 @@
 
 import { Box, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { Temporal, toDate } from "@langwatch/time";
 
 // The leaf module, never the barrel: `timeWindow.ts` is import-free precisely
 // so the browser can read the same names and format the database is bound with,
@@ -55,8 +56,12 @@ interface WindowText {
 
 function textOf(window: LangWatchQLTimeWindowValues): WindowText {
   return {
-    start: formatLangWatchQLDateTimeParameter(new Date(window.start)),
-    end: formatLangWatchQLDateTimeParameter(new Date(window.end)),
+    start: formatLangWatchQLDateTimeParameter(
+      toDate(Temporal.Instant.fromEpochMilliseconds(window.start)),
+    ),
+    end: formatLangWatchQLDateTimeParameter(
+      toDate(Temporal.Instant.fromEpochMilliseconds(window.end)),
+    ),
   };
 }
 

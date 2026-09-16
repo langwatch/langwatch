@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { Temporal, type Instant } from "@langwatch/time";
 
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
@@ -27,7 +28,7 @@ const DATABASE = "analytics";
 const NO_GATED_COLUMNS: readonly string[] = [];
 
 /** Well after every timestamp the fixtures use, so no period is unfinished. */
-const LONG_AFTER = new Date("2026-06-01T00:00:00Z");
+const LONG_AFTER = Temporal.Instant.from("2026-06-01T00:00:00Z");
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -47,7 +48,7 @@ function diagnose({
   columns?: readonly LangWatchQLColumn[];
   rows?: readonly Record<string, unknown>[];
   truncated?: boolean;
-  now?: Date;
+  now?: Instant;
 }): readonly LangWatchQLDiagnostic[] {
   const validation = validateLangWatchQL({
     sql,
@@ -407,7 +408,7 @@ describe("given a LangWatchQL query that ran", () => {
         ],
         // Half an hour into the 12:00 bucket, which therefore holds half a
         // period's data against the whole periods before it.
-        now: new Date("2026-02-20T12:30:00Z"),
+        now: Temporal.Instant.from("2026-02-20T12:30:00Z"),
       });
 
       expect(codesOf(diagnostics)).toEqual(["INCOMPLETE_COMPARISON_PERIOD"]);
@@ -429,7 +430,7 @@ describe("given a LangWatchQL query that ran", () => {
               hourlyBucket("2026-02-20 11:00:00"),
               hourlyBucket("2026-02-20 12:00:00"),
             ],
-            now: new Date("2026-02-20T13:00:00Z"),
+            now: Temporal.Instant.from("2026-02-20T13:00:00Z"),
           }),
         ),
       ).toEqual([]);
@@ -506,7 +507,7 @@ describe("given a LangWatchQL query that ran", () => {
         ],
         // Past the end of June, so the newest period has closed and the
         // unfinished-period rule stays out of what this test is about.
-        now: new Date("2026-07-15T00:00:00Z"),
+        now: Temporal.Instant.from("2026-07-15T00:00:00Z"),
       });
 
       expect(codesOf(diagnostics)).toEqual(["MISSING_TIME_BUCKETS"]);

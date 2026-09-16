@@ -2,6 +2,7 @@
  * The LangWatchQL executor over a real ClickHouse endpoint.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { nowInstant } from "@langwatch/time";
 import {
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLUnavailableError,
@@ -97,7 +98,7 @@ export class ClickHouseLangWatchQLExecutorAdapter extends LangWatchQLExecutor {
     tenantCapability,
     limits,
   }: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
 
     try {
       const resultSet = await this.client.query({
@@ -126,7 +127,7 @@ export class ClickHouseLangWatchQLExecutorAdapter extends LangWatchQLExecutor {
         },
       };
     } catch (error) {
-      throw refusalFor({ error, durationMs: Date.now() - startedAt });
+      throw refusalFor({ error, durationMs: nowInstant().epochMilliseconds - startedAt });
     }
   }
 

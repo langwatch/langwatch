@@ -4,7 +4,7 @@
  * endpoints.
  */
 
-import { differenceInCalendarDays, nowInstant, subDays } from "@langwatch/time";
+import { differenceInCalendarDays, nowInstant, subDays, toDate } from "@langwatch/time";
 import type React from "react";
 import {
   createContext,
@@ -262,7 +262,7 @@ function useSavedViewsInternal() {
       if (period) {
         if (period.relativeDays !== undefined) {
           endDate = nowInstant().toString({ fractionalSecondDigits: 3 });
-          startDate = subDays(new Date(), period.relativeDays - 1).toISOString();
+          startDate = subDays(nowInstant().epochMilliseconds, period.relativeDays - 1).toISOString();
         } else if (period.startDate && period.endDate) {
           startDate = period.startDate;
           endDate = period.endDate;
@@ -398,8 +398,8 @@ function useSavedViewsInternal() {
             period: optimisticView.period ?? null,
             query: optimisticView.query ?? null,
             order: old.length,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: toDate(nowInstant()),
+            updatedAt: toDate(nowInstant()),
           } as (typeof old)[number],
         ];
       });

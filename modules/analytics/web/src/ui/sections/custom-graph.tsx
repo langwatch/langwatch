@@ -1469,9 +1469,9 @@ function MonitorGraph({
               }
               // Otherwise show date range
               return `${format(
-                new Date(filterParams.startDate),
+                filterParams.startDate,
                 "MMM d",
-              )} - ${format(new Date(filterParams.endDate), "MMM d, yyyy")}`;
+              )} - ${format(filterParams.endDate, "MMM d, yyyy")}`;
             })()}
         </Text>
       </VStack>

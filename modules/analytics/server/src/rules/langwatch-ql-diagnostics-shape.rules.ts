@@ -3,6 +3,7 @@
  *
  * The rules themselves are the `langwatch-ql-*-diagnostics` services.
  */
+import type { Instant } from "@langwatch/time";
 import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
 import type { LangWatchQLResultLimits } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
@@ -59,7 +60,7 @@ export interface LangWatchQLDiagnosticsInput {
    * the clock so that the answer is a function of its inputs — the same result at the same
    * instant always produces the same diagnostics.
    */
-  readonly now: Date;
+  readonly now: Instant;
 }
 
 // ---------------------------------------------------------------------------

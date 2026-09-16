@@ -6,7 +6,7 @@
 
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { format } from "@langwatch/time";
+import { format, nowInstant, toDate } from "@langwatch/time";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 import { Popover } from "@langwatch/design-system/popover";
@@ -67,7 +67,7 @@ export function AnalyticsPeriodPicker({
 
   const getDateRangeLabel = () => {
     if (mode === "relative") {
-      const matchedByDays = presetForRange(startDate, endDate, new Date());
+      const matchedByDays = presetForRange(startDate, endDate, toDate(nowInstant()));
       if (matchedByDays) return matchedByDays.label;
 
       const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
