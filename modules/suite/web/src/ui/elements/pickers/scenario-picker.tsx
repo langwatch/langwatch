@@ -1,8 +1,7 @@
 /**
- * Picker component for selecting scenarios in a suite form.
- *
- * Renders: search input with inline "Add Scenario" button, label filter chips,
- * scrollable checkbox list, and a footer with count + select all/clear.
+ * Picker for selecting scenarios in a suite form: search with inline "Add
+ * Scenario", label filter chips, a checkbox list, and a footer with count
+ * and select-all/clear.
  */
 
 import { Badge, Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";

@@ -1,13 +1,7 @@
 /**
- * The `/api/projects` family on a runtime that stands in for the deployment:
- * one organization door, the credential fact, the route-scoped permission the
- * by-id routes ask, and the flat legacy envelope this family publishes.
- *
- * The door is handed its application through the SAME operations-only
- * feature-API proxy the composition hands it — not the stub object directly —
- * so a route naming an operation the application does not serve fails here the
- * way it fails in production. That the real `ProjectApp` serves them is
- * `project.rest.composition.unit.test.ts`.
+ * `/api/projects` on a runtime standing in for the deployment, handed its
+ * app through the SAME operations-only proxy the composition uses, so a
+ * call the app doesn't serve fails here as it does in production.
  */
 import {
   createRestRuntime,

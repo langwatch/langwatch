@@ -1,9 +1,7 @@
 /**
- * `/api/projects` — the organization's own projects, and the ingestion
- * credential of each. The door resolves the ORGANIZATION, so the five by-id
- * routes ask their permission at the project the path names instead.
- * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
- *       specs/api-keys/project-key-read-access.feature
+ * `/api/projects` — the organization's own projects and each one's ingestion
+ * credential. The door resolves the ORGANIZATION; the five by-id routes ask
+ * permission at the project the path names. Spec: specs/api-keys/project-key-read-access.feature
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
@@ -47,19 +45,9 @@ import {
 } from "../rules/project-openapi.rules.ts";
 
 /**
- * What the management door reaches, as flat operations the module's own
- * application serves.
- *
- * Every member is implemented by `ProjectApp`, which declares `implements
- * ProjectManagementApi` — so a door that asks for something the composition
- * does not supply fails the build rather than the first request. It used to
- * ask for two accessors (`projects()`, `apiKeys()`) that no application had,
- * and every route in this family answered 500.
- *
- * The two reads are taken straight off {@link ProjectApi} so they cannot drift
- * from the contract. The five writes are declared here because they are this
- * door's own question — an ORGANIZATION credential acting on one of that
- * organization's projects — and no peer module asks it.
+ * What the management door reaches: flat operations `ProjectApp` serves via
+ * `implements ProjectManagementApi`, so an unsupplied member fails the build
+ * — not the first request. Two reads mirror {@link ProjectApi}; five are this door's own.
  */
 export interface ProjectManagementApi extends Pick<
   ProjectApi,
@@ -67,9 +55,8 @@ export interface ProjectManagementApi extends Pick<
 > {
   /**
    * Provisions a project in this organization. Distinct from
-   * `ProjectApi.create(input, by)` because a management credential may be a
-   * service key, which acts as nobody: the actor here is nullable and that
-   * one's is not.
+   * `ProjectApi.create` because a management credential may be a service key
+   * (acts as nobody) — the actor here is nullable; that one's is not.
    */
   createInOrganization(
     input: Readonly<{
@@ -175,11 +162,9 @@ const LISTING_ANSWERS_WHAT_THE_KEY_REACHES =
   "the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused";
 
 /**
- * Why the two base-key routes answer nothing rather than check a permission.
- * This door is reached with an ORGANIZATION token, and the base key outlives
- * every membership and attributes nothing, so trading one credential for it is
- * refused for all of them. A permission gate would be worse than useless: an
- * administrator told "insufficient permissions" goes and widens their token.
+ * The two base-key routes answer nothing rather than check a permission —
+ * the base key outlives every membership and attributes to nobody, so a
+ * gate would be worse than useless: refused, an admin just widens their token.
  */
 const BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN =
   "the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller";

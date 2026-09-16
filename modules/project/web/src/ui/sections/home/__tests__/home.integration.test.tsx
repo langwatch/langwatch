@@ -87,12 +87,9 @@ import {
 } from "../../../../model/project-home-host.ts";
 
 /**
- * The narrowest host the page can be drawn against.
- *
- * The composition itself is stubbed above — this suite is about the ORDER the
- * three homes resolve in, not about the gates — so what the host has to answer
- * is the organization the "Considering LangWatch?" ask is read for, and
- * fail-closed nothings for the rest.
+ * The narrowest host the page can be drawn against. The composition is
+ * stubbed above — this suite is about the ORDER homes resolve in, not the
+ * gates — so it answers only the org for "Considering LangWatch?", nothing else.
  */
 class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {

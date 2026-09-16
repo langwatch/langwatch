@@ -72,12 +72,9 @@ export { PostgresSuiteRepositories } from "./repositories/prisma/prisma.suite.re
 export type { SuiteRepositories } from "./repositories/suite.repositories.ts";
 
 /**
- * The three REST families this feature declares and carries on {@link suiteServer}:
- * the two published v1 families — a run plan is what you run, a test suite is
- * what it runs against — and the deprecated `/api/suites` alias that predates
- * the split. Each publishes its own links through the app's own `platformUrl`,
- * so none takes a builder. All three are served from the same {@link SuiteApp}
- * the tRPC surface is.
+ * The three REST families on {@link suiteServer}: two published v1
+ * families (a run plan you run, a test suite you run against), and the
+ * deprecated `/api/suites` alias — all three serve from the same {@link SuiteApp}.
  */
 export { createRunPlansRest } from "./transport/run-plans.rest.ts";
 export { createTestSuitesRest } from "./transport/test-suites.rest.ts";

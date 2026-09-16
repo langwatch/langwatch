@@ -1,19 +1,7 @@
 /**
  * @vitest-environment node
- * The `/api/projects` family against the application the COMPOSITION builds,
- * not a stub shaped like the door's witness.
- *
- * This is the test the family did not have. Every route here answered 500 in
- * production while the stubbed suite stayed green, because the stub supplied
- * the two accessors the door asked for by hand and `ProjectApp` supplied
- * neither: the operations-only feature-API proxy threw
- * `TypeError: Feature API "project" exposes operations only: projects is not
- * callable` on the first member access, and the boundary degraded that to a
- * generic `internal_error`.
- *
- * So: a real `ProjectApp`, over a real repository, bound to its module-API
- * token and reached through the same proxy `transport-mounting` uses.
- *
+ * `/api/projects` against the real `ProjectApp`, not a stub — the stub
+ * passed while production 500'd because the proxy refuses uncomposed calls.
  * Spec: specs/projects/projects-management-door.feature
  */
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
@@ -35,14 +23,9 @@ const OTHER_ORGANIZATION_ID = "organization-other";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
 
 /**
- * The four peer applications this family never reaches, as the feature-API
- * references they really are: declared and deliberately never bound, so any
- * call refuses by name instead of quietly answering. No cast, and no
- * hand-written twin of another module's contract.
- *
- * AuthZ is among them: the management door authenticates an organization
- * credential and enforces its own scope, so nothing here probes a permission.
- * The browser door is the one that does.
+ * The four peer applications this family never reaches — declared, never
+ * bound, so a call refuses by name instead of answering quietly. AuthZ is
+ * among them: this door authenticates its own credential; the browser door probes permissions.
  */
 function unreachablePeers() {
   const apis = new LocalFeatureApis();

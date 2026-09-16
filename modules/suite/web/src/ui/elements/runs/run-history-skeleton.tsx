@@ -1,8 +1,7 @@
 /**
  * Loading placeholder for the run history list, mirroring the real layout
- * (sticky run-row header followed by a grid of scenario cards) so content
- * doesn't jump when data lands — same approach as the Traces V2 table's
- * skeleton rows.
+ * (sticky run-row header, grid of scenario cards) so content doesn't jump
+ * when data lands — same approach as the Traces V2 table's skeleton rows.
  */
 
 import { Box, Grid, HStack, Skeleton, VStack } from "@chakra-ui/react";

@@ -15,12 +15,9 @@ export type PlanConfig = {
 };
 
 /**
- * Orders targets so "dev vs prod" and "prod vs dev" are one config.
- *
- * Stable and total: `type`, then the reference id, then the parameter
- * overrides, all of which every target carries (see `targetSortKey`).
- * Comparison columns therefore keep their order between runs of the same
- * plan, and a plain agent sorts before the same agent with overrides.
+ * Orders targets so "dev vs prod" and "prod vs dev" are one config: stable
+ * and total by `type`, reference id, then overrides (see `targetSortKey`).
+ * Columns keep order between runs; a plain agent sorts before its overridden twin.
  */
 export function sortSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
   return [...targets].sort((left, right) =>

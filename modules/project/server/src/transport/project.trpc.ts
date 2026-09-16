@@ -1,9 +1,7 @@
 /**
  * The server half of `project.*`: one project's lifecycle and its settings.
- * Every deployment capability the surface needs beside the project's own is
- * named on {@link ProjectBrowserApi}, and nothing here constructs a transport
- * error — the project's refusals carry their own status.
- * Spec: modules/project/specs/project-service.feature.
+ * Every other deployment capability is named on {@link ProjectBrowserApi};
+ * nothing here constructs a transport error. Spec: modules/project/specs/project-service.feature.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
@@ -49,9 +47,8 @@ export interface ProjectBrowserApi {
   encryptProjectSecret(value: string): string;
   /**
    * Whether `by` holds `permission` at a scope the declared check did not
-   * resolve: the team or organization a create names, and the OTHER project an
-   * archive acts on. The caller travels as an argument because the process's
-   * one application instance answers it, for every request in flight.
+   * resolve — the team/organization a create names, or the OTHER project an
+   * archive acts on. `by` travels as an argument: one app instance answers every request.
    */
   probePermission(input: {
     permission: AuthzPermission;
@@ -82,10 +79,9 @@ export interface ProjectBrowserApi {
 export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>("project");
 
 /**
- * `create`'s standing depends on what was asked for, so no single permission
- * at one scope states it: creating INTO a team asks that team for
- * `project:create`, and creating a team alongside asks the organization for
- * `organization:manage`. The handler resolves the tier and asks.
+ * `create`'s standing depends on what was asked for: creating INTO a team
+ * asks that team for `project:create`; creating a team alongside asks the
+ * organization for `organization:manage`. The handler resolves the tier.
  */
 const CREATE_RESOLVES_ITS_OWN_TIER =
   "creating INTO a team asks that team for project:create; creating a team alongside asks the organization for organization:manage, and which of the two was asked for is only known once the input is parsed";
@@ -131,12 +127,9 @@ export const projectTrpcTransport = defineTrpcRouter(ProjectBrowserApi, projectT
   })
 
   /**
-   * The base key authenticates every ingestion call the project accepts, so
-   * revealing it is an administrative act and is gated the same as rotating
-   * it. `project:update` is the contributor's permission — it lets somebody
-   * rename a project, and it used to hand them a credential that outlives
-   * their membership and that nothing on the ingestion path can attribute
-   * back to them.
+   * The base key authenticates every ingestion call, so revealing it is
+   * gated like rotating it. `project:update` (a contributor permission) used
+   * to hand out a credential that outlives membership and can't be attributed back.
    */
   .procedure("getProjectAPIKey")
   .withPermission("project:manage")

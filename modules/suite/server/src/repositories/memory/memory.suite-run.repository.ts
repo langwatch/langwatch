@@ -39,11 +39,9 @@ export class MemorySuiteRunRepository
   }
 
   /**
-   * The tenant's runs for one scenario set, newest first.
-   *
-   * `default` and the empty string name the same set — a run recorded before
-   * sets were named carries neither — so a history read for one finds the
-   * other, exactly as the live store's `IN` filter does.
+   * The tenant's runs for one scenario set, newest first. `default` and the
+   * empty string name the same set (a run recorded before sets were named
+   * carries neither), so a read for one finds the other, as the live store's `IN` filter does.
    */
   async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
     const wanted = new Set(

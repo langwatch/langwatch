@@ -17,11 +17,9 @@ import { describe, expect, it } from "vitest";
 import { suiteServer } from "../../suite.server.ts";
 
 /**
- * The one member `SuiteApp` declares it reads (`suite.app.ts`,
- * `reads("clickhouse")`). Installing on the memory tier never reaches a store,
- * so the boot needs the member to EXIST and nothing more — a stub that refuses
- * on use proves that without opening a client, and turns a reach into a named
- * failure rather than a silent one.
+ * The one member `SuiteApp` declares reading (`reads("clickhouse")`).
+ * Installing on the memory tier never reaches a store, so boot needs the
+ * member to EXIST — a stub that refuses on use proves it, naming the failure.
  */
 function membersWithoutStores() {
   return {

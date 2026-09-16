@@ -14,9 +14,8 @@ export interface CodingAgentActivityRepository {
 
 /**
  * How stale a project's recorded coding-agent activity has to be before the
- * next fold writes it again. A shorter window turns a busy fleet's session
- * folds into Postgres traffic; a longer one leaves the settings surfaces
- * reading an activity date another graph has already moved.
+ * next fold writes it again — shorter turns a busy fleet's folds into
+ * Postgres traffic, longer leaves settings surfaces reading a stale date.
  */
 export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 

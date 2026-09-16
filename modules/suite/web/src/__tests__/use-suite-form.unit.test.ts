@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Unit tests for the useSuiteForm hook.
- *
- * Tests validation logic, toggle actions, filtering, and form data shape.
+ * Unit tests for `useSuiteForm`: validation logic, toggle actions,
+ * filtering, and form data shape.
  */
 
 import { act, renderHook } from "@testing-library/react";

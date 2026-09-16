@@ -1,9 +1,8 @@
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 /**
- * The rollout flag the signal-focused home hangs off, and the only lever
- * that switches the composition. Registered with `defaultValue: false`, so
- * every project keeps the classic home until the flag is explicitly turned
- * on for a project, an organization, or a user.
+ * The rollout flag the signal-focused home hangs off — the only lever that
+ * switches composition. `defaultValue: false` keeps every project on
+ * classic until the flag is turned on for a project, org, or user.
  */
 export const SIGNAL_FOCUSED_HOME_FLAG = "release_ui_home_signal_focused_enabled" as const;
 
@@ -13,11 +12,9 @@ export function useShowSignalFocusedHome(): boolean {
 }
 
 /**
- * The same gate, with its uncertainty exposed.
- *
- * `enabled` reads `false` while the flag is in flight, which is right for
- * hiding a control and wrong for picking a page: this composition wins
- * outright, so nothing else can be decided until it has answered.
+ * The same gate, with its uncertainty exposed. `enabled` reads `false`
+ * while the flag is in flight — right for hiding a control, wrong for
+ * picking a page: this composition wins outright, so nothing else decides until it answers.
  */
 export function useSignalFocusedHomeVisibility(): {
   show: boolean;

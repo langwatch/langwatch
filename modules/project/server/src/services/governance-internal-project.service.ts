@@ -17,12 +17,9 @@ export abstract class ProjectOldestTeam {
 }
 
 /**
- * The two project reads Governance's ingestion pull makes.
- *
- * `ProjectService` satisfies it, and so does the service below. Naming the
- * pair is what lets a background process pull a customer's usage without
- * composing a capability that additionally wants an LWQL key map, a
- * stored-object runtime and a diagnostics sink.
+ * The two project reads Governance's ingestion pull makes. `ProjectService`
+ * satisfies it, and so does the service below — naming the pair lets a
+ * background process pull usage without composing a heavier capability.
  */
 export abstract class GovernanceInternalProject {
   abstract findWithTeam(id: string): Promise<ProjectWithTeam | null>;

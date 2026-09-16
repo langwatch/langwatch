@@ -2,22 +2,18 @@ import { useSignalFocusedHomeVisibility } from "./use-show-signal-focused-home.t
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
- * Which of the three home compositions renders.
- *
- * `signal-focused` is the briefing sheet leading the page, `langy` is the lit
- * block with a real composer in it — the command-bar home — `classic` is
- * banners + traces overview + recent work + onboarding.
+ * Which of the three home compositions renders: `signal-focused` (briefing
+ * sheet leads), `langy` (command-bar home with a real composer), or
+ * `classic` (banners, traces overview, recent work, onboarding).
  */
 export type HomeComposition =
   | "signal-focused"
   | "langy"
   | "classic"
   /**
-   * Not known yet. Every gate below reports `false` while it loads, so the
-   * page would otherwise resolve to `classic`, paint it, and then swap to the
-   * real composition a beat later — the reader watches their home page change
-   * shape under them on every cold load. The page renders one skeleton for
-   * this and commits to nothing.
+   * Not known yet. Every gate reports `false` while loading, so the page
+   * would resolve to `classic`, paint it, then swap — the reader would watch
+   * their home change shape on every cold load. One skeleton renders instead.
    */
   | "undecided";
 

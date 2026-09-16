@@ -80,11 +80,9 @@ type ProjectSetup = FeatureSetup<
 >;
 
 /**
- * The part of the browser door's witness this application answers today. The
- * three left out are other verticals' answers — trace protections, the Langy
- * key mint, the audit record — and `apps/worker` installs this module beside
- * none of them, so naming one as a dependency refuses its boot. Who supplies
- * them: `.claude/handoffs/project-trpc-witness-alignment.md`.
+ * The browser door's witness answered today. Trace protections, the Langy
+ * key mint and the audit record are excluded — naming one as a dependency
+ * refuses boot in `apps/worker`; see `.claude/handoffs/project-trpc-witness-alignment.md`.
  */
 type ServedBrowserApi = Pick<
   ProjectBrowserApi,
@@ -92,12 +90,9 @@ type ServedBrowserApi = Pick<
 >;
 
 /**
- * The project feature's application: what peer modules call, what the
- * `/api/projects` door calls, and what the browser door reaches. Each door is
- * handed this object through the operations-only proxy, so a member it names
- * and this class does not serve throws on the first request — which is what
- * naming every door's shape in the `implements` clause turns back into a build
- * failure.
+ * The project application: what peer modules, `/api/projects` and the browser
+ * door each call, handed through the operations-only proxy — an unserved
+ * member throws at first request, which `implements` turns into a build failure.
  */
 export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ServedBrowserApi {
   listPaths(input: { projectIds: string[] }) {
@@ -176,10 +171,9 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   }
 
   /**
-   * Whether `by` holds `permission` at a scope the door's declared check did
-   * not resolve. The caller is an argument because this application is the
-   * process's one instance: a probe reading a "current user" from anywhere
-   * else would answer for whoever asked last.
+   * Whether `by` holds `permission` at a scope the door's check did not
+   * resolve. `by` is an argument because this is the process's one instance —
+   * reading a "current user" from anywhere else would answer for whoever asked last.
    */
   probePermission(input: {
     permission: AuthzPermission;
@@ -216,11 +210,9 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   }
 
   /**
-   * The `/api/projects` management operations. Each is scoped to the
-   * organization the door's credential resolved, which is the argument the
-   * in-app paths above resolve from the project itself instead: a management
-   * token issued for one organization must not reach another's project, and
-   * that difference is the whole reason these are separate operations.
+   * The `/api/projects` management operations, each scoped to the
+   * organization the door's credential resolved — never the project itself —
+   * so a token issued for one organization cannot reach another's project.
    */
   createInOrganization(
     input: Readonly<{
@@ -272,8 +264,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   /**
    * The service key a newly provisioned project is handed back with: an
    * organization key bound as ADMIN on that project alone, belonging to no
-   * member. The binding shape lives here rather than in the door because it is
-   * what a project's own service credential IS, not how one door spells it.
+   * member. Lives here because it is what a project's credential IS, not how one door spells it.
    */
   async provisionServiceKey(
     input: Readonly<{

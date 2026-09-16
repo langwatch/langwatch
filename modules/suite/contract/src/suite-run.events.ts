@@ -75,10 +75,9 @@ export const SuiteRunItemCompletedEventSchema = suiteRunEventSchema.extend({
 export type SuiteRunItemCompletedEvent = z.infer<typeof SuiteRunItemCompletedEventSchema>;
 
 /**
- * SuiteRunItemRegraded event - emitted when a completed item's verdict
- * changes after the fact, which happens when the evaluators attached to the
- * run gate its verdict. Carries what the item counted as before and what it
- * counts as now, so the fold moves its counters without per-item state.
+ * SuiteRunItemRegraded — emitted when a completed item's verdict changes
+ * because an attached evaluator gates it. Carries the before/after verdict
+ * so the fold moves counters without per-item state.
  */
 export const suiteRunItemRegradedEventDataSchema = z.object({
   batchRunId: z.string(),

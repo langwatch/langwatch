@@ -89,10 +89,8 @@ export const integrationsCheckStatusSchema = z
 export type IntegrationsCheckStatus = z.infer<typeof integrationsCheckStatusSchema>;
 
 /**
- * One project, as the `/api/projects` management family answers it: the
- * identity, the two setup fields and the team it sits in. The stored row's
- * credential and its archive stamp are deliberately absent — the credential
- * has its own gated route, and an archived project is not listed.
+ * One project as `/api/projects` answers it: identity, setup fields, team —
+ * no credential (its own gated route) or archive stamp (never listed).
  */
 export const projectRestSchema = z
   .object({

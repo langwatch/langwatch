@@ -7,10 +7,9 @@ import {
 } from "@langwatch/suite-contract";
 
 /**
- * Moves a completed item from what it counted as to what it counts as now.
- * Keyed by the caller's idempotency key (the evaluated event that changed
- * the verdict), so one verdict change moves the counters once and a later
- * change moves them again.
+ * Moves a completed item from what it counted as to what it counts as now,
+ * keyed by the idempotency key (the evaluating event) — one change moves
+ * counters once; a later change moves them again.
  */
 export const RegradeSuiteRunItemCommand = defineCommand({
   commandType: "lw.suite_run.regrade_item",

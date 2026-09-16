@@ -94,10 +94,8 @@ export interface ProjectApi {
   /** The organisation's internal governance project, created on first ask. */
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
   /**
-   * Reads only who the project is, the value a request boundary carries.
-   *
-   * Five indexed columns and no team row, because this runs once per
-   * authenticated request. Absent when the project does not exist.
+   * Reads only who the project is — five indexed columns, no team row,
+   * because this runs once per authenticated request. Absent when missing.
    */
   findIdentity(id: string): Promise<ProjectIdentity | null>;
   /** Lists active projects reached by the supplied organisation/team/project scopes. */

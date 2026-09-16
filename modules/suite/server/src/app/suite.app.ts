@@ -62,18 +62,16 @@ export interface SuiteAppDependencies {
 
 /**
  * This App's own config: the deployment's public origin, for `platformUrl`.
- * Optional — not every install serves REST — and defaulted to `{}` so a
- * deployment that names no `suite` slice in its process config still boots
- * rather than failing to parse an absent object.
+ * Optional and defaulted to `{}`, so a deployment naming no `suite` slice
+ * still boots rather than failing to parse an absent object.
  */
 const suiteAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
 export type SuiteAppConfig = z.infer<typeof suiteAppConfigSchema>;
 
 /**
- * The run projection is read from ClickHouse and from nowhere else, so this
- * module reads the process's `clickhouse` member. A deployment that named no
- * ClickHouse refuses at boot naming this module and that member, rather than
- * serving an empty run history out of a store nothing ever wrote to.
+ * The run projection reads from ClickHouse only, so this module reads the
+ * process's `clickhouse` member. A deployment naming none refuses at boot
+ * naming this module and member, rather than serving an empty history from nothing.
  */
 type SuiteSetup = FeatureSetup<
   typeof SuiteApp.dependencies,

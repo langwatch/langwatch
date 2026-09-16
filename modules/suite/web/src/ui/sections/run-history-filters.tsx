@@ -1,8 +1,6 @@
 /**
- * Filter bar for run history list.
- *
- * Provides Scenario and Pass/Fail filter dropdowns on the left,
- * and a Group-by selector on the right.
+ * Filter bar for run history: Scenario and Pass/Fail dropdowns on the
+ * left, a Group-by selector on the right.
  */
 
 import { Button, HStack, IconButton, NativeSelect, Spinner, Text } from "@chakra-ui/react";

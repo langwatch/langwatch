@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The `project.*` namespace against the application the COMPOSITION builds.
- * The sibling of `project.rest.composition.unit.test.ts`, for the same defect:
- * `project.trpc.unit.test.ts` hands the mount seven `vi.fn`s and stays green
- * while every procedure throws. Spec: specs/projects/projects-browser-door.feature
+ * The `project.*` namespace against the composition-built app — same defect
+ * as `project.trpc.unit.test.ts`, whose seven `vi.fn` mounts stay green while
+ * every procedure throws. Spec: specs/projects/projects-browser-door.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
@@ -32,10 +31,9 @@ const OTHER_PROJECT_ID = "project_other";
 const NOW = new Date("2026-09-01T00:00:00.000Z");
 
 /**
- * Which members of the browser witness the application answers today. The map
- * is `Record<keyof …>`, so a member added to the witness must be classified
- * here. The three `false` entries are other verticals' answers; who supplies
- * them: `.claude/handoffs/project-trpc-witness-alignment.md`.
+ * Which members of the browser witness the app answers today. `Record<keyof
+ * …>` forces a new member to be classified here; the three `false` entries
+ * are other verticals' — see `.claude/handoffs/project-trpc-witness-alignment.md`.
  */
 const BROWSER_MEMBERS_SERVED: Record<keyof ProjectBrowserApi, boolean> = {
   projects: true,
@@ -200,10 +198,9 @@ function application(
 }
 
 /**
- * The object boot hands every one of this module's transports: the application
- * bound to the module's own API token, reached through the operations-only
- * proxy. Nothing else in a test may stand in for this — it is the proxy, not
- * the class, that decides whether a door's member access throws.
+ * The object boot hands every one of this module's transports: the app bound
+ * to the module's own API token, through the operations-only proxy — it is
+ * the proxy, not the class, that decides whether a member access throws.
  */
 function provided(app: ProjectApp) {
   const apis = new LocalFeatureApis();
@@ -216,10 +213,8 @@ function provided(app: ProjectApp) {
 
 /**
  * The `project.*` namespace on a real tRPC root, over the real application.
- *
- * The three members no installed peer answers are supplied here, explicitly and
- * visibly, because the mount will not accept a partial witness. Everything else
- * is the application's own answer.
+ * The three members no installed peer answers are supplied here, explicitly,
+ * because the mount refuses a partial witness — everything else is the app's own answer.
  */
 function mount(options: Parameters<typeof application>[0] = {}) {
   const built = application(options);

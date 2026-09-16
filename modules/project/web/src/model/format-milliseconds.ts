@@ -1,10 +1,7 @@
 /**
- * A duration, at the precision the reader can act on.
- *
- * `platform/app`'s `formatMilliseconds`, taken rather than imported for the
- * usual reason — a feature-web package may not reach into the application, and
- * the application's copy is gone. `@langwatch/analytics-web` and
- * `@langwatch/trace-web` each keep the same ladder for the same reason.
+ * A duration, at the precision the reader can act on. Taken from
+ * `platform/app`'s `formatMilliseconds` — a feature-web package may not
+ * reach into the application, and that copy is gone (`analytics-web`, `trace-web` match).
  */
 export const formatMilliseconds = (ms: number): string => {
   if (ms < 1000) return `${Math.round(ms)}ms`;

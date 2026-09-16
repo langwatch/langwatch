@@ -1,9 +1,6 @@
 /**
- * Pure formatting functions for scenario run status labels.
- *
- * Converts raw status + evaluation results into human-readable labels.
- * Individual run labels include criteria counts (e.g. "passed (4/5)").
- *
+ * Pure formatting for scenario run status labels: raw status + evaluation
+ * results become human-readable labels, e.g. "passed (4/5)".
  * @see specs/features/suites/suite-list-view-status.feature
  */
 
@@ -39,11 +36,9 @@ const TERMINAL_WITH_CRITERIA: Set<ScenarioRunStatus> = new Set([
 ]);
 
 /**
- * Formats a scenario run status into a display label with optional criteria count.
- *
- * Terminal statuses (success, failed, error) show "Passed" or "Failed" with
- * criteria count in parentheses when criteria exist, e.g. "Passed (4/5)".
- * Non-terminal statuses return their label as-is: "Running", "Pending", etc.
+ * Formats a scenario run status into a display label with optional
+ * criteria count: terminal statuses show "Passed"/"Failed" with counts
+ * when available; non-terminal statuses return their label as-is.
  */
 export function formatRunStatusLabel({ status, results }: FormatRunStatusLabelInput): string {
   const label = STATUS_LABELS[status];

@@ -29,10 +29,8 @@ type DeclaredParameter = Pick<ScenarioParameterDefinition, "name" | "defaultValu
 
 /**
  * The default of every plain parameter the scenarios of a run declare.
- *
- * First declaration wins, the way the run dialog unions the definitions, so
- * two scenarios that default one name differently read one default. A secret
- * has no default and is never in the map.
+ * First declaration wins, as the run dialog unions definitions — two
+ * scenarios defaulting one name differently read one default. Secrets never appear.
  */
 export function declaredDefaults(
   definitions: readonly DeclaredParameter[],
@@ -46,12 +44,9 @@ export function declaredDefaults(
 }
 
 /**
- * The overrides of a target: the values it was given with every entry taken
- * out whose value is the declared default of that parameter.
- *
- * A value typed equal to the default changes nothing the agent receives, so
- * it is no override: a row with an empty line and a row that spells the
- * default out are one target. Nothing when no entry is left.
+ * The overrides of a target: given values with every entry equal to the
+ * declared default removed — such a value changes nothing the agent
+ * receives, so a blank row and one spelling out the default are one target.
  */
 export function canonicalOverrides({
   runParameters,
@@ -91,12 +86,9 @@ export function canonicalParameters(runParameters: RunParameterValues): string {
 }
 
 /**
- * The key a target folds under.
- *
- * The reference id alone when the target carries no overrides, so every key
- * that existed before overrides did is unchanged. Otherwise the reference id,
- * `#`, and the first eight hex characters of the SHA-1 of the canonical
- * overrides, so the same overrides written in another order take one key.
+ * The key a target folds under: the reference id alone with no overrides
+ * (unchanged from before overrides existed), else id + `#` + the first
+ * eight hex SHA-1 chars of the canonical overrides — order-independent.
  */
 export function targetKeyOf({
   referenceId,
@@ -111,10 +103,9 @@ export function targetKeyOf({
 }
 
 /**
- * A key back into its reference id and its hash.
- *
- * The hash is null for a key with no overrides. A `#` that is not followed by
- * a hash of the right shape is part of the reference id.
+ * A key back into its reference id and its hash — null hash for a key with
+ * no overrides. A `#` not followed by a hash of the right shape is part
+ * of the reference id.
  */
 export function splitTargetKey(key: string): {
   referenceId: string;
@@ -143,12 +134,9 @@ export function targetParametersLabel({
 }
 
 /**
- * The string a target sorts under: `type:referenceId|k=v,k2=v2`, the
- * overrides sorted by name, nothing after the `|` when there are none.
- *
- * Readable on purpose, and the one string the run dialog and the server both
- * sort by, so the columns of a run keep the order the dialog showed them in.
- * The hash lives in {@link targetKeyOf} alone.
+ * The string a target sorts under: `type:referenceId|k=v,k2=v2`, overrides
+ * sorted by name. Readable on purpose — the run dialog and server both sort
+ * by it, keeping run columns in the dialog's order. The hash is {@link targetKeyOf} alone.
  */
 export function targetSortKey({
   type,
@@ -200,12 +188,9 @@ type LabelledTarget = {
 };
 
 /**
- * The parameter names that tell the targets of one agent apart.
- *
- * For each agent that appears more than once, the names whose value is not
- * the same on every one of its targets. A name one target carries and another
- * does not counts as a difference. An agent that appears once has no such
- * name, and neither has a name every target of the agent shares.
+ * The parameter names telling one agent's targets apart: for an agent
+ * appearing more than once, names whose value differs across its targets
+ * (presence counts as a difference too). An agent appearing once has none.
  */
 export function differingParameterNames(
   targets: readonly LabelledTarget[],

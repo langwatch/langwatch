@@ -3,10 +3,8 @@ import type { RunHistoryState } from "../behavior/use-run-history-store.ts";
 import { createRunHistoryStore } from "../behavior/use-run-history-store.ts";
 
 /**
- * Unit tests for the run history store.
- *
- * Tests the zustand store logic for groupBy state, filter state,
- * URL serialization, and URL hydration.
+ * Unit tests for the run history store: groupBy state, filter state, URL
+ * serialization, and URL hydration.
  */
 
 function createStore() {

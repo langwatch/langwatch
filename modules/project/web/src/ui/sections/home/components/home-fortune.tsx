@@ -7,8 +7,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 /**
  * A fortune cookie for the observability-minded: one mono line per visit,
- * half genuinely useful (the shortcuts people never find), half fun. Fills
- * the quiet corner under setup with something worth a smile, and the dice
+ * half genuinely useful (shortcuts people never find), half fun — the dice
  * reroll it for readers who want another.
  */
 

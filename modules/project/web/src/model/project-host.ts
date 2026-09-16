@@ -32,12 +32,9 @@ export type ProjectHostOrganization = {
 };
 
 /**
- * The project this page edits.
- *
- * `isPersonal` and `firstMessage` are not settings — they are what the page
- * decides with. A personal workspace is never offered as the organization's
- * project, and a project that has never received data is what the LLMOps
- * hand-off offers to set up.
+ * The project this page edits. `isPersonal` and `firstMessage` are not
+ * settings — a personal workspace is never offered as the organization's
+ * project, and a project with no data is what the LLMOps hand-off sets up.
  */
 export type ProjectHostProject = {
   id: string;
@@ -62,11 +59,9 @@ export type ProjectSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984).
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * composed sentence — customer words are resolved from `code` by the
+ * host's presentation registry (#5984).
  */
 export type ProjectFailureNotice = {
   error: unknown;
@@ -83,10 +78,9 @@ export abstract class ProjectHostPort {
   abstract hasPermission(permission: string): boolean;
 
   /**
-   * Whether the reader holds the lite `EXTERNAL` membership role.
-   *
-   * A membership column rather than a grant, so `hasPermission` cannot answer
-   * it; it decides which settings are shown as read-only rather than hidden.
+   * Whether the reader holds the lite `EXTERNAL` membership role — a column
+   * rather than a grant, so `hasPermission` cannot answer it; decides which
+   * settings show read-only rather than hidden.
    */
   abstract isLiteMember(): boolean;
 
@@ -94,11 +88,9 @@ export abstract class ProjectHostPort {
   abstract isFeatureEnabled(flag: string): boolean;
 
   /**
-   * The application's project switcher, or null where none is mounted.
-   *
-   * The platform page put `DashboardLayout`'s selector in its header; chrome
-   * belongs to the route tree, so the control is handed in rather than
-   * imported. The audit-log screen next door takes the same shape.
+   * The application's project switcher, or null where none is mounted. The
+   * platform page puts `DashboardLayout`'s selector in its header — chrome
+   * belongs to the route tree, so it is handed in, same as the audit-log screen.
    */
   abstract projectSwitcher(): ReactNode | null;
 
@@ -116,11 +108,9 @@ const ProjectHostContext = createContext<ProjectHostPort | undefined>(void 0);
 export const ProjectHostProvider = ProjectHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means the screen rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useProjectHost(): ProjectHostPort {
   const host = useContext(ProjectHostContext);

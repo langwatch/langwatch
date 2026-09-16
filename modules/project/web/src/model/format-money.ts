@@ -7,11 +7,9 @@ export type Money = {
 };
 
 /**
- * Money, written the way a cost line should read.
- *
- * `platform/app`'s `formatMoney`, unchanged: the "< $0.0001" branch is what
- * keeps a real but tiny spend from rendering as a flat zero, which reads as
- * "this cost nothing" rather than "this cost less than we show".
+ * Money, written the way a cost line should read. `platform/app`'s
+ * `formatMoney`, unchanged: the "< $0.0001" branch keeps a real but tiny
+ * spend from rendering as a flat zero — "cost nothing" vs "cost less than shown".
  */
 export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
   const currencySymbols = { USD: "$", EUR: "€" } as const;

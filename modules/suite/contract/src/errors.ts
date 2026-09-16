@@ -1,8 +1,7 @@
 /**
  * Handled errors for suite fields and evaluator attachments: a write that
- * violates the field grammar or the mapping rules refuses with one of these,
- * naming what a caller can fix.
- *
+ * violates the field grammar or mapping rules refuses with one, naming
+ * what a caller can fix.
  * @see specs/suites/test-suites.feature
  * @see specs/scenarios/scenario-fields.feature
  */

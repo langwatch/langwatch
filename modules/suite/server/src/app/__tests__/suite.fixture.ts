@@ -1,8 +1,7 @@
 /**
- * The suite application over memory repositories, for a test that wants the
- * real decisions and none of the datastores. Peers arrive as API fixtures, so
- * an operation the test did not stub refuses by name rather than answering
- * undefined.
+ * The suite application over memory repositories, for a test that wants
+ * the real decisions and no datastores. Peers are API fixtures, so an
+ * unstubbed operation refuses by name rather than answering undefined.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -38,10 +37,9 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
 }
 
 /**
- * `SuiteApp` now builds `execution` for itself in production
- * (`suite-composition.build.ts`) rather than taking one as a member; this
- * fixture goes through `createForTesting` instead, which still takes an
- * `execution` override for a test that wants to observe a scheduled run.
+ * `SuiteApp` now builds `execution` itself in production
+ * (`suite-composition.build.ts`); this fixture uses `createForTesting`
+ * instead, which still takes an `execution` override to observe a scheduled run.
  */
 export function createSuiteTestApp(
   input: Readonly<{

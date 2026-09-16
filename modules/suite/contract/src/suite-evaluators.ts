@@ -20,10 +20,9 @@ import {
 } from "./errors.ts";
 
 /**
- * The fields a write declares, or the handled refusal.
- *
- * The schema reports the first bad identifier by its position; the error
- * names the identifier itself, which is what the editor shows.
+ * The fields a write declares, or the handled refusal. The schema reports
+ * the first bad identifier by position; the error names the identifier
+ * itself, which is what the editor shows.
  */
 export function readSuiteFieldDefinitions(
   raw: unknown,
@@ -55,11 +54,9 @@ export function evaluatorInputSpecsOf(
 }
 
 /**
- * The attachments a write carries, checked against the project.
- *
- * Every attachment must name an evaluator the project holds, and every
- * mapping must name a path the run can read. A plan level attachment may not
- * read a scenario field.
+ * The attachments a write carries, checked against the project: every
+ * attachment must name an evaluator the project holds, every mapping a
+ * path the run can read, and a plan-level attachment may not read a scenario field.
  */
 export function readEvaluatorAttachments({
   attachments,
@@ -97,10 +94,9 @@ export function readEvaluatorAttachments({
 }
 
 /**
- * Refuses the removal of a field an attachment still reads.
- *
- * Checked against the attachments as they will be after the write, so a save
- * that removes the field and the mapping together goes through.
+ * Refuses the removal of a field an attachment still reads. Checked against
+ * the attachments as they will be after the write, so a save that removes
+ * the field and the mapping together goes through.
  */
 export function assertFieldsNotInUse({
   fields,

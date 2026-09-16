@@ -103,11 +103,9 @@ export function useSuiteForm({
   );
 
   /**
-   * The scenarios the scope covers, from the lists the form already holds.
-   *
-   * The same rule the run resolves against the database, read here against the
-   * project's active scenarios, so the count under the picker is what the run will
-   * cover.
+   * The scenarios the scope covers, from lists the form already holds — the
+   * same rule the run resolves against the database, read here against the
+   * project's active scenarios, so the picker's count matches what the run will cover.
    */
   const scopedScenarioIds = useMemo(() => {
     const active = scenarios ?? [];

@@ -1,10 +1,7 @@
 /**
- * Confirmation dialog for archiving a suite.
- *
- * Shows the suite name and explains that archiving is reversible
- * and test runs are preserved.
- *
- * Uses orange (warning) color rather than red (danger) since archiving is reversible.
+ * Confirmation dialog for archiving a suite: shows the name, explains
+ * archiving is reversible and test runs are preserved, using orange
+ * (warning) rather than red (danger) since it's reversible.
  */
 
 import { Button, Spinner, Text, VStack } from "@chakra-ui/react";

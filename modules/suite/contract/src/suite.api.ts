@@ -66,10 +66,9 @@ export interface SuiteApi {
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;
   getOrganizationId(projectId: string): Promise<string>;
   /**
-   * The platform's own address for one suite resource, built from the
-   * project's slug and the path the caller already resolved. The three suite
-   * REST declarations are static objects with no request-scoped builder to
-   * receive, so the app composes the link itself.
+   * The platform's own address for one suite resource, from the project's
+   * slug and the path already resolved — the three suite REST declarations
+   * are static objects with no request-scoped builder, so the app composes it.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
 }

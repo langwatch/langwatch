@@ -44,11 +44,9 @@ export type SuiteFormReturn = UseFormReturn<
 >;
 
 /**
- * The rules the Agent Testing run plan editor holds the same form to.
- *
- * It asks for no target: the run dialog is where an agent or a prompt is
- * chosen. It asks for a scenario list only from a plan that runs one, and for a
- * suite or label scope it asks that the scope name something.
+ * The rules the Agent Testing run plan editor holds the same form to: no
+ * target (the run dialog chooses agent/prompt), a scenario list only from
+ * a plan that runs one, and a suite/label scope must name something.
  */
 export const planFormSchema = suiteFormSchema
   .extend({

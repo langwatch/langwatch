@@ -41,11 +41,9 @@ export const projectJsonValueSchema = z.json();
 export type ProjectJsonValue = z.infer<typeof projectJsonValueSchema>;
 
 /**
- * The scalar project value shared by the application transports.
- *
- * This deliberately mirrors the durable value without importing Prisma.  A
- * repository adapter owns the database mapping; callers of the feature see a
- * stable, serialisable value instead of a generated client type.
+ * The scalar project value shared by the application transports. Mirrors the
+ * durable value without importing Prisma — a repository adapter owns the
+ * database mapping, so callers see a stable value, not a generated client type.
  */
 export const projectSchema = z
   .object({

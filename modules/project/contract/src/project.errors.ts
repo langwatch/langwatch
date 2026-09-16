@@ -83,11 +83,8 @@ export class PersonalProjectProtectedError extends HandledError {
 }
 
 /**
- * The caller archived the project they are currently in.
- *
- * Refused rather than performed: archiving the project the request is scoped
- * to leaves the caller inside something that no longer exists, and every
- * subsequent read in that session answers "not found".
+ * The caller archived the project they are currently in. Refused rather than
+ * performed: it would leave the caller inside something that no longer exists.
  */
 export class CannotArchiveCurrentProjectError extends HandledError {
   declare readonly code: "project_cannot_archive_current";
@@ -144,12 +141,8 @@ export class TraceSharingDeniedError extends HandledError {
 }
 
 /**
- * No caller identity reached a surface that needs one.
- *
- * Kept as a named refusal rather than a narrowing `throw` because the
- * authenticated procedure that normally refuses first is the host's, not this
- * feature's: a host that mounts one of these surfaces on an open procedure
- * gets the 401 it should, not a 500.
+ * No caller identity reached a surface that needs one — a named refusal (not
+ * a throw) so a host mounting this on an open procedure gets a 401, not a 500.
  */
 export class ProjectCallerUnauthenticatedError extends HandledError {
   declare readonly code: "unauthorized";

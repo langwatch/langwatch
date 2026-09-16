@@ -1,8 +1,6 @@
 /**
- * Shared test factories for suites test files.
- *
- * Centralizes makeScenarioRunData, makeBatchRun, and makeSummary
- * to avoid duplication across unit and integration tests.
+ * Shared test factories for suites tests: `makeScenarioRunData`,
+ * `makeBatchRun`, and `makeSummary`, to avoid duplication.
  */
 import {
   SimulationRunStatus as ScenarioRunStatus,

@@ -42,10 +42,9 @@ export type ConnectedTargetReferenceReader = Pick<
 >;
 
 /**
- * Which of the given agents has a process connected right now. A name with no
- * environment is answered by presence, so the reader is required to resolve
- * one; a process that composed no connected-agent runtime reads every agent as
- * offline, which refuses such a reference rather than guessing.
+ * Which of the given agents has a process connected right now. A name with
+ * no environment resolves by presence; a process with no connected-agent
+ * runtime reads every agent as offline, refusing such a reference rather than guessing.
  */
 export type ConnectedPresenceReader = (input: {
   projectId: string;
@@ -73,10 +72,9 @@ export class ConnectedTargetService {
   private constructor() {}
 
   /**
-   * Refuses the run when one of its agents is a personal development agent of someone other
-   * than the actor. The same predicate the listings mark their rows with, so a row a client
-   * was told it could choose is never refused here, and one it was told it could not is never
-   * accepted.
+   * Refuses the run when an agent is someone else's personal dev agent — the
+   * same predicate the listings mark rows with, so a row the client was told
+   * it could choose is never refused, and one it couldn't is never accepted.
    */
   static async assertConnectedAgentsRunnable({
     agents,
@@ -128,11 +126,8 @@ export class ConnectedTargetService {
 
   /**
    * The targets with every `<name>@<environment>` and every bare `<name>`
-   * reference replaced by the id of the agent it names.
-   *
-   * A name with no environment means the agent in development, where the
-   * person improving it runs it. When no process is connected there but one
-   * other environment has one, that environment is the one.
+   * reference replaced by the connected agent's id. No environment means
+   * development; if none is connected there, the one other connected environment is used.
    */
   static async resolveConnectedReferences({
     targets,
@@ -231,9 +226,8 @@ async function resolveConnectedReference({
 }
 
 /**
- * The agent a name with no environment addresses, or nothing when the name is
- * not a connected agent's and is read as an id.
- *
+ * The agent a name with no environment addresses, or nothing when it is
+ * not a connected agent's and reads as an id.
  * @throws {AgentEnvironmentUnresolvedError} when no process is connected
  *   anywhere, or when more than one environment besides development has one
  */

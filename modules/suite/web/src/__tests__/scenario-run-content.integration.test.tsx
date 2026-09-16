@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for ScenarioRunContent component.
- *
- * Tests grid vs list rendering and click delegation.
- * ScenarioGridCard and ScenarioTargetRow are mocked to keep tests focused.
+ * Integration tests for ScenarioRunContent: grid vs list rendering and
+ * click delegation. ScenarioGridCard/ScenarioTargetRow are mocked to keep tests focused.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

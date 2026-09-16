@@ -207,15 +207,11 @@ export function TracesOverview({
         input={tracesOverviewGraph}
         emptyState={<NewProjectQuickView projectSlug={project.slug} />}
       />
-      {/* One footer, always carrying both halves of what the figures mean.
-          It used to be an either/or: a reader on a window wide enough for a
-          trend was offered the chart but never told what the deltas were
-          measured against, and a reader on a window too short was told, but
-          left with a single sentence under a wide row of numbers. Both halves
-          are true in both cases, so both are shown: what the comparison is, on
-          the left, and the one thing worth doing about this window, on the
-          right. The band is the same shape either way, which is what stops it
-          reading as a leftover. */}
+      {/* One footer always carries both halves of what the figures mean — used
+          to be either/or: a wide window got the trend chart but never the
+          deltas' baseline; a narrow window got the sentence but no chart.
+          Both are always true now: the comparison (left) and what's worth
+          doing about it (right), same shape either way so it never reads as a leftover. */}
       {compact ? (
         <HStack gap={3} flexWrap="wrap" width="full" align="center">
           <Text fontSize="xs" color="fg.subtle">

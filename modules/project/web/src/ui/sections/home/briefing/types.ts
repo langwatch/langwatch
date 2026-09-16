@@ -51,9 +51,8 @@ export interface BriefingReceiptContext {
 
 /**
  * One evidence-backed item in the attention inbox — a changed/repeated error
- * shape, a shared signal across errored traces, or a meaningful latency
- * regression. The link points at the exact Trace Explorer search behind the
- * claim, so the row is a starting point rather than a report.
+ * shape, a shared signal, or a latency regression. The link points at the
+ * exact Trace Explorer search behind the claim, a starting point not a report.
  */
 export interface BriefingReceipt {
   id: string;
@@ -66,10 +65,9 @@ export interface BriefingReceipt {
   /** Concrete trace-filter evidence that can be attached to Langy's next turn. */
   context?: BriefingReceiptContext;
   /**
-   * A scoped question for this signal. Reserved: the row no longer renders its
-   * own "Ask Langy" button (the row opens traces, the paperclip attaches, and
-   * asking is the card-level ⌘I) — kept so a future one-click "investigate this"
-   * can seed the composer without re-plumbing the derivation.
+   * A scoped question for this signal. Reserved: the row no longer renders
+   * its own "Ask Langy" (opens traces via card-level ⌘I instead) — kept so a
+   * future one-click "investigate this" can seed the composer without re-plumbing.
    */
   askPrompt?: string;
 }
@@ -92,10 +90,9 @@ export interface BriefingData {
   /** The one-line plain-language read that leads the card. */
   headline: string;
   /**
-   * The project has NOTHING to read yet (no traces, no scenarios, no recent
-   * work). The sheet leads with the typed invitation (QuietHeadline) instead
-   * of a plain headline: first steps typed and deleted in rotation, each
-   * openable (docs / feature page) or handable to Langy.
+   * The project has NOTHING to read yet. The sheet leads with the typed
+   * invitation (QuietHeadline) instead of a plain headline: first steps
+   * typed and deleted in rotation, each openable or handable to Langy.
    */
   quiet?: boolean;
   /** A caption above the receipts ("Needs a look"). */

@@ -68,10 +68,8 @@ export type ProjectApiMap = {
 
   governance: {
     /**
-     * Where `/` lands for this organization.
-     *
-     * Never read here — only invalidated, because the primary-use setting on
-     * this page is what changes the answer.
+     * Where `/` lands for this organization. Never read here — only
+     * invalidated, because the primary-use setting on this page changes the answer.
      */
     resolveHome: {
       query: { input: Record<string, never>; output: unknown };

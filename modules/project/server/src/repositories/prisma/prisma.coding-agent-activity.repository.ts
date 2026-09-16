@@ -6,11 +6,9 @@ import {
 } from "../coding-agent-activity.repository.ts";
 
 /**
- * The one model the coding-agent activity seam reads and writes, and nothing
- * else in the client.
- *
- * The composition root already holds a typed `PrismaClient`; naming the model
- * here is what lets it hand that client straight down with no cast at the seam.
+ * The one model the coding-agent activity seam reads and writes. Naming it
+ * here is what lets the composition root hand its typed `PrismaClient`
+ * straight down with no cast at the seam.
  */
 export type PrismaCodingAgentActivityDatabase = Pick<PrismaClient, "project">;
 
@@ -28,11 +26,9 @@ export class PrismaCodingAgentActivityRepository implements CodingAgentActivityR
   }
 
   /**
-   * The organization an active project belongs to.
-   *
-   * An archived project is not found, which is the same answer
-   * `ProjectService.getOrganizationId` gives: it reads through `getWithTeam`,
-   * whose query carries `archivedAt: null` and whose miss is this error.
+   * The organization an active project belongs to — the same answer as
+   * `ProjectService.getOrganizationId` (`getWithTeam`, `archivedAt: null`);
+   * an archived project misses with this error.
    */
   async getOrganizationId(projectId: string): Promise<string> {
     const project = await this.prisma.project.findUnique({

@@ -1,8 +1,6 @@
 /**
- * Client-side icon mappings for scenario run statuses.
- *
- * Extends the server-safe StatusConfig with Lucide icon components
- * and animation flags for use in React components.
+ * Client-side icon mappings for scenario run statuses: extends the
+ * server-safe StatusConfig with Lucide icons and animation flags.
  */
 
 import type { LucideIcon } from "lucide-react";

@@ -1,8 +1,7 @@
 /**
  * The server half of `suites.testSuites.*`. A test suite is a suite of kind
- * "test_suite": it groups scenarios through Scenario.testSuiteId and runs them
- * through the ordinary suite run path.
- *
+ * "test_suite": it groups scenarios via `Scenario.testSuiteId` and runs
+ * them through the ordinary suite run path.
  * @see specs/suites/test-suites.feature
  */
 

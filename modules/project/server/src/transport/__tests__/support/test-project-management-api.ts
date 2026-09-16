@@ -1,13 +1,9 @@
 import type { ProjectManagementApi } from "../../project.rest.ts";
 
 /**
- * The seven operations the management door reaches, so a transport suite stays
- * at that boundary: what a test cares about is overridden, the rest refuse by
- * name.
- *
- * Typed against the door's own witness rather than against a hand-written
- * shape, and the application declares `implements ProjectManagementApi`, so a
- * member this fake serves is a member production serves too.
+ * The seven operations the management door reaches, keeping a transport
+ * suite at that boundary — cared-about answers overridden, the rest refuse
+ * by name. Typed against the door's witness, so a served member is one production serves too.
  */
 export class TestProjectManagementApi implements ProjectManagementApi {
   constructor(private readonly overrides: Partial<ProjectManagementApi> = {}) {}

@@ -54,14 +54,10 @@ export class SuiteRunProcessingPipelineAdapter {
             store: deps.suiteRunStateFoldStore,
           }),
         )
-        // Every one of these three folds by addition — StartedCount + 1,
-        // CompletedCount + 1, FailedCount + 1 — and the fold executor drops a
-        // replay by `event.id`, which two deliveries of the same command do not
-        // share. All three commands define `makeJobId`, but `withCommand` reads
-        // deduplication only from these options, so without them the method is
-        // inert and a redelivered simulation event double-counts a suite run's
-        // progress, which can flip its status to SUCCESS or FAILURE before the
-        // run has finished.
+        // These three fold by addition (Started/Completed/FailedCount + 1),
+        // deduped by `event.id` — `withCommand` only reads dedup from
+        // `makeJobId` in these options; omit it and a redelivery double-counts,
+        // flipping status to SUCCESS/FAILURE before the run has finished.
         .withCommand("startSuiteRun", commands.startSuiteRun, {
           deduplication: {
             makeId: requireJobId("startSuiteRun", commands.startSuiteRun.makeJobId),

@@ -1,9 +1,7 @@
 /**
- * The home imports two stylesheets for their side effect — its own hero scroll
- * behaviour and the serif display voice the greeting, the banner and the
- * recents headings are set in. Vite resolves and injects them; TypeScript needs
- * telling that the modules exist, the way `@langwatch/langy-web` already does
- * for its own.
+ * The home imports two stylesheets for side effect — its hero scroll and the
+ * serif display voice for headings. Vite injects them; TypeScript needs
+ * telling the modules exist, as `@langwatch/langy-web` already does.
  */
 declare module "*.css" {
   const content: string;

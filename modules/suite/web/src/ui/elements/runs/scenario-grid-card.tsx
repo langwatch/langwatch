@@ -1,10 +1,7 @@
 /**
- * Grid card for a scenario run, used in grid view mode.
- *
- * Wraps SimulationCard to display a scenario run result as a card
- * with status overlay and a "Target: Scenario (#N)" title.
- * Uses MessagePreview for a lightweight conversation preview that
- * doesn't require the CopilotKit runtime.
+ * Grid card for a scenario run (grid view mode). Wraps SimulationCard with
+ * a status overlay and "Target: Scenario (#N)" title, using MessagePreview
+ * for a lightweight conversation preview without the CopilotKit runtime.
  */
 
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";

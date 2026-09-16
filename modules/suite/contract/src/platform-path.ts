@@ -10,12 +10,9 @@ export const AGENT_TESTING_FLAG = "release_ui_agent_testing_v2_enabled";
 export type TestingInterface = "agent_testing" | "simulations";
 
 /**
- * Answers which interface a project reads.
- *
- * A flag read that fails answers the Simulations pages: it is the interface
- * every project can open, so it is the safe answer. The organization is what a
- * release rule of the flag names, so a caller that does not hold it has it read
- * from the project.
+ * Which interface a project reads. A failed flag read answers Simulations
+ * (the interface every project can open) — the organization is what the
+ * flag's release rule names, read from the project when a caller lacks it.
  */
 export type TestingInterfaceReader = (args: {
   projectId: string;
@@ -50,12 +47,9 @@ export function suitePath({
 }
 
 /**
- * The path of a run set, without the project prefix.
- *
- * The scenario library appends the batch run id to it to name a run, so the
- * path must stay one the interface reads a batch under. Agent Testing lists a
- * set a code run writes into as a plan of its own; the platform's own sets
- * are listed under their plans, so those open the results list.
+ * The path of a run set, without the project prefix. The scenario library
+ * appends the batch run id to name a run, so this must be one the interface
+ * reads a batch under — a code-run set is its own plan; platform sets open the results list.
  */
 export function scenarioSetPath({
   ui,

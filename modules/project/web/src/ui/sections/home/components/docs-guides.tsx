@@ -13,11 +13,9 @@ import { HomeCard } from "./home-card.tsx";
 import { HOME_SECTION_GAP, HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
 
 /**
- * Docs & guides, said out loud: a card of four first-class guide links (not
- * footer whispers). Each tile names a JOB, not a document, wearing its own
- * colour — the one place on the home where the features' brand colours are
- * allowed out, because wayfinding is exactly what they're for. All real docs
- * URLs already linked elsewhere in the app, so none of them can 404.
+ * Docs & guides, said out loud: four first-class guide links, each naming a
+ * JOB not a document, in its own colour — wayfinding is what that's for.
+ * All URLs already link elsewhere in the app, so none of them can 404.
  */
 
 interface Guide {

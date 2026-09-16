@@ -1,8 +1,7 @@
 /**
- * Picker component for selecting targets (agents and prompts) in a suite form.
- *
- * Renders: search input with inline "Add Target" button, scrollable checkbox
- * list with type indicators, and a footer with count + select all/clear buttons.
+ * Picker for selecting targets (agents and prompts) in a suite form: search
+ * with inline "Add Target", a checkbox list with type indicators, and a
+ * footer with count and select-all/clear buttons.
  */
 
 import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";

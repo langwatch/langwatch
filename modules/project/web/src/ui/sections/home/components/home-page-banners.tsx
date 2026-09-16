@@ -674,14 +674,10 @@ export function HomePageBanners({
                   </chakra.span>
                 </chakra.button>
 
-                {/* The pagination is a span waterfall — the shape this product
-                    draws all day. Each announcement gets an equal segment
-                    because each gets an equal dwell; the ones already shown
-                    read complete, the live one fills across its own dwell (the
-                    same `progress` value the auto-advance runs on, so it eases
-                    to a stop under the pointer exactly like the rotation does),
-                    and the ones ahead are still empty track. Position and
-                    countdown are one object instead of dots plus a timer. */}
+                {/* Pagination is a span waterfall: each segment is an equal dwell, so
+                    shown ones read complete and the live one fills across its own
+                    dwell (the same `progress` value the auto-advance runs on) while
+                    ahead ones stay empty track — one object, not dots plus a timer. */}
                 {/* The hit area is 16px tall; the mark inside it is 2px. Bled
                     back out with a negative margin so buying a real click
                     target costs the layout nothing — the rule sits exactly

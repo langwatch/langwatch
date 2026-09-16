@@ -141,12 +141,9 @@ export const ARCHIVE_PROJECT: RestTransportDocs = {
 };
 
 /**
- * The project's own ingestion key, and the two operations that no longer
- * answer here. Both are documented rather than removed: a caller who still
- * holds the old integration needs to find out what happened to it, and a 404
- * would tell them the project is gone instead.
- *
- * Neither publishes a 200 any more, because neither can produce one.
+ * The project's own ingestion key; two operations no longer answer here but
+ * stay documented (not removed) so a caller with the old integration learns
+ * what happened rather than seeing a 404 that implies the project is gone.
  */
 export const GET_PROJECT_API_KEY: RestTransportDocs = {
   summary: "Get the project API key",

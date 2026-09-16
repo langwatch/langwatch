@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- * The `project.*` procedures over the real runtime, one `ProjectApi` fake and
- * the six deployment answers the door names. Every answer is checked against
- * the declared output schema, which is what makes it load-bearing.
- * Spec: modules/project/specs/project-service.feature.
+ * The `project.*` procedures over the real runtime, one `ProjectApi` fake
+ * and the six deployment answers the door names — every answer checked
+ * against the declared output schema. Spec: modules/project/specs/project-service.feature.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
@@ -466,9 +465,8 @@ describe("the project tRPC namespace", () => {
 
     /**
      * Creating INTO a team asks that team for `project:create`; creating a
-     * team alongside asks the organization for `organization:manage`. Which of
-     * the two applies is only known once the input is parsed, which is why the
-     * declaration hands the question to the handler.
+     * team alongside asks the organization for `organization:manage` — known
+     * only once the input is parsed, so the declaration hands it to the handler.
      */
     it("asks the named team for project:create", async () => {
       const { caller, probePermission } = mount({

@@ -25,11 +25,9 @@ const panelStateCache = new Map<string, PanelState>();
 let hydrated = false;
 
 /**
- * Read back what this device remembers, the first time a panel asks. Read on
- * first use rather than at module load, because the shell installs the store
- * it is remembered in while it mounts. Supports the legacy format where each
- * entry was a plain array of expanded ids (treated as both expanded and seen,
- * matching the old expand-all behavior those entries were saved under).
+ * Read back what this device remembers, the first time a panel asks — on
+ * first use, not module load, since the shell installs the store while it
+ * mounts. Supports the legacy format: a plain array of ids, treated as both expanded and seen.
  */
 function hydrateFromStorage(): void {
   if (hydrated) return;

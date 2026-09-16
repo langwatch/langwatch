@@ -108,11 +108,9 @@ const WIRE_KINDS = {
 } as const satisfies Record<SuiteKind, "folder" | "custom">;
 
 /**
- * The suite as this family answers it. `kind` and `scope` are optional in the
- * document, not in the answer: every server sends both. They arrived after
- * clients were generated from this family, and a client that reads them as
- * required fails against a server that predates them.
- *
+ * The suite as this family answers it. `kind` and `scope` are optional in
+ * the document, not the answer: every server sends both, since clients
+ * generated before they existed would fail reading them as required.
  * @see specs/api-reference/legacy-response-fields-optional.feature
  */
 const suiteResponseSchema = z.object({
@@ -541,10 +539,8 @@ async function scheduleRun(params: {
 
 /**
  * The one refusal this family re-words: a rejected execution carries the
- * plan's own reasons and is published at 400. Everything else the application
- * raises is already a handled error - `SuiteNotFoundError` and
- * `OrganizationNotFoundForProjectError` both name their cause, their 404 and
- * their remediation - so it travels to the boundary untouched.
+ * plan's reasons, published at 400. Everything else — already a handled
+ * error with its own cause, 404, and remediation — travels to the boundary untouched.
  */
 function refuseRun(error: unknown): never {
   if (error instanceof SuiteExecutionError) throw new SuiteAliasRunRefusedError(error);

@@ -2,11 +2,9 @@ import { Card } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 
 /**
- * HomeCard
- * Standard card styling for home page components: the same quiet hairline
- * material as the Langy briefing surfaces (bg.surface, muted border, the
- * shared 14px card radius) minus Langy's texture and accent — so the whole
- * home reads as one system, and only the briefing wears the warm skin.
+ * Standard card styling for home components: the same quiet hairline
+ * material as Langy's briefing surfaces (bg.surface, muted border, 14px
+ * radius) minus its texture and accent, so only briefing wears the warm skin.
  */
 export function HomeCard(props: ComponentProps<typeof Card.Root>) {
   return (

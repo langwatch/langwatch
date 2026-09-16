@@ -1,8 +1,6 @@
 /**
- * The domain rules over suite fields and evaluator attachments: what a write
- * is refused with, which fields are in use, and which attachments a run still
- * cannot start with.
- *
+ * The domain rules over suite fields and evaluator attachments: what a
+ * write is refused with, which fields are in use, and which attachments a run cannot start with.
  * @see specs/suites/test-suites.feature
  * @see specs/scenarios/scenario-fields.feature
  */

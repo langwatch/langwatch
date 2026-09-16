@@ -36,14 +36,10 @@ export function HomePage() {
 
   return (
     <>
-      {/* `clip`, not `hidden`. The lit block's bloom bleeds sideways past its
-          own box on purpose, and on a viewport narrower than the container
-          that bleed landed outside the page and gave the home a horizontal
-          scrollbar. `overflow: hidden` is what cannot be used here — it makes
-          this a scroll container and forces the cross axis to `auto`, which is
-          what broke the page scroll before. `overflow-x: clip` clips the one
-          axis without creating a scroll container, so the block still bleeds
-          DOWN into the page and nothing scrolls sideways. */}
+      {/* `clip`, not `hidden`. The lit block's bloom bleeds sideways past its box
+          on purpose; on a narrow viewport that bleed caused a horizontal scrollbar.
+          `overflow: hidden` forces the cross axis to `auto` too, breaking page scroll.
+          `overflow-x: clip` clips just the one axis, so DOWN bleed still works. */}
       <Box width="full" position="relative" overflowX="clip">
         {/* A reading measure, not a dashboard sprawl: the briefing sheet is
             the page, so the column narrows to keep its lines composed. */}
@@ -229,15 +225,11 @@ function LangyHome() {
           <OnboardingProgress />
         </>
       )}
-      {/* The route into the docs. It is not the footer's quiet link list
-          (LearningResources renders below for every composition): this is the
-          guided one, and a home that has just invited someone to ask a
-          question in plain language is exactly where the reader who would
-          rather read the docs first needs to find them.
-
-          Its onboarding control is off here because that control moved UP into
-          the lit block, where the attention is. Two of the same on one page
-          would just be one of them going unclicked. */}
+      {/* The route into the docs — not the footer's quiet link list (that renders
+          below for every composition): this is the guided one, for a reader who'd
+          rather read docs first than ask a question in plain language.
+          Onboarding control is off here because it moved UP into the lit block —
+          two of the same on one page would just leave one unclicked. */}
       <DocsGuides />
     </>
   );

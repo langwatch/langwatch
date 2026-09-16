@@ -1,8 +1,6 @@
 /**
- * Data transforms for the run history list.
- *
- * Groups flat ScenarioRunData arrays into RunGroup structures by batch, scenario, or target.
- * Computes pass rates and calculates totals.
+ * Data transforms for the run history list: groups flat scenario-run data
+ * into batch/scenario/target groups, computing pass rates and totals.
  */
 
 import {
@@ -94,10 +92,8 @@ export type RunGroupType = (typeof RUN_GROUP_TYPES)[number];
 export type RunViewContext = "suite" | "external" | "all-runs";
 
 /**
- * Returns the group-by options available for a given view context.
- *
- * External sets omit "target" since they have no target resolution.
- * Suite and all-runs views include all options.
+ * The group-by options available for a view context — external omits
+ * "target" (no target resolution); suite and all-runs include everything.
  */
 export function availableGroupByOptions({
   viewContext,
@@ -195,12 +191,9 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
 }
 
 /**
- * Groups a flat list of scenario runs by their batchRunId.
- *
- * Returns batch runs sorted by timestamp descending (most recent first).
- * Each batch uses the minimum timestamp (creation time) from its scenario runs
- * so batches maintain stable ordering even when individual runs update.
- * When scenarioSetIds is provided, each batch run includes its scenarioSetId.
+ * Groups scenario runs by `batchRunId`, sorted by timestamp descending.
+ * Each batch uses its runs' MINIMUM timestamp so ordering stays stable as
+ * individual runs update; `scenarioSetIds`, when given, tags each batch's `scenarioSetId`.
  */
 export function groupRunsByBatchId({
   runs,
@@ -239,10 +232,8 @@ export function groupRunsByBatchId({
 }
 
 /**
- * Groups a flat list of scenario runs by their scenarioId.
- *
- * Returns groups sorted by timestamp descending (most recent first).
- * Uses the scenario's name as the group label.
+ * Groups scenario runs by `scenarioId`, sorted by timestamp descending,
+ * labelled with the scenario's name.
  */
 export function groupRunsByScenarioId({ runs }: { runs: ScenarioRunData[] }): RunGroup[] {
   const scenarioMap = new Map<string, ScenarioRunData[]>();
@@ -307,11 +298,9 @@ export function groupRunsByTargetKey({ runs }: { runs: ScenarioRunData[] }): Run
 }
 
 /**
- * Groups a flat list of scenario runs by their target (metadata.langwatch.targetReferenceId).
- *
- * Returns groups sorted by timestamp descending (most recent first).
- * Resolves the display name from targetNameMap; runs without target metadata
- * are placed in an "Unknown" group.
+ * Groups scenario runs by target (`metadata.langwatch.targetReferenceId`),
+ * sorted by timestamp descending. Display name resolves from
+ * `targetNameMap`; runs without target metadata land in "Unknown".
  */
 export function groupRunsByTarget({
   runs,
@@ -567,10 +556,8 @@ export function computeRunHistoryTotals({ runs }: { runs: ScenarioRunData[] }): 
 }
 
 /**
- * Computes run summaries for each suite from flat scenario run data.
- *
- * Groups runs by suite (via scenarioSetIds), finds the most recent batch
- * for each suite, and returns pass/fail summary for that batch.
+ * Run summaries per suite: groups by `scenarioSetIds`, finds each suite's
+ * most recent batch, and returns its pass/fail summary.
  */
 export function computeSuiteRunSummaries({
   runs,

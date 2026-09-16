@@ -68,10 +68,9 @@ describe("the projects REST declaration", () => {
     });
 
     /**
-     * A permission on either base-key route would be a promise that some
-     * credential can pass it, and none can — a project administrator told
-     * "insufficient permissions" goes and widens their token, which is the one
-     * thing that must not work here.
+     * A permission on either base-key route would promise some credential
+     * can pass it, and none can — a project administrator told "insufficient
+     * permissions" widening their token is the one thing that must not work here.
      */
     it("asks no permission on either base-key route, because none would grant it", () => {
       const baseKeyRoutes = declaration.routes.filter((route) =>

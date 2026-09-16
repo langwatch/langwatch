@@ -1,10 +1,7 @@
 /**
- * Scrolls to and highlights a specific batch row in the run history.
- *
- * When `highlightBatchId` is set:
- * 1. Waits for a `[data-batch-id="..."]` element to appear in the DOM
- * 2. If it's NOT the first row, scrolls it into view
- * 3. Triggers a yellow flash highlight that fades after ~2 seconds
+ * Scrolls to and highlights a batch row in run history: when
+ * `highlightBatchId` is set, waits for `[data-batch-id]` to appear, scrolls
+ * it into view unless it's the first row, then flashes yellow for ~2s.
  */
 import { useEffect, useState } from "react";
 

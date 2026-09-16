@@ -49,10 +49,9 @@ export type SuiteServiceOptions = {
   execution: SuiteExecution;
   runRepository: SuiteRunReadRepository;
   /**
-   * Which connected agents have a process attached, so a target that names an
-   * agent without an environment can be settled. Absent on a process that
-   * composed no connected-agent runtime: every agent then reads as offline and
-   * such a target is refused rather than guessed at.
+   * Which connected agents have a process attached, so a target naming an
+   * agent without environment can be settled. Absent on a process with no
+   * connected-agent runtime: every agent reads offline, refusing rather than guessing.
    */
   connectedPresence?: ConnectedPresenceReader;
   generateId?: () => string;

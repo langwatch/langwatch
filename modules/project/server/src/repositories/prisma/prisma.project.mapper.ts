@@ -1,11 +1,9 @@
 import type { ProjectIdentity } from "@langwatch/project-contract";
 
 /**
- * The columns a project identity is, named once.
- *
- * Two reads answer with an identity — one project and a batch — and a column
- * present in one and missing from the other is a runtime `undefined` the type
- * checker cannot see, because Prisma types a `select` from its literal.
+ * The columns a project identity is, named once — two reads share this (one
+ * project, one batch), and a column present in one but missing from the
+ * other is a runtime `undefined` Prisma's literal-typed `select` can't catch.
  */
 export const PROJECT_IDENTITY_SELECT = {
   id: true,

@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
- * The `/api/projects` REST door: input validation, the access each route
- * declares, the status a domain refusal becomes, and the wire body. What the
- * domain decides belongs to the service's own tests, not here.
- * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
- *       specs/api-keys/project-key-read-access.feature
- *       specs/projects/projects-management-door.feature
+ * The `/api/projects` REST door: input validation, route access, the status
+ * a domain refusal becomes, and the wire body — not what the domain decides.
+ * Spec: specs/projects/projects-management-door.feature
  */
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
@@ -640,11 +637,9 @@ describe("the projects REST family", () => {
   });
 
   /**
-   * `/api/projects` is reached with an ORGANIZATION API token, and the base
-   * key is a credential that authenticates every ingestion call the project
-   * accepts. Both routes are therefore withdrawn from this door outright — see
-   * `refuseBaseKeyToApiToken`. The door reaches no credential operation at
-   * all: {@link ProjectManagementApi} carries none.
+   * `/api/projects` reached with an ORGANIZATION API token: the base key
+   * authenticates every ingestion call, so both routes are withdrawn
+   * outright (`refuseBaseKeyToApiToken`) — {@link ProjectManagementApi} carries none.
    */
   describe("given a caller holding an organization API token", () => {
     /** @scenario "An API key principal cannot read the base key" */

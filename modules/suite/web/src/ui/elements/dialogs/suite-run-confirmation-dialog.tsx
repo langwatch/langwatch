@@ -1,9 +1,6 @@
 /**
- * Confirmation dialog shown before running a suite.
- *
- * Displays the suite name, scenario/target counts, and estimated job count
- * so the user can review what will be executed before confirming.
- *
+ * Confirmation dialog shown before running a suite: suite name, scenario/
+ * target counts, and estimated job count, so the user reviews before confirming.
  * @see specs/scenarios/secret-run-parameters.feature
  */
 
@@ -177,11 +174,9 @@ export function SuiteRunConfirmationDialog({
 }
 
 /**
- * One input per parameter the run can carry, prefilled with the value the run
- * would use if nothing here is touched.
- *
- * A secret parameter is the exception: it has no default, its field hides what
- * is typed, and the run waits for it.
+ * One input per parameter the run can carry, prefilled with the value it
+ * would use untouched. A secret parameter is the exception: no default,
+ * its field hides what is typed, and the run waits for it.
  */
 function RunParameterFields({
   parameters,
