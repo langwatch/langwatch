@@ -297,6 +297,46 @@ regressions, and 792 of its 955 rows are test files, which are the cheap half.
 carries a `comment-block-size` finding, so lane `comment-w11` is editing it.
 Do this the moment that lane is collected.
 
+## THE TWO RULES WERE PRESCRIBING THE SHAPE THE USER BANNED (2026-09-16, fixed)
+
+The try-to-null rename wave that cost this drive a lane's work was not a lane
+misreading its manifest. **Both rules told it to do that.**
+
+`no-try-prefix`, on 448 live findings:
+
+> "If `{{name}}` genuinely answers with absence and its callers branch on that,
+> rename it `find<Noun>` for the thing it looks up."
+
+`fallible-result-naming`'s `nullableWithoutFind`, on 605 live findings:
+
+> "rename `{{name}}` to `find<Noun>` for the thing it looks up ... **and keep the
+> nullable**."
+
+Both prescribe a nullable `find*`. The naming decision of the same morning says
+`find` states cardinality and answers an array, and that `T | null` is not a
+shape new code writes. So a thousand-odd findings were instructing every lane to
+create new violations of the convention it was grinding toward, and the lane that
+took it literally was following the tool.
+
+**Fixed** in `911464fcdc` and `9f36dd7dd4`. Both now say: drop the prefix either
+way, then decide by what is answered - `get<Noun>` / `getBy<Key>` and throw the
+domain error for one thing that may not exist, an array named `find<Noun>` whose
+empty case is the absence for none-or-many - and both name the nullable-`find*`
+rename as the one move to avoid. A test pins each clause so the advice cannot
+drift back, and the specs carry why the old wording was wrong.
+
+Conversions were exempted separately (`181a18cd16`, -166 findings): the only fix
+the rule offers a nullable result is a `find*` rename, so `extractMessageText`,
+`parseKsuidCreatedAtMs` and `stringifySpanIO` could comply only by lying about
+cardinality, and throwing would break the fail-soft ingestion contract. This
+closes the trace scoping question that was blocking a lane.
+
+**Still teaching the old rule, both held dirty by the concurrent session:**
+`.claude/skills/architecture-guide/references/server.md:98,102` (what the module
+skill puts in front of every lane) and `dev/docs/lint-rules.md:371,372,836`
+(generated - regenerate with `pnpm --filter @langwatch/architecture-enforcer
+docs`, do not hand-edit). Fix both the moment that session releases them.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
