@@ -4,8 +4,9 @@
  * that define/redefine a chart are gated; reads always render regardless.
  * @see ~/server/analytics/saved-workbench-charts/errors.ts — the sibling gate this mirrors
  */
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError, remediation } from "@langwatch/handled-error";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   CUSTOM_CHART_PLAYGROUND_FLAG,
@@ -39,14 +40,17 @@ export class CustomGraphWritesDisabledForPlaygroundError extends HandledError {
  * read, since existing graphs must keep rendering regardless of the flag.
  */
 export async function assertCustomGraphWritesAllowed({
-  prisma,
+  featureFlags,
+  projects,
   projectId,
 }: {
-  prisma: PrismaClient;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  projects: Pick<ProjectApi, "findOrganizationId">;
   projectId: string;
 }): Promise<void> {
   const playgroundEnabled = await customChartPlaygroundEnabled({
-    prisma,
+    featureFlags,
+    projects,
     projectId,
   });
   if (playgroundEnabled) {

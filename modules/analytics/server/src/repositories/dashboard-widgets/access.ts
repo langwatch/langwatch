@@ -1,9 +1,5 @@
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-// TODO(merge-analytics-port): `featureFlagService` is a monolith singleton with
-// no module-shape equivalent. Escalated in .claude/handoffs/merge-analytics-port.md —
-// resolving it changes this function's signature, and modules/trace owns the caller.
-import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED, type FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
  * The gate over the custom-chart-playground surface — page, REST routes and
@@ -12,20 +8,28 @@ import { featureFlagService } from "~/server/featureFlag";
  */
 export const CUSTOM_CHART_PLAYGROUND_FLAG = "release_custom_chart_playground";
 
+/**
+ * Whether the playground is on for this project. Both collaborators are peer
+ * APIs the analytics app already holds: the flag registry answers the
+ * targeting question, and the project family answers which organization the
+ * project belongs to. It read a monolith `featureFlagService` singleton and
+ * a `PrismaClient` until that singleton stopped existing, which left this
+ * module unable to answer the question at all — every dashboard-widgets
+ * request died on `assertCustomChartPlaygroundEnabled is not callable` and
+ * the caller was told "an unknown error occurred" (apidiff run 20260916-r8).
+ */
 export async function customChartPlaygroundEnabled({
-  prisma,
+  featureFlags,
+  projects,
   projectId,
 }: {
-  prisma: PrismaClient;
+  featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  projects: Pick<ProjectApi, "findOrganizationId">;
   projectId: string;
 }): Promise<boolean> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  const organizationId = project?.team?.organizationId;
+  const organizationId = await projects.findOrganizationId(projectId);
 
-  return featureFlagService.isEnabled(CUSTOM_CHART_PLAYGROUND_FLAG, {
+  return featureFlags.isEnabled(CUSTOM_CHART_PLAYGROUND_FLAG, {
     distinctId: projectId,
     projectId,
     organizationId: organizationId ?? NOT_TARGETED,

@@ -33,6 +33,8 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { customChartPlaygroundEnabled } from "../repositories/dashboard-widgets/access.ts";
+import { CustomChartPlaygroundNotEnabledError } from "../repositories/dashboard-widgets/errors.ts";
 import { NotFoundError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -441,5 +443,22 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     }
 
     return { id: project.id, lwqlKey: project.lwqlKey };
+  }
+
+  /**
+   * The dashboard-widgets family's gate, which `DashboardWidgetApi` has always
+   * declared and nothing implemented: the feature-api proxy exposes what the
+   * bound app actually has, so every call answered
+   * `assertCustomChartPlaygroundEnabled is not callable` and the caller read
+   * "an unknown error occurred" instead of the 403 this refusal is.
+   */
+  async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
+    const enabled = await customChartPlaygroundEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projects: this.#dependencies.projects,
+      projectId: input.projectId,
+    });
+
+    if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
   }
 }
