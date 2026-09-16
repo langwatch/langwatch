@@ -1233,11 +1233,31 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     });
 
     it("keeps a legacy id-only reference intact", () => {
+      // No path tail to exempt here — what protects the bare reference is
+      // the shape floor: stored-object ids are minted content-addressed with
+      // a FIXED zero timestamp (deriveStoredObjectId), so every real id
+      // leads with a long run of zeros and can never read as key material.
       const url = `/api/files/${STORED_OBJECT_ID}`;
 
       const { text } = redactSecretsInText({ text: url });
 
       expect(text).toBe(url);
+    });
+  });
+
+  describe("given a bare so_-prefixed value that IS key-shaped", () => {
+    // `so` earns no GLOBAL prefix exemption: two letters is exactly the
+    // shape vendors mint keys in, and a stored-object id can never look
+    // like this (fixed zero timestamp = leading zeros, low entropy). The
+    // record-reference exemption applies only to the LAST path segment of
+    // a slash-carrying span.
+    it("redacts it like any other unknown-vendor key", () => {
+      const input = "creds so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
     });
   });
 

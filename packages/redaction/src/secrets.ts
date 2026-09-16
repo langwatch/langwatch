@@ -366,11 +366,19 @@ const RECORD_ID_PREFIXES = new Set([
   "acct",
   "cus",
   "sub",
-  // Stored objects: edge media extraction rewrites span media to
-  // `/api/files/{projectId}/so_<id>` references, and that id is a record id
-  // like any other minted here (#8077).
-  "so",
 ]);
+
+/**
+ * Prefixes that may name a record id in the LAST path segment of a span —
+ * the tail exemption's vocabulary (see `shaped_api_key`). Everything in
+ * {@link RECORD_ID_PREFIXES} plus `so`: edge media extraction rewrites span
+ * media to `/api/files/{projectId}/so_<id>` references, and a stored object
+ * only ever appears as that terminal segment (#8077). `so` stays OUT of the
+ * global leading-prefix exemption on purpose — two letters is exactly the
+ * shape a vendor mints keys in, and a bare `so_…` value that looks like a
+ * key must keep the generic shape rule's protection.
+ */
+const RECORD_REFERENCE_TAIL_PREFIXES = new Set([...RECORD_ID_PREFIXES, "so"]);
 
 /**
  * Keys that are published on purpose. PostHog's `phc_` is a client-side project
@@ -723,7 +731,10 @@ const VALUE_RULES: ValueRule[] = [
         const tailPrefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(
           body.slice(lastSlash + 1),
         )?.[1];
-        if (tailPrefix && RECORD_ID_PREFIXES.has(tailPrefix.toLowerCase())) {
+        if (
+          tailPrefix &&
+          RECORD_REFERENCE_TAIL_PREFIXES.has(tailPrefix.toLowerCase())
+        ) {
           // Key material ahead of the reference keeps its protection whether
           // it reads as one segment or many: a slash is a valid character in
           // the bodies this rule accepts, so a credential may itself be split
