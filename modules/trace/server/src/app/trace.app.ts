@@ -74,6 +74,10 @@ import type { TraceExistenceRepository } from "../repositories/read/trace-existe
 import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
+import {
+  TraceExportBoundsService,
+  type TraceExportBounds,
+} from "../services/trace-export-bounds.service.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";
 import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
@@ -419,6 +423,12 @@ export interface TraceAppDependencies {
    */
   requestBounds: Pick<EntitlementApi, "requestBound">;
   /**
+   * The export download door's tier-effective rate window and in-flight
+   * slots. Absent on a process that serves no export door; the door then
+   * refuses by name rather than exporting unbudgeted.
+   */
+  exportBounds: TraceExportBounds | null;
+  /**
    * The door the deprecated `/api/trace/*` family resolves its project
    * credential through. Optional because a REST-less process never reaches
    * it; `credential` raises by name rather than admitting an absent caller.
@@ -503,7 +513,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
    * process stages commands on; the logger names the process in a blob
    * read's refusal. Everything else is a peer Api or its own repository.
    */
-  static readonly reads = reads("clickhouse", "eventing", "logger", "redis");
+  static readonly reads = reads("clickhouse", "eventing", "logger", "redis", "rateLimiter");
 
   static create(input: TraceAppDependencies | TraceSetup): TraceApp {
     if (!("members" in input)) return new TraceApp(input);
@@ -518,6 +528,12 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
         ...input.dependencies,
         repositories: input.repositories,
         requestBounds: input.dependencies.plans,
+        exportBounds: TraceExportBoundsService.createOverRedis({
+          entitlement: input.dependencies.plans,
+          projects: input.dependencies.projects,
+          rateLimiter: input.members.rateLimiter,
+          redis: input.members.redis,
+        }),
         protections: {
           authz: input.dependencies.authz,
           projects: input.dependencies.projects,
@@ -646,6 +662,22 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
     return this.#dependencies.protections.resolveForApiKey(input);
+  }
+
+  /**
+   * The export download door's budget. Raises rather than exporting
+   * unbudgeted when this process composed no export bounds, and a method
+   * because the door reads it through the operations-only proxy.
+   */
+  exportBounds(): TraceExportBounds {
+    const bounds = this.#dependencies.exportBounds;
+    if (!bounds) {
+      throw new Error(
+        "The trace export download asked for its budget, and this process composed Trace without the export bounds it is counted through",
+      );
+    }
+
+    return bounds;
   }
 
   findExistingTraceIds(input: {

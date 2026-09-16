@@ -141,6 +141,7 @@ function harness(
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(),
+    exportBounds: null,
   });
 
   return {

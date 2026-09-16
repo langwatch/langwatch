@@ -74,6 +74,7 @@ function harness(tier: "free" | "paid" | "enterprise") {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(tier),
+    exportBounds: null,
   });
 
   return {

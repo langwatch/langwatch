@@ -56,6 +56,27 @@ export class WebhookEventNotFoundError extends HandledError {
 }
 
 /**
+ * The test-delivery door answered this organization too often. `fault` stays
+ * customer: the test fires are theirs, and the retry-after is theirs to wait
+ * out — a test flood would leave LangWatch egress IPs toward a third party.
+ */
+export class WebhookTestRateLimitedError extends HandledError {
+  declare readonly code: "webhook_test_rate_limited";
+
+  constructor(input: { retryAfterSeconds?: number | undefined }) {
+    super("webhook_test_rate_limited", "Too many webhook test deliveries in the last minute", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+    });
+    this.name = "WebhookTestRateLimitedError";
+  }
+}
+
+/**
  * A named refusal for the one collaborator a process may compose no builder
  * for: a stable code, a customer-safe message, `fault: "platform"`.
  */

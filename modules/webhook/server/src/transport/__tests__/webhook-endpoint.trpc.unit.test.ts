@@ -106,6 +106,11 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
     dispatch: () => {
       throw new Error("The test fire is a REST-only path");
     },
+    testFireBounds: {
+      assertTestFireWithinBounds: () => {
+        throw new Error("The test fire is a REST-only path");
+      },
+    },
     endpointStream: {
       flush: () => {
         throw new Error("Endpoint stream flush is not exercised by these scenarios");

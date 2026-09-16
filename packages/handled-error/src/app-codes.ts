@@ -256,6 +256,7 @@ export const APP_ERROR_CODES = [
   "invite_not_ready",
   "invite_throttled",
   "invite_wrong_account",
+  "invites_rate_limited",
   "join_auto_connection_admits",
   "join_auto_domain_unproven",
   "join_auto_not_licensed",
@@ -559,6 +560,7 @@ export const APP_ERROR_CODES = [
   "test_fire_rate_limited",
   "test_fire_unavailable",
   "time_range_too_wide",
+  "trace_export_rate_limited",
   "trace_id_ambiguous",
   "trace_ids_too_many",
   "trace_not_evaluatable",
@@ -599,6 +601,7 @@ export const APP_ERROR_CODES = [
   "webhook_endpoint_invalid",
   "webhook_endpoint_not_found",
   "webhook_event_not_found",
+  "webhook_test_rate_limited",
   "workflow_execution_failed",
   "workflow_not_found",
 ] as const;

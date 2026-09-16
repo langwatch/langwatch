@@ -459,23 +459,24 @@ export class FakeInviteRateLimit implements OrganizationInviteRateLimit {
     key,
     windowSeconds,
     max,
+    count = 1,
   }: {
     key: string;
     windowSeconds: number;
     max: number;
+    count?: number;
   }): Promise<{ allowed: boolean; resetAt: number }> {
     const now = Date.now();
     const windowMs = windowSeconds * 1000;
     const recent = (this.sends.get(key) ?? []).filter((sentAt) => now - sentAt < windowMs);
+    // The Redis adapter increments before it decides, so a refused attempt spends too.
+    this.sends.set(key, [...recent, ...Array.from({ length: count }, () => now)]);
 
-    if (recent.length >= max) {
-      return { allowed: false, resetAt: recent[0]! + windowMs };
+    if (recent.length + count <= max) {
+      return { allowed: true, resetAt: now + windowMs };
     }
 
-    recent.push(now);
-    this.sends.set(key, recent);
-
-    return { allowed: true, resetAt: now + windowMs };
+    return { allowed: false, resetAt: (recent[0] ?? now) + windowMs };
   }
 }
 

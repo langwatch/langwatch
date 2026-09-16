@@ -198,6 +198,7 @@ function deployment(access: OtlpAccess = {}) {
       codingAgents: peers.codingAgents,
       share: peers.share,
       requestBounds: peers.plans,
+      exportBounds: null,
     }),
   );
 

@@ -33,6 +33,7 @@ import {
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
 import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { InviteService } from "../services/invite.service.ts";
 import type {
   OrganizationCeremony,
@@ -190,12 +191,13 @@ class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
   private constructor(private readonly redis: RedisConnection) {}
 
   async limit(
-    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+    input: Readonly<{ key: string; windowSeconds: number; max: number; count?: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
     const counter = `organization:invite:rate-limit:${input.key}`;
     const now = Date.now();
-    const used = await this.redis.incr(counter);
-    if (used === 1) await this.redis.expire(counter, input.windowSeconds);
+    const count = input.count ?? 1;
+    const used = count === 1 ? await this.redis.incr(counter) : await this.redis.incrby(counter, count);
+    if (used === count) await this.redis.expire(counter, input.windowSeconds);
     if (used <= input.max) {
       return { allowed: true, resetAt: now + input.windowSeconds * 1000 };
     }
@@ -535,7 +537,7 @@ export function buildOrganizationInfrastructure(input: {
   dependencies: {
     projects: ProjectApi;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
-    entitlement: Pick<EntitlementApi, "getActivePlan">;
+    entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
   };
@@ -565,6 +567,12 @@ export function buildOrganizationInfrastructure(input: {
       entitlement: dependencies.entitlement,
       permissions: dependencies.permissions,
       roles: dependencies.roles,
+    }),
+    // The sender-scoped creation counter: same fixed-window adapter the
+    // resend throttle spends, so both invite limits live behind one port.
+    inviteCreationThrottle: InviteCreationThrottleService.create({
+      rateLimit: RedisOrganizationInviteRateLimit.create(input.redis),
+      plans: dependencies.entitlement,
     }),
     // No join-request ledger is composed on this process, so the join door refuses by name;
     // the invitation door's own join-request touches are silent no-ops when this is null.

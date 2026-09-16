@@ -25,6 +25,7 @@ import type {
   OrganizationPlanGate,
   OrganizationSignals,
 } from "../app/organization.members.ts";
+import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {
@@ -32,6 +33,8 @@ export interface OrganizationInvitationDoorDependencies {
   readonly joinRequests: OrganizationJoinRequests | null;
   readonly plans: OrganizationPlanGate;
   readonly signals: OrganizationSignals;
+  /** The sender-scoped per-hour creation counter, spent before a batch is written. */
+  readonly creationThrottle: Pick<InviteCreationThrottleService, "assertCreationAllowed">;
   /** Provisions the accepting person's personal workspace for this tenant. */
   ensurePersonalWorkspace(
     input: Readonly<{
@@ -61,6 +64,14 @@ export class OrganizationInvitationDoorService {
     input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteCreated[]> {
+    // Spent first, one per invited address: a refused batch never writes, and
+    // a flooding sender spends against the counter, not the seat census.
+    await this.deps.creationThrottle.assertCreationAllowed({
+      organizationId: input.organizationId,
+      senderUserId: by.id,
+      count: input.invites.length,
+    });
+
     const namesCustomRole = input.invites.some((invite) =>
       (invite.teams ?? []).some((team) => isOrganizationApiCustomRole(team.role)),
     );

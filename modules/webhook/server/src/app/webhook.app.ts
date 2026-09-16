@@ -18,6 +18,7 @@ import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts"
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
+import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
 import { buildWebhookComposition } from "./webhook-composition.build.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
@@ -93,6 +94,12 @@ export interface WebhookAppDependencies {
    */
   dispatch: WebhookTestDispatch;
   /**
+   * The tier-effective per-organization window a test fire is counted
+   * against, before any dispatch — the limit the test door rides now that it
+   * is exempt from the hourly dispatch cap.
+   */
+  testFireBounds: Pick<WebhookTestBoundsService, "assertTestFireWithinBounds">;
+  /**
    * The same coalescing endpoint stream the delivery worker appends live
    * spend outcomes to, shared over the process's one `processStore` member
    * so a replay rides the exact live-delivery machinery rather than a
@@ -114,8 +121,9 @@ export class WebhookApp implements WebhookApiContract {
    *  {@link buildWebhookComposition} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The one raw member this app derives collaborators from: the durable
-   *  store a health read shares with the worker's delivery process manager. */
-  static readonly reads = reads("prisma");
+   *  store a health read shares with the worker's delivery process manager.
+   *  `rateLimiter` is the test-fire door's per-organization counter. */
+  static readonly reads = reads("prisma", "rateLimiter");
 
   static create(input: WebhookSetup): WebhookApp {
     const built = buildWebhookComposition({
@@ -136,6 +144,10 @@ export class WebhookApp implements WebhookApiContract {
       }),
       assertEndpointsEntitled: built.assertEndpointsEntitled,
       dispatch: built.dispatch,
+      testFireBounds: WebhookTestBoundsService.create({
+        entitlement: input.dependencies.entitlement,
+        rateLimiter: input.members.rateLimiter,
+      }),
       endpointStream: WebhookEndpointStreamService.create({
         processStore: built.processStore,
       }),
@@ -169,7 +181,11 @@ export class WebhookApp implements WebhookApiContract {
     this.#dependencies.endpoints.getDeliveries(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.#dependencies.health.health(input);
   testFire: WebhookApiContract["testFire"] = async ({ organizationId, endpointId }) => {
-    const { endpoints, dispatch } = this.#dependencies;
+    const { endpoints, dispatch, testFireBounds } = this.#dependencies;
+    // Counted before anything else: a refused caller never reaches the
+    // receiver, and a flood never leaves this deployment's egress IPs.
+    await testFireBounds.assertTestFireWithinBounds({ organizationId });
+
     const [secrets, destination] = await Promise.all([
       endpoints.getSigningSecrets({ organizationId, endpointId }),
       endpoints.getDestinationConfig({ organizationId, endpointId }),
@@ -359,8 +375,8 @@ export interface WebhookDispatchRequest {
   signingSecrets: readonly string[];
   /** A drawer or CLI test rather than a real delivery. Marked
    *  non-suppressibly on the wire (ADR-040 §1) and exempt from the hourly
-   *  dispatch cap, which it rides the caller's own per-user limit instead
-   *  of. */
+   *  dispatch cap, which the tier-effective per-organization
+   *  `webhookTestPerMinute` window in the app's `testFire` answers instead. */
   isTestFire?: boolean;
 }
 

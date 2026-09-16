@@ -85,6 +85,7 @@ function bootTraceApp(options: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
     } as ProjectApi,
     requestBounds: createTraceTestRequestBounds(),
+    exportBounds: null,
     protections: {
       resolveForApiKey: async () => ({ canSeeCosts: true }),
     } as unknown as TraceViewerProtectionService,

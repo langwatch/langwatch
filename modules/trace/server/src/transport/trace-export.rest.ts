@@ -19,6 +19,11 @@ import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
 
+import type {
+  TraceExportBounds,
+  TraceExportSlot,
+} from "../services/trace-export-bounds.service.ts";
+
 const logger = createLogger("langwatch:api:export-traces");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
@@ -84,6 +89,11 @@ export interface TraceExportRestMembers<
   getViewerProtections(session: TSession, input: Readonly<{ projectId: string }>): Promise<unknown>;
   /** The export itself. Resolved per request, never constructed at mount. */
   exports(): TraceExport<TRequest>;
+  /**
+   * The tier-effective rate window and in-flight slots one download consumes,
+   * counted after the permission probe and before the sizing query.
+   */
+  exportBounds(): TraceExportBounds;
   /** Fans one progress event out to every pod serving this tenant. */
   broadcast(): AppRestBroadcast;
   /**
@@ -113,12 +123,14 @@ function exportStream({
   exportId,
   exportService,
   broadcast,
+  slot,
 }: {
   request: TraceExportRequestFields;
   protections: unknown;
   exportId: string;
   exportService: TraceExport<TraceExportRequestFields>;
   broadcast: AppRestBroadcast;
+  slot: TraceExportSlot;
 }): ReadableStream {
   const encoder = new TextEncoder();
 
@@ -155,7 +167,12 @@ function exportStream({
           "export_progress",
         );
         controller.error(error);
+      } finally {
+        await slot.release();
       }
+    },
+    async cancel() {
+      await slot.release();
     },
   });
 }
@@ -222,6 +239,11 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
       return jsonAnswer({ error: "You do not have permission to access this endpoint." }, 403);
     }
 
+    const exportBounds = app.exportBounds();
+    // Counted after the permission probe: a caller without standing never
+    // reaches the budget, and a refused caller never spends it.
+    await exportBounds.assertExportWithinRate({ projectId: request.projectId });
+
     const protections = await app.getViewerProtections(session, { projectId: request.projectId });
 
     logger.info(
@@ -230,6 +252,10 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
     );
 
     const exportId = crypto.randomUUID();
+    const slot = await exportBounds.acquireExportSlot({
+      projectId: request.projectId,
+      exportId,
+    });
     const broadcast = app.broadcast();
     const exportService = app.exports();
 
@@ -237,6 +263,7 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
     try {
       totalCount = await exportService.getTotalCount({ request, protections });
     } catch (error) {
+      await slot.release();
       // A failure that already knows what it is - a query timeout, a time range
       // too wide, ClickHouse unavailable - says something more useful than
       // "the export failed", so it travels untouched. Anything else becomes the
@@ -246,7 +273,7 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
       throw app.exportFailedError(error);
     }
 
-    const stream = exportStream({ request, protections, exportId, exportService, broadcast });
+    const stream = exportStream({ request, protections, exportId, exportService, broadcast, slot });
 
     return {
       status: 200,

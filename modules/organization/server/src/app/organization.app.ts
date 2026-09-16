@@ -111,6 +111,7 @@ import type {
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
+import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
 import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
@@ -221,6 +222,12 @@ export type OrganizationInfrastructure = Readonly<{
   seats: OrganizationSeatLicense;
   /** The invitations this deployment administers, or none. */
   invitations: OrganizationInvitations | null;
+  /**
+   * The sender-scoped creation counter the invitation door spends before a
+   * batch is written. Travels beside `invitations`: a deployment with the
+   * ceremony always has the throttle.
+   */
+  inviteCreationThrottle: InviteCreationThrottleService;
   /** The join-request ledger, or none. */
   joinRequests: OrganizationJoinRequests | null;
   plans: OrganizationPlanGate;
@@ -366,6 +373,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           joinRequests: members.joinRequests,
           plans: members.plans,
           signals: members.signals,
+          creationThrottle: members.inviteCreationThrottle,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;
@@ -420,6 +428,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       settingsSecrets: refusing<OrganizationSettingsSecret>("settings cipher"),
       demoProject: { userId: "", projectId: "" },
       invitations: null,
+      inviteCreationThrottle: refusing<InviteCreationThrottleService>("invite creation throttle"),
       joinRequests: null,
       ...setup.members,
     } as OrganizationInfrastructure;
@@ -448,6 +457,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           joinRequests: members.joinRequests,
           plans: members.plans,
           signals: members.signals,
+          creationThrottle: members.inviteCreationThrottle,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
       : null;

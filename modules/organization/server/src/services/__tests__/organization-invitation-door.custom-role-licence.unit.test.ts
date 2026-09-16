@@ -53,6 +53,7 @@ function door(options: { customRolesAllowed: boolean }) {
       joinRequests: null,
       plans,
       signals,
+      creationThrottle: { assertCreationAllowed: async () => {} },
       ensurePersonalWorkspace: vi.fn(async () => undefined),
     }),
   };

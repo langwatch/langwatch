@@ -32,6 +32,7 @@ function unreachableDependencies(): WebhookAppDependencies {
     events: undefined,
     assertEndpointsEntitled: async () => undefined,
     dispatch: unreachable("dispatch"),
+    testFireBounds: unreachable("testFireBounds"),
     endpointStream: unreachable("endpointStream"),
   };
 }

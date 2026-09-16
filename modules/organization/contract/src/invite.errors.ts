@@ -151,6 +151,25 @@ export class InviteThrottledError extends HandledError {
   }
 }
 
+/**
+ * One sender created more invitations in an hour than their plan carries.
+ * Sender-scoped, not organization-scoped: an admin hopping projects must not
+ * reset the counter. `fault: "customer"` — the batch is theirs, and so is the wait.
+ */
+export class InvitesRateLimitedError extends HandledError {
+  declare readonly code: "invites_rate_limited";
+
+  constructor(retryAfterSeconds: number) {
+    super("invites_rate_limited", "Too many invitations created in the last hour", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      meta: { retryAfterSeconds },
+    });
+    this.name = "InvitesRateLimitedError";
+  }
+}
+
 export class InviteNotReadyError extends Error {
   constructor(inviteId: string, status: string) {
     super(`Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`);

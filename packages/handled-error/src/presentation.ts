@@ -1705,6 +1705,11 @@ const presentations = {
         : "Sign out and sign back in as the account this invitation was sent to.";
     },
   },
+  invites_rate_limited: {
+    // The counter is the sender's and so is the wait; the batch was not written.
+    title: "Too many invites just now",
+    describe: () => "None of those invites were created. Wait a while, then send the batch again.",
+  },
   // ---------------------------------------------------------------------
   // Joining an organization (D12, ADR-117)
   //
@@ -3168,6 +3173,13 @@ const presentations = {
     title: "Too many test sends just now",
     describe: () => "That one wasn't sent. Wait a minute, then try again.",
   },
+  trace_export_rate_limited: {
+    // A full-project export is a full-store scan, so the copy says both the
+    // wait and that nothing was produced.
+    title: "Too many exports just now",
+    describe: () =>
+      "That export didn't start. Wait for a running export to finish — or a minute — then try again.",
+  },
   unsubscribe_rate_limited: {
     // Read on the unsubscribe page, by someone with no session and nothing to
     // fix. Waiting is the whole remedy.
@@ -4117,6 +4129,10 @@ const presentations = {
     title: "That event isn't in the log",
     describe: () =>
       "It may have aged out of the events log, or it may be a budget or virtual-key event, which are delivered by webhook but not retained here.",
+  },
+  webhook_test_rate_limited: {
+    title: "Too many test deliveries just now",
+    describe: () => "That test wasn't sent. Wait a minute, then send it again.",
   },
   external_id_conflict: {
     // The id is the caller's own, so naming it back is the fastest way to see

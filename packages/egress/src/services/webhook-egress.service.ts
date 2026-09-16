@@ -173,7 +173,9 @@ export class WebhookEgressService {
   }: WebhookSendInput): Promise<WebhookSendResult> {
     const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
     assertWebhookUrlAllowed({ url, label, allowInsecureLocal });
-    // A real fire only; test fires ride the drawer's per-user limit. The cap
+    // A real fire only; a test fire is counted on its own door instead — the
+    // automation drawer's per-user limit, or the tier-effective per-organization
+    // `webhookTestPerMinute` window in the webhook app's testFire. The cap
     // lives outside this sender because a queue transport must answer to the
     // same cap without going through it.
     if (projectId && !testFire) {

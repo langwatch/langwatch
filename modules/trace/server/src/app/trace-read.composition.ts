@@ -111,6 +111,8 @@ export type TraceReaderCompositionOptions = {
    * only carry the registry's enterprise ceiling.
    */
   requestBounds: TraceAppDependencies["requestBounds"];
+  /** The export door's rate window and in-flight slots, built by the app from process members. */
+  exportBounds: TraceAppDependencies["exportBounds"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 };
@@ -246,6 +248,7 @@ export function composeTraceAppDependencies(
     broadcast: options.broadcast,
     protections,
     requestBounds: options.requestBounds,
+    exportBounds: options.exportBounds,
     ...(options.apiKeys
       ? {
           legacyCredential: TraceLegacyCredentialService.create({

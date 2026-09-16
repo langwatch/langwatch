@@ -196,6 +196,7 @@ function deployment(access: CollectorAccess = {}) {
       codingAgents: peers.codingAgents,
       share: peers.share,
       requestBounds: peers.plans,
+      exportBounds: null,
     }),
   );
 

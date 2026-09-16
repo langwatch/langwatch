@@ -19,6 +19,33 @@ export class ExportFailedError extends HandledError {
 }
 
 /**
+ * The export door answered this project too often, or every in-flight slot is
+ * held. `fault` stays customer: the rate and the concurrency are the caller's
+ * own plan's, and the retry-after is theirs to wait out.
+ */
+export class TraceExportRateLimitedError extends HandledError {
+  declare readonly code: "trace_export_rate_limited";
+
+  constructor(input: { reason: "rate" | "concurrency"; retryAfterSeconds?: number | undefined }) {
+    super(
+      "trace_export_rate_limited",
+      input.reason === "rate"
+        ? "Too many trace exports started in the last minute"
+        : "Too many trace exports already running for this project",
+      {
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        ...(input.retryAfterSeconds !== undefined
+          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+          : {}),
+      },
+    );
+    this.name = "TraceExportRateLimitedError";
+  }
+}
+
+/**
  * No active auth session. Known cause the customer can act on (sign in again).
  * 401 status with registry-keyed copy (`unauthorized`).
  */

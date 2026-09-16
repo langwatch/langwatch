@@ -391,6 +391,12 @@ export type { TraceRequestCollectionResult } from "./services/ingestion/trace-in
 // shares, and the two refusals the transport publishes. filters is joined
 // to the analytics schema at the mount; see trace-export.vocabulary.ts.
 export { TraceExportService } from "./services/query/trace-export.service.ts";
+export { TraceExportBoundsService } from "./services/trace-export-bounds.service.ts";
+export type {
+  TraceExportBounds,
+  TraceExportSlot,
+  TraceExportSlotStore,
+} from "./services/trace-export-bounds.service.ts";
 export {
   exportFormatSchema,
   exportModeSchema,
