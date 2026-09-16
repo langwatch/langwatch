@@ -5594,6 +5594,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-client-web':
+        specifier: workspace:*
+        version: link:../../../packages/api-client-web
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
