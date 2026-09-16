@@ -2696,10 +2696,6 @@ const presentations = {
     describe: () =>
       "Your providers weren't asked, so no agent list is on the way. Ask your administrator to switch it on, or contact support — trying again won't help until they do.",
   },
-  ingestion_template_not_found: {
-    title: "Ingestion template not found",
-    describe: () => "It may have been archived or removed. Reload to see the current list.",
-  },
   platform_health_subsystem_not_found: {
     title: "No such subsystem",
     describe: () =>
@@ -2714,16 +2710,6 @@ const presentations = {
     title: "The platform is not healthy",
     describe: () =>
       "At least one subsystem did not answer. The report lists every subsystem and what each one said.",
-  },
-  platform_template_immutable: {
-    title: "This template can't be edited directly",
-    describe: () =>
-      "Platform-default templates are read-only. Fork it into your organization to add or edit its rules.",
-  },
-  invalid_source_type: {
-    title: "Enter a valid source type",
-    describe: () =>
-      "A source type can only use lowercase letters, digits, and underscores, up to 40 characters. Update it and try again.",
   },
   user_token_required: {
     title: "Sign in to do this",

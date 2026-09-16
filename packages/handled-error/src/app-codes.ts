@@ -238,7 +238,6 @@ export const APP_ERROR_CODES = [
   "ingestion_key_workspace_missing",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
-  "ingestion_template_not_found",
   "insufficient_permissions",
   // Also a Go code, with copy already written under the shared/transport
   // heading — the REST boundary in `packages/api` puts it on the wire as the
@@ -249,7 +248,6 @@ export const APP_ERROR_CODES = [
   "invalid_cursor",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
-  "invalid_source_type",
   "invite_already_accepted",
   "invite_expired",
   "invite_not_found",
@@ -422,7 +420,6 @@ export const APP_ERROR_CODES = [
   "platform_health_subsystem_not_found",
   "platform_health_unauthorized",
   "platform_health_unhealthy",
-  "platform_template_immutable",
   "project_cannot_archive_current",
   "project_creation_failed",
   "project_destination_team_not_found",

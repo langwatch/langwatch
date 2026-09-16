@@ -9,7 +9,7 @@ import {
   createRestRuntime,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
@@ -18,8 +18,9 @@ import {
   type IngestionTemplate,
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -115,17 +116,13 @@ function buildApi(
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
 
   const app = GovernanceApp.create({
+    dependencies: {
+      projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      organizations: createApiFixture<OrganizationApi>(),
+      permissions: createApiFixture<AuthzApi>(),
+    },
     members: {
       governance,
-      projects: {
-        getOrganizationId,
-        findInternal: unreachable<ProjectApi["findInternal"]>(),
-      },
-      organizations: {
-        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-        tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
-      },
-      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
       personalVirtualKeys: {
         isOrganizationMember:
           unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
