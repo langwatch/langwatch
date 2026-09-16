@@ -9,9 +9,8 @@ import type {
 
 /**
  * The identity write surface, sliced by ROLE (ADR-115): three collaborators
- * need three different verb subsets, each a real boundary (e.g. the
- * better-auth adapter must never verify). A named interface documents that
- * reason; a `Pick<IdentityService, …>` would just silently follow the class.
+ * need three different verb subsets, each a real boundary. A named
+ * interface documents that; a `Pick<IdentityService, …>` would just follow the class.
  */
 
 /** The verbs a better-auth ceremony can run (adapter.ts's whole reach). */

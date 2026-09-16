@@ -1,8 +1,7 @@
 /**
- * The address lock (ADR-116 §6): claims are taken atomically here, BEFORE the
- * proof is consumed, so two claims on the same address can no longer both pass
- * a read-then-write race before either write lands. It is a LOCK, not a truth
- * table — `Identifier` still records who holds which sign-in method.
+ * The address lock (ADR-116 §6): claims are atomic, BEFORE the proof is
+ * consumed, so two claims can't both pass a read-then-write race. A LOCK,
+ * not a truth table — `Identifier` still records who holds which method.
  */
 
 import type { Instant } from "@langwatch/time";

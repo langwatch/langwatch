@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
  * Replay parity for the `Identifier` projection (ADR-101 §3): incremental
- * maintenance must equal a rebuild from scratch. The live path round-trips
- * rows through `factToRow`/`rowToFact`, the same shape Prisma writes and
- * reads, so a lost column or memory-only field shows up here and nowhere else.
+ * maintenance must equal a rebuild from scratch, round-tripping rows through
+ * `factToRow`/`rowToFact` so a lost column shows up here and nowhere else.
  */
 import {
   emptyIdentityHeads,

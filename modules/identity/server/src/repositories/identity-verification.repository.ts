@@ -1,8 +1,7 @@
 /**
- * The verification ceremony's row-truth record (D01): pinned at mint to exactly one
- * (verificationId, identifierId, userId), hashed token, S256 challenge, TTL. The app stores it
- * on the better-auth Verification protocol table; the events carry only `verificationId` and
- * `method` — the token and verifier never appear in any fact (the payload rule).
+ * The verification ceremony's row-truth record (D01): hashed token, S256
+ * challenge, TTL, pinned at mint. Events carry only `verificationId` and
+ * `method` — the token and verifier never appear in any fact (payload rule).
  */
 export interface IdentityVerificationRecord {
   verificationId: string;

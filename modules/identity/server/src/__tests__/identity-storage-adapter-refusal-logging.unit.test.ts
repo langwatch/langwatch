@@ -1,9 +1,7 @@
 /**
  * A storage refusal is logged before it reaches the customer: better-auth
- * turns an adapter throw into a redirect carrying only the error CODE, so
- * production ran that failure with zero log lines naming it — undiagnosable
- * from the logs alone. Its own file since mocking the logger factory needs
- * hoisting above the adapter's module-level `createLogger` call.
+ * turns an adapter throw into a redirect carrying only the error CODE, which
+ * left production undiagnosable from the logs alone.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

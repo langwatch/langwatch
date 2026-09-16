@@ -95,10 +95,9 @@ export interface IdentityWriteGateState {
 }
 
 /**
- * The two mails a join request's own timers send (D12) — nobody asked for
- * them, so if the process holding the wakes cannot send them, nobody does.
- * The port takes resolved names/addresses: deciding WHO is told is this
- * package's job; WHAT they read is the composition root's.
+ * The two mails a join request's own timers send (D12). The port takes
+ * resolved names/addresses: WHO is told is this package's job, WHAT they
+ * read is the composition root's.
  */
 export interface JoinRequestMail {
   /** The one nudge, on the seventh day. Sent to one organization admin. */
@@ -125,11 +124,8 @@ export interface JoinRequestNotificationMail {
     requesterName: string;
     domain: string;
     /**
-     * How many requests from this domain have already been approved.
-     *
-     * An admin approving a third colleague from one domain is doing by hand
-     * what one setting does for them. Absent, or below the habit floor, the
-     * mail says nothing about it.
+     * How many requests from this domain have already been approved. Absent,
+     * or below the habit floor, the mail says nothing about it.
      */
     approvedFromDomainCount?: number;
   }): Promise<unknown>;
@@ -146,11 +142,8 @@ export interface JoinRequestNotificationMail {
     requesterEmail: string;
     organizationName: string;
     /**
-     * Why the organization came, where its row says.
-     *
-     * This message is the first one a new member gets, and unlike the sign-up
-     * confirmation it is sent when an organization already exists to have an
-     * answer. Absent falls back to the steps every reader can take.
+     * Why the organization came, where its row says it. Absent falls back to
+     * the steps every reader can take.
      */
     intent?: "AGENT_GOVERNANCE" | "LLM_OPS";
   }): Promise<unknown>;
@@ -166,10 +159,8 @@ export interface JoinRequestNotificationMail {
     requesterEmail: string;
     organizationName: string;
     /**
-     * A personal project of their own to work in meanwhile, when they have one.
-     *
-     * A second line and never the button: the thing this reader came for is the
-     * organization, and asking again is what they do next.
+     * A personal project to work in meanwhile, when they have one. A second
+     * line, never the button — the organization is what this reader came for.
      */
     personalProjectUrl?: string;
   }): Promise<unknown>;
@@ -181,10 +172,8 @@ export interface JoinRequestNotificationMail {
     memberName: string;
     domain: string;
     /**
-     * Seats held after this join, against what the plan covers.
-     *
-     * Absent for an organization on enterprise or negotiated terms, whose
-     * ceiling is its own rather than the public ladder's.
+     * Seats held after this join, against what the plan covers. Absent for
+     * enterprise/negotiated terms, whose ceiling is not the public ladder's.
      */
     seats?: { used: number; ceiling: number };
   }): Promise<unknown>;

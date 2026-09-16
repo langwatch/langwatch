@@ -92,10 +92,9 @@ export class IdentityVerificationInvalidError extends HandledError {
 }
 
 /**
- * The completion ceremony could not confirm either outcome yet: separate from
- * `invalid` (nothing was wrong) and from `expired` (the link is still good) —
- * it is the gap between VERIFIED and DEAD_END. `platform` fault and a 5xx on
- * purpose: the person did nothing wrong; a run of these means the fold is lagging.
+ * The completion ceremony could not confirm either outcome yet — the gap
+ * between VERIFIED and DEAD_END, separate from `invalid` and `expired`.
+ * `platform` fault and a 5xx on purpose: a run of these means the fold lags.
  */
 export class IdentityVerificationNotSettledError extends HandledError {
   constructor() {
@@ -522,12 +521,10 @@ export class IdentityEngineUnavailableError extends HandledError {
 }
 
 /**
- * An `account` storage operation the identity branch does not serve. `fault: "platform"`
- * because nothing the customer did caused it and nothing they can do fixes it: the library
- * asked for a shape we never taught the branch.
+ * An `account` storage operation the identity branch does not serve.
+ * `fault: "platform"` — nothing the customer did caused it. Held as a
+ * constant so a reader recognizes the code across a package boundary.
  */
-/** The refusal's machine name, held as a constant so a reader recognises it by
- *  code rather than by class identity across a package boundary. */
 export const IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE = "identity_unsupported_storage_query";
 
 export class IdentityUnsupportedStorageQueryError extends HandledError {

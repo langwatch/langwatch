@@ -36,10 +36,9 @@ export const mfaMethodSchema = z.enum(["totp"]);
 export type MfaMethod = z.infer<typeof mfaMethodSchema>;
 
 /**
- * How an enrollment ended. `password+totp` is the person themselves, having
- * re-proved both; `org-admin` is an administrator's reset for somebody whose
- * authenticator is gone. The distinction is the audit trail's whole point,
- * so it is a fact rather than something inferred from the actor's shape.
+ * How an enrollment ended: `password+totp` is the person re-proving both;
+ * `org-admin` is an administrator's reset. Recorded as a fact, not inferred
+ * from the actor's shape, because the audit trail depends on it.
  */
 export const mfaDisableViaSchema = z.enum(["password+totp", "org-admin"]);
 export type MfaDisableVia = z.infer<typeof mfaDisableViaSchema>;
@@ -78,11 +77,9 @@ export const backupCodeConsumedPayloadSchema = z.object({
 });
 
 /**
- * A fresh set replaced whatever was left. Not in D06's original event list,
- * and added because the spec asks for "Regenerating replaces every code that
- * was left" to be real: the plugin overwrites its own column on its own, but
- * the consumed POSITIONS live here, and without this fact they would carry
- * over onto a new set and make "how many are left" a lie.
+ * A fresh set replaced whatever was left. The plugin overwrites its own
+ * column on its own, but consumed POSITIONS live only here — without this
+ * fact they would carry over and make "how many are left" a lie.
  */
 export const backupCodesRegeneratedPayloadSchema = z.object({
   enrollmentId: z.string().min(1),
@@ -145,9 +142,7 @@ export type MfaEnrollmentLifecycleState = (typeof MFA_ENROLLMENT_STATES)[number]
 
 /**
  * One person's two-step verification, as the projection knows it. Every
- * field is a lifecycle fact; there is deliberately nowhere here a secret or
- * a code could be put, which is what makes "no rebuilt row holds a secret or
- * a code" a property of the type rather than of a test.
+ * field is a lifecycle fact — nowhere here can a secret or code be put.
  */
 export interface MfaEnrollmentState {
   userId: string;
@@ -191,10 +186,8 @@ export function remainingBackupCodes(state: MfaEnrollmentState): number {
 }
 
 /**
- * Whether this account can prove a second factor on its own — the account
- * half of an organization's membership condition. Only ENABLED counts: a
- * setup that was started and never confirmed proves nothing, and one that
- * was turned off or expired proves nothing any more.
+ * Whether this account can prove a second factor on its own. Only ENABLED
+ * counts — unconfirmed, turned-off, and expired all prove nothing.
  */
 export function canProveSecondFactor(state: MfaEnrollmentState): boolean {
   return state.state === "ENABLED";
@@ -318,10 +311,8 @@ export type ExpireMfaEnrollmentCommandData = z.infer<typeof expireMfaEnrollmentC
 export const disableMfaCommandDataSchema = userTenantedCommandSchema({
   via: mfaDisableViaSchema,
   /**
-   * Slugs of the organizations this person belongs to that require a second
-   * factor, as the caller resolved them. Non-empty refuses the disable: the
-   * guard names them back so the screen can say WHICH organization is
-   * asking, and reads the requirement rather than trusting a boolean.
+   * Organizations requiring a second factor, as the caller resolved them.
+   * Non-empty refuses the disable, naming WHICH organization is asking.
    */
   requiringOrganizationSlugs: z.array(z.string().min(1)),
   occurredAtMs: z.number().int().nonnegative(),

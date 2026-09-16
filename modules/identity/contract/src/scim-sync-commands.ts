@@ -38,11 +38,9 @@ const commandIdentitySchema = z.object({
 });
 
 /**
- * Every sync command carries the identity block AND the invariant that makes
- * it one history per organization: `tenantId === organizationId`. A caller
- * wiring them differently would persist events under one tenant's stream and
- * fold them into another organization's projection, which nothing downstream
- * can detect. Refused at the wire boundary instead.
+ * Every sync command enforces `tenantId === organizationId`. Wiring them
+ * differently would fold events into another organization's projection
+ * undetectably downstream — refused at the wire boundary.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema.extend(shape).refine(

@@ -65,23 +65,10 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
     });
 
     // What gets announced is what was RECORDED, never what this thread
-    // decided (ADR-135).
-    //
-    // `expireJoin` used to be read for its return value, which is the facts
-    // the guard produced ON THIS THREAD. The same guard runs again on the
-    // queue, against state that may have moved in between, and the queue's run
-    // is the one whose events are stored. An administrator approving inside
-    // the expiry window is exactly that divergence: the calling path reads
-    // PENDING and states an expiry, the approval folds first, the queue's
-    // re-run reads APPROVED and states nothing. Gating the email on the
-    // returned facts sent that person a notice that their request had lapsed,
-    // moments after it was in fact granted — which this function's own comment
-    // already called worse than telling them nothing.
-    //
-    // So the projection is what is read, and only the PENDING -> EXPIRED
-    // transition is announced. Requiring the transition rather than merely the
-    // end state is what keeps a replayed wake silent about a request that
-    // expired an hour ago and was already announced then.
+    // decided (ADR-135): reading the guard's own return value could send an
+    // expiry notice for a request the queue's re-run actually approved.
+    // Requiring the PENDING -> EXPIRED transition, not just the end state,
+    // keeps a replayed wake silent about an expiry already announced.
     if (before?.state !== "PENDING") return;
 
     const recorded = await this.reads.tryFindRequest({ joinRequestId });
@@ -94,14 +81,10 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
       return;
     }
 
-    // Still PENDING here means the fold has not landed — the ledger's
-    // read-your-writes window was already spent inside `expireJoin`, so this
-    // is the projection genuinely lagging rather than a wake that fired early.
-    // Nothing is sent, because a notice we cannot substantiate is the failure
-    // this whole change exists to remove; but an expiry nobody is ever told
-    // about is its own quiet defect, so it is said out loud here rather than
-    // returning in silence. Any other state is the ordinary case of somebody
-    // having answered the request first, and is not worth a line.
+    // Still PENDING means the fold hasn't landed (read-your-writes was
+    // already spent inside `expireJoin`) — genuine lag, not an early wake.
+    // Nothing is sent, since an unsubstantiated notice is the failure this
+    // exists to remove; logged so a silent expiry isn't a quiet defect too.
     if (recorded?.state === "PENDING") {
       logger.warn(
         { joinRequestId, organizationId },

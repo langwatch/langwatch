@@ -4,10 +4,9 @@ import type { JoinSetting } from "../../rules/join-requests-contract.rules.ts";
 import { PrismaJoinCandidateRepository } from "./prisma.join-request.repository.ts";
 
 /**
- * The organization's joining setting, as two plain columns. Not event-sourced,
- * on purpose: it is configuration an administrator sets, like every other
- * organization setting, and the thing that needs a history is the requests it
- * produces rather than the switch itself.
+ * The organization's joining setting, as two plain columns. Not
+ * event-sourced on purpose — the requests it produces need history, not
+ * the switch itself.
  */
 export class PrismaJoinSettingRepository implements JoinSetting {
   static create(prisma: PrismaClient): PrismaJoinSettingRepository {

@@ -33,10 +33,8 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
 
 /**
  * Why removing this identifier would strand the person, or null. Pure and
- * exported because two callers need the SAME answer (the detach guard, and
- * the settings surface's Remove control) — a screen with its own rule would
- * drift from this one. Doesn't read the subject's own state, only what
- * would be LEFT, so it answers the same for VERIFIED and PRIMARY.
+ * exported so the detach guard and the Remove control share ONE answer,
+ * never a screen's own drifting rule. Reads only what would be LEFT.
  */
 export function detachStrandsUser({
   heads,

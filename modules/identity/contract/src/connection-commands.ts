@@ -26,12 +26,9 @@ export const RESUME_CONNECTION_COMMAND_TYPE = "lw.identity.resume_connection" as
 export const REQUEST_TEARDOWN_COMMAND_TYPE = "lw.identity.request_teardown" as const;
 export const COMPLETE_TEARDOWN_COMMAND_TYPE = "lw.identity.complete_teardown" as const;
 /**
- * The one command that STATES HISTORY rather than commanding a change: the
- * grandfather migration's, which records what an organization's `ssoDomain`
- * and `ssoProvider` strings have been doing all along as the history a
- * connection would have had. It creates a connection or it does nothing;
- * it can never move one that already exists, so it cannot be a way around a
- * guard (ADR-117 §5: "grandfathering never weakens a guard").
+ * The one command that STATES HISTORY rather than commands a change: the
+ * grandfather migration's. Creates a connection or does nothing — never
+ * moves an existing one, so it cannot be a way around a guard (ADR-117 §5).
  */
 export const GRANDFATHER_CONNECTION_COMMAND_TYPE = "lw.identity.grandfather_connection" as const;
 
@@ -69,11 +66,9 @@ const commandIdentitySchema = z.object({
 });
 
 /**
- * Every connection command carries the identity block AND the invariant that
- * makes it one history per organization: `tenantId === organizationId`. A
- * caller wiring them differently would persist events under one tenant's
- * stream and fold them into another organization's projection, which nothing
- * downstream can detect. Refused at the wire boundary instead.
+ * Every connection command enforces `tenantId === organizationId`. Wiring
+ * them differently would fold events into another organization's
+ * projection undetectably downstream — refused at the wire boundary.
  */
 function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
   return commandIdentitySchema.extend(shape).refine(

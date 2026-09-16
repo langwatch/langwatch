@@ -103,10 +103,9 @@ describe("the instance sign-in method policy", () => {
     });
 
     /**
-     * Break-glass is the door somebody reaches for when the identity provider
-     * cannot be answered, and it has to work from any machine. A passkey is
-     * bound to one device, so a set that names it is a break-glass that fails
-     * exactly for the person who needs it — sitting at a different machine.
+     * Break-glass has to work from any machine. A passkey is bound to one
+     * device, so naming it in the set would fail exactly the person who
+     * needs break-glass — sitting at a different machine.
      */
     it("keeps the passkey out of the break-glass set", async () => {
       const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
@@ -118,11 +117,9 @@ describe("the instance sign-in method policy", () => {
 
   describe("given a license gate that denies", () => {
     /**
-     * The gate evicts its memo on rejection (ADR-027 Decision 6, self-healing),
-     * so a second read is a second licensing scan behind its own timeout — and
-     * one unauthenticated request then holds several slow database reads open
-     * exactly when the database is already struggling. A denial is email mode
-     * by definition, so there is nothing the second read could add.
+     * The gate evicts its memo on rejection (ADR-027 Decision 6): a second
+     * read would be a second licensing scan, holding slow database reads
+     * open exactly when the database is already struggling.
      */
     it("does not ask the provider resolver a second question", async () => {
       licensedStore(false);

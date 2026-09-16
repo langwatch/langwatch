@@ -15,12 +15,9 @@ export type EventingJoinRequestLifecycleOptions = {
 };
 
 /**
- * What the two wakes actually do (D12): send the one reminder, and dispatch
- * the guarded `expireJoin` command.
- *
- * A command rather than a projection write, and that is the point — the
- * process manager decides WHEN, the guard still decides WHETHER. It re-reads
- * the folded deadline, so a wake that fires early expires nothing.
+ * What the two wakes actually do (D12): send the reminder, dispatch the
+ * guarded `expireJoin` command. The manager decides WHEN, the guard
+ * WHETHER — it re-reads the deadline, so an early wake expires nothing.
  */
 export class PrismaJoinRequestLifecycleRepository implements JoinRequestLifecycle {
   static create(options: EventingJoinRequestLifecycleOptions): PrismaJoinRequestLifecycleRepository {

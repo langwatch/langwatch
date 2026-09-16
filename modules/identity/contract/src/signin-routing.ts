@@ -65,10 +65,9 @@ export function isLocalSignInMethod(method: SignInMethod): boolean {
 }
 
 /**
- * The connection lifecycle as ROUTING sees it. D04's aggregate carries the
- * full lifecycle (DRAFT → … → TORN_DOWN, ADR-117 §5); routing only ever needs
- * to know whether a connection is serving traffic, has been paused by a human
- * (which the guidance screens name), or is neither.
+ * The connection lifecycle as ROUTING sees it — not D04's full aggregate
+ * lifecycle (ADR-117 §5), only whether a connection serves traffic, was
+ * paused by a human, or is neither.
  */
 export const SSO_CONNECTION_ROUTING_STATES = ["ACTIVE", "SUSPENDED", "INACTIVE"] as const;
 export type SsoConnectionRoutingState = (typeof SSO_CONNECTION_ROUTING_STATES)[number];
@@ -125,10 +124,8 @@ export const SIGNIN_ROUTING_OUTCOMES = [
   "redirect_to_connection",
   "method_picker",
   /**
-   * Nobody holds this address, so the journey is a sign-up. Its own outcome
-   * rather than a picker with an empty method set: the screen that answers it
-   * asks for a confirmation link, not for a credential, and a caller reading
-   * `methodSet` to decide what to draw would draw nothing.
+   * Nobody holds this address, so the journey is a sign-up. Its own outcome,
+   * not an empty-method picker: the screen asks for a confirmation link.
    */
   "route_to_signup",
 ] as const;
@@ -162,11 +159,8 @@ export const routingDecisionSchema = z.object({
 });
 
 /**
- * What the identified account holds, as the account lookup answers it.
- *
- * Kinds, never material. "This account can sign in with a passkey" is what
- * the screen needs to know to offer one; which passkey, on which device,
- * registered when, is not, and the engine is the wrong place for any of it.
+ * What the identified account holds, as the account lookup answers it. Kinds,
+ * never material — "can sign in with a passkey", never which one or when.
  */
 export interface AccountSignInMethods {
   hasPassword: boolean;
@@ -236,11 +230,9 @@ const picker = (
 ): RoutingDecision => ({ outcome: "method_picker", methodSet, reasonCode });
 
 /**
- * A connection would route. Policy gets the last word: an unlicensed or
- * unmounted method is not offered anywhere, and the person lands on the local
- * set with a reason code that says which of the two happened. Falling back to
- * `localMethods` rather than `defaultMethods` is deliberate — the defaults are
- * what a licensed deployment offers, and reaching here means they are not.
+ * A connection would route, but policy gets the last word: an unlicensed or
+ * unmounted method falls back to `localMethods`, not `defaultMethods` — the
+ * defaults are what a licensed deployment offers, and this is not that.
  */
 function redirectOrFall({
   connection,
@@ -330,11 +322,9 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
 }
 
 /**
- * The router's decision, expressed in the one word the LEGACY path answers:
- * `resolveAuthProvider()` returns `"email"` or the id of the IdP the sign-in
- * page auto-redirects to, and that is the entire routing decision the legacy
- * front door makes. Projecting the router onto it is what makes shadow mode a
- * comparison rather than two unrelated logs (ADR-117 §7).
+ * The router's decision, expressed as the LEGACY path does:
+ * `resolveAuthProvider()` returns `"email"` or an IdP id. Projecting onto it
+ * is what makes shadow mode a comparison, not two unrelated logs (ADR-117 §7).
  */
 export function legacyProviderOf(decision: RoutingDecision): string {
   if (decision.outcome === "redirect_to_connection") {

@@ -4,12 +4,8 @@ import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing"
 export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as const;
 
 /**
- * How long a request waits for an answer.
- *
- * Fourteen days, matching an invitation's own expiry (D11): the two sit in
- * one panel and a person who holds one of each should not have to remember
- * that they lapse on different schedules. It is also long enough that a
- * holiday does not silently cost somebody their team.
+ * How long a request waits for an answer: fourteen days, matching an
+ * invitation's own expiry (D11) so the two lapse on the same schedule.
  */
 export const JOIN_REQUEST_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -35,12 +31,9 @@ export const expireRequestIntentSchema = z.object({
 });
 
 /**
- * What the process holds while a request is open.
- *
- * Two deadlines and one flag, because a process instance has exactly ONE
- * `nextWakeAt` column: the day-7 wake re-arms itself to the day-14 deadline
- * rather than a second timer existing. `remindedAt` is what makes the
- * reminder exactly-once even if the wake is redelivered.
+ * What the process holds while a request is open. One `nextWakeAt` column
+ * means the day-7 wake re-arms to the day-14 deadline; `remindedAt` makes
+ * the reminder exactly-once under redelivery.
  */
 export interface JoinRequestLifecycleState {
   remindAtMs: number | null;
@@ -96,12 +89,9 @@ export const onJoinRequested: EventHandler<
 };
 
 /**
- * Disarm. Every ending is terminal, so a request that reached one has nothing
- * left to wake for — and a wake that still fired would dispatch a command the
- * guard refuses and send a reminder about a request nobody can answer.
- *
- * This is what "no reminder and no expiry wake follows" means mechanically
- * for a withdrawal.
+ * Disarm. Every ending is terminal: nothing is left to wake for, and a wake
+ * that still fired would dispatch a command the guard refuses and send a
+ * reminder about a request nobody can answer.
  */
 export const onJoinResolved: EventHandler<
   JoinRequestLifecycleState,

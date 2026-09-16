@@ -1,9 +1,7 @@
 /**
- * Builds the {@link IdentityInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/features/identity/identity.composition.ts` and
- * `apps/api/src/app/api-identity-pipelines.composition.ts`, both deleted by
- * b383462d96). `IdentityApp.create` now builds it itself from the two members
- * it reads — `prisma` and `eventing` — plus its own config.
+ * Builds the {@link IdentityInfrastructure} that `IdentityApp.create` used to
+ * receive hand-composed. It now builds this itself from the two members it
+ * reads — `prisma` and `eventing` — plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
@@ -126,10 +124,8 @@ const SSO_CONNECTION_COMMAND_NAMES = [
 
 /**
  * This process's own producer-only registration of the four identity
- * pipelines, and the module's implementation of {@link IdentityEventing} over
- * the senders it resolved. Registering here — inside the module that reads
- * `eventing` — rather than in a process composition root is the whole point
- * of the App declaring `reads(...)`.
+ * pipelines, implementing {@link IdentityEventing} over the resolved senders.
+ * Registering here is the whole point of the App declaring `reads(...)`.
  */
 class RegisteredIdentityEventing implements IdentityEventing {
   static create(eventing: EventSourcing): RegisteredIdentityEventing {
@@ -190,20 +186,8 @@ const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<string
 
 /**
  * The senders of the four identity registrations a process makes SOMEWHERE
- * ELSE, resolved at the first send rather than at composition.
- *
- * A process that drains the ledgers composes Identity's read graph BEFORE its
- * install phase runs, and the install phase is what registers the complete
- * Postgres definitions. So there is nothing to resolve yet when this is built,
- * and there is no second registration to make: one runtime holds one pipeline
- * per name, and a producer-only definition registered beside the full one
- * would either be refused — which is what killed the combined backend boot —
- * or win the name and answer every guard read with a stand-in that refuses.
- *
- * The verb lists still gate: a command outside them answers `null` exactly as
- * the registering shape does, and a listed command missing from the process's
- * own registration THROWS by name, which is the late equivalent of that
- * shape's boot-time refusal.
+ * ELSE, resolved at first send because nothing exists to resolve until the
+ * install phase registers the full definition.
  */
 class ProcessRegisteredIdentityEventing implements IdentityEventing {
   static create(eventing: EventSourcing): ProcessRegisteredIdentityEventing {
@@ -233,10 +217,9 @@ class ProcessRegisteredIdentityEventing implements IdentityEventing {
 }
 
 /**
- * Lifted verbatim (Step 8's rule) from `postgres.sso-connection-pipeline.adapter.ts`'s
- * ledger writer, over this process's own `eventing`. Every command not
- * currently staged answers `null`, which the guards read as "not commandable
- * on this process".
+ * Lifted verbatim (Step 8's rule) from the sso-connection-pipeline ledger
+ * writer, over this process's own `eventing`. Not-yet-staged commands answer
+ * `null`, which guards read as "not commandable on this process".
  */
 function ssoConnectionLedger(options: {
   prisma: ProcessMembers["prisma"];

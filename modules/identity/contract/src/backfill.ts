@@ -3,9 +3,8 @@ import { isLiveIdentifierState } from "./vocabulary.ts";
 
 /**
  * The backfill's parity policy (ADR-101 §6): what the fold-built rows must
- * look like for a user to count as proven, stated as pure functions over
- * row shapes. `@langwatch/identity-server`'s IdentityBackfillService drives
- * the pass; this module only says what agreement means.
+ * look like for a user to count as proven, as pure functions over row
+ * shapes. This module only says what agreement means.
  */
 
 export interface BackfillIdentifierRow {

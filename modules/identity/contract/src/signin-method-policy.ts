@@ -86,13 +86,10 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
   }
 
   async resolvePolicy(): Promise<SignInMethodPolicy> {
-    // Resolved ONCE, and every branch below reads this answer rather than
-    // asking the gate again. On the healthy path re-asking was free (the memo
-    // answers); on the failure path it was not — the gate evicts its memo on
-    // rejection (ADR-027 Decision 6, self-healing), so each extra await
-    // recomputed a licensing scan behind its own timeout, and one
-    // unauthenticated request held several slow database reads open exactly
-    // when the database was already struggling.
+    // Resolved ONCE; every branch below reads this answer. The gate evicts
+    // its memo on rejection (ADR-027 Decision 6), so re-asking on the
+    // failure path would hold slow database reads open exactly when the
+    // database is already struggling.
     const federationLicensed = await this.inputs.federationLicensed();
     // DENY is email mode by definition (ADR-027 Decision 2), which is also what
     // `resolveAuthProvider` would conclude — skipping it here spends no second
@@ -108,13 +105,9 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
 
     return {
       defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
-      // NOT the passkeys. Break-glass is the door somebody reaches for when the
-      // identity provider cannot be answered, and the whole reason it exists is
-      // that anybody can use it from any machine — which is exactly what a
-      // credential bound to one device is not. `PASSKEY_METHOD` says so where
-      // it is defined; this is the line that has to agree with it. Appending
-      // them here was invisible while the plugin was behind a setting that
-      // defaulted off, and would go live the moment it is not.
+      // NOT the passkeys. Break-glass works from any machine, which a
+      // credential bound to one device does not — this line has to agree
+      // with `PASSKEY_METHOD`'s own definition.
       localMethods: LOCAL_METHOD_SET,
       federationLicensed,
       // Only a self-hosted deployment auto-redirects on its sole connection.

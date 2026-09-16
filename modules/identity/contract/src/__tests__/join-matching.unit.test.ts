@@ -13,10 +13,8 @@ import {
 
 /**
  * The offers behind an `ask`, or a failure naming the outcome that arrived.
- *
- * Narrowing rather than casting: a decision that stopped being `ask` fails
- * here, where the message says what it became, instead of reading
- * `organizations` off a variant that does not have them.
+ * Narrowing, not casting: a decision that stopped being `ask` fails here
+ * rather than reading `organizations` off a variant without them.
  */
 function asked(decision: JoinLookupDecision): readonly JoinOffer[] {
   if (decision.outcome !== "ask") {

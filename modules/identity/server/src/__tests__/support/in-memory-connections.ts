@@ -12,10 +12,9 @@ import type {
 } from "../../repositories/sso-connection.repository.ts";
 
 /**
- * The connection guards' three reads, in memory — and, deliberately, the SAME
- * reducer the projection folds with. A test double that maintained its own
- * idea of what an event does to a connection would let a guard pass against
- * a state the real projection never produces.
+ * The connection guards' three reads, in memory — using the SAME reducer the
+ * projection folds with, so a guard can never pass against a state the real
+ * projection never produces.
  */
 export class InMemoryConnections implements SsoConnectionReadRepository {
   private readonly states = new Map<string, SsoConnectionState>();
@@ -83,9 +82,8 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
 
 /**
  * Which actors this deployment counts as LangWatch platform operators. A set
- * of ids rather than a boolean, so a test can hold an operator and an
- * organization administrator at once — which is the shape every scenario
- * about who may attest a domain actually needs.
+ * of ids, not a boolean, so a test can hold an operator and an
+ * organization administrator at once.
  */
 export class StubPlatformOperators implements SsoPlatformOperatorRepository {
   private readonly operators: Set<string>;

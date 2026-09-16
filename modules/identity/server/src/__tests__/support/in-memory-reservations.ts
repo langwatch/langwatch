@@ -4,10 +4,9 @@ import type {
 } from "../../repositories/identity-reservations.repository.ts";
 
 /**
- * The address lock, in memory (ADR-116 §6). A `Map` insert is atomic here for the same reason
- * the Postgres primary key is atomic there: the first writer wins and every later one reads the
- * winner's row back. That is the whole contract, so a suite driving the guards over this
- * exercises the real decision rather than a stub that always says yes.
+ * The address lock, in memory (ADR-116 §6). A `Map` insert is atomic, same
+ * as the Postgres primary key: first writer wins, everyone else reads that
+ * row back — the real decision, not a stub that always says yes.
  */
 export class InMemoryReservations implements IdentityReservationRepository {
   readonly held = new Map<string, IdentifierReservationHolder>();

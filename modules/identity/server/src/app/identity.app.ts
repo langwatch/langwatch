@@ -1,8 +1,7 @@
 /**
- * The identity feature's application: the guards, the ledger writer, the
- * backfill pass, the newborn sweep, the join-request and SSO-connection
- * guards, and the directory-sync guards - every capability that crosses a
- * package boundary today (`IdentityApi`, ADR-101, ADR-115, ADR-116, ADR-117).
+ * The identity feature's application: guards, ledger writer, backfill,
+ * newborn sweep, join-request/SSO-connection/directory-sync guards — every
+ * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
@@ -40,10 +39,9 @@ import { IdentitySecretHealMigrationAdapter } from "../services/system-migration
  */
 const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 /**
- * Config schema: `ADMIN_EMAILS`, the deployment's platform-operator list, for
- * the SSO connection guards' D05 tier-1 check. Defaults to none rather than
- * refusing at boot, because a process that composes no operators still
- * composes every other identity capability.
+ * Config schema: `ADMIN_EMAILS`, the platform-operator list for the SSO
+ * connection guards' D05 tier-1 check. Defaults to none rather than refusing
+ * at boot — every other identity capability still composes.
  */
 const identityAppConfigSchema = z.object({
   adminEmails: z.array(z.string()).default([]),

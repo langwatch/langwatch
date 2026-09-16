@@ -1,7 +1,6 @@
 /**
  * Who a join-request notification reaches, and what they are called.
- * `JoinRequestReadRepository` owns membership decisions (counts/enums only);
- * absences here are real, not defensive — an unwritten fold, a renamed org,
+ * Absences here are real, not defensive — an unwritten fold, a renamed org,
  * an addressless user — and the service above decides what each one means.
  */
 export abstract class JoinRequestAudience {

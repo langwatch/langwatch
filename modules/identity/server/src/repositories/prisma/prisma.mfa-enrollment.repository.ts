@@ -27,11 +27,9 @@ export class PrismaMfaEnrollmentRepository implements MfaEnrollmentRepository {
   }
 
   /**
-   * The organizations this person belongs to that require a second factor. Read here rather
-   * than trusted from the command, so a caller working from a stale membership list cannot turn
-   * the factor off and keep the access. Read as a NESTED select off the person, not a top-level
-   * `organizationUser.findMany`: this question spans every organization one person belongs to,
-   * so `guardOrganizationId` (ADR-021) would refuse it as a 500 rather than a skipped check.
+   * Organizations this person belongs to that require a second factor. Read
+   * here, not trusted from the command, so a stale list can't turn the
+   * factor off. A NESTED select — a top-level query would need `guardOrganizationId` (ADR-021).
    */
   async findRequiringOrganizationSlugs({ userId }: { userId: string }): Promise<readonly string[]> {
     const person = await this.database.user.findUnique({

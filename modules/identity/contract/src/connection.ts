@@ -51,9 +51,8 @@ export type SsoVerificationCeremonyMethod = z.infer<typeof ssoVerificationCeremo
 
 /**
  * Where a connection came from. `legacy-grandfathered` is stamped on every
- * event the grandfather migration emits, so an operator reading a
- * connection's history can always tell which ones a human configured and
- * which the migration inferred from two string columns.
+ * migration-emitted event, so an operator can tell human-configured from
+ * migration-inferred.
  */
 export const SSO_CONNECTION_SOURCES = ["self-serve", "legacy-grandfathered"] as const;
 export const ssoConnectionSourceSchema = z.enum(SSO_CONNECTION_SOURCES);
@@ -296,11 +295,8 @@ export type SsoConnectionFact = SsoConnectionFactInput & { occurredAt: number };
 
 /**
  * What proved one domain, kept per domain and forever (D05 amendment). The
- * price of an attestation standing indefinitely is that the weaker evidence
- * must never become invisible, so the method rides on the connection itself
- * rather than only in the log: every surface that reads a connection reads
- * this too, and an attested domain cannot be presented as one the customer
- * proved.
+ * method rides on the connection itself, not only the log, so an attested
+ * domain can never be presented as one the customer proved.
  */
 export interface SsoDomainVerification {
   domain: string;
@@ -397,11 +393,9 @@ const withVerification = (
 ];
 
 /**
- * The reducer. Pure and total: every fact answers a next state, and the
- * same function runs in the framework's fold, in the replay proof and in a
- * browser tab. A fact the state machine forbids never reaches here — the
- * guards refuse before any fact exists — so this file states transitions
- * rather than re-checking them.
+ * The reducer. Pure and total: the same function runs in the framework's
+ * fold, the replay proof, and a browser tab. Guards refuse a forbidden fact
+ * before it exists, so this file states transitions, never re-checks them.
  */
 export function reduceSsoConnection({
   state,
@@ -561,11 +555,9 @@ export interface ConnectionRoutingComparison {
 }
 
 /**
- * The one comparison `SSOCONN_ROUTING` shadow mode runs on every live login
- * and the grandfather migration runs per domain to earn `finalized`. Pure, so
- * the thing the bake gate counts is the same function the migration's proof
- * calls and a test can enumerate — and so computing it can never be what
- * changes a sign-in.
+ * The one comparison shadow mode runs on every login and the grandfather
+ * migration runs per domain to earn `finalized`. Pure, so computing it can
+ * never be what changes a sign-in.
  */
 export function compareConnectionRouting({
   legacy,

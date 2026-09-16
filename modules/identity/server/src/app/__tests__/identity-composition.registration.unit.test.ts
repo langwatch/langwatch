@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * Which process registers the four identity pipelines. Two registration shapes share the same
- * four names; one runtime holds one per name. The draining process composes Identity's read
- * graph before install, so it registers nothing here — registering the producer set too is what
- * killed the combined backend boot on `Pipeline "identity" is already registered`.
+ * Which process registers the four identity pipelines: two registration
+ * shapes share the same names, and only one runtime holds one per name.
  * Spec: modules/identity/specs/identity-pipeline-registration-ownership.feature
  */
 import type { EventSourcing } from "@langwatch/eventing";
@@ -18,9 +16,8 @@ import { buildIdentityInfrastructure } from "../identity-composition.build.ts";
 
 /**
  * An `EventSourcing` that records what a composition asked of it, standing in
- * for the runtime the process owns. `getPipeline` answers only what has been
- * registered, exactly as the real one does - a lookup before the install phase
- * throws rather than answering emptily.
+ * for the runtime the process owns. `getPipeline` throws before install,
+ * exactly as the real one does, rather than answering emptily.
  */
 function recordingRuntime() {
   const registered: string[] = [];
@@ -71,10 +68,9 @@ function recordingRuntime() {
 }
 
 /**
- * The database seam, unused: every repository this build constructs stores the
- * client and touches it on a call, and no test here makes one. Typed off the
- * build's own parameter rather than by naming `PrismaClient`, which belongs to
- * the repository layer.
+ * The database seam, unused here: every repository this build constructs
+ * stores the client but no test makes a call. Typed off the build's own
+ * parameter rather than naming `PrismaClient`, which belongs to the repository.
  */
 type IdentityBuildInput = Parameters<typeof buildIdentityInfrastructure>[0];
 

@@ -65,12 +65,9 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
   }
 
   /**
-   * The callback of a provider that asserts its OWN issuer. Google, GitHub, GitLab and Azure AD
-   * are keyed by better-auth on the issuer the provider states, not one we mint, matched here via
-   * `@@index([issuer, providerAccountId])`. Returns the row's `providerId` too, since a provider
-   * subject is unique only WITHIN an issuer — deriving it from the issuer instead would risk
-   * answering with another IdP's user. A null `providerId` backs no protocol account, so it
-   * resolves nobody here.
+   * The callback of a provider that asserts its OWN issuer, matched via
+   * `@@index([issuer, providerAccountId])`. Returns `providerId` too: a
+   * subject is unique only WITHIN an issuer, never derived from it alone.
    */
   async resolveByIssuerSubject({
     issuer,
@@ -128,9 +125,8 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
 
   /**
    * Records that this identifier answered (`Identifier.lastUsedAt`).
-   * Fire-and-forget: a sign-in must never fail or wait on this write. Records
-   * a RESOLUTION, not an authentication — the password/passkey/IdP check
-   * still runs after this returns.
+   * Fire-and-forget — a sign-in must never fail or wait on this write, and
+   * it records a RESOLUTION, not an authentication.
    */
   private touchLastUsed(identifierId: string): void {
     void this.prisma.identifier

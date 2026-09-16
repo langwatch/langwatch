@@ -130,10 +130,9 @@ export interface IdentityStack {
 }
 
 /**
- * The memory engine standing in for the current legacy Prisma account table.
- * `Account` now has an issuer column; the wrapper remains the named fixture
- * for tests that pin translation against that real schema rather than against
- * an earlier, issuer-less version of it.
+ * The memory engine standing in for the current legacy Prisma account table
+ * (now with an issuer column). Named so tests pin translation against that
+ * real schema, not an earlier, issuer-less version.
  */
 function schemaBoundLegacyEngine(db: MemoryDB) {
   return memoryAdapter(db);

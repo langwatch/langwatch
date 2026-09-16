@@ -23,10 +23,8 @@ type Stack = IdentityStack;
 const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
 
 /**
- * The email attach facts the STORE holds, by their `commandId:index` key.
- *
- * The projection can converge for its own reasons — the guard reads the heads
- * — so the store is where "the retry cost no row" is actually visible.
+ * The email attach facts the STORE holds, by their `commandId:index` key —
+ * where "the retry cost no row" is actually visible (the guard reads heads).
  */
 const emailFactsHeld = (stack: Stack) =>
   [...stack.events.rows.values()].filter(
@@ -93,12 +91,10 @@ describe("better-auth over the born-finalized entrance", () => {
 
         await flaggedSignUp(stack.auth, EMAIL);
 
-        // The retry derived the same user id from the same address, so it
-        // restated the same command, and wrote the rows the first attempt
-        // never did. WHICH layer absorbs the restatement depends on the
-        // clock — inside a second the guard finds the identifier already in
-        // the heads, across one the store finds the key already taken — so
-        // this asserts the outcome and the test below pins the harder path.
+        // The retry derived the same user id, restated the same command, and
+        // wrote the rows the first attempt never did. WHICH layer absorbs it
+        // depends on the clock, so this asserts the outcome only; the test
+        // below pins the harder path.
         expect(userIdOf(stack)).toBe(firstUserId);
         expect(stack.db.user).toHaveLength(1);
         expect(

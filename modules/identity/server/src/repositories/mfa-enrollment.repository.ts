@@ -17,10 +17,9 @@ export abstract class MfaEnrollmentRepository {
    *  the question the same way. */
   abstract findEnrollment(args: { userId: string }): Promise<MfaEnrollmentState>;
   /**
-   * Slugs of the organizations this person belongs to that require a second
-   * factor. Read rather than trusted from the caller: the disable guard has
-   * to name WHICH organization is asking, and a caller that computed it
-   * itself could be working from a stale membership list.
+   * Organizations requiring a second factor. Read, not trusted from the
+   * caller: the disable guard must name WHICH organization is asking, not
+   * work from a caller's possibly-stale membership list.
    */
   abstract findRequiringOrganizationSlugs(args: { userId: string }): Promise<readonly string[]>;
 }

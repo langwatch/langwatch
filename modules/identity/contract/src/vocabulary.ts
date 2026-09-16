@@ -1,10 +1,9 @@
 import { z } from "zod";
 
 /**
- * The identity vocabulary (ADR-101, D01): what an identifier is called, the
- * states it moves through, and the two arrival rules everything else rests
- * on. Pure data and pure functions, so the sign-in screens (D13) and the
- * server read the same words.
+ * The identity vocabulary (ADR-101, D01): what an identifier is called, its
+ * states, and the two arrival rules everything rests on. Pure data and
+ * functions, so sign-in screens (D13) and the server read the same words.
  */
 
 /** The widened provider vocabulary (D01). `auth0-legacy` / `okta-legacy`
@@ -35,11 +34,9 @@ export const IDENTIFIER_LIFECYCLE_STATES = [
 export type IdentifierLifecycleState = (typeof IDENTIFIER_LIFECYCLE_STATES)[number];
 
 /**
- * An identifier arrives ATTACHED or VERIFIED, never further along:
- * OAuth/SSO ceremonies and account-control providers (credential, passkey)
- * arrive VERIFIED (R8 — the ceremony itself is the proof), `email` arrives
- * ATTACHED and verifies via the magic-link ceremony. PRIMARY, DEAD_END and
- * DETACHED are transitions, not arrivals — each has its own event.
+ * An identifier arrives ATTACHED or VERIFIED, never further along (R8):
+ * OAuth/SSO and account-control providers arrive VERIFIED, `email` arrives
+ * ATTACHED. PRIMARY, DEAD_END, DETACHED are transitions, not arrivals.
  */
 export const identifierArrivalStateSchema = z.enum(["ATTACHED", "VERIFIED"]);
 export type IdentifierArrivalState = z.infer<typeof identifierArrivalStateSchema>;
@@ -54,11 +51,9 @@ export const identityActorSchema = z.object({
 export type IdentityActor = z.infer<typeof identityActorSchema>;
 
 /**
- * R8 arrival semantics: OAuth/SSO ceremonies arrive VERIFIED (the ceremony
- * is the proof), credential/passkey are verified at creation (account
- * control, not mailbox), `email` arrives ATTACHED and verifies via the
- * magic-link ceremony. Legacy-migration providers arrive VERIFIED — D09
- * migrates only established sign-ins.
+ * R8 arrival semantics (see {@link IdentifierArrivalState}): only `email`
+ * arrives ATTACHED; legacy-migration providers arrive VERIFIED too, since
+ * D09 migrates only established sign-ins.
  */
 export function arrivalStateForProvider(provider: IdentifierProvider): IdentifierArrivalState {
   return provider === "email" ? "ATTACHED" : "VERIFIED";

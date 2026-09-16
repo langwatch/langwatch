@@ -120,11 +120,8 @@ export type PasskeyRemovalOutcome = "deleted" | "not_found" | "would_strand_user
 
 /**
  * The atomic persistence boundary behind better-auth's one-passkey delete.
- *
- * The decision and the deletion have to share one serializable transaction:
- * two removals deciding from the same stale set of passkeys would each see
- * another way in and both remove one, which is how somebody locks themselves
- * out of their own account.
+ * Decision and deletion share one serializable transaction: two removals
+ * reading the same stale set could both proceed and lock the user out.
  */
 export interface PasskeyRemovalPort {
   deleteIfAnotherWayInRemains(args: { passkeyId: string }): Promise<PasskeyRemovalOutcome>;
@@ -388,17 +385,11 @@ function identityCustomAdapter({
           return row === null ? null : [row];
         }
         case "byIssuerSubject": {
-          // The same read as above for a provider whose issuer is its own.
-          // The provider id comes BACK from resolution rather than being
-          // derived here: a subject is unique only within an issuer, and
-          // guessing the provider is how one IdP's subject answers for
-          // another IdP's user.
-          //
-          // A miss, or a user the backfill has not finalized, returns null
-          // and the caller falls through to the legacy row that is still
-          // their truth — which is what this branch must do rather than
-          // refuse, since the callback key names no user and so every user
-          // on the deployment rides the same answer.
+          // The provider id comes BACK from resolution, not derived here: a
+          // subject is unique only within an issuer, so guessing the provider
+          // would let one IdP's subject answer for another's user. A miss, or
+          // an unfinalized user, falls through to the legacy row — the
+          // callback key names no user, so every user rides the same answer.
           const resolved = await resolution.resolveByIssuerSubject({
             issuer: query.issuer,
             providerAccountId: query.accountId,
@@ -595,11 +586,9 @@ function identityCustomAdapter({
     };
 
     /**
-     * Translates an `issuer` clause in an account `where` for the legacy
-     * engine — a pass-through except: an issuer beside the providerId it was
-     * minted from is dropped (same fact twice); beside a DIFFERENT providerId
-     * it refuses (no rows); a synthetic issuer standing alone rewrites to
-     * providerId, so a row whose stored issuer is null is still found.
+     * Translates an `issuer` clause in an account `where` for the legacy engine:
+     * matching providerId is dropped, a different one refuses, and a synthetic
+     * issuer alone rewrites to providerId so a null-issuer row is still found.
      */
     const legacyAccountWhere = async (
       model: string,
@@ -631,10 +620,9 @@ function identityCustomAdapter({
     };
 
     /**
-     * Minted back onto every account row the LEGACY branch serves: 1.7 checks
-     * the issuer on a row it is handed, and a null one fails its own
-     * comparison — reaching a RETURNING user as "Something went wrong signing
-     * you in". Fallback rather than the common case (every row was backfilled).
+     * Minted back onto every account row the LEGACY branch serves: 1.7 checks the
+     * issuer on a row it is handed, and a null one fails, surfacing to a
+     * RETURNING user as "Something went wrong signing you in".
      */
     const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
       if (modelOf(model) !== "account") return row;

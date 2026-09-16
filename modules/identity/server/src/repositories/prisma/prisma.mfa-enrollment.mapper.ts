@@ -7,11 +7,8 @@ import type {
 
 /**
  * The `MfaEnrollment` row shape a stored enrollment is read back from.
- *
- * Structural rather than the generated model type, for the same reason the
- * identifier row is: it is also the contract a test writes rows against, so a
- * column the model gains that nothing here names is a column this mapping
- * does not carry.
+ * Structural, not the generated model type — also the contract a test
+ * writes rows against, so an ungained column here is one this mapping drops.
  */
 export interface MfaEnrollmentRow {
   userId: string;
@@ -29,11 +26,9 @@ export interface MfaEnrollmentRow {
 }
 
 /**
- * One stored row back into the reducer's state.
- *
- * One function rather than one per reader: the fold's projection store and the
- * guards' read answer questions about the same row, and two copies of this
- * would eventually disagree about what a column means.
+ * One stored row back into the reducer's state. One function, not one per
+ * reader: the fold's store and the guards' read answer questions about the
+ * same row, and two copies would eventually disagree.
  */
 export function mfaEnrollmentRowToState(row: MfaEnrollmentRow): MfaEnrollmentState {
   return {

@@ -5,11 +5,9 @@ import { z } from "zod";
  */
 
 /**
- * Authentication method references (RFC 8176 vocabulary, plus `saml` for the
- * federated case). A CLOSED list on purpose: `amr` arrives from an identity
- * provider we do not control, and the one rule that matters here is that
- * nothing infers a factor the provider did not assert. An unrecognized value
- * is kept for the record and asserts nothing.
+ * Authentication method references (RFC 8176, plus `saml`). A CLOSED list —
+ * `amr` comes from a provider we do not control, and nothing here infers a
+ * factor the provider did not assert.
  */
 export const AMR_VALUES = [
   /** A password. */
@@ -45,11 +43,9 @@ export const SECOND_FACTOR_AMR_VALUES = [
 ] as const satisfies readonly Amr[];
 
 /**
- * The passkey's value. A passkey is possession-based AND phishing-resistant,
- * so it clears the bar `mfaRequired` exists for and one that an authenticator
- * code does not: a convincing website can talk somebody through reading a
- * code off their screen, and cannot talk a browser into signing a challenge
- * for the wrong origin.
+ * The passkey's value. Possession-based AND phishing-resistant — unlike an
+ * authenticator code, a convincing site cannot talk a browser into signing a
+ * challenge for the wrong origin.
  */
 export const PHISHING_RESISTANT_AMR = "phw" as const satisfies Amr;
 
@@ -97,10 +93,9 @@ export function signInProvedSecondFactor(amr: readonly string[] | null | undefin
 }
 
 /**
- * A session that recorded nothing. Every session minted before D06 is one of
- * these, and so is every ordinary password sign-in by somebody with no
- * enrollment — which is why a null `amr` has to be a first-class value here
- * and not an error. Nothing about it ends a session.
+ * A session that recorded nothing — every session minted before D06, plus any
+ * ordinary password sign-in with no enrollment. Not an error; nothing ends a
+ * session over it.
  */
 export function recordedNothing(amr: readonly string[] | null | undefined): boolean {
   return !amr || amr.length === 0;
@@ -116,9 +111,7 @@ export interface SecondFactorEvidence {
 
 /**
  * Why a member reaches an organization's data, or does not. Named rather than
- * boolean because the enrollment gate has to tell the person WHAT would let
- * them through, and an administrator's member list has to say which of their
- * members is held.
+ * boolean: the enrollment gate must say WHAT would let them through.
  */
 export type SecondFactorSatisfaction =
   /** The organization does not require one. */
@@ -150,10 +143,8 @@ export function satisfiesOrganizationMfaRequirement({
 }
 
 /**
- * What a two-step challenge may ask for, and it is a closed list because the
- * answer to "why not a passkey too" is that a passkey is a FIRST factor here.
- * Registering one is a way in, never a way of setting two-step verification
- * up, and the challenge screen must not offer it as one.
+ * What a two-step challenge may ask for. Closed: a passkey is a FIRST factor
+ * here, so the challenge screen must not offer it as a way to set one up.
  */
 export const MFA_CHALLENGE_METHODS = ["totp", "backup_code"] as const;
 export type MfaChallengeMethod = (typeof MFA_CHALLENGE_METHODS)[number];
@@ -163,11 +154,9 @@ export function isMfaChallengeMethod(value: string): value is MfaChallengeMethod
 }
 
 /**
- * Whether an identity provider connection is asserting a second factor for
- * the people who sign in through it. An administrator whose organization
- * requires one needs to be told when the answer is no — otherwise every one
- * of their federated members is held at a gate for a reason that looks like
- * our bug and is their identity provider's configuration.
+ * Whether an identity provider connection asserts a second factor for its
+ * sign-ins. When it does not, federated members are held at the enrollment
+ * gate for their provider's configuration, not our bug.
  */
 export function connectionAssertsSecondFactor(
   assertedAmr: readonly string[] | null | undefined,

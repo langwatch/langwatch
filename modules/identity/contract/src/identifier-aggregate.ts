@@ -17,19 +17,14 @@ import type { IdentityActor } from "./vocabulary.ts";
 
 /**
  * An identifier is an aggregate — the rules one identifier's own stream folds
- * by, and the table that says which stream a fact is stated on.
- *
- * The reasoning is ADR-127; it is not repeated here. What this file owns is the
- * two things the reasoning turns into code: `identityStreamsFor`, and a fold
- * that can see one head and no more.
+ * by, and which stream a fact is stated on. Reasoning: ADR-127, not repeated
+ * here. This file owns `identityStreamsFor`, and a fold seeing one head only.
  */
 
 /**
- * A stream a fact is stated on. Discriminated rather than a bare id, because
- * the two kinds are folded by different things: an identifier's stream folds
- * with `reduceIdentifier`, and the person's folds two-step verification and
- * nothing about identifiers. They are both KSUIDs, so nothing but this type
- * stops a caller handing a user id to a per-identifier fold.
+ * A stream a fact is stated on. Discriminated, not a bare id: both kinds are
+ * KSUIDs, so nothing but this type stops a caller handing a user id to a
+ * per-identifier fold.
  */
 export type IdentityStream =
   | { kind: "identifier"; identifierId: string }

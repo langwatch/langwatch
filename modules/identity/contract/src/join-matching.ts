@@ -5,11 +5,8 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
  */
 
 /**
- * Joining, as an organization has set it.
- *
- * `request` is the default for a self-serve organization; `auto` is never a
- * default and never inferred — an administrator turns it on and names the
- * domain while doing it.
+ * Joining, as an organization has set it. `auto` is never inferred — an
+ * administrator turns it on and names the domain.
  */
 export const DOMAIN_JOIN_SETTINGS = ["off", "request", "auto"] as const;
 export type DomainJoinSetting = (typeof DOMAIN_JOIN_SETTINGS)[number];
@@ -24,10 +21,8 @@ export const DEFAULT_DOMAIN_JOIN_SETTING: DomainJoinSetting = "request";
 export const JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD = 1;
 
 /**
- * Walking in automatically needs more, because nobody gates it. One colleague
- * with a personal-looking address at a small vendor is not evidence a company
- * owns a domain; the administrator naming the domain, plus corroboration from
- * a second verified member, is.
+ * Auto-join needs a second verified member as corroboration: one colleague at
+ * a personal-looking address is not proof a company owns the domain.
  */
 export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
 
@@ -80,10 +75,9 @@ export function isPublicEmailDomain(domain: string): boolean {
 }
 
 /**
- * The domain a join decision is made on: the tail of the address after the
- * SAME normalization attach-time uses (NFKC fold, lowercase, trim, plus-tag
- * stripped). Null for anything that is not email-shaped — which answers the
- * same nothing every other refusal does.
+ * The domain a join decision is made on, normalized exactly as attach-time
+ * does (NFKC fold, lowercase, trim, plus-tag stripped). Null when not
+ * email-shaped.
  */
 export function joinDomainOf(email: string): string | null {
   return identifierDomain(normalizeIdentifierValue(email));
@@ -119,10 +113,8 @@ export interface JoinOffer {
 }
 
 /**
- * The decision. `none` is the ONE answer every refusal gives: a domain nobody
- * holds, an organization that turned joining off, and an address nobody has
- * verified are field-for-field identical here, and a caller that wanted to
- * tell them apart has nothing to read.
+ * The decision. `none` covers every refusal identically — no domain, joining
+ * off, unverified address — so a caller cannot tell them apart.
  */
 export type JoinLookupDecision =
   | { outcome: "none" }
@@ -130,12 +122,8 @@ export type JoinLookupDecision =
   | { outcome: "auto"; organization: JoinOffer };
 
 /**
- * Round a member count down to something a stranger may see.
- *
- * Exact below ten, because "3 of your colleagues" is the whole signal for a
- * small team and rounding it to zero would say nothing; buckets above that,
- * because the difference between 117 and 118 members is the organization's
- * business and not the visitor's.
+ * Round a member count down to something a stranger may see: exact below ten
+ * (rounding a small team to zero would say nothing), bucketed above it.
  */
 export function coarseColleagueCount(memberCount: number): number {
   if (memberCount <= 0) return 0;
@@ -161,21 +149,16 @@ export interface JoinLookupInput {
   verified: boolean;
   organizations: readonly JoinCandidateOrganization[];
   /**
-   * Whether this deployment may admit people automatically. The licence gate
-   * holds `auto` and lets `request` through — automatic joining is
-   * federation, asking is not — so an unlicensed deployment sees every `auto`
-   * organization fall back to asking rather than disappear.
+   * Whether this deployment may admit people automatically. Unlicensed
+   * deployments fall every `auto` organization back to `request` instead.
    */
   autoJoinLicensed: boolean;
 }
 
 /**
- * Which organizations are open to an address, and whether one of them takes
- * it without asking.
- *
- * Auto-join is not a second mechanism: an `auto` answer still means a request
- * is made, and it is approved by policy the moment it is. What differs is
- * only who resolves it.
+ * Which organizations are open to an address, and whether one takes it
+ * without asking. Auto-join is not a second mechanism — the request is still
+ * made and approved by policy; only who resolves it differs.
  */
 export function resolveJoinLookup({
   email,

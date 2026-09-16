@@ -1,11 +1,9 @@
 import { generate } from "@langwatch/ksuid";
 
 /**
- * Identity command identity — the analogue of the grants ledger's
- * `deriveGrantId` (ADR-092 §13). A LIVE ceremony mints a random id per
- * ceremony; an ADOPTION derives its id from the source row, so a repeated
- * backfill restates the same id and read-side dedupe absorbs it. A persisted
- * contract — add a form, never edit one.
+ * Identity command identity (ADR-092 §13 analogue). A LIVE ceremony mints
+ * a random id; an ADOPTION derives its id from the source row, so a
+ * repeated backfill restates it and dedupe absorbs it.
  */
 
 /** A live ceremony's command id — random, minted once per ceremony. */

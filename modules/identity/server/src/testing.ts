@@ -33,12 +33,9 @@ export function inMemoryIdentityUsers({
 }
 
 /**
- * The address lock (ADR-116 §6), in memory.
- *
- * A `Map` insert is atomic here for the same reason the Postgres primary key
- * is atomic there: the first writer wins, and every later one reads the
- * winner's row back. A suite that stubbed this to always grant the claim would
- * be proving the guard against a lock that never locks.
+ * The address lock (ADR-116 §6), in memory. A `Map` insert is atomic, same
+ * as the Postgres primary key: first writer wins. A suite that stubbed this
+ * to always grant the claim would prove the guard against a lock that never locks.
  */
 export function inMemoryIdentityReservations(): IdentityReservationRepository & {
   held: Map<string, IdentifierReservationHolder>;

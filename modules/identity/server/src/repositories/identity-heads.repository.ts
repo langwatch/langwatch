@@ -2,10 +2,8 @@ import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract
 
 /**
  * How the guards and the ceremonies see current state: reads over the
- * `Identifier` projection and `User.userHashKey`. Either the calling-path
- * (read-your-writes against Postgres) or the staged path (serialized by the
- * queue's per-user FIFO against the fold), a guard reads the heads first
- * and states only what they do not carry (PR #7429).
+ * `Identifier` projection and `User.userHashKey`. A guard reads the heads
+ * first and states only what they do not carry (PR #7429).
  */
 export abstract class IdentityHeadsRepository {
   /** The per-user HMAC key (`User.userHashKey`); null when not yet minted —
@@ -14,11 +12,9 @@ export abstract class IdentityHeadsRepository {
   /** The user's current identifier heads, as the projection knows them. */
   abstract findHeads(args: { userId: string }): Promise<IdentityHeads>;
   /**
-   * Whether this user's projection has folded at least once — a cursor row
-   * exists. Until it has, the heads may hold PROVISIONAL rows the ledger wrote
-   * for a newborn before staging, and those are not event truth: the attach
-   * guard dedupes against folded heads only, so the queued run still states
-   * the fact the row anticipates.
+   * Whether this user's projection has folded at least once. Until it has,
+   * heads may hold PROVISIONAL rows that are not event truth — the attach
+   * guard dedupes against folded heads only.
    */
   abstract hasFolded(args: { userId: string }): Promise<boolean>;
   /** An ACTIVE (VERIFIED or PRIMARY) identifier holding this normalized
@@ -32,10 +28,9 @@ export abstract class IdentityHeadsRepository {
     identifierId: string;
   }): Promise<IdentifierFact | null>;
   /**
-   * The identifier a protocol `Account` row mirrors, by accountId first. The
-   * fallback keys on better-auth's own `providerId`, never the folded
-   * `provider` vocabulary — keying on the fold once matched and detached the
-   * wrong enterprise account, since it collapses every OIDC connection into `oidc`.
+   * The identifier a protocol `Account` row mirrors, by accountId first.
+   * Falls back to `providerId`, never the folded `provider` vocabulary,
+   * which collapses every OIDC connection into `oidc`.
    */
   abstract tryFindIdentifierIdForAccount(args: {
     userId: string;

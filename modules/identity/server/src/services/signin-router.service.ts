@@ -25,11 +25,9 @@ export interface SignInDomainRouting {
 }
 
 /**
- * What the submitted address's account holds (ADR-117, revision 2026-08-25). The one per-user
- * read the router makes: it answers KINDS — a password, a passkey, which connections — and
- * never a credential, so what crosses this seam is the same information the method screen is
- * about to draw anyway. `null` means no account holds the address, a routing answer rather than
- * an absence: it is what sends somebody to sign-up instead of a password box they cannot pass.
+ * What the submitted address's account holds (ADR-117). The one per-user
+ * read the router makes: answers KINDS, never a credential. `null` means no
+ * account holds the address — routes to sign-up, not a password box.
  */
 export interface SignInAccountLookup {
   findAccountMethods(input: {
@@ -67,12 +65,9 @@ export interface SignInRoutingRecord {
   breakGlass: boolean;
   breakGlassRateLimited: boolean;
   /**
-   * WHO walked through the local door — the address as submitted — and null on every other
-   * sign-in. The deliberate exception to the rule above: `domain` is the org-level fact every
-   * ordinary sign-in is decided on, and naming the person on every attempt turns a log into a
-   * mailing list. A granted break-glass is rare, deliberate, bypasses the org's chosen identity
-   * provider, and ADR-117 §2 requires it audited — an audit record that can't say who used the
-   * door is not one.
+   * WHO walked through the local door, null on every other sign-in — naming
+   * the person on every attempt would turn the log into a mailing list.
+   * ADR-117 §2 requires break-glass audited by who used the door.
    */
   breakGlassIdentifier: string | null;
 }
@@ -159,12 +154,9 @@ export class SignInRouterService {
   }
 
   /**
-   * What the address's account holds, or `undefined` when the question does not arise: a
-   * granted break-glass reads nothing (the door is for when the stores are broken), no address
-   * means no account to look up, and a domain a connection owns routes on the domain without
-   * reaching the account branch — asking anyway would add a Postgres read to the hot path of the
-   * busiest deployments. So the extra read lands only where nothing owns the domain, the one
-   * case whose answer changes it: sign-in is at most two Postgres reads now (was one; R12/R13).
+   * What the address's account holds, or `undefined` when the question does
+   * not arise: break-glass, no address, or a domain already owned. The extra
+   * read lands only where nothing owns the domain (R12/R13).
    */
   private async accountMethods({
     granted,

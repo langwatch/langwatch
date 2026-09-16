@@ -9,10 +9,9 @@ export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
 // ---- lifecycle -----------------------------------------------------------
 
 /**
- * Where a connection's directory sync stands. `TOKEN_ISSUED` is "wired but
- * never used", which is worth telling apart from `SYNCING`: an identity
- * provider that was configured and has never pushed is a setup that stalled,
- * and it looks nothing like one that is working.
+ * Where a connection's directory sync stands. `TOKEN_ISSUED` ("wired but
+ * never used") is worth telling apart from `SYNCING` — a stalled setup looks
+ * nothing like a working one.
  */
 export const SCIM_SYNC_STATES = ["TOKEN_ISSUED", "SYNCING", "ERROR", "REVOKED"] as const;
 export const scimSyncStateSchema = z.enum(SCIM_SYNC_STATES);
@@ -170,10 +169,8 @@ export type ScimSyncFact = ScimSyncFactInput & { occurredAt: number };
 // ---- folded state --------------------------------------------------------
 
 /**
- * The last thing that went wrong, as the failure surface reads it. It names
- * the connection, the operation and a reason code, and it carries no token,
- * no secret and no internal hostname — the payload schemas above are what
- * make that true rather than a promise.
+ * The last thing that went wrong, as the failure surface reads it. Names the
+ * connection, operation and reason code — never a token, secret, or hostname.
  */
 export interface ScimSyncFailure {
   op: ScimApplyOp;
@@ -310,10 +307,9 @@ export function reduceScimSync({
 }
 
 /**
- * Whether a new failure continues the one already standing, which is what
- * makes `attempts` a retry count rather than a total. Same operation, same
- * reason, same person: the identity provider is retrying, not failing at
- * something new.
+ * Whether a new failure continues the one already standing — same operation,
+ * reason and person — which is what makes `attempts` a retry count, not a
+ * total.
  */
 function sameFailure(
   standing: ScimSyncFailure | null,

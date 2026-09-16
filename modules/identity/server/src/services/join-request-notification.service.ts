@@ -29,11 +29,9 @@ export class JoinRequestNotificationService {
   ) {}
 
   /**
-   * The day-7 nudge, to every admin of the organization being asked.
-   *
-   * The requester is read through the request rather than passed in: the wake
-   * carries the request and the tenant, and asking the row who made it keeps
-   * the process manager's state free of a person's identity.
+   * The day-7 nudge, to every admin of the organization being asked. The
+   * requester is read through the request, not passed in: the wake carries
+   * only the request and tenant, keeping process state free of identity.
    */
   async requestStillWaiting({
     joinRequestId,

@@ -10,10 +10,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { JoinMembership } from "../../rules/join-requests-contract.rules.ts";
 
 /**
- * The KSUID resource an organization-scoped grant is born under. Spelled as a
- * literal, the way every other module spells its own: the prefix is a
- * PERSISTED format, and a second description of it writes bindings the
- * revocation queries never find.
+ * The KSUID resource an organization-scoped grant is born under, spelled as
+ * a literal: the prefix is a PERSISTED format, and a second description of
+ * it writes bindings the revocation queries never find.
  */
 const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
 

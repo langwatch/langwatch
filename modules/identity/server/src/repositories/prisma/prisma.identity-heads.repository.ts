@@ -4,11 +4,9 @@ import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
 import { identifierRowToFact } from "./prisma.identifier.mapper.ts";
 
 /**
- * The two models the identity heads are read off, and nothing else in the
- * client.
- *
- * The composition root already holds a typed `PrismaClient`; naming the models
- * here is what lets it hand that client straight down with no cast at the seam.
+ * The two models the identity heads are read off, nothing else in the
+ * client. Naming them here is what lets the composition root hand its typed
+ * `PrismaClient` straight down with no cast at the seam.
  */
 export type PrismaIdentityHeadsDatabase = Pick<
   PrismaClient,
@@ -85,12 +83,9 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
   }
 
   /**
-   * By pinned account id first; failing that, the user's live identifiers
-   * under the same VERBATIM `providerId` - never the folded `provider`, which
-   * collapses every enterprise IdP into `oidc` and would let unlinking one
-   * detach the identifier of another the customer still signs in with.
-   * `take: 2` is the ambiguity guard: two matches answer null rather than a
-   * guess, and so does none.
+   * By pinned account id first, then VERBATIM `providerId` — never the
+   * folded `provider`, which would let unlinking one enterprise IdP detach
+   * another. `take: 2` answers null on any ambiguity, never a guess.
    */
   async tryFindIdentifierIdForAccount({
     userId,

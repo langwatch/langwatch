@@ -26,9 +26,8 @@ export interface MemoryUserRow {
 
 /**
  * One in-memory store behind every identity repository twin, the way one
- * Postgres connection sits behind every Prisma one: an identifier written
- * through the heads rows is what the reservations, the verification and the
- * backfill rows answer from.
+ * Postgres connection sits behind every Prisma one: the heads rows are what
+ * reservations, verification, and backfill answer from.
  */
 export class MemoryIdentityStore {
   static create(): MemoryIdentityStore {

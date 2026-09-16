@@ -13,12 +13,9 @@ export function identifierDomain(normalizedValue: string): string | null {
 }
 
 /**
- * A domain as a connection claims it (D04), folded the SAME way the domain
- * of a normalized identifier is. The two have to agree byte for byte or
- * routing silently misses: `identifierDomain` answers the tail of an
- * already-normalized value, so this applies the identical fold to a domain
- * typed on its own, and tolerates an operator pasting `@acme.com` or a
- * trailing dot.
+ * A domain as a connection claims it (D04), folded the SAME way as an
+ * identifier's domain — they must agree byte for byte or routing silently
+ * misses. Tolerates an operator pasting `@acme.com` or a trailing dot.
  */
 export function normalizeDomain(raw: string): string {
   const folded = raw.normalize("NFKC").trim().toLowerCase();

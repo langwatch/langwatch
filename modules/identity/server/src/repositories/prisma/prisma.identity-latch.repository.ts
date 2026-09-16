@@ -17,11 +17,9 @@ export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
   }
 
   /**
-   * Has ANY user finished the backfill? The question the per-user read asks
-   * first: while the answer is no, no user can be past the latch, so the
-   * per-user lookup is pure cost on every authenticated request.
-   *
-   * `findFirst` stops at the first matching row rather than counting them all.
+   * Has ANY user finished the backfill? Asked first: while no, the per-user
+   * lookup is pure cost on every request. `findFirst` stops at the first
+   * matching row rather than counting them all.
    */
   async hasAnyoneFinalized(): Promise<boolean> {
     const row = await this.database.systemMigrationTenantState.findFirst({

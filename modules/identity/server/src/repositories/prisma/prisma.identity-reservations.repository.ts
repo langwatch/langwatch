@@ -17,11 +17,9 @@ export type PrismaIdentityReservationsDatabase = Pick<
 >;
 
 /**
- * The address lock over Postgres (ADR-116 §6).
- *
- * `IdentifierReservation` is not project-scoped and is deliberately exempt
- * from the multitenancy middleware: it is keyed by a normalized address and
- * claimed before any user is known to hold it, which is the whole point.
+ * The address lock over Postgres (ADR-116 §6). Deliberately exempt from the
+ * multitenancy middleware — keyed by a normalized address, claimed before
+ * any user is known to hold it.
  */
 export class PrismaIdentityReservationRepository implements IdentityReservationRepository {
   static create(database: PrismaIdentityReservationsDatabase): PrismaIdentityReservationRepository {
@@ -31,29 +29,9 @@ export class PrismaIdentityReservationRepository implements IdentityReservationR
   private constructor(private readonly database: PrismaIdentityReservationsDatabase) {}
 
   /**
-   * ONE statement, and that is the whole design.
-   *
-   * `ON CONFLICT DO UPDATE ... RETURNING` returns the row that ends up
-   * holding the key — this caller's on an insert, the incumbent's on a
-   * conflict. `DO NOTHING ... RETURNING` returns no row at all on conflict,
-   * which is why this cannot be written that way and then read back: an
-   * insert followed by a separate `findUnique` is two statements, and a
-   * `release()` or `reapOrphans()` deleting the incumbent's row between them
-   * returns nothing while the key sits free. Answering that with the
-   * caller's own claim would tell them they hold a lock that does not
-   * exist — and the next caller, inserting into the now-free key, would be
-   * told the same. Two users staging facts for one address is exactly the
-   * cross-user double-verification this table exists to prevent, and nothing
-   * downstream catches it: `Identifier.value` deliberately carries no unique
-   * constraint. `reapOrphans` cannot help either, because the defect is the
-   * ABSENCE of a row, not a stale one.
-   *
-   * The `SET` is a deliberate no-op — assigning the column to itself is what
-   * makes the row visible to `RETURNING` without changing it. Concurrent
-   * claimants on one key serialize on that row lock, which is the behaviour
-   * wanted: the second waits microseconds and then reads the real winner.
-   * There is no outer transaction anywhere on this path, so the lock is held
-   * for one statement and can never take part in a lock-ordering cycle.
+   * ONE statement: `ON CONFLICT DO UPDATE ... RETURNING` always returns a row
+   * (mine or the incumbent's), closing the window a separate insert-then-read
+   * would leave for two claimants to both see the address as free.
    */
   async claim({
     normalizedValue,

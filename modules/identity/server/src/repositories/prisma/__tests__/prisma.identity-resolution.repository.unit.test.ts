@@ -3,11 +3,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaIdentityResolutionRepository } from "../prisma.identity-resolution.repository.ts";
 
 /**
- * `touchLastUsed` records that a resolved identifier answered
- * (`Identifier.lastUsedAt`), fire-and-forget: a sign-in must never fail or
- * wait on this write. The waits below flush the repository's own
- * fire-and-forget promise before asserting, since nothing in the public API
- * hands the test a handle to await.
+ * `touchLastUsed` is fire-and-forget: a sign-in must never fail or wait on
+ * it. The waits below flush that promise before asserting, since the public
+ * API hands the test no handle to await.
  */
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

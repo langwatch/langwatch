@@ -41,10 +41,8 @@ export function parseIdentifierLifecycleState(raw: string): IdentifierLifecycleS
 
 /**
  * One stored `Identifier` row as the fact the reducer and the reads speak.
- *
- * The projection writer and every reader have to agree on this mapping or the
- * guards would read a different shape than the fold wrote, which is why it is
- * one function rather than a projection each repository performs for itself.
+ * Writer and every reader must agree on this mapping, or a guard would read
+ * a different shape than the fold wrote — one function, not one per repository.
  */
 export function identifierRowToFact(row: IdentifierRow): IdentifierFact {
   return {
@@ -67,12 +65,9 @@ export function identifierRowToFact(row: IdentifierRow): IdentifierFact {
 }
 
 /**
- * One fact as the `Identifier` row that stores it.
- *
- * The exact inverse of `identifierRowToFact`, and it has to stay that way: the
- * fold writes through this and every guard reads back through that, so a
- * column carried one way and dropped the other is a fact the projection
- * silently forgets.
+ * One fact as the `Identifier` row that stores it — the exact inverse of
+ * `identifierRowToFact`. A column carried one way and dropped the other is
+ * a fact the projection silently forgets.
  */
 export function identifierFactToRow(fact: IdentifierFact): IdentifierRow {
   return {

@@ -39,12 +39,9 @@ type Recorded = {
 };
 
 /**
- * A client whose two identity delegates answer and whose every other delegate
- * refuses.
- *
- * Refusing the rest is what makes "it never reads the identifier projection"
- * an observation rather than a claim: a delegate that quietly answered would
- * let a read this fork must not make pass unnoticed.
+ * A client whose two identity delegates answer and every other refuses —
+ * so "it never reads the identifier projection" is an observation, not a
+ * claim: a quietly-answering delegate would let a forbidden read pass unnoticed.
  */
 function stubClient(options: {
   anyoneFinalized?: boolean;

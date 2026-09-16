@@ -168,11 +168,9 @@ export class VerificationCeremonyService {
     });
 
     // What this person is told is what was RECORDED, never what this thread
-    // decided (ADR-135): this guard also runs again on the queue, and only
-    // the second run's events are stored, so trusting this thread's own
-    // verdict can tell someone their address belongs to a stranger, or that a
-    // dead-ended address is theirs. `uniqueness_race_lost` is the only reason
-    // anything is ever dead-ended, so the recorded state alone is conclusive.
+    // decided (ADR-135): trusting this thread's own verdict could tell
+    // someone their address belongs to a stranger, or a dead-ended address
+    // is theirs — only the recorded state is conclusive.
     const recorded = await this.heads.tryFindIdentifier({ userId, identifierId });
 
     if (recorded?.state === "DEAD_END") {
@@ -180,12 +178,10 @@ export class VerificationCeremonyService {
     }
 
     if (recorded?.state !== "VERIFIED" && recorded?.state !== "PRIMARY") {
-      // Neither outcome is recorded yet: the write is queued and the ledger's
-      // read-your-writes window was already spent. Claiming either would be a
-      // guess, and both guesses are the harms above, so this says the true
-      // thing instead. The record is deliberately NOT consumed — the same link
-      // works, and clicking it again once the fold lands is the whole
-      // remediation.
+      // Neither outcome is recorded yet — the read-your-writes window was
+      // already spent. Claiming either would be one of the harms above, so
+      // this says the true thing. NOT consumed: the same link still works,
+      // and clicking it again once the fold lands is the remediation.
       logger.warn(
         { userId, identifierId, verificationId, state: recorded?.state ?? null },
         "verification completion could not be confirmed: the identifier projection has not caught up, so neither success nor a uniqueness loss is claimed",

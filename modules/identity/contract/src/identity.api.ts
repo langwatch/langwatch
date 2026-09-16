@@ -259,10 +259,9 @@ export interface ScimSyncGuardsApi {
 }
 
 /**
- * The capabilities identity publishes across a package boundary today: the
- * email fork read, the two guard services, the address-lock reservations,
- * the newborn reconciliation, the user-migration registry, and the SSO
- * backoffice connection writer.
+ * The capabilities identity publishes across a package boundary today: email
+ * fork read, guard services, address-lock reservations, newborn
+ * reconciliation, user-migration registry, SSO backoffice connection writer.
  */
 export interface IdentityApi {
   /** Gets the identifier-backed address for this user, or null for legacy `User.email` holders. */

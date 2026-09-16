@@ -1,9 +1,7 @@
 /**
  * The identity storage adapter with everything unlatched (ADR-116 §1):
- * proves the gate ships CLOSED (a dual real-`betterAuth()` run, stock vs.
- * adapter-wired, diffed) and the FACTORY SPINE — two better-auth call paths
- * that bypass any wrapper. The accounts port is INERT, so an accidental
- * write fails loudly. Hermetic: no database, no network.
+ * proves the gate ships CLOSED (diffed stock vs. adapter-wired) and the
+ * FACTORY SPINE's bypass paths. The accounts port is INERT. Hermetic.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack.ts";
@@ -169,10 +167,9 @@ describe("better-auth over the identity storage adapter", () => {
   });
 
   /**
-   * The legacy engine here follows the current Prisma account shape, including
-   * the issuer column added for better-auth 1.7's account key. These tests pin
-   * both halves: synthetic issuers may be translated when they merely repeat
-   * the provider, while real connection issuers are persisted and matched.
+   * The legacy engine here follows the current Prisma account shape,
+   * including better-auth 1.7's issuer column. Pins both halves: synthetic
+   * issuers translate when they repeat the provider; real ones persist.
    */
   describe("given the legacy engine is bound to the Prisma account schema", () => {
     let identity: IdentityStack;
@@ -218,13 +215,11 @@ describe("better-auth over the identity storage adapter", () => {
 
     /** @scenario "A connection is found by its own issuer, not refused for it" */
     it("finds a connection account by the real issuer it was linked under", async () => {
-      // The case nothing covered, and the reason it mattered: the OAuth
-      // callback looks an account up by `(issuer, accountId)`, and a
-      // connection's issuer is its own URL rather than a synthetic one. When
-      // the read answered "no rows" for an issuer it could not decode, every
-      // returning connection sign-in failed to find its own row and
-      // better-auth tried to create it again into the account uniqueness
-      // constraint.
+      // The OAuth callback looks an account up by `(issuer, accountId)`; a
+      // connection's issuer is its own URL, not a synthetic one. Answering
+      // "no rows" for an issuer it could not decode meant every returning
+      // connection sign-in failed to find its row and hit the account
+      // uniqueness constraint trying to recreate it.
       const cookie = await signUp(identity.auth, EMAIL);
       const context = await identity.auth.$context;
       const userId = identity.db.user?.[0]?.id as string;

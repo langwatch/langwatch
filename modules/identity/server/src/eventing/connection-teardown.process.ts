@@ -31,10 +31,9 @@ export type ConnectionTeardownIntents = {
 };
 
 /**
- * What actually completes a teardown: dispatching the guarded
- * `completeTeardown` command. The process manager decides WHEN; the guard
- * still decides whether — it re-reads the folded deadline, so a wake that
- * fires early (a lagged queue, a replayed job) cannot complete anything.
+ * What actually completes a teardown: the guarded `completeTeardown`
+ * command. The manager decides WHEN; the guard re-reads the folded
+ * deadline, so an early wake (lagged queue, replay) completes nothing.
  */
 export interface ConnectionTeardown {
   completeTeardown(args: {
@@ -46,9 +45,8 @@ export interface ConnectionTeardown {
 
 /**
  * Arm the deadline the request carried. `nextWakeAt` is the fact's own
- * `tearDownAfterMs` rather than `now + grace`: the request decided the
- * deadline, and a wake computed here would drift every time the event was
- * redelivered.
+ * `tearDownAfterMs`, not `now + grace` — computing it here would drift on
+ * every redelivery.
  */
 export const onTeardownRequested: EventHandler<
   ConnectionTeardownState,

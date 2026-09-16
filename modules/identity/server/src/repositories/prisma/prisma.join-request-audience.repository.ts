@@ -9,10 +9,8 @@ export type PrismaJoinRequestAudienceDatabase = Pick<
 
 /**
  * Who a join-request notification reaches, out of Postgres. The admin read
- * filters `disabledAt: null` because a deactivated admin cannot answer the
- * request. No query here carries a `projectId`: these are identity-side
- * tables under the multitenancy middleware's exemption, and a join request
- * is not scoped to a project — none of these models has the column.
+ * filters `disabledAt: null` — a deactivated admin cannot answer. No query
+ * carries `projectId`: these identity tables are exempt, having no column.
  */
 export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
   static create(database: PrismaJoinRequestAudienceDatabase): PrismaJoinRequestAudienceRepository {

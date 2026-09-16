@@ -2,10 +2,9 @@ import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
 
 /**
- * The `User` table as identity reads it, in memory. Exists mainly for the
- * reverse read, `tryFindUserIdByEmail` (the legacy collision guard,
- * ADR-116 §6): an unseeded suite has no legacy holders, which is what most
- * guard tests want; a seeded one gets the refusal.
+ * The `User` table as identity reads it, in memory. Mainly for
+ * `tryFindUserIdByEmail` (the legacy collision guard, ADR-116 §6): unseeded
+ * has no legacy holders (most guard tests), seeded gets the refusal.
  */
 export class InMemoryUsers implements IdentityUsersRepository {
   /** userId → the address as `User.email` stores it, unnormalized. */

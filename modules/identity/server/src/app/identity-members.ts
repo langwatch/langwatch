@@ -1,9 +1,7 @@
 /**
- * What the process supplies this feature that is not one of its twelve
- * repository rows: the eventing port, the operator list, the join-request
- * mail gateway, the latch cache's knobs, and the write-side heads the four
- * pipelines fold into (Q3(b) - each stays process-side rather than becoming
- * a thirteenth-and-up row, because building them needs `EventSourcing`).
+ * What the process supplies this feature beyond its twelve repository rows:
+ * eventing, operators, join-request mail, latch knobs, write-side heads
+ * (Q3(b) — each needs `EventSourcing`, so stays process-side).
  */
 import type { IdentityEventing } from "./identity.members.ts";
 import type { JoinRequestMail } from "./identity.members.ts";

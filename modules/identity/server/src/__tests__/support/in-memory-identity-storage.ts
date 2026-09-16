@@ -28,11 +28,9 @@ const EMPTY_SECRETS = {
 } satisfies Required<IdentityAccountSecrets>;
 
 /**
- * The identity branch's storage, in memory: `Identifier` heads joined to a credential map, and
- * the `(value | subject) ⋈ migration state` resolution read beside them. The heads are the SAME
- * projection the guards read, so a suite driving real better-auth through the adapter watches
- * one fold feed both; the `Account` rows are the memory adapter's own, which is what makes the
- * bridge mirror observable.
+ * The identity branch's storage, in memory: `Identifier` heads joined to a
+ * credential map, with the SAME projection the guards read — so a suite
+ * watches one fold feed both.
  */
 export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolver {
   readonly credentials = new Map<string, StoredCredential>();
@@ -256,10 +254,9 @@ const refuses = (method: string) => () => {
 };
 
 /**
- * Ports that hold nothing: what the adapter runs on when no user is latched. Reads answer empty
- * rather than throwing, because a read by account id has no user to gate on until it has read —
- * that probe is how the branch learns whose row it is. Every write throws instead: a closed
- * gate must not put a single row or fact into identity storage.
+ * Ports that hold nothing: what the adapter runs on when no user is latched.
+ * Reads answer empty (a probe with no user to gate on yet); every write
+ * throws — a closed gate must never write a row or fact.
  */
 export const inertIdentityPorts = {
   accounts: {

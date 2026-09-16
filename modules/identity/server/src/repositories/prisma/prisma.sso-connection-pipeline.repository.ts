@@ -77,12 +77,9 @@ export class PostgresSsoConnectionPipelineAdapter {
   private composed: SsoConnectionPipelineGraph | undefined;
 
   /**
-   * The connection write surface itself, for a process that commands connections without
-   * running the pipeline — the operator back office is the one that does.
-   *
-   * The SAME instance {@link build} hands the teardown subscriber, so an operator's command
-   * and the pipeline's own run the same guards over the same ledger writer. A second
-   * composition here would give the back office its own break-glass budget.
+   * The connection write surface for a process commanding connections
+   * without running the pipeline. The SAME instance {@link build} hands the
+   * teardown subscriber, avoiding a second break-glass budget.
    */
   connections(): SsoConnectionService {
     return this.compose().connections;

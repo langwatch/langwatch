@@ -17,10 +17,9 @@ export function newSsoConnectionCommandId(): string {
 }
 
 /**
- * The connection the grandfather migration creates for an organization.
- * Derived from the organization so every pass names the same aggregate —
- * which is what lets the guard answer "this already exists" rather than
- * minting a second connection for the same two strings.
+ * The connection the grandfather migration creates for an organization,
+ * derived from it so every pass names the same aggregate — letting the
+ * guard answer "this already exists" rather than minting a second one.
  */
 export function grandfatheredSsoConnectionId({
   organizationId,
@@ -31,10 +30,9 @@ export function grandfatheredSsoConnectionId({
 }
 
 /**
- * The grandfather pass's command id (ADR-117 §5: idempotency keys
- * `grandfather:<orgId>`). The facts it states key off
+ * The grandfather pass's command id (ADR-117 §5). Facts key off
  * `<commandId>:<index>`, so a second pass derives byte-identical keys and
- * the event store dedupes every one of them.
+ * the event store dedupes them.
  */
 export function grandfatherCommandId({ organizationId }: { organizationId: string }): string {
   return `grandfather:${organizationId}`;

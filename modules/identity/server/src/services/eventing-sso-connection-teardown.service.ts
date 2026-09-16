@@ -6,12 +6,9 @@ import type { ConnectionTeardown } from "../eventing/connection-teardown.process
 const logger = createLogger("langwatch:identity:sso-connection-teardown");
 
 /**
- * A torn-down connection's directory tokens stop verifying with it (D08).
- *
- * A port rather than the SCIM service, because that service is the whole
- * directory capability and this wake reaches ONE method of it. Answering
- * `revoked` lets a process that has a directory report what it retired and a
- * process that has none say so by name.
+ * A torn-down connection's directory tokens stop verifying with it (D08). A
+ * port, not the SCIM service — that service is the whole directory
+ * capability and this wake reaches ONE method of it.
  */
 export abstract class SsoConnectionDirectoryRevocation {
   abstract revokeTokensForConnection(input: {
@@ -71,12 +68,9 @@ export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardown 
   }
 
   /**
-   * AFTER the teardown command, and never instead of it: the connection being
-   * torn down is the fact, and revoking its credentials is the consequence. A
-   * failure here is logged rather than thrown — the teardown itself has
-   * already landed, and turning a token-cleanup failure into a failed wake
-   * would retry a teardown that is already complete. The tokens are dead
-   * either way, because the connection they name is TORN_DOWN.
+   * AFTER the teardown command, never instead of it. Logged, not thrown, on
+   * failure: the teardown already landed, and retrying it would retry work
+   * that's done — the tokens are dead either way once TORN_DOWN.
    */
   private async endDirectorySync({
     connectionId,

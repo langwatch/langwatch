@@ -7,12 +7,9 @@ import type { IdentityLedger } from "../../rules/identity-ledger.rules.ts";
 import { type InMemoryHeads, T0 } from "./in-memory-heads.ts";
 
 /**
- * The event store, in memory, WITH its idempotency contract: every fact is
- * keyed `<commandId>:<index>`, so a retried command re-states facts the store
- * already holds and absorbs them rather than writing twice. This is the ONLY
- * reason a restated attach converges on one identifier — the derived id
- * depends on `occurredAt`, so only the pinned command id makes two attempts
- * the same fact.
+ * The event store, in memory, WITH its idempotency contract: facts are keyed
+ * `<commandId>:<index>`, so a retry absorbs rather than writes twice — the
+ * only reason a restated attach converges on one identifier.
  */
 export class InMemoryIdentityEventStore {
   /** `<commandId>:<index>` → the fact that landed under it. */
@@ -52,9 +49,8 @@ export class InMemoryIdentityEventStore {
 
 /**
  * The ledger every in-memory stack runs on: append through the store, fold
- * what landed into the heads — what the app's pipeline does once ClickHouse
- * holds the append. `commands` records every command DISPATCHED, deduped or
- * not, since the absorption happens at the store, exactly as in production.
+ * what landed into the heads. `commands` records every DISPATCH, deduped or
+ * not — absorption happens at the store, exactly as in production.
  */
 export function inMemoryIdentityLedger({
   heads,

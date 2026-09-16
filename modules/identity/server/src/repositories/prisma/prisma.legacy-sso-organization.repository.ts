@@ -27,10 +27,9 @@ export class PrismaLegacySsoOrganizationRepository implements LegacySsoOrganizat
   }
 
   /**
-   * The organization registered to a domain, by the same string columns
+   * The organization registered to a domain, by the same columns
    * {@link tryFindLegacySso} reads. Not part of
-   * {@link LegacySsoOrganizationRepository}; for a caller wanting the
-   * organization itself rather than a routable connection shape.
+   * {@link LegacySsoOrganizationRepository}; for a caller wanting the org itself.
    */
   async findByDomain({
     domain,

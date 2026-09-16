@@ -46,10 +46,9 @@ class InMemoryVerificationStore implements IdentityVerificationRepository {
 }
 
 /**
- * The heads double models a PROJECTION, not a constant: completion reads the identifier back
- * after dispatching the write and answers from its recorded state (ADR-135), so a double that
- * returns one fixed state can't exercise this. `fold` is what the write does to the
- * projection, and it is the knob each test turns.
+ * The heads double models a PROJECTION, not a constant: completion reads the
+ * identifier back after dispatching (ADR-135), so a fixed-state double can't
+ * exercise this. `fold` is the knob each test turns.
  */
 function harness(options?: {
   identifierState?: "ATTACHED" | "VERIFIED";
@@ -57,10 +56,9 @@ function harness(options?: {
   now?: () => number;
   latched?: boolean;
   /**
-   * What the dispatched write lands in the projection by the read-your-writes wait inside it.
-   * `"VERIFIED"` is the golden path; `"DEAD_END"` is how a uniqueness race resolves on the
-   * losing side; `"unfolded"` leaves state alone — the queue accepted the command but the
-   * fold hasn't landed, which must claim neither outcome.
+   * What the dispatched write lands in the projection. `"VERIFIED"` is the
+   * golden path, `"DEAD_END"` a losing uniqueness race, `"unfolded"` an
+   * accepted command whose fold hasn't landed — claiming neither outcome.
    */
   fold?: "VERIFIED" | "DEAD_END" | "unfolded";
 }) {

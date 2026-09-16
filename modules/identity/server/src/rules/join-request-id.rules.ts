@@ -1,10 +1,9 @@
 import { generate } from "@langwatch/ksuid";
 
 /**
- * Join-request identity (D12): every form a join-request id or command id
- * takes lives here, so the string deciding whether a retry is the same
- * command is never duplicated elsewhere. A persisted contract — changing a
- * form makes every prior command a different command. Add a form; never edit one.
+ * Join-request identity (D12): every id/command-id form lives here, never
+ * duplicated. A persisted contract — changing a form makes every prior
+ * command a different command. Add a form; never edit one.
  */
 
 /** A request somebody made — random, minted once. */
@@ -18,11 +17,9 @@ export function newJoinRequestCommandId(): string {
 }
 
 /**
- * The command id an EXPIRY wake dispatches with.
- *
- * Derived from the request and the deadline it was scheduled for, so a wake
- * redelivered by a lagged worker derives byte-identical idempotency keys and
- * the event store dedupes it. A wake that fires twice must cost one event.
+ * The command id an EXPIRY wake dispatches with, derived from the request
+ * and deadline so a redelivered wake derives a byte-identical idempotency
+ * key and the event store dedupes it.
  */
 export function expireJoinCommandId({
   joinRequestId,
@@ -35,10 +32,9 @@ export function expireJoinCommandId({
 }
 
 /**
- * The command id an APPROVAL dispatches with, derived from the request and
- * resolver rather than minted fresh: a retry after a partial failure (fact
- * landed, membership didn't) must be the same command, so a replayed
- * approval attaches membership exactly once.
+ * The command id an APPROVAL dispatches with, derived from request and
+ * resolver, not minted fresh — a retry after a partial failure must be the
+ * same command so a replay attaches membership exactly once.
  */
 export function approveJoinCommandId({
   joinRequestId,

@@ -12,12 +12,9 @@ const USER = "user_sam";
 const ACTOR = { type: "user", id: USER } as const;
 
 /**
- * A recording stand-in for the composition root's typed client.
- *
- * Every model the seam is allowed to name, and no other — which is the point
- * of the test below as much as of the type: a guard wired to a second client
- * would leave one of these counters at zero while every assertion about the
- * refusal it produced still passed.
+ * A recording stand-in for the composition root's typed client, naming
+ * every model the seam allows and no other: a guard wired to a second
+ * client would leave a counter at zero while every assertion still passed.
  */
 function recordingDatabase() {
   const identifierFindMany = vi.fn(async () => [] as unknown[]);

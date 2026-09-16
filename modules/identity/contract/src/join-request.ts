@@ -195,11 +195,9 @@ export function isPendingJoinRequest(state: JoinRequestState): boolean {
 }
 
 /**
- * The reducer. Pure and total: every fact answers a next state, and the same
- * function runs in the framework's fold, in the replay proof and in a browser
- * tab. A fact the state machine forbids never reaches here — the guards
- * refuse before any fact exists — so this states transitions rather than
- * re-checking them.
+ * The reducer. Pure and total: the same function runs in the framework's
+ * fold, the replay proof, and a browser tab. Guards refuse a forbidden fact
+ * before it exists, so this states transitions, never re-checks them.
  */
 export function reduceJoinRequest({
   state,

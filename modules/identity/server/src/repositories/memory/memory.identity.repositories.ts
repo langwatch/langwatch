@@ -22,9 +22,8 @@ import {
 
 /**
  * The "memory" tier: every identity repository the app is tested without a
- * database. One store behind all twelve rows, the way one Postgres connection
- * sits behind the Prisma tier - an identifier written through one row is what
- * the others answer from.
+ * database. One store behind all twelve rows, the way one Postgres
+ * connection sits behind the Prisma tier.
  */
 export class MemoryIdentityRepositories {
   static readonly requires = [] as const;

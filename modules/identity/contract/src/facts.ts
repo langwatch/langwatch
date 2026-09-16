@@ -43,13 +43,9 @@ export const identifierAttachedPayloadSchema = z.object({
    *  exists (an email alias attached for routing has none). */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
-  /** better-auth's OWN provider id, verbatim, when a protocol row backs
-   *  this identifier. `provider` above is the folded vocabulary — every
-   *  generic OAuth and enterprise IdP collapses into `oidc` and microsoft
-   *  into `azure-ad` — so it cannot answer a callback that asks for
-   *  `auth0`. `Account` is a projection of this log (ADR-116), and the
-   *  column it keys its uniqueness by is this one. Null for an identifier
-   *  no protocol row backs (the email adopted from `User.email`). */
+  /** better-auth's OWN provider id, verbatim. `provider` is folded vocabulary
+   *  (auth0/enterprise IdPs collapse into `oidc`) so it cannot answer a
+   *  callback needing the exact id. Null when no protocol row backs this. */
   providerId: z.string().min(1).nullable(),
   /**
    * Subject issuer (IdP). Paired with accountId to uniquely identify user within that issuer.
@@ -129,10 +125,8 @@ export type LinkProposalReason = z.infer<typeof linkProposalReasonSchema>;
 
 /**
  * A callback matched somebody, but not unambiguously enough to link without a
- * human (ADR-117 §3). Stated as a fact rather than a row so the proposal has
- * the same history, the same erasure and the same replay as every other thing
- * we know about an identity — and so the refusal an operator is asked about
- * later is evidenced rather than reconstructed.
+ * human (ADR-117 §3). A fact, not a row, so it shares history, erasure and
+ * replay with everything else we know about an identity.
  */
 export const linkProposedPayloadSchema = z.object({
   proposalId: z.string().min(1),
@@ -154,9 +148,8 @@ export const linkProposedPayloadSchema = z.object({
 
 /**
  * A fact as a command decides it: the type and the payload. The framework
- * envelope (aggregate, tenant, ids, idempotency key) and `occurredAt` are
- * stamped by whoever appends — the app's pipeline envelope — from the
- * command that produced it.
+ * envelope and `occurredAt` are stamped by whoever appends, from the command
+ * that produced it.
  */
 export const identifierFactInputSchema = z.discriminatedUnion("type", [
   z.object({
