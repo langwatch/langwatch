@@ -67,9 +67,29 @@ tests. The raw figure is 3,169, but fourteen `*-web` packages each report the
 same 102 errors because each compiles the shared web graph, so the raw number
 counts single defects up to fourteen times. TS2339 206, TS2322 141, TS2307 105.
 
-**Whole-repo typecheck cannot be measured while lanes are running.** The
-declaration build aborts with "Declaration inputs changed during compilation"
-whenever a lane writes a watched file. Measure when the tree is quiet.
+**Three things will make you misread the typecheck number. All three bit this
+session.**
+
+1. **`pnpm typecheck:all` bails on the first failing package.** It is
+   `pnpm -r`, which stops at the first non-zero exit, so the count it gives is
+   "errors up to the first broken package", not the repository's. Add
+   `--no-bail` for a measurement.
+
+2. **Running `npx tsc --noEmit` inside a package floods TS6305.** 76 of the 105
+   errors in `modules/analytics/web` were `TS6305 output file has not been
+   built`, which is an unbuilt project reference, not a defect. The package's
+   own `typecheck` script builds declarations first and reports **zero** of
+   them. Direct `tsc` is the wrong instrument now that the gate works; if you
+   must use it, exclude TS6305 and TS6059 before comparing anything.
+
+3. **Whole-repo typecheck cannot be measured while lanes are running.** The
+   declaration build aborts with "Declaration inputs changed during
+   compilation" whenever a lane writes a watched file. Measure when the tree is
+   quiet, or the number is a race, not a reading.
+
+Corrected baseline after all three: **1,137 real distinct errors** (1,156 minus
+19 TS6059 build artefacts), 665 source / 491 test. The 3,169 raw figure counts
+single defects once per dependent package.
 
 ### What the dead gate hid, and how to find the rest
 
