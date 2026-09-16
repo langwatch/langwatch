@@ -6,6 +6,15 @@ Feature: The condition-shape lint rule
   chain is a path to a value rather than complexity of its own, so its depth counts
   only once the test already calls or combines.
 
+  The rule's own defaults are one call, two operators and two hops. **This
+  repository configures it looser**, at three calls, four operators and three
+  hops, and the reason is in what the defaults were reporting: 323 of 630
+  findings were a condition with exactly two calls in it, which is
+  `isEnabled(flag) && isReady(row)` — two named predicates joined by an `and`.
+  That is the readable form, and rewriting it into guard clauses buys nothing.
+  What the looser setting still catches is a test doing genuinely too much at
+  once, and it is 106 sites rather than 630.
+
   Background:
     Given a workspace whose agent feature is at strict layout version 0
 

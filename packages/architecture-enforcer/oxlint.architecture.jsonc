@@ -16,7 +16,15 @@
   ],
   "rules": {
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
-    "langwatch/condition-shape": "error",
+    // Tuned 2026-09-17 from the shape of what it was actually reporting. The
+    // default maxCalls of 1 fired on any condition with two calls in it, which
+    // was 323 of 630 findings and covers `isEnabled(flag) && isReady(row)` -
+    // two named predicates joined by an and, which is the readable form, not
+    // the unreadable one. What stays reported is a condition doing genuinely
+    // too much at once: three or more calls, five or more terms in a logical
+    // chain, a ternary nested inside the test, or a deep property walk that
+    // also combines with something else.
+    "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
     "langwatch/legacy-monolith-path": "error",
     "langwatch/api-context-services": "error",
     "langwatch/comment-block-size": "error",
