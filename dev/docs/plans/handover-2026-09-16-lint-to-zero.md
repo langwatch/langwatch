@@ -286,16 +286,38 @@ files are baselined for it; **the two sets share no file**. Three production
 | `no-nested-ternary` | **0** | 292 | enforces nothing, anywhere |
 | `shared-setup-is-a-hook` | **0** | 168 | enforces nothing, anywhere |
 
-**The highest-impact change available on this drive is not a new rule and not a
-grinding wave.** It is populating `count` on the existing entries so a baselined
-file cannot silently grow, which converts 6,925 permanent exemptions into a
-ratchet at the cost of one script run. Un-baseline `stand-in-cast` first when
-you do: it is the rule that would have caught this drive's two rename
-regressions, and 792 of its 955 rows are test files, which are the cheap half.
+**Where the suppression actually happens, pinned:**
+`packages/oxlint-rules/src/baseline.mjs` exports `isBaselined`, which is one
+`Set.has("<rule>|<file>")` lookup over `oxlint-baseline.json`. **Neither `count`
+nor `expires` appears anywhere in that file.** 28 rules import it, `stand-in-cast`
+among them. That is why a file with 53 casts reports none.
 
-**Blocked, not forgotten:** `packages/architecture-enforcer/src/baseline.ts`
-carries a `comment-block-size` finding, so lane `comment-w11` is editing it.
-Do this the moment that lane is collected.
+It is a different consumer from the architecture-enforcer's TypeScript
+`baseline.ts`, whose `liveKeys` *does* honour `expires` and whose growth check
+*does* read `count` - those govern the shape policies, not the oxlint rules. Do
+not confuse the two: an earlier pass through this concluded the fix was "one
+script run" on the JSON, and it is not. The JS reader has to learn the field
+first.
+
+**The change worth making** is in `baseline.mjs`: have `isBaselined` return the
+recorded count rather than a boolean, and let a rule report findings beyond it.
+That converts 6,925 permanent exemptions into a ratchet. Populating the JSON
+alone does nothing, because nothing reads it.
+
+Two protections that DO already exist, and should not be re-invented: the oxlint
+baseline is **shrink-only** - `growth.added` in
+`policies/quality/oxlint-baseline-check.ts` refuses any entry not in the merge
+base - and `stale` refuses an entry whose finding no longer fires. So the baseline
+cannot gain new `rule|file` rows. What it cannot see is a file already on the list
+gaining more violations of the rule it is listed for.
+
+Un-baseline `stand-in-cast` first: 792 of its 955 rows are test files, the cheap
+half, and it is the rule that would have caught this drive's rename regressions.
+
+**Blocked, not forgotten:** `packages/oxlint-rules/src/baseline.mjs` is inside
+lane `condition-shape-w1`'s owned paths and
+`packages/architecture-enforcer/src/baseline.ts` inside `comment-w11`'s. Do this
+the moment both are collected.
 
 ## THE TWO RULES WERE PRESCRIBING THE SHAPE THE USER BANNED (2026-09-16, fixed)
 
