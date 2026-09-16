@@ -163,7 +163,7 @@ export class VisibilityWindowService {
    * `null` when the plan has no visibility window (all paid/licensed plans).
    * Throws when plan resolution fails — callers must fail closed.
    */
-  async tryGetVisibilityCutoffMs({
+  async getVisibilityCutoffMs({
     organizationId,
   }: {
     organizationId: string;

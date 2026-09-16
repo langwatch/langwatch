@@ -1,5 +1,5 @@
 import type { ContentSource } from "./trace-content-part.types.ts";
-import { tryParseRecord } from "./trace-content-part.record-schema.ts";
+import { parseRecord } from "./trace-content-part.record-schema.ts";
 
 interface NormalizedMediaPart {
   type: "image" | "audio" | "video" | "document";
@@ -7,7 +7,7 @@ interface NormalizedMediaPart {
 }
 
 export function normalizeContentSource(source: unknown): ContentSource | null {
-  const s = tryParseRecord(source);
+  const s = parseRecord(source);
   if (!s) return null;
 
   const mimeType = firstString(s, "mimeType", "media_type")?.toLowerCase();
@@ -47,7 +47,7 @@ function mediaKindForMimeType(mimeType: string): "image" | "audio" | "video" | "
 
 export function inlineDataToMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
   const carrier = o.inline_data ?? o.inlineData;
-  const c = tryParseRecord(carrier);
+  const c = parseRecord(carrier);
   if (!c) return null;
 
   const data = typeof c.data === "string" ? c.data : undefined;
@@ -73,7 +73,7 @@ function toMediaPart(o: Record<string, unknown>): NormalizedMediaPart | null {
 }
 
 export function isInlineDataCarrier(part: unknown): boolean {
-  const o = tryParseRecord(part);
+  const o = parseRecord(part);
   if (!o) return false;
 
   return o.inline_data !== undefined || o.inlineData !== undefined;

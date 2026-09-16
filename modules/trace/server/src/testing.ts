@@ -28,7 +28,7 @@ export class EmptyTraceEventDerivation implements TraceEventDerivation {
 }
 
 export class EmptyTraceSummaryReaderRepository extends TraceSummaryReaderRepository {
-  async tryGetSummary(): Promise<null> {
+  async findSummary(): Promise<null> {
     return null;
   }
 }

@@ -40,7 +40,7 @@ export class TraceMediaReferenceAdapter implements TraceMediaReferenceResolver {
     });
   }
 
-  trySerialize(references: TraceMediaReference[]): string | null {
+  serialize(references: TraceMediaReference[]): string | null {
     return serializeMediaRefList(references as TraceMediaRef[]);
   }
 }

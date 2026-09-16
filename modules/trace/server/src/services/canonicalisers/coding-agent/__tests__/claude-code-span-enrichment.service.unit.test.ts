@@ -37,7 +37,7 @@ function tryComputeClaudeInteractionOutput(input: {
   windowEndMs: number;
   slackMs?: number;
 }) {
-  return ClaudeCodeSpanEnrichmentService.tryComputeClaudeInteractionOutput({
+  return ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
     ...input,
     traceCanonicalisation,
   });

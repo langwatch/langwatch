@@ -187,7 +187,7 @@ function extractTextFromMessages(
     const { type, value } = data;
 
     if (type === "chat_messages" && Array.isArray(value)) {
-      return traceCanonicalisation.tryExtractMessageText({ value, mode });
+      return traceCanonicalisation.extractMessageText({ value, mode });
     }
 
     if (type === "json" && typeof value === "object" && value !== null) {
@@ -205,12 +205,12 @@ function extractTextFromMessages(
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
-    return traceCanonicalisation.tryExtractMessageText({ value: data, mode });
+    return traceCanonicalisation.extractMessageText({ value: data, mode });
   }
 
   // Handle single message object
   if (typeof data === "object" && data !== null) {
-    return traceCanonicalisation.tryExtractMessageText({ value: data, mode });
+    return traceCanonicalisation.extractMessageText({ value: data, mode });
   }
 
   return null;

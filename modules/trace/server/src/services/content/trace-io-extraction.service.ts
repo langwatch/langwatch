@@ -44,7 +44,7 @@ export class TraceIOExtractionService {
         continue;
       }
 
-      const input = this.tryExtractRichIOFromSpan(span, "input");
+      const input = this.extractRichIOFromSpan(span, "input");
       if (input !== null) {
         return { span, input };
       }
@@ -64,7 +64,7 @@ export class TraceIOExtractionService {
         continue;
       }
 
-      const fb = this.tryExtractFallbackIOFromSpan(span, "input");
+      const fb = this.extractFallbackIOFromSpan(span, "input");
       if (fb) {
         return fb;
       }
@@ -73,9 +73,9 @@ export class TraceIOExtractionService {
     return null;
   }
 
-  tryExtractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
+  extractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
-      "TraceIOExtractionService.tryExtractFirstInput",
+      "TraceIOExtractionService.extractFirstInput",
       {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
@@ -134,9 +134,9 @@ export class TraceIOExtractionService {
    * top-level node output, then falls back to last-finishing span.
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
-  tryExtractLastOutput(spans: NormalizedSpan[]): ExtractedIO | null {
+  extractLastOutput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
-      "TraceIOExtractionService.tryExtractLastOutput",
+      "TraceIOExtractionService.extractLastOutput",
       {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
@@ -161,7 +161,7 @@ export class TraceIOExtractionService {
             continue;
           }
 
-          const fb = this.tryExtractFallbackIOFromSpan(span, "output");
+          const fb = this.extractFallbackIOFromSpan(span, "output");
           if (fb) {
             otelSpan.setAttributes({
               "output.found": true,
@@ -192,14 +192,14 @@ export class TraceIOExtractionService {
     otelSpan: { setAttributes: (attributes: Record<string, string | number | boolean>) => void },
   ): ExtractedIO | null {
     const hasValidOutput = (span: NormalizedSpan): boolean =>
-      !shouldExcludeSpan(span) && this.tryExtractRichIOFromSpan(span, "output") !== null;
+      !shouldExcludeSpan(span) && this.extractRichIOFromSpan(span, "output") !== null;
 
     const topLevelWithOutput = this.flattenSpanTree(this.organizeSpansIntoTree(spans), "inside-out")
       .filter(hasValidOutput)
       .reverse();
     if (topLevelWithOutput.length === 1 && topLevelWithOutput[0]) {
       const span = topLevelWithOutput[0];
-      const output = this.tryExtractRichIOFromSpan(span, "output");
+      const output = this.extractRichIOFromSpan(span, "output");
       otelSpan.setAttributes({
         "output.found": true,
         "span.type": getSpanType(span),
@@ -217,7 +217,7 @@ export class TraceIOExtractionService {
       return null;
     }
 
-    const output = this.tryExtractRichIOFromSpan(lastSpan, "output");
+    const output = this.extractRichIOFromSpan(lastSpan, "output");
     otelSpan.setAttributes({
       "output.found": true,
       "span.type": getSpanType(lastSpan),
@@ -244,7 +244,7 @@ export class TraceIOExtractionService {
     },
   } as const;
 
-  tryExtractRichIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
+  extractRichIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
     const attrs = span.spanAttributes;
     const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
 
@@ -261,7 +261,7 @@ export class TraceIOExtractionService {
     // Priority 2: LangWatch attribute — semantic matches only. Returns non-null ONLY when the
     // payload yields a meaningful text (direct string or heuristic hit on a recognized wrapper
     // key). If the payload is an unknown shape, callers should fall back to
-    // `tryExtractFallbackIOFromSpan` as a last-resort rather than letting a stringified mystery
+    // `extractFallbackIOFromSpan` as a last-resort rather than letting a stringified mystery
     // object shadow a real match on another span.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
@@ -279,7 +279,7 @@ export class TraceIOExtractionService {
    * Last-resort stringified fallback for spans that HAVE a langwatch.input/output attribute but
    * whose shape defeats every semantic heuristic.
    */
-  tryExtractFallbackIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
+  extractFallbackIOFromSpan(span: NormalizedSpan, type: "input" | "output"): ExtractedIO | null {
     const attrs = span.spanAttributes;
     const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
     const langwatchValue = attrs[keys.langwatch];

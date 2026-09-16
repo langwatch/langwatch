@@ -40,7 +40,7 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
     return new PrismaTraceEditOverlayRepository(prisma);
   }
 
-  async tryFindByProjectAndTrace({
+  async findByProjectAndTrace({
     projectId,
     traceId,
   }: {

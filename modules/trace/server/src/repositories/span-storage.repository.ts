@@ -82,7 +82,7 @@ export abstract class SpanStorageRepository {
    * always applied) so no caller can make this read unbounded on a leaked
    * trace_id. `limit` may only lower the bound.
    */
-  abstract getSpansByTraceId(
+  abstract findSpansByTraceId(
     params: {
       tenantId: string;
       traceId: string;
@@ -94,14 +94,14 @@ export abstract class SpanStorageRepository {
    * scenario role cost/latency) needing canonicalized attributes and parent
    * links. Bounded by MAX_DERIVATION_SPANS against a pathological trace.
    */
-  abstract getNormalizedSpansByTraceId(
+  abstract findNormalizedSpansByTraceId(
     params: {
       tenantId: string;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
-  abstract tryGetSpanByIds(
+  abstract findSpanByIds(
     params: {
       tenantId: string;
       traceId: string;
@@ -112,9 +112,9 @@ export abstract class SpanStorageRepository {
    * @see ADR-069
    * Claim-check resolution read: one canonical span by identity, windowed
    * with no unbounded fallback — a miss stays cheap via queue retry.
-   * Derivation-shaped: empty events/links; use tryGetSpanByIds for a whole span.
+   * Derivation-shaped: empty events/links; use findSpanByIds for a whole span.
    */
-  abstract tryFindNormalizedSpanById(
+  abstract findNormalizedSpanById(
     params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null>;
   /**
@@ -122,28 +122,28 @@ export abstract class SpanStorageRepository {
    * trace-detail read, derived from spans' OTel events (ARRAY JOIN over
    * Events.*, no heavy attribute scan) — far cheaper than fetching whole spans.
    */
-  abstract getTraceEventsByTraceId(
+  abstract findTraceEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
   /**
    * Event rollups for a page of traces (the list's Events column). Same
-   * Events.* ARRAY JOIN as {@link getTraceEventsByTraceId}, batched across
+   * Events.* ARRAY JOIN as {@link findTraceEventsByTraceId}, batched across
    * the page in one query — a badge needs only a name and count.
    */
-  abstract getTraceEventRollupsByTraceIds(
+  abstract findTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,
   ): Promise<Record<string, TraceEventRollup>>;
-  abstract getEventsByTraceId(
+  abstract findEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  abstract getSpanEvents(
+  abstract findSpanEvents(
     params: {
       tenantId: string;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  abstract getSpanSummaryByTraceId(
+  abstract findSpanSummaryByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   /**
@@ -216,13 +216,13 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     // No-op storage.
   }
 
-  async getSpansByTraceId(
+  async findSpansByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<Span[]> {
     return [];
   }
 
-  async getNormalizedSpansByTraceId(
+  async findNormalizedSpansByTraceId(
     _params: {
       tenantId: string;
       traceId: string;
@@ -232,13 +232,13 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async tryFindNormalizedSpanById(
+  async findNormalizedSpanById(
     _params: NormalizedSpanByIdParams,
   ): Promise<NormalizedSpan | null> {
     return null;
   }
 
-  async tryGetSpanByIds(
+  async findSpanByIds(
     _params: {
       tenantId: string;
       traceId: string;
@@ -248,25 +248,25 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return null;
   }
 
-  async getTraceEventsByTraceId(
+  async findTraceEventsByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]> {
     return [];
   }
 
-  async getTraceEventRollupsByTraceIds(
+  async findTraceEventRollupsByTraceIds(
     _params: TraceEventRollupParams,
   ): Promise<Record<string, TraceEventRollup>> {
     return {};
   }
 
-  async getEventsByTraceId(
+  async findEventsByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]> {
     return [];
   }
 
-  async getSpanEvents(
+  async findSpanEvents(
     _params: {
       tenantId: string;
       traceId: string;
@@ -276,7 +276,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async getSpanSummaryByTraceId(
+  async findSpanSummaryByTraceId(
     _params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]> {
     return [];

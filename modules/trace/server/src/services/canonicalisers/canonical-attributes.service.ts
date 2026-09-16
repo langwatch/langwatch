@@ -76,7 +76,7 @@ export class CanonicalAttributeStore {
     return this.take(key);
   }
 
-  tryTakeAny(keys: readonly string[]): { key: string; value: unknown } | null {
+  takeAny(keys: readonly string[]): { key: string; value: unknown } | null {
     for (const k of keys) {
       const v = this.take(k);
       if (v !== void 0) {
@@ -134,7 +134,7 @@ export class CanonicalEventStore {
   }
 
   /** Take first event with this name (and mark it consumed) */
-  tryTakeFirst(name: string): CanonicalEvent | null {
+  takeFirst(name: string): CanonicalEvent | null {
     for (let i = 0; i < this.events.length; i++) {
       if (this.consumed.has(i)) continue;
       const event = this.events[i];

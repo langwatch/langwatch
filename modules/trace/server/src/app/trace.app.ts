@@ -223,7 +223,7 @@ export type TracesV2SpanReader = Readonly<{
   getSpansByTraceId(
     params: ByTrace & { limit?: number; visibilityCutoffMs?: number | null },
   ): Promise<Span[]>;
-  tryGetSpanById(
+  findSpanById(
     params: ByTrace & { spanId: string; visibilityCutoffMs?: number | null },
   ): Promise<Span | null>;
   getSpanEvents(params: ByTrace & { spanId: string }): Promise<ElasticSearchEvent[]>;
@@ -284,7 +284,7 @@ export type TraceLogRecordReader = Readonly<{
 
 /** The stored reviewer corrections, as this feature reads and writes them. */
 export type TraceEditOverlayStore = Readonly<{
-  tryGetByTraceId(
+  findByTraceId(
     input: Readonly<{ projectId: string; traceId: string }>,
   ): Promise<TraceEditOverlayDto | null>;
   upsert(
@@ -305,7 +305,7 @@ export type TraceEditOverlayStore = Readonly<{
       userId: string | null;
     }>,
   ): Promise<TraceEditOverlayDto>;
-  tryRemoveTraceIOEdit(
+  removeTraceIOEdit(
     input: Readonly<{
       projectId: string;
       traceId: string;
@@ -323,7 +323,7 @@ export type TraceEditOverlayStore = Readonly<{
       userId: string | null;
     }>,
   ): Promise<TraceEditOverlayDto>;
-  tryRemoveSpanFieldEdit(
+  removeSpanFieldEdit(
     input: Readonly<{
       projectId: string;
       traceId: string;
@@ -375,7 +375,7 @@ export type TraceShareReader = Readonly<{
 
 /** The project card the share page prints above the trace. */
 export type TraceProjectReader = Readonly<{
-  tryGetById(projectId: string): Promise<{
+  findById(projectId: string): Promise<{
     name: string | null;
     slug: string | null;
     language: string | null;
@@ -707,7 +707,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     if (target.kind === "span") {
       const span = { projectId, traceId, spanId: target.spanId, userId };
       if (withdrawn) {
-        await this.#dependencies.traces.editOverlay.tryRemoveSpanFieldEdit({
+        await this.#dependencies.traces.editOverlay.removeSpanFieldEdit({
           ...span,
           field: target.field,
         });
@@ -723,7 +723,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
 
     const trace = { projectId, traceId, field: target.field, userId };
     if (withdrawn) {
-      await this.#dependencies.traces.editOverlay.tryRemoveTraceIOEdit(trace);
+      await this.#dependencies.traces.editOverlay.removeTraceIOEdit(trace);
     } else {
       await this.#dependencies.traces.editOverlay.mergeTraceIOEdit({
         ...trace,
@@ -853,7 +853,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    return this.#dependencies.traces.read.tryGetEvaluationInputs(input);
+    return this.#dependencies.traces.read.findEvaluationInputs(input);
   }
 
   /** Topic and subtopic counts for the filtered window. */
@@ -885,7 +885,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     spanId: string;
     protections: unknown;
   }): Promise<PromptStudioSpanResult | null> {
-    return this.#dependencies.traces.read.tryGetSpanForPromptStudio(input);
+    return this.#dependencies.traces.read.findSpanForPromptStudio(input);
   }
 
   // -------------------------------------------------------------------------
@@ -1109,7 +1109,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null> {
-    return this.#dependencies.traces.spans.tryGetSpanById({
+    return this.#dependencies.traces.spans.findSpanById({
       tenantId: input.projectId,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -1229,7 +1229,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
 
   /** A polling read: absent summaries and disabled projections both read as null. */
   findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
-    return this.#dependencies.traces.tree.tryGetSummary(input);
+    return this.#dependencies.traces.tree.findSummary(input);
   }
 
   readModelUsageStats(input: {
@@ -1303,7 +1303,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null> {
-    return this.#dependencies.traces.editOverlay.tryGetByTraceId({
+    return this.#dependencies.traces.editOverlay.findByTraceId({
       projectId: input.projectId,
       traceId: input.traceId,
     });

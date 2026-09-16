@@ -79,7 +79,7 @@ export class TraceSessionGroupsCursorService {
    * at a boundary the repository would compare against a different aggregate expression, so a
    * dollar amount would be measured against a timestamp with no error. Refuse it instead.
    */
-  static tryKeysetCursorFor({
+  static keysetCursorFor({
     encoded,
     sortColumn,
     sortDirection,

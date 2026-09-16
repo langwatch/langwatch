@@ -62,7 +62,7 @@ describe("given the memory-backed trace repositories", () => {
       });
 
       await expect(
-        repositories.editOverlay.tryFindByProjectAndTrace({
+        repositories.editOverlay.findByProjectAndTrace({
           projectId: "project-1",
           traceId: "trace-1",
         }),

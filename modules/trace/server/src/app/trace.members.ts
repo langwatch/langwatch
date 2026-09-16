@@ -99,9 +99,9 @@ export type TraceIoValue = {
 
 
 export interface TraceIoExtraction {
-  tryExtractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
+  extractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null;
 
-  tryExtractFallbackIOFromSpan(
+  extractFallbackIOFromSpan(
     span: NormalizedSpan,
     side: TraceIoSide,
   ): TraceIoValue | null;
@@ -112,7 +112,7 @@ export interface TraceIoExtraction {
  * deliberately unknown; transports never inspect them. */
 export interface TraceLegacyRead {
   /** One trace with its spans, or undefined when the project holds no such trace. */
-  tryGetById(
+  findById(
     projectId: string,
     traceId: string,
     protections: unknown,
@@ -168,7 +168,7 @@ export interface TraceLegacyRead {
   ): Promise<Record<string, Evaluation[]>>;
 
   /** One evaluation's inputs, resolved lazily when its card is expanded. */
-  tryGetEvaluationInputs(input: {
+  findEvaluationInputs(input: {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null>;
@@ -187,7 +187,7 @@ export interface TraceLegacyRead {
   ): Promise<DistinctFieldNamesResult>;
 
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */
-  tryGetSpanForPromptStudio(input: {
+  findSpanForPromptStudio(input: {
     projectId: string;
     spanId: string;
     protections: unknown;
@@ -217,7 +217,7 @@ export interface TraceMediaReferenceResolver {
     precedence: "append" | "prepend";
   }): TraceMediaReference[];
 
-  trySerialize(references: TraceMediaReference[]): string | null;
+  serialize(references: TraceMediaReference[]): string | null;
 }
 
 /** Where media lifted out of a span's content is put. Reused by the extraction
@@ -433,7 +433,7 @@ export interface TraceSpoolLegacyObject {
  * deliberate "cannot count" answer, not an error; spans without usage stay as
  * they arrived, not stamped with a guess. */
 export interface TraceTokenCounter {
-  tryCountTokens(model: string, text: string | undefined): Promise<number | undefined>;
+  countTokens(model: string, text: string | undefined): Promise<number | undefined>;
 }
 
 /** Process-composed sender for Trace's registered durable topic command. */

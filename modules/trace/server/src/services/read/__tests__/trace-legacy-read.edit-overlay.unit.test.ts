@@ -74,8 +74,8 @@ function makeService(): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {
-      getTracesWithSpans: mockGetTracesWithSpans,
-      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+      findTracesWithSpans: mockGetTracesWithSpans,
+      findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
     } as unknown as TraceLegacyReadRepository,
     editOverlay: {
@@ -98,7 +98,7 @@ describe("TraceService withEditOverlay", () => {
         new Map([["trace-1", traceOutputPatch("the corrected answer")]]),
       );
 
-      const result = await makeService().tryGetById(PROJECT_ID, "trace-1", protections, {
+      const result = await makeService().findById(PROJECT_ID, "trace-1", protections, {
         withEditOverlay: true,
       });
 
@@ -114,7 +114,7 @@ describe("TraceService withEditOverlay", () => {
         new Map([["trace-1", traceOutputPatch("a correction this reader never asked for")]]),
       );
 
-      const result = await makeService().tryGetById(PROJECT_ID, "trace-1", protections);
+      const result = await makeService().findById(PROJECT_ID, "trace-1", protections);
 
       expect(result?.output?.value).toBe("captured output");
       expect(mockGetPatchesByTraceIds).not.toHaveBeenCalled();

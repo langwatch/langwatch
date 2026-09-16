@@ -442,7 +442,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @param occurredAt approximate time range bounding the partition scan.
    * @param opts.resolveBlobs resolves offloaded IO.
    */
-  async getTracesWithSpans(
+  async findTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
@@ -578,7 +578,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  async getTracesByThreadId(
+  async findTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
@@ -623,7 +623,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Fetch full traces with spans. Forward resolveBlobs so the
           // thread-detail read can resolve full IO (#4991); customer thread
           // views with no resolver wired stay on the preview.
-          const traces = await this.getTracesWithSpans(
+          const traces = await this.findTracesWithSpans(
             projectId,
             traceIds,
             protections,
@@ -654,7 +654,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /** @param opts.resolveBlobs forwarded to the per-trace fetch. */
-  async getTracesWithSpansByThreadIds(
+  async findTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
@@ -708,7 +708,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           // Forward resolveBlobs so the eval path reads full thread IO; customer thread
           // views pass nothing and stay on the preview.
-          const traces = await this.getTracesWithSpans(
+          const traces = await this.findTracesWithSpans(
             projectId,
             traceIds,
             protections,
@@ -737,7 +737,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  async getAllTracesForProject(
+  async findAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},
@@ -1055,7 +1055,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult
    */
-  async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
+  async findTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
@@ -1144,7 +1144,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult
    */
-  async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
+  async findCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
@@ -1230,7 +1230,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  async tryGetSpanForPromptStudio({
+  async findSpanForPromptStudio({
     projectId,
     spanId,
     protections,
@@ -1240,7 +1240,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     return this.tracer.withActiveSpan(
-      "TraceLegacyReadClickHouseRepository.tryGetSpanForPromptStudio",
+      "TraceLegacyReadClickHouseRepository.findSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
@@ -1472,7 +1472,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    *
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
-  async getDistinctFieldNames(
+  async findDistinctFieldNames(
     projectId: string,
     startDate: number,
     endDate: number,
@@ -2115,7 +2115,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const rows = (await result.json()) as EventSpanRow[];
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
-      const event = TraceEventAttributeMappingService.tryMapEventAttrsToEvent({ row, projectId });
+      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({ row, projectId });
       if (!event) continue;
       const list = byTrace.get(row.TraceId) ?? [];
       list.push(event);

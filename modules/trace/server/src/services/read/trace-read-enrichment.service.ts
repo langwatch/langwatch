@@ -53,7 +53,7 @@ export class TraceReadEnrichmentService {
   }
 
   /**
-   * The single-trace tail shared by every branch of {@link tryGetById}: coding-agent
+   * The single-trace tail shared by every branch of {@link findById}: coding-agent
    * enrichment first, then the reviewer correction if the caller asked for one.
    */
   async enrichAndCorrect({

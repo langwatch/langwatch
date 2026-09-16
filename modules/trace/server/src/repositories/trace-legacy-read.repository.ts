@@ -30,30 +30,30 @@ export interface TraceOccurredAtRange {
  * service that orchestrates a read never names one.
  */
 export abstract class TraceLegacyReadRepository {
-  abstract getAllTracesForProject(
+  abstract findAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options?: GetAllTracesForProjectOptions,
   ): Promise<TracesForProjectResult>;
 
-  abstract getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult>;
+  abstract findCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult>;
 
-  abstract getDistinctFieldNames(
+  abstract findDistinctFieldNames(
     projectId: string,
     startDate: number,
     endDate: number,
   ): Promise<DistinctFieldNamesResult>;
 
-  abstract getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult>;
+  abstract findTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult>;
 
-  abstract getTracesByThreadId(
+  abstract findTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]>;
 
-  abstract getTracesWithSpans(
+  abstract findTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
@@ -61,7 +61,7 @@ export abstract class TraceLegacyReadRepository {
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]>;
 
-  abstract getTracesWithSpansByThreadIds(
+  abstract findTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
@@ -75,7 +75,7 @@ export abstract class TraceLegacyReadRepository {
     limit?: number;
   }): Promise<string[]>;
 
-  abstract tryGetSpanForPromptStudio(params: {
+  abstract findSpanForPromptStudio(params: {
     projectId: string;
     spanId: string;
     protections: Protections;

@@ -282,7 +282,7 @@ export class ClaudeCodeLogEnrichmentService {
       const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
       const interactionOutput =
         span.output == null && isInteractionSpan(span)
-          ? ClaudeCodeSpanEnrichmentService.tryComputeClaudeInteractionOutput({
+          ? ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
               logs,
               windowStartMs: span.timestamps.started_at,
               windowEndMs: span.timestamps.finished_at,

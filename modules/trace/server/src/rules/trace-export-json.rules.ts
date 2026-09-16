@@ -100,7 +100,16 @@ function serializeEvaluation(evaluation: {
   score?: number | null;
   label?: string | null;
   details?: string | null;
-}) {
+}): {
+  evaluation_id: string;
+  evaluator_id: string;
+  name: string;
+  status: string;
+  passed: boolean | null;
+  score: number | null;
+  label: string | null;
+  details: string | null;
+} {
   return {
     evaluation_id: evaluation.evaluation_id,
     evaluator_id: evaluation.evaluator_id,

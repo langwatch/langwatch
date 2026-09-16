@@ -31,14 +31,14 @@ export class TraceEditOverlayService {
     return new TraceEditOverlayService(repository);
   }
 
-  async tryGetByTraceId({
+  async findByTraceId({
     projectId,
     traceId,
   }: {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null> {
-    const row = await this.repository.tryFindByProjectAndTrace({
+    const row = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });
@@ -140,7 +140,7 @@ export class TraceEditOverlayService {
    * field's proposal is withdrawn, not span renames or deletions made elsewhere. When it was the
    * only edit the row goes with it, so withdrawal returns the trace to uncorrected.
    */
-  async tryRemoveTraceIOEdit({
+  async removeTraceIOEdit({
     projectId,
     traceId,
     field,
@@ -151,7 +151,7 @@ export class TraceEditOverlayService {
     field: TraceEditIOField;
     userId: string | null;
   }): Promise<TraceEditOverlayDto | null> {
-    const existing = await this.repository.tryFindByProjectAndTrace({
+    const existing = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });
@@ -227,7 +227,7 @@ export class TraceEditOverlayService {
    * corrected field goes with it, and a correction left with no edits returns the trace to
    * uncorrected, so a withdrawn suggestion never leaves an inert row behind.
    */
-  async tryRemoveSpanFieldEdit({
+  async removeSpanFieldEdit({
     projectId,
     traceId,
     spanId,
@@ -240,7 +240,7 @@ export class TraceEditOverlayService {
     field: TraceEditIOField;
     userId: string | null;
   }): Promise<TraceEditOverlayDto | null> {
-    const existing = await this.repository.tryFindByProjectAndTrace({
+    const existing = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });
@@ -292,7 +292,7 @@ export class TraceEditOverlayService {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayPatch> {
-    const existing = await this.repository.tryFindByProjectAndTrace({
+    const existing = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });

@@ -198,7 +198,7 @@ export class TraceService {
     }
 
     try {
-      const sample = await this.composition.repository.tryFindIngestLag({
+      const sample = await this.composition.repository.findIngestLag({
         tenantId: parsed.projectId,
       });
       if (!sample || sample.sampleCount < MIN_INGEST_SAMPLE_COUNT) {
@@ -218,10 +218,10 @@ export class TraceService {
     }
   }
 
-  async tryGetSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
+  async findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
     const parsed = traceSummaryLookupInputSchema.parse(input);
 
-    return this.composition.summaryReader.tryGetSummary({
+    return this.composition.summaryReader.findSummary({
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
     });

@@ -435,14 +435,14 @@ function readRepository() {
   return { clickhouse, repo };
 }
 
-describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () => {
+describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
   describe("given a span reference with the span's own start time", () => {
     /** @scenario "The referenced span is read back inside its own partition window" */
     it("bounds the read to a window centred on the hint rather than scanning every partition", async () => {
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.tryFindNormalizedSpanById({
+      await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -461,7 +461,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.tryFindNormalizedSpanById({
+      await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -484,7 +484,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const foundSpan = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -504,7 +504,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      await repo.tryFindNormalizedSpanById({
+      await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -523,7 +523,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const foundSpan = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -547,7 +547,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [];
 
-      const foundSpan = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.findNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -566,7 +566,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
 
       await expect(
-        repo.tryFindNormalizedSpanById({
+        repo.findNormalizedSpanById({
           tenantId: "",
           traceId: "trace-1",
           spanId: "span-1",
@@ -584,7 +584,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       clickhouse.refuseWith = new Error("Attempt to read after eof");
 
       await expect(
-        repo.tryFindNormalizedSpanById({
+        repo.findNormalizedSpanById({
           tenantId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",

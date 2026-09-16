@@ -166,7 +166,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
 
       const chain = await rejectionChain(
-        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
+        service.findTracesWithSpans(PROJECT, traceIds(400), openProtections),
       );
 
       expect(chain).toMatch(/exceeded 50000 spans/);
@@ -181,7 +181,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
 
       const chain = await rejectionChain(
-        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
+        service.findTracesWithSpans(PROJECT, traceIds(400), openProtections),
       );
 
       expect(chain).toMatch(/of 400 traces/);
@@ -208,7 +208,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       });
 
       const chain = await rejectionChain(
-        service.getTracesWithSpans(PROJECT, traceIds(400), openProtections),
+        service.findTracesWithSpans(PROJECT, traceIds(400), openProtections),
       );
 
       expect(chain).toMatch(/exceeded 50000 spans/);
@@ -225,7 +225,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
         traceCanonicalisation,
       });
 
-      await rejectionChain(service.getTracesWithSpans(PROJECT, traceIds(400), openProtections));
+      await rejectionChain(service.findTracesWithSpans(PROJECT, traceIds(400), openProtections));
 
       expect(spanReadSettings[0]).toMatchObject({
         max_result_rows: String(50_000 + 1),
@@ -243,7 +243,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
         traceCanonicalisation,
       });
 
-      const traces = await service.getTracesWithSpans(PROJECT, traceIds(60), openProtections);
+      const traces = await service.findTracesWithSpans(PROJECT, traceIds(60), openProtections);
 
       expect(traces).toHaveLength(60);
     });

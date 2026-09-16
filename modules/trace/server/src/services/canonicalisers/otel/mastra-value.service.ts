@@ -77,7 +77,7 @@ export class MastraValuesService {
    * Works for both model_step output ({text, toolCalls}) and
    * agent_run output ({text, files}).
    */
-  tryExtractTextFromOutput(output: unknown): string | null {
+  extractTextFromOutput(output: unknown): string | null {
     const parsed = outputSchema.safeParse(output);
 
     return parsed.success && parsed.data.text ? parsed.data.text : null;
@@ -101,7 +101,7 @@ export class MastraValuesService {
    * Extracts the body object from mastra.model_step.input.
    * Input format: {body: {model: string, messages: [...], ...}}
    */
-  tryExtractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
+  extractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
     const parsed = modelStepInputSchema.safeParse(input);
 
     return parsed.success ? parsed.data.body : null;
@@ -111,7 +111,7 @@ export class MastraValuesService {
    * Extracts model name from mastra.metadata.modelMetadata attribute.
    * The attribute is an object: {modelId, modelVersion, modelProvider}
    */
-  tryExtractModelFromMetadata(attrs: { get: (key: string) => unknown }): string | null {
+  extractModelFromMetadata(attrs: { get: (key: string) => unknown }): string | null {
     const metadata = attrs.get("mastra.metadata.modelMetadata");
     const parsed = modelMetadataSchema.safeParse(metadata);
 
@@ -170,7 +170,7 @@ export class MastraValuesService {
    * Normalizes message content to a string.
    * Handles string, array of content parts, and object with text/content fields.
    */
-  tryNormalizeContentToString(content: unknown): string | null {
+  normalizeContentToString(content: unknown): string | null {
     if (typeof content === "string" && content.length > 0) {
       return content;
     }
@@ -190,7 +190,7 @@ export class MastraValuesService {
   /**
    * Extracts system prompt content from the model_step body messages.
    */
-  tryExtractSystemPromptFromBody(body: Record<string, unknown> | null): string | null {
+  extractSystemPromptFromBody(body: Record<string, unknown> | null): string | null {
     if (!body || !Array.isArray(body.messages)) {
       return null;
     }
@@ -201,7 +201,7 @@ export class MastraValuesService {
         continue;
       }
 
-      const text = this.tryNormalizeContentToString(message.data.content);
+      const text = this.normalizeContentToString(message.data.content);
       if (text) {
         return text;
       }
@@ -213,7 +213,7 @@ export class MastraValuesService {
   /**
    * Derives a contextual display name for a Mastra span.
    */
-  tryDeriveDisplayName({
+  deriveDisplayName({
     mastraType,
     modelName,
     isOrphan,
@@ -226,7 +226,7 @@ export class MastraValuesService {
   }): string | null {
     if (isOrphan) {
       // Try to extract a short description from the system prompt
-      const systemPrompt = this.tryExtractSystemPromptFromBody(modelStepBody);
+      const systemPrompt = this.extractSystemPromptFromBody(modelStepBody);
       if (systemPrompt) {
         // Take first ~60 chars of the system prompt as description
         const desc = systemPrompt.length > 60 ? systemPrompt.slice(0, 57) + "..." : systemPrompt;

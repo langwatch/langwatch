@@ -149,7 +149,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(baseInput, protections);
+        const result = await service.findAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -172,7 +172,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A", "trace-B"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.getAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.findAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
 
@@ -200,7 +200,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceIds: ["trace-A"],
         } as GetAllTracesForProjectInput;
 
-        const result = await service.getAllTracesForProject(inputWithTraceIds, protections);
+        const result = await service.findAllTracesForProject(inputWithTraceIds, protections);
 
         expect(result).not.toBeNull();
         const traces = result!.groups.flat();
@@ -218,7 +218,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(baseInput, protections);
+        const result = await service.findAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -261,7 +261,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.getAllTracesForProject(baseInput, protections, {
+          const result = await service.findAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -292,7 +292,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             scrollId,
           } as GetAllTracesForProjectInput;
 
-          const result = await service.getAllTracesForProject(inputWithScrollId, protections);
+          const result = await service.findAllTracesForProject(inputWithScrollId, protections);
 
           expect(result).not.toBeNull();
 
@@ -316,7 +316,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.getAllTracesForProject(baseInput, protections);
+          const result = await service.findAllTracesForProject(baseInput, protections);
 
           expect(result).not.toBeNull();
 
@@ -340,7 +340,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.getAllTracesForProject(baseInput, protections, {
+          const result = await service.findAllTracesForProject(baseInput, protections, {
             scrollId: "not-valid-base64!!!",
           });
 
@@ -369,7 +369,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.getAllTracesForProject(baseInput, protections, {
+          const result = await service.findAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -396,7 +396,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
             traceCanonicalisation,
           });
 
-          const result = await service.getAllTracesForProject(baseInput, protections, {
+          const result = await service.findAllTracesForProject(baseInput, protections, {
             scrollId,
           });
 
@@ -426,7 +426,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -448,7 +448,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -470,7 +470,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "Hello World" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -487,7 +487,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           {
             ...baseInput,
             query: "100% success_rate",
@@ -513,7 +513,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -535,7 +535,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -557,7 +557,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -593,7 +593,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -615,7 +615,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
           { ...protections, canSeeCapturedOutput: false },
         );
@@ -635,7 +635,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(
+        const result = await service.findAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: false,
@@ -656,7 +656,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: false,
@@ -677,7 +677,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "hello" } as GetAllTracesForProjectInput,
           {
             canSeeCapturedInput: true,
@@ -700,7 +700,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getAllTracesForProject(
+        await service.findAllTracesForProject(
           { ...baseInput, query: "ab" } as GetAllTracesForProjectInput,
           protections,
         );
@@ -720,7 +720,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(baseInput, protections);
+        const result = await service.findAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
 
@@ -774,7 +774,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(
+        const result = await service.findAllTracesForProject(
           { ...baseInput, pageSize: 4 } as GetAllTracesForProjectInput,
           protections,
         );
@@ -821,7 +821,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(
+        const result = await service.findAllTracesForProject(
           { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
           protections,
         );
@@ -854,7 +854,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await expect(service.getAllTracesForProject(baseInput, protections)).rejects.toThrow(
+        await expect(service.findAllTracesForProject(baseInput, protections)).rejects.toThrow(
           "SYNTAX_ERROR",
         );
       });
@@ -892,7 +892,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(baseInput, protections);
+        const result = await service.findAllTracesForProject(baseInput, protections);
 
         expect(result).not.toBeNull();
         expect(result!.groups.flat()).toHaveLength(1);
@@ -935,7 +935,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const result = await service.getAllTracesForProject(baseInput, protections, {
+        const result = await service.findAllTracesForProject(baseInput, protections, {
           includeSpans: true,
         });
 
@@ -987,7 +987,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
+        const traces = await service.findTracesWithSpans("proj_123", traceIds, protections);
 
         expect(traces).not.toBeNull();
         expect(traces!.map((t) => t.trace_id).sort()).toEqual(traceIds);
@@ -1027,7 +1027,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.getTracesWithSpans("proj_123", traceIds, protections);
+        const traces = await service.findTracesWithSpans("proj_123", traceIds, protections);
 
         expect(traces).toHaveLength(30);
         // call 0 = resolve, 1 = OOM full summary, 2 = summary batch1,
@@ -1047,7 +1047,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         await expect(
-          service.getTracesWithSpans("proj_123", ["trace-0"], protections),
+          service.findTracesWithSpans("proj_123", ["trace-0"], protections),
         ).rejects.toThrow();
         // The resolve fails open (call 1), then the summary's non-OOM error
         // propagates without per-batch retries (call 2) — no retry loop.
@@ -1072,7 +1072,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections, {
+        await service.findTracesWithSpans("proj_123", ["trace-0"], protections, {
           from: 1_000_000,
           to: 2_000_000,
         });
@@ -1111,7 +1111,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
 
         const resolveCall = mockClickHouseQuery.mock.calls[0]![0];
         expect(resolveCall.query).toContain("min(OccurredAt)");
@@ -1144,7 +1144,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
 
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         // No OccurredAt predicate inlined at all, and no window params.
@@ -1170,7 +1170,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+        const traces = await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
 
         // The read still succeeds; the summary just stays unbounded (the
         // pre-optimization behaviour) rather than propagating the resolve error.

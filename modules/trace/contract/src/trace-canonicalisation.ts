@@ -124,7 +124,7 @@ export abstract class TraceCanonicalisationService {
 
   abstract canonicalizeLogRecord(input: CanonicalizeLogRecordInput): CanonicalizeLogRecordResult;
 
-  abstract tryExtractMessageText(input: ExtractMessageTextInput): string | null;
+  abstract extractMessageText(input: ExtractMessageTextInput): string | null;
 
   abstract deriveClaudeRequestContent(
     input: DeriveClaudeRequestContentInput,

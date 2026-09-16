@@ -127,8 +127,8 @@ export class TraceOffloadResolutionService {
 
     return {
       resolvedSpans,
-      recomputedInput: ioExtractionService.tryExtractFirstInput(resolvedSpans),
-      recomputedOutput: ioExtractionService.tryExtractLastOutput(resolvedSpans),
+      recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
+      recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
       anyResolved: true,
     };
   }

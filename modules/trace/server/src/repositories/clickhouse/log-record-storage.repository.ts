@@ -24,7 +24,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
 
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async getLogsByTraceId(
+  async findLogsByTraceId(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,

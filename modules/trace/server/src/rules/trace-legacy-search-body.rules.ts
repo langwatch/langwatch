@@ -7,7 +7,9 @@ import { fromZodError } from "zod-validation-error";
 import type { TraceLegacySearchFields } from "../transport/trace-legacy.rest.ts";
 
 /** Either wire spelling of a window bound: epoch milliseconds, or a parseable date. */
-function dateBound(field: "startDate" | "endDate") {
+function dateBound(
+  field: "startDate" | "endDate",
+): z.ZodUnion<readonly [z.ZodNumber, z.ZodString]> {
   return z.union([
     z.number(),
     z.string().refine((value) => !Number.isNaN(Date.parse(value)), {

@@ -29,7 +29,7 @@ const buildService = (stored: unknown | null) => {
   const upsert = vi.fn(async ({ patch }: { patch: TraceEditOverlayPatch }) => row(patch));
   const deleteRow = vi.fn(async () => undefined);
   const repository = {
-    tryFindByProjectAndTrace: vi.fn(async () => (stored ? row(stored) : null)),
+    findByProjectAndTrace: vi.fn(async () => (stored ? row(stored) : null)),
     findAllByProjectAndTraces: vi.fn(async () => (stored ? [row(stored)] : [])),
     upsert,
     delete: deleteRow,
@@ -44,7 +44,7 @@ const buildService = (stored: unknown | null) => {
 };
 
 const removeOutput = (service: TraceEditOverlayService) =>
-  service.tryRemoveTraceIOEdit({
+  service.removeTraceIOEdit({
     projectId: "project-1",
     traceId: "trace-1",
     field: "output",
@@ -52,7 +52,7 @@ const removeOutput = (service: TraceEditOverlayService) =>
   });
 
 const removeInput = (service: TraceEditOverlayService) =>
-  service.tryRemoveTraceIOEdit({
+  service.removeTraceIOEdit({
     projectId: "project-1",
     traceId: "trace-1",
     field: "input",
@@ -209,7 +209,7 @@ describe("TraceEditOverlayService", () => {
       const { service } = buildService({ version: 99 });
 
       expect(
-        await service.tryGetByTraceId({
+        await service.findByTraceId({
           projectId: "project-1",
           traceId: "trace-1",
         }),
@@ -504,7 +504,7 @@ describe("TraceEditOverlayService", () => {
       it("keeps the span's other edits", async () => {
         const { service, deleteRow } = buildService(storedSuggestion);
 
-        const remaining = await service.tryRemoveSpanFieldEdit({
+        const remaining = await service.removeSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -529,7 +529,7 @@ describe("TraceEditOverlayService", () => {
           deletedSpanIds: [],
         });
 
-        const remaining = await service.tryRemoveSpanFieldEdit({
+        const remaining = await service.removeSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -553,7 +553,7 @@ describe("TraceEditOverlayService", () => {
         });
 
         expect(
-          await service.tryRemoveSpanFieldEdit({
+          await service.removeSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-1",
@@ -578,7 +578,7 @@ describe("TraceEditOverlayService", () => {
           deletedSpanIds: [],
         });
 
-        const remaining = await service.tryRemoveSpanFieldEdit({
+        const remaining = await service.removeSpanFieldEdit({
           projectId: "project-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -598,7 +598,7 @@ describe("TraceEditOverlayService", () => {
         const { service, deleteRow, upsert } = buildService(storedSuggestion);
 
         expect(
-          await service.tryRemoveSpanFieldEdit({
+          await service.removeSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-1",
@@ -614,7 +614,7 @@ describe("TraceEditOverlayService", () => {
         const { service, deleteRow, upsert } = buildService(storedSuggestion);
 
         expect(
-          await service.tryRemoveSpanFieldEdit({
+          await service.removeSpanFieldEdit({
             projectId: "project-1",
             traceId: "trace-1",
             spanId: "span-9",
@@ -672,7 +672,7 @@ describe("TraceEditOverlayService", () => {
       const { service } = buildService(null);
 
       expect(
-        await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+        await service.findByTraceId({ projectId: "project-1", traceId: "trace-1" }),
       ).toBeNull();
     });
   });
@@ -721,7 +721,7 @@ describe("TraceEditOverlayService", () => {
         },
       );
       const repository = {
-        tryFindByProjectAndTrace: vi.fn(async () => null),
+        findByProjectAndTrace: vi.fn(async () => null),
         upsert,
         delete: vi.fn(),
       } as unknown as TraceEditOverlayRepository;
@@ -784,7 +784,7 @@ describe("TraceEditOverlayService", () => {
 
       expect(deleteRow).toHaveBeenCalledTimes(2);
       expect(
-        await service.tryGetByTraceId({ projectId: "project-1", traceId: "trace-1" }),
+        await service.findByTraceId({ projectId: "project-1", traceId: "trace-1" }),
       ).toBeNull();
     });
   });
@@ -797,7 +797,7 @@ describe("TraceEditOverlayService", () => {
       ]);
       const repository = {
         findAllByProjectAndTraces,
-        tryFindByProjectAndTrace: vi.fn(async () => null),
+        findByProjectAndTrace: vi.fn(async () => null),
       } as unknown as TraceEditOverlayRepository;
       const service = TraceEditOverlayService.create(repository);
 

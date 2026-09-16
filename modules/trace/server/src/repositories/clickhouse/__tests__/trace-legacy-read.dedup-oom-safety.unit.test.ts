@@ -123,7 +123,7 @@ describe("trace dedup OOM safety", () => {
   describe("SpanStorageClickHouseRepository.getSpansByTraceId() (app-layer)", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "getSpansByTraceId");
+    const body = extractMethodBody(spanStorageSource, "findSpansByTraceId");
     const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
@@ -149,7 +149,7 @@ describe("trace dedup OOM safety", () => {
   describe("SpanStorageClickHouseRepository.getEventsByTraceId() (app-layer)", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "getEventsByTraceId");
+    const body = extractMethodBody(spanStorageSource, "findEventsByTraceId");
     const dedupHelper = extractFunctionBody(spanStorageSource, "dedupInTuple");
 
     describe("when the stored_spans query SQL is inspected", () => {
@@ -175,7 +175,7 @@ describe("trace dedup OOM safety", () => {
   describe("SpanStorageClickHouseRepository.getTraceEventsByTraceId() (app-layer)", () => {
     const spanStoragePath = path.resolve(__dirname, "..", "span-storage.repository.ts");
     const spanStorageSource = fs.readFileSync(spanStoragePath, "utf-8");
-    const body = extractMethodBody(spanStorageSource, "getTraceEventsByTraceId");
+    const body = extractMethodBody(spanStorageSource, "findTraceEventsByTraceId");
 
     describe("when the events-only query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {

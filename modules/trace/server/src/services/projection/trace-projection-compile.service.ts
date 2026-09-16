@@ -42,7 +42,7 @@ function resolveSelectedFields(select: string[]): ResolvedField[] {
     }
 
     seen.add(path);
-    const resolved = TraceProjectionCatalogService.tryResolveField(path);
+    const resolved = TraceProjectionCatalogService.resolveField(path);
     if (resolved) {
       fields.push(resolved);
     } else {

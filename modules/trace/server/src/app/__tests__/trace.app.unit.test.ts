@@ -68,15 +68,15 @@ type ReadCall = { name: string; args: unknown[] };
  */
 function harness(
   reads: Partial<{
-    tryGetById: TraceLegacyRead["tryGetById"];
+    findById: TraceLegacyRead["findById"];
     getEvaluationsMultiple: TraceLegacyRead["getEvaluationsMultiple"];
     getAllTracesForProject: TraceLegacyRead["getAllTracesForProject"];
     getTracesWithSpans: TraceLegacyRead["getTracesWithSpans"];
     getByTraceId: TraceSummaryReader["getByTraceId"];
   }> = {},
 ) {
-  const tryGetById = vi.fn<TraceLegacyRead["tryGetById"]>(
-    reads.tryGetById ?? (async () => traceRow("trace-1")),
+  const tryGetById = vi.fn<TraceLegacyRead["findById"]>(
+    reads.findById ?? (async () => traceRow("trace-1")),
   );
   const getEvaluationsMultiple = vi.fn<TraceLegacyRead["getEvaluationsMultiple"]>(
     reads.getEvaluationsMultiple ?? (async () => ({})),
@@ -100,7 +100,7 @@ function harness(
     };
 
   const read: Partial<TraceLegacyRead> = {
-    tryGetById,
+    findById: tryGetById,
     getEvaluationsMultiple,
     getAllTracesForProject,
     getTracesWithSpans,
@@ -210,7 +210,7 @@ describe("TraceApp", () => {
       // door's business, and both doors depend on getting `undefined` rather
       // than a throw.
       it("answers undefined rather than failing", async () => {
-        const { app } = harness({ tryGetById: async () => undefined });
+        const { app } = harness({ findById: async () => undefined });
 
         await expect(
           app.readTrace({

@@ -80,16 +80,16 @@ function makeNormalizedSpan(
   };
 }
 
-/** Stub with getNormalizedSpansByTraceId returning spans, others null (forces
+/** Stub with findNormalizedSpansByTraceId returning spans, others null (forces
  * resolution path). */
 function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepository {
   const nullRepo = new NullSpanStorageRepository();
   return {
     ...nullRepo,
-    getNormalizedSpansByTraceId: vi.fn(async () => normalizedSpans),
+    findNormalizedSpansByTraceId: vi.fn(async () => normalizedSpans),
     // Keep raw paths returning empty so tests can distinguish the two paths.
-    getSpansByTraceId: vi.fn(async () => []),
-    tryGetSpanByIds: vi.fn(async () => null),
+    findSpansByTraceId: vi.fn(async () => []),
+    findSpanByIds: vi.fn(async () => null),
   } as unknown as SpanStorageRepository;
 }
 
@@ -180,7 +180,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       });
     });
 
-    describe("when tryGetSpanById is called with BlobResolutionDeps wired", () => {
+    describe("when findSpanById is called with BlobResolutionDeps wired", () => {
       it("returns the span with the full output value, not the preview", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
@@ -194,7 +194,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           },
         });
 
-        const span = await service.tryGetSpanById({
+        const span = await service.findSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",
           spanId: "span-1",
@@ -222,7 +222,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           },
         });
 
-        const span = await service.tryGetSpanById({
+        const span = await service.findSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",
           spanId: "non-existent-span",
@@ -292,9 +292,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     });
 
     describe("when getSpansByTraceId is called without BlobResolutionDeps", () => {
-      it("delegates directly to the repository getSpansByTraceId (no normalization path)", async () => {
+      it("delegates directly to the repository findSpansByTraceId (no normalization path)", async () => {
         const repo = makeStubRepository([spanWithRef]);
-        // Without deps, the service calls getSpansByTraceId on the repo (which returns []).
+        // Without deps, the service calls findSpansByTraceId on the repo (which returns []).
         const service = SpanStorageService.create({ repository: repo });
 
         const spans = await service.getSpansByTraceId({
@@ -302,11 +302,11 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           traceId: "trace-legacy",
         });
 
-        // The stub repo's getSpansByTraceId returns [] — proving the direct path was taken.
+        // The stub repo's findSpansByTraceId returns [] — proving the direct path was taken.
         expect(spans).toHaveLength(0);
-        // getNormalizedSpansByTraceId must NOT have been called (no resolution).
+        // findNormalizedSpansByTraceId must NOT have been called (no resolution).
         expect(
-          (repo.getNormalizedSpansByTraceId as ReturnType<typeof vi.fn>).mock.calls,
+          (repo.findNormalizedSpansByTraceId as ReturnType<typeof vi.fn>).mock.calls,
         ).toHaveLength(0);
       });
     });

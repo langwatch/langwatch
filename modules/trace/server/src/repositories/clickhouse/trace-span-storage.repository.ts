@@ -219,7 +219,7 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
 
   // One read: single stored span by identity for derivation consumer. HINT REQUIRED
   // (span's own start, not ingest time). Returns empty events/links. Do not render
-  async tryFindNormalizedSpanById(input: {
+  async findNormalizedSpanById(input: {
     tenantId: string;
     traceId: string;
     spanId: string;
@@ -227,7 +227,7 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
   }): Promise<NormalizedSpan | null> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
-      "TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById",
+      "TraceSpanStorageClickHouseRepository.findNormalizedSpanById",
     );
 
     try {
@@ -354,12 +354,12 @@ export class TraceStoredSpanReaderClickHouseRepository extends TraceStoredSpanRe
     );
   }
 
-  tryGetNormalizedSpan(input: {
+  findNormalizedSpan(input: {
     tenantId: string;
     traceId: string;
     spanId: string;
     occurredAtMs: number;
   }): Promise<NormalizedSpan | null> {
-    return this.repository.tryFindNormalizedSpanById(input);
+    return this.repository.findNormalizedSpanById(input);
   }
 }

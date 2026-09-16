@@ -35,7 +35,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined> {
-    return this.read.tryGetById(input.projectId, input.traceId, input.protections, {
+    return this.read.findById(input.projectId, input.traceId, input.protections, {
       full: true,
       ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
     });

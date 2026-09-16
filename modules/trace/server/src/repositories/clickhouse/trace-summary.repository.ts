@@ -305,11 +305,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     });
   }
 
-  async tryFindByTraceId(
+  async findByTraceId(
     { tenantId, traceId }: { tenantId: string; traceId: string },
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.tryFindByTraceId");
+    EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.findByTraceId");
 
     // Fold read-back path (ADR-066): an explicit window applies verbatim
     // with NO internal fallback — the fold executor owns the miss retry, so
@@ -628,7 +628,7 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
     traceId: string;
     window?: TraceSummaryReadWindow;
   }): Promise<TraceSummaryData | null> {
-    return this.repository.tryFindByTraceId(
+    return this.repository.findByTraceId(
       { tenantId: input.tenantId, traceId: input.traceId },
       { window: input.window },
     );

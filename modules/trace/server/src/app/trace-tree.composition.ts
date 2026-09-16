@@ -5,7 +5,11 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { TraceClickHouse, type TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
+import {
+  TraceClickHouse,
+  type TraceClickHouseClient,
+  type TraceClickHouseResolver,
+} from "../repositories/trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
 import { type TraceQueryClassifier } from "./trace.members.ts";
@@ -66,13 +70,13 @@ class ResolverTraceClickHouse extends TraceClickHouse {
     return new ResolverTraceClickHouse(resolveClient);
   }
 
-  resolve(tenantId: string) {
+  resolve(tenantId: string): Promise<TraceClickHouseClient> {
     return this.resolveClient(tenantId);
   }
 }
 
 class NullTraceSummaryReader extends TraceSummaryReaderRepository {
-  async tryGetSummary(): Promise<null> {
+  async findSummary(): Promise<null> {
     return null;
   }
 }

@@ -313,7 +313,7 @@ async function projectedSearch({
   dateField?: "occurred" | "updated";
 }) {
   const compiled = TraceProjectionCompileService.compileProjection({ from, select, protections });
-  const results = await service.getAllTracesForProject(makeQueryInput(), protections, {
+  const results = await service.findAllTracesForProject(makeQueryInput(), protections, {
     downloadMode: true,
     projection: compiled.plan,
     dateField,

@@ -31,7 +31,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
     const mastraType = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_SPAN_TYPE);
     const rawModelStepInput = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_INPUT);
-    const modelStepBody = mastraValuesService.tryExtractBodyFromModelStepInput(rawModelStepInput);
+    const modelStepBody = mastraValuesService.extractBodyFromModelStepInput(rawModelStepInput);
 
     // Detect eval model_step: orphan (no parent) OR has response_format (structured output eval)
     const isEvalModelStep =
@@ -131,7 +131,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
   /** Fallback: mastra.metadata.modelMetadata names the model when the body did not. */
   private applyMetadataModel(ctx: ExtractorContext): string | null {
     const { attrs } = ctx.bag;
-    const modelName = mastraValuesService.tryExtractModelFromMetadata(attrs);
+    const modelName = mastraValuesService.extractModelFromMetadata(attrs);
     const canRecordMetadataModel =
       Boolean(modelName) &&
       !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) &&
@@ -184,7 +184,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
       ? void 0
       : attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
     if (rawOutput !== void 0) {
-      const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
+      const text = mastraValuesService.extractTextFromOutput(rawOutput);
       if (text) {
         ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
         ctx.recordRule(`${this.id}:mastra.agent_run.output->langwatch.output`);
@@ -234,7 +234,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
     // For orphan eval spans: extract system prompt as input
     if (isEvalModelStep && !attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
-      const systemPrompt = mastraValuesService.tryExtractSystemPromptFromBody(modelStepBody);
+      const systemPrompt = mastraValuesService.extractSystemPromptFromBody(modelStepBody);
       if (systemPrompt) {
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, systemPrompt);
         ctx.recordRule(`${this.id}:orphan.system_prompt->langwatch.input`);
@@ -250,7 +250,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
     isEvalModelStep: boolean,
     modelStepBody: Record<string, unknown> | null,
   ): void {
-    const displayName = mastraValuesService.tryDeriveDisplayName({
+    const displayName = mastraValuesService.deriveDisplayName({
       mastraType,
       modelName,
       isOrphan: isEvalModelStep,
@@ -264,7 +264,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
   /** The model_step text output, and the assistant message a bare text implies. */
   private applyModelStepTextOutput(ctx: ExtractorContext, rawOutput: unknown): void {
-    const text = mastraValuesService.tryExtractTextFromOutput(rawOutput);
+    const text = mastraValuesService.extractTextFromOutput(rawOutput);
     if (!text) {
       return;
     }

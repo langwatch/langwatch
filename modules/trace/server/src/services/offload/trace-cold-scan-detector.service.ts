@@ -36,7 +36,7 @@ export class TraceColdScanDetectorService {
    * column, or null when fine. Errs toward flagging, since a projection or ORDER BY mention
    * enables no pruning: a false positive is a log line, a false negative is real S3 cost.
    */
-  static tryDetectColdScan(query: string): string | null {
+  static detectColdScan(query: string): string | null {
     if (typeof query !== "string" || query.length === 0) {
       return null;
     }

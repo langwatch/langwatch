@@ -95,7 +95,7 @@ const makeSummary = () => ({
 
 function makeSpanRepo(spans: NormalizedSpan[]): SpanStorageRepository {
   return {
-    getNormalizedSpansByTraceId: vi.fn().mockResolvedValue(spans),
+    findNormalizedSpansByTraceId: vi.fn().mockResolvedValue(spans),
   } as unknown as SpanStorageRepository;
 }
 
@@ -108,7 +108,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
     it("returns the stored preview unchanged", async () => {
       const service = TraceSummaryService.create({
         repository: {
-          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
       });
@@ -138,7 +138,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       it("returns the recomputed full input instead of the stored preview", async () => {
         const service = TraceSummaryService.create({
           repository: {
-            tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+            findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
           fullResolutionDeps: {
@@ -161,7 +161,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         const spanRepo = makeSpanRepo([spanWithRef]);
         const service = TraceSummaryService.create({
           repository: {
-            tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+            findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
           fullResolutionDeps: {
@@ -174,7 +174,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         const result = await service.getByTraceId("proj-1", "trace-1");
 
         expect(result.computedInput).toBe("preview-input…");
-        expect(spanRepo.getNormalizedSpansByTraceId).not.toHaveBeenCalled();
+        expect(spanRepo.findNormalizedSpansByTraceId).not.toHaveBeenCalled();
       });
     });
   });
@@ -187,7 +187,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       const blobStore = fakeBlobStore({});
       const service = TraceSummaryService.create({
         repository: {
-          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
@@ -219,7 +219,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
       });
       const service = TraceSummaryService.create({
         repository: {
-          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
@@ -241,12 +241,12 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
     it("falls back to the stored preview instead of throwing", async () => {
       const service = TraceSummaryService.create({
         repository: {
-          tryFindByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
         fullResolutionDeps: {
           spanStorageRepository: {
-            getNormalizedSpansByTraceId: vi
+            findNormalizedSpansByTraceId: vi
               .fn()
               .mockRejectedValue(new Error("ClickHouse unavailable")),
           } as unknown as SpanStorageRepository,

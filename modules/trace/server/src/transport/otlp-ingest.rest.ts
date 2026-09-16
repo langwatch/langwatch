@@ -177,7 +177,7 @@ const traceRequestType =
  * Only its length may be recorded: the bytes carry prompts, completions and
  * host identifiers, and a log sink is not a place customer content may reach.
  */
-function bodyForensics(body: ArrayBuffer | Uint8Array) {
+function bodyForensics(body: ArrayBuffer | Uint8Array): { bodyBytes: number } {
   return { bodyBytes: body.byteLength };
 }
 

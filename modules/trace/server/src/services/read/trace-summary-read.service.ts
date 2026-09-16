@@ -63,7 +63,7 @@ export class TraceSummaryService {
       full?: boolean;
     },
   ): Promise<TraceSummaryData> {
-    const result = await this.repository.tryFindByTraceId({ tenantId, traceId }, options);
+    const result = await this.repository.findByTraceId({ tenantId, traceId }, options);
     if (!result) {
       throw new TraceNotFoundError(traceId);
     }
@@ -105,7 +105,7 @@ export class TraceSummaryService {
     }
 
     try {
-      const normalizedSpans = await deps.spanStorageRepository.getNormalizedSpansByTraceId({
+      const normalizedSpans = await deps.spanStorageRepository.findNormalizedSpansByTraceId({
         tenantId,
         traceId: summary.traceId,
         occurredAtMs: summary.occurredAt,

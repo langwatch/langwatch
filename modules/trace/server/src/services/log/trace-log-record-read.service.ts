@@ -48,7 +48,7 @@ export class LogRecordStorageService {
     limit?: number,
   ): Promise<StoredLogRecordRow[]> {
     const [legacy, canonical] = await Promise.all([
-      this.repository.getLogsByTraceId(tenantId, traceId, occurredAtMs, limit),
+      this.repository.findLogsByTraceId(tenantId, traceId, occurredAtMs, limit),
       this.canonical.getLogsByTraceId({
         tenantId,
         traceId,

@@ -22,11 +22,11 @@ export class TraceIoExtractionAdapter implements TraceIoExtraction {
     return new TraceIoExtractionAdapter(service);
   }
 
-  tryExtractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
-    return this.service.tryExtractRichIOFromSpan(span, side);
+  extractRichIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
+    return this.service.extractRichIOFromSpan(span, side);
   }
 
-  tryExtractFallbackIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
-    return this.service.tryExtractFallbackIOFromSpan(span, side);
+  extractFallbackIOFromSpan(span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
+    return this.service.extractFallbackIOFromSpan(span, side);
   }
 }

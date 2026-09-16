@@ -13,7 +13,7 @@ export class SpanModelNameService {
    * The first non-empty string value found at any of the provided attribute
    * keys, in priority order. Null when no key matches.
    */
-  tryExtractModelName(span: OtlpSpan, attributeKeys: readonly string[]): string | null {
+  extractModelName(span: OtlpSpan, attributeKeys: readonly string[]): string | null {
     for (const key of attributeKeys) {
       for (const attr of span.attributes) {
         if (attr.key !== key) {

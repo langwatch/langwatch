@@ -166,7 +166,7 @@ describe("TraceCanonicalisationService", () => {
   });
 
   it("derives input text from the last user message", () => {
-    const result = service.tryExtractMessageText({
+    const result = service.extractMessageText({
       value: [
         { role: "system", content: "instructions" },
         { role: "user", content: "first question" },

@@ -21,7 +21,7 @@ export class MemoryTraceEditOverlayRepository extends TraceEditOverlayRepository
     return new MemoryTraceEditOverlayRepository();
   }
 
-  async tryFindByProjectAndTrace({
+  async findByProjectAndTrace({
     projectId,
     traceId,
   }: {

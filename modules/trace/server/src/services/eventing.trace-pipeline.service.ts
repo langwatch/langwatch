@@ -150,7 +150,7 @@ export class EventingTracePipelineAdapter {
     return new EventingTracePipelineAdapter(options);
   }
 
-  build() {
+  build(): ReturnType<typeof buildTracePipeline> {
     return buildTracePipeline(this.options);
   }
 }

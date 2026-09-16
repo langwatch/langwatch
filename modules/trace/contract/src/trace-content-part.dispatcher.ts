@@ -3,7 +3,7 @@ import {
   mediaTypeToAudioFormat,
 } from "./trace-content-part.file-decoder.ts";
 import { toMediaPart } from "./trace-content-part.provider-source.ts";
-import { tryParseRecord } from "./trace-content-part.record-schema.ts";
+import { parseRecord } from "./trace-content-part.record-schema.ts";
 import type { AsyncContentPartVisitor, ContentPartVisitor } from "./trace-content-part.types.ts";
 
 /** The tool name a `tool_use` / `tool_call` part carries, under either spelling. */
@@ -49,7 +49,7 @@ function inputAudioPart<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
-  const ia = tryParseRecord(o.input_audio);
+  const ia = parseRecord(o.input_audio);
   if (!ia) return visitor.unknown?.(part);
 
   const data = asString(ia.data);
@@ -95,7 +95,7 @@ function openAiFilePart<R>(
   part: unknown,
   visitor: AsyncContentPartVisitor<R>,
 ): R | Promise<R> | undefined {
-  const file = tryParseRecord(o.file);
+  const file = parseRecord(o.file);
   if (!file) return visitor.unknown?.(part);
 
   const binPart = openAiFilePayloadToBinaryPart(file);
@@ -202,7 +202,7 @@ export function dispatchContentPart<R>(
     return visitor.text(part);
   }
 
-  const o = tryParseRecord(part);
+  const o = parseRecord(part);
   if (!o) {
     return visitor.unknown?.(part);
   }
@@ -218,6 +218,6 @@ function imageUrlFromPart(o: Record<string, unknown>): string | null {
   if (o.type !== "image_url") return null;
   const carrier = o.image_url;
   if (typeof carrier === "string" && carrier) return carrier;
-  const record = tryParseRecord(carrier);
+  const record = parseRecord(carrier);
   return record && typeof record.url === "string" ? record.url : null;
 }

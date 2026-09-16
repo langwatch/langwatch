@@ -86,7 +86,7 @@ class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
     this.refuse();
   }
 
-  tryExtractMessageText(_input: ExtractMessageTextInput): string | null {
+  extractMessageText(_input: ExtractMessageTextInput): string | null {
     this.refuse();
   }
 
@@ -107,11 +107,11 @@ class ProducerOnlyIoExtraction implements TraceIoExtraction {
   constructor(private readonly processName: string) {
   }
 
-  tryExtractRichIOFromSpan(): never {
+  extractRichIOFromSpan(): never {
     throw producerOnly(this.processName, "extract a span's captured input or output");
   }
 
-  tryExtractFallbackIOFromSpan(): never {
+  extractFallbackIOFromSpan(): never {
     throw producerOnly(this.processName, "extract a span's captured input or output");
   }
 }
@@ -136,7 +136,7 @@ class ProducerOnlyMediaReferences implements TraceMediaReferenceResolver {
     this.refuse();
   }
 
-  trySerialize(): never {
+  serialize(): never {
     this.refuse();
   }
 }
@@ -208,7 +208,9 @@ export class TraceProcessingProducerAdapter {
    * Builds the trace-processing definition for a process that only sends commands on it.
    * `processName` names the refusal, so a stand-in reached by accident names which process.
    */
-  static createTraceProcessingProducerPipeline(input: { processName: string }) {
+  static createTraceProcessingProducerPipeline(input: {
+    processName: string;
+  }): ReturnType<ReturnType<EventingTracePipelineAdapter["build"]>["build"]> {
     const { processName } = input;
     return EventingTracePipelineAdapter.create({
       spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(processName, "span"),

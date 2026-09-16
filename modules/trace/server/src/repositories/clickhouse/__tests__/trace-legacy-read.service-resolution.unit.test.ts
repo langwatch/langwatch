@@ -221,7 +221,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
           });
 
           // Per-call gate (#4888): resolution fires only when resolveBlobs:true.
-          const traces = await service.getTracesWithSpans(
+          const traces = await service.findTracesWithSpans(
             "proj-1",
             ["trace-1"],
             protections,

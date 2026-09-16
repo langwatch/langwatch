@@ -66,8 +66,8 @@ function makeService(): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {
-      getTracesWithSpans: mockGetTracesWithSpans,
-      getTracesWithSpansByThreadIds: vi.fn(),
+      findTracesWithSpans: mockGetTracesWithSpans,
+      findTracesWithSpansByThreadIds: vi.fn(),
       resolveTraceIdByPrefix: mockResolveTraceIdByPrefix,
     } as unknown as TraceLegacyReadRepository,
     editOverlay: { getPatchesByTraceIds: vi.fn() } as unknown as TraceEditOverlayService,
@@ -87,7 +87,7 @@ describe("given a project with traces stored in ClickHouse", () => {
     it("returns the trace without ever scanning for a prefix", async () => {
       mockGetTracesWithSpans.mockResolvedValue([trace(FULL_TRACE_ID)]);
 
-      const result = await makeService().tryGetById(PROJECT_ID, FULL_TRACE_ID, protections);
+      const result = await makeService().findById(PROJECT_ID, FULL_TRACE_ID, protections);
 
       expect(result?.trace_id).toBe(FULL_TRACE_ID);
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe("given a project with traces stored in ClickHouse", () => {
         .mockResolvedValueOnce([trace(FULL_TRACE_ID)]);
       mockResolveTraceIdByPrefix.mockResolvedValue([FULL_TRACE_ID]);
 
-      const result = await makeService().tryGetById(
+      const result = await makeService().findById(
         PROJECT_ID,
         "63dc535cea6335c506bc",
         protections,
@@ -125,7 +125,7 @@ describe("given a project with traces stored in ClickHouse", () => {
       mockResolveTraceIdByPrefix.mockResolvedValue(candidates);
 
       const failure = await makeService()
-        .tryGetById(PROJECT_ID, "abc12345", protections)
+        .findById(PROJECT_ID, "abc12345", protections)
         .catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(AmbiguousTraceIdPrefixError);
@@ -141,7 +141,7 @@ describe("given a project with traces stored in ClickHouse", () => {
     /** @scenario No match returns 404 */
     it("resolves to nothing so the transport answers not found", async () => {
       await expect(
-        makeService().tryGetById(PROJECT_ID, "deadbeef", protections),
+        makeService().findById(PROJECT_ID, "deadbeef", protections),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).toHaveBeenCalled();
     });
@@ -150,7 +150,7 @@ describe("given a project with traces stored in ClickHouse", () => {
   describe("when the prefix belongs to another project", () => {
     /** @scenario Prefix match is scoped to the current project */
     it("scans only the caller's project", async () => {
-      await makeService().tryGetById("project_b", "aaaa1111", protections);
+      await makeService().findById("project_b", "aaaa1111", protections);
 
       expect(mockResolveTraceIdByPrefix.mock.calls[0]![0].projectId).toBe("project_b");
     });
@@ -160,7 +160,7 @@ describe("given a project with traces stored in ClickHouse", () => {
     /** @scenario Too-short prefix falls through to 404 */
     it("never scans", async () => {
       await expect(
-        makeService().tryGetById(PROJECT_ID, "ab", protections),
+        makeService().findById(PROJECT_ID, "ab", protections),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
     });
@@ -170,7 +170,7 @@ describe("given a project with traces stored in ClickHouse", () => {
     /** @scenario Non-hex input skips prefix scan and returns 404 */
     it("never scans", async () => {
       await expect(
-        makeService().tryGetById(PROJECT_ID, "not-a-hex-id-zzzz", protections),
+        makeService().findById(PROJECT_ID, "not-a-hex-id-zzzz", protections),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
     });

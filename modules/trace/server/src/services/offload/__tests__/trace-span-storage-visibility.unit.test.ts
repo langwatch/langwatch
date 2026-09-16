@@ -24,8 +24,8 @@ const makeSpan = (startedDaysAgo: number, id = "span-1"): Span =>
 const makeService = (spans: Span[]) =>
   SpanStorageService.create({
     repository: {
-      getSpansByTraceId: vi.fn().mockResolvedValue(spans),
-      tryGetSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
+      findSpansByTraceId: vi.fn().mockResolvedValue(spans),
+      findSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
       findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
       findSpansSince: vi.fn().mockResolvedValue(spans),
     } as never,
@@ -69,9 +69,9 @@ describe("given a span storage read with a visibility gate", () => {
       );
     });
 
-    it("teases a single span on tryGetSpanById", async () => {
+    it("teases a single span on findSpanById", async () => {
       const service = makeService([makeSpan(15)]);
-      const span = await service.tryGetSpanById({
+      const span = await service.findSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",

@@ -50,7 +50,7 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function trySerializedByteValues(value: unknown): number[] | undefined {
+function serializedByteValues(value: unknown): number[] | undefined {
   const parsed = serializedUint8ArraySchema.safeParse(value);
   if (!parsed.success) {
     return void 0;
@@ -64,7 +64,7 @@ export const idSchema = z.preprocess((value) => {
     return bytesToHex(value);
   }
 
-  const bytes = trySerializedByteValues(value);
+  const bytes = serializedByteValues(value);
   return bytes ? bytesToHex(new Uint8Array(bytes)) : value;
 }, z.string());
 
@@ -88,7 +88,7 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
         return value;
       }
 
-      const bytes = trySerializedByteValues(value);
+      const bytes = serializedByteValues(value);
       return bytes ? new Uint8Array(bytes) : value;
     }, bytesSchema)
     .optional()

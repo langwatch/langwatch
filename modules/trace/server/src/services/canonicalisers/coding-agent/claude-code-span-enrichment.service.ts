@@ -187,7 +187,7 @@ export class ClaudeCodeSpanEnrichmentService {
    * window, with slack for an exporter flushing just after close. A parsed response body beats raw
    * assistant text at the same timestamp, and both are gated so a utility reply never headlines.
    */
-  static tryComputeClaudeInteractionOutput({
+  static computeClaudeInteractionOutput({
     logs,
     windowStartMs,
     windowEndMs,

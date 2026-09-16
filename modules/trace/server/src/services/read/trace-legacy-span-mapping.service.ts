@@ -24,26 +24,26 @@ import {
  * Falls back to gen_ai.usage.prompt_tokens/completion_tokens for compat.
  */
 function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | null {
-  const promptTokens = TraceNumberCoercionService.tryCoerceToNumber(
+  const promptTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ?? spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
-  const completionTokens = TraceNumberCoercionService.tryCoerceToNumber(
+  const completionTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.output_tokens"] ??
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = TraceNumberCoercionService.tryCoerceToNumber(
+  const reasoningTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.reasoning_tokens"],
   );
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
-  const cacheReadInputTokens = TraceNumberCoercionService.tryCoerceToNumber(
+  const cacheReadInputTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
       spanAttributes["gen_ai.usage.cached_input_tokens"],
   );
-  const cacheCreationInputTokens = TraceNumberCoercionService.tryCoerceToNumber(
+  const cacheCreationInputTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 

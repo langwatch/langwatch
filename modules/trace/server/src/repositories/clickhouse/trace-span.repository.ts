@@ -211,10 +211,10 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     return rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row));
   }
 
-  async tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
+  async findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
-      "ClickHouseTraceSpanRepository.tryFindIngestLag",
+      "ClickHouseTraceSpanRepository.findIngestLag",
     );
 
     const client = await this.clickhouse.resolve(input.tenantId);

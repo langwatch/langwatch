@@ -59,7 +59,7 @@ export class TraceOriginService {
     return new TraceOriginService();
   }
 
-  tryInferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+  inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
     for (const rule of LEGACY_ORIGIN_RULES) {
       if (rule.check(span)) {
         return rule.origin;
@@ -145,7 +145,7 @@ export class TraceOriginService {
     mergedAttributes: Record<string, string>;
     isRootSpan: boolean;
   }): string | undefined {
-    const inferred = this.tryInferOriginFromLegacyMarkers(span);
+    const inferred = this.inferOriginFromLegacyMarkers(span);
     if (isRootSpan && inferred) {
       return inferred;
     }

@@ -52,7 +52,7 @@ export class TraceViewerProtectionService {
         );
         return this.now() - this.options.fallbackVisibilityDays * dayMs;
       }
-      return await this.window.tryGetVisibilityCutoffMs({ organizationId });
+      return await this.window.getVisibilityCutoffMs({ organizationId });
     } catch (error) {
       this.logger.error(
         { projectId, error },
@@ -162,7 +162,7 @@ export class TraceViewerProtectionService {
     };
   }
 
-  async tryResolveForShare(
+  async resolveForShare(
     input: Readonly<{ projectId: string; userId: string | undefined }>,
   ): Promise<Protections | null> {
     const project = await this.options.projects.findWithTeam(input.projectId);

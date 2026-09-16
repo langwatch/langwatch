@@ -196,7 +196,7 @@ export function stringifyForText(value: unknown): string | null {
  * Attempts to unwrap a "text" content block's `text`, when it is itself a JSON-encoded typed
  * block with a non-"text" inner `type`, into that inner block (recursively normalized).
  */
-export function tryUnwrapJsonTextBlock(
+export function unwrapJsonTextBlock(
   t: string,
   seen: WeakSet<object>,
 ): { unwrapped: true; value: unknown } | { unwrapped: false } {
@@ -241,7 +241,7 @@ function normalizeTextBlock(obj: Record<string, unknown>, seen: WeakSet<object>)
   const looksLikeTypedBlock = t.startsWith("{") && t.endsWith("}") && t.includes('"type":"');
   if (!looksLikeTypedBlock) return obj;
 
-  const result = tryUnwrapJsonTextBlock(t, seen);
+  const result = unwrapJsonTextBlock(t, seen);
 
   return result.unwrapped ? result.value : obj;
 }
@@ -316,14 +316,14 @@ export function messagesToText(
   }
 
   if (Array.isArray(messages)) {
-    return traceCanonicalisation.tryExtractMessageText({
+    return traceCanonicalisation.extractMessageText({
       value: messages,
       mode,
     });
   }
 
   // Try message-shaped extraction first (content, parts, text, value)
-  const messageText = traceCanonicalisation.tryExtractMessageText({
+  const messageText = traceCanonicalisation.extractMessageText({
     value: messages,
     mode,
   });

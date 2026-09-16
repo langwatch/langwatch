@@ -608,7 +608,21 @@ export function toConversationContextTurn({
   trace: TraceListItem;
   protections: V2Protections;
   contentPrivacy: TraceContentPrivacy;
-}) {
+}): {
+  traceId: string;
+  timestamp: number;
+  name: string;
+  rootSpanType: string | null;
+  status: "error" | "ok" | "warning";
+  input: string | null;
+  output: string | null;
+  inputRedacted: boolean;
+  outputRedacted: boolean;
+  inputVisibleTo: string | null;
+  outputVisibleTo: string | null;
+  totalTokens: number;
+  totalCost: number | null;
+} {
   const { input, output, inputRedacted, outputRedacted, inputVisibleTo, outputVisibleTo } =
     redactV2Content(
       {

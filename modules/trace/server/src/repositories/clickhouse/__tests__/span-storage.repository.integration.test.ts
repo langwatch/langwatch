@@ -174,7 +174,7 @@ function makeEventRow(
 integration("SpanStorageClickHouseRepository single-trace reads (integration)", () => {
   describe("when reading a trace under the per-query memory cap", () => {
     it("returns the earliest `limit` spans ordered by StartTime", async () => {
-      const spans = await repo.getNormalizedSpansByTraceId({
+      const spans = await repo.findNormalizedSpansByTraceId({
         tenantId,
         traceId,
       });
@@ -190,7 +190,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("returns the latest version of a duplicated span, not the stale one", async () => {
-      const spans = await repo.getNormalizedSpansByTraceId({
+      const spans = await repo.findNormalizedSpansByTraceId({
         tenantId,
         traceId,
       });
@@ -203,7 +203,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("preserves the full heavy SpanAttributes payload", async () => {
-      const spans = await repo.getNormalizedSpansByTraceId({
+      const spans = await repo.findNormalizedSpansByTraceId({
         tenantId,
         traceId,
       });
@@ -250,7 +250,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("getTraceEventsByTraceId returns all events incl. exceptions in ASC order, latest span version only", async () => {
-      const events = await repo.getTraceEventsByTraceId({
+      const events = await repo.findTraceEventsByTraceId({
         tenantId: eventsTenantId,
         traceId: eventsTraceId,
       });
@@ -266,7 +266,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("getEventsByTraceId filters out exception events and orders by event_timestamp DESC, latest span version only", async () => {
-      const events = await repo.getEventsByTraceId({
+      const events = await repo.findEventsByTraceId({
         tenantId: eventsTenantId,
         traceId: eventsTraceId,
       });
@@ -397,7 +397,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     /** @scenario A trace with events shows a badge per event name */
     it("returns one entry per event name for a trace", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [feedbackTraceId],
         timeRange,
@@ -419,7 +419,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     /** @scenario Repeated events of the same name collapse into one badge with a count */
     /** @scenario Badges are ordered by when the event first occurred */
     it("collapses repeats by name, ordered by first occurrence, latest span version only", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [chattyTraceId],
         timeRange,
@@ -442,7 +442,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     /** @scenario Events are shown for the traces currently on screen */
     it("answers a whole page in one call, keyed by trace id", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [feedbackTraceId, chattyTraceId, quietTraceId],
         timeRange,
@@ -453,7 +453,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     /** @scenario A trace with no events shows the empty marker */
     it("omits a trace that recorded no events", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [quietTraceId],
         timeRange,
@@ -464,7 +464,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     /** @scenario A trace with a very large number of events stays bounded */
     it("trims to the badge cap while still reporting the true totals", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [noisyTraceId],
         timeRange,
@@ -480,7 +480,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     /** @scenario Only the caller's project is read */
     it("leaves out the neighbour's events on a trace id both tenants used", async () => {
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [otherTenantTraceId],
         timeRange,
@@ -504,7 +504,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     /** @scenario The search is confined to the period on screen */
     it("returns nothing when the page's time range excludes the spans", async () => {
       const longAgo = rollupBase.getTime() - 400 * 24 * 60 * 60 * 1000;
-      const rollups = await repo.getTraceEventRollupsByTraceIds({
+      const rollups = await repo.findTraceEventRollupsByTraceIds({
         tenantId: rollupTenantId,
         traceIds: [feedbackTraceId],
         timeRange: { from: longAgo, to: longAgo + 60_000 },
@@ -520,7 +520,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       });
 
       await expect(
-        failingRepo.getTraceEventRollupsByTraceIds({
+        failingRepo.findTraceEventRollupsByTraceIds({
           tenantId: rollupTenantId,
           traceIds: [],
           timeRange,
@@ -589,7 +589,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
 
     describe("when the trace's occurrence time is recorded in trace_summaries", () => {
       it("resolves the partition window from trace_summaries and still returns the events", async () => {
-        const events = await repo.getTraceEventsByTraceId({
+        const events = await repo.findTraceEventsByTraceId({
           tenantId: hintlessTenantId,
           traceId: withEventsTraceId,
         });
@@ -606,7 +606,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           recordStoredSpansQueries(ch);
         const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
-        const events = await recordingRepo.getTraceEventsByTraceId({
+        const events = await recordingRepo.findTraceEventsByTraceId({
           tenantId: hintlessTenantId,
           traceId: noEventsTraceId,
         });
@@ -686,7 +686,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
 
     it("resolves the partition window from trace_summaries and still returns the spans", async () => {
-      const spans = await repo.getNormalizedSpansByTraceId({
+      const spans = await repo.findNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
         traceId: withSpansTraceId,
       });
@@ -698,7 +698,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
-      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+      const spans = await recordingRepo.findNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
         traceId: emptyTraceId,
       });
@@ -717,7 +717,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
-      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+      const spans = await recordingRepo.findNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
         traceId: outOfWindowTraceId,
       });
@@ -737,7 +737,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       const { client: recordingClient, queries: storedSpansQueries } = recordStoredSpansQueries(ch);
       const recordingRepo = new SpanStorageClickHouseRepository(async () => recordingClient);
 
-      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+      const spans = await recordingRepo.findNormalizedSpansByTraceId({
         tenantId: hintlessTenantId,
         traceId: orphanTraceId,
       });

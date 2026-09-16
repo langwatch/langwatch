@@ -21,7 +21,7 @@ class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
 }
 
 class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
-  async tryGetSummary(): Promise<null> {
+  async findSummary(): Promise<null> {
     return null;
   }
 }

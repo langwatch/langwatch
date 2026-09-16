@@ -42,6 +42,7 @@ import { TraceQueryClassificationAdapter } from "../services/trace-query-classif
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
+  type TraceQueryFieldValuesResult,
 } from "../repositories/read/query-field-values.repository.ts";
 import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
 import {
@@ -163,7 +164,7 @@ export function composeTraceAppDependencies(
         ...(summaryStore
           ? {
               summaryReader: {
-                tryGetSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
+                findSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
                   summaryStore.tryGet(traceId, {
                     aggregateId: traceId,
                     tenantId: createTenantId(tenantId),
@@ -178,7 +179,7 @@ export function composeTraceAppDependencies(
               userId: void 0,
               publiclyShared: false,
             });
-            const trace = await read.tryGetById(
+            const trace = await read.findById(
               projectId,
               traceId,
               { ...resolved, canSeeCosts: true },
@@ -302,7 +303,7 @@ class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
     this.#listReader = listReader;
   }
 
-  list(input: TraceQueryFieldValuesInput) {
+  list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
     return this.#listReader.getFacetValues({
       tenantId: input.projectId,
       timeRange: input.timeRange,
@@ -325,8 +326,8 @@ export class TraceReadFullIo implements TraceFullIo {
   }
 
   recompute(spans: NormalizedSpan[]) {
-    const input = this.#extraction.tryExtractFirstInput(spans);
-    const output = this.#extraction.tryExtractLastOutput(spans);
+    const input = this.#extraction.extractFirstInput(spans);
+    const output = this.#extraction.extractLastOutput(spans);
     return {
       input: input ? { type: "json", value: traceRecordValueSchema.parse(input.raw) } : null,
       output: output ? { type: "json", value: traceRecordValueSchema.parse(output.raw) } : null,

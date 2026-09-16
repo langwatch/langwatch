@@ -279,6 +279,8 @@ class TraceCapabilityUnavailableError extends HandledError {
   }
 }
 
-function refusalFactory(processName: string) {
+function refusalFactory(
+  processName: string,
+): (capability: string) => TraceCapabilityUnavailableError {
   return (capability: string) => new TraceCapabilityUnavailableError(processName, capability);
 }

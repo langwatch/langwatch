@@ -97,13 +97,13 @@ export class SpanStorageService {
   ): Promise<Span[]> {
     if (!this.blobResolutionDeps) {
       return applyVisibilityGate(
-        await this.repository.getSpansByTraceId(params),
+        await this.repository.findSpansByTraceId(params),
         params.visibilityCutoffMs,
       );
     }
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
-    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -121,7 +121,7 @@ export class SpanStorageService {
   async getNormalizedSpansByTraceId(
     params: ByTraceId & { limit?: number },
   ): Promise<NormalizedSpan[]> {
-    return this.repository.getNormalizedSpansByTraceId(params);
+    return this.repository.findNormalizedSpansByTraceId(params);
   }
 
   /**
@@ -129,8 +129,8 @@ export class SpanStorageService {
    * consumers. Deliberately ungated and unresolved, and `null` means not readable yet so queue
    * callers retry. The partition hint is required: the read behind it has no unbounded fallback.
    */
-  async tryGetNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
-    return this.repository.tryFindNormalizedSpanById(params);
+  async findNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+    return this.repository.findNormalizedSpanById(params);
   }
 
   /**
@@ -138,16 +138,16 @@ export class SpanStorageService {
    * dependencies were supplied. Resolution fetches the whole trace's normalized spans and isolates
    * the requested one afterwards, so sibling pointers resolve consistently with the trace read.
    */
-  async tryGetSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
+  async findSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
       span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
 
     if (!this.blobResolutionDeps) {
-      return gateOne(await this.repository.tryGetSpanByIds(params));
+      return gateOne(await this.repository.findSpanByIds(params));
     }
 
     // Resolve the single span via the normalized+resolve path.
-    const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
     const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
@@ -164,7 +164,7 @@ export class SpanStorageService {
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
-    return this.repository.getTraceEventsByTraceId(params);
+    return this.repository.findTraceEventsByTraceId(params);
   }
 
   /**
@@ -175,19 +175,19 @@ export class SpanStorageService {
   async getTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,
   ): Promise<Record<string, TraceEventRollup>> {
-    return this.repository.getTraceEventRollupsByTraceIds(params);
+    return this.repository.findTraceEventRollupsByTraceIds(params);
   }
 
   async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {
-    return this.repository.getEventsByTraceId(params);
+    return this.repository.findEventsByTraceId(params);
   }
 
   async getSpanEvents(params: BySpanId): Promise<ElasticSearchEvent[]> {
-    return this.repository.getSpanEvents(params);
+    return this.repository.findSpanEvents(params);
   }
 
   async getSpanSummaryByTraceId(params: ByTraceId): Promise<SpanSummaryRow[]> {
-    return this.repository.getSpanSummaryByTraceId(params);
+    return this.repository.findSpanSummaryByTraceId(params);
   }
 
   async getLangwatchSignalsByTraceId(params: ByTraceId): Promise<SpanLangwatchSignalsRow[]> {

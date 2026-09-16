@@ -23,7 +23,7 @@ export interface TraceEditOverlayRow {
  * one per trace, so every write is an upsert.
  */
 export abstract class TraceEditOverlayRepository {
-  abstract tryFindByProjectAndTrace(params: {
+  abstract findByProjectAndTrace(params: {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayRow | null>;

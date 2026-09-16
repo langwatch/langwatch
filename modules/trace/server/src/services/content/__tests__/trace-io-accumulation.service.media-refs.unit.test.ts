@@ -20,10 +20,10 @@ type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 class StubExtraction implements TraceIoExtraction {
   constructor(private readonly sides: { input?: Rich; output?: Rich }) {
   }
-  tryExtractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
+  extractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
     return (this.sides[side] as TraceIoValue | undefined) ?? null;
   }
-  tryExtractFallbackIOFromSpan(): TraceIoValue | null {
+  extractFallbackIOFromSpan(): TraceIoValue | null {
     return null;
   }
 }

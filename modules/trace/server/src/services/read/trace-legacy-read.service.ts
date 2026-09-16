@@ -129,14 +129,14 @@ export class TraceLegacyReadService {
     );
   }
 
-  async tryGetById(
+  async findById(
     projectId: string,
     traceId: string,
     protections: Protections,
     opts?: { full?: boolean; withEditOverlay?: boolean },
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
-      "TraceService.tryGetById",
+      "TraceService.findById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
         const finish = (trace: Trace) =>
@@ -147,7 +147,7 @@ export class TraceLegacyReadService {
             withEditOverlay: opts?.withEditOverlay,
           });
 
-        const traces = await this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.findTracesWithSpans(
           projectId,
           [traceId],
           protections,
@@ -186,7 +186,7 @@ export class TraceLegacyReadService {
           }
 
           span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.clickHouseService.getTracesWithSpans(
+          const resolved = await this.clickHouseService.findTracesWithSpans(
             projectId,
             [candidates[0]!],
             protections,
@@ -216,7 +216,7 @@ export class TraceLegacyReadService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const traces = await this.clickHouseService.getTracesWithSpans(
+        const traces = await this.clickHouseService.findTracesWithSpans(
           projectId,
           traceIds,
           protections,
@@ -243,7 +243,7 @@ export class TraceLegacyReadService {
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        const traces = await this.clickHouseService.getTracesByThreadId(
+        const traces = await this.clickHouseService.findTracesByThreadId(
           projectId,
           threadId,
           protections,
@@ -264,7 +264,7 @@ export class TraceLegacyReadService {
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const result = await this.clickHouseService.getAllTracesForProject(
+        const result = await this.clickHouseService.findAllTracesForProject(
           input,
           protections,
           options,
@@ -319,7 +319,7 @@ export class TraceLegacyReadService {
    * @param evaluationId - The evaluation to fetch inputs for
    * @returns The parsed inputs, or null when none are available
    */
-  async tryGetEvaluationInputs({
+  async findEvaluationInputs({
     projectId,
     evaluationId,
   }: {
@@ -327,7 +327,7 @@ export class TraceLegacyReadService {
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
     return this.tracer.withActiveSpan(
-      "TraceService.tryGetEvaluationInputs",
+      "TraceService.findEvaluationInputs",
       {
         attributes: {
           "tenant.id": projectId,
@@ -358,7 +358,7 @@ export class TraceLegacyReadService {
         },
       },
       async () => {
-        const traces = await this.clickHouseService.getTracesWithSpansByThreadIds(
+        const traces = await this.clickHouseService.findTracesWithSpansByThreadIds(
           projectId,
           threadIds,
           protections,
@@ -384,7 +384,7 @@ export class TraceLegacyReadService {
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        return this.clickHouseService.getTopicCounts(input);
+        return this.clickHouseService.findTopicCounts(input);
       },
     );
   }
@@ -399,7 +399,7 @@ export class TraceLegacyReadService {
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        return this.clickHouseService.getCustomersAndLabels(input);
+        return this.clickHouseService.findCustomersAndLabels(input);
       },
     );
   }
@@ -413,12 +413,12 @@ export class TraceLegacyReadService {
       "TraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
-        return this.clickHouseService.getDistinctFieldNames(projectId, startDate, endDate);
+        return this.clickHouseService.findDistinctFieldNames(projectId, startDate, endDate);
       },
     );
   }
 
-  async tryGetSpanForPromptStudio({
+  async findSpanForPromptStudio({
     projectId,
     spanId,
     protections,
@@ -428,10 +428,10 @@ export class TraceLegacyReadService {
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     return this.tracer.withActiveSpan(
-      "TraceService.tryGetSpanForPromptStudio",
+      "TraceService.findSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        return this.clickHouseService.tryGetSpanForPromptStudio({
+        return this.clickHouseService.findSpanForPromptStudio({
           projectId,
           spanId,
           protections,

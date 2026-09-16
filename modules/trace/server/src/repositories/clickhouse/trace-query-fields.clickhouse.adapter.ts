@@ -25,7 +25,10 @@ const evaluatorStatusRead: CategoricalRead = (t) =>
 // Re-expresses the `evaluatorVerdict` multiIf in JS — `error` and `skipped`
 // win, then the 0/1/null `Passed` maps to fail/pass/unknown. Kept in lockstep
 // with the SQL expression on the `evaluatorVerdict` facet.
-function evaluatorVerdictOf(evaluation: { status?: string | null; passed?: boolean | null }) {
+function evaluatorVerdictOf(evaluation: {
+  status?: string | null;
+  passed?: boolean | null;
+}): "error" | "fail" | "pass" | "skipped" | "unknown" {
   if (evaluation.status === "error") return "error";
   if (evaluation.status === "skipped") return "skipped";
   if (evaluation.passed === true) return "pass";

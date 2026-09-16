@@ -186,7 +186,7 @@ export class TraceCanonicalisationService extends TraceCanonicalisationServiceCo
     });
   }
 
-  tryExtractMessageText(input: ExtractMessageTextInput): string | null {
+  extractMessageText(input: ExtractMessageTextInput): string | null {
     const parsed = extractMessageTextInputSchema.parse(input);
     const lastUserText = parsed.mode === "input" ? extractLastUserMessageText(parsed.value) : null;
 

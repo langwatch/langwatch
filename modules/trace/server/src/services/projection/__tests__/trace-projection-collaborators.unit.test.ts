@@ -65,7 +65,7 @@ describe("given a span carrying semantic input and output attributes", () => {
         spanAttributes: { "gen_ai.input.messages": messages },
       });
 
-      expect(extraction.tryExtractRichIOFromSpan(span, "input")).toEqual({
+      expect(extraction.extractRichIOFromSpan(span, "input")).toEqual({
         raw: messages,
         text: "how much is it",
         source: "gen_ai",
@@ -78,7 +78,7 @@ describe("given a span carrying semantic input and output attributes", () => {
         spanAttributes: { "langwatch.output": "nine euro" },
       });
 
-      expect(extraction.tryExtractRichIOFromSpan(span, "output")).toEqual({
+      expect(extraction.extractRichIOFromSpan(span, "output")).toEqual({
         raw: "nine euro",
         text: "nine euro",
         source: "langwatch",
@@ -93,8 +93,8 @@ describe("given a span carrying semantic input and output attributes", () => {
         spanAttributes: { "langwatch.input": { unrecognised_wrapper: { depth: 3 } } },
       });
 
-      expect(extraction.tryExtractRichIOFromSpan(span, "input")).toBeNull();
-      expect(extraction.tryExtractFallbackIOFromSpan(span, "input")?.text).toContain(
+      expect(extraction.extractRichIOFromSpan(span, "input")).toBeNull();
+      expect(extraction.extractFallbackIOFromSpan(span, "input")?.text).toContain(
         "unrecognised_wrapper",
       );
     });
@@ -103,8 +103,8 @@ describe("given a span carrying semantic input and output attributes", () => {
     it("reports nothing at all when the span carries no LangWatch attribute", () => {
       const span = createTestSpan({ spanAttributes: { "http.method": "POST" } });
 
-      expect(extraction.tryExtractRichIOFromSpan(span, "input")).toBeNull();
-      expect(extraction.tryExtractFallbackIOFromSpan(span, "input")).toBeNull();
+      expect(extraction.extractRichIOFromSpan(span, "input")).toBeNull();
+      expect(extraction.extractFallbackIOFromSpan(span, "input")).toBeNull();
     });
   });
 });
@@ -124,7 +124,7 @@ describe("given the media reference port over the contract's format", () => {
 
       expect(refs).toEqual([{ kind: "image", url: "/api/files/p/a", role: "assistant" }]);
 
-      const serialized = media.trySerialize(refs);
+      const serialized = media.serialize(refs);
       expect(serialized).toBe('[{"kind":"image","url":"/api/files/p/a","role":"assistant"}]');
       expect(media.parse(serialized)).toEqual(refs);
       expect(

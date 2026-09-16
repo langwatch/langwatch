@@ -1,4 +1,4 @@
-// Integration tests for `tryFindByTraceId` partition pruning
+// Integration tests for `findByTraceId` partition pruning
 // (production schema: ReplacingMergeTree, partitioned by week, ordered by TenantId/TraceId)
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -113,9 +113,9 @@ function recordingRepo(): {
   };
 }
 
-integration("TraceSummaryClickHouseRepository.tryFindByTraceId (integration)", () => {
+integration("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("returns the trace when no occurredAtMs hint is passed", async () => {
-    const result = await repo.tryFindByTraceId({ tenantId, traceId: presentTraceId });
+    const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe(presentTraceId);
@@ -124,7 +124,7 @@ integration("TraceSummaryClickHouseRepository.tryFindByTraceId (integration)", (
   it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.tryFindByTraceId({ tenantId, traceId: presentTraceId });
+    const result = await rec.findByTraceId({ tenantId, traceId: presentTraceId });
 
     expect(result?.traceId).toBe(presentTraceId);
     // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
@@ -139,7 +139,7 @@ integration("TraceSummaryClickHouseRepository.tryFindByTraceId (integration)", (
   it("skips the heavy read entirely for a trace that does not exist", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.tryFindByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
+    const result = await rec.findByTraceId({ tenantId, traceId: `missing-${nanoid()}` });
 
     expect(result).toBeNull();
     // The light resolve confirms absence; the heavy unbounded read is never

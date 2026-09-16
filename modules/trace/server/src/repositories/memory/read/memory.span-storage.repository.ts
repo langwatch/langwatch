@@ -32,14 +32,14 @@ export class MemorySpanStorageRepository extends NullSpanStorageRepository {
     for (const span of spans) this.#store.put(span);
   }
 
-  override async getNormalizedSpansByTraceId(
+  override async findNormalizedSpansByTraceId(
     parameters: { tenantId: string; traceId: string; limit?: number } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
     const spans = this.#store.findNormalizedByTrace(parameters);
     return typeof parameters.limit === "number" ? spans.slice(0, parameters.limit) : spans;
   }
 
-  override async tryFindNormalizedSpanById(parameters: {
+  override async findNormalizedSpanById(parameters: {
     tenantId: string;
     traceId: string;
     spanId: string;
@@ -48,13 +48,13 @@ export class MemorySpanStorageRepository extends NullSpanStorageRepository {
     return spans.find((span) => span.spanId === parameters.spanId) ?? null;
   }
 
-  override async getTraceEventsByTraceId(
+  override async findTraceEventsByTraceId(
     parameters: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]> {
     return this.#store.findDerivedEvents(parameters);
   }
 
-  override async tryGetSpanByIds(
+  override async findSpanByIds(
     _parameters: { tenantId: string; traceId: string; spanId: string } & OccurredAtHint,
   ): Promise<Span | null> {
     // The rendered span is a different shape from the row written here, and

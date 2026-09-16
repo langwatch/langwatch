@@ -317,7 +317,7 @@ export class ClaudeCodeTruncatedRequestService {
    * system/tools values, keeps partial system text that identifies session context.
    * @internal exported for unit testing
    */
-  trySalvage(raw: string): { role: string; content: string }[] | null {
+  salvage(raw: string): { role: string; content: string }[] | null {
     const trimmed = raw.replace(CLAUDE_TRUNCATION_MARKER, "");
 
     const system = this.salvageTopLevelValue(trimmed, "system");

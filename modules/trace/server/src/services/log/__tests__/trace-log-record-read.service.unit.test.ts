@@ -31,7 +31,7 @@ const canonicalRow: StoredLogRecordRow = {
 function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecordRow[] } = {}) {
   const getLogsByTraceId = vi.fn().mockResolvedValue(legacyRows);
   const repository = {
-    getLogsByTraceId,
+    findLogsByTraceId: getLogsByTraceId,
   } as unknown as LogRecordStorageRepository;
   const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
   const canonical: LogApi = {

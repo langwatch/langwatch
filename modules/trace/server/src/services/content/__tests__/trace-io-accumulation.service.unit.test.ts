@@ -23,10 +23,10 @@ type Extracted = { rich?: TraceIoValue | null; fallback?: TraceIoValue | null };
 class FakeExtraction implements TraceIoExtraction {
   constructor(private readonly sides: { input?: Extracted; output?: Extracted }) {
   }
-  tryExtractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
+  extractRichIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
     return this.sides[side]?.rich ?? null;
   }
-  tryExtractFallbackIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
+  extractFallbackIOFromSpan(_span: NormalizedSpan, side: TraceIoSide): TraceIoValue | null {
     return this.sides[side]?.fallback ?? null;
   }
 }
@@ -52,7 +52,7 @@ class FakeMediaReferences implements TraceMediaReferenceResolver {
   }): TraceMediaReference[] {
     return precedence === "prepend" ? [...incoming, ...existing] : [...existing, ...incoming];
   }
-  trySerialize(references: TraceMediaReference[]): string | null {
+  serialize(references: TraceMediaReference[]): string | null {
     return references.length === 0 ? null : JSON.stringify(references);
   }
 }

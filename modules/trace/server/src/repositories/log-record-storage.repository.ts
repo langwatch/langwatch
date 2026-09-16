@@ -24,7 +24,7 @@ export abstract class LogRecordStorageRepository {
    * {@link TRACE_LOG_READ_CAP} unless narrowed. Optional occurredAtMs hint enables
    * partition pruning on TimeUnixMs.
    */
-  abstract getLogsByTraceId(
+  abstract findLogsByTraceId(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
@@ -52,7 +52,7 @@ export abstract class LogRecordStorageRepository {
 }
 
 export class NullLogRecordStorageRepository implements LogRecordStorageRepository {
-  async getLogsByTraceId(
+  async findLogsByTraceId(
     _tenantId: string,
     _traceId: string,
     _occurredAtMs?: number,

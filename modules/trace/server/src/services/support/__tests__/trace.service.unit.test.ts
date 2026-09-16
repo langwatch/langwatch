@@ -52,7 +52,7 @@ class FakeTraceRepository extends TraceProjectedReadRepository {
     return Promise.resolve([]);
   }
 
-  async tryFindIngestLag(): Promise<null> {
+  async findIngestLag(): Promise<null> {
     return null;
   }
 
@@ -84,7 +84,7 @@ class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
 class CapturingSummaryReader extends TraceSummaryReaderRepository {
   readonly calls: { tenantId: string; traceId: string }[] = [];
 
-  async tryGetSummary(input: { tenantId: string; traceId: string }): Promise<null> {
+  async findSummary(input: { tenantId: string; traceId: string }): Promise<null> {
     this.calls.push(input);
     return null;
   }
@@ -177,7 +177,7 @@ describe("TraceService span-tree read", () => {
     });
 
     await expect(
-      traceService.tryGetSummary({ projectId: "project_1", traceId: "trace_1" }),
+      traceService.findSummary({ projectId: "project_1", traceId: "trace_1" }),
     ).resolves.toBeNull();
     expect(summaryReader.calls).toEqual([{ tenantId: "project_1", traceId: "trace_1" }]);
   });
@@ -197,7 +197,7 @@ describe("TraceService span-tree read", () => {
             return Promise.resolve([]);
           }
 
-          async tryFindIngestLag(): Promise<null> {
+          async findIngestLag(): Promise<null> {
             return null;
           }
 
@@ -285,7 +285,7 @@ describe("TraceService span-tree read", () => {
         return Promise.resolve([]);
       }
 
-      async tryFindIngestLag(): Promise<null> {
+      async findIngestLag(): Promise<null> {
         return null;
       }
 

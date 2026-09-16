@@ -165,7 +165,7 @@ export class ClaudeCodeResponseService {
    * Excludes tool_use (tool invocations, not replies) and thinking (redacted by Anthropic).
    * @internal exported for unit testing only
    */
-  tryExtractAssistantTextFromResponseBody(raw: unknown): string | null {
+  extractAssistantTextFromResponseBody(raw: unknown): string | null {
     const parsed = this.parseJsonBody(raw);
     if (parsed === null) {
       return null;
@@ -178,8 +178,8 @@ export class ClaudeCodeResponseService {
    * Extracts title from title-generation response body JSON.
    * Never throws to avoid blocking ingest on malformed bodies.
    */
-  tryExtractSessionTitleFromResponseBody(raw: string): string | null {
-    const text = this.tryExtractAssistantTextFromResponseBody(raw);
+  extractSessionTitleFromResponseBody(raw: string): string | null {
+    const text = this.extractAssistantTextFromResponseBody(raw);
     if (text === null) {
       return null;
     }
@@ -202,7 +202,7 @@ export class ClaudeCodeResponseService {
    * Null when unparseable or split-less (older APIs report only the flat total).
    * @internal exported for unit testing
    */
-  tryExtractCacheCreationTtlSplit(raw: unknown): {
+  extractCacheCreationTtlSplit(raw: unknown): {
     ephemeral5mInputTokens: number;
     ephemeral1hInputTokens: number;
   } | null {
@@ -229,7 +229,7 @@ export class ClaudeCodeResponseService {
    * Trace headline uses text-only to keep final text reply instead of tool marker.
    * @internal exported for unit testing
    */
-  tryExtractAssistantOutputFromResponseBody(raw: unknown): string | null {
+  extractAssistantOutputFromResponseBody(raw: unknown): string | null {
     const parsed = this.parseJsonBody(raw);
     if (parsed === null) {
       return null;

@@ -147,10 +147,10 @@ function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"])
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {
-      getTracesWithSpans: mockGetTracesWithSpans,
-      getTracesByThreadId: mockGetTracesByThreadId,
-      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
-      getAllTracesForProject: mockGetAllTracesForProject,
+      findTracesWithSpans: mockGetTracesWithSpans,
+      findTracesByThreadId: mockGetTracesByThreadId,
+      findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+      findAllTracesForProject: mockGetAllTracesForProject,
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
     } as unknown as TraceLegacyReadRepository,
     editOverlay: {} as TraceEditOverlayService,
@@ -160,7 +160,7 @@ function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"])
   });
 }
 
-describe("TraceService.tryGetById — Claude Code log content enrichment", () => {
+describe("TraceService.findById — Claude Code log content enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -173,7 +173,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.findById(PROJECT_ID, TRACE_ID, protections);
       const span = trace?.spans?.[0];
 
       expect(span?.input).toEqual({
@@ -194,7 +194,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      await service.findById(PROJECT_ID, TRACE_ID, protections);
 
       expect(getLogs).toHaveBeenCalledTimes(1);
       expect(getLogs).toHaveBeenCalledWith(PROJECT_ID, TRACE_ID, 1_700_000_000_000);
@@ -206,7 +206,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       ]);
       const service = makeService(vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS));
 
-      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.findById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.metrics?.prompt_tokens).toBe(120);
       expect(trace?.spans?.[0]?.metrics?.completion_tokens).toBe(8);
@@ -222,7 +222,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       const getLogs = vi.fn().mockResolvedValue(CLAUDE_LOG_ROWS);
       const service = makeService(getLogs);
 
-      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.findById(PROJECT_ID, TRACE_ID, protections);
 
       expect(getLogs).not.toHaveBeenCalled();
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
@@ -237,7 +237,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       ]);
       const service = makeService(vi.fn().mockResolvedValue([]));
 
-      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.findById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
       expect(trace?.spans?.[0]?.metrics?.cost).toBe(STORED_COST);
@@ -251,7 +251,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
       ]);
       const service = makeService(vi.fn().mockRejectedValue(new Error("clickhouse down")));
 
-      const trace = await service.tryGetById(PROJECT_ID, TRACE_ID, protections);
+      const trace = await service.findById(PROJECT_ID, TRACE_ID, protections);
 
       expect(trace?.spans?.[0]?.input ?? null).toBeNull();
     });
@@ -259,7 +259,7 @@ describe("TraceService.tryGetById — Claude Code log content enrichment", () =>
 });
 
 /** Enrichment on multi-trace reads (evals, export, threads) must match
- * tryGetById behavior. */
+ * findById behavior. */
 describe("TraceService — multi-trace read enrichment", () => {
   beforeEach(() => {
     vi.clearAllMocks();

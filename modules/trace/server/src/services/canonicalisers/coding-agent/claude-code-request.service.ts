@@ -123,7 +123,7 @@ export class ClaudeCodeRequestService {
    * Returns null when unparseable, no messages array, or every turn empty.
    * @internal exported for ingest-time body derivation + unit testing
    */
-  tryBuildInputMessagesFromRequestBody(
+  buildInputMessagesFromRequestBody(
     raw: unknown,
   ): { role: string; content: string }[] | null {
     const parsed = this.tryParseRequestBody(raw);
@@ -131,7 +131,7 @@ export class ClaudeCodeRequestService {
       return this.buildInputMessages(parsed);
     }
 
-    return typeof raw === "string" ? claudeCodeTruncatedRequestService.trySalvage(raw) : null;
+    return typeof raw === "string" ? claudeCodeTruncatedRequestService.salvage(raw) : null;
   }
 
   deriveClaudeRequestBody(raw: unknown): {
@@ -147,7 +147,7 @@ export class ClaudeCodeRequestService {
     }
 
     return {
-      messages: typeof raw === "string" ? claudeCodeTruncatedRequestService.trySalvage(raw) : null,
+      messages: typeof raw === "string" ? claudeCodeTruncatedRequestService.salvage(raw) : null,
       toolResults: new Map(),
     };
   }

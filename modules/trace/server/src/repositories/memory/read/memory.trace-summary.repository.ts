@@ -30,7 +30,7 @@ export class MemoryTraceSummaryRepository extends TraceSummaryRepository {
     for (const entry of entries) await this.upsert(entry.data, entry.tenantId);
   }
 
-  async tryFindByTraceId(
+  async findByTraceId(
     trace: { tenantId: string; traceId: string },
     _options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {

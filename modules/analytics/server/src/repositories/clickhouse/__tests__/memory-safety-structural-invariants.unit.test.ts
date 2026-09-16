@@ -122,7 +122,7 @@ describe("memory-safety", () => {
   describe("topic and field-discovery query attribute access", () => {
     /**
      * Read the actual production source of clickhouse-trace.service.ts and
-     * extract the method bodies for getTopicCounts and getDistinctFieldNames.
+     * extract the method bodies for findTopicCounts and findDistinctFieldNames.
      * This way, if the SQL changes the test checks the ACTUAL code.
      */
     const traceServicePath = path.resolve(
@@ -131,39 +131,39 @@ describe("memory-safety", () => {
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-    const getTopicCountsBody = traceServiceSource.match(
-      /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    const findTopicCountsBody = traceServiceSource.match(
+      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
-    const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    const findDistinctFieldNamesBody = traceServiceSource.match(
+      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the topic counting query SQL is inspected", () => {
       /** @scenario Topic and field-discovery queries access only specific attributes */
       it("does not select the full SpanAttributes Map column", () => {
-        expect(getTopicCountsBody).not.toBeNull();
-        expect(getTopicCountsBody![0]).not.toContain("SpanAttributes");
+        expect(findTopicCountsBody).not.toBeNull();
+        expect(findTopicCountsBody![0]).not.toContain("SpanAttributes");
       });
 
       it("does not select the full Attributes Map column without key access", () => {
-        expect(getTopicCountsBody).not.toBeNull();
+        expect(findTopicCountsBody).not.toBeNull();
         // Attributes without ['key'] means reading the entire Map
-        expect(getTopicCountsBody![0]).not.toMatch(/\bAttributes\b(?!\[)/);
+        expect(findTopicCountsBody![0]).not.toMatch(/\bAttributes\b(?!\[)/);
       });
     });
 
     describe("when the field discovery query SQL is inspected", () => {
       /** @scenario "Topic and field-discovery queries access only specific attributes" */
       it("does not select the full SpanAttributes Map column", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
-        expect(getDistinctFieldNamesBody![0]).not.toContain("SpanAttributes");
+        expect(findDistinctFieldNamesBody).not.toBeNull();
+        expect(findDistinctFieldNamesBody![0]).not.toContain("SpanAttributes");
       });
 
       it("uses mapKeys() for Attributes access (extracts keys only, not values)", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
+        expect(findDistinctFieldNamesBody).not.toBeNull();
         // mapKeys extracts only the key names, avoiding reading all Map values
-        expect(getDistinctFieldNamesBody![0]).toContain("mapKeys(Attributes)");
+        expect(findDistinctFieldNamesBody![0]).toContain("mapKeys(Attributes)");
       });
     });
   });
@@ -178,15 +178,15 @@ describe("memory-safety", () => {
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-    const getTopicCountsBody = traceServiceSource.match(
-      /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    const findTopicCountsBody = traceServiceSource.match(
+      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the topic counting query SQL is inspected", () => {
       /** @scenario Topic counting query includes a LIMIT clause */
       it("includes a LIMIT clause followed by a number", () => {
-        expect(getTopicCountsBody).not.toBeNull();
-        expect(getTopicCountsBody![0]).toMatch(/\bLIMIT\s+\d+/);
+        expect(findTopicCountsBody).not.toBeNull();
+        expect(findTopicCountsBody![0]).toMatch(/\bLIMIT\s+\d+/);
       });
     });
   });
@@ -201,8 +201,8 @@ describe("memory-safety", () => {
     );
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-    const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+    const findDistinctFieldNamesBody = traceServiceSource.match(
+      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the field discovery query SQL is inspected", () => {
@@ -213,18 +213,18 @@ describe("memory-safety", () => {
 
       /** @scenario Field discovery query includes a LIMIT clause */
       it("span names query includes a LIMIT clause followed by a number", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
+        expect(findDistinctFieldNamesBody).not.toBeNull();
         // The body contains two queries (span names + metadata keys).
         // Verify at least two LIMIT occurrences so both are covered.
-        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
+        const limitMatches = findDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
         expect(limitMatches).not.toBeNull();
         expect(limitMatches!.length).toBeGreaterThanOrEqual(1);
       });
 
       it("metadata keys query includes a LIMIT clause followed by a number", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
+        expect(findDistinctFieldNamesBody).not.toBeNull();
         // Both the span-names and metadata-keys queries must have LIMIT.
-        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
+        const limitMatches = findDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
         expect(limitMatches).not.toBeNull();
         expect(limitMatches!.length).toBeGreaterThanOrEqual(2);
       });

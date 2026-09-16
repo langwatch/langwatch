@@ -29,7 +29,7 @@ export abstract class TraceProjectedReadRepository {
 
   abstract findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
 
-  abstract tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
+  abstract findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null>;
 
   abstract findSummaryPage(input: {
     tenantId: string;

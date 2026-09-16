@@ -130,7 +130,7 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
    * fold sums per-call values, which can never double-count a span.
    */
   private liftApiResponseBodyUsage(ctx: LogExtractorContext): void {
-    const usage = claudeCodeResponseService.tryExtractCacheCreationTtlSplit(
+    const usage = claudeCodeResponseService.extractCacheCreationTtlSplit(
       ctx.bag.attrs.get("body"),
     );
     if (usage === null) {

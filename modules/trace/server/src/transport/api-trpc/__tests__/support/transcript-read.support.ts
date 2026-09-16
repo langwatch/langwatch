@@ -42,12 +42,12 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
 
 /**
  * The read ports, real everywhere the package owns the implementation.
- * `tryGetVisibilityCutoffMs` answers "no window": that cutoff is a SEPARATE
+ * `getVisibilityCutoffMs` answers "no window": that cutoff is a SEPARATE
  * gate resolved by the process, and leaving it on would mask what these suites measure.
  */
 export function createTranscriptReadPorts(): TracesV2ReadMembers {
   return {
-    tryGetVisibilityCutoffMs: async () => null,
+    getVisibilityCutoffMs: async () => null,
     derivedAttrPrefixes: {
       input: DERIVED_INPUT_ATTR_PREFIX,
       output: DERIVED_OUTPUT_ATTR_PREFIX,

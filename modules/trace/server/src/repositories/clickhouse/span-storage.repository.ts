@@ -149,7 +149,7 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
- * Settings for the single-span fetch paths (`tryGetSpanByIds`, `getSpanEvents`).
+ * Settings for the single-span fetch paths (`findSpanByIds`, `getSpanEvents`).
  * Locks `query_plan_optimize_lazy_materialization=1` per-query so the LazilyRead
  * optimiser stays engaged even if a future cluster/profile config flips it off.
  */
@@ -663,7 +663,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpansByTraceId({
+  async findSpansByTraceId({
     tenantId,
     traceId,
     limit,
@@ -726,7 +726,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getNormalizedSpansByTraceId({
+  async findNormalizedSpansByTraceId({
     tenantId,
     traceId,
     limit,
@@ -792,7 +792,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async tryGetSpanByIds({
+  async findSpanByIds({
     tenantId,
     traceId,
     spanId,
@@ -802,7 +802,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<Span | null> {
-    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.tryGetSpanByIds");
+    EventUtils.validateTenantId({ tenantId }, "SpanStorageClickHouseRepository.findSpanByIds");
 
     try {
       return await this.readTraceSpans<Span | null>(
@@ -837,7 +837,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   /**
    * Windowed read for derivation consumers; miss is expected and cheap to retry.
    */
-  async tryFindNormalizedSpanById({
+  async findNormalizedSpanById({
     tenantId,
     traceId,
     spanId,
@@ -845,7 +845,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.tryFindNormalizedSpanById",
+      "SpanStorageClickHouseRepository.findNormalizedSpanById",
     );
 
     try {
@@ -1072,7 +1072,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     });
   }
 
-  async getTraceEventsByTraceId({
+  async findTraceEventsByTraceId({
     tenantId,
     traceId,
     occurredAtMs,
@@ -1144,7 +1144,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getTraceEventRollupsByTraceIds({
+  async findTraceEventRollupsByTraceIds({
     tenantId,
     traceIds,
     timeRange,
@@ -1187,7 +1187,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getEventsByTraceId({
+  async findEventsByTraceId({
     tenantId,
     traceId,
     occurredAtMs,
@@ -1255,7 +1255,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpanEvents({
+  async findSpanEvents({
     tenantId,
     traceId,
     spanId,
@@ -1284,7 +1284,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_attrs AS attributes
               FROM (
                 -- Single-span fetch. Same rationale and same investigation
-                -- as tryGetSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
+                -- as findSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
                 -- LazilyRead survives through this subquery + ARRAY JOIN
                 -- composition: Events.Timestamp / Events.Name /
                 -- Events.Attributes are deferred past the inner LIMIT 1
@@ -1333,7 +1333,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpanSummaryByTraceId({
+  async findSpanSummaryByTraceId({
     tenantId,
     traceId,
     occurredAtMs,

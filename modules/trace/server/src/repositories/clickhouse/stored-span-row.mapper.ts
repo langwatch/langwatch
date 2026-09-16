@@ -3,7 +3,11 @@
  * moved here from app so coding-agent-server can import without path aliases.
  */
 import { createLogger } from "@langwatch/observability";
-import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
+import {
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+  type NormalizedSpan,
+} from "@langwatch/trace-contract";
 
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
@@ -186,7 +190,7 @@ export interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
-export function mapChRowToNormalized(row: FullSpanRow) {
+export function mapChRowToNormalized(row: FullSpanRow): NormalizedSpan {
   return {
     id: "",
     traceId: row.TraceId,

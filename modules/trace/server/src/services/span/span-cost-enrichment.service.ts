@@ -58,7 +58,7 @@ export class OtlpSpanCostEnrichmentService {
    * (most spans) — a scope cascade over three tiers, run on every span.
    */
   async enrichSpan({ span, tenantId }: { span: OtlpSpan; tenantId: string }): Promise<void> {
-    const modelName = this.modelNames.tryExtractModelName(
+    const modelName = this.modelNames.extractModelName(
       span,
       CODING_AGENT_MODEL_SPAN_NAMES.has(span.name)
         ? CODING_AGENT_MODEL_ATTRIBUTE_KEYS

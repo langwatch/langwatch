@@ -17,6 +17,7 @@ import {
   projectRestFacts,
   RequestValidationError,
   resolver,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   TraceApi,
@@ -179,7 +180,11 @@ export type TracesRestOptions = Readonly<{
 }>;
 
 /** The `/api/traces` and `/api/v1/traces` family. */
-export function createTracesRest(options: TracesRestOptions = {}) {
+export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<TraceApi>;
+}> {
   const { updateTraceMetadata, readCodingAgentTranscript } = options;
 
   let router = defineRestRouter(TraceApi)

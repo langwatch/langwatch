@@ -26,18 +26,18 @@ describe("memory-safety", () => {
   describe("topic and field-discovery query attribute access", () => {
     /**
      * Read the actual production source of clickhouse-trace.service.ts and
-     * extract the method bodies for getTopicCounts and getDistinctFieldNames.
+     * extract the method bodies for findTopicCounts and findDistinctFieldNames.
      * This way, if the SQL changes the test checks the ACTUAL code.
      */
     const traceServicePath = traceReadSourcePath();
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
     const getTopicCountsBody = traceServiceSource.match(
-      /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the topic counting query SQL is inspected", () => {
@@ -77,7 +77,7 @@ describe("memory-safety", () => {
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
     const getTopicCountsBody = traceServiceSource.match(
-      /async getTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+      /async findTopicCounts[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the topic counting query SQL is inspected", () => {
@@ -97,7 +97,7 @@ describe("memory-safety", () => {
     const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
     const getDistinctFieldNamesBody = traceServiceSource.match(
-      /async getDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
+      /async findDistinctFieldNames[\s\S]*?(?=\n {2}async |\n {2}\/\*\*|\n {2}private )/,
     );
 
     describe("when the field discovery query SQL is inspected", () => {

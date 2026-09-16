@@ -48,7 +48,7 @@ const LEGACY_PROJECT_KEY: ResolvedApiKeyCredential = {
 function bootTraceApp(options: {
   resolveToken: (token: string) => ResolvedApiKeyCredential | null;
 }) {
-  const tryGetById = vi.fn(async () => void 0);
+  const findById = vi.fn(async () => void 0);
   const apiKeys = {
     findResolvedToken: vi.fn(async ({ token }: { token: string }) => options.resolveToken(token)),
     markUsed: vi.fn(),
@@ -60,7 +60,7 @@ function bootTraceApp(options: {
   const app = TraceApp.create({
     traces: {
       existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
-      read: { tryGetById } as unknown as TraceLegacyRead,
+      read: { findById } as unknown as TraceLegacyRead,
       spans: {} as TracesV2SpanReader,
       summary: {} as TraceSummaryReader,
       list: {} as TracesV2ListReader,
@@ -107,7 +107,7 @@ function bootTraceApp(options: {
       context.json({ error: "Internal Server Error", message: "An unknown error occurred" }, 500),
   });
 
-  return { family, tryGetById, apiKeys };
+  return { family, findById, apiKeys };
 }
 
 describe("given the deprecated trace family installed on the trace application", () => {
@@ -143,7 +143,7 @@ describe("given the deprecated trace family installed on the trace application",
   describe("when a resolvable project key asks for a trace that is not there", () => {
     /** @scenario "A credentialled legacy trace read reaches the read" */
     it("reaches the read and answers the family's own 404", async () => {
-      const { family, tryGetById } = bootTraceApp({ resolveToken: () => LEGACY_PROJECT_KEY });
+      const { family, findById } = bootTraceApp({ resolveToken: () => LEGACY_PROJECT_KEY });
 
       const response = await family.request("/api/trace/trace-1", {
         headers: { "x-auth-token": "a-project-key" },
@@ -151,7 +151,7 @@ describe("given the deprecated trace family installed on the trace application",
 
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ message: "Trace not found." });
-      expect(tryGetById).toHaveBeenCalled();
+      expect(findById).toHaveBeenCalled();
     });
   });
 

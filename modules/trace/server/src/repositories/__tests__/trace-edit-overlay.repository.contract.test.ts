@@ -25,7 +25,7 @@ describe.each(backends)("given the $name trace edit overlay repository", ({ crea
       const repository = create();
 
       await expect(
-        repository.tryFindByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
+        repository.findByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
       ).resolves.toBeNull();
     });
   });
@@ -45,7 +45,7 @@ describe.each(backends)("given the $name trace edit overlay repository", ({ crea
       expect(saved.updatedById).toBe("user-1");
 
       await expect(
-        repository.tryFindByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
+        repository.findByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
       ).resolves.toMatchObject({ traceId: "trace-1", patch });
     });
   });
@@ -105,7 +105,7 @@ describe.each(backends)("given the $name trace edit overlay repository", ({ crea
       await repository.delete({ projectId: "project-1", traceId: "trace-1" });
 
       await expect(
-        repository.tryFindByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
+        repository.findByProjectAndTrace({ projectId: "project-1", traceId: "trace-1" }),
       ).resolves.toBeNull();
     });
   });

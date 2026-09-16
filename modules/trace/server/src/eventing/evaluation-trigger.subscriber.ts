@@ -222,7 +222,21 @@ function extractCausalityDepthFromOtlpAttrs(
 // ---------------------------------------------------------------------------
 
 /** The trace-derived fields every monitor's command payload shares. */
-function buildTraceEvaluationFields(foldState: TraceSummaryData) {
+function buildTraceEvaluationFields(foldState: TraceSummaryData): {
+  threadId: string | undefined;
+  userId: string | undefined;
+  customerId: string | undefined;
+  labels: string[] | undefined;
+  origin: string | undefined;
+  hasError: boolean;
+  promptIds: string[] | undefined;
+  topicId: string | undefined;
+  subTopicId: string | undefined;
+  spanModels: string[] | undefined;
+  customMetadata: Record<string, string> | undefined;
+  computedInput: string | undefined;
+  computedOutput: string | undefined;
+} {
   const attrs = foldState.attributes ?? {};
   return {
     threadId: attrs["gen_ai.conversation.id"],

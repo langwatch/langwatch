@@ -140,7 +140,7 @@ export class TraceIOAccumulationService {
     span: NormalizedSpan;
     isRoot: boolean;
   }): Pick<TraceIOAccumulation, "computedInput" | "inputIsFallback" | "inputMediaRefs"> {
-    const rich = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "input");
+    const rich = this.traceIOExtractionService.extractRichIOFromSpan(span, "input");
 
     // A root restates the whole trace's input, so it always wins. A child only
     // fills a gap, or replaces a stringified fallback with a semantic match.
@@ -152,7 +152,7 @@ export class TraceIOAccumulationService {
     // flag is what lets a later semantic match take over.
     const fallback =
       rich === null && carried.computedInput === null
-        ? this.traceIOExtractionService.tryExtractFallbackIOFromSpan(span, "input")
+        ? this.traceIOExtractionService.extractFallbackIOFromSpan(span, "input")
         : null;
 
     const winner = richWins ? rich : fallback;
@@ -188,7 +188,7 @@ export class TraceIOAccumulationService {
     TraceIOAccumulation,
     "computedInput" | "inputIsFallback" | "inputMediaRefs" | "blockedByGuardrail"
   > {
-    const rich = this.traceIOExtractionService.tryExtractRichIOFromSpan(span, "output");
+    const rich = this.traceIOExtractionService.extractRichIOFromSpan(span, "output");
     const isExplicit = rich?.source === "langwatch";
 
     // A semantic match always displaces a fallback, whatever the end times say:
@@ -208,7 +208,7 @@ export class TraceIOAccumulationService {
 
     const fallback =
       rich === null && carried.computedOutput === null
-        ? this.traceIOExtractionService.tryExtractFallbackIOFromSpan(span, "output")
+        ? this.traceIOExtractionService.extractFallbackIOFromSpan(span, "output")
         : null;
 
     const mediaRefs = (winning: boolean): string | null =>
@@ -320,7 +320,7 @@ export class TraceIOAccumulationService {
       return serialized;
     }
 
-    return mediaReferences.trySerialize(
+    return mediaReferences.serialize(
       mediaReferences.merge({
         existing: mediaReferences.parse(serialized),
         incoming,

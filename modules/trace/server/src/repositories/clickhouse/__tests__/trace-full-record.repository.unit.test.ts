@@ -36,6 +36,13 @@ class Payloads extends TracePayloadReaderRepository {
   }
 }
 
+/** A blob read that fails. `read` throws now rather than answering null. */
+class FailingPayloads extends TracePayloadReaderRepository {
+  async read(): Promise<string> {
+    throw new Error("blob unavailable");
+  }
+}
+
 class FullIo implements TraceFullIo {
   recompute(spans: NormalizedSpan[]) {
     return {
@@ -172,7 +179,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
     const queries: string[] = [];
     const repository = ClickHouseTraceFullRecordRepository.create(
       new TenantClickHouseResolver(clientFor({}, queries)),
-      new Payloads(null),
+      new Payloads("unread"),
       new FullIo(),
     );
 
@@ -189,7 +196,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
     const port = new TenantClickHouseResolver(clientFor({ thread: true }));
     const repository = ClickHouseTraceFullRecordRepository.create(
       port,
-      new Payloads(null),
+      new FailingPayloads(),
       new FullIo(),
     );
 

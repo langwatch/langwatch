@@ -25,7 +25,7 @@ class IngestLagRepository extends TraceProjectedReadRepository {
     return Promise.resolve([]);
   }
 
-  async tryFindIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
+  async findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {
     this.calls.push(input.tenantId);
     if (this.failure) throw this.failure;
     return this.sample;
@@ -47,7 +47,7 @@ class EmptyQueryFields extends TraceQueryFieldValuesRepository {
 }
 
 class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
-  async tryGetSummary(): Promise<null> {
+  async findSummary(): Promise<null> {
     return null;
   }
 }
