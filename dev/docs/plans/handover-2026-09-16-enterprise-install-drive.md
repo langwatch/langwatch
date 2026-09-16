@@ -351,6 +351,99 @@ its REST transport, and `tslsp-cli diagnostics` clean on both
 the package's own `tsc --noEmit` never reaches because the declarations gate
 fails first. A real boot is still owed.
 
+### The boot graph resolves - checked, not assumed
+
+Document generation evaluates each REST transport's router but never calls
+`GovernanceApp.create`, so app construction was untested by everything above. The
+way that fails at boot is an unresolved peer token, and that is checkable
+statically. Drop this in the enterprise worktree as `apps/api/src/tasks/probe.ts`
+and run it with `node --experimental-transform-types`:
+
+```ts
+import { serverModules } from "@langwatch/installed-modules/server";
+const mods = serverModules as unknown as readonly any[];
+const provided = new Map<unknown, string>();
+for (const m of mods) if (m.apiContract) provided.set(m.apiContract, m.name);
+for (const m of mods)
+  for (const [slot, token] of Object.entries(m.dependencies ?? {}))
+    if (!provided.has(token)) console.log(`UNRESOLVED ${m.name}: ${slot}`);
+```
+
+Result at the enterprise tier: 49 modules, 49 contracts, and **governance's three
+dependencies all resolve** - `projects` from project, `organizations` from
+organization, `permissions` from authz. SCIM resolves five of six from modules.
+
+Seven slots across seven modules report unresolved, and **all seven are
+pre-existing and handled by the composition root, not defects**:
+
+- `auditLog` (agent, automation, evaluator, ops, scim, sso) - filled by
+  `auditLogNullServer`, which `api-production.composition.ts:52` installs
+  precisely when `audit-log` is absent from the generated list.
+- `license` (entitlement) - `ActivatedLicenseSource` is
+  `moduleApi<EntitlementSource>("licensing")` and is supplied by
+  `.withProvided(ActivatedLicenseSource, licenseSource)`, a token provided
+  directly rather than by a module, which is why it is not in the contract map.
+
+So a token missing from that probe's output is not automatically a bug - check
+`withProvided` and the null-server fallbacks before calling one. The probe's
+value is that it separates "declared and resolvable" from "declared", and
+governance and scim are both clean on the first.
+
+### The first real boot, and the two breaks it found
+
+A stack was booted at the enterprise tier in a throwaway worktree
+(`haven up` in `.claude/worktrees/ent-parity`). Static checks had all passed; the
+boot found two failures neither of them could see, which is the argument for
+doing this before declaring a drive finished.
+
+**1. `createScimService` - mine, fixed in `65712f4dd0`.** The backend crash-looped
+on `module '@langwatch/enterprise-scim-server' does not export 'createScimService'`.
+`36167dbde4` (this drive, scim onto ADR-144) removed four exports from the scim
+server's `index.ts` and left `enterprise/packages/composition/api/src/index.ts`
+re-exporting all four. `apps/api/src/app/api-production.composition.ts:36` imports
+one unrelated symbol from that barrel (`createActivatedLicenseSource`), which is
+enough to evaluate it and fail on the one value among the four. Three separate
+gates missed it: `pnpm typecheck` covers three applications and this is one of the
+~180 packages outside them; the package-suites job has been dead since
+`e702359c53`; and no process installed the enterprise modules at all until this
+boot.
+
+**2. `rateLimiter` - not mine, still open, and it blocks every boot of this
+branch.** With the first fixed, boot fails at:
+
+```
+fatal boot failure: Module "auth" reads the "rateLimiter" member,
+which this process cannot supply.   (MissingMemberError)
+  at createWorkerFoundationApps (apps/worker/src/app/worker-foundation-apps.composition.ts:180)
+```
+
+`651625d14f` (2026-09-16) made `modules/auth/server/src/app/auth.app.ts:158`
+declare `reads("logger", "prisma", "redis", "rateLimiter")` and wired the **api**
+to supply it (`api-production.composition.ts:249,434`). The worker installs auth
+through its foundation apps and supplies no limiter - the file contains no
+occurrence of the word. So this is ADR-144's refusal working exactly as designed,
+naming the module and the member.
+
+**It reproduces at the core tier**, so it is not this drive and not the enterprise
+build: regenerate the same worktree with plain `node dev/scripts/generate-modules.mjs`
+and the identical `MissingMemberError` appears. The worker composition is clean in
+git, so no session is mid-fix on it.
+
+Two candidate fixes, and choosing between them is an architecture decision rather
+than a patch:
+
+- the worker supplies a limiter (or a no-op) in its own member record, which asks
+  what rate limiting means in a process with no public doors; or
+- `auth`'s `reads` stops requiring one unconditionally, which asks whether the
+  member is genuinely required by the module or only by its HTTP surface.
+
+Do not guess between them. The owning change is `651625d14f`.
+
+**Where this leaves the 25.** They are proved declared and their boot graph
+resolves; they are not yet proved to answer, because no process on this branch
+currently boots far enough to serve anything. That is blocked on the `rateLimiter`
+decision, not on governance or scim.
+
 ### Then
 
 1. **Teach apidiff the tier.** Generation must move ahead of the install, and the
