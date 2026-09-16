@@ -10,6 +10,7 @@ const REPOSITORY_ROOT = resolve(import.meta.dirname, "../..");
 const SERVER_LIST = "modules/server-modules.generated.ts";
 const WEB_LIST = "modules/web-modules.generated.ts";
 const SERVER_MEMBERS = "modules/server-module-members.generated.ts";
+const MODULES_PACKAGE = "modules/package.json";
 
 /** `api-key` reads as `apiKey`, which is how a module names its declaration. */
 function camelCase(id) {
@@ -118,6 +119,28 @@ function sourceFor({ declarations, constant, half }) {
   ].join("\n");
 }
 
+/**
+ * `@langwatch/installed-modules`'s dependencies, derived from the very
+ * declarations the server list imports.
+ *
+ * Kept generated rather than hand-written because the two drifted: the lists
+ * named 48 modules under the enterprise tier while this file declared 44 core
+ * ones, so the generator died resolving `@langwatch/enterprise-licensing-server`
+ * and no enterprise build could be produced at all.
+ */
+function packageSourceFor({ root, catalogue, tiers }) {
+  const manifest = JSON.parse(readFileSync(resolve(root, MODULES_PACKAGE), "utf8"));
+  const installed = declarationsFor({ root, catalogue, half: "server", suffix: "Server", tiers });
+
+  manifest.dependencies = Object.fromEntries(
+    [...new Set(installed.map((declaration) => declaration.package))]
+      .sort()
+      .map((name) => [name, "workspace:*"]),
+  );
+
+  return `${JSON.stringify(manifest, undefined, 2)}\n`;
+}
+
 /** Both lists for one tier, as the text that belongs on disk. */
 export function generateModuleLists({ root = REPOSITORY_ROOT, tier = "core" } = {}) {
   const catalogue = JSON.parse(readFileSync(resolve(root, "modules/catalogue.json"), "utf8"));
@@ -135,6 +158,7 @@ export function generateModuleLists({ root = REPOSITORY_ROOT, tier = "core" } = 
       half: "web",
     }),
     [SERVER_MEMBERS]: memberSourceFor({ root, catalogue, tiers }),
+    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue, tiers }),
   };
 }
 
