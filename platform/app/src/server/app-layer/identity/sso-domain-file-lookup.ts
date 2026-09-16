@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   fetchFollowingPublicHosts,
   type HostResolver,
+  pinnedFetch,
   systemHostResolver,
 } from "./public-egress";
 
@@ -73,7 +74,7 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
    * that needs the network to say anything at all.
    */
   constructor(
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: typeof fetch = pinnedFetch,
     private readonly resolveHost: HostResolver = systemHostResolver,
   ) {}
 

@@ -1,6 +1,6 @@
 import { classify } from "@langwatch/ssrf";
 import { lookup } from "dns/promises";
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
 /**
  * Making a request to an address a customer typed, without making it to
@@ -191,6 +191,28 @@ export function pinnedTo(addresses: string[]): Agent {
   });
 }
 
+/**
+ * The fetch a pinned dispatcher may be handed to, and the only one.
+ *
+ * `pinnedTo` builds its agent out of THIS package's undici, and a dispatcher
+ * is only ever valid to the undici that made it. The global `fetch` is Node's
+ * own bundled copy — a different one — so it rejected the agent outright with
+ * `UND_ERR_INVALID_ARG: invalid onRequestStart method`, which reaches the
+ * caller as a bare `TypeError: fetch failed`.
+ *
+ * That is indistinguishable from the host being down, and it is how the two
+ * ceremonies came to blame the customer for our own mismatched import: every
+ * issuer was reported unreachable and every domain file missing, on every
+ * environment, for as long as the guard has had callers. Nothing caught it
+ * because both seams are injected — the tests supply a fake fetch, so the one
+ * pairing that matters is the one nothing exercised.
+ *
+ * The agent and the fetch therefore ship together, from one module. A caller
+ * that takes the default cannot get the combination wrong, and a caller that
+ * passes its own is a test.
+ */
+export const pinnedFetch: typeof fetch = undiciFetch;
+
 export type PublicFetchOutcome =
   | { ok: true; response: Response; finalUrl: string }
   | { ok: false; refusal: EgressRefusal };
@@ -206,7 +228,7 @@ export type PublicFetchOutcome =
  */
 export async function fetchFollowingPublicHosts({
   url,
-  fetchImpl,
+  fetchImpl = pinnedFetch,
   resolveHost,
   signal,
   headers,
@@ -214,7 +236,9 @@ export async function fetchFollowingPublicHosts({
   dialableInternalOrigins = [],
 }: {
   url: string;
-  fetchImpl: typeof fetch;
+  /** Defaults to `pinnedFetch`, which is the only fetch the dispatcher below
+   *  is valid for. A caller passes its own only in a test. */
+  fetchImpl?: typeof fetch;
   resolveHost: HostResolver;
   signal: AbortSignal;
   headers?: Record<string, string>;

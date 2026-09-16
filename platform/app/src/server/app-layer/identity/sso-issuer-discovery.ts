@@ -5,6 +5,7 @@ import {
 import {
   fetchFollowingPublicHosts,
   type HostResolver,
+  pinnedFetch,
   systemHostResolver,
 } from "./public-egress";
 
@@ -43,7 +44,7 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
    * that needs the network to say anything at all.
    */
   constructor(
-    private readonly fetchImpl: typeof fetch = fetch,
+    private readonly fetchImpl: typeof fetch = pinnedFetch,
     private readonly resolveHost: HostResolver = systemHostResolver,
     /** Origins somebody vouched for, which may answer inside a private
      *  network. Resolved by the composition root — see
@@ -96,12 +97,32 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
         ? { reachable: true }
         : { reachable: false, reason: "answered something else" };
     } catch (error) {
-      return {
-        reachable: false,
-        reason: error instanceof Error ? error.name : "unreachable",
-      };
+      return { reachable: false, reason: describeThrow(error) };
     }
   }
+}
+
+/**
+ * What went wrong, in enough detail to act on.
+ *
+ * This used to be `error.name`, which for anything undici throws is the
+ * single word `TypeError` — true, and worth nothing. A misconfigured
+ * dispatcher, an expired certificate, a refused connection and a timeout all
+ * arrived as that one word, so the only way to tell them apart was to
+ * reproduce the fetch by hand outside the process. The cause carries the code
+ * that actually distinguishes them.
+ *
+ * This reaches the LOG, not the customer: the refusal the caller sees is
+ * `sso_issuer_unreachable` and carries none of this, which is the same rule
+ * the guard's own refusals follow.
+ */
+function describeThrow(error: unknown): string {
+  if (!(error instanceof Error)) return "unreachable";
+  const cause: unknown = error.cause;
+  if (cause instanceof Error && "code" in cause) {
+    return `${error.name} (${String(cause.code)})`;
+  }
+  return error.name;
 }
 
 /** The two endpoints every OpenID Connect provider publishes and every
