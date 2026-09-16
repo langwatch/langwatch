@@ -9,6 +9,7 @@ import {
 } from "@langwatch/enterprise-worker";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
+import { resolveRequestBound } from "@langwatch/plans";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -156,10 +157,7 @@ import {
   WorkerInfrastructureAdapter,
   type WorkerInfrastructureAdapterOptions,
 } from "../platform/infrastructure/worker-foundation.adapter.ts";
-import {
-  WorkerLifecycle,
-  WorkerTransport,
-} from "../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerLifecycle, WorkerTransport } from "../platform/lifecycle/worker-runtime.port.ts";
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
 import type { WorkerFeatureInstaller } from "../features/worker-feature.installer.ts";
 import { WorkerApplication } from "./worker.application.ts";
@@ -904,9 +902,7 @@ export class WorkerProductionComposition {
       projects: tenancy?.projects,
       redis: eventingOptions.groupQueue.redis,
       resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-      ...(options.featureClickHouse
-        ? { clickhouse: options.featureClickHouse.queryClient }
-        : {}),
+      ...(options.featureClickHouse ? { clickhouse: options.featureClickHouse.queryClient } : {}),
       defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
       // The SAME object storage the trace claim check writes through: a staged
       // invoke body belongs in the tenant's own bucket, not a second one.
@@ -1056,13 +1052,34 @@ export class WorkerProductionComposition {
         : undefined;
     // The ONE dataset application this process installs. Both halves that
     // reach a dataset read it: the automation append below, and the studio
-    // datasets an evaluation run materialises.
+    // datasets an evaluation run materialises. Its batch bound resolves on
+    // the SAME plan provider the trace record reader answers from, boot
+    // overrides included.
     const datasets =
       options.connection && options.resources
         ? await createWorkerDatasetApp({
             database: options.connection.client,
             storage: objectStorage,
             resources: options.resources,
+            ...(tenancy
+              ? {
+                  requestBounds: {
+                    projects: tenancy.projects,
+                    ...(plans
+                      ? {
+                          entitlement: {
+                            requestBound: async ({ key, organizationId }) =>
+                              resolveRequestBound(
+                                key,
+                                (await plans.getActivePlan({ organizationId })).type,
+                                options.config.requestBounds,
+                              ),
+                          },
+                        }
+                      : {}),
+                  },
+                }
+              : {}),
           })
         : undefined;
     const automationDatasets = traceRecords ? datasets : undefined;

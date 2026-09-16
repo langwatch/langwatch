@@ -2,12 +2,20 @@
  * (not intersected) so authorization sweep can read scope ids.
  */
 import { z } from "zod";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,
   newDatasetEntriesSchema,
 } from "./dataset.ts";
 import type { Dataset, DatasetNameResult, DatasetSummary } from "./dataset.ts";
+
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * application refuses batches above the caller's tier value through the
+ * entitlement peer.
+ */
+const DATASET_RECORD_IDS_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRISE");
 
 /**
  * The half of a dataset write that is the same either way: the tenant key and
@@ -115,7 +123,7 @@ export const datasetRecordApiPageInputSchema = z.object({
 export const datasetRecordApiDeleteManyInputSchema = z.object({
   projectId: z.string(),
   datasetId: z.string(),
-  recordIds: z.array(z.string()),
+  recordIds: z.array(z.string()).max(DATASET_RECORD_IDS_MAX),
 });
 
 /** `batchRecord.getAllByexperimentSlug`: one experiment, named by its URL slug. */

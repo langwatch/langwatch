@@ -33,11 +33,7 @@ import {
   type UpsertDatasetInput,
   upsertDatasetInputSchema,
 } from "@langwatch/dataset-contract";
-import type {
-  DatasetNormalizeQueue,
-  DatasetUpload,
-  DatasetContent,
-} from "../app/dataset.app.ts";
+import type { DatasetNormalizeQueue, DatasetUpload, DatasetContent } from "../app/dataset.app.ts";
 import {
   DatasetConflictError,
   DatasetNotFoundError,
@@ -45,6 +41,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { DatasetRecordService } from "./dataset-record.service.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
+import { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 import type { DatasetStorageResolver } from "../app/dataset.app.ts";
@@ -59,6 +56,8 @@ export type DatasetServiceOptions = {
   content?: DatasetContent;
   storageResolver?: DatasetStorageResolver;
   generateId?: () => string;
+  /** The tier-aware batch bound the record writes refuse above. */
+  requestBounds: DatasetRequestBoundsService;
 };
 
 /**
@@ -76,7 +75,8 @@ export class DatasetService {
   private readonly naming: DatasetNamingService;
 
   private constructor(private readonly options: DatasetServiceOptions) {
-    this.generateId = options.generateId ?? (() => generate(DATASET_RECORD_KSUID_RESOURCE).toString());
+    this.generateId =
+      options.generateId ?? (() => generate(DATASET_RECORD_KSUID_RESOURCE).toString());
     this.naming = DatasetNamingService.create(options.repository);
     this.records = DatasetRecordService.create({
       options,
@@ -84,6 +84,7 @@ export class DatasetService {
       assertReady: (dataset) => this.assertReady(dataset),
       assertKnownColumns: (columns) => assertKnownColumns(columns),
       generateId: () => this.generateId(),
+      requestBounds: options.requestBounds,
     });
   }
 

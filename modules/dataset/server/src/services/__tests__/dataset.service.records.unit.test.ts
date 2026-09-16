@@ -6,6 +6,7 @@ import { InvalidColumnError } from "@langwatch/dataset-contract";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 
 const PROJECT_ID = "project-1";
 const NULL_BYTE = String.fromCharCode(0);
@@ -48,7 +49,12 @@ function service(overrides: { columnTypes?: { name: string; type: string }[] } =
   } as unknown as DatasetRecordRepository;
 
   return {
-    service: DatasetService.create({ repository, records, generateId: () => "generated-id" }),
+    service: DatasetService.create({
+      repository,
+      records,
+      generateId: () => "generated-id",
+      requestBounds: createDatasetTestRequestBounds(),
+    }),
     update,
     createMany,
     updateRecord,

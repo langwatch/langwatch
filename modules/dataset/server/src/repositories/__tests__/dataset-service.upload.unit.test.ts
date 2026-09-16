@@ -3,6 +3,7 @@ import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetUpload } from "../../app/dataset.app.ts";
 
 const row = (): Dataset =>
@@ -87,6 +88,7 @@ describe("DatasetService upload boundary", () => {
       repository: new Repo(),
       records: new Records(),
       uploads,
+      requestBounds: createDatasetTestRequestBounds(),
     });
     await expect(
       service.createPendingUpload({ projectId: "p1", name: "D", filename: "d.csv" }),

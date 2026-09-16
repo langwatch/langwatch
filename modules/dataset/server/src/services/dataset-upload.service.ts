@@ -72,7 +72,7 @@ export class DatasetUploadAdapter implements DatasetUpload {
   async uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    this.assertFile(input.filename, input.content, input.fileSize);
+    this.assertFile(input.filename, input.content);
     const dataset = await this.findDataset(input.slugOrId, input.projectId);
     const { headers, rows } = parseFileContent({
       content: input.content,
@@ -121,7 +121,7 @@ export class DatasetUploadAdapter implements DatasetUpload {
   async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult> {
-    this.assertFile(input.filename, input.content, input.fileSize);
+    this.assertFile(input.filename, input.content);
     const { headers, rows } = parseFileContent({
       content: input.content,
       format: detectFileFormat(input.filename),
@@ -294,8 +294,14 @@ export class DatasetUploadAdapter implements DatasetUpload {
     return dataset;
   }
 
-  private assertFile(filename: string, content: string, fileSize: number): void {
-    if (fileSize > MAX_FILE_SIZE_BYTES)
+  /**
+   * The upload gate. The size bound is measured on the server — the bytes the
+   * content actually carries — never the client-stated `fileSize`, which an
+   * understated value must not widen. The row cap reads the parsed rows.
+   */
+  private assertFile(filename: string, content: string): void {
+    const byteSize = Buffer.byteLength(content, "utf8");
+    if (byteSize > MAX_FILE_SIZE_BYTES)
       throw new UploadValidationError(
         "File size exceeds the maximum limit of 25MB",
         "file_too_large",

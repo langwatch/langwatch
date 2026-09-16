@@ -10,6 +10,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { DatasetService } from "../dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import type {
   DatasetContent,
   DatasetNormalizeQueue,
@@ -159,6 +160,7 @@ describe("DatasetService", () => {
       repository,
       records,
       generateId: () => "record_1",
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     const dataset = await service.upsertDataset({
@@ -178,6 +180,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records: new MemoryRecordRepository(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     await expect(
@@ -196,6 +199,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records: new MemoryRecordRepository(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     await expect(
@@ -217,6 +221,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records: new MemoryRecordRepository(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     await expect(
@@ -275,6 +280,7 @@ describe("DatasetService", () => {
       repository,
       records,
       content: new MemoryContent(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     const result = await service.getDatasetWithRecords({
@@ -332,6 +338,7 @@ describe("DatasetService", () => {
       records,
       uploads: new Uploads(),
       queue: new Queue(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
 
     await service.finalizeUpload({ projectId: "project_1", datasetId: "dataset_1" });

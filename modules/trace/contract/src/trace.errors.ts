@@ -109,6 +109,28 @@ export class PageTooDeepError extends HandledError {
 }
 
 /**
+ * A trace- or thread-id array above the plan's bound. Refused rather than
+ * silently dropped, so a caller paging through a large export learns the
+ * bound at the first oversized request.
+ */
+export class TraceIdsTooManyError extends HandledError {
+  declare readonly code: "trace_ids_too_many";
+
+  constructor(maxIds: number) {
+    super(
+      "trace_ids_too_many",
+      `At most ${maxIds} trace or thread ids can be read at once under this plan. Split the request into smaller batches.`,
+      {
+        httpStatus: 422,
+        fault: "customer",
+        meta: { maxIds },
+      },
+    );
+    this.name = "TraceIdsTooManyError";
+  }
+}
+
+/**
  * This process refused the statement itself: concurrency slots all taken and the wait queue
  * full, so it never reached ClickHouse.
  */

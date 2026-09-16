@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { ExperimentWorkflowDsl } from "../experiment-execution-data.service.ts";
 import type { ExperimentRunProgressRepository } from "../../repositories/experiment-run-progress.repository.ts";
 import {
@@ -147,6 +148,12 @@ function buildDeps(
       agents: {} as never,
       workflows: workflowSource,
       evaluators: {} as never,
+      entitlements: {
+        requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
+      },
+      projects: {
+        getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+      },
     },
     progress,
     baseUrl: "https://app.langwatch.test",

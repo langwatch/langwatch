@@ -34,6 +34,9 @@ import type {
   WorkerProjectS3Source,
   WorkerProjectS3Target,
 } from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
+import { createAbsentRequestBound } from "@langwatch/entitlement-server";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
  * `job:datasetNormalize`, composed in this process. Azure reuses
@@ -58,6 +61,14 @@ export function createWorkerDatasetNormalization(options: {
   );
 }
 
+/** The peer halves a bounded dataset write asks for: the tier value and the
+ * project→organization directory that resolves it. Both optional: a process
+ * that makes no bounded write (reads and upserts only) never reaches them. */
+export type WorkerDatasetRequestBounds = {
+  projects?: Pick<ProjectApi, "getOrganizationId"> | undefined;
+  entitlement?: Pick<EntitlementApi, "requestBound"> | undefined;
+};
+
 /** The object storage a dataset's chunked content is read and written through. */
 export type WorkerDatasetObjectStorage = {
   runtime: StoredObjectStorageRuntimeAdapter;
@@ -75,6 +86,12 @@ export async function createWorkerDatasetApp(options: {
   /** Absent where the caller reads rows only: a chunk read then has no store. */
   storage?: WorkerDatasetObjectStorage | undefined;
   resources: ResourceOwnership;
+  /**
+   * The bounds the record batch writes refuse above. Absent, the batch bound
+   * answers its free-tier value, and the project directory is refused by name
+   * on the bounded write itself, not at boot.
+   */
+  requestBounds?: WorkerDatasetRequestBounds | undefined;
 }): Promise<DatasetApi> {
   const runtime = await createApp({
     role: "worker",
@@ -84,6 +101,17 @@ export async function createWorkerDatasetApp(options: {
     // neither, and this is the one place that says so.
     .withProvided(DatasetApp.dependencies.experiments, uncomposed("experiment directory"))
     .withProvided(DatasetApp.dependencies.permissions, uncomposed("grants service"))
+    .withProvided(
+      DatasetApp.dependencies.projects,
+      options.requestBounds?.projects ?? uncomposed("project directory"),
+    )
+    .withProvided(
+      DatasetApp.dependencies.entitlement,
+      // Every bound answers its free-tier value; any OTHER entitlement
+      // question is refused by name, exactly like the uncomposed peers.
+      options.requestBounds?.entitlement ??
+        Object.assign(uncomposed<EntitlementApi>("plan directory"), createAbsentRequestBound()),
+    )
     .withModules([datasetServer])
     .boot();
 

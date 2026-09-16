@@ -19,6 +19,7 @@ import type { AgentApi, AgentWithFields } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { promptServiceFixture } from "@langwatch/prompt-server/testing";
 import {
@@ -176,6 +177,12 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     agents: new FakeAgentApi(),
     workflows: createWorkflowDslPort(prisma!),
     evaluators: new FakeEvaluatorApi() as unknown as EvaluatorApi,
+    entitlements: {
+      requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
+    },
+    projects: {
+      getOrganizationId: async () => ORG_ID,
+    },
   });
 
   const createPublishedWorkflow = async (name: string) => {

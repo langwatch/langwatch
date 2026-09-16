@@ -16,8 +16,10 @@ import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { generate } from "@langwatch/ksuid";
@@ -85,10 +87,8 @@ function refusing<T>(capability: string): T {
   return new Proxy(
     {},
     {
-      get:
-        () =>
-        (): Promise<never> =>
-          Promise.reject(new ExperimentCapabilityUnavailableError(capability)),
+      get: () => (): Promise<never> =>
+        Promise.reject(new ExperimentCapabilityUnavailableError(capability)),
       has: () => true,
     },
   ) as T;
@@ -246,6 +246,10 @@ export function buildExperimentInfrastructure(input: {
     evaluators: EvaluatorApi;
     prompts: PromptApi;
     permissions: AuthzApi;
+    /** The directory that answers which organization a project belongs to. */
+    projects: ProjectApi;
+    /** The tier-effective row bound an execution's dataset must fit under. */
+    entitlement: EntitlementApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
   const { prisma, clickhouse, logger, dependencies } = input;
@@ -285,6 +289,8 @@ export function buildExperimentInfrastructure(input: {
     agents: dependencies.agents,
     evaluators: dependencies.evaluators,
     workflows: refusing<ExperimentWorkflowDsl>("workflow-backed experiment execution"),
+    entitlements: dependencies.entitlement,
+    projects: dependencies.projects,
   };
   const runLoop: ExperimentV3RunLoop = {
     ports: null,

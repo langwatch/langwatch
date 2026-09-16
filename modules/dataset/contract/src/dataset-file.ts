@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { resolveRequestBound } from "@langwatch/plans";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 import type { DatasetColumns } from "./dataset.ts";
 
@@ -15,14 +16,18 @@ const getSafeColumnName = (columnName: string, existingNames: Set<string>): stri
 };
 
 /**
- * Maximum number of rows allowed per file upload.
+ * Maximum number of rows allowed per file upload. The request-bounds registry
+ * owns the number; both tiers quoted there are the same, so any tier answers
+ * it — "FREE" is only the spelling of "the tier-agnostic value".
  */
-export const MAX_ROWS_LIMIT = 10_000;
+export const MAX_ROWS_LIMIT = resolveRequestBound("datasetRowsMax", "FREE");
 
 /**
- * Maximum file size in bytes (25 MB).
+ * Maximum file size in bytes (25 MB), measured on the server after the
+ * content arrives — the client-stated size is not trusted. Same registry
+ * derivation as {@link MAX_ROWS_LIMIT}.
  */
-export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+export const MAX_FILE_SIZE_BYTES = resolveRequestBound("datasetFileBytes", "FREE");
 
 // JSON.parse rejects U+0000 null bytes inside string literals as a
 // "Bad control character" syntax error, even though Postgres-bound

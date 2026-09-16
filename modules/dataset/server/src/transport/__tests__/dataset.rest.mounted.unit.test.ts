@@ -485,7 +485,7 @@ describe("the mounted dataset REST family", () => {
       const { send, stub } = mount();
 
       const response = await send("POST", "/api/dataset/my-dataset/records", {
-        entries: Array.from({ length: 1001 }, (_, index) => ({ input: `item-${index}` })),
+        entries: Array.from({ length: 4001 }, (_, index) => ({ input: `item-${index}` })),
       });
 
       expect(response.status).toBe(422);
@@ -495,7 +495,7 @@ describe("the mounted dataset REST family", () => {
       };
       expect(body.error).toBe("validation_error");
       expect(body.reasons[0]?.meta.field).toBe("entries");
-      expect(body.reasons[0]?.meta.message).toMatch(/batch size|1000/i);
+      expect(body.reasons[0]?.meta.message).toMatch(/batch size|4000/i);
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
     });
 
@@ -546,7 +546,8 @@ describe("the mounted dataset REST family", () => {
       });
 
       expect(
-        (await send("POST", "/api/dataset/ghost/records", { entries: [{ input: "hello" }] })).status,
+        (await send("POST", "/api/dataset/ghost/records", { entries: [{ input: "hello" }] }))
+          .status,
       ).toBe(404);
     });
   });

@@ -1,5 +1,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
@@ -8,6 +11,7 @@ import type { DatasetAppConfig, DatasetInfrastructure } from "../dataset.app.ts"
 import { DatasetApp } from "../dataset.app.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
+import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
 
 /** One experiment, as this feature reads it: a name to borrow and an id. */
 export function datasetTestExperiment(
@@ -45,11 +49,55 @@ export function createDatasetTestAuthz(permitted = true) {
   });
 }
 
+export function createDatasetTestProjects(organizationId = "organization-1"): ProjectApi {
+  return Object.assign(createApiFixture<ProjectApi>(), {
+    getOrganizationId: vi.fn(async () => organizationId),
+  });
+}
+
+const TIER_PLAN_TYPE = {
+  free: "FREE",
+  paid: "PRO",
+  enterprise: "ENTERPRISE",
+} as const;
+
+/**
+ * The entitlement peer answering every request bound on one tier. Suites that
+ * assert tier behavior pick the tier; the rest take the free default, the
+ * same answer an absent entitlement resolves.
+ */
+export function createDatasetTestEntitlement(
+  tier: keyof typeof TIER_PLAN_TYPE = "free",
+): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
+    requestBound: ({ key }: { key: RequestBoundKey; organizationId: string }) =>
+      Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[tier])),
+  });
+}
+
+/**
+ * The request-bound collaborator a `DatasetService` test constructs directly
+ * with, answering every bound on one tier.
+ */
+export function createDatasetTestRequestBounds(
+  tier: keyof typeof TIER_PLAN_TYPE = "free",
+): DatasetRequestBoundsService {
+  return DatasetRequestBoundsService.create({
+    entitlement: createDatasetTestEntitlement(tier),
+    projects: createDatasetTestProjects(),
+  });
+}
+
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
     members?: DatasetInfrastructure;
-    dependencies?: Partial<{ experiments: ExperimentApi; permissions: AuthzApi }>;
+    dependencies?: Partial<{
+      experiments: ExperimentApi;
+      permissions: AuthzApi;
+      projects: ProjectApi;
+      entitlement: EntitlementApi;
+    }>;
     config?: DatasetAppConfig;
   }> = {},
 ): DatasetApp {
@@ -58,6 +106,8 @@ export function createDatasetTestApp(
     dependencies: {
       experiments: input.dependencies?.experiments ?? createDatasetTestExperiments(),
       permissions: input.dependencies?.permissions ?? createDatasetTestAuthz(),
+      projects: input.dependencies?.projects ?? createDatasetTestProjects(),
+      entitlement: input.dependencies?.entitlement ?? createDatasetTestEntitlement(),
     },
     members: input.members ?? {},
     config: input.config ?? {},

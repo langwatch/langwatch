@@ -1,8 +1,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 import { AnnotationApp } from "../annotation.app.ts";
@@ -62,6 +64,26 @@ export function createAnnotationTestAuthz(canUpdate = true): AuthzApi {
   return createApiFixture<AuthzApi>({ hasProjectPermission: async () => canUpdate });
 }
 
+const TIER_PLAN_TYPE = {
+  free: "FREE",
+  paid: "PRO",
+  enterprise: "ENTERPRISE",
+} as const;
+
+/**
+ * The entitlement peer answering every request bound on one tier. Suites that
+ * assert clamp behavior pick the tier; the rest take the free default, the
+ * same answer an absent entitlement resolves.
+ */
+export function createAnnotationTestEntitlement(
+  tier: keyof typeof TIER_PLAN_TYPE = "free",
+): EntitlementApi {
+  return createApiFixture<EntitlementApi>({
+    requestBound: ({ key }: { key: RequestBoundKey; organizationId: string }) =>
+      Promise.resolve(resolveRequestBound(key, TIER_PLAN_TYPE[tier])),
+  });
+}
+
 export function createAnnotationTestApp(
   input: Readonly<{
     repositories?: AnnotationRepositories;
@@ -71,6 +93,7 @@ export function createAnnotationTestApp(
       traces: TraceApi;
       users: UserApi;
       permissions: AuthzApi;
+      entitlement: EntitlementApi;
     }>;
   }> = {},
 ): AnnotationApp {
@@ -82,6 +105,7 @@ export function createAnnotationTestApp(
       traces: input.dependencies?.traces ?? createAnnotationTestTraces(),
       users: input.dependencies?.users ?? createAnnotationTestUsers(),
       permissions: input.dependencies?.permissions ?? createAnnotationTestAuthz(),
+      entitlement: input.dependencies?.entitlement ?? createAnnotationTestEntitlement(),
     },
   });
 }

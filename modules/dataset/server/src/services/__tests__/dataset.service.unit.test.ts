@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -44,7 +45,11 @@ function serviceHolding(records: ReturnType<typeof record>[]) {
     }),
   } as unknown as DatasetRecordRepository;
 
-  return DatasetService.create({ repository, records: recordsRepository });
+  return DatasetService.create({
+    repository,
+    records: recordsRepository,
+    requestBounds: createDatasetTestRequestBounds(),
+  });
 }
 
 const read = (

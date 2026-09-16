@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveRequestBound } from "@langwatch/plans";
 
 export const datasetColumnTypeSchema = z.enum([
   "string",
@@ -55,8 +56,15 @@ export type DatasetRecordForm = z.infer<typeof datasetRecordFormSchema>;
 /** Portable span-shaped dataset value used by trace mapping on both sides. */
 export const datasetSpanSchema = z.record(z.string(), z.unknown());
 
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * application refuses batches above the caller's tier value through the
+ * entitlement peer.
+ */
+const DATASET_BATCH_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRISE");
+
 export const newDatasetEntriesSchema = z.object({
-  entries: z.array(datasetRecordEntrySchema),
+  entries: z.array(datasetRecordEntrySchema).max(DATASET_BATCH_MAX),
 });
 
 export const datasetConfirmColumnsSchema = z.array(

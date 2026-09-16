@@ -4,8 +4,10 @@
 import { AgentApi } from "@langwatch/agent-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
@@ -135,9 +137,7 @@ export type ExperimentWorkflowAuthoring = Readonly<{
 
 /** What the doors ask about the caller, beyond the check already declared. */
 export type ExperimentPermissions = Readonly<{
-  mayManageEvaluations(
-    input: Readonly<{ actorId: string; projectId: string }>,
-  ): Promise<boolean>;
+  mayManageEvaluations(input: Readonly<{ actorId: string; projectId: string }>): Promise<boolean>;
 }>;
 
 /** The project's own model cost rules, as the pricing cascade reads them. */
@@ -199,6 +199,10 @@ export class ExperimentApp implements ExperimentApi {
     evaluators: EvaluatorApi,
     prompts: PromptApi,
     permissions: AuthzApi,
+    /** The directory that answers which organization a project belongs to. */
+    projects: ProjectApi,
+    /** The tier-effective row bound an execution's dataset must fit under. */
+    entitlement: EntitlementApi,
   };
   static readonly reads = reads("prisma", "clickhouse", "logger");
 
@@ -361,9 +365,7 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** The runs of each named experiment, keyed by experiment id, with their aggregate. */
-  getRunAggregates(
-    input: ExperimentRunListInput,
-  ): Promise<Record<string, ExperimentRunAggregate>> {
+  getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
     return this.#dependencies.experiments.getRunAggregates(input);
   }
 
@@ -519,9 +521,7 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   /** Records a run's cell results directly against the workbench state. */
-  recordWorkbenchRunResults(
-    input: RecordWorkbenchRunResultsInput,
-  ): Promise<WorkbenchSaveResult> {
+  recordWorkbenchRunResults(input: RecordWorkbenchRunResultsInput): Promise<WorkbenchSaveResult> {
     return this.#dependencies.experiments.recordWorkbenchRunResults(input);
   }
 
@@ -579,7 +579,11 @@ export class ExperimentApp implements ExperimentApi {
   ): AsyncIterable<ExperimentUpdateFrame> {
     const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
     try {
-      for await (const eventArgs of on(emitter, "experiment_updated", (input.signal ? { signal: input.signal } : {}))) {
+      for await (const eventArgs of on(
+        emitter,
+        "experiment_updated",
+        input.signal ? { signal: input.signal } : {},
+      )) {
         yield (eventArgs as unknown[])[0] as ExperimentUpdateFrame;
       }
     } finally {

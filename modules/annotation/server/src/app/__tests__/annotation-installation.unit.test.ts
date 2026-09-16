@@ -4,6 +4,7 @@ import {
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
@@ -16,6 +17,7 @@ import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.a
 import {
   createAnnotationTestApp,
   createAnnotationTestAuthz,
+  createAnnotationTestEntitlement,
   createAnnotationTestOrganizations,
   createAnnotationTestProjects,
   createAnnotationTestTraces,
@@ -32,6 +34,7 @@ function process() {
     .withProvided(TraceApi, createAnnotationTestTraces())
     .withProvided(UserApi, createAnnotationTestUsers())
     .withProvided(AuthzApi, createAnnotationTestAuthz())
+    .withProvided(EntitlementApi, createAnnotationTestEntitlement())
     .withModules([withMemoryRepositories(annotationServer)]);
 }
 

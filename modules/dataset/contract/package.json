@@ -25,6 +25,7 @@
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

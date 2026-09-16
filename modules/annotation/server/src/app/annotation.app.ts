@@ -34,6 +34,7 @@ import {
   type AnnotationSuggestionSource,
 } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   OrganizationApi,
   UserNotInOrganizationError,
@@ -67,6 +68,8 @@ type AnnotationSetup = Readonly<{
     traces: TraceApi;
     users: UserApi;
     permissions: AuthzApi;
+    /** The tier-effective bounds the queue reads clamp their take to. */
+    entitlement: EntitlementApi;
   }>;
 }>;
 const logger = createLogger("langwatch:annotation:app");
@@ -92,6 +95,7 @@ export class AnnotationApp implements AnnotationApi {
     traces: TraceApi,
     users: UserApi,
     permissions: AuthzApi,
+    entitlement: EntitlementApi,
   };
 
   #annotations: AnnotationService;
@@ -102,6 +106,7 @@ export class AnnotationApp implements AnnotationApi {
   #users: UserApi;
   #traces: TraceApi;
   #permissions: AuthzApi;
+  #entitlement: EntitlementApi;
 
   private constructor(
     repositories: AnnotationRepositories,
@@ -120,6 +125,7 @@ export class AnnotationApp implements AnnotationApi {
     this.#users = dependencies.users;
     this.#traces = dependencies.traces;
     this.#permissions = dependencies.permissions;
+    this.#entitlement = dependencies.entitlement;
   }
 
   static create({ repositories, dependencies }: AnnotationSetup): AnnotationApp {
@@ -516,6 +522,23 @@ export class AnnotationApp implements AnnotationApi {
   async listOptimizedQueues(input: AnnotationReviewOptimizedQueuesInput) {
     const { members, ...scope } = await this.#getOrganizationScope(input);
 
+    // The tier-effective take: the paged read clamps to the plan's page size,
+    // and the all-items read — unbounded before — takes at most the plan's
+    // queue bound. The repository's unbounded branch is never asked for more
+    // than the tier allows.
+    const allQueueItems = input.allQueueItems === true;
+
+    const [pageSizeMax, queueTakeMax] = await Promise.all([
+      this.#entitlement.requestBound({
+        key: "annotationPageSizeMax",
+        organizationId: scope.organizationId,
+      }),
+      this.#entitlement.requestBound({
+        key: "annotationQueueTakeMax",
+        organizationId: scope.organizationId,
+      }),
+    ]);
+
     const page = await this.#queues.listQueueItemsPage({
       ...scope,
       projectId: input.projectId,
@@ -526,9 +549,9 @@ export class AnnotationApp implements AnnotationApi {
       includeMemberQueues: input.showQueueAndUser === true,
       startDate: input.startDate ? fromDate(input.startDate) : void 0,
       endDate: input.endDate ? fromDate(input.endDate) : void 0,
-      pageSize: input.pageSize,
-      pageOffset: input.pageOffset,
-      allQueueItems: input.allQueueItems === true,
+      pageSize: allQueueItems ? queueTakeMax : Math.min(input.pageSize, pageSizeMax),
+      pageOffset: allQueueItems ? 0 : input.pageOffset,
+      allQueueItems: false,
     });
 
     const queueIds = [

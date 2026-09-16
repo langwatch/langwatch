@@ -268,6 +268,15 @@ const presentations = {
     title: "Trace ID is ambiguous",
     describe: () => "That prefix matches more than one trace. Use a longer prefix.",
   },
+  trace_ids_too_many: {
+    title: "Too many traces requested at once",
+    describe: (error) => {
+      const maxIds = str(error, "maxIds", "");
+      return maxIds
+        ? `This plan allows at most ${maxIds} trace or thread ids per request. Split it into smaller batches.`
+        : "Split the request into smaller batches.";
+    },
+  },
   span_not_found: {
     title: "Span not found",
     describe: () => "It may have been deleted along with its trace.",
@@ -1846,8 +1855,7 @@ const presentations = {
   },
   auth_no_address_to_confirm: {
     title: "This account has no email address",
-    describe: () =>
-      "Add an email address in your account settings, then confirm it.",
+    describe: () => "Add an email address in your account settings, then confirm it.",
   },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
@@ -2444,8 +2452,7 @@ const presentations = {
   // the two-step-verification gate.
   LAST_WAY_IN: {
     title: "You'd have no way back into your account",
-    describe: () =>
-      "That is the only way into this account. Add another way to sign in first.",
+    describe: () => "That is the only way into this account. Add another way to sign in first.",
   },
   identity_mfa_code_invalid: {
     // Deliberately says nothing about whether two-step verification is even
@@ -2846,6 +2853,15 @@ const presentations = {
   dataset_chunk_too_large: {
     title: "That value is too large to save",
     describe: () => "Shorten the value in this row, then save again.",
+  },
+  dataset_batch_too_large: {
+    title: "That batch is too large",
+    describe: (error) => {
+      const maxEntries = str(error, "maxEntries", "");
+      return maxEntries
+        ? `A dataset batch accepts at most ${maxEntries} entries under this plan. Split it into smaller batches.`
+        : "Split the batch into smaller ones and try again.";
+    },
   },
   dataset_duplicate_record_id: {
     title: "Two rows share the same identifier",

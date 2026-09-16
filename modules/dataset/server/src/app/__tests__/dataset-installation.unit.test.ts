@@ -6,17 +6,26 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";
-import { createDatasetTestAuthz, createDatasetTestExperiments } from "./dataset.fixture.ts";
+import {
+  createDatasetTestAuthz,
+  createDatasetTestEntitlement,
+  createDatasetTestExperiments,
+  createDatasetTestProjects,
+} from "./dataset.fixture.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role, config: {} })
     .withProvided(ExperimentApi, createDatasetTestExperiments())
     .withProvided(AuthzApi, createDatasetTestAuthz())
+    .withProvided(ProjectApi, createDatasetTestProjects())
+    .withProvided(EntitlementApi, createDatasetTestEntitlement())
     .withModules([withMemoryRepositories(datasetServer)]);
 }
 

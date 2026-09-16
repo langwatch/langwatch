@@ -14,6 +14,7 @@ import { TraceCollectorSpanService } from "../services/span/trace-collector-span
  */
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -72,6 +73,7 @@ import type { TraceLegacyRead } from "./trace.members.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
+import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";
 import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
@@ -396,6 +398,12 @@ export interface TraceAppDependencies {
   share: ShareApi;
   projects: ProjectApi;
   /**
+   * The tier-effective request bounds these reads clamp and refuse by. The
+   * entitlement peer resolves the caller's plan; the transport schemas only
+   * carry the registry's enterprise ceiling.
+   */
+  requestBounds: Pick<EntitlementApi, "requestBound">;
+  /**
    * The door the deprecated `/api/trace/*` family resolves its project
    * credential through. Optional because a REST-less process never reaches
    * it; `credential` raises by name rather than admitting an absent caller.
@@ -494,6 +502,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
         ...collaborators,
         ...input.dependencies,
         repositories: input.repositories,
+        requestBounds: input.dependencies.plans,
         protections: {
           authz: input.dependencies.authz,
           projects: input.dependencies.projects,
@@ -507,10 +516,15 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   #contentReader: TraceContentReadService;
+  #readBounds: TraceReadBoundsService;
   #dependencies: TraceAppDependencies;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
     this.#contentReader = TraceContentReadServiceImpl.create(dependencies.traces.read);
+    this.#readBounds = TraceReadBoundsService.create({
+      entitlement: dependencies.requestBounds,
+      projects: dependencies.projects,
+    });
   }
 
   resolveIngestWaitTimeout(input: TraceIngestWaitInput) {
@@ -543,18 +557,34 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     return this.#dependencies.traces.tree.getEvaluationEvents(input);
   }
 
-  listTraces(input: Parameters<TraceContentReadService["listTraces"]>[0]) {
-    return this.#contentReader.listTraces(input);
+  async listTraces(input: Parameters<TraceContentReadService["listTraces"]>[0]) {
+    const pageSize =
+      input.query.pageSize === undefined
+        ? undefined
+        : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+
+    return this.#contentReader.listTraces({
+      ...input,
+      query: {
+        ...input.query,
+        ...(pageSize === undefined ? {} : { pageSize }),
+      },
+    });
   }
   readTrace(input: Parameters<TraceContentReadService["readTrace"]>[0]) {
     return this.#contentReader.readTrace(input);
   }
-  readTracesWithSpans(input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0]) {
+  async readTracesWithSpans(input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0]) {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
+
     return this.#contentReader.readTracesWithSpans(input);
   }
-  readTracesWithSpansPreview(
+
+  async readTracesWithSpansPreview(
     input: Parameters<TraceContentReadService["readTracesWithSpansPreview"]>[0],
   ) {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
+
     return this.#contentReader.readTracesWithSpansPreview(input);
   }
   readOrderedSpansForTrace(
@@ -565,19 +595,27 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   readThreadTraces(input: Parameters<TraceContentReadService["readThreadTraces"]>[0]) {
     return this.#contentReader.readThreadTraces(input);
   }
-  readThreadsTraces(input: Parameters<TraceContentReadService["readThreadsTraces"]>[0]) {
+  async readThreadsTraces(input: Parameters<TraceContentReadService["readThreadsTraces"]>[0]) {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
+
     return this.#contentReader.readThreadsTraces(input);
   }
-  readSampleTraces(input: Parameters<TraceContentReadService["readSampleTraces"]>[0]) {
-    return this.#contentReader.readSampleTraces(input);
+  async readSampleTraces(input: Parameters<TraceContentReadService["readSampleTraces"]>[0]) {
+    const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
+
+    return this.#contentReader.readSampleTraces({ ...input, pageSize });
   }
   readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]) {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
     return this.#dependencies.viewer.readForViewer(input);
   }
 
-  resolveViewerProtections(input: { projectId: string; userId: string | null }): Promise<Protections> {
-    if (!this.#dependencies.protections) throw new Error("Trace protections service is unavailable");
+  resolveViewerProtections(input: {
+    projectId: string;
+    userId: string | null;
+  }): Promise<Protections> {
+    if (!this.#dependencies.protections)
+      throw new Error("Trace protections service is unavailable");
     return this.#dependencies.protections.resolve({
       projectId: input.projectId,
       userId: input.userId ?? void 0,
@@ -590,7 +628,8 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     apiKeyId: string | null;
     userId: string | null;
   }): Promise<Protections> {
-    if (!this.#dependencies.protections) throw new Error("Trace protections service is unavailable");
+    if (!this.#dependencies.protections)
+      throw new Error("Trace protections service is unavailable");
     return this.#dependencies.protections.resolveForApiKey(input);
   }
 
@@ -748,11 +787,13 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   // Legacy content reads live on the cohesive content service.
 
   /** The evaluator verdicts on a page of traces, keyed by trace id. */
-  readEvaluations(input: {
+  async readEvaluations(input: {
     projectId: string;
     traceIds: string[];
     protections: unknown;
   }): Promise<Record<string, Evaluation[]>> {
+    await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
+
     return this.#dependencies.traces.read.getEvaluationsMultiple(
       input.projectId,
       input.traceIds,
@@ -1405,9 +1446,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** Where one already-normalized span goes: the receiver both doors share. */
-  ingestSpan(
-    input: Parameters<CollectorSpanIngest>[0],
-  ): ReturnType<CollectorSpanIngest> {
+  ingestSpan(input: Parameters<CollectorSpanIngest>[0]): ReturnType<CollectorSpanIngest> {
     const ingestion = this.#dependencies.ingestion;
     if (!ingestion) {
       throw new TraceIngestionUnavailableError();

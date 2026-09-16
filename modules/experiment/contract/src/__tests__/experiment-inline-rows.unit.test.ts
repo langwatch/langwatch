@@ -1,0 +1,37 @@
+/**
+ * The registry enterprise ceiling is the outer validation shell for inline
+ * row data: above 4000 rows refuses at the schema. The execution data load
+ * refuses above the caller's tier, so the bound holds at every entry.
+ */
+import { describe, expect, it } from "vitest";
+import { resolveRequestBound } from "@langwatch/plans";
+import { executionRequestSchema, runInputsBodySchema } from "../workbench/execution/types.ts";
+
+const ENTERPRISE_ROWS = resolveRequestBound("experimentInlineRowsMax", "ENTERPRISE");
+
+const rows = (count: number) => Array.from({ length: count }, (_, index) => ({ row: index }));
+
+const baseRequest = {
+  projectId: "p1",
+  name: "Run",
+  dataset: { id: "d1", name: "Inline", type: "inline", columns: [] },
+  targets: [],
+  evaluators: [],
+  scope: { type: "full" },
+};
+
+describe("execution request inline data bound", () => {
+  it("executionRequestSchema refuses data above the enterprise ceiling", () => {
+    expect(
+      executionRequestSchema.safeParse({ ...baseRequest, data: rows(ENTERPRISE_ROWS + 1) }).success,
+    ).toBe(false);
+    expect(
+      executionRequestSchema.safeParse({ ...baseRequest, data: rows(ENTERPRISE_ROWS) }).success,
+    ).toBe(true);
+  });
+
+  it("runInputsBodySchema refuses data above the enterprise ceiling", () => {
+    expect(runInputsBodySchema.safeParse({ data: rows(ENTERPRISE_ROWS + 1) }).success).toBe(false);
+    expect(runInputsBodySchema.safeParse({ data: rows(ENTERPRISE_ROWS) }).success).toBe(true);
+  });
+});

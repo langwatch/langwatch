@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   annotationAnchorColumnsSchema,
   annotationAnchorScopeSchema,
@@ -6,6 +7,13 @@ import {
 } from "./annotation-anchor.schemas.ts";
 import { annotationQueueItemStatusSchema } from "./annotation-queue.schemas.ts";
 import { annotationScoreOptionSchema } from "./annotation-score.schemas.ts";
+
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * application clamps the effective page size and the all-queue-items take to
+ * the caller's tier through the entitlement peer.
+ */
+const ANNOTATION_PAGE_SIZE_MAX = resolveRequestBound("annotationPageSizeMax", "ENTERPRISE");
 
 export const annotationApiScoreOptionsSchema = z.record(z.string(), annotationScoreOptionSchema);
 export type AnnotationApiScoreOptions = z.infer<typeof annotationApiScoreOptionsSchema>;
@@ -119,7 +127,7 @@ export type AnnotationApiQueueBySlugOrIdInput = z.infer<
 export const annotationApiOptimizedQueuesInputSchema = z.object({
   projectId: z.string(),
   selectedAnnotations: annotationQueueItemStatusSchema,
-  pageSize: z.number(),
+  pageSize: z.number().int().min(1).max(ANNOTATION_PAGE_SIZE_MAX),
   pageOffset: z.number(),
   queueId: z.string().optional(),
   queueIds: z.array(z.string()).optional(),

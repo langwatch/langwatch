@@ -5,6 +5,7 @@
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 import {
@@ -14,6 +15,14 @@ import {
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
 import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
+
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * tier-effective value (free 1000 / paid 2000 / enterprise 4000) is enforced
+ * where the organization's plan is known, in the trace application.
+ */
+const TRACES_PAGE_SIZE_MAX = resolveRequestBound("tracesPageSizeMax", "ENTERPRISE");
+const TRACE_IDS_MAX = resolveRequestBound("traceIdsMax", "ENTERPRISE");
 
 /**
  * Offset pagination was dropped for ClickHouse (deep OFFSET degrades badly;
@@ -39,7 +48,9 @@ export const traceFilterInputSchema = sharedFiltersInputSchema.extend({
   pageOffset: pageOffsetInput,
   // Non-negative integers only (#2163): a fractional or negative page size
   // reaches ClickHouse as a LIMIT and fails there instead of at the boundary.
-  pageSize: z.number().int().positive().optional(),
+  // The ceiling is the registry's enterprise tier; the application clamps to
+  // the caller's tier.
+  pageSize: z.number().int().positive().max(TRACES_PAGE_SIZE_MAX).optional(),
 });
 
 /** The same, plus the paging and ordering the list/search read understands. */
@@ -87,7 +98,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withOutput(z.record(z.string(), z.unknown()).nullable())
 
   .query("getEvaluationsMultiple")
-  .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
+  .withInput(z.object({ projectId: z.string(), traceIds: z.array(z.string()).max(TRACE_IDS_MAX) }))
   .withOutput(z.record(z.string(), evaluationSchema.array()))
 
   .query("getTopicCounts")
@@ -106,7 +117,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(
     z.object({
       projectId: z.string(),
-      traceIds: z.array(z.string()),
+      traceIds: z.array(z.string()).max(TRACE_IDS_MAX),
       withEditOverlay: withEditOverlayInput,
     }),
   )
@@ -116,7 +127,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(
     z.object({
       projectId: z.string(),
-      traceIds: z.array(z.string()),
+      traceIds: z.array(z.string()).max(TRACE_IDS_MAX),
       withEditOverlay: withEditOverlayInput,
     }),
   )
@@ -126,7 +137,7 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(
     z.object({
       projectId: z.string(),
-      threadIds: z.array(z.string()),
+      threadIds: z.array(z.string()).max(TRACE_IDS_MAX),
       withEditOverlay: withEditOverlayInput,
     }),
   )

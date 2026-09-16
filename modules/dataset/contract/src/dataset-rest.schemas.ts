@@ -4,6 +4,7 @@
  * declaration and the published document read.
  */
 import { z } from "zod";
+import { resolveRequestBound } from "@langwatch/plans";
 
 import {
   datasetColumnsSchema,
@@ -12,6 +13,13 @@ import {
   datasetRecordSchema,
   datasetSummarySchema,
 } from "./dataset.ts";
+
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * application refuses batches above the caller's tier value through the
+ * entitlement peer.
+ */
+const DATASET_BATCH_MAX = resolveRequestBound("datasetBatchMax", "ENTERPRISE");
 
 const columnTypeSchema = z.object({ name: z.string(), type: datasetColumnTypeSchema });
 
@@ -34,22 +42,26 @@ export const datasetRestBatchCreateRecordsSchema = z.object({
   entries: z
     .array(z.record(z.string(), z.any()))
     .min(1, "entries is required")
-    .max(1000, "Maximum batch size is 1000 entries"),
+    .max(DATASET_BATCH_MAX, `Maximum batch size is ${DATASET_BATCH_MAX} entries`),
 });
 
 export const datasetRestDeleteRecordsSchema = z.object({
   recordIds: z
     .array(z.string())
     .min(1, "recordIds is required")
-    .max(1000, "Maximum 1000 records per batch delete"),
+    .max(DATASET_BATCH_MAX, `Maximum ${DATASET_BATCH_MAX} records per batch delete`),
 });
 
 /** The legacy spelling of the batch-records body; same grain, older name. */
 export const datasetRestLegacyEntriesSchema = z
   .object({
-    entries: z.array(z.record(z.string(), z.any())).meta({
-      example: [{ input: "hi", output: "Hello, how can I help you today?" }],
-    }),
+    entries: z
+      .array(z.record(z.string(), z.any()))
+      .min(1)
+      .max(DATASET_BATCH_MAX)
+      .meta({
+        example: [{ input: "hi", output: "Hello, how can I help you today?" }],
+      }),
   })
   .meta({ id: "DatasetPostEntries" });
 

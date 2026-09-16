@@ -1,4 +1,5 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 import {
   type DatasetReference,
@@ -9,6 +10,13 @@ import {
 } from "../../experiment-workbench.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+
+/**
+ * The outer validation shell is the registry's enterprise ceiling; the
+ * execution data load refuses rows above the caller's tier value through the
+ * entitlement peer, so the bound holds at every entry.
+ */
+const EXPERIMENT_INLINE_ROWS_MAX = resolveRequestBound("experimentInlineRowsMax", "ENTERPRISE");
 
 // ============================================================================
 // Execution Request Types
@@ -174,7 +182,7 @@ export const executionRequestSchema = z
     ]),
     concurrency: z.number().min(1).max(24).optional(),
     /** Inline row data to evaluate instead of a saved or attached dataset (row-first). */
-    data: z.array(z.record(z.string(), z.unknown())).optional(),
+    data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
     /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
     dataset_id: z.string().optional(),
     /** Constant inputs applied to every row, overriding entry fields. */
@@ -207,7 +215,7 @@ export const executionRequestSchema = z
  */
 export const runInputsBodySchema = z
   .object({
-    data: z.array(z.record(z.string(), z.unknown())).optional(),
+    data: z.array(z.record(z.string(), z.unknown())).max(EXPERIMENT_INLINE_ROWS_MAX).optional(),
     dataset_id: z.string().optional(),
     parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
     row_indices: z.array(z.number().int().nonnegative()).optional(),

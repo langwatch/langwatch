@@ -28,6 +28,7 @@
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "liqe": "catalog:",
     "ohm-js": "^17.5.0",

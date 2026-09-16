@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DatasetService } from "../../services/dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
@@ -53,6 +54,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository: new Repo(),
       records: new Records(),
+      requestBounds: createDatasetTestRequestBounds(),
     });
     await expect(service.getBySlugOrId({ projectId: "p1", slugOrId: "d1" })).resolves.toMatchObject(
       { id: "d1" },

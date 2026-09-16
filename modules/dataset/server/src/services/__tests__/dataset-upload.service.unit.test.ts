@@ -4,11 +4,8 @@
  * coerced to declared column types. Repositories/storage are fakes here.
  */
 import { describe, expect, it } from "vitest";
-import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";
-import type {
-  DatasetStorage,
-  DatasetStorageResolver,
-} from "../../app/dataset.app.ts";
+import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.app.ts";
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
@@ -294,9 +291,28 @@ describe("DatasetUploadAdapter", () => {
     });
 
     describe("when the file is larger than the family accepts", () => {
-      it("refuses it on size alone, without parsing it", async () => {
+      it("refuses it on the bytes the content carries, not the size the client stated", async () => {
         const { adapter } = harness({ row: datasetRow() });
 
+        // The client understates the size to zero; the refusal still lands,
+        // because the bound is measured on the server after the content
+        // arrives. The content is not a parseable CSV: size refuses first.
+        await expect(
+          adapter.uploadToExistingDataset({
+            slugOrId: "user-feedback",
+            projectId: PROJECT_ID,
+            filename: "feedback.csv",
+            content: "x".repeat(MAX_FILE_SIZE_BYTES + 1),
+            fileSize: 0,
+          }),
+        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "file_too_large" });
+      });
+
+      it("accepts a file whose client-stated size overshoots the measured one", async () => {
+        const { adapter } = harness({ row: datasetRow() });
+
+        // The reverse lie must not refuse either: the measured bytes decide,
+        // and they sit well under the cap.
         await expect(
           adapter.uploadToExistingDataset({
             slugOrId: "user-feedback",
@@ -305,7 +321,26 @@ describe("DatasetUploadAdapter", () => {
             content: "input,output\nhello,world\n",
             fileSize: MAX_FILE_SIZE_BYTES + 1,
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "file_too_large" });
+        ).resolves.toMatchObject({ recordsCreated: 1 });
+      });
+    });
+
+    describe("when the file carries more rows than the family accepts", () => {
+      it("refuses it on the parsed row count", async () => {
+        const { adapter } = harness({ row: datasetRow() });
+        const rows = Array.from({ length: MAX_ROWS_LIMIT + 1 }, (_, i) => `${i},row ${i}`).join(
+          "\n",
+        );
+
+        await expect(
+          adapter.uploadToExistingDataset({
+            slugOrId: "user-feedback",
+            projectId: PROJECT_ID,
+            filename: "feedback.csv",
+            content: `input,output\n${rows}\n`,
+            fileSize: 0,
+          }),
+        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "row_limit_exceeded" });
       });
     });
 

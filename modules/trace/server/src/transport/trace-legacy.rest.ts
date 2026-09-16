@@ -14,6 +14,7 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   traceFormatQuerySchema,
   traceLegacyIdParamsSchema,
@@ -27,6 +28,13 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 
 const PRODUCES_JSON = "application/json";
+
+/**
+ * The page a legacy search answers when the caller named no size: the
+ * registry's free-tier bound, the same default this route always had. An
+ * explicit size is clamped to the caller's tier by the application, not here.
+ */
+const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
 /** A resolved project credential, or the refusal this family publishes. */
 export type TraceLegacyCredential =
@@ -319,7 +327,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
 
     const headers = supersededBy("/api/traces/search");
 
-    const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+    const pageSize = params.pageSize ?? DEFAULT_TRACES_PAGE_SIZE;
     const protections = await app.getProtections({ projectId: project.id, credential });
     const results = await app.traces().listTraces({
       // The body carried the deployment's own filter vocabulary through the

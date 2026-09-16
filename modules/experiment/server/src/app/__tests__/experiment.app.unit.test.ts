@@ -8,6 +8,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
+import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import { readFile } from "node:fs/promises";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
@@ -170,6 +171,12 @@ function harness({
       prompts: createApiFixture<PromptApi>(),
       agents: createApiFixture<AgentApi>(),
       workflows: createApiFixture<ExperimentWorkflowDsl>(),
+      entitlements: {
+        requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
+      },
+      projects: {
+        getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+      },
     },
     workflows: workflowService,
     defaultConcurrency: 10,

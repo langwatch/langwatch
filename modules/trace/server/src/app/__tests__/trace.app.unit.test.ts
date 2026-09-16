@@ -19,6 +19,7 @@ import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyRead } from "../trace.members.ts";
+import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -136,7 +137,10 @@ function harness(
     evaluations: {} as EvaluationApi,
     codingAgents: {} as CodingAgentApi,
     share: {} as ShareApi,
-    projects: {} as ProjectApi,
+    projects: {
+      getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+    } as ProjectApi,
+    requestBounds: createTraceTestRequestBounds(),
   });
 
   return {

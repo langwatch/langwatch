@@ -64,7 +64,8 @@ import {
   WorkflowService,
   workflowRepositories,
   type WorkflowNlpRuntime,
-  type WorkflowLlmParameterResolution,} from "@langwatch/workflow-server";
+  type WorkflowLlmParameterResolution,
+} from "@langwatch/workflow-server";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -295,7 +296,15 @@ export async function createWorkerScenarioExecutionGraph(input: {
   input.resources.own("worker scenario suites", () => suiteRuntime.stop());
   const suites = suiteRuntime.module(suiteServer).provided;
 
-  const datasets = await createWorkerDatasetApp({ database: prisma, resources: input.resources });
+  const datasets = await createWorkerDatasetApp({
+    database: prisma,
+    resources: input.resources,
+    // This process appends no batches through the dataset application — the
+    // suites read rows and upsert materialised datasets — but the project
+    // directory is supplied so the bounded-write gate never surprises a
+    // future caller with a refusal by name.
+    requestBounds: { projects: deps.projects },
+  });
   const nlpRuntime = HttpWorkflowNlpRuntimeAdapter.create({
     serviceUrl: deps.nlpServiceUrl,
     staging: deps.payloadStaging,

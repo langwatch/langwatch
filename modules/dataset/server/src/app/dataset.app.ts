@@ -2,8 +2,44 @@
  * reach. Wire mapping and read ceiling live in the doors.
  */
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
-import { DatasetApi, type DatasetNormalizePayload, type AbortPendingUploadInput, type BatchEvaluationRecord, type BatchEvaluationSummary, type CopyDatasetInput, type CreateDatasetFromUploadInput, type CreateDatasetFromUploadResult, type CreateDatasetRecordsInput, type Dataset, type DatasetColumns, type DatasetEntrySelection, type DatasetHead, type DatasetListResult, type DatasetLookupInput, type DatasetNameInput, type DatasetNameResult, type DatasetPage, type DatasetPageInput, type DatasetRecord, type DatasetRecordMutationResult, type DatasetRecordPage, type DatasetWithRecords, type DeleteDatasetRecordsInput, type FinalizeUploadInput, type ListDatasetsInput, type PendingUploadInput, type PendingUploadResult, type RetryNormalizeInput, type StagedUploadInput, type UpdateDatasetRecordInput, type UploadExistingDatasetInput, type UpsertDatasetInput } from "@langwatch/dataset-contract";
+import {
+  DatasetApi,
+  type DatasetNormalizePayload,
+  type AbortPendingUploadInput,
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  type CopyDatasetInput,
+  type CreateDatasetFromUploadInput,
+  type CreateDatasetFromUploadResult,
+  type CreateDatasetRecordsInput,
+  type Dataset,
+  type DatasetColumns,
+  type DatasetEntrySelection,
+  type DatasetHead,
+  type DatasetListResult,
+  type DatasetLookupInput,
+  type DatasetNameInput,
+  type DatasetNameResult,
+  type DatasetPage,
+  type DatasetPageInput,
+  type DatasetRecord,
+  type DatasetRecordMutationResult,
+  type DatasetRecordPage,
+  type DatasetWithRecords,
+  type DeleteDatasetRecordsInput,
+  type FinalizeUploadInput,
+  type ListDatasetsInput,
+  type PendingUploadInput,
+  type PendingUploadResult,
+  type RetryNormalizeInput,
+  type StagedUploadInput,
+  type UpdateDatasetRecordInput,
+  type UploadExistingDatasetInput,
+  type UpsertDatasetInput,
+} from "@langwatch/dataset-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { generate } from "@langwatch/ksuid";
 import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
@@ -11,6 +47,7 @@ import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-compo
 import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
 import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
 import { DatasetUploadAdapter } from "../services/dataset-upload.service.ts";
+import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
@@ -87,7 +124,14 @@ export interface DatasetUpsertInput {
 
 export class DatasetApp implements DatasetApi {
   static readonly contract = DatasetApi;
-  static readonly dependencies = { experiments: ExperimentApi, permissions: AuthzApi };
+  static readonly dependencies = {
+    experiments: ExperimentApi,
+    permissions: AuthzApi,
+    /** The directory that answers which organization a project belongs to. */
+    projects: ProjectApi,
+    /** The tier-effective bounds the record writes refuse above. */
+    entitlement: EntitlementApi,
+  };
   static readonly configSchema = datasetAppConfigSchema;
   /**
    * No ProcessMembers member: everything this feature reads beyond its own
@@ -149,6 +193,10 @@ export class DatasetApp implements DatasetApi {
       // fallback DatasetService would otherwise reach for (`nanoid`) is not
       // this feature's own choice to make on its behalf.
       generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
+      requestBounds: DatasetRequestBoundsService.create({
+        entitlement: dependencies.entitlement,
+        projects: dependencies.projects,
+      }),
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
@@ -231,11 +279,7 @@ export class DatasetApp implements DatasetApi {
   }
 
   /** A dataset renamed in place, keeping its columns and its entries. */
-  renameDataset(input: {
-    datasetId: string;
-    projectId: string;
-    name: string;
-  }): Promise<Dataset> {
+  renameDataset(input: { datasetId: string; projectId: string; name: string }): Promise<Dataset> {
     return this.#datasets.renameDataset(input);
   }
 
@@ -451,7 +495,6 @@ export type DatasetS3Client = { s3Client: S3Client; s3Bucket: string };
 /** A per-operation S3 client lease. Callers release it once their I/O has settled. */
 export type DatasetS3ClientLease = DatasetS3Client & { release(): void };
 
-
 export interface DatasetS3ClientResolver {
   /**
    * Resolves the current tenant target and acquires its process-owned client
@@ -474,7 +517,6 @@ export type DatasetAzureConfig = {
   accountName: string;
   container: string;
 };
-
 
 export interface DatasetAzureConfigResolver {
   resolve(projectId: string): Promise<DatasetAzureConfig>;

@@ -19,6 +19,7 @@ import { TraceLegacyCredentialService } from "../../services/support/trace-legac
 import type { TraceViewerProtectionService } from "../../services/viewer/trace-viewer-protection.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
+import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -49,9 +50,7 @@ function bootTraceApp(options: {
 }) {
   const tryGetById = vi.fn(async () => void 0);
   const apiKeys = {
-    findResolvedToken: vi.fn(async ({ token }: { token: string }) =>
-      options.resolveToken(token),
-    ),
+    findResolvedToken: vi.fn(async ({ token }: { token: string }) => options.resolveToken(token)),
     markUsed: vi.fn(),
   } as unknown as ApiKeyApi;
   const authz = {
@@ -82,7 +81,10 @@ function bootTraceApp(options: {
     evaluations: {} as EvaluationApi,
     codingAgents: {} as CodingAgentApi,
     share: {} as ShareApi,
-    projects: {} as ProjectApi,
+    projects: {
+      getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
+    } as ProjectApi,
+    requestBounds: createTraceTestRequestBounds(),
     protections: {
       resolveForApiKey: async () => ({ canSeeCosts: true }),
     } as unknown as TraceViewerProtectionService,

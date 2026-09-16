@@ -31,6 +31,7 @@ import {
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
+import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;
@@ -43,6 +44,8 @@ type DatasetRecordServiceOptions = {
     entries: readonly Record<string, unknown>[];
   }) => void;
   generateId: () => string;
+  /** The tier-aware batch bound the writes refuse above. */
+  requestBounds: DatasetRequestBoundsService;
 };
 
 export class DatasetRecordService {
@@ -236,6 +239,7 @@ export class DatasetRecordService {
 
   async batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
     const parsed = createDatasetRecordsInputSchema.parse(input);
+    await this.deps.requestBounds.assertBatchSize(parsed.projectId, parsed.entries.length);
     const dataset = await this.getBySlugOrId({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
@@ -301,6 +305,7 @@ export class DatasetRecordService {
 
   async deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }> {
     const parsed = deleteDatasetRecordsInputSchema.parse(input);
+    await this.deps.requestBounds.assertBatchSize(parsed.projectId, parsed.recordIds.length);
     const dataset = await this.getBySlugOrId({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,

@@ -40,9 +40,17 @@ import {
   type TraceSearchBody,
 } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:api:traces");
+
+/**
+ * The page a search answers when the caller named no size: the registry's
+ * free-tier bound, the same default this route always had. An explicit size
+ * is clamped to the caller's tier by the application, not here.
+ */
+const DEFAULT_TRACES_PAGE_SIZE = resolveRequestBound("tracesPageSizeMax", "FREE");
 
 /** The credential a route reads: an API key's own id, and the member it acts as. */
 export const tracesRestCredential = defineRestMiddleware(
@@ -129,7 +137,11 @@ function serializeTraceRows(
   return { serializedTraces, skippedCount };
 }
 
-function streamSearchEnvelope(serializedTraces: string[], pagination: string, schemaSuffix: string): string {
+function streamSearchEnvelope(
+  serializedTraces: string[],
+  pagination: string,
+  schemaSuffix: string,
+): string {
   return `{"traces":[${serializedTraces.join(",")}],"pagination":${pagination}${schemaSuffix}}`;
 }
 
@@ -149,7 +161,9 @@ function coerceToEpochOrThrow(value: unknown, field: string): number {
 export type TracesRestOptions = Readonly<{
   /** Absent where the process registered no command queue; the route is not registered at all. */
   updateTraceMetadata?:
-    | ((input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>) => Promise<void>)
+    | ((
+        input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>,
+      ) => Promise<void>)
     | undefined;
   /** Absent when coding-agent session store not composed; route unregistered. */
   readCodingAgentTranscript?:
@@ -217,7 +231,7 @@ export function createTracesRest(options: TracesRestOptions = {}) {
 
       logger.info({ projectId: scope.id }, "Searching traces for project");
 
-      const pageSize = Math.min(rawPageSize ?? 1000, 1000);
+      const pageSize = rawPageSize ?? DEFAULT_TRACES_PAGE_SIZE;
       const protections = await app.resolveApiKeyProtections({
         projectId: scope.id,
         apiKeyId: caller.apiKeyId,
@@ -312,10 +326,10 @@ export function createTracesRest(options: TracesRestOptions = {}) {
         logger.info({ projectId: scope.id, traceId }, "Getting trace transcript");
 
         const protections = await app.resolveApiKeyProtections({
-        projectId: scope.id,
-        apiKeyId: caller.apiKeyId,
-        userId: caller.userId,
-      });
+          projectId: scope.id,
+          apiKeyId: caller.apiKeyId,
+          userId: caller.userId,
+        });
         const trace = await readOneTraceOrThrow({ app, projectId: scope.id, traceId, protections });
 
         return readCodingAgentTranscript({
@@ -371,15 +385,15 @@ export function createTracesRest(options: TracesRestOptions = {}) {
           content: { "application/json": { schema: resolver(traceNotFoundBodySchema) } },
         },
         409: {
-          description:
-            "Ambiguous trace ID prefix \u2014 the prefix matches more than one trace",
+          description: "Ambiguous trace ID prefix \u2014 the prefix matches more than one trace",
           content: { "application/json": { schema: resolver(traceAmbiguousPrefixBodySchema) } },
         },
       },
     })
     .handle(async ({ app, input, scope }, project, caller) => {
       const { traceId } = input;
-      const format = input.format ?? (input.llmMode === "true" || input.llmMode === "1" ? "digest" : "json");
+      const format =
+        input.format ?? (input.llmMode === "true" || input.llmMode === "1" ? "digest" : "json");
 
       logger.info({ projectId: scope.id, traceId }, "Getting trace by ID");
 
@@ -403,7 +417,10 @@ export function createTracesRest(options: TracesRestOptions = {}) {
         protections,
       });
       const evaluations = evaluationsMap[resolvedTraceId] ?? [];
-      const url = app.platformUrl({ projectSlug: project.projectSlug, path: `/traces/${resolvedTraceId}` });
+      const url = app.platformUrl({
+        projectSlug: project.projectSlug,
+        path: `/traces/${resolvedTraceId}`,
+      });
 
       if (format === "digest") {
         return {

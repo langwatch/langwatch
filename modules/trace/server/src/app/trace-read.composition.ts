@@ -105,6 +105,12 @@ export type TraceReaderCompositionOptions = {
   share: TraceAppDependencies["share"];
   broadcast: TraceAppDependencies["broadcast"];
   commands: TraceProcessingCommands;
+  /**
+   * The tier-effective request bounds the read graph clamps and refuses by.
+   * The entitlement peer resolves the caller's plan; the transport schemas
+   * only carry the registry's enterprise ceiling.
+   */
+  requestBounds: TraceAppDependencies["requestBounds"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 };
@@ -146,48 +152,48 @@ export function composeTraceAppDependencies(
   const tree = !resolve
     ? traceRefusalProxy<TraceTreeService>(options.protections.processName, "the trace tree read")
     : TraceTreeComposition.create({
-    resolveClient: resolve,
-    modelProviders: options.modelProviders,
-    queryFieldValues: TraceReadQueryFieldValues.create(list),
-    queryClassification: TraceQueryClassificationAdapter.create(),
-    // A process that folds no trace projections has no fold to ask, so the
-    // reader is left out rather than answering an empty summary.
-    ...(summaryStore
-      ? {
-          summaryReader: {
-            tryGetSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
-              summaryStore.tryGet(traceId, {
-                aggregateId: traceId,
-                tenantId: createTenantId(tenantId),
-              }),
+        resolveClient: resolve,
+        modelProviders: options.modelProviders,
+        queryFieldValues: TraceReadQueryFieldValues.create(list),
+        queryClassification: TraceQueryClassificationAdapter.create(),
+        // A process that folds no trace projections has no fold to ask, so the
+        // reader is left out rather than answering an empty summary.
+        ...(summaryStore
+          ? {
+              summaryReader: {
+                tryGetSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
+                  summaryStore.tryGet(traceId, {
+                    aggregateId: traceId,
+                    tenantId: createTenantId(tenantId),
+                  }),
+              },
+            }
+          : {}),
+        records: {
+          getById: async ({ projectId, traceId }) => {
+            const resolved = await protections.resolve({
+              projectId,
+              userId: void 0,
+              publiclyShared: false,
+            });
+            const trace = await read.tryGetById(
+              projectId,
+              traceId,
+              { ...resolved, canSeeCosts: true },
+              { full: true },
+            );
+            if (!trace) {
+              throw new TraceNotFoundError(traceId);
+            }
+            return traceRecordSchema.parse(trace);
           },
-        }
-      : {}),
-    records: {
-      getById: async ({ projectId, traceId }) => {
-        const resolved = await protections.resolve({
-          projectId,
-          userId: void 0,
-          publiclyShared: false,
-        });
-        const trace = await read.tryGetById(
-          projectId,
-          traceId,
-          { ...resolved, canSeeCosts: true },
-          { full: true },
-        );
-        if (!trace) {
-          throw new TraceNotFoundError(traceId);
-        }
-        return traceRecordSchema.parse(trace);
-      },
-    },
-    eventDerivation: TraceEventDerivationService.create({
-      spans: options.repositories.derivationSpans,
-    }),
-    payloads: options.repositories.eventPayloads,
-    fullIo: TraceReadFullIo.create(ioExtractionService),
-  }).build();
+        },
+        eventDerivation: TraceEventDerivationService.create({
+          spans: options.repositories.derivationSpans,
+        }),
+        payloads: options.repositories.eventPayloads,
+        fullIo: TraceReadFullIo.create(ioExtractionService),
+      }).build();
 
   return {
     traces: {
@@ -239,6 +245,7 @@ export function composeTraceAppDependencies(
     share: options.share,
     broadcast: options.broadcast,
     protections,
+    requestBounds: options.requestBounds,
     ...(options.apiKeys
       ? {
           legacyCredential: TraceLegacyCredentialService.create({

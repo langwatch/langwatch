@@ -4,7 +4,9 @@
 
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   transposeColumnsFirstToRowsFirstWithId,
   type StudioWorkflow,
@@ -217,6 +219,13 @@ export type ExecutionDataServices = {
   /** The committed studio DSL a workflow target runs, once per dataset row. */
   workflows: ExperimentWorkflowDsl;
   evaluators?: EvaluatorApi;
+  /**
+   * The tier-effective row bound inline data must fit under, and the directory
+   * that answers which organization a project belongs to. The load refuses
+   * rows above the caller's tier so the bound holds at every entry.
+   */
+  entitlements: Pick<EntitlementApi, "requestBound">;
+  projects: Pick<ProjectApi, "getOrganizationId">;
 };
 
 /**
@@ -372,6 +381,18 @@ export class ExperimentExecutionDataService {
       return baseDataset;
     }
 
+    // The row bound the caller's plan answers, enforced at the load so it
+    // holds for inline data a transport let through and for saved datasets
+    // alike. Refused, not truncated: a run over a silently shortened dataset
+    // reports success over the wrong rows.
+    const rowBound = await ExperimentExecutionDataService.resolveRowBound(projectId, services);
+    if (baseDataset.rows.length > rowBound) {
+      return {
+        error: `The dataset has ${baseDataset.rows.length} rows; this plan allows at most ${rowBound} per run. Reduce the rows or run against a saved dataset.`,
+        status: 422,
+      };
+    }
+
     // Caller parameters become constant columns across every row, and a single
     // synthetic row when there is no dataset.
     const { rows: datasetRows, columns: datasetColumns } =
@@ -427,6 +448,23 @@ export class ExperimentExecutionDataService {
       loadedEvaluators,
       loadedWorkflows,
     };
+  }
+
+  /**
+   * The row bound the project's plan answers: the registry's
+   * `experimentInlineRowsMax` on the organization's tier, boot overrides
+   * included — the same resolution the entitlement application makes.
+   */
+  private static async resolveRowBound(
+    projectId: string,
+    services: ExecutionDataServices,
+  ): Promise<number> {
+    const organizationId = await services.projects.getOrganizationId(projectId);
+
+    return services.entitlements.requestBound({
+      key: "experimentInlineRowsMax",
+      organizationId,
+    });
   }
 
   /**

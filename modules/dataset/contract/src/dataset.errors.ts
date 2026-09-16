@@ -42,6 +42,24 @@ export class DatasetNotFoundError extends HandledError {
 }
 
 /**
+ * An entries or recordIds batch above the plan's bound. Refused rather than
+ * silently truncated: a write that drops rows is worse than one that says no,
+ * and the caller can split the batch and retry.
+ */
+export class DatasetBatchTooLargeError extends HandledError {
+  declare readonly code: "dataset_batch_too_large";
+
+  constructor({ count, maxEntries }: { count: number; maxEntries: number }) {
+    super(
+      "dataset_batch_too_large",
+      `A dataset batch accepts at most ${maxEntries} entries under this plan; this one carried ${count}. Split it into smaller batches.`,
+      { httpStatus: 422, fault: "customer", meta: { count, maxEntries } },
+    );
+    this.name = "DatasetBatchTooLargeError";
+  }
+}
+
+/**
  * A column-type change was requested on a dataset whose storage format cannot rewrite every
  * chunk's keys yet (Decision 6 defers that migration).
  */

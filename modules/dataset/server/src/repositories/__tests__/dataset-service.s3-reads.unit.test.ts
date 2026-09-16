@@ -4,6 +4,7 @@ import { DatasetContent } from "../../app/dataset.app.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 
 const dataset = (): Dataset =>
   datasetSchema.parse({
@@ -89,6 +90,7 @@ describe("DatasetService object-backed reads", () => {
       repository: new Repo(),
       records: new Records(),
       content,
+      requestBounds: createDatasetTestRequestBounds(),
     });
     await service.getDatasetWithRecords({
       slugOrId: "dataset_1",
