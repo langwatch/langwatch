@@ -588,6 +588,24 @@ does not recognise". It was `const dateOf = (value: Instant): Date => toDate(val
 rule and right that it could not decide the question; the answer was neither
 renaming nor widening the list, but deleting the wrapper (`265dc626e1`).
 
+### Thirteen rules report zero, and that was checked rather than assumed
+
+After the ledger went, 58 of 71 registered `langwatch/*` rules fire and 13 report
+nothing. A rule at zero because the tree is clean and a rule at zero because its
+`applies` can never match look identical from the outside - and the second is
+exactly what `no-nested-ternary` and `shared-setup-is-a-hook` were while every
+occurrence sat in the ledger.
+
+So the two highest-stakes were probed by planting a violation:
+`secrets-through-source` (a `process.env.ANTHROPIC_API_KEY` read in a contract
+package) fired, and `typed-prisma-seam` (a `database: object` taken and cast to
+`PrismaClient`) fired twice. Both zeros are real.
+
+Worth knowing while you are there: `stand-in-cast` did NOT fire on
+`database as PrismaClient`. That is its documented scope - it targets
+`as unknown as T` and `as any`, and a narrowing `as T` is deliberately left
+alone - so the seam rule is what covers that case, not the cast rule.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
