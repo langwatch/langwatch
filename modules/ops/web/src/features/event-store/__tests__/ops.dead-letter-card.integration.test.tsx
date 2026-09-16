@@ -246,14 +246,11 @@ describe("DeadLettersCard", () => {
       expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    // Deliberately unbound. What this asserts is that the row offers both
-    // verbs and hands the discard its full ref. That the mark is kept, and
-    // that both substrates use the same verbs, are claims the integration
-    // suite and the vocabulary suite own — binding them here would report
-    // them covered while asserting neither. The binding token is not spelled
-    // out even in prose: the parity scanner matches it anywhere in a comment,
-    // so writing it here would register a binding for a scenario that does
-    // not exist.
+    // Deliberately unbound: this only asserts the row offers both verbs and
+    // hands the discard its full ref. That the mark is kept, and that both
+    // substrates use the same verbs, are claims the integration and
+    // vocabulary suites own - the scanner matches a binding token anywhere
+    // in a comment, so writing it here would bind a scenario that doesn't exist.
     it("offers Redrive and Discard side by side, and Discard carries the full ref", () => {
       const onDiscard = vi.fn();
       const message = makeMessage();

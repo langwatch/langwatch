@@ -3,10 +3,8 @@ import { adminClient, impersonateUser } from "../../../index.ts";
 
 /**
  * Pin the request-body shape the admin UI posts to `/api/admin/:resource`.
- * The app-owned Ops Hono handler reads these exact fields
- * (via ra-data-simple-prisma's `defaultHandler` / `getListHandler`), so any
- * drift here silently breaks the list/update/create flows across every
- * Backoffice resource view.
+ * The app-owned Ops Hono handler reads these exact fields (via
+ * ra-data-simple-prisma), so drift here breaks every Backoffice resource view.
  */
 describe("adminClient", () => {
   const originalFetch = globalThis.fetch;

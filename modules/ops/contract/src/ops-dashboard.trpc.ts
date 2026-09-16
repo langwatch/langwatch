@@ -1,9 +1,7 @@
 /**
- * The `ops.*` procedures the operator dashboard and the scheduler page call.
- * The names are the browser's cache keys, so they are the wire names the ops
- * surfaces have always called. One of five declarations under the same `ops`
- * namespace: the router builder runs out of type-instantiation depth around
- * fifty procedures and the surface has ninety-two, so the process merges them.
+ * The `ops.*` procedures the dashboard and scheduler page call - the
+ * browser's cache keys. Split across five files: the router builder caps
+ * around fifty procedures per namespace, and this surface has ninety-two.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
@@ -54,9 +52,8 @@ export const opsDashboardTrpc = defineTrpcContract("ops")
 
   /**
    * One parked tenant's groups, read live rather than from the snapshot: a
-   * parking storm can hold hundreds of thousands of groups, and carrying those
-   * in a snapshot every pod reads would recreate the size problem ADR-090
-   * removes.
+   * parking storm can hold hundreds of thousands of groups, which a
+   * snapshot every pod reads would recreate the size problem ADR-090 removes.
    */
   .query("listParkedGroups")
   .withInput(opsListParkedQueueGroupsInputSchema)

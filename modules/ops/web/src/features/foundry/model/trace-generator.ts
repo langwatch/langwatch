@@ -339,12 +339,9 @@ function makeGuardrailSpan(includeEvents?: boolean): SpanConfig {
 }
 
 /**
- * Recursively builds a span tree targeting a specific span count.
- *
- * Strategy:
- * - At each level, pick a "pattern" (agent loop, rag pipeline, workflow, etc.)
- * - Fill children until we approach the target budget
- * - Recurse into children that can hold more children
+ * Recursively builds a span tree targeting a specific span count: pick a
+ * pattern per level, fill children toward the budget, and recurse into
+ * children that can hold more.
  */
 interface SubtreeArgs {
   budget: number;
@@ -511,12 +508,9 @@ function appendSingleLeafStep(isGenai: boolean, args: SubtreeArgs): StepResult {
 }
 
 /**
- * Recursively builds a span tree targeting a specific span count.
- *
- * Strategy:
- * - At each level, pick a "pattern" (agent loop, rag pipeline, workflow, etc.)
- * - Fill children until we approach the target budget
- * - Recurse into children that can hold more children
+ * Recursively builds a span tree targeting a specific span count: pick a
+ * pattern per level, fill children toward the budget, and recurse into
+ * children that can hold more.
  */
 function buildSubtree(args: SubtreeArgs): {
   spans: SpanConfig[];

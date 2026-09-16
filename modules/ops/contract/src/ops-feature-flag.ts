@@ -1,9 +1,7 @@
 /**
  * The input and output shapes the operator feature-flag surface parses.
- *
- * The rules payload composes `featureFlagRulesWriteSchema`, which the
- * feature-flag module owns: write-time only, because the read path must keep
- * accepting whatever is already stored.
+ * The rules payload composes `featureFlagRulesWriteSchema` write-time only
+ * - the read path must keep accepting whatever is already stored.
  */
 import { featureFlagRulesWriteSchema } from "@langwatch/feature-flag-contract";
 import { z } from "zod";

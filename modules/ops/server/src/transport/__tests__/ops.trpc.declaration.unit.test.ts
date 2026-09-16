@@ -1,8 +1,7 @@
 /**
- * The ops tRPC wire, pinned: every procedure name, its kind, and the access it
- * is reached behind. A rename is a cache-key change in every operator surface,
- * and a loosened access declaration is a cross-tenant read handed to somebody
- * who is not staff. The five `ops` declarations are one namespace.
+ * The ops tRPC wire, pinned: every procedure name, its kind, and the access
+ * it is reached behind. A rename is a cache-key change everywhere; a
+ * loosened access is a cross-tenant read handed to a non-staff caller.
  */
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
 import {
@@ -258,9 +257,8 @@ describe("the ops tRPC declarations", () => {
 
   /**
    * Five declarations, one claim: a process mounts one router per namespace,
-   * so what the parts declare has to arrive as a single declaration. A part
-   * that fell out of the composition would leave its procedures unreachable
-   * with nothing failing at boot to say so.
+   * so the parts must arrive as a single declaration. A part that fell out
+   * would leave its procedures unreachable with nothing failing at boot.
    */
   describe("given the one declaration the process mounts", () => {
     it("claims the ops namespace once, over every part's procedures", () => {

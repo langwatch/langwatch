@@ -1,10 +1,7 @@
 /**
- * The operator dashboard's vocabulary, as schemas.
- *
- * They were interfaces, and the same shapes were then written a second time as
- * zod inside the snapshot artifact's parser. One declaration now: the schema is
- * the wire contract the snapshot is parsed against AND the shape the tRPC
- * surface declares it answers, and every type here is inferred from it.
+ * The operator dashboard's vocabulary, as schemas. One declaration now: the
+ * schema is both the wire contract the snapshot artifact parses against and
+ * the shape the tRPC surface answers, with every type inferred from it.
  */
 import { z } from "zod";
 import { latencyWindowsSchema } from "./ops-latency.ts";
@@ -171,10 +168,9 @@ export const redisInfoSchema = z.object({
 export type RedisInfo = z.infer<typeof redisInfoSchema>;
 
 /**
- * Where the served data came from and how old it is.
- *
- * Nulls mean "no snapshot of that kind has been read yet", which the dashboard
- * renders as its loading state rather than as zeroes.
+ * Where the served data came from and how old it is. Nulls mean "no
+ * snapshot of that kind has been read yet", which the dashboard renders as
+ * its loading state rather than zeroes.
  */
 export const snapshotProvenanceSchema = z.object({
   /** When the live artifact was computed, in ms; null when none has been read. */
@@ -240,10 +236,9 @@ export const dashboardDataSchema = z.object({
   pausedKeys: z.array(z.string()),
   topErrors: z.array(errorClusterSchema),
   /**
-   * Tenants sitting at their in-flight cap, deepest first (ADR-090).
-   *
-   * Always tenant soft-cap parking — the poison-group guard's unrelated "park"
-   * puts a crash-looping group in the BLOCKED set and never appears here.
+   * Tenants sitting at their in-flight cap, deepest first (ADR-090). Always
+   * tenant soft-cap parking - the poison-group guard's unrelated "park" puts
+   * a crash-looping group in the BLOCKED set and never appears here.
    */
   parkedTenants: z.array(parkedTenantSchema),
   parkedTenantsBound: boundedSchema,

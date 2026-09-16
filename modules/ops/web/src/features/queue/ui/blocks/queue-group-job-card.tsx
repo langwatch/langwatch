@@ -132,11 +132,9 @@ function JobContextRows({
 }
 
 /**
- * One staged job, structurally: what it is (type, name), whose request staged
- * it (`__context`), where its body lives (payload store tier), and when it
- * runs. The full payload stays one click away behind the JSON toggle — the
- * structured lines answer the routine questions without making the operator
- * read a wall of JSON for each of twenty jobs.
+ * One staged job, structurally: what it is, whose request staged it
+ * (`__context`), where its body lives, and when it runs. Full payload is
+ * one click away behind the JSON toggle, sparing a wall of JSON per job.
  */
 export function GroupJobCard({
   job,

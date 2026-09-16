@@ -71,10 +71,9 @@ export function safePrettyJson(content: string): string {
 }
 
 /**
- * Walk pretty-printed JSON lines once to compute the 1-indexed line numbers
- * that should be highlighted given a set of pinned dot-paths. A line is
- * marked when its own key matches a pinned path *or* any of its object
- * ancestors does — pinning a parent visually hits the whole subtree.
+ * Walk pretty-printed JSON lines once to compute the 1-indexed line
+ * numbers to highlight for a set of pinned dot-paths. A line is marked
+ * when its key or any object ancestor matches - pinning a parent hits the whole subtree.
  */
 function computeHighlightLines(lines: string[], pinnedKeys: ReadonlySet<string>): number[] {
   const path: string[] = [];

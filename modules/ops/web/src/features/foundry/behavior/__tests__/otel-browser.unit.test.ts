@@ -1,9 +1,7 @@
 /**
- * The Foundry page loads this module in the browser, so its import graph is
- * part of the page: a module that will not resolve or parse takes `/ops/foundry`
- * down with a transform failure and no page at all. Building a provider here
- * exercises the whole chain the browser walks.
- * Spec: specs/ops/foundry-trace-playground.feature
+ * The Foundry page loads this module in the browser: a module that will
+ * not resolve or parse takes `/ops/foundry` down entirely. Building a
+ * provider here exercises the whole chain. Spec: specs/ops/foundry-trace-playground.feature
  */
 import { describe, expect, it } from "vitest";
 

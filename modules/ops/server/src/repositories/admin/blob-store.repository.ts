@@ -8,11 +8,9 @@ import type {
 } from "@langwatch/ops-contract";
 
 /**
- * Outcome of an atomic hand delete.
- *
- * `refusedLiveLeases` is non-zero only when the delete was refused because that
- * many live leases still referenced the blob at the instant it ran — the count
- * the lease-guarded script measured, not one read separately and now stale.
+ * Outcome of an atomic hand delete. `refusedLiveLeases` is non-zero only
+ * when refused because that many live leases referenced the blob at the
+ * instant it ran - measured by the lease-guarded script, not read stale.
  */
 export interface BlobDeleteResult {
   deleted: boolean;

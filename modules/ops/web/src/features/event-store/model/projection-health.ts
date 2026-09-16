@@ -16,9 +16,8 @@ export interface ProjectionHealthRow extends ProjectionMeta {
 
 /**
  * Registry × live tree for projections, the same shape as the subscribers
- * join: the registry knows every projection that exists, the tree only knows
- * the ones with live jobs, and absence must not render as health. Projection
- * jobs file under the normalized "fold"/"map"/"state" type nodes.
+ * join: the registry knows every projection, live jobs file under
+ * normalized "fold"/"map"/"state" nodes, and absence must not render as health.
  */
 export function joinProjectionHealth({
   projections,

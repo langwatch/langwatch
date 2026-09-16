@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The process-manager card is DejaView's "state machine for a single aggregate":
- * the machine's triggers and emitted commands, plus this aggregate's current
- * position (state, revision) and the commands it has sent.
+ * The process-manager card is DejaView's "state machine for a single
+ * aggregate": triggers, emitted commands, and this aggregate's current
+ * position and sent commands.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

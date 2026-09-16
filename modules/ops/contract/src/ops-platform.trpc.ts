@@ -1,9 +1,7 @@
 /**
- * The deployment-wide levers an operator pulls: the feature-flag registry, the
- * group-queue blob store and the in-place system migrations. Everything here
- * that can destroy a payload also asks for a non-impersonated session and a
- * typed `confirm`. One of five declarations under `ops` - see
- * `ops-dashboard.trpc.ts` for why there are five.
+ * The deployment-wide levers an operator pulls: feature flags, the blob
+ * store, and system migrations. Anything that can destroy a payload also
+ * asks for a non-impersonated session and a typed `confirm`.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { operatorFeatureFlagCatalogueSchema } from "@langwatch/feature-flag-contract";
@@ -122,20 +120,18 @@ export const opsPlatformTrpc = defineTrpcContract("ops")
   .withOutput(opsMigrationOrganizationMatchSchema.array())
 
   /**
-   * Enroll one organization for one registered migration, effective on the
-   * next pass. Duplicates, unknown migrations, unknown organizations,
-   * migrations that admit every organization already and any enrollment on a
-   * self-hosted installation are each refused by name.
+   * Enroll one organization for one registered migration, effective next
+   * pass. Duplicates, unknown migrations/organizations, auto-admitting
+   * migrations and self-hosted installs are each refused by name.
    */
   .mutation("enrollMigrationTenant")
   .withInput(opsEnrollMigrationTenantInputSchema)
   .withOutput(opsMigrationEnrolledSchema)
 
   /**
-   * Enroll a sampled cohort in one action. The sample is drawn from
-   * organizations not yet enrolled, excluding enterprise plans and
-   * private-dataplane routes by data rather than by any list in code; either
-   * exclusion can be lifted for one draw.
+   * Enroll a sampled cohort in one action. Drawn from organizations not yet
+   * enrolled, excluding enterprise plans and private-dataplane routes by
+   * data rather than by any list in code; either exclusion is liftable per draw.
    */
   .mutation("enrollMigrationCohort")
   .withInput(opsEnrollMigrationCohortInputSchema)

@@ -76,10 +76,9 @@ export abstract class ProcessOpsRepository {
   }): Promise<{ woke: boolean; previousWakeAt: number | null }>;
 
   /**
-   * One dead message back to pending, due immediately, attempts reset —
-   * mirroring the store's instance-level requeue. The ref scopes the write
-   * (tenancy carried on every mutation); returns the message key for the
-   * audit trail, or null when it was not dead (or not that instance's).
+   * One dead message back to pending, due immediately, attempts reset -
+   * mirroring the store's instance-level requeue. Returns the message key
+   * for the audit trail, or null when it was not dead (or not that instance's).
    */
   abstract tryRedriveDeadMessage(params: {
     ref: ProcessRef;
@@ -90,8 +89,7 @@ export abstract class ProcessOpsRepository {
   /**
    * One dead message marked never-to-be-sent. A mark, not a delete: the row
    * is retained as its own audit trail and the dispatcher never leases a
-   * discarded row. Returns the message key for the audit trail, or null when
-   * the message was not dead (or not that instance's).
+   * discarded row. Returns the message key, or null when it was not dead.
    */
   abstract tryDiscardDeadMessage(params: {
     ref: ProcessRef;
@@ -115,11 +113,9 @@ export abstract class ProcessOpsRepository {
   }): Promise<OutboxAttemptView[]>;
 
   /**
-   * Clear a LAPSED lease so the dispatcher can pick the message up now
-   * instead of waiting out the lease. Guarded in the write itself: only a
-   * pending message whose lease already expired is touched, so a live
-   * delivery's lease can never be released from under it. Returns the
-   * message key for the audit trail, or null when nothing matched.
+   * Clear a LAPSED lease so the dispatcher can pick the message up now.
+   * Guarded in the write itself: only a pending message whose lease already
+   * expired is touched, so a live delivery's lease can never be released.
    */
   abstract tryReleaseLapsedLease(params: {
     ref: ProcessRef;

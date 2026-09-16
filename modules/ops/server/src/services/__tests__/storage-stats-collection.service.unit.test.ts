@@ -1,8 +1,7 @@
 /**
- * These gauges are the only producer for table-size, disk and backup alerts.
- * Two failure modes: reporting a dropped table, and letting one bad endpoint
- * affect others.
- * Spec: specs/ops/worker-operational-loops.feature
+ * These gauges are the only producer for table-size, disk and backup
+ * alerts. Two failure modes: reporting a dropped table, and letting one
+ * bad endpoint affect others. Spec: specs/ops/worker-operational-loops.feature
  */
 import { describe, expect, it } from "vitest";
 

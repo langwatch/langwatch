@@ -21,11 +21,9 @@ export interface GroupCluster<T extends ClusterableGroup> {
 }
 
 /**
- * Split a trailing bare-index segment off an identifier.
- *
- * Only a final segment that is entirely digits counts. A trailing segment with
- * any other content is part of the identity — collapsing on it would merge
- * genuinely different groups, which is worse than showing a long list.
+ * Split a trailing bare-index segment off an identifier. Only a final
+ * segment that is entirely digits counts - anything else is part of the
+ * identity, and collapsing on it would merge genuinely different groups.
  */
 export function splitIndexedSuffix(groupId: string): {
   stem: string;
@@ -82,11 +80,9 @@ function olderOf(a: number | null, b: number | null): number | null {
 }
 
 /**
- * Elide the MIDDLE of an over-long identifier.
- *
- * Right-truncation is useless here: every ksuid in a project shares its prefix,
- * so `project_LVYcVYGW1AJ…` is indistinguishable from every sibling. Both ends
- * carry the information, so both ends survive.
+ * Elide the middle of an over-long identifier. Right-truncation is useless
+ * here: every ksuid in a project shares its prefix, so both ends have to
+ * survive for one to be distinguishable from its siblings.
  */
 export function middleEllipsis(value: string, maxLength = 48): string {
   if (maxLength <= 1) return "…";

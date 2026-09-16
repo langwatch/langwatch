@@ -23,13 +23,10 @@ export function DejaViewContent() {
     },
   );
 
-  // DejaView search is bounded server-side to the last 365 days (the ops
-  // router supplies the sinceMs). Cold-tier storage kicks in earlier
-  // (env-var-derived from CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS) -
-  // aggregates inside the search window but past the hot tier still come
-  // back, they're just quite some slower. The banner under the search
-  // surfaces both numbers so the operator sees the bounds up front
-  // instead of guessing why an old aggregate didn't show up.
+  // DejaView search is bounded server-side to the last 365 days; cold-tier
+  // storage kicks in earlier (from CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS)
+  // but aggregates past the hot tier still come back, just slower. The
+  // banner surfaces both numbers so the operator sees the bounds up front.
   const searchWindowQuery = api.ops.getEventLogSearchWindow.useQuery(void 0, {
     staleTime: 60 * 60 * 1000,
   });

@@ -470,11 +470,9 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
 }
 
 /**
- * Renders a wrapped list of clickable chips for the Users table's
- * Organizations / Projects columns. Each chip deep-links to the matching
- * Backoffice list page with the row's id pre-loaded into the `q` search
- * param so the user lands on a single-row, filtered view, giving a one-click
- * drill-down from the Users table into the related record.
+ * Renders clickable chips for the Users table's Organizations/Projects
+ * columns. Each chip deep-links to the matching Backoffice list page with
+ * the row's id pre-loaded into `q`, landing on a filtered single-row view.
  */
 function RefChipList({
   refs,

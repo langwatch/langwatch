@@ -1,9 +1,7 @@
 /**
- * The server half of the operator dashboard and scheduler procedures. The
- * surface is PLATFORM-TIER: the gate is not an RBAC permission resolved
- * against an id in the input - there is no id - but the deployment's own
- * operator allow-list, which the application owns and `app.admitOperator`
- * decides with. `getScope` answers rather than refuses, so the menu can poll it.
+ * The server half of the operator dashboard and scheduler procedures.
+ * Platform-tier: the deployment's own operator allow-list decides, not an
+ * RBAC permission. `getScope` answers rather than refuses, so the menu can poll it.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OpsApi, opsDashboardTrpc } from "@langwatch/ops-contract";

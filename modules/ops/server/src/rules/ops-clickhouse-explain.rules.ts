@@ -1,10 +1,7 @@
 /**
  * The pure guardrail pass in front of the operator-only ClickHouse EXPLAIN.
- *
- * Everything here decides whether a query may be wrapped and run at all, and
- * what may be written about it afterwards. No client, no clock, no
- * environment: the service owns which account runs the wrapped query, and this
- * module owns whether there is a wrapped query to run.
+ * No client, no clock, no environment: the service owns which account runs
+ * the wrapped query, and this module owns whether there is one to run.
  */
 import { createHash } from "node:crypto";
 
@@ -37,12 +34,9 @@ const TABLE_FUNCTION_RE =
 /// of other tenants, etc.). Reject any reference to it.
 const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 
-/// Normalize the query for the regex safety pass with a single lexer that
-/// tracks string, line-comment, and (nested) block-comment state in
-/// ClickHouse order. A character is either inside a string, inside a
-/// comment, or in normal SQL - never two at once - so we walk char-by-char
-/// with one state variable. See the full rationale in the previous
-/// commits' reviewer threads (string-vs-comment bypass, nested comments).
+/// Normalizes for the regex safety pass with a single lexer tracking
+/// string, line-comment and nested block-comment state in ClickHouse order,
+/// char-by-char with one state variable - never two states at once.
 export function stripCommentsAndStrings(query: string): string {
   let out = "";
   let i = 0;
@@ -190,10 +184,9 @@ export function redactQueryForAudit(query: string): {
 }
 
 /**
- * The ops connection URL, split into the fields @clickhouse/client wants. The
- * userinfo split and percent-decoding are ours because the library forwards
- * `URL.username` / `URL.password` to the wire in their encoded form, so a
- * password carrying '@' or '%' would authenticate as "p%40ss" and be refused.
+ * The ops connection URL, split into the fields @clickhouse/client wants.
+ * Userinfo split and percent-decoding are ours - the library forwards them
+ * still encoded, so a password with '@' or '%' would authenticate wrong.
  */
 export function findOpsConnection(raw: string): {
   url: string;

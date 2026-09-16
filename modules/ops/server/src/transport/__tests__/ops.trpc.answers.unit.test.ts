@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- *
- * What the ops surface ANSWERS, over the real runtime and a real `OpsApp`.
- * Every operator page reads its fields off these shapes, so a changed one is a
- * blank card rather than an error. The gate is exercised alongside them.
+ * What the ops surface answers, over the real runtime and a real `OpsApp`.
+ * Every operator page reads its fields off these shapes, so a changed one
+ * is a blank card rather than an error.
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { OpsCapability } from "@langwatch/ops-server";

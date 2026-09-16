@@ -1,8 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * The back office's single sign-on list and its detail drawer.
- *
  * Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";

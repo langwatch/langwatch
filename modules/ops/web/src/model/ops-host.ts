@@ -5,11 +5,8 @@ import { createContext, useContext } from "react";
 
 /**
  * The project the operator is standing in, and the key traces are sent with.
- *
- * Only the Foundry asks for it, and it asks for both halves at once: a
- * generated trace is posted to the ingestion endpoint with the project's own
- * API key, which is the one fact on this port that is not about the address or
- * the session.
+ * Only the Foundry asks for both halves at once, to post a generated trace
+ * with the project's own API key.
  */
 export type OpsProject = { id: string; apiKey: string };
 
@@ -27,12 +24,9 @@ export type OpsSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: since the
- * wire message of a handled error is its code slug, a screen that wrote its own
- * copy would print the slug at the operator. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what was being done.
+ * A failure, as the screen knows it. `error` travels raw - never a
+ * screen-composed sentence, since a handled error's wire message is its
+ * code slug. `fallbackTitle` names the action for an unrecognised code.
  */
 export type OpsFailureNotice = {
   error: unknown;
@@ -41,36 +35,29 @@ export type OpsFailureNotice = {
 };
 
 /**
- * The one thing a screen is handed.
- *
- * Methods rather than an object of loose functions, so the adapter is a class
- * the frontend feature constructs once and a test double is an obvious object
- * literal.
+ * The one thing a screen is handed. Methods rather than loose functions, so
+ * the adapter is a class the feature constructs once and a test double is an
+ * obvious object literal.
  */
 export abstract class OpsHostApi {
   /**
-   * Whether the reader may see the Ops workspace at all.
-   *
-   * Fails closed: an answer that has not arrived reads as no, exactly as the
-   * `ops.getScope` probe's `{ kind: "none" }` did while it was in flight.
+   * Whether the reader may see the Ops workspace at all. Fails closed: an
+   * answer that has not arrived reads as no, exactly as the `ops.getScope`
+   * probe's `{ kind: "none" }` did while in flight.
    */
   abstract hasOpsAccess(): boolean;
 
   /**
    * Whether the reader may see the Backoffice, which is strictly narrower.
-   *
-   * Kept apart from {@link hasOpsAccess} for the reason the platform shell
-   * stated: if ops access ever broadens past operators, the Backoffice must not
-   * broaden with it.
+   * Kept apart from {@link hasOpsAccess}: if ops access ever broadens past
+   * operators, the Backoffice must not broaden with it.
    */
   abstract isOpsAdmin(): boolean;
 
   /**
-   * True on a shared (multi-tenant) install. What hangs on it is blast
-   * radius: a PRODUCT flag flipped here reaches every customer, so the
-   * feature-flag rows carry a fleet-reach warning only when this answers
-   * true. Answering false quietly on a self-hosted install is the correct
-   * silence, not a failure mode.
+   * True on a shared (multi-tenant) install. A product flag flipped here
+   * reaches every customer, so feature-flag rows carry a fleet-reach warning
+   * only when this answers true; false on self-hosted is correct silence.
    */
   abstract sharedInstall(): boolean;
 
@@ -101,10 +88,9 @@ const OpsHostContext = createContext<OpsHostApi | undefined>(void 0);
 export const OpsHostProvider = OpsHostContext.Provider;
 
 /**
- * The application this screen is running in.
- *
- * Missing means the screen was mounted outside its frontend feature, which is a
- * composition fault rather than something the screen can degrade around.
+ * The application this screen is running in. Missing means it was mounted
+ * outside its frontend feature - a composition fault, not something the
+ * screen can degrade around.
  */
 export function useOpsHost(): OpsHostApi {
   const host = useContext(OpsHostContext);

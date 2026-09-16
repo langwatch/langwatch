@@ -149,10 +149,8 @@ function InstanceOutboxSection({
 
 /**
  * The drawer body, separated from the queries so it renders (and tests)
- * against plain data. State is shown as JSON directly — it is
- * identities-and-flags by the substrate's content boundary, and its shape is
- * different for every process, so a structured view would just be a worse
- * JSON.
+ * against plain data. State shows as JSON directly - its shape differs
+ * per process, so a structured view would just be a worse JSON.
  */
 export function ProcessInstanceContent({
   detail,

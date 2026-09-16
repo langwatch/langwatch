@@ -353,11 +353,9 @@ describe("parseSnapshot", () => {
   });
 
   /**
-   * The readers poll one fixed key, so the same string arrives repeatedly and
-   * is only validated once. The risk that buys is staleness: a cache that
-   * failed to notice a rewritten snapshot would freeze the dashboard on old
-   * numbers while the platform moved underneath it, and it would look like
-   * nothing was happening rather than like a bug. That is the case below.
+   * The readers poll one fixed key, validating the same string only once.
+   * The risk: a missed rewrite would freeze the dashboard on old numbers,
+   * looking like nothing was happening rather than a bug (the case below).
    */
   describe("given the same stored snapshot read twice", () => {
     /** @scenario "An unchanged snapshot is validated once and reused" */

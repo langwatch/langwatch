@@ -27,11 +27,8 @@ export interface BlobListing {
 
 /**
  * Owns everything the payload listing reads: which queue and ordering are
- * selected, and the cursor-paged fetch behind them.
- *
- * Ranked orderings return a single best-of-sample page, so `hasMore` is false
- * for them by construction — only storage order walks the cursor, and that is
- * the one mode where an operator can page past the first {@link PAGE_SIZE}.
+ * selected, and the cursor-paged fetch behind them. Ranked orderings return
+ * a single page, so `hasMore` is false - only storage order pages further.
  */
 export function useBlobListing(): BlobListing {
   const [queueName, setQueueName] = useState<string | null>(null);

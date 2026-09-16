@@ -50,10 +50,9 @@ function flattenChildrenToString(children: React.ReactNode): string {
 interface KbdProps {
   children: React.ReactNode;
   /**
-   * When true, the key auto-presses itself on a loop after a short delay so a
-   * reader who hasn't tried the keyboard yet still sees the flash. As soon as
-   * the reader presses the real key for themselves, the demo stops — they've
-   * "found" it.
+   * When true, the key auto-presses itself on a loop after a short delay so
+   * a reader who hasn't tried it yet still sees the flash - it stops as
+   * soon as the reader presses the real key themselves.
    */
   demo?: boolean;
   /** Override the demo interval (ms between auto-presses). */

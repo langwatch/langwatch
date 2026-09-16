@@ -138,8 +138,7 @@ function GroupErrorSection({ detail, now }: { detail: GroupInfo; now: number }) 
 /**
  * The drawer body, separated from the queries so it can be rendered (and
  * tested) against plain data. `now` is injectable for the same reason the
- * table pins it to the fetch instant: countdowns must be derived from a fixed
- * point, not from whenever the component happens to re-render.
+ * table pins it: countdowns derive from a fixed point, not from re-render.
  */
 export function GroupDetailContent({
   detail,

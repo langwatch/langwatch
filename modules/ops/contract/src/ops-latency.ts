@@ -63,10 +63,8 @@ export function mergeHistogramCounts(
 
 /**
  * A quantile from bucketed counts: the upper bound of the bucket where the
- * cumulative count crosses the rank — a deliberate slight OVERestimate, which
- * is the honest direction for a latency figure. Overflow-bucket hits report
- * the largest finite bound. Null when the window holds nothing, so a quiet
- * window renders as "nothing to report", never as a fabricated zero.
+ * cumulative count crosses the rank - a deliberate overestimate, the honest
+ * direction for latency. Null means the window holds nothing, never zero.
  */
 export function percentileFromHistogram(
   counts: Map<string, number>,

@@ -40,12 +40,10 @@ export class PrismaProcessAuditRepository extends ProcessAuditRepository {
     processKey: string | null;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    // Scheduled singletons run under the `__global__` pseudo-project; the audit
-    // row records the ref verbatim rather than inventing a scope. A fleet-scoped
-    // act has no project at all and records none, the same as the queue sink.
-    // The target triple is written only when all three parts are real: a
-    // process-scoped bulk act has a name but no instance, and `foo/null/null`
-    // would read as an instance that does not exist.
+    // Scheduled singletons run under `__global__`; the audit records the ref
+    // verbatim rather than inventing a scope. The target triple is written
+    // only when all three parts are real - a bulk act with a name but no
+    // instance would otherwise read as `foo/null/null`, a nonexistent one.
     await this.auditLog.record({
       userId: entry.actorUserId,
       ...(entry.projectId === null ? {} : { projectId: entry.projectId }),

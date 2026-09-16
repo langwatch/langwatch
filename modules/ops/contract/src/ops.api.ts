@@ -282,19 +282,16 @@ export interface OpsApi {
   }): Promise<void>;
   /**
    * One page of the support inbox, audited before it is answered: reports
-   * carry reporter-submitted transcripts and contact addresses, so who opened
-   * the inbox is itself worth keeping. The search TEXT never reaches the audit
-   * row - a contact search is an email address, and audit rows outlive the
-   * inbox.
+   * carry transcripts and contact addresses, so who opened it is worth
+   * keeping. Search TEXT never reaches the audit row - it can be an email.
    */
   listBugReports(input: ListBugReportsInput & { actorUserId: string }): Promise<BugReportListing>;
   /** One report in full, audited before it is answered. */
   getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport>;
   /**
    * File one report from a customer's coding agent. Unauthenticated on
-   * purpose: the reporter may be struggling because setup failed, so a report
-   * must never require a working login. A project credential only enriches the
-   * report with a project link.
+   * purpose: the reporter may be struggling because setup failed, so a
+   * report must never require a working login.
    */
   submitBugReport(input: {
     report: SubmitBugReport;

@@ -1,10 +1,9 @@
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 
 /**
- * The request context a job carries in its `__context` machinery field —
- * stamped at enqueue so the worker can restore tracing and tenant identity.
- * The structured job view surfaces it because it answers the operator's first
- * three questions (whose job, which request, which user) without reading JSON.
+ * The request context a job carries in `__context`, stamped at enqueue so
+ * the worker can restore tracing and tenant identity. Surfaced because it
+ * answers whose job, which request, which user, without reading JSON.
  */
 export interface JobContextInfo {
   traceId: string | null;

@@ -102,9 +102,8 @@ export type BugReportIdInput = z.infer<typeof bugReportIdInputSchema>;
 
 /**
  * The report a customer's coding agent posts, parsed by the intake route
- * itself because a rejected report answers the bespoke body released CLI and
- * MCP builds already read. The two size caps are the stored columns': an
- * oversized report is refused rather than truncated into an unreadable one.
+ * so a rejection answers the bespoke body released CLI/MCP builds read.
+ * Oversized is refused, not truncated into something unreadable.
  */
 export const submitBugReportSchema = z
   .object({

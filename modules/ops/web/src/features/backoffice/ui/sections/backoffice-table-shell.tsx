@@ -16,8 +16,7 @@ type BackofficeTableProps = Omit<
 
 /**
  * App composition adapter for the reusable Ops backoffice list shell.
- *
- * SearchInput, PageLayout, and handled-error copy are app concerns; all list
+ * SearchInput, PageLayout and handled-error copy are app concerns; list
  * layout and pagination behaviour lives in @langwatch/ops-web.
  */
 export function BackofficeTable({

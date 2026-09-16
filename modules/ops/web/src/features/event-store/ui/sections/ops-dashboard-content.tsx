@@ -12,12 +12,9 @@ import { PausedCard } from "./paused-panel.tsx";
 import { StatStrip } from "./stat-strip.tsx";
 
 /**
- * The ops landing page, read top to bottom as strip → health → chart →
- * structure → detail (dev/docs/best_practices/ops-dashboard.md).
- *
- * Space is proportional to trouble: an all-clear health state is one line, a
- * problem expands in place, and anything that explains a headline number sits
- * above the detail tables rather than below them.
+ * The ops landing page, read top to bottom as strip -> health -> chart ->
+ * structure -> detail (dev/docs/best_practices/ops-dashboard.md). Space is
+ * proportional to trouble: an all-clear state is one line, a problem expands in place.
  */
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const queuesQuery = api.ops.listQueues.useQuery(undefined, {

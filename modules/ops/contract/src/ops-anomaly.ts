@@ -21,12 +21,9 @@ export type AnomalyKind = z.infer<typeof anomalyKindSchema>;
 export type AnomalyTier = z.infer<typeof anomalyTierSchema>;
 
 /**
- * The operator's manual dismissal of one active anomaly.
- *
- * `kind` stays a one-member enum rather than reusing `anomalyKindSchema`
- * above: the two accept exactly the same value, but a literal and an enum
- * word their rejection differently, and this schema is the live transport
- * contract.
+ * The operator's manual dismissal of one active anomaly. `kind` stays a
+ * one-member enum rather than reusing `anomalyKindSchema`: they accept the
+ * same value, but a literal and an enum word rejection differently.
  */
 export const opsDismissAnomalyInputSchema = z.object({
   tenantId: z.string().min(1),

@@ -29,14 +29,10 @@ export function PipelineTreeCard({
 
   const pausedKeySet = useMemo(() => new Set(pausedKeys), [pausedKeys]);
 
-  // The tree is seeded from a 24h known-pipelines registry, which is right for
-  // continuity and wrong for a default view: an idle pipeline renders as a row
-  // of pure whitespace, and half the tree was whitespace between the reader and
-  // the two pipelines that had work. Idle rows fold away and say how many.
-  // Recursive on purpose: a root is a namespace, and namespaces usually carry
-  // no counters of their own. Classifying on the root's direct counts alone
-  // folded away every parent of a busy child — hiding the work rather than the
-  // whitespace this fold exists to remove.
+  // The tree is seeded from a 24h known-pipelines registry, so idle
+  // pipelines render as pure whitespace; idle rows fold away and say how
+  // many. Folding is recursive: classifying on a root's own direct counts
+  // alone hid every parent of a busy child, not just the whitespace.
   const { working, idle } = useMemo(() => {
     const hasWork = (node: PipelineNode): boolean =>
       node.pending > 0 || node.active > 0 || node.blocked > 0 || node.children.some(hasWork);

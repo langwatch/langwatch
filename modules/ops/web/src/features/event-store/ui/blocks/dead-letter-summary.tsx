@@ -4,11 +4,9 @@ import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import type { DeadLetterProcessCount } from "../../model/dead-letter-types.ts";
 
 /**
- * Which processes are dead and how stale, doubling as the filter.
- *
- * One button per process rather than a dropdown: the breakdown IS the
- * diagnosis most of the time, and an operator mid-incident should not have to
- * open a control to read it.
+ * Which processes are dead and how stale, doubling as the filter. One
+ * button per process rather than a dropdown: the breakdown is the
+ * diagnosis, and an operator mid-incident should not have to open a control.
  */
 export function DeadLetterSummary({
   byProcess,

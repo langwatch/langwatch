@@ -1,9 +1,7 @@
 /**
- * The input shapes the operator system-migrations surface parses.
- *
- * The confirmations are typed strings rather than booleans, and optional
- * rather than required, because only the migrations that declare themselves
- * destructive demand one — the transport asks the runner which those are.
+ * The input shapes the operator system-migrations surface parses. The
+ * confirmations are typed strings, optional, because only migrations that
+ * declare themselves destructive demand one - the transport asks the runner.
  */
 import { z } from "zod";
 import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
@@ -59,12 +57,9 @@ export const opsRollBackSystemMigrationTenantInputSchema = z.object({
  * publish the correct types instead of Promise<unknown>. */
 
 /**
- * The migration status vocabulary, as a schema.
- *
- * Annotated with the runner's own union so the two can never drift: the
- * package that owns `TenantMigrationStatus` carries no zod, and a schema that
- * stopped matching it would be a type error here rather than a wrong shape on
- * the wire.
+ * The migration status vocabulary, as a schema. Annotated with the runner's
+ * own union so the two can never drift - the owning package carries no zod,
+ * so a mismatch is a type error here, not a wrong shape on the wire.
  */
 const tenantMigrationStatusSchema: z.ZodType<TenantMigrationStatus> = z.enum([
   "migrated",
@@ -90,10 +85,9 @@ export const opsMigrationEnrollmentRecordSchema = z.object({
   migrationName: z.string(),
   enrolledByUserId: z.string(),
   /**
-   * The enroller's display name; null when it no longer resolves (the user id
-   * above still identifies them). Never the email — the name is the one piece
-   * of personal data the listing carries, and the read is audited for exactly
-   * that reason.
+   * The enroller's display name; null when it no longer resolves. Never the
+   * email - the name is the one piece of personal data this listing carries,
+   * and the read is audited for that reason.
    */
   enrolledByLabel: z.string().nullable(),
   createdAt: z.date(),
@@ -160,11 +154,9 @@ export const opsMigrationCohortResultSchema = z.object({
 export type OpsMigrationCohortResult = z.infer<typeof opsMigrationCohortResultSchema>;
 
 /**
- * Where one organization stands after a targeted pass.
- *
- * `status` is null when the pass wrote no record — the migration decided the
- * organization was out of scope — and `waiting` says the record exists but the
- * migration is holding it on a prerequisite rather than having finished.
+ * Where one organization stands after a targeted pass. `status` is null
+ * when the pass wrote no record - out of scope - and `waiting` says the
+ * record exists but is held on a prerequisite rather than finished.
  */
 export const opsMigrationTargetedRunResultSchema = z.object({
   status: tenantMigrationStatusSchema.nullable(),

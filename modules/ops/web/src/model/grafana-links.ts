@@ -21,12 +21,9 @@ const DEFAULT_FROM = "now-1h";
 const DEFAULT_TO = "now";
 
 /**
- * Wrap a single Explore query pane in the `panes`/`schemaVersion=1` URL shape
- * Grafana has used since 10.1 (current through 13.x). The pane key is arbitrary.
- *
- * Fails closed: a malformed base URL (a bare host with no scheme, an empty
- * string, anything `new URL` rejects) returns null rather than throwing, so a
- * misconfigured Grafana never turns a rendered row into a blank page.
+ * Wraps a single Explore query pane in the `panes`/`schemaVersion=1` URL
+ * shape Grafana has used since 10.1. Fails closed: a malformed base URL
+ * returns null rather than throwing, so misconfiguration never blanks a row.
  */
 function buildExploreUrl(baseUrl: string, pane: Record<string, unknown>): string | null {
   let url: URL;
@@ -77,8 +74,7 @@ function escapeQueryString(value: string): string {
 /**
  * A Grafana Explore link to every span the queue executed for one group.
  * GroupQueue stamps `queue.group_id` on each consumer span, so the TraceQL
- * attribute match is exact — no substring false positives across groups that
- * share a prefix. Returns null when the base URL is malformed.
+ * match is exact - no substring false positives across a shared prefix.
  */
 export function grafanaGroupTracesUrl(
   groupId: string,
@@ -100,10 +96,9 @@ export function grafanaGroupTracesUrl(
 }
 
 /**
- * A Grafana Explore link to the log lines mentioning one group. A line-contains
- * filter rather than a label matcher: the group id is logged as an ordinary
- * field by whichever worker touches the group, not indexed as a stream label.
- * Returns null when the base URL is malformed.
+ * A Grafana Explore link to the log lines mentioning one group. A
+ * line-contains filter, not a label matcher: the group id is logged as an
+ * ordinary field, not indexed as a stream label.
  */
 export function grafanaGroupLogsUrl(groupId: string, config: GrafanaDeepLinkConfig): string | null {
   const uid = config.lokiDatasourceUid ?? DEFAULT_LOKI_DATASOURCE_UID;

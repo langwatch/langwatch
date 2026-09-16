@@ -44,9 +44,8 @@ export abstract class OpsExplainRepository {
 
   /**
    * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are
-   * ClickHouse settings sent only for the fallback client: the `langwatch_ops`
-   * user's `readonly_safe` profile forbids client-side setting changes and
-   * already enforces the same caps server-side.
+   * ClickHouse settings sent only for the fallback client - the
+   * `langwatch_ops` user's profile already enforces the same caps server-side.
    */
   abstract runExplain(params: {
     client: OpsExplainQueryClient;

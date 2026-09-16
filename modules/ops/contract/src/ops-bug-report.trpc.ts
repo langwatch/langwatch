@@ -1,8 +1,7 @@
 /**
- * Every `bugReports.*` procedure: `getAll` pages the reports filed against the
- * product itself and `getById` opens one. The gate is not an RBAC permission -
- * a report carries no tenant, so there is no scope an id could be checked at.
- * What decides it is the LangWatch staff list.
+ * Every `bugReports.*` procedure: `getAll` pages reports filed against the
+ * product, `getById` opens one. Not an RBAC permission - a report carries
+ * no tenant, so the LangWatch staff list decides instead.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 

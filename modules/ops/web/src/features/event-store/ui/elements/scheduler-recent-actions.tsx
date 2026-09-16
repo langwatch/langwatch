@@ -11,11 +11,9 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 /**
- * What operators have done here recently.
- *
- * These controls are cross-tenant and can send a customer-facing artifact out
- * of band, so "why did this run at 03:14" needs an answer on the screen that
- * caused it — not only in a log search somebody has to know to run.
+ * What operators have done here recently. These controls are cross-tenant
+ * and can send a customer-facing artifact out of band, so "why did this
+ * run at 03:14" needs an answer on-screen, not only in a log search.
  */
 export function SchedulerRecentActions({
   entries,

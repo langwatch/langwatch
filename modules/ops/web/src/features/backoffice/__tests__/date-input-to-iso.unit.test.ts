@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { dateInputToISO } from "../../../index.ts";
 
 /**
- * Regression — CodeRabbit review on #3254 surfaced that
- * `new Date("2026-04-16").toISOString()` parses as UTC midnight, which shifts
- * the calendar day one step backwards for users west of UTC (the date they
- * typed ends up stored as the previous day). `dateInputToISO` must preserve
- * the typed calendar date in every timezone.
+ * Regression (#3254): `new Date("2026-04-16").toISOString()` parses as UTC
+ * midnight, shifting the calendar day back a step for users west of UTC.
+ * `dateInputToISO` must preserve the typed calendar date in every timezone.
  */
 describe("dateInputToISO", () => {
   describe("when given a YYYY-MM-DD date-input value", () => {

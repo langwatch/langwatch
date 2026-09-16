@@ -1,10 +1,7 @@
 /**
- * Redis engine-CPU percent derivation.
- *
- * Redis processes commands on a single thread. CloudWatch's
- * `EngineCPUUtilization` is the percent of that thread spent in user+sys CPU
- * time. We derive the same number locally by diffing two `INFO cpu` snapshots
- * of `used_cpu_user_main_thread` and `used_cpu_sys_main_thread`.
+ * Redis engine-CPU percent derivation. Redis runs commands on a single
+ * thread; CloudWatch's `EngineCPUUtilization` is that thread's user+sys CPU
+ * percent, derived here by diffing two `INFO cpu` snapshots.
  */
 
 export type RedisCpuSample = {

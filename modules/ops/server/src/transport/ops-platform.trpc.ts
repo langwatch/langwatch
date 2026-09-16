@@ -1,8 +1,7 @@
 /**
  * The server half of the feature-flag, blob-store and system-migration
- * procedures. Platform-tier throughout - see `ops-operator.trpc.ts`. Anything
- * that can destroy a payload passes a SECOND gate the application owns: a real
- * signed-in operator, not an impersonation, with a typed confirmation.
+ * procedures. Platform-tier - see `ops-operator.trpc.ts`. Anything
+ * destructive passes a second gate: a real signed-in operator, not an impersonation.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OpsApi, opsPlatformTrpc } from "@langwatch/ops-contract";

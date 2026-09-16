@@ -1,10 +1,7 @@
 /**
- * The backoffice's organization edit, composed the way the process composes
- * it, with the routing flip on. Integration level: the refusal is raised in
- * the ops adapter's own service graph and the copy a reader sees is read from
- * the presentation registry, so nothing here is a restatement of the rule.
- *
- * Spec: specs/identity/sso-onboarding-tiers.feature
+ * The backoffice's organization edit, with the routing flip on. The
+ * refusal is raised in the ops service graph, and its copy is read from
+ * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";

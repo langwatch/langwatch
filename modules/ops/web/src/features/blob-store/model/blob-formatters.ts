@@ -33,11 +33,9 @@ export function formatTtl(seconds: number | null): string {
 }
 
 /**
- * How long ago the blob's oldest lease lapsed — i.e. how long since the holder
- * that should have released it stopped renewing.
- *
- * A deadline still in the future is not a lapse at all: something holds this
- * blob right now, so it reads as Live rather than as a countdown.
+ * How long ago the blob's oldest lease lapsed - how long since the holder
+ * that should have released it stopped renewing. A deadline still in the
+ * future is not a lapse: it reads as Live rather than as a countdown.
  */
 export function formatLeaseLapse(deadlineMs: number | null): string {
   if (deadlineMs === null) return "None";

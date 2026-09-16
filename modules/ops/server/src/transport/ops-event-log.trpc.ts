@@ -1,8 +1,7 @@
 /**
  * The server half of the event-log, replay and anomaly procedures.
- *
- * Platform-tier throughout: see `ops-operator.trpc.ts` for why the gate is the
- * application's rather than the door's.
+ * Platform-tier throughout: see `ops-operator.trpc.ts` for why the gate is
+ * the application's rather than the door's.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OpsApi, opsEventLogTrpc } from "@langwatch/ops-contract";
@@ -125,12 +124,10 @@ export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc
         userName: operator?.name ?? operator?.email ?? "unknown",
       });
     } catch (err) {
-      // Left as a raw TRPCError deliberately, and it is the one refusal on
-      // this surface that is. The branch answers CONFLICT for EVERY failure,
-      // including members ones: "already running" is a nameable cause a
-      // caller can act on, and everything else is not. Splitting it needs an
-      // error code this module cannot add, so it is reported rather than
-      // taken here.
+      // Left as a raw TRPCError deliberately: the branch answers CONFLICT
+      // for every failure, though only "already running" is a nameable
+      // cause a caller can act on - splitting it needs an error code this
+      // module cannot add.
       const rawMessage = err instanceof Error ? err.message : String(err);
 
       throw new TRPCError({

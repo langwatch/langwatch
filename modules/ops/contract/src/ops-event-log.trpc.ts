@@ -1,8 +1,7 @@
 /**
- * The `ops.*` procedures DejaView and the replay wizard call: searching the
- * event log, reading one aggregate's events, recomputing a projection, driving
- * a rebuild, and the anomalies raised alongside them. One of five declarations
- * under `ops` - see `ops-dashboard.trpc.ts` for why there are five.
+ * The `ops.*` procedures DejaView and the replay wizard call: search the
+ * event log, read one aggregate's events, recompute a projection, drive a
+ * rebuild, and the anomalies raised alongside them.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";

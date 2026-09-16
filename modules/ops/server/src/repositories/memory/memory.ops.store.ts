@@ -61,9 +61,8 @@ export interface MemoryProcessInstanceRow {
 }
 
 /**
- * The rows every memory repository in this module reads and writes.
- *
- * One store per composed process, handed to each twin, so a report filed
+ * The rows every memory repository in this module reads and writes. One
+ * store per composed process, handed to each twin, so a report filed
  * through one repository is the report another one lists.
  */
 export class MemoryOpsStore {

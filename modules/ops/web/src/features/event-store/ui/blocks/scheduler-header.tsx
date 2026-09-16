@@ -3,10 +3,9 @@ import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
 import type { SchedulerHeaderCounts } from "../../model/scheduler-presentation.ts";
 
 /**
- * What needs attention, and whether the calendar loop itself is the problem.
- *
- * A stalled loop is a property of the SCHEDULER, not of any row, so it belongs
- * here rather than being inferred by reading every timestamp on the page.
+ * What needs attention, and whether the calendar loop itself is the
+ * problem. A stalled loop is a property of the scheduler, not of any row,
+ * so it belongs here rather than inferred from every timestamp on the page.
  */
 export function SchedulerHeader({
   counts,

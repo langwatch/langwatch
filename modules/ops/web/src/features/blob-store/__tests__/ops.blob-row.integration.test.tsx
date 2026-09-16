@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Covers what an operator is told about a payload's references and who may act
- * on it — the row half of the payload-store scenarios in
- * specs/event-sourcing/payload-store-content-addressed.feature.
+ * Covers what an operator is told about a payload's references and who
+ * may act on it - the row half of the payload-store scenarios.
  */
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

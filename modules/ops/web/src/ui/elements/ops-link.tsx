@@ -18,10 +18,9 @@ export function Link({ href, children, ...props }: OpsLinkProps) {
 }
 
 /**
- * The `next/link` call shape, which wraps its child rather than styling it.
- *
- * Kept as its own export so the call sites that passed `style={{ textDecoration:
- * "none" }}` around a `<Text>` are the lines they were.
+ * The `next/link` call shape, which wraps its child rather than styling
+ * it. Kept as its own export so the call sites that passed
+ * `style={{ textDecoration: "none" }}` around a `<Text>` are the lines they were.
  */
 export function OpsNextLink({
   href,

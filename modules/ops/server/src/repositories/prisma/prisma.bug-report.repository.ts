@@ -1,8 +1,7 @@
 /**
- * The support inbox's rows, over Prisma.
- *
- * Moved out of the application process unchanged: every filter, selection,
- * ordering and return shape is the one the back office has always been served.
+ * The support inbox's rows, over Prisma. Moved out of the application
+ * process unchanged: every filter, selection, ordering and return shape is
+ * the one the back office has always been served.
  */
 import { generate } from "@langwatch/ksuid";
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
@@ -13,12 +12,9 @@ import { type Instant, fromDate } from "@langwatch/time";
 import type { BugReportRepository } from "../admin/bug-report.repository.ts";
 
 /**
- * The id prefix every report carries.
- *
- * Stated rather than imported: the application's `KSUID_RESOURCES` table is a
- * browser-shared constant map, and one entry of it reaching a server package
- * would drag the whole map. The value is the wire format of every id already
- * stored, so it is pinned by the rows rather than by the constant.
+ * The id prefix every report carries. Stated rather than imported: the
+ * application's `KSUID_RESOURCES` is a browser-shared constant map, and one
+ * entry reaching a server package would drag the whole map.
  */
 const BUG_REPORT_KSUID_RESOURCE = "bugreport";
 

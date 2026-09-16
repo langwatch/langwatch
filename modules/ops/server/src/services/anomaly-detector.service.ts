@@ -175,10 +175,9 @@ export class AnomalyDetectorService {
   }
 
   /**
-   * The kill switch is per-tenant, so it resolves against the tenant being
-   * evaluated. A `system` target carries no identity, so a rule naming one
-   * project would match nobody and fail. Resolution fails open: flag outage
-   * must not silently disable observability.
+   * The kill switch is per-tenant, resolved against the tenant being
+   * evaluated. A `system` target carries no identity, so it fails open -
+   * flag outage must not silently disable observability.
    */
   private async isKilledForTenant(tenantId: string): Promise<boolean> {
     if (!this.featureFlags) {

@@ -79,10 +79,9 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
 }
 
 /**
- * The next timed work across the platform — scheduled jobs and process-manager
- * wakes merged into one soonest-first table, overdue rows tinted and sorted to
- * the top. Answers "what fires next, and is anything late?" without leaving
- * the dashboard; the event-sourcing page keeps the full views.
+ * The next timed work across the platform - scheduled jobs and
+ * process-manager wakes merged into one soonest-first table, overdue rows
+ * tinted and sorted to the top, so nothing needs leaving the dashboard.
  */
 export function UpcomingWorkCard({
   schedules,

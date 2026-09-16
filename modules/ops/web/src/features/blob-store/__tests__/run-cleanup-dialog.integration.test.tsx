@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
  * Renders the real RunCleanupDialog against an actual ChakraProvider. The
  * subject is the typed-confirmation guard: reclaiming deletes payloads
- * irreversibly and silently at the queue level, so the dialog must not be able
- * to fire the sweep on anything less than the exact word.
+ * irreversibly, so the dialog must fire only on the exact word.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

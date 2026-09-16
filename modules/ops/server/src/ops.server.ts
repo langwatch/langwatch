@@ -19,11 +19,9 @@ export const opsServer = defineServerModule("ops")
     opsBugReportTrpcTransport,
   )
   // The intake is public - the reporter may be struggling because setup
-  // failed - so the credential only ENRICHES a report where the caller
-  // happened to present one. Same precedence the project door itself reads
-  // a token at: Basic, then a non-empty Bearer, then X-Auth-Token. No
-  // verification against the api-key store here: a bad token still files
-  // the report, just without a project link.
+  // failed - so the credential only enriches a report, at the same
+  // precedence the project door reads a token at (Basic, Bearer,
+  // X-Auth-Token). Unverified: a bad token still files the report.
   .withTransportFacts(() => [
     bindRestMiddleware(bugReportCredential, (context) =>
       apiKeyRequestCredentialOf(context.req.raw),

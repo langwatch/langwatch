@@ -89,10 +89,8 @@ export interface PromptConfig {
   versionId?: string;
   /**
    * The pin the developer set on the call site, in shorthand form
-   * ("handle:production"). Emitted as `langwatch.prompt.selected.id`,
-   * which the trace-summary projection records into `SelectedPromptId`.
-   * When this differs from the resolved runtime prompt, the drawer
-   * surfaces a drift warning.
+   * ("handle:production"), emitted as `langwatch.prompt.selected.id`. When
+   * this differs from the resolved runtime prompt, the drawer warns of drift.
    */
   selectedId?: string;
   variables?: Record<string, string>;

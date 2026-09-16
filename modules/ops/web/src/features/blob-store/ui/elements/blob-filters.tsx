@@ -3,10 +3,9 @@ import { HStack, NativeSelect } from "@chakra-ui/react";
 import type { OpsBlobSort } from "@langwatch/ops-contract";
 
 /**
- * Reader-facing name for each server sort mode.
- *
- * Keyed by {@link OpsBlobSort}, so a mode added server-side fails the build
- * here rather than silently dropping out of the picker.
+ * Reader-facing name for each server sort mode. Keyed by
+ * {@link OpsBlobSort}, so a mode added server-side fails the build here
+ * rather than silently dropping out of the picker.
  */
 const SORT_LABELS: Record<OpsBlobSort, string> = {
   largest: "Largest first",

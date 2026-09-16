@@ -1,10 +1,7 @@
 /**
- * The `ops.*` procedures the group-queue and dead-letter pages call, declared
- * once. Reads list what is blocked, parked or retired; writes unblock, drain,
- * retire and replay it.
- *
- * One of five declarations under the same `ops` namespace - see
- * `ops-dashboard.trpc.ts` for why the surface is declared in five parts.
+ * The `ops.*` procedures the group-queue and dead-letter pages call. Reads
+ * list what is blocked, parked or retired; writes unblock, drain, retire
+ * and replay it. See `ops-dashboard.trpc.ts` for why this is one of five.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
@@ -57,10 +54,9 @@ export const opsQueueTrpc = defineTrpcContract("ops")
   .withOutput(groupInfoSchema)
 
   /**
-   * The Grafana deep-link configuration, so ops surfaces can build per-row
-   * Explore links client-side. Null when no Grafana is configured, so callers
-   * render no link rather than a dead one. Grafana is access-controlled in its
-   * own right, so the base URL is not a secret to an operator.
+   * The Grafana deep-link configuration for per-row Explore links. Null
+   * when no Grafana is configured. Grafana is access-controlled on its own,
+   * so the base URL is not a secret to an operator.
    */
   .query("getGrafanaLinkConfig")
   .withInput(z.void())

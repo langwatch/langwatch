@@ -24,11 +24,9 @@ interface Props {
 const JOBS_PAGE_SIZE = 20;
 
 /**
- * A drawer for one queue group, addressed by the groups table's own
- * `?group=<queue>|<id>` — paste the URL and the same group is open. It owns its
- * own queries and mutations rather than receiving callbacks, which is what it
- * did under the application drawer registry and stays true now that the table
- * renders it: the group is a resource, not a slice of the table's state.
+ * A drawer for one queue group, addressed by `?group=<queue>|<id>` - paste
+ * the URL and the same group is open. Owns its own queries and mutations
+ * rather than callbacks: the group is a resource, not a table-state slice.
  */
 export function GroupDetailDrawer({ queueName = "", groupId = "", onClose }: Props) {
   const { hasAccess } = useOpsPermission();

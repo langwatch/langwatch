@@ -8,18 +8,15 @@ interface Props {
   rowHeight: number;
   columnCount: number;
   /**
-   * Ref to the scrolling element. Using a ref (rather than a stateful
-   * `HTMLElement | null`) keeps the DOM node out of React state — react-virtual
-   * reads `.current` lazily from inside its layout effects, so it picks up the
-   * element after the parent commits without needing a render to fire.
+   * Ref to the scrolling element. A ref, not stateful `HTMLElement | null`,
+   * keeps the DOM node out of React state - react-virtual reads `.current`
+   * lazily from its layout effects, picking it up after commit with no render.
    */
   scrollContainerRef: RefObject<HTMLElement | null>;
   renderRow: (index: number) => ReactNode;
   /**
-   * Stable per-row key. Without this, react-virtual falls back to the row
-   * index, so `vi.key` (which is what wraps each rendered row) reuses DOM
-   * across reorders — a row that moves from index 3 to index 5 keeps the
-   * DOM node from index 3, leaking state. Pass something like
+   * Stable per-row key. Without it, react-virtual keys rows by index, so a
+   * row moving from index 3 to 5 reuses the DOM node and leaks state. Pass
    * `(i) => list[i].id` whenever the underlying list can reorder.
    */
   getItemKey?: (index: number) => string | number;

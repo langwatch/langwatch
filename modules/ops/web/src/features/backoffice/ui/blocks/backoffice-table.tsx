@@ -33,12 +33,9 @@ export interface BackofficeTableProps {
 }
 
 /**
- * Controlled list-view chrome shared by Ops backoffice resources.
- *
- * Resource queries, routing, and handled-error copy stay in the application;
- * this package owns the stable heading, search, card, loading, and paging
- * presentation. Slots are deliberately named and narrow so app composition
- * does not become a hidden context or transport dependency.
+ * Controlled list-view chrome shared by Ops backoffice resources. Resource
+ * queries, routing and handled-error copy stay in the application; this
+ * package owns heading, search, card, loading and paging presentation.
  */
 export function BackofficeTable({
   title,

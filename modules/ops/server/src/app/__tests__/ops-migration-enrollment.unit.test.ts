@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
- * The transport -> application seam for the migration enrollment procedures:
- * the surface names the migration, stamps the acting operator, demands the
- * right grain, and delegates the rest to the runner the process supplies.
- * Spec: specs/migration/authz-grants-rollout.feature.
+ * The transport -> application seam for the migration enrollment
+ * procedures: names the migration, stamps the operator, and delegates to
+ * the runner. Spec: specs/migration/authz-grants-rollout.feature.
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
@@ -105,11 +103,9 @@ function buildCaller() {
 }
 
 /**
- * The stable code of the handled refusal a call raised.
- *
- * Asserted instead of the tRPC code because that mapping belongs to the
- * boundary's own status table: the feature raises a coded `HandledError` and
- * the boundary decides what status it becomes.
+ * The stable code of the handled refusal a call raised. Asserted instead
+ * of the tRPC code because that mapping belongs to the boundary's own
+ * status table, not the feature.
  */
 async function refusalCodeOf(call: Promise<unknown>): Promise<string> {
   try {

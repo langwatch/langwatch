@@ -93,9 +93,8 @@ function useBulkActions(onSettled: () => void) {
 
 /**
  * The Dead Letters page's mutations and their pending state
- * (specs/ops/dead-letter-recovery.feature). Returns state and callbacks only,
- * never JSX — same shape as `useProcessInstanceActions`, which owns the
- * equivalent set for one process instance.
+ * (specs/ops/dead-letter-recovery.feature). Returns state and callbacks
+ * only, never JSX - same shape as `useProcessInstanceActions`.
  */
 export function useDeadLetterActions() {
   const utils = api.useUtils();

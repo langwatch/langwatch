@@ -72,10 +72,9 @@ export const opsRedriveDeadLettersInputSchema = z.object({
 });
 
 /**
- * The fleet-wide discard — no `processName` — crosses every tenant and cannot
- * be undone, since no redrive path selects a discarded row. It therefore takes
- * a typed confirmation: the destructive breadth has to be reached
- * deliberately, not by omitting a field.
+ * The fleet-wide discard - no `processName` - crosses every tenant and
+ * cannot be undone. It takes a typed confirmation, so the destructive
+ * breadth is reached deliberately, not by omitting a field.
  */
 export const opsDiscardDeadLettersInputSchema = z
   .object({
@@ -139,11 +138,9 @@ export const processOutboxMessageViewSchema = z.object({
 export type ProcessOutboxMessageView = z.infer<typeof processOutboxMessageViewSchema>;
 
 /**
- * A retired message, with the identity needed to act on it.
- *
- * The fleet-wide read: it carries the full ref so a row can be redriven
- * straight from the list, and the trace id so the operator can reach the
- * failure itself.
+ * A retired message, with the identity needed to act on it: the full ref so
+ * a row can be redriven straight from the list, and the trace id so the
+ * operator can reach the failure itself.
  */
 export const deadOutboxMessageViewSchema = processOutboxMessageViewSchema.extend({
   processName: z.string(),

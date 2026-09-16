@@ -1,10 +1,7 @@
 /**
- * The process ports a mounted ops declaration runs on, as a test supplies
- * them: one signed-in person and an authorization answer the test decides.
- *
- * The operator gate is NOT here. It is the application's - the deployment's
- * own allow-list, checked in the handler - so a test moves it by changing who
- * the `opsOperator` fact answers with, not by changing these ports.
+ * The process ports a mounted ops declaration runs on: one signed-in
+ * person and an authorization answer, both test-supplied. The operator
+ * gate is not here - it is the application's, changed via `opsOperator`.
  */
 import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
 

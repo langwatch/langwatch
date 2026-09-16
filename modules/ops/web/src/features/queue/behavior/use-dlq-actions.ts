@@ -14,10 +14,8 @@ const plural = (count: number) => (count === 1 ? "group" : "groups");
 
 /**
  * The DLQ card's recovery mutations (specs/ops/dead-letter-recovery.feature).
- *
  * Both the row action and the per-queue bulk go through the explicit-id
- * endpoints: one verb, one audit shape, and the confirmation covers exactly
- * the ids that were shown when the operator clicked.
+ * endpoints, so the confirmation covers exactly the ids the operator saw.
  */
 export function useDlqActions() {
   const { countOutcomeHandlers } = useOpsMutationOutcomes();

@@ -27,9 +27,8 @@ function PercentileCell({
 
 /**
  * Processing-time percentiles per real time window, from the completion
- * histograms — the honest companion to the strip's last-200-jobs tiles. A
- * quiet window shows a dash, never a fabricated zero; "All time" means since
- * latency history began recording.
+ * histograms - the honest companion to the strip's last-200-jobs tiles. A
+ * quiet window shows a dash, never a fabricated zero.
  */
 export function LatencyWindowsCard({ windows }: { windows: LatencyWindows | null }) {
   if (!windows) return null;

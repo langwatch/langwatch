@@ -1,8 +1,7 @@
 /**
  * The engine-CPU percent an operator reads is derived across two collection
- * cycles, not from one INFO reading: the collector diffs the main-thread CPU
- * counters against the previous sample and the dashboard view carries the
- * result. Spec: specs/ops/redis-pressure.feature
+ * cycles, not one INFO reading: the collector diffs main-thread CPU
+ * counters against the previous sample. Spec: specs/ops/redis-pressure.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpsLatencyHistograms, OpsQueueTotals } from "../repositories/observe/ops-metrics.repository.ts";

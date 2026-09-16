@@ -1,10 +1,7 @@
 /**
- * The back office: `/api/admin/impersonate` and `/api/admin/:resource`. The
- * application decides everything; this family owns only the HTTP half.
- *
- * TWO SESSIONS ARE READ AND THEY ANSWER DIFFERENT QUESTIONS: the actor, read
- * as the impersonator where one is present, and the raw auth session whose id
- * impersonation is attached to. An expired cookie is a 401, not a refusal.
+ * The back office's HTTP half only - the application decides everything.
+ * Two sessions are read: the actor (impersonator where present), and the
+ * raw session impersonation attaches to. An expired cookie is a 401.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -55,11 +52,9 @@ const STAFF_RESOLVED_IN_HANDLER =
   "credential opens this door and no permission describes it";
 
 /**
- * `/api/admin/...`, at exactly the addresses React Admin calls. Literal
- * because the back office has no dated contract to negotiate.
- *
- * `impersonate` is declared BEFORE `:resource`, because the runtime matches in
- * declaration order and the parameter would otherwise swallow it.
+ * `/api/admin/...`, at exactly the addresses React Admin calls - the back
+ * office has no dated contract to negotiate. `impersonate` is declared
+ * before `:resource` so declaration order cannot swallow it as a parameter.
  */
 export const adminRest = defineRestRouter(OpsApi)
   .withNamespace("admin")

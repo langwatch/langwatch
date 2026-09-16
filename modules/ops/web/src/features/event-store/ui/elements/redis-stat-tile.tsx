@@ -17,11 +17,9 @@ type RedisData = Pick<
 >;
 
 /**
- * Redis memory, processor and connections as ONE tile.
- *
- * They were three, which is how a ten-column strip ended up with eleven tiles
- * and orphaned the last onto a row of its own. They are also one subject: an
- * operator reads them together or not at all.
+ * Redis memory, processor and connections as one tile - they were three,
+ * which is how a ten-column strip ended up with eleven tiles and an
+ * orphaned last one. They are one subject: read together or not at all.
  */
 export function RedisStatTile({ data }: { data: RedisData }) {
   // Compute the raw ratio for threshold checks, round only for display, so

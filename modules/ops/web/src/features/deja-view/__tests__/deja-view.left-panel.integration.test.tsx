@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * DejaView's left rail lists what processes an aggregate's events. It now shows
- * event subscribers rather than subscribers — the raw-event consumers, keyed by
- * the event types they react to.
+ * DejaView's left rail lists what processes an aggregate's events: event
+ * subscribers, the raw-event consumers keyed by the event types they react to.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

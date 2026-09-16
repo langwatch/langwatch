@@ -2,12 +2,9 @@ import { Card, HStack, Table, Text } from "@chakra-ui/react";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 /**
- * Blocked-group error clusters.
- *
- * Renders only when there is something to report — the all-clear case collapses
- * onto the dashboard's health line instead of spending a card saying "No
- * errors". The clusters come from the snapshot's EXHAUSTIVE blocked walk, so
- * this and the blocked drill-down can no longer disagree about what exists.
+ * Blocked-group error clusters. Renders only when there is something to
+ * report - the all-clear case collapses onto the dashboard's health line.
+ * Clusters come from the snapshot's exhaustive blocked walk, matching the drill-down.
  */
 export function TopErrorsCard({
   topErrors,

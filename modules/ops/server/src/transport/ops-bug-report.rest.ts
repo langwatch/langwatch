@@ -1,8 +1,7 @@
 /**
- * `POST /api/bug-reports` - intake for reports from customers' coding agents.
- * Unauthenticated on purpose: the reporter may be struggling because setup
- * failed, so filing must never require a working login. A credential, where
- * the caller has one, only adds a project link and is never a gate.
+ * `POST /api/bug-reports` - intake for reports from customers' coding
+ * agents. Unauthenticated on purpose: the reporter may be struggling
+ * because setup failed, so filing must never require a working login.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {

@@ -4,12 +4,9 @@ import {
 } from "../app/ops.app.ts";
 
 /**
- * The dataplane answer, read off the ClickHouse routing table the deployment's
- * environment states.
- *
- * It takes the routes rather than the whole table, so this feature needs no
- * dependency on the ClickHouse client for one map. An organization the map
- * does not name is on the shared instance, the router's own fallback.
+ * The dataplane answer, read off the ClickHouse routing table. Takes the
+ * routes rather than the whole table, needing no ClickHouse client
+ * dependency; an unnamed organization falls back to the shared instance.
  */
 export class RoutingTableOrganizationDataplaneAdapter implements OrganizationDataplaneResolver {
   static create({

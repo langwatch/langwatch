@@ -10,12 +10,9 @@ import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
 import { OpsSnapshotRepository } from "../observe/ops-snapshot.repository.ts";
 
 /**
- * The `{snapshot}` hash tag is load-bearing, not decoration.
- *
- * The fenced write below reads the lease and writes the artifact in one Lua
- * call. On Redis Cluster a script may only touch keys in a single slot, so
- * without a common hash tag the fence would fail with CROSSSLOT on exactly the
- * deployments that need it most.
+ * The `{snapshot}` hash tag is load-bearing: the fenced write below reads
+ * the lease and writes the artifact in one Lua call, and on Redis Cluster a
+ * script may only touch keys in a single slot.
  */
 export const SNAPSHOT_LIVE_KEY = "ops:{snapshot}:live";
 export const SNAPSHOT_DETAIL_KEY = "ops:{snapshot}:detail";
@@ -23,11 +20,9 @@ export const SNAPSHOT_LEASE_KEY = "ops:{snapshot}:lease";
 export const SNAPSHOT_EPOCH_KEY = "ops:{snapshot}:epoch";
 
 /**
- * The lease outlives several write cycles on purpose. Too short and an
- * ordinary GC pause hands the lease to another pod and back, churning the
- * writer for no reason; too long and a crashed writer leaves the dashboard
- * stale for the remainder. Ten seconds is five live cycles — long enough to
- * ride out a pause, short enough that a crash costs a handful of beats.
+ * The lease outlives several write cycles on purpose: too short and a GC
+ * pause churns the writer between pods; too long and a crash leaves the
+ * dashboard stale. Ten seconds is five live cycles.
  */
 export const LEASE_TTL_SECONDS = 10;
 
@@ -90,11 +85,8 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
 
   /**
    * One round trip in the common case (renewal), two on a fresh acquisition.
-   *
-   * A writer that renews keeps its token and epoch; any acquisition mints a
-   * fresh token and takes a fresh epoch from the shared counter. The token,
-   * not the writer id, is what lands in the lease key — see `LeaseState.token`
-   * for why a stable per-pod value cannot fence a write.
+   * The token, not the writer id, is what lands in the lease key - see
+   * `LeaseState.token` for why a stable per-pod value cannot fence a write.
    */
   async acquireOrRenewLease({ writerId }: { writerId: string }): Promise<OpsSnapshotLease> {
     if (this.currentToken) {

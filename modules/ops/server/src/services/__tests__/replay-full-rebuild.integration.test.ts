@@ -19,12 +19,9 @@ import { ReplayRedisRepository } from "../../repositories/redis/redis.replay.rep
 import { ReplayService } from "../replay.service.ts";
 
 /**
- * A replay that is cancelled or fails leaves its completed markers in Redis on
- * purpose, so a plain re-run resumes instead of repeating work. When the target
- * table has meanwhile been emptied, that same behaviour makes the rebuild
- * report success while silently skipping every aggregate the earlier run had
- * finished. `fullRebuild` clears those markers under the replay lock, before
- * discovery, so the rebuild covers them.
+ * A cancelled/failed replay leaves completed markers in Redis so a re-run
+ * resumes rather than repeats - but an emptied target table then makes the
+ * rebuild silently skip finished work, which `fullRebuild` fixes by clearing them.
  */
 
 const PROJECTION_NAME = "traceAnalyticsRollup";

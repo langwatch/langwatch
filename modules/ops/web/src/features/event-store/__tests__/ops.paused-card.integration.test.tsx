@@ -8,10 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PausedCard } from "../ui/sections/paused-card.tsx";
 
 /**
- * The merged "what is switched off" panel.
- *
- * Spec: specs/ops/ops-dashboard-density.feature ("One question, one place").
- * The point of the panel is that one glance answers for all three mechanisms,
+ * The merged "what is switched off" panel (specs/ops/ops-dashboard-density.feature,
+ * "One question, one place"). One glance answers for all three mechanisms,
  * so the tests assert on all three at once rather than one section at a time.
  */
 

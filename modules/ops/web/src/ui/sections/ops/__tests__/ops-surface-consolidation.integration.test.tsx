@@ -86,12 +86,9 @@ describe("ops surface consolidation", () => {
   });
 
   /**
-   * The replay wizard used to be `openDrawer("opsReplay")` — a name in the
-   * application drawer registry, which is a composition this package may not
-   * carry a copy of. It keeps its own query key instead, and the property that
-   * has to survive is the one the registry was actually giving it: an operator
-   * mid-replay can send the URL to whoever is on call with them and they open
-   * the same thing.
+   * The replay wizard uses its own query key rather than the application
+   * drawer registry, which this package may not carry a copy of. What must
+   * survive: sending the URL lets an on-call operator open the same replay.
    */
   describe("given an operator on the projections page", () => {
     describe("when they start a replay", () => {

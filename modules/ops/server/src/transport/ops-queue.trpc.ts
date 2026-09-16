@@ -1,7 +1,6 @@
 /**
- * The server half of the group-queue and dead-letter procedures.
- *
- * Platform-tier throughout: see `ops-operator.trpc.ts` for why the gate is the
+ * The server half of the group-queue and dead-letter procedures. Platform-tier
+ * throughout: see `ops-operator.trpc.ts` for why the gate is the
  * application's rather than the door's.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";

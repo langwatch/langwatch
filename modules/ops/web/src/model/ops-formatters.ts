@@ -57,11 +57,9 @@ export function formatDuration(startedAt: string, completedAt?: string | null): 
 }
 
 /**
- * A length of time, as a length of time.
- *
- * The alternative is reconstructing an instant (`Date.now() - elapsed`) so a
- * relative formatter can subtract the clock back out, which reads as "5m ago"
- * for something that is not in the past — it has lasted five minutes.
+ * A length of time, as a length of time. The alternative is reconstructing
+ * an instant to feed a relative formatter, which reads as "5m ago" for
+ * something that is not in the past - it has lasted five minutes.
  */
 export function formatDurationMs(ms: number): string {
   if (ms < 0) return "—";

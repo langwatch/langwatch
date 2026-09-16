@@ -1,8 +1,7 @@
 /**
- * Backup collection is opt-out, so every install checks it—even those
+ * Backup collection is opt-out, so every install checks it - even those
  * without a backup_log table. Don't warn repeatedly for this expected
- * absence.
- * Spec: specs/ops/clickhouse-backup-metrics.feature
+ * absence. Spec: specs/ops/clickhouse-backup-metrics.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

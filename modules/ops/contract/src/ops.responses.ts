@@ -1,9 +1,7 @@
 /**
- * What the `ops.*` tRPC surface ANSWERS: mostly the operations vocabulary the
- * other modules here declare, reused rather than restated, plus the shapes the
- * surface invents. Every acknowledgement is its own named schema rather than
- * one shared `{ ok: true }`, so a caller reading `jobsRemoved` off a drain
- * cannot typecheck against a replay.
+ * What the `ops.*` tRPC surface answers. Every acknowledgement is its own
+ * named schema rather than one shared `{ ok: true }`, so a caller reading
+ * `jobsRemoved` off a drain cannot typecheck against a replay.
  */
 import { z } from "zod";
 import { searchProjectsResultSchema } from "@langwatch/project-contract";
@@ -23,10 +21,9 @@ import {
 } from "./ops-event-log.ts";
 
 /**
- * The operator's reach, as the process resolved it.
- *
- * `none` is an answer rather than a refusal so the global menu can poll the
- * probe on every page load without spamming the console.
+ * The operator's reach, as the process resolved it. `none` is an answer
+ * rather than a refusal, so the global menu can poll the probe on every
+ * page load without spamming the console.
  */
 export const opsScopeSchema = z.union([
   z.object({ kind: z.literal("none") }).strict(),
@@ -35,11 +32,9 @@ export const opsScopeSchema = z.union([
 export type OpsScope = z.infer<typeof opsScopeSchema>;
 
 /**
- * The operator behind a request, as far as this module reads them.
- *
- * `impersonator` is the real admin behind an impersonation session. It is what
- * makes an impersonating operator still an operator on a read, and what
- * refuses them on a write whose damage nobody would notice in time.
+ * The operator behind a request. `impersonator` is the real admin behind an
+ * impersonation session - it keeps an impersonating operator an operator on
+ * a read, and refuses them on a write nobody would notice the damage of.
  */
 export const opsOperatorSchema = z.object({
   id: z.string(),
@@ -63,10 +58,9 @@ export type OpsOperatorPermission = "ops:view" | "ops:manage";
 export const opsScopeProbeSchema = z.object({ scope: opsScopeSchema }).strict();
 
 /**
- * What `ops.getBadgeCounts` answers: the two integers the navigation badge
- * renders, and when they were computed. `computedAt` is nullable because those
- * zeroes mean "we cannot say" rather than "nothing is wrong", and a current
- * timestamp beside them would present unavailable data as a fresh all-clear.
+ * What `ops.getBadgeCounts` answers. `computedAt` is nullable because a
+ * zero count can mean "we cannot say" rather than "nothing is wrong", and a
+ * current timestamp beside it would present that as a fresh all-clear.
  */
 export const opsApiGetBadgeCountsOutputSchema = z
   .object({
@@ -82,11 +76,9 @@ export type OpsApiGetBadgeCountsOutput = z.infer<typeof opsApiGetBadgeCountsOutp
 // ---------------------------------------------------------------------------
 
 /**
- * One registered projection, as the process's pipeline registry knows it.
- *
- * Named fields, not `unknown` - a tRPC procedure publishes what its handler
- * returns, so an `unknown` here is what the browser gets, and every ops
- * surface reading a projection row was reading its fields off `{}`.
+ * One registered projection, as the pipeline registry knows it. Named
+ * fields, not `unknown` - a tRPC procedure publishes what its handler
+ * returns, so `unknown` here is what the browser would get.
  */
 export const opsProjectionRegistrationSchema = z.object({
   projectionName: z.string(),
@@ -283,12 +275,9 @@ export const opsExplainRequestSchema = z.object({
 export type OpsExplainRequest = z.infer<typeof opsExplainRequestSchema>;
 
 /**
- * What one EXPLAIN answers.
- *
- * `refused` is the guardrail pass: a query the wrapper will not run, named so
- * the operator can fix it. The rest are the deployment's own conditions, and
- * `failed` deliberately carries no engine prose - the cluster's own message
- * names internals, and the service logs it instead.
+ * What one EXPLAIN answers. `refused` is the guardrail pass, named so the
+ * operator can fix it. `failed` deliberately carries no engine prose - the
+ * cluster's own message names internals, so the service logs it instead.
  */
 export type OpsExplainAnswer =
   | Readonly<{ status: "ok"; type: OpsExplainType; rows: unknown[] }>

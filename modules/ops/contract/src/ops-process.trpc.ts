@@ -1,8 +1,7 @@
 /**
  * The `ops.*` procedures the process-manager fleet pages call: what each
  * manager is doing, what has stopped, and the verbs that put it back in
- * motion. One of five declarations under `ops` - see `ops-dashboard.trpc.ts`.
- * Spec: specs/ops/process-manager-visibility.feature.
+ * motion. Spec: specs/ops/process-manager-visibility.feature.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
@@ -44,9 +43,8 @@ import {
 export const opsProcessTrpc = defineTrpcContract("ops")
   /**
    * The per-aggregate process-manager state machines for one aggregate: each
-   * machine's definition joined to this aggregate's current instance state and
-   * the intents it has emitted. Scheduled singletons are excluded, because
-   * they are not keyed by aggregate id.
+   * machine's definition joined to its current instance state and emitted
+   * intents. Scheduled singletons are excluded - not keyed by aggregate id.
    */
   .query("getAggregateProcessManagers")
   .withInput(opsAggregateProcessManagersInputSchema)
@@ -68,9 +66,8 @@ export const opsProcessTrpc = defineTrpcContract("ops")
 
   /**
    * Retired messages across every process. Answers "what has permanently
-   * stopped", which `listProcessOutbox` could not: that one needs a full
-   * process ref, so it can only be reached by an operator who already knows
-   * where the failure is.
+   * stopped", which `listProcessOutbox` cannot: that needs a full process
+   * ref, reachable only by an operator who already knows where it failed.
    */
   .query("listDeadLetters")
   .withInput(opsListDeadLettersInputSchema)

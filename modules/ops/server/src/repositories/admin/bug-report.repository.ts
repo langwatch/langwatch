@@ -1,10 +1,9 @@
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
 
 /**
- * Storage for the reports customers' coding agents file. A GLOBAL support
- * inbox: the table carries no organization, team or project column, so nothing
- * here narrows by tenant and nothing could, which is why the reads take a page
- * and a search term rather than a scope.
+ * Storage for the reports customers' coding agents file. A global support
+ * inbox: the table carries no organization, team or project column, so
+ * reads take a page and a search term rather than a scope.
  */
 export interface BugReportRepository {
   create(input: { data: BugReportCreateInput }): Promise<BugReport>;

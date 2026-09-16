@@ -152,10 +152,8 @@ function MessageMetaRow({
 
 /**
  * One outbox message: what it intends, where it stands, and its producing
- * trace via the carrier captured at commit. The lapsed-lease wording is
- * deliberate — the outbox lease is not renewed mid-delivery, so a dead
- * dispatcher and a slow live one are indistinguishable until the fencing
- * check, and the card must not accuse the live one.
+ * trace. "Lapsed" is deliberate wording - the lease is not renewed
+ * mid-delivery, so a dead and a slow-live dispatcher look alike until fencing.
  */
 export function OutboxMessageCard({
   message,

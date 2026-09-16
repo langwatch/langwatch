@@ -1,10 +1,7 @@
 /**
  * Pass-level proof of the pacing rules, composed the way
- * `runSystemMigrationPass` composes them: the real runner from
- * @langwatch/system-migrations, the real cohort helpers from ../cohort, and
- * the migration list filtered by each migration's own
- * `runsAutomaticallyOnSelfHosted` declaration. What is faked is storage -
- * this is about who gets processed, not how state is stored.
+ * `runSystemMigrationPass` composes them: real runner and cohort helpers,
+ * filtered by migration declarations. Only storage is faked here.
  */
 import {
   type SystemMigration,
@@ -101,9 +98,8 @@ function migrationOf({
 
 /**
  * The pass, composed exactly as runtime.ts composes it: enrollment is per
- * (organization, migration), read into a map the cohort probes, and a
- * migration's own `enrolledAutomatically` declaration is what lets it skip
- * that map entirely.
+ * (organization, migration), read into a map the cohort probes; a
+ * migration's own `enrolledAutomatically` lets it skip that map entirely.
  */
 function passOn({
   isSaaS,

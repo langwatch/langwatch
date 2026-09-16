@@ -1,20 +1,15 @@
 /**
- * Who may reach an `ops.*` procedure, and the one fact the process resolves.
- * The surface is PLATFORM-TIER, which `withPermission` cannot express: it
- * resolves a permission against a scope id in the input, and these procedures
- * carry none. So the declaration is `serviceAuthorized`, the deployment's
- * operator allow-list decides, and the process supplies only WHO is asking.
+ * Who may reach an `ops.*` procedure. The surface is PLATFORM-TIER -
+ * `withPermission` needs a scope id these procedures carry none of, so
+ * `serviceAuthorized` defers to the deployment's operator allow-list.
  */
 import { defineTrpcFact } from "@langwatch/api/trpc";
 import { opsOperatorSchema } from "@langwatch/ops-contract";
 
 /**
- * The signed-in person behind the request, as the process's own session read
- * resolves them - including the impersonator, where one is present.
- *
- * A fact rather than part of the actor: the allow-list is a list of ADDRESSES,
- * and an actor carries an id alone, so a gate that saw only the id would admit
- * nobody. The application decides what the address means.
+ * The signed-in person behind the request, including the impersonator where
+ * one is present. A fact rather than part of the actor: the allow-list is a
+ * list of addresses, and an actor carries only an id.
  */
 export const opsOperatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable());
 
@@ -42,10 +37,9 @@ export const OPS_MANAGE = {
 } as const;
 
 /**
- * The status probe. It answers `{ kind: "none" }` for a non-operator rather
- * than refusing, so the global menu can poll it on every page load without
- * spamming the console with permission errors (lw#3584). Nothing is disclosed
- * by the answer beyond whether the caller is staff, which the caller knows.
+ * The status probe. Answers `{ kind: "none" }` for a non-operator rather
+ * than refusing, so the global menu can poll it every page load without
+ * spamming the console (lw#3584); it discloses only whether the caller is staff.
  */
 export const OPS_PROBE = {
   reason:
@@ -54,10 +48,9 @@ export const OPS_PROBE = {
 } as const;
 
 /**
- * The support inbox. The same allow-list, and still not an RBAC grain: a bug
- * report carries no tenant - the table has no organization, team or project
- * column - so there is no scope an id in the input could be checked at, and no
- * organization role that could grant the read.
+ * The support inbox. Same allow-list, still not an RBAC grain: a bug report
+ * carries no tenant - no organization, team or project column - so there is
+ * no scope an id could be checked at, and no role that could grant the read.
  */
 export const BUG_REPORTS_STAFF_ONLY = {
   reason:

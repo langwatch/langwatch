@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- *
- * The `bugReports.*` surface: the staff gate (an impersonating operator is
- * read as the operator), the audit row written BEFORE the answer and never
- * carrying the search text, the parser's paging defaults, and the refusal for
- * a report id that names nothing.
+ * The `bugReports.*` surface: the staff gate, the audit row written before
+ * the answer (never carrying search text), paging defaults, and the
+ * refusal for an unknown report id.
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -91,10 +89,9 @@ describe("the bugReports tRPC namespace", () => {
 
   describe("given an operator impersonating a customer", () => {
     /**
-     * The session's user is the customer while an impersonation is running.
-     * Checking the allow-list against that identity would lock an operator out
-     * of the inbox for as long as they were debugging somebody's account, and
-     * would put the customer's id on the audit row for a read they did not do.
+     * The session's user is the customer while impersonating. Checking the
+     * allow-list against that identity would lock the operator out while
+     * debugging, and put the customer's id on the audit row for their read.
      */
     it("reads the impersonator as the operator, and audits them", async () => {
       const { impersonatingCaller, record } = harness();

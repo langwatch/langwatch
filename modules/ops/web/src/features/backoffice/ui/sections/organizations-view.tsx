@@ -29,12 +29,9 @@ import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 /**
- * Read-facing Organization shape — intentionally does NOT include
- * s3Endpoint / s3AccessKeyId /
- * s3SecretAccessKey / s3Bucket. Those are credentials and the admin Hono
- * route strips them from every list / getOne response (see the Ops admin
- * transport). The edit drawer still accepts *new* values for
- * those fields, write-only.
+ * Read-facing Organization shape - excludes the s3 credential fields. The
+ * admin Hono route strips them from every list/getOne response; the edit
+ * drawer still accepts new values for them, write-only.
  */
 interface AdminOrganization {
   id: string;

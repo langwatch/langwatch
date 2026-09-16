@@ -1,10 +1,7 @@
 /**
- * The server half of `bugReports.*`: the support inbox the back office reads.
- *
- * The staff gate and the audit row are both the application's. Every read is
- * audit-logged before it is answered, because a report carries a
- * reporter-submitted transcript and a contact address, so who opened the inbox
- * is itself a fact worth keeping.
+ * The server half of `bugReports.*`: the support inbox the back office
+ * reads. Staff gate and audit row are both the application's - every read
+ * is logged before it is answered, since who opened it is worth keeping.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OpsApi, opsBugReportTrpc } from "@langwatch/ops-contract";

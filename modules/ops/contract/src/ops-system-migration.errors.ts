@@ -32,12 +32,9 @@ export class MigrationRollbackBlockedByDependentError extends HandledError {
 }
 
 /**
- * A cutover rollback refused because the organization never actually cut
- * over: its record is `migrated` only because the cutover parks tenants
- * there while they WAIT (on unfinished prerequisites, or outside the
- * cutover cohort). There is no flip to undo and no fact to append, and
- * pinning the row `rolled_back` would strand the organization terminally
- * before it ever started.
+ * Refused because the organization never cut over - its `migrated` record
+ * only means the cutover is parking it (unfinished prerequisites, or outside
+ * the cohort). Nothing to flip, so pinning `rolled_back` would strand it.
  */
 export class MigrationRollbackCutoverNotStartedError extends HandledError {
   declare readonly code: "migration_rollback_cutover_not_started";
@@ -53,10 +50,9 @@ export class MigrationRollbackCutoverNotStartedError extends HandledError {
 }
 
 /**
- * Enrollment failures (specs/migration/system-migrations-runner.feature, the
- * enrollment scenarios). Enrollment is the cloud rollout's pacing lever, so
- * every refusal here is an operator mistake the operator can act on - a
- * handled error with a stable code, never a 500.
+ * Enrollment failures (specs/migration/system-migrations-runner.feature).
+ * Enrollment paces the cloud rollout, so every refusal here is an operator
+ * mistake the operator can act on - never a 500.
  */
 
 export class MigrationEnrollmentAlreadyExistsError extends HandledError {
@@ -88,11 +84,9 @@ export class MigrationEnrollmentNotFoundError extends HandledError {
 }
 
 /**
- * An enrollment action refused because the migration admits every
- * organization already (`enrolledAutomatically`). The row would decide
- * nothing, and accepting it would tell the operator they had paced something
- * they had not - so the action refuses rather than writing inert
- * bookkeeping.
+ * Refused because the migration already admits every organization
+ * (`enrolledAutomatically`) - the row would decide nothing, and accepting it
+ * would tell the operator they had paced something they had not.
  */
 export class MigrationEnrolledAutomaticallyError extends HandledError {
   declare readonly code: "migration_enrolled_automatically";
@@ -122,10 +116,9 @@ export class MigrationUnknownError extends HandledError {
 }
 
 /**
- * A targeted run refused because the organization is not enrolled for the
- * migration (cloud only - self-hosted has no enrollment). Enrollment stays
- * the single pacing source of truth: a run that bypassed it would be an
- * unenrolled organization migrating anyway.
+ * Refused because the organization is not enrolled (cloud only -
+ * self-hosted has no enrollment). Enrollment is the single pacing source of
+ * truth; bypassing it would run an unenrolled organization anyway.
  */
 export class MigrationRunRequiresEnrollmentError extends HandledError {
   declare readonly code: "migration_run_requires_enrollment";
@@ -159,10 +152,9 @@ export class MigrationPassAlreadyRunningError extends HandledError {
 }
 
 /**
- * A targeted run refused on a self-hosted installation for a migration not
- * yet released there. The runner never drives it for any tenant until a
- * release flips its declaration, and a targeted run must not become the
- * bypass.
+ * Refused on self-hosted for a migration not yet released there - the
+ * runner never drives it for any tenant until release flips its
+ * declaration, and a targeted run must not become the bypass.
  */
 export class MigrationNotAvailableOnInstallationError extends HandledError {
   declare readonly code: "migration_not_available_on_installation";
@@ -178,11 +170,9 @@ export class MigrationNotAvailableOnInstallationError extends HandledError {
 }
 
 /**
- * Enrollment exists to pace the CLOUD rollout. On a self-hosted installation
- * it could only ever be a lie in the interface: released migrations already
- * run for every organization with no enrollment, and unreleased ones run for
- * nobody however many rows exist. So rather than accept a row that changes
- * nothing, both enrollment actions refuse outright off cloud.
+ * Enrollment paces the cloud rollout only - off cloud, released migrations
+ * already run for everyone and unreleased ones run for nobody regardless of
+ * rows, so both enrollment actions refuse outright.
  */
 export class MigrationEnrollmentCloudOnlyError extends HandledError {
   declare readonly code: "migration_enrollment_cloud_only";
@@ -210,11 +200,9 @@ export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
 }
 
 /**
- * An operator acted on an organization the named migration has never
- * processed, in a place that needs the record itself rather than the pin.
- * The rollback deliberately accepts a missing record (it pins the
- * organization out of the rollout ahead of the pass); the drain proof cannot,
- * because the proof is written ONTO the migration's own report.
+ * Rollback accepts a missing record (it pins the organization out ahead of
+ * the pass); the drain proof cannot, because the proof is written onto the
+ * migration's own report, which requires the record to exist.
  */
 export class MigrationStateNotFoundError extends HandledError {
   declare readonly code: "migration_state_not_found";

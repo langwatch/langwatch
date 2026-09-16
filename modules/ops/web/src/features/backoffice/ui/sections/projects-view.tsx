@@ -27,11 +27,9 @@ import { BackofficeTable } from "./backoffice-table-shell.tsx";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 /**
- * Read-facing Project shape — does NOT include s3Endpoint / s3AccessKeyId /
- * s3SecretAccessKey / s3Bucket. Project-level S3 overrides are credentials
- * and the admin Hono route strips them from every list / getOne response
- * (see the Ops admin transport). The edit drawer accepts new values,
- * write-only.
+ * Read-facing Project shape - excludes the s3 credential fields. The admin
+ * Hono route strips them from every list/getOne response; the edit drawer
+ * still accepts new values for them, write-only.
  */
 interface AdminProject {
   id: string;

@@ -19,20 +19,18 @@ export interface SubscriberHealthRow extends SubscriberMeta {
 }
 
 /**
- * The subscriber's queue path. Load-bearing grammar: GroupQueue keys
- * subscriber groups `<tenant>/subscriber/<name>/…` and the pipeline tree
- * files them under `<pipeline>/subscriber/<name>`, so this exact shape is
- * what the pause set matches against.
+ * The subscriber's queue path. Load-bearing grammar: GroupQueue keys groups
+ * `<tenant>/subscriber/<name>/…`, and the pipeline tree files them under
+ * `<pipeline>/subscriber/<name>` - the exact shape the pause set matches.
  */
 export function subscriberPauseKey(meta: { pipelineName: string; subscriberName: string }): string {
   return `${meta.pipelineName}/subscriber/${meta.subscriberName}`;
 }
 
 /**
- * Registry × live tree. Registry-driven on purpose: a subscriber with no
- * live jobs vanishes from the tree entirely, and "vanished" must not render
- * the same as "healthy" — the registry knows it exists, so it gets a row
- * with zeros and an explicit no-live-presence marker.
+ * Registry × live tree, registry-driven: a subscriber with no live jobs
+ * vanishes from the tree entirely, and "vanished" must not render as
+ * "healthy" - it gets a row with zeros and an explicit no-presence marker.
  */
 export function joinSubscriberHealth({
   subscribers,

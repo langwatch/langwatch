@@ -45,11 +45,9 @@ describe("given a queue with work in several states", () => {
   });
 
   /**
-   * The regression this module exists for. `Staged/s` is derived as the
-   * change in in-flight work plus completions, so work moving from pending
-   * into parked must leave the total unchanged. When parking was excluded,
-   * the same movement looked like 500 jobs leaving the system and the
-   * derived ingestion rate lost exactly that much.
+   * The regression this module exists for: `Staged/s` derives from the
+   * change in in-flight work plus completions, so pending-to-parked must
+   * leave the total unchanged - excluding it made jobs look like they left.
    */
   describe("when a tenant's groups park", () => {
     /** @scenario "Parked work counts as in flight" */

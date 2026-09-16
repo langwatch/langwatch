@@ -98,11 +98,9 @@ export const opsQueueReconcileResultSchema = z.object({
 export type OpsQueueReconcileResult = z.infer<typeof opsQueueReconcileResultSchema>;
 
 /**
- * The input shapes the operator queue surface parses.
- *
- * These are transport contracts rather than service ones: they carry the page
- * sizes and ceilings a caller is held to, which is why the paging fields are
- * defaulted here and merely optional on the service inputs above.
+ * The input shapes the operator queue surface parses. Transport contracts
+ * rather than service ones: they carry the page sizes and ceilings a
+ * caller is held to, defaulted here though merely optional on the service.
  */
 export const opsQueueNameInputSchema = z.object({ queueName: z.string() });
 

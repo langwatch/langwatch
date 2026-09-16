@@ -167,11 +167,9 @@ export function recordingOpsToaster(): RecordingOpsToaster {
 }
 
 /**
- * The address, held where React can see it change.
- *
- * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one every Ops overlay relies on
- * to drop its key when it closes.
+ * The address, held where React can see it change. `setQuery` replaces the
+ * whole query string - a key left out is a key removed - which every Ops
+ * overlay relies on to drop its key when it closes.
  */
 function OpsHostHarness({ host, children }: { host: FakeOpsHost; children: ReactNode }) {
   const [query, setQuery] = useState<OpsQuery>(host.query);
@@ -184,12 +182,9 @@ function OpsHostHarness({ host, children }: { host: FakeOpsHost; children: React
 
 export type OpsRenderResult = RenderResult & {
   /**
-   * Re-renders under the SAME host and provider.
-   *
-   * Testing Library's own `rerender` replaces the whole tree with what it is
-   * handed, which would drop both wrappers — and a suite that re-renders to
-   * pick up new mock data would then fail on a missing provider rather than on
-   * what it is about.
+   * Re-renders under the same host and provider. Testing Library's own
+   * `rerender` replaces the whole tree, which would drop both wrappers -
+   * failing a suite on a missing provider rather than what it is about.
    */
   rerenderWithOpsHost: (next: ReactElement) => void;
 };

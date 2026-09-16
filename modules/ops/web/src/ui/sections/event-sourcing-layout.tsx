@@ -132,12 +132,9 @@ export function EventSourcingLayout({
 }
 
 /**
- * The dead total, in the navigation, on every page of this section.
- *
- * Absent when the count is zero: a nav item is not a counter panel, and a
- * permanent "0" beside a link trains the reader to stop seeing it. The zero IS
- * shown on the Dead Letters page itself, where ops-dashboard.md's rule applies
- * — there, a zero is how the operator knows the panel is live.
+ * The dead total, in the navigation, on every page of this section. Absent
+ * when zero - a permanent "0" beside a link trains the reader to stop
+ * seeing it. Zero IS shown on the Dead Letters page itself (ops-dashboard.md).
  */
 function DeadLetterBadge() {
   const counts = api.ops.listDeadLetterCounts.useQuery(undefined, {

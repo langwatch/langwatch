@@ -11,11 +11,9 @@ const PRESENTATION: Record<SchedulerJobStatus, { label: string; palette: string 
 };
 
 /**
- * One column for what were three (In progress, Retries, Last error).
- *
- * Those three were mostly em-dashes, and the one case that mattered — a
- * schedule failing and retrying — was split across two of them. The lateness
- * and the failure detail ride along here, where the state already is.
+ * One column for what were three (In progress, Retries, Last error) - all
+ * mostly em-dashes, and the one case that mattered was split across two of
+ * them. Lateness and failure detail ride along here, where the state already is.
  */
 export function SchedulerStatusBadge({
   status,
