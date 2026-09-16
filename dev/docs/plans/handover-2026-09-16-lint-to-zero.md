@@ -23,6 +23,22 @@ Wave 10 collected four lanes:
     fallible-gateway   156 -> 47 in modules/gateway/server, 109 cleared, 69 files
     fallible-trace     215 -> 189 in modules/trace, 20 renames, 28 files
     comment-w10        195 -> 0 across eleven packages, 111 files
+    fallible-langy     116 -> 102 in modules/langy/server, under the NEW convention
+
+**Read this before judging langy's 14 against gateway's 109.** The langy lane
+first produced a 69-file slice under the old convention, renaming nullable
+lookups to `find*`. The coordinator then destroyed it with
+`git checkout -- modules/langy/server` on unstaged work - the lane's output was
+unrecoverable, and that was a coordinator error, not the lane's. It was redone
+under the convention above, and the second pass is far smaller **because doing
+it correctly is slower**: converting `T | null` to one-or-throw needs every
+caller read to decide whether absence there is a failure or a legitimate answer.
+Two conversions passed that test. The other 102 findings did not, and are named
+in the lane's handoff rather than bulk-renamed.
+
+That ratio - 109 mechanical renames against 2 real conversions - is the honest
+cost of the new convention, and it is the number to plan the rest of the family
+with.
 
 ### DECISION, 2026-09-16: what `find` and `get` mean from here on
 
