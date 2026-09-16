@@ -24,6 +24,36 @@ Wave 10 collected four lanes:
     fallible-trace     215 -> 189 in modules/trace, 20 renames, 28 files
     comment-w10        195 -> 0 across eleven packages, 111 files
 
+### DECISION, 2026-09-16: what `find` and `get` mean from here on
+
+Taken by the user, and it is forward-looking only.
+
+    find*          returns an ARRAY (0..n)
+    get* / getBy*  returns exactly ONE, or throws
+    T | null       is no longer a shape we write
+
+**The existing 1,217 `find*` methods that return one-or-null are NOT being
+converted.** That was considered and deliberately deferred: it is a behaviour
+change to every one of them plus every caller that branches on absence, and it
+would reverse three collected waves. They stay. Do not open a lane for them, and
+do not "tidy" one while passing.
+
+So the tree will hold two conventions at once for a while. That is accepted. New
+code follows the rule above; old code is left alone until someone decides
+otherwise.
+
+**One place the linter will fight the new convention, and it needs fixing before
+anyone writes a repository under it.** `fallible-result-naming` carries
+`REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/` and fires on any
+`get*` or `list*` method in a repository file, **whatever it returns**, with
+"repositories answer `find*`, services answer `get*`". A new repository method
+`getById(): T` that throws is exactly right under the decision above and the
+linter will tell you to rename it `findById`. The check needs to stop firing when
+the method is not nullable, or repositories need an explicit carve-out.
+
+Nothing else collides: the remainder of the rule only governs methods that can
+answer with absence, and the new convention has none.
+
 ### The decision wave 10 raised, and it is not a rename
 
 `modules/trace` is the inverse of `modules/gateway`. Gateway's findings were
