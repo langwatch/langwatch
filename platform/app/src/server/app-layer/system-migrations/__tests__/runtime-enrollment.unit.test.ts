@@ -125,8 +125,8 @@ for (const [delegateName, delegate] of Object.entries(stubs.prisma)) {
 }
 
 describe("the PR1 migration registry", () => {
-  /** @scenario "PR1 does not run the unproved SSO grandfather migration" */
-  it("leaves D04 out of every organization-rooted migration path", () => {
+  /** @scenario "The D04 connection grandfather migration is declared in the shared registry" */
+  it("declares D04 beside the authorization engine, for every organization-rooted path", () => {
     const migrationNames = registeredMigrations().map(
       (migration) => migration.name,
     );
