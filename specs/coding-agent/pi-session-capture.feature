@@ -124,8 +124,14 @@ Feature: pi session capture
   # false and was caught by running it: pi expands a leading tilde before it
   # writes, and we were returning the tilde untouched, so a user whose settings
   # file says `~/pi-sessions` had every session missed in silence. Settings
-  # files are the sharp case, since JSON cannot expand a tilde itself. The last
-  # row pins it.
+  # files are the sharp case, since JSON cannot expand a tilde itself, which is
+  # why the last row names it.
+  #
+  # That row names the case; it does not enforce it. The parity checker binds
+  # tests to a scenario by its name and has no notion of an example row, so
+  # four rows and one row carry the same one obligation. What makes the tilde
+  # case fail when the expansion is removed is the test, which was reverted
+  # against each of the three sources in turn to prove it.
   Scenario Outline: A session kept somewhere other than the default place is still found
     Given a user who set pi's session directory <how>
     When we work out where to look

@@ -160,16 +160,30 @@ export async function readSettingsSessionDir(
  * applies both before it decides where to write, so a reader that skips them
  * is looking somewhere pi never wrote.
  *
- * What is deliberately NOT mirrored: pi's Windows shell-path handling, which it
- * applies only on win32 and which unquotes and unescapes a shell-mangled path.
- * Capture on Windows is not covered by this feature's scenarios and adding an
- * untested second spelling of someone else's parser is the worse risk. A
- * Windows user who names a directory with shell quoting still resolves to the
+ * What is deliberately NOT mirrored, and it is two things rather than one: pi's
+ * Windows shell-path handling, which unquotes and unescapes a shell-mangled
+ * path, and pi's expansion of a leading `~\` — both guarded by `win32` in pi and
+ * both skipped here. Capture on Windows is not covered by this feature's
+ * scenarios, and adding an untested second spelling of someone else's parser is
+ * the worse risk. A Windows user naming either shape still resolves to the
  * literal string, which is the behaviour before this change.
  *
  * Nothing here resolves a relative path or strips a trailing separator, because
  * pi does neither: `normalizePath` returns both unchanged, and both name the
  * same directory to the filesystem when read from the same working directory.
+ *
+ * The one place this returns something pi would not: a `file://` URL carrying a
+ * host, such as `file://remote/share`. pi throws there and so never starts, so
+ * there is no session for anyone to read; we return the literal, read a
+ * directory that does not exist, and record nothing. Different route, same
+ * outcome, and the outcome is the right one — so the catch is not papering over
+ * a failure, it is declining to crash capture over a launch that never happened.
+ *
+ * Agreement with pi on every other shape was checked by running both functions
+ * side by side over `~`, `~/x`, `~user/x`, `~~`, `~x`, `~\x`, `file:///abs`,
+ * `FILE://` (neither expands: pi's test is case-sensitive), a whitespace-padded
+ * path, a relative path, a trailing separator, and the empty string. Thirteen of
+ * fourteen identical; the fourteenth is the host-bearing URL above.
  */
 export function normalizeNamedPiDir(named: string, home = homedir()): string {
   if (named === "~") return home;
