@@ -218,6 +218,12 @@ export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
 export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
 export const MODEL_METADATA_STAMPED_MARKER =
   "langwatch.reserved.model_metadata_stamped";
+/**
+ * Depth of the evaluator causality chain a span was emitted under, stamped by
+ * nlpgo's BaggageAttributeProcessor. Folded here and read by the
+ * evaluation-trigger loop guard, so both sides must name the same key.
+ */
+export const RESERVED_CAUSALITY_DEPTH = "langwatch.reserved.causality_depth";
 
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,
@@ -287,13 +293,13 @@ export class TraceAttributeAccumulationService {
     //
     // Arrives as an int on the OTLP path and as a string on others, so accept
     // both and store the canonical decimal form.
-    const causalityDepth = spanAttrs["langwatch.reserved.causality_depth"];
+    const causalityDepth = spanAttrs[RESERVED_CAUSALITY_DEPTH];
     const causalityDepthNum =
       typeof causalityDepth === "number" || typeof causalityDepth === "string"
         ? Number(causalityDepth)
         : NaN;
     if (Number.isFinite(causalityDepthNum))
-      result["langwatch.reserved.causality_depth"] = String(causalityDepthNum);
+      result[RESERVED_CAUSALITY_DEPTH] = String(causalityDepthNum);
 
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
     if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
@@ -453,13 +459,13 @@ export class TraceAttributeAccumulationService {
     // would keep "0" forever and the loop guard would never fire on it. Depth
     // is a "has this trace been through the evaluator" signal, so it only ever
     // climbs.
-    const depthKey = "langwatch.reserved.causality_depth";
-    const existingDepth = Number(state.attributes[depthKey]);
-    const incomingDepth = Number(spanAttrs[depthKey]);
+    const existingDepth = Number(state.attributes[RESERVED_CAUSALITY_DEPTH]);
+    const incomingDepth = Number(spanAttrs[RESERVED_CAUSALITY_DEPTH]);
     const depths = [existingDepth, incomingDepth].filter((d) =>
       Number.isFinite(d),
     );
-    if (depths.length > 0) merged[depthKey] = String(Math.max(...depths));
+    if (depths.length > 0)
+      merged[RESERVED_CAUSALITY_DEPTH] = String(Math.max(...depths));
 
     // Metadata: deep-merge JSON objects, first-wins for primitives
     for (const key of Object.keys(merged)) {

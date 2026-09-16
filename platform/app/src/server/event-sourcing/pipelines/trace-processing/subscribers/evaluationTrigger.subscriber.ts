@@ -8,6 +8,7 @@ import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
+import { RESERVED_CAUSALITY_DEPTH } from "../projections/services/trace-attribute-accumulation.service";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
   MAX_PROCESSED_SPANS,
@@ -208,7 +209,7 @@ async function causalityLoopGuardFired({
   return true;
 }
 
-const CAUSALITY_DEPTH_ATTR = "langwatch.reserved.causality_depth";
+const CAUSALITY_DEPTH_ATTR = RESERVED_CAUSALITY_DEPTH;
 
 /**
  * Causality-loop detection for events that carry no span payload.
