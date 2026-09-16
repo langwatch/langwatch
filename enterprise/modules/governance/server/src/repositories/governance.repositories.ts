@@ -6,6 +6,7 @@ import type { DepartmentRepository } from "./directory/department.repository.ts"
 import type { GovernanceDirectory } from "./directory/governance-directory.repository.ts";
 import type { GovernanceOcsfExportRepository } from "./audit/governance-setup-state.repository.ts";
 import type { GovernanceSetupStateRepository } from "./audit/governance-setup-state.repository.ts";
+import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
 import type { OrganizationSessionPolicyRepository } from "./policy/session-policy.repository.ts";
 import type { PersonalVirtualKeyRepository } from "./directory/personal-virtual-key.repository.ts";
 import type { RoutingPolicyRepository } from "./policy/routing-policy.repository.ts";
@@ -30,17 +31,20 @@ import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * The rows the governance module owns, chosen once at boot.
  *
- * The ingestion-pull half of the module (sources, templates, activity
+ * The rest of the ingestion-pull half of the module (sources, activity
  * rollups, the pull-run projection and the AI tool catalogue) reads and writes
  * through its own narrow seams and is not yet part of the selection; those
  * rows are listed as unfinished in the conversion report rather than declared
- * here with no memory twin behind them.
+ * here with no memory twin behind them. `ingestionTemplates` is the one row
+ * of that half already converted — both tiers exist, so the REST family's
+ * seven template operations no longer need the ~100-operation facade.
  */
 export interface GovernanceRepositories {
   readonly adminWorkspaceViewAudit: AdminWorkspaceViewAuditRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectory;
+  readonly ingestionTemplates: IngestionTemplateRepository;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
   readonly routingPolicies: RoutingPolicyRepository;

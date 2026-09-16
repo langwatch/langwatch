@@ -21,9 +21,6 @@ import {
   governanceRestCaller,
   governanceRestSurface,
 } from "./transport/governance.rest.ts";
-import { governanceCliRest } from "./transport/governance-cli.rest.ts";
-import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
-
 
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
@@ -109,11 +106,19 @@ import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
  * The whole module, declared: one application and the REST family it answers.
  * A process installs this and mounts what it wants; the repositories and
  * services behind the application stay private to this feature server.
+ *
+ * `governanceCliRest` and `governanceIngestRest` are not mounted here: both
+ * bind tokens their own transport files declare
+ * (`transport/governance-cli.rest.ts`, `transport/governance-ingest.rest.ts`)
+ * that no process resolves, because nothing builds the
+ * `createGovernanceInstallation` facade behind them yet. Dropping them from
+ * the boot graph is wire-neutral — neither surfaces in the platform's route
+ * list today.
  */
 export const governanceServer = defineServerModule("governance")
   .withRepositories(governanceRepositories)
   .withApp(GovernanceApp)
-  .withTransports(governanceRest, governanceCliRest, governanceIngestRest)
+  .withTransports(governanceRest)
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.
   .withTransportFacts(() => [

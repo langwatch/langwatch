@@ -86,6 +86,7 @@ import {
   type GovernanceIngestAccessApi,
 } from "../services/governance-ingest-access.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
+import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
@@ -305,7 +306,19 @@ export interface GovernanceIngestMembers {
  * process supplies.
  */
 export interface GovernanceAppDependencies {
-  governance: GovernanceApi;
+  /**
+   * The ~100-operation governance facade, and the CLI/ingest collaborators
+   * behind it. Optional because nothing constructs
+   * `createGovernanceInstallation` today — no `GovernanceInstallationOptions`
+   * is assembled anywhere a process boots — so a process that installs this
+   * app supplies none of the three. Every method that reads one of them (the
+   * CLI/ingest accessors, and the personal-virtual-key, routing-policy and
+   * CLI-bootstrap operations the REST family does not call) throws a plain
+   * error if it is ever reached before a process actually supplies it; the
+   * seven ingestion-template and two department operations this REST family
+   * serves read none of the three.
+   */
+  governance?: GovernanceApi;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -326,10 +339,17 @@ export interface GovernanceAppDependencies {
   personalVirtualKeys: GovernancePersonalVirtualKeyMembers;
   /** Resolves the actor token stamped on a span to the person who owns it. */
   actors: GovernanceActorDirectory;
-  /** What the CLI governance plane reaches beyond this feature. */
-  cli: GovernanceCliMembers;
-  /** What the push-mode ingestion receivers reach beyond this feature. */
-  ingest: GovernanceIngestMembers;
+  /**
+   * What the CLI governance plane reaches beyond this feature. Optional for
+   * the same reason as {@link governance} — supplied only alongside it.
+   */
+  cli?: GovernanceCliMembers;
+  /**
+   * What the push-mode ingestion receivers reach beyond this feature.
+   * Optional for the same reason as {@link governance} — supplied only
+   * alongside it.
+   */
+  ingest?: GovernanceIngestMembers;
 }
 
 /** Who a call is attributed to, and (for a lazy backfill) what to name them. */
@@ -350,6 +370,13 @@ export interface GovernanceCaller {
  * Until then they travel beside the process's own members the way
  * `ScimBespokeMembers` does, so that what is genuinely unfinished is visible
  * in the type rather than hidden inside one undifferentiated bag.
+ *
+ * `governance`, `cli` and `ingest` stay three separate keys here rather than
+ * folding into one grouped optional slot: `buildAppWithUnfinishedCapability`
+ * in `app/__tests__/governance.app.unit.test.ts` builds this application by
+ * naming them at this same top level, and a grouped slot would turn that into
+ * an excess-property error. Each is independently optional instead, for the
+ * one reason given on {@link GovernanceAppDependencies.governance}.
  */
 export type GovernanceBespokeMembers = Omit<
   GovernanceAppDependencies,
@@ -397,54 +424,85 @@ export class GovernanceApp
     repositories: GovernanceRepositories,
   ) {
     this.departments = DepartmentService.create({ repository: repositories.departments });
-    this.personalUsageDashboards = PersonalUsageDashboardService.create({
-      governance: dependencies.governance,
-      organizations: dependencies.organizations,
-      projects: dependencies.projects,
+    this.templates = IngestionTemplateService.create({
+      repository: repositories.ingestionTemplates,
     });
-    this.cliAccessService = GovernanceCliAccessService.create({
-      accessTokens: dependencies.cli.accessTokens,
-      directory: () => dependencies.cli.members,
-      plans: () => dependencies.cli.plans,
-      permittedOnOrganization: (input) => this.permittedOn("organization", input.organizationId, input),
-      publicBaseUrl: dependencies.cli.publicBaseUrl,
-    });
-    this.cliCredentialService = GovernanceCliCredentialService.create({
-      governance: () => dependencies.governance,
-      directory: () => dependencies.cli.persons,
-      supportContacts: () => dependencies.cli.supportContacts,
-      ensurePersonalWorkspace: (input) => dependencies.organizations.ensurePersonalWorkspace(input),
-      tryFindPersonalWorkspace: (input) =>
-        dependencies.organizations.tryFindPersonalWorkspace(input),
-      permittedOnProject: (input) => this.permittedOn("project", input.projectId, input),
-      budgets: dependencies.cli.budgets,
-      publicBaseUrl: dependencies.cli.publicBaseUrl,
-    });
-    this.cliActivityService = GovernanceCliActivityService.create({
-      governance: () => dependencies.governance,
-    });
-    this.ingestAccessService = GovernanceIngestAccessService.create({
-      governance: () => dependencies.governance,
-      rateLimit: dependencies.ingest.rateLimit,
-    });
-    this.ingestReceiverService = GovernanceIngestReceiverService.create({
-      governance: () => dependencies.governance,
-      projects: () => dependencies.ingest.projects,
-      directory: () => dependencies.ingest.principals,
-      traceCollection: dependencies.ingest.traceCollection,
-      logCollection: dependencies.ingest.logCollection,
-      metricCollection: dependencies.ingest.metricCollection,
-      spend: dependencies.ingest.spend,
-    });
+
+    // In a real deployment all three arrive together, from the one call that
+    // builds the facade (`createGovernanceInstallation`) — never singly. No
+    // process makes that call today, so every service below stays unbuilt
+    // and its accessor throws if a CLI/ingest transport or a personal-key/
+    // routing-policy tRPC operation ever reaches it.
+    const { governance, cli, ingest } = dependencies;
+    if (governance && cli && ingest) {
+      this.personalUsageDashboards = PersonalUsageDashboardService.create({
+        governance,
+        organizations: dependencies.organizations,
+        projects: dependencies.projects,
+      });
+      this.cliAccessService = GovernanceCliAccessService.create({
+        accessTokens: cli.accessTokens,
+        directory: () => cli.members,
+        plans: () => cli.plans,
+        permittedOnOrganization: (input) =>
+          this.permittedOn("organization", input.organizationId, input),
+        publicBaseUrl: cli.publicBaseUrl,
+      });
+      this.cliCredentialService = GovernanceCliCredentialService.create({
+        governance: () => governance,
+        directory: () => cli.persons,
+        supportContacts: () => cli.supportContacts,
+        ensurePersonalWorkspace: (input) => dependencies.organizations.ensurePersonalWorkspace(input),
+        tryFindPersonalWorkspace: (input) =>
+          dependencies.organizations.tryFindPersonalWorkspace(input),
+        permittedOnProject: (input) => this.permittedOn("project", input.projectId, input),
+        budgets: cli.budgets,
+        publicBaseUrl: cli.publicBaseUrl,
+      });
+      this.cliActivityService = GovernanceCliActivityService.create({
+        governance: () => governance,
+      });
+      this.ingestAccessService = GovernanceIngestAccessService.create({
+        governance: () => governance,
+        rateLimit: ingest.rateLimit,
+      });
+      this.ingestReceiverService = GovernanceIngestReceiverService.create({
+        governance: () => governance,
+        projects: () => ingest.projects,
+        directory: () => ingest.principals,
+        traceCollection: ingest.traceCollection,
+        logCollection: ingest.logCollection,
+        metricCollection: ingest.metricCollection,
+        spend: ingest.spend,
+      });
+    }
   }
 
   private readonly departments: DepartmentService;
-  private readonly personalUsageDashboards: PersonalUsageDashboardService;
-  private readonly cliAccessService: GovernanceCliAccessApi;
-  private readonly cliCredentialService: GovernanceCliCredentialApi;
-  private readonly cliActivityService: GovernanceCliActivityApi;
-  private readonly ingestAccessService: GovernanceIngestAccessApi;
-  private readonly ingestReceiverService: GovernanceIngestReceiverApi;
+  private readonly templates: IngestionTemplateService;
+  private readonly personalUsageDashboards?: PersonalUsageDashboardService;
+  private readonly cliAccessService?: GovernanceCliAccessApi;
+  private readonly cliCredentialService?: GovernanceCliCredentialApi;
+  private readonly cliActivityService?: GovernanceCliActivityApi;
+  private readonly ingestAccessService?: GovernanceIngestAccessApi;
+  private readonly ingestReceiverService?: GovernanceIngestReceiverApi;
+
+  /**
+   * Every accessor below resolves to the ~100-operation governance facade
+   * (see the comment on {@link GovernanceAppDependencies.governance}), which
+   * no process builds yet. Its callers all sit behind the CLI/ingest
+   * transports this module drops from its boot graph, or a tRPC surface no
+   * composition root mounts — so this throw is unreachable in practice, and
+   * honest about why on the day it stops being unreachable.
+   */
+  private unfinishedCapability(): never {
+    throw new Error("governance: this capability is not installed on this app");
+  }
+
+  /** The governance facade, or a throw naming why it is absent. */
+  private get governanceApi(): GovernanceApi {
+    return this.dependencies.governance ?? this.unfinishedCapability();
+  }
 
   /**
    * One permission question at one scope. Both CLI families ask it — the gate
@@ -470,34 +528,34 @@ export class GovernanceApp
 
   /** The bearer, the plan and the RBAC permission, in that order. */
   cliAccess(): GovernanceCliAccessApi {
-    return this.cliAccessService;
+    return this.cliAccessService ?? this.unfinishedCapability();
   }
 
   /** Everything `/api/auth/cli` hands back or mints. */
   cliCredentials(): GovernanceCliCredentialApi {
-    return this.cliCredentialService;
+    return this.cliCredentialService ?? this.unfinishedCapability();
   }
 
   /** The Activity Monitor reads, each with its ownership proof. */
   cliActivity(): GovernanceCliActivityApi {
-    return this.cliActivityService;
+    return this.cliActivityService ?? this.unfinishedCapability();
   }
 
   /** The same governance capability the console's tRPC procedures read. */
   governance(): GovernanceApi {
-    return this.dependencies.governance;
+    return this.governanceApi;
   }
 
   // ── The push-mode ingestion receivers ─────────────────────────────────────
 
   /** Throttle, bearer secret and path-id check, in that order. */
   ingestAccess(): GovernanceIngestAccessApi {
-    return this.ingestAccessService;
+    return this.ingestAccessService ?? this.unfinishedCapability();
   }
 
   /** Where a payload of each signal is folded, priced and acknowledged. */
   ingestReceiver(): GovernanceIngestReceiverApi {
-    return this.ingestReceiverService;
+    return this.ingestReceiverService ?? this.unfinishedCapability();
   }
 
   // ── Ingestion templates ───────────────────────────────────────────────────
@@ -507,19 +565,19 @@ export class GovernanceApp
     projectId: string;
   }): Promise<IngestionTemplate[]> {
     const organizationId = await this.organizationOf(scope.projectId);
-    return this.dependencies.governance.templateListForUser({ organizationId });
+    return this.templates.listForUser({ organizationId });
   }
 
   /** The same union, with the canonical OTTL source on every row. */
   async listIngestionTemplatesForAdmin(scope: { projectId: string }): Promise<IngestionTemplate[]> {
     const organizationId = await this.organizationOf(scope.projectId);
-    return this.dependencies.governance.templateListForOrgAdmin({ organizationId });
+    return this.templates.listForOrgAdmin({ organizationId });
   }
 
   /** One template, scoped to the project's organization. */
   async getIngestionTemplate(input: { projectId: string; id: string }): Promise<IngestionTemplate> {
     const organizationId = await this.organizationOf(input.projectId);
-    return this.dependencies.governance.templateGetByIdForOrg({
+    return this.templates.getByIdForOrg({
       id: input.id,
       organizationId,
     });
@@ -545,7 +603,7 @@ export class GovernanceApp
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate> {
     const organizationId = await this.organizationOf(by.projectId);
-    return this.dependencies.governance.templateCreateOrg({
+    return this.templates.createOrgTemplate({
       organizationId,
       callerUserId: attributedUserId(by),
       sourceType: input.sourceType,
@@ -564,7 +622,7 @@ export class GovernanceApp
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate> {
     const organizationId = await this.organizationOf(by.projectId);
-    return this.dependencies.governance.templateUpdateOttlRules({
+    return this.templates.updateOttlRules({
       organizationId,
       callerUserId: attributedUserId(by),
       id: input.id,
@@ -579,7 +637,7 @@ export class GovernanceApp
     by: GovernanceProjectCaller,
   ): Promise<void> {
     const organizationId = await this.organizationOf(by.projectId);
-    await this.dependencies.governance.templateArchiveOrg({
+    await this.templates.archiveOrgTemplate({
       organizationId,
       callerUserId: attributedUserId(by),
       id: input.id,
@@ -593,7 +651,7 @@ export class GovernanceApp
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate> {
     const organizationId = await this.organizationOf(by.projectId);
-    return this.dependencies.governance.templateCloneFromPlatform({
+    return this.templates.cloneFromPlatform({
       organizationId,
       callerUserId: attributedUserId(by),
       sourceTemplateId: input.sourceTemplateId,
@@ -644,7 +702,7 @@ export class GovernanceApp
       organizationId: input.organizationId,
       ...(principalUserId === undefined ? {} : { userId: principalUserId }),
     };
-    return this.dependencies.governance.personalVirtualKeyList(query);
+    return this.governanceApi.personalVirtualKeyList(query);
   }
 
   /**
@@ -677,7 +735,7 @@ export class GovernanceApp
     if (duplicate) throw new PersonalVirtualKeyLabelTakenError(input.label);
 
     try {
-      return await this.dependencies.governance.personalVirtualKeyIssue({
+      return await this.governanceApi.personalVirtualKeyIssue({
         userId: by.id,
         organizationId: input.organizationId,
         personalProjectId: workspace.project.id,
@@ -707,7 +765,7 @@ export class GovernanceApp
     });
 
     try {
-      await this.dependencies.governance.personalVirtualKeyRevoke({
+      await this.governanceApi.personalVirtualKeyRevoke({
         userId: by.id,
         organizationId: input.organizationId,
         virtualKeyId: input.id,
@@ -739,7 +797,7 @@ export class GovernanceApp
    * the totals, the per-day buckets, and the split by model.
    */
   personalUsage(input: PersonalUsageQueryInput): Promise<PersonalUsageRollup> {
-    return this.personalUsageDashboards.rollup(input);
+    return (this.personalUsageDashboards ?? this.unfinishedCapability()).rollup(input);
   }
 
   /**
@@ -751,7 +809,7 @@ export class GovernanceApp
     input: { organizationId: string; window?: PersonalUsageWindow },
     by: GovernanceCaller,
   ): Promise<PersonalUsageRollup> {
-    return this.personalUsageDashboards.read({
+    return (this.personalUsageDashboards ?? this.unfinishedCapability()).read({
       userId: by.id,
       organizationId: input.organizationId,
       window: input.window,
@@ -771,7 +829,7 @@ export class GovernanceApp
     input: { organizationId: string; includeTopModels?: boolean },
     by: GovernanceCaller,
   ): Promise<GovernanceBudgetOverviewForUser> {
-    return this.dependencies.governance.personalBudgetOverviewForUser({
+    return this.governanceApi.personalBudgetOverviewForUser({
       organizationId: input.organizationId,
       userId: by.id,
       includeTopModels: input.includeTopModels,
@@ -786,7 +844,7 @@ export class GovernanceApp
     input: { organizationId: string },
     by: GovernanceCaller,
   ): Promise<CliBootstrapResult> {
-    return this.dependencies.governance.cliBootstrapResolve({
+    return this.governanceApi.cliBootstrapResolve({
       userId: by.id,
       organizationId: input.organizationId,
     });
@@ -836,12 +894,12 @@ export class GovernanceApp
 
   /** Policies in an organization, optionally narrowed to one scope's choices. */
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
-    return this.dependencies.governance.routingPolicyList(input);
+    return this.governanceApi.routingPolicyList(input);
   }
 
   /** One policy by id, including its scope rows. */
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
-    return this.dependencies.governance.routingPolicyGetById(input);
+    return this.governanceApi.routingPolicyGetById(input);
   }
 
   /** Creates a policy, attributed to the caller who asked for it. */
@@ -850,7 +908,7 @@ export class GovernanceApp
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
     try {
-      return await this.dependencies.governance.routingPolicyCreate({
+      return await this.governanceApi.routingPolicyCreate({
         ...input,
         actorUserId: by.id,
       });
@@ -865,7 +923,7 @@ export class GovernanceApp
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
     try {
-      return await this.dependencies.governance.routingPolicyUpdate({
+      return await this.governanceApi.routingPolicyUpdate({
         ...input,
         actorUserId: by.id,
       });
@@ -879,7 +937,7 @@ export class GovernanceApp
     input: Omit<SetDefaultRoutingPolicyInput, "actorUserId">,
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
-    return this.dependencies.governance.routingPolicySetDefault({
+    return this.governanceApi.routingPolicySetDefault({
       ...input,
       actorUserId: by.id,
     });
@@ -887,7 +945,7 @@ export class GovernanceApp
 
   /** Removes one policy from the organization. */
   deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void> {
-    return this.dependencies.governance.routingPolicyDelete(input);
+    return this.governanceApi.routingPolicyDelete(input);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────

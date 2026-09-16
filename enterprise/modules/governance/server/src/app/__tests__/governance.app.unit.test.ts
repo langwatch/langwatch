@@ -2,18 +2,21 @@
  * Ingestion-template operations: resolve organization and attribute writes.
  * Moved from @audit-uniform integration test (proves the rule once at unit level instead of
  * four times). Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature.
+ *
+ * These operations read `repositories.ingestionTemplates` through
+ * `IngestionTemplateService`, not the `governance` facade — so `buildApp()`
+ * below supplies no `governance`/`cli`/`ingest` member at all, proving the
+ * REST family needs none of the three. The one test that does need them
+ * (the CLI/ingest accessors) builds its own app with the bag present.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  type CreateIngestionTemplateInput,
-  type GovernanceCallSurface,
-  type IngestionTemplate,
-} from "@langwatch/enterprise-governance-contract";
+import type { GovernanceCallSurface } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
@@ -32,28 +35,40 @@ const unreachable = <Method>(): Method =>
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
 
-const row: IngestionTemplate = {
-  id: "tmpl-1",
-  slug: "internal_codex_abc123",
-  sourceType: "internal_codex",
-  displayName: "Internal Codex",
-  description: null,
-  iconAsset: null,
-  credentialSchema: null,
-  ottlRules: "",
-  platformPublished: false,
-  enabled: true,
-  organizationId: ORGANIZATION_ID,
-};
-
-function buildApp(overrides: Partial<TestGovernanceService> = {}) {
-  const governance = Object.assign(new TestGovernanceService(), overrides);
+function buildApp() {
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
+  const repositories = MemoryGovernanceRepositories.create();
 
   const app = GovernanceApp.create({
-    repositories: MemoryGovernanceRepositories.create(),
+    repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      organizations: createApiFixture<OrganizationApi>(),
+      permissions: createApiFixture<AuthzApi>(),
+    },
+    members: {
+      personalVirtualKeys: {
+        isOrganizationMember:
+          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
+        hasActivePersonalKeyLabelled:
+          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
+      },
+      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
+    },
+  });
+
+  return { app, getOrganizationId, repositories };
+}
+
+/** The one app in this file that also carries the still-unfinished bag. */
+function buildAppWithUnfinishedCapability() {
+  const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
+  const governance = new TestGovernanceService();
+
+  const app = GovernanceApp.create({
+    repositories,
+    dependencies: {
+      projects: createApiFixture<ProjectApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
@@ -81,60 +96,58 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
     },
   });
 
-  return { app, getOrganizationId };
+  return { app };
 }
 
 describe("GovernanceApp ingestion templates", () => {
   describe("given a caller who names only their project", () => {
     it("resolves the organization from the project rather than taking one", async () => {
-      const templateListForUser = vi.fn(async () => [row]);
-      const { app, getOrganizationId } = buildApp({ templateListForUser });
+      const { app, getOrganizationId, repositories } = buildApp();
+      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       await app.listIngestionTemplatesForMember({ projectId: PROJECT_ID });
 
       expect(getOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
-      expect(templateListForUser).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
+      expect(listUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
     });
 
     it("resolves it the same way for every template operation", async () => {
-      const calls: string[] = [];
-      const record = <Input extends { organizationId: string }>(name: string) =>
-        vi.fn(async (input: Input) => {
-          calls.push(`${name}:${input.organizationId}`);
-          return row;
-        });
-      const { app } = buildApp({
-        templateListForOrgAdmin: vi.fn(async (input: { organizationId: string }) => {
-          calls.push(`listForAdmin:${input.organizationId}`);
-          return [row];
-        }),
-        templateGetByIdForOrg: record("get"),
-        templateCreateOrg: record("create"),
-        templateUpdateOttlRules: record("updateOttl"),
-        templateCloneFromPlatform: record("clone"),
-      });
+      const { app, getOrganizationId, repositories } = buildApp();
       const by: GovernanceProjectCaller = {
         projectId: PROJECT_ID,
         userId: "user-1",
         surface: "hono",
       };
+      // Seeded directly on the repository, bypassing `by.projectId`, so this
+      // does not itself count toward the organization-resolution assertion.
+      const platformTemplate = await repositories.ingestionTemplates.createWithAudit({
+        template: {
+          slug: "platform_seed",
+          sourceType: "internal_codex",
+          displayName: "Platform Seed",
+          description: null,
+          iconAsset: null,
+          credentialSchema: null,
+          ottlRules: "",
+          organizationId: null,
+        },
+        callerUserId: "seed",
+        surface: "hono",
+      });
 
-      await app.listIngestionTemplatesForAdmin({ projectId: PROJECT_ID });
-      await app.getIngestionTemplate({ projectId: PROJECT_ID, id: "tmpl-1" });
-      await app.createIngestionTemplate(
+      const created = await app.createIngestionTemplate(
         { sourceType: "internal_codex", displayName: "Internal Codex" },
         by,
       );
-      await app.updateIngestionTemplateOttlRules({ id: "tmpl-1", ottlRules: "" }, by);
-      await app.cloneIngestionTemplate({ sourceTemplateId: "tmpl-platform" }, by);
+      await app.listIngestionTemplatesForAdmin({ projectId: PROJECT_ID });
+      await app.getIngestionTemplate({ projectId: PROJECT_ID, id: created.id });
+      await app.updateIngestionTemplateOttlRules({ id: created.id, ottlRules: "" }, by);
+      await app.cloneIngestionTemplate({ sourceTemplateId: platformTemplate.id }, by);
 
-      expect(calls).toEqual([
-        `listForAdmin:${ORGANIZATION_ID}`,
-        `get:${ORGANIZATION_ID}`,
-        `create:${ORGANIZATION_ID}`,
-        `updateOttl:${ORGANIZATION_ID}`,
-        `clone:${ORGANIZATION_ID}`,
-      ]);
+      expect(getOrganizationId).toHaveBeenCalledTimes(5);
+      expect(
+        getOrganizationId.mock.calls.every(([projectId]) => projectId === PROJECT_ID),
+      ).toBe(true);
     });
   });
 
@@ -145,29 +158,29 @@ describe("GovernanceApp ingestion templates", () => {
      * records the same string rather than each inventing its own.
      */
     it("attributes the write to the project itself", async () => {
-      const templateCreateOrg = vi.fn(async () => row);
-      const { app } = buildApp({ templateCreateOrg });
+      const { app, repositories } = buildApp();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await app.createIngestionTemplate(
         { sourceType: "internal_codex", displayName: "Internal Codex" },
         { projectId: PROJECT_ID, userId: null, surface: "hono" },
       );
 
-      expect(templateCreateOrg).toHaveBeenCalledWith(
+      expect(createWithAudit).toHaveBeenCalledWith(
         expect.objectContaining({ callerUserId: `svc_${PROJECT_ID}` }),
       );
     });
 
     it("attributes it to the member when the credential names one", async () => {
-      const templateCreateOrg = vi.fn(async () => row);
-      const { app } = buildApp({ templateCreateOrg });
+      const { app, repositories } = buildApp();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await app.createIngestionTemplate(
         { sourceType: "internal_codex", displayName: "Internal Codex" },
         { projectId: PROJECT_ID, userId: "user-1", surface: "hono" },
       );
 
-      expect(templateCreateOrg).toHaveBeenCalledWith(
+      expect(createWithAudit).toHaveBeenCalledWith(
         expect.objectContaining({ callerUserId: "user-1" }),
       );
     });
@@ -176,12 +189,8 @@ describe("GovernanceApp ingestion templates", () => {
   describe("when the same creation arrives over each of the four surfaces", () => {
     /** @scenario "State-changing calls emit audit rows regardless of surface" */
     it("records four writes that differ only in the surface", async () => {
-      const written: CreateIngestionTemplateInput[] = [];
-      const templateCreateOrg = vi.fn(async (input: CreateIngestionTemplateInput) => {
-        written.push(input);
-        return row;
-      });
-      const { app } = buildApp({ templateCreateOrg });
+      const { app, repositories } = buildApp();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
       const surfaces: GovernanceCallSurface[] = ["trpc", "hono", "cli", "mcp"];
 
       for (const surface of surfaces) {
@@ -196,9 +205,8 @@ describe("GovernanceApp ingestion templates", () => {
         );
       }
 
-      const everythingButTheSurface = {
+      const everythingButSurfaceAndSlug = {
         organizationId: ORGANIZATION_ID,
-        callerUserId: "user-1",
         sourceType: "internal_codex",
         displayName: "Internal Codex",
         description: "Custom",
@@ -207,30 +215,51 @@ describe("GovernanceApp ingestion templates", () => {
         ottlRules: 'set(attributes["langwatch.cost.usd"], attributes["x"])',
       };
 
-      expect(written.map((input) => input.surface)).toEqual(surfaces);
-      expect(written.map(({ surface: _surface, ...rest }) => rest)).toEqual([
-        everythingButTheSurface,
-        everythingButTheSurface,
-        everythingButTheSurface,
-        everythingButTheSurface,
+      expect(createWithAudit.mock.calls.map(([input]) => input.surface)).toEqual(surfaces);
+      expect(createWithAudit.mock.calls.map(([input]) => input.callerUserId)).toEqual([
+        "user-1",
+        "user-1",
+        "user-1",
+        "user-1",
+      ]);
+      expect(
+        createWithAudit.mock.calls.map(([input]) => {
+          const { slug: _slug, ...rest } = input.template;
+          return rest;
+        }),
+      ).toEqual([
+        everythingButSurfaceAndSlug,
+        everythingButSurfaceAndSlug,
+        everythingButSurfaceAndSlug,
+        everythingButSurfaceAndSlug,
       ]);
     });
   });
 });
 
 describe("GovernanceApp as the module a process installs", () => {
-  describe("given the three REST declarations the module mounts", () => {
-    /** @scenario "Every governance REST family answers from the installed module" */
+  describe("given the one REST declaration the module mounts", () => {
     it("answers every capability the declarations name from the one app", () => {
-      const { app } = buildApp();
+      const { app } = buildAppWithUnfinishedCapability();
 
-      expect(governanceServer.transports).toHaveLength(3);
+      expect(governanceServer.transports).toHaveLength(1);
       expect(app.cliAccess().findCaller).toBeTypeOf("function");
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");
       expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
       expect(app.ingestAccess().authorize).toBeTypeOf("function");
       expect(app.ingestReceiver().receiveTraces).toBeTypeOf("function");
+    });
+  });
+
+  describe("given a process that supplies none of the still-unfinished capability", () => {
+    it("still constructs, and only the capability itself throws", async () => {
+      const { app } = buildApp();
+
+      expect(() => app.governance()).toThrow(/governance/);
+      await expect(
+        app.listIngestionTemplatesForMember({ projectId: PROJECT_ID }),
+      ).resolves.toEqual([]);
     });
   });
 });

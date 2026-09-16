@@ -6,6 +6,7 @@ import { PrismaAdminWorkspaceViewAuditRepository } from "./prisma.admin-workspac
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
 import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaGovernanceDirectoryRepository } from "./prisma.governance-directory.repository.ts";
+import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
 import { PrismaGovernanceOcsfExportRepository } from "./prisma.ocsf-export.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
 import { PrismaOrganizationSessionPolicyRepository } from "./prisma.organization-session-policy.repository.ts";
@@ -29,6 +30,7 @@ export class PostgresGovernanceRepositories {
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
       departments: PrismaDepartmentRepository.create(prisma),
       directory: PrismaGovernanceDirectoryRepository.create(prisma),
+      ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       ocsfExports: PrismaGovernanceOcsfExportRepository.create(prisma),
       personalVirtualKeys: PrismaPersonalVirtualKeyRepository.create(prisma),
       routingPolicies: PrismaRoutingPolicyRepository.create(prisma),

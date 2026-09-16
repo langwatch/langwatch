@@ -1,6 +1,14 @@
 /**
  * The governance REST door: who may reach each route, what the wire body looks like, and which
  * application operation each verb dispatches to.
+ *
+ * The seven ingestion-template operations read `repositories.ingestionTemplates` through
+ * `IngestionTemplateService`, not the `governance`/`cli`/`ingest` facade bag — so `buildApi()`
+ * below supplies none of the three, and a test that needs a row to exist seeds it for real on the
+ * repository rather than overriding a facade method. See
+ * `../../app/__tests__/governance.app.unit.test.ts`, which solves the identical problem one file
+ * over.
+ *
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
 import {
@@ -14,29 +22,25 @@ import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
-  type CreateIngestionTemplateInput,
-  type IngestionTemplate,
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
+import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
-  type GovernanceCliMembers,
-  type GovernanceIngestMembers,
 } from "../../app/governance.app.ts";
 import {
   governanceRest,
   governanceRestCaller,
   governanceRestSurface,
 } from "../governance.rest.ts";
-import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
 
 /** A dependency this door never reaches; calling one is the test's own bug. */
 const unreachable = <Method>(): Method =>
@@ -65,19 +69,17 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
-function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate {
+/** A row for `repositories.ingestionTemplates.createWithAudit` to seed directly. */
+function newTemplateInput(overrides: Partial<NewIngestionTemplate> = {}): NewIngestionTemplate {
   return {
-    id: "tmpl-1",
-    slug: "claude_code",
-    sourceType: "claude_code",
-    displayName: "Platform Default",
-    description: "Locked platform row",
-    iconAsset: "preset:claude_code",
+    slug: "seed_template",
+    sourceType: "internal_codex",
+    displayName: "Seed Template",
+    description: null,
+    iconAsset: null,
     credentialSchema: null,
     ottlRules: 'set(attributes["x"], "y")',
-    platformPublished: true,
-    enabled: true,
-    organizationId: null,
+    organizationId: ORGANIZATION_ID,
     ...overrides,
   };
 }
@@ -109,22 +111,20 @@ function viewerOf(request: Request): string | null {
 
 function buildApi(
   options: {
-    governance?: Partial<TestGovernanceService>;
     grants?: readonly string[];
   } = {},
 ) {
-  const governance = Object.assign(new TestGovernanceService(), options.governance);
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
+  const repositories = MemoryGovernanceRepositories.create();
 
   const app = GovernanceApp.create({
-    repositories: MemoryGovernanceRepositories.create(),
+    repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
     members: {
-      governance,
       personalVirtualKeys: {
         isOrganizationMember:
           unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
@@ -132,18 +132,6 @@ function buildApi(
           unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
       },
       actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
-      cli: {
-        accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
-        members: unreachable<GovernanceCliMembers["members"]>(),
-        plans: unreachable<GovernanceCliMembers["plans"]>(),
-        persons: unreachable<GovernanceCliMembers["persons"]>(),
-        supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
-      },
-      ingest: {
-        projects: unreachable<GovernanceIngestMembers["projects"]>(),
-        principals: unreachable<GovernanceIngestMembers["principals"]>(),
-        traceCollection: unreachable<GovernanceIngestMembers["traceCollection"]>(),
-      },
     },
   });
 
@@ -203,6 +191,7 @@ function buildApi(
     hono,
     refusals,
     getOrganizationId,
+    repositories,
     asUser: requestWith(`Bearer ${USER_BOUND_TOKEN}`, "Authorization"),
     asProjectKey: requestWith(LEGACY_PROJECT_TOKEN, "X-Auth-Token"),
   };
@@ -211,13 +200,13 @@ function buildApi(
 describe("the governance REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
-      const templateListForUser = vi.fn(async () => []);
-      const { hono } = buildApi({ governance: { templateListForUser } });
+      const { hono, repositories } = buildApi();
+      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       const response = await hono.request("/api/governance/ingestion-templates");
 
       expect(response.status).toBe(401);
-      expect(templateListForUser).not.toHaveBeenCalled();
+      expect(listUserVisible).not.toHaveBeenCalled();
     });
 
     it("refuses a credential it does not recognise", async () => {
@@ -233,18 +222,18 @@ describe("the governance REST family", () => {
 
   describe("given a legacy project key, which is bound to a project and not to a person", () => {
     it("still serves the member-facing template list", async () => {
-      const templateListForUser = vi.fn(async () => [template()]);
-      const { asProjectKey } = buildApi({ governance: { templateListForUser } });
+      const { asProjectKey, repositories } = buildApi();
+      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates");
 
       expect(response.status).toBe(200);
-      expect(templateListForUser).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
+      expect(listUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
     });
 
     it("refuses the admin list as user_token_required and reads nothing", async () => {
-      const templateListForOrgAdmin = vi.fn(async () => [template()]);
-      const { asProjectKey } = buildApi({ governance: { templateListForOrgAdmin } });
+      const { asProjectKey, repositories } = buildApi();
+      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates/admin");
 
@@ -253,12 +242,12 @@ describe("the governance REST family", () => {
         error: "user_token_required",
         message: expect.any(String),
       });
-      expect(templateListForOrgAdmin).not.toHaveBeenCalled();
+      expect(listAdminVisible).not.toHaveBeenCalled();
     });
 
     it("refuses creating an organization template and writes nothing", async () => {
-      const templateCreateOrg = vi.fn(async () => template());
-      const { asProjectKey } = buildApi({ governance: { templateCreateOrg } });
+      const { asProjectKey, repositories } = buildApi();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asProjectKey("/api/governance/ingestion-templates", {
         method: "POST",
@@ -271,17 +260,14 @@ describe("the governance REST family", () => {
       expect(response.status).toBe(403);
       const body = (await response.json()) as { error: string };
       expect(body.error).toBe("user_token_required");
-      expect(templateCreateOrg).not.toHaveBeenCalled();
+      expect(createWithAudit).not.toHaveBeenCalled();
     });
   });
 
   describe("given a credential whose ceiling does not carry the route's permission", () => {
     it("refuses the manage routes and leaves the view routes reachable", async () => {
-      const templateListForUser = vi.fn(async () => []);
-      const { asUser, refusals } = buildApi({
-        grants: ["aiTools:view"],
-        governance: { templateListForUser },
-      });
+      const { asUser, refusals, repositories } = buildApi({ grants: ["aiTools:view"] });
+      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
 
       const view = await asUser("/api/governance/ingestion-templates");
       const admin = await asUser("/api/governance/ingestion-templates/admin");
@@ -289,32 +275,36 @@ describe("the governance REST family", () => {
       expect(view.status).toBe(200);
       expect(admin.status).toBe(403);
       expect(refusals).toEqual(["aiTools:manage"]);
+      expect(listAdminVisible).not.toHaveBeenCalled();
     });
   });
 
   describe("when the two listings are read", () => {
     it("routes the member list and the admin list to different reads", async () => {
-      const templateListForUser = vi.fn(async () => [template({ ottlRules: "" })]);
-      const templateListForOrgAdmin = vi.fn(async () => [template()]);
-      const { asUser } = buildApi({
-        governance: { templateListForUser, templateListForOrgAdmin },
+      const { asUser, repositories } = buildApi();
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput({ ottlRules: 'set(attributes["x"], "y")' }),
+        callerUserId: "seed",
+        surface: "hono",
       });
+      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
+      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
 
       const member = await asUser("/api/governance/ingestion-templates");
       await expect(member.json()).resolves.toEqual({
         data: [
           {
-            id: "tmpl-1",
-            slug: "claude_code",
-            source_type: "claude_code",
-            display_name: "Platform Default",
-            description: "Locked platform row",
-            icon_asset: "preset:claude_code",
-            credential_schema: null,
+            id: seeded.id,
+            slug: seeded.slug,
+            source_type: seeded.sourceType,
+            display_name: seeded.displayName,
+            description: seeded.description,
+            icon_asset: seeded.iconAsset,
+            credential_schema: seeded.credentialSchema,
             ottl_rules: "",
-            platform_published: true,
+            platform_published: false,
             enabled: true,
-            organization_id: null,
+            organization_id: ORGANIZATION_ID,
           },
         ],
       });
@@ -322,22 +312,15 @@ describe("the governance REST family", () => {
       const admin = await asUser("/api/governance/ingestion-templates/admin");
       const adminBody = (await admin.json()) as { data: { ottl_rules: string }[] };
       expect(adminBody.data[0]?.ottl_rules).toContain('set(attributes["x"]');
-      expect(templateListForUser).toHaveBeenCalledOnce();
-      expect(templateListForOrgAdmin).toHaveBeenCalledOnce();
+      expect(listUserVisible).toHaveBeenCalledOnce();
+      expect(listAdminVisible).toHaveBeenCalledOnce();
     });
   });
 
   describe("when an organization template is created", () => {
     it("answers 201 with the created row and attributes the write to the caller", async () => {
-      const created = template({
-        id: "tmpl-new",
-        platformPublished: false,
-        organizationId: ORGANIZATION_ID,
-        displayName: "Internal Codex",
-        sourceType: "internal_codex",
-      });
-      const templateCreateOrg = vi.fn(async () => created);
-      const { asUser } = buildApi({ governance: { templateCreateOrg } });
+      const { asUser, repositories } = buildApi();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asUser("/api/governance/ingestion-templates", {
         method: "POST",
@@ -358,24 +341,25 @@ describe("the governance REST family", () => {
         };
       };
       expect(body.ingestion_template).toMatchObject({
-        id: "tmpl-new",
         platform_published: false,
         organization_id: ORGANIZATION_ID,
       });
-      expect(templateCreateOrg).toHaveBeenCalledWith(
+      expect(createWithAudit).toHaveBeenCalledWith(
         expect.objectContaining({
-          organizationId: ORGANIZATION_ID,
           callerUserId: USER_ID,
-          sourceType: "internal_codex",
-          displayName: "Internal Codex",
           surface: "hono",
+          template: expect.objectContaining({
+            organizationId: ORGANIZATION_ID,
+            sourceType: "internal_codex",
+            displayName: "Internal Codex",
+          }),
         }),
       );
     });
 
     it("reads its own name for 'no credential schema' as an absent one", async () => {
-      const templateCreateOrg = vi.fn(async () => template());
-      const { asUser } = buildApi({ governance: { templateCreateOrg } });
+      const { asUser, repositories } = buildApi();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       await asUser("/api/governance/ingestion-templates", {
         method: "POST",
@@ -386,16 +370,15 @@ describe("the governance REST family", () => {
         }),
       });
 
-      expect(templateCreateOrg).toHaveBeenCalledWith(
-        expect.objectContaining({ credentialSchema: null }),
+      expect(createWithAudit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          template: expect.objectContaining({ credentialSchema: null }),
+        }),
       );
     });
 
     it("names the source type the domain refused, in the family's nested body", async () => {
-      const templateCreateOrg = vi.fn(async (): Promise<IngestionTemplate> => {
-        throw new InvalidSourceTypeError();
-      });
-      const { asUser } = buildApi({ governance: { templateCreateOrg } });
+      const { asUser } = buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates", {
         method: "POST",
@@ -410,8 +393,8 @@ describe("the governance REST family", () => {
     });
 
     it("refuses a body with no display name before the application sees it", async () => {
-      const templateCreateOrg = vi.fn(async () => template());
-      const { asUser } = buildApi({ governance: { templateCreateOrg } });
+      const { asUser, repositories } = buildApi();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const response = await asUser("/api/governance/ingestion-templates", {
         method: "POST",
@@ -421,7 +404,7 @@ describe("the governance REST family", () => {
       expect(response.status).toBe(422);
       const body = (await response.json()) as { error: string };
       expect(body.error).toBe("validation_error");
-      expect(templateCreateOrg).not.toHaveBeenCalled();
+      expect(createWithAudit).not.toHaveBeenCalled();
     });
   });
 
@@ -432,12 +415,8 @@ describe("the governance REST family", () => {
      * any caller forge an audit row's provenance.
      */
     it("honours cli and ignores a claim to be an in-process surface", async () => {
-      const surfaces: CreateIngestionTemplateInput["surface"][] = [];
-      const templateCreateOrg = vi.fn(async (input: CreateIngestionTemplateInput) => {
-        surfaces.push(input.surface);
-        return template();
-      });
-      const { asUser } = buildApi({ governance: { templateCreateOrg } });
+      const { asUser, repositories } = buildApi();
+      const createWithAudit = vi.spyOn(repositories.ingestionTemplates, "createWithAudit");
 
       const create = (surface: string) =>
         asUser("/api/governance/ingestion-templates", {
@@ -451,22 +430,29 @@ describe("the governance REST family", () => {
       await create("trpc");
       await create("mcp");
 
-      expect(surfaces).toEqual(["cli", "cli", "hono", "hono"]);
+      expect(createWithAudit.mock.calls.map(([input]) => input.surface)).toEqual([
+        "cli",
+        "cli",
+        "hono",
+        "hono",
+      ]);
     });
   });
 
   describe("when a template's OTTL is replaced", () => {
     it("answers 200 with the updated row", async () => {
-      const updated = template({
-        id: "tmpl-2",
-        platformPublished: false,
-        organizationId: ORGANIZATION_ID,
-        ottlRules: 'set(attributes["new"], "1")',
+      const { asUser, repositories } = buildApi();
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput(),
+        callerUserId: "seed",
+        surface: "hono",
       });
-      const templateUpdateOttlRules = vi.fn(async () => updated);
-      const { asUser } = buildApi({ governance: { templateUpdateOttlRules } });
+      const updateOttlRulesWithAudit = vi.spyOn(
+        repositories.ingestionTemplates,
+        "updateOttlRulesWithAudit",
+      );
 
-      const response = await asUser("/api/governance/ingestion-templates/tmpl-2/ottl-rules", {
+      const response = await asUser(`/api/governance/ingestion-templates/${seeded.id}/ottl-rules`, {
         method: "PATCH",
         body: JSON.stringify({ ottl_rules: 'set(attributes["new"], "1")' }),
       });
@@ -476,24 +462,26 @@ describe("the governance REST family", () => {
         ingestion_template: { ottl_rules: string };
       };
       expect(body.ingestion_template.ottl_rules).toContain("new");
-      expect(templateUpdateOttlRules).toHaveBeenCalledWith(
+      expect(updateOttlRulesWithAudit).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: ORGANIZATION_ID,
           callerUserId: USER_ID,
-          id: "tmpl-2",
+          id: seeded.id,
           surface: "hono",
         }),
       );
     });
 
     it("reports a platform-published row as immutable", async () => {
-      const templateUpdateOttlRules = vi.fn(async (): Promise<IngestionTemplate> => {
-        throw new PlatformTemplateImmutableError();
+      const { asUser, repositories } = buildApi();
+      const platformTemplate = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput({ organizationId: null }),
+        callerUserId: "seed",
+        surface: "hono",
       });
-      const { asUser } = buildApi({ governance: { templateUpdateOttlRules } });
 
       const response = await asUser(
-        "/api/governance/ingestion-templates/tmpl-platform/ottl-rules",
+        `/api/governance/ingestion-templates/${platformTemplate.id}/ottl-rules`,
         { method: "PATCH", body: JSON.stringify({ ottl_rules: "forged" }) },
       );
 
@@ -505,25 +493,27 @@ describe("the governance REST family", () => {
 
   describe("when a template is archived", () => {
     it("answers 200 and reports the row archived", async () => {
-      const templateArchiveOrg = vi.fn(async () => undefined);
-      const { asUser } = buildApi({ governance: { templateArchiveOrg } });
+      const { asUser, repositories } = buildApi();
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput(),
+        callerUserId: "seed",
+        surface: "hono",
+      });
+      const archiveWithAudit = vi.spyOn(repositories.ingestionTemplates, "archiveWithAudit");
 
-      const response = await asUser("/api/governance/ingestion-templates/tmpl-3", {
+      const response = await asUser(`/api/governance/ingestion-templates/${seeded.id}`, {
         method: "DELETE",
       });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ archived: true });
-      expect(templateArchiveOrg).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "tmpl-3", organizationId: ORGANIZATION_ID }),
+      expect(archiveWithAudit).toHaveBeenCalledWith(
+        expect.objectContaining({ id: seeded.id, organizationId: ORGANIZATION_ID }),
       );
     });
 
     it("reports an unknown id as not found", async () => {
-      const templateArchiveOrg = vi.fn(async (): Promise<void> => {
-        throw new TemplateNotFoundError("nope");
-      });
-      const { asUser } = buildApi({ governance: { templateArchiveOrg } });
+      const { asUser } = buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/nope", {
         method: "DELETE",
@@ -537,19 +527,20 @@ describe("the governance REST family", () => {
 
   describe("when a platform template is cloned", () => {
     it("answers 201 with the organization's own copy", async () => {
-      const clone = template({
-        id: "tmpl-clone",
-        platformPublished: false,
-        organizationId: ORGANIZATION_ID,
-        displayName: "Clone Source (custom)",
-        ottlRules: 'set(attributes["from"], "platform")',
+      const { asUser, repositories } = buildApi();
+      const source = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput({
+          organizationId: null,
+          displayName: "Clone Source",
+          ottlRules: 'set(attributes["from"], "platform")',
+        }),
+        callerUserId: "seed",
+        surface: "hono",
       });
-      const templateCloneFromPlatform = vi.fn(async () => clone);
-      const { asUser } = buildApi({ governance: { templateCloneFromPlatform } });
 
       const response = await asUser("/api/governance/ingestion-templates/clone", {
         method: "POST",
-        body: JSON.stringify({ source_template_id: "tmpl-platform" }),
+        body: JSON.stringify({ source_template_id: source.id }),
       });
 
       expect(response.status).toBe(201);
@@ -563,22 +554,16 @@ describe("the governance REST family", () => {
         };
       };
       expect(body.ingestion_template).toMatchObject({
-        id: "tmpl-clone",
         platform_published: false,
         organization_id: ORGANIZATION_ID,
         display_name: "Clone Source (custom)",
         ottl_rules: 'set(attributes["from"], "platform")',
       });
-      expect(templateCloneFromPlatform).toHaveBeenCalledWith(
-        expect.objectContaining({ sourceTemplateId: "tmpl-platform" }),
-      );
+      expect(body.ingestion_template.id).not.toBe(source.id);
     });
 
     it("reports an unknown source as not found", async () => {
-      const templateCloneFromPlatform = vi.fn(async (): Promise<IngestionTemplate> => {
-        throw new TemplateNotFoundError("gone");
-      });
-      const { asUser } = buildApi({ governance: { templateCloneFromPlatform } });
+      const { asUser } = buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/clone", {
         method: "POST",
@@ -591,14 +576,19 @@ describe("the governance REST family", () => {
 
   describe("when one template is read by id", () => {
     it("scopes the read to the project's organization", async () => {
-      const templateGetByIdForOrg = vi.fn(async () => template({ id: "tmpl-4" }));
-      const { asUser } = buildApi({ governance: { templateGetByIdForOrg } });
+      const { asUser, repositories } = buildApi();
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput(),
+        callerUserId: "seed",
+        surface: "hono",
+      });
+      const findVisible = vi.spyOn(repositories.ingestionTemplates, "findVisible");
 
-      const response = await asUser("/api/governance/ingestion-templates/tmpl-4");
+      const response = await asUser(`/api/governance/ingestion-templates/${seeded.id}`);
 
       expect(response.status).toBe(200);
-      expect(templateGetByIdForOrg).toHaveBeenCalledWith({
-        id: "tmpl-4",
+      expect(findVisible).toHaveBeenCalledWith({
+        id: seeded.id,
         organizationId: ORGANIZATION_ID,
       });
     });
@@ -609,10 +599,7 @@ describe("the governance REST family", () => {
      * close.
      */
     it("reports a row outside the organization as not found", async () => {
-      const templateGetByIdForOrg = vi.fn(async (): Promise<IngestionTemplate> => {
-        throw new TemplateNotFoundError("foreign");
-      });
-      const { asUser } = buildApi({ governance: { templateGetByIdForOrg } });
+      const { asUser } = buildApi();
 
       const response = await asUser("/api/governance/ingestion-templates/foreign");
 
@@ -629,31 +616,38 @@ describe("the governance REST family", () => {
      */
     /** @scenario Reading one ingestion template demands the same permission as reading them all */
     it("refuses a caller who may only view AI tools, and discloses no rules", async () => {
-      const templateGetByIdForOrg = vi.fn(async () => template({ id: "tmpl-5" }));
-      const { asUser, refusals } = buildApi({
-        grants: ["aiTools:view"],
-        governance: { templateGetByIdForOrg },
+      const { asUser, refusals, repositories } = buildApi({ grants: ["aiTools:view"] });
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput(),
+        callerUserId: "seed",
+        surface: "hono",
       });
+      const findVisible = vi.spyOn(repositories.ingestionTemplates, "findVisible");
 
-      const response = await asUser("/api/governance/ingestion-templates/tmpl-5");
+      const response = await asUser(`/api/governance/ingestion-templates/${seeded.id}`);
 
       expect(response.status).toBe(403);
-      expect(await response.text()).not.toContain(template().ottlRules);
+      expect(await response.text()).not.toContain(seeded.ottlRules);
       expect(refusals).toEqual(["aiTools:manage"]);
-      expect(templateGetByIdForOrg).not.toHaveBeenCalled();
+      expect(findVisible).not.toHaveBeenCalled();
     });
 
     /** @scenario A key with no user behind it cannot read an ingestion template by id */
     it("refuses a legacy project key, which the ceiling alone lets through", async () => {
-      const templateGetByIdForOrg = vi.fn(async () => template({ id: "tmpl-6" }));
-      const { asProjectKey } = buildApi({ governance: { templateGetByIdForOrg } });
+      const { asProjectKey, repositories } = buildApi();
+      const seeded = await repositories.ingestionTemplates.createWithAudit({
+        template: newTemplateInput(),
+        callerUserId: "seed",
+        surface: "hono",
+      });
+      const findVisible = vi.spyOn(repositories.ingestionTemplates, "findVisible");
 
-      const response = await asProjectKey("/api/governance/ingestion-templates/tmpl-6");
+      const response = await asProjectKey(`/api/governance/ingestion-templates/${seeded.id}`);
 
       expect(response.status).toBe(403);
       const body = (await response.json()) as { error: string };
       expect(body.error).toBe("user_token_required");
-      expect(templateGetByIdForOrg).not.toHaveBeenCalled();
+      expect(findVisible).not.toHaveBeenCalled();
     });
   });
 });

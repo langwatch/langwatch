@@ -5,6 +5,7 @@ import { MemoryAdminWorkspaceViewAuditRepository } from "./memory.admin-workspac
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
 import { MemoryDepartmentRepository } from "./memory.department.repository.ts";
 import { MemoryGovernanceDirectoryRepository } from "./memory.governance-directory.repository.ts";
+import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
 import { MemoryGovernanceStore } from "./memory-governance.store.ts";
@@ -29,6 +30,7 @@ export class MemoryGovernanceRepositories {
       anomalyRules: MemoryAnomalyRuleRepository.create(store),
       departments: MemoryDepartmentRepository.create(store),
       directory: MemoryGovernanceDirectoryRepository.create(store),
+      ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       personalVirtualKeys: MemoryPersonalVirtualKeyRepository.create(store),
       routingPolicies: MemoryRoutingPolicyRepository.create(store),

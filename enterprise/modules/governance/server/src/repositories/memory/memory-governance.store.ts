@@ -4,6 +4,7 @@ import type {
   AnomalyAlertDispatchRecord,
   AnomalyRule,
   Department,
+  IngestionTemplate,
   PersonalVirtualKey,
   RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
@@ -52,6 +53,7 @@ export class MemoryGovernanceStore {
   readonly departmentOfUser = new Map<string, string | null>();
   readonly departmentOfTeam = new Map<string, string | null>();
   readonly departmentOfProject = new Map<string, string | null>();
+  readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];
   readonly routingPolicies: RoutingPolicy[] = [];
   readonly personalVirtualKeys: PersonalVirtualKey[] = [];
