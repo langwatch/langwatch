@@ -850,9 +850,12 @@ function CliPathsSection({
   //
   // Not a claim that pi CANNOT be routed: langy points pi at the gateway
   // today by generating a models.json for it
-  // (services/langyworker/src/models.ts). That path writes a file to the
-  // machine pi runs on, which the launcher deliberately does not do — see
-  // ADR-132 §7 and its open question on a generated models.json.
+  // (services/langyworker/src/models.ts). The launcher must not copy that,
+  // and this is the one place the distinction can mislead — a generated
+  // models.json is resolved by every pi session, so it would repoint runs
+  // the user never launched through LangWatch. ADR-132 forbids it under the
+  // "No writes to the user's machine" invariant (§Invariants), and
+  // 132-task-list.md records it as the trap to expect.
   const isIngestionOnly = form.assistantKind === "pi";
   return (
     <FormSection
