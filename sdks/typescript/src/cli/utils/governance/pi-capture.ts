@@ -18,10 +18,15 @@
  *
  * The window has one honest limit: a SECOND pi the user starts by hand, in
  * another terminal, while this run is going, also has a fresh modification time
- * and is captured too. Narrowing it further needs an identity pi does not give
- * us — it writes no launching-process marker — so the choice is this
- * over-capture or dropping resumed sessions, whose files predate the run and
- * are the common case. #8132 is where the identity belongs.
+ * and is captured too. pi writes no launching-process marker, so the alternative
+ * on this axis is tightening to files created after the run started, which drops
+ * every resumed session because a resumed file already existed.
+ *
+ * One narrowing does exist and is unused: the session header carries `cwd`, the
+ * directory pi ran in (`pi-session-file.ts:100`). A hand-started pi in another
+ * directory could be excluded on it. Nothing here reads it. Not done, not
+ * impossible. #8132 is a different problem, and points the other way: it wants
+ * plain `pi` runs captured, not excluded.
  *
  * **A failed post is retried, not swallowed.** The codex streamer marks a turn
  * emitted only after a successful post, so a transient failure retries on the

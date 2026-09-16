@@ -192,16 +192,23 @@ Feature: pi session capture
 
   # --- Only capturing what we launched, and only once -----------------------
 
-  # What separates the two is when the file was last written, against the run's
-  # own start time. pi writes no marker saying who launched it, so that stamp is
-  # the only identity available. This buys one honest limit: a second pi the user
-  # starts by hand while this run is going has a fresh write time too, and is
-  # captured. Narrowing it needs an identity pi does not give us: the session
-  # header carries only id, timestamp and cwd, no process or launcher field.
-  # Issue #8132 is where that identity belongs. Tightening the
-  # stamp instead, to files created after the run started, would drop every
-  # resumed session, because a resumed file already existed. That is a whole
-  # category lost, which is why the over-capture is the side we err on.
+  # What separates the two is each row's own clock, pi's rather than the
+  # filesystem's, against the run's start time. The file's write time is only a
+  # prefilter, and a deliberately loose one: it carries a one second grace
+  # because a filesystem mtime can land before the stamp it is compared to. A
+  # file the user last wrote in the second before launch is read; its rows are
+  # then dropped individually. See the header of pi-capture.ts, which states
+  # that mtime is not a sound question on its own.
+  #
+  # pi writes no marker saying which process launched it, so a second pi the
+  # user starts by hand during this run writes rows on the same clock and is
+  # captured. The session header does carry cwd, the directory pi ran in, which
+  # would narrow this: a hand-started pi in another directory could be excluded.
+  # Nothing reads it today. That is an open improvement, not a limit.
+  # Tightening the file stamp instead, to files created after the run started,
+  # would drop every resumed session, because a resumed file already existed.
+  # That is a whole category lost, which is why the over-capture is the side we
+  # err on.
   # Both halves are asserted, never just the absence: a run that captured
   # nothing at all would satisfy the absence on its own.
   @unit
