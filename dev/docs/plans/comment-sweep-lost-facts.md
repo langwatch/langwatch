@@ -696,3 +696,35 @@ diff a b     # empty => every change is confined to comment-shaped lines
 It has one theoretical hole of its own — a multi-line template literal whose
 lines begin with `*` or `//` — so it is a better second opinion, not a proof.
 The pair still has to disagree in public and be reconciled by hand.
+
+## Wave 6 — `modules/project` and `modules/suite`
+
+### Six shipped source files cite a gitignored path
+
+Not a lost fact — a dangling one, found by the sweep rather than caused by it.
+These files carry a comment pointing at `.claude/handoffs/…` or
+`.claude/manifests/…`:
+
+```
+modules/analytics/server/src/repositories/dashboard-widgets/access.ts
+modules/project/server/src/app/project.app.ts
+modules/project/server/src/transport/__tests__/project.trpc.composition.unit.test.ts
+modules/trace/contract/src/traces-v2.trpc.ts
+packages/architecture-enforcer/tests/agent-workflow-protocol.unit.test.ts
+skills/_tests/agent-workflow-protocol.scenario.test.ts
+```
+
+`.claude/handoffs/` and `.claude/manifests/` are both gitignored
+(`.gitignore:191` and `:193`). The referenced files exist on this machine —
+`project-trpc-witness-alignment.md` is 10KB and still there — but **no clone of
+this repository has any of them**, so the citation resolves to nothing for every
+other reader, and to nothing at all once this working copy is gone.
+
+`project.app.ts:85` is the sharp case: it explains why the app *refuses to boot
+in `apps/worker`* and defers the reasoning to the gitignored handoff. That is a
+load-bearing behavioural rule whose justification is one `rm` away.
+
+The fix is not to delete the citations but to move what they point at into
+committed documentation — a `dev/docs/adr/` entry or a `dev/docs/` page — and
+repoint them. Until then, treat any `.claude/` reference in shipped source as a
+broken link.
