@@ -1,29 +1,49 @@
-Feature: The oxlint baseline replaces the hand-written per-file registers
-  Debt for cognitive-complexity, condition-shape, max-depth and complexity
-  used to live as ~2,400 hand-edited filenames spread across oxlint config
-  overrides, with no mechanical shrink-only check. It now lives in one file,
-  packages/architecture-enforcer/src/oxlint-baseline.json, keyed `rule|file` with
-  a `measured` date. A `defineRule` plugin rule (cognitive-complexity,
-  condition-shape) consults it directly and reports nothing for a baselined
-  file; the two native rules that cannot read it (max-depth, complexity)
-  still need a config override, but that override is generated from the same
-  baseline file by generate-native-baseline-overrides.mjs rather than
-  hand-maintained. `langwatch/nested-ternary` used to be a third plugin rule
-  here, written only so it could read the baseline in place of the built-in
-  `no-nested-ternary`; ADR-135/ADR-140's class-A migration deleted it and
-  enabled the built-in directly, so the 342 entries it used to read are now
-  unconsulted by anything.
+Feature: There is no lint suppression list
+  Debt for cognitive-complexity, condition-shape, max-depth and complexity once
+  lived as ~2,400 hand-edited filenames spread across oxlint config overrides.
+  That became one ledger, packages/architecture-enforcer/src/oxlint-baseline.json,
+  keyed `rule|file` with a `measured` date and a shrink-only check, which was a
+  real improvement on what it replaced.
+
+  It is now gone, and the reason is what it grew into. The ledger held 6,925
+  `rule|file` rows hiding 8,904 findings, and hid them in a way nothing could
+  see or bound:
+
+    - A key carried no count, and `isBaselined` was a set lookup, so a file on
+      the list was exempt from that rule however many NEW violations it gained.
+      The shrink-only check could not catch this: it refused new KEYS, and
+      growth inside a key already present adds none.
+    - No entry carried an `expires`, and the reader the rules consult did not
+      read that field at all, so nothing ever came back on its own.
+    - It blocked its own repair. A wave that met a baselined INTERFACE stopped
+      at it, correctly, leaving the flagged implementations unfixable by whoever
+      found them.
+    - Two rules, `no-nested-ternary` and `shared-setup-is-a-hook`, had every
+      occurrence suppressed, so they enforced nothing anywhere while reading as
+      clean.
+
+  The count went from 6,403 to 15,514 the day it was deleted. That number is the
+  point: it was always the real one. A rule now either runs everywhere or is
+  turned off by name in the configuration, where a reader can see it.
 
   Background:
     Given a workspace whose agent feature is at strict layout version 0
 
   @unit
-  Scenario: A baselined file reports nothing
-    Given a file baselined for a rule it would otherwise fail
+  Scenario: A rule reports every finding, in every file
+    Given a file that fails a rule and was previously listed in the suppression ledger
     When that rule runs over the file
-    Then it reports nothing
+    Then it reports the finding
+    And no file is exempt from a rule it fails
 
-  Rule: `no-nested-ternary` is the built-in that replaced the baseline-reading plugin rule
+  @unit
+  Scenario: There is no suppression ledger to read
+    Given the repository as it stands
+    When the oxlint baseline path is looked for
+    Then no such file exists
+    And nothing in the linter reads one
+
+  Rule: A rule is enabled or disabled by name, never per file
 
     @unit
     Scenario: The nested ternary rule is enabled workspace-wide
@@ -31,12 +51,9 @@ Feature: The oxlint baseline replaces the hand-written per-file registers
       When its workspace-wide rules are read
       Then the built-in no-nested-ternary rule is enabled
 
-  Rule: `oxlint` holds the ledger to a shrink-only ratchet
-
-  @unit
-  Scenario: The oxlint baseline is shrink-only and every entry carries a measured date
-    Given the current oxlint baseline and a merge-base reference baseline
-    When the baseline is checked against the reference
-    Then a current entry not present in the reference is rejected
-    And an entry with no measured date is rejected regardless of a reference
-    And an absent baseline file passes
+    @unit
+    Scenario: Turning a rule off is a visible configuration choice
+      Given a rule the repository does not want to enforce
+      When it is turned off
+      Then it is turned off by name in the oxlint configuration
+      And it is not turned off for a list of individual files

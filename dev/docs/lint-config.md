@@ -22,11 +22,11 @@ being held in a register that can only shrink. That is what keeps
 as well as `packages/**` on purpose: a file does not change its checks by
 moving.
 
-The `langwatch/*` rules differ from the native ones in the way that matters
-here: a plugin rule consults
-`packages/architecture-lint/src/oxlint-baseline.json` itself, so it needs no
-override. A native rule cannot, which is why the three generated overrides at
-the bottom of the config exist.
+The `langwatch/*` rules used to differ from the native ones here: a plugin rule
+consulted the suppression ledger itself while a native rule could not, which is
+why three generated overrides once sat at the bottom of the config. Ledger and
+overrides were both deleted on 2026-09-16, so plugin and native rules now behave
+the same way — every rule applies to every file it governs.
 
 ## Registers still in force
 
@@ -52,11 +52,23 @@ clean) and server source (7 hits across 5 files, fixed when the rule landed).
 Narrowing the scope is the honest version of a baseline — everything inside it
 is clean and stays clean, instead of one number nobody reads.
 
-## Shrink-only baselines seeded by measurement
+## There are no baselines any more
 
-These rules ship at `error` with their existing findings seeded into
-`oxlint-baseline.json`. A new finding is a hard failure; an existing row may
-only be deleted.
+**`oxlint-baseline.json` was deleted on 2026-09-16 and nothing replaces it.**
+The rules below shipped at `error` with their findings seeded into it; they now
+report every finding in every file, and the repository-wide count went from
+6,403 to 16,230 the day it went.
+
+The ledger held 6,925 `rule|file` rows hiding 8,904 findings. It was deleted
+because of what it could not do, not because seeding was wrong: a key carried no
+count, so a listed file was exempt however many NEW violations it gained, and the
+shrink-only check could not see that — it refused new keys, and growth inside an
+existing key adds none. Nothing expired. And it blocked its own repair, because a
+wave meeting a baselined *interface* stopped there and left the flagged
+implementations unfixable. Two rules had every occurrence suppressed and so
+enforced nothing anywhere while reading as clean.
+
+The table below is kept as the historical measurement that seeded it.
 
 | Rule | Measured | Finding |
 | --- | --- | --- |
@@ -195,20 +207,19 @@ trio in favour of oxlint built-ins, with three different outcomes.
   advisory-only noise or an immediate red build, neither of which is what
   "enabled" means. See ADR-141 / ADR-142.
 
-## The generated overrides
+## The generated overrides are gone too
 
-`max-depth`, `complexity` and `no-nested-ternary` are native oxlint rules and
-cannot read `oxlint-baseline.json` the way a plugin rule does, so their
-per-file exemptions are written out longhand. Regenerate them, never hand-edit
-the file lists:
+`max-depth`, `complexity` and `no-nested-ternary` are native oxlint rules that
+could not read the ledger, so their per-file exemptions were written out longhand
+by a generator. Ledger, generated blocks and generator were all deleted together
+on 2026-09-16; those three rules now apply everywhere, which is where the 633
+`no-nested-ternary` findings in the new count come from.
 
-```bash
-node packages/architecture-lint/src/generate-native-baseline-overrides.mjs
-```
-
-They must stay the **last** override for each of those rules. oxlint applies
-overrides in array order and later wins, so the blanket test-file thresholds
-above would otherwise shadow the generated exemption for a baselined test file.
+Two per-file overrides remain in `dev/lint/oxlint.baseline.jsonc` and are **not**
+debt: `no-restricted-imports` is off for the design system's own `dialog.tsx` and
+`drawer.tsx`, which exist to wrap the Chakra primitive everyone else is pointed
+at, and `no-empty` is off for test files by policy. A rule is otherwise enabled
+or disabled by name, where a reader can see it.
 
 ## The register that closed the file
 
