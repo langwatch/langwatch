@@ -350,10 +350,24 @@ not confuse the two: an earlier pass through this concluded the fix was "one
 script run" on the JSON, and it is not. The JS reader has to learn the field
 first.
 
-**The change worth making** is in `baseline.mjs`: have `isBaselined` return the
-recorded count rather than a boolean, and let a rule report findings beyond it.
-That converts 6,925 permanent exemptions into a ratchet. Populating the JSON
-alone does nothing, because nothing reads it.
+**The change worth making** is in `baseline.mjs`: let `isBaselined` honour a
+bypass so a measurement run can count what the ledger hides, then a drift script
+compares each `rule|file` against a recorded count. Populating the JSON alone
+does nothing, because nothing reads it.
+
+**IT WAS WRITTEN AND BACKED OUT, and the reason is a decision for the user.**
+The bypass has to read an environment variable, and `langwatch(environment-boundaries)`
+refuses that in `packages/*/src/`: a reusable package receives typed
+configuration; only a `platform/config/` module, a process boot file or a test
+may read the environment. The rule fired on the edit immediately.
+
+Narrowing the rule to exempt the lint plugin is defensible - `oxlint-rules` runs
+inside the linter, not a product process, so "receive typed config" does not
+apply to it - but **changing a rule so that your own change passes is the exact
+move this drive exists to catch**, and a coordinator must not take it alone. The
+code and the spec scenario were reverted to HEAD byte-for-byte rather than
+shipped. Ask before re-attempting; the alternative is accepting that the
+suppressed half stays uncountable.
 
 Two protections that DO already exist, and should not be re-invented: the oxlint
 baseline is **shrink-only** - `growth.added` in
