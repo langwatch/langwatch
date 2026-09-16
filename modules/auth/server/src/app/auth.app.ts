@@ -150,10 +150,9 @@ export class AuthApp implements AuthApiContract {
   };
   static readonly configSchema = authAppConfigSchema;
   /**
-   * Declared rather than cast. Better Auth's storage, its hooks and its session
-   * cache are this module's to build, and each needs one of these three: a
-   * process that cannot supply one refuses at boot, by module and by member,
-   * instead of composing a sign-in door whose collaborators are `undefined`.
+   * Declared rather than cast: Better Auth's storage, hooks and session cache
+   * each need one of these three. A process that cannot supply one refuses at
+   * boot, instead of composing a door whose collaborators are `undefined`.
    */
   static readonly reads = reads("logger", "prisma", "redis");
 
@@ -164,10 +163,8 @@ export class AuthApp implements AuthApiContract {
   readonly #dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi };
   /**
    * The deployment's ONE Better Auth instance, or nothing where it named no
-   * browser-session identity. Assigned once, in {@link AuthApp.create}, because
-   * the instance is built over this application: Better Auth revokes every
-   * browser session of a person who resets their password, and it has to revoke
-   * them on the same application every other caller revokes through.
+   * browser-session identity. Assigned once in {@link AuthApp.create}: it must
+   * revoke sessions on the same application every other caller revokes through.
    */
   #betterAuth: BetterAuthTransport | null = null;
 
@@ -240,10 +237,8 @@ export class AuthApp implements AuthApiContract {
 
   /**
    * Whether Better Auth accepts the session token these headers carry.
-   *
    * Answers "nobody" rather than refusing when this process composed no
-   * instance: an unconfigured deployment has anonymous callers, not failing
-   * ones, and {@link AuthApp.betterAuth} is where the reason is named.
+   * instance — an unconfigured deployment has anonymous callers, not failing ones.
    */
   async tryVerifyBrowserSession(input: {
     headers: Headers;

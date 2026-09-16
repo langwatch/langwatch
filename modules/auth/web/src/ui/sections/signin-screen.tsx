@@ -29,12 +29,9 @@ import { authFailureMessage } from "../../model/auth-failure-message.ts";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
 
 /**
- * Which sign-in screen this deployment has (ADR-117 §7).
- *
- * Until the flip, and after a rollback, the legacy screen below answers
- * exactly as it always has: this component adds a branch in front of it and
- * changes nothing inside it. Neither renders until the deployment has said
- * which one it is, because guessing would flash the wrong door on every load.
+ * Which sign-in screen this deployment has (ADR-117 §7). The legacy screen
+ * still answers exactly as it always has — this only adds a branch in front
+ * of it. Neither renders until the deployment says which, to avoid flashing the wrong door.
  */
 export default function SignIn() {
   const frontDoor = useIdentityFrontDoor();

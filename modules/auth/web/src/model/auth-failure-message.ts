@@ -18,10 +18,9 @@ const normalize = (value: string | undefined): string =>
     .replace(/[\s-]+/g, "_");
 
 /**
- * Every identifier the auth layer uses for "those are not the credentials for
- * this account". `user_not_found` belongs in here on purpose: telling a
- * stranger which addresses have accounts is an enumeration oracle, so it must
- * be indistinguishable from a wrong password everywhere this set is read.
+ * Every identifier meaning "not the credentials for this account".
+ * `user_not_found` belongs here: telling a stranger which addresses have
+ * accounts is an enumeration oracle, so it must read like a wrong password.
  */
 const CREDENTIAL_REJECTION_KEYS = new Set([
   "invalid_email_or_password",

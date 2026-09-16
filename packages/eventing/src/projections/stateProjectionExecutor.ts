@@ -56,10 +56,8 @@ export function applyStateEvent<State, E extends Event>({
 
 /**
  * Applies queued events to a directly readable operational projection.
- *
- * GroupQueue serializes this executor per projection key. The persisted cursor
- * makes an acknowledged-after-write retry a no-op; no Redis cache, event-log
- * read, or database transaction is part of this load/apply/store cycle.
+ * GroupQueue serializes this executor per projection key; the persisted
+ * cursor makes an acknowledged-after-write retry a safe no-op.
  */
 export class StateProjectionExecutor {
   async execute<State, E extends Event>({

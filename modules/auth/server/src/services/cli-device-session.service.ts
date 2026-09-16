@@ -27,10 +27,9 @@ export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
 /** Min seconds between successive `/exchange` polls per device_code. */
 export const POLL_RATE_LIMIT_SECONDS = 4;
 /**
- * How long one `/exchange` holds the exclusive redemption claim. Longer than
- * the poll window on purpose: the window paces polls, it does not fence a
- * redemption that outruns its four seconds. Sized to cover the reads and the
- * mint, short enough that a throw before the release frees the code early.
+ * How long one `/exchange` holds the exclusive redemption claim — longer than
+ * the poll window, which only paces polls rather than fencing a slower
+ * redemption, but short enough to free the code early if release is skipped.
  */
 export const EXCHANGE_CLAIM_SECONDS = 30;
 /**
@@ -279,10 +278,9 @@ export class CliDeviceSessionService {
   }
 
   /**
-   * Claims the exclusive right to redeem this approved device code. Everything
-   * past approval hands out a credential the code may only buy once, and the
-   * device-session mint revokes the previous key for the same device label —
-   * so two redemptions would hand out two sets and kill the first's key.
+   * Claims the exclusive right to redeem this approved device code. The
+   * device-session mint revokes the previous key for the same device label,
+   * so two redemptions would hand out two credential sets and kill the first.
    */
   claimExchange(deviceCode: string): Promise<boolean> {
     return this.store.setIfAbsent({
@@ -294,9 +292,8 @@ export class CliDeviceSessionService {
 
   /**
    * Releases a claim that bought nothing, so the next poll can try. Only for
-   * paths that consumed NOTHING: a successful redemption's claim is left to
-   * expire, or a request that read the record before its deletion would
-   * re-claim and hand out a second credential.
+   * paths that consumed NOTHING: releasing a successful redemption's claim
+   * early could let a late reader re-claim and mint a second credential.
    */
   releaseExchangeClaim(deviceCode: string): Promise<void> {
     return this.store.delete(exchangeClaimKey(deviceCode));

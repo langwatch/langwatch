@@ -30,19 +30,15 @@ export interface GroundShift {
   scale: number;
   swirl: number;
   /**
-   * How far across the field the colour dissolves, as a fraction of its own
-   * width. The mask holds solid to `1 - fade` and is gone by the far edge, so
-   * a larger number is a longer, softer dissolve rather than a smaller cloud.
-   *
-   * At rest it is most of the field: a short fade reads as a shape with an
-   * edge, and this is meant to read as light.
+   * How far the colour dissolves, as a fraction of the field's width — solid
+   * to `1 - fade`, gone by the far edge, so a larger number softens the
+   * dissolve. At rest it's most of the field, reading as light, not a shape.
    */
   fade: number;
   /**
-   * How much of the viewport the colour reaches across, as a multiplier on
-   * its resting width. Sign-up is a longer journey with more to say, so it
-   * gets more of the page; the far end of either door pulls back, because by
-   * then the person is reading rather than being greeted.
+   * How much of the viewport the colour reaches, as a multiplier on its
+   * resting width. Sign-up (longer journey) gets more page; either door
+   * pulls back at the far end, since by then the person is reading, not being greeted.
    */
   reach: number;
 }
@@ -58,10 +54,9 @@ export const GROUND_AT_REST: GroundShift = {
 };
 
 /**
- * Deliberately small. This is the ground acknowledging a move, not narrating
- * one: the largest of these turns the field by a twelfth of a turn across most
- * of a second, which reads as drift rather than as a transition somebody has
- * to sit through before they can type.
+ * Deliberately small: the ground acknowledges a move, doesn't narrate one.
+ * The largest turn is a twelfth of a turn across most of a second — drift,
+ * not a transition somebody has to sit through before they can type.
  */
 const DEPTH_SHIFT: Record<FrontDoorDepth, GroundShift> = {
   entry: GROUND_AT_REST,
@@ -102,10 +97,9 @@ const DEPTH_SHIFT: Record<FrontDoorDepth, GroundShift> = {
 };
 
 /**
- * Crossing between the doors slides the field, so the two are not the same
- * picture with different words over it — and gives each one a different amount
- * of the page. Sign-up is the longer journey and the one making a case, so its
- * colour reaches further; log-in is somebody who has already decided.
+ * Crossing between the doors slides the field, giving each a different
+ * amount of page: sign-up is the longer journey making a case, so its colour
+ * reaches further; log-in is somebody who's already decided.
  */
 const DOOR_SHIFT: Record<
   FrontDoorDoor,

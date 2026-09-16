@@ -7,12 +7,9 @@ import { Google } from "./google-icon.tsx";
 import { Microsoft } from "./microsoft-icon.tsx";
 
 /**
- * The mark on a method's button.
- *
- * A provider people recognize gets its own: that mark, not the words beside
- * it, is what someone scanning the screen is actually looking for. Everything
- * else gets the same neutral key, because inventing a logo for a connection we
- * know nothing about would be a worse guess than not drawing one.
+ * The mark on a method's button. A recognized provider gets its own — what
+ * someone scanning the screen looks for. Everything else gets the same
+ * neutral key: a guessed logo is worse than none.
  */
 const BRAND_ICONS: Record<string, ReactNode> = {
   google: <Google />,

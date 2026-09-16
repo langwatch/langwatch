@@ -4,11 +4,9 @@ import { describe, expect, it } from "vitest";
 import { SIGN_IN_ROUTING_REASON_COPY, signInRoutingReasonCopy } from "../routing-reason-copy.ts";
 
 /**
- * The reason-code copy map is what stands between a routing decision and the
- * words a customer reads. These pin the properties that make it safe to render
- * whatever the router answers: every code the router can produce is accounted
- * for, no entry leaks a code slug or internal wording, and a code this build
- * has never heard of renders nothing rather than itself.
+ * The reason-code copy map stands between a routing decision and the words a
+ * customer reads. These pin what makes it safe: every code is accounted for,
+ * none leaks a code slug or internal wording, and an unknown code renders nothing.
  */
 describe("given the sign-in routing reason copy", () => {
   describe("when the router's whole vocabulary is walked", () => {

@@ -1,8 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * The invitation landing (D13 renders it, D11 owns the rules underneath).
- *
  * Specs: specs/identity/signin-signup-screens.feature,
  *        specs/identity/resilient-invitations.feature
  */

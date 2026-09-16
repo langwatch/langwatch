@@ -54,9 +54,8 @@ const routingReasonCopy = {
 } satisfies Record<SignInRoutingReasonCode, RoutingReasonCopy | null>;
 
 /**
- * The copy for a reason code, or null when the code is worth nothing on
- * screen. Takes the code as a plain string and answers null for one it does
- * not know: the value arrives over the wire, and an unrecognised code must
+ * The copy for a reason code, or null when worth nothing on screen. Takes a
+ * plain string and answers null for an unknown one: a wire value must
  * render nothing rather than putting itself on screen.
  */
 export function signInRoutingReasonCopy(reasonCode: string): RoutingReasonCopy | null {

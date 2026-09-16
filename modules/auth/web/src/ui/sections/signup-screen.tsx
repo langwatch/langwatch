@@ -141,14 +141,11 @@ function SignUpForm() {
     try {
       await register.mutateAsync(values);
     } catch (error) {
-      // An address that already has an account is not a wall, it is almost
-      // always the customer's own: sign-up writes the account and its password
-      // in one call and exchanges them for a session in another, so a failure
-      // in the second leaves an account nobody ever mentions and every retry
-      // lands here. It is also where someone who was a member before and got
-      // invited back arrives, because an invite asks them to create an account
-      // they already have. Carry on into the sign-in leg with the credentials
-      // they just typed rather than dead-ending them on their own account.
+      // An address with an account isn't a wall — usually the customer's own:
+      // sign-up writes the account then exchanges credentials for a session
+      // in a second call, so a failure there leaves an orphaned account every
+      // retry lands here. Also where a re-invited former member arrives. Carry
+      // on into sign-in with the credentials just typed, not a dead end.
       if (readHandledError(error)?.code !== "email_already_registered") {
         // Every other refusal renders in the alert below, through the code
         // registry. A toast here would only cover it with a vaguer line.
@@ -157,13 +154,10 @@ function SignUpForm() {
       accountWasJustCreated = false;
     }
 
-    // The account exists from here on, so this leg fails on its own terms  - 
-    // and it has no alert of its own, which is why it toasts.
-    //
-    // next-auth answers with ITS OWN identifiers (`CredentialsSignin`,
-    // `INVALID_ORIGIN`), which are not handled-error codes and so have no
-    // registry entry. `authFailureMessage` is the mapping for those, and it
-    // refuses to put a bare identifier on screen.
+    // The account exists from here on, so this leg fails on its own terms
+    // and toasts (no alert of its own). next-auth answers with ITS OWN
+    // identifiers (`CredentialsSignin`, `INVALID_ORIGIN`), not handled-error
+    // codes, so `authFailureMessage` maps them rather than showing a bare identifier.
     setSignInLoading(true);
     let message: string | null = null;
     // The refusal itself, where there was one to catch. A provider that
@@ -178,12 +172,10 @@ function SignUpForm() {
       });
 
       if (response?.error ?? (response?.status && response.status >= 400)) {
-        // Recovering an existing account and the password was not its
-        // password: the honest answer is the one the server already gave,
-        // that address has an account, plus the two ways into it. Leave
-        // `submitError` unset so the registry copy for
-        // `email_already_registered` renders instead of being masked by a
-        // sign-in sentence that would read as though the account were new.
+        // Recovering an existing account with the wrong password: the honest
+        // answer is what the server already gave. Leave `submitError` unset
+        // so the registry copy for `email_already_registered` renders,
+        // rather than being masked by a sign-in sentence implying a new account.
         if (
           !accountWasJustCreated &&
           isCredentialRejection({
@@ -202,13 +194,11 @@ function SignUpForm() {
         }
       }
     } catch (error) {
-      // A thrown exception is not the auth layer answering — it is the fetch
-      // wrapper, a relayed response body, or anything else that blew up on the
-      // way. `authFailureMessage`'s last branch paints any multi-word string
-      // straight onto the screen, so feeding it `error.message` puts whatever
-      // that was into the alert and the toast verbatim. Nothing here is copy,
-      // so nothing here is shown: the caught error goes to the console for
-      // whoever is debugging, and the customer reads the fallback.
+      // A thrown exception isn't the auth layer answering — it's the fetch
+      // wrapper or something that blew up. `authFailureMessage`'s last branch
+      // paints any multi-word string straight onto the screen, so feeding it
+      // `error.message` would leak it verbatim. The caught error goes to the
+      // console instead; the customer reads the fallback.
       console.error("sign-in after sign-up threw", error);
       refusal = error;
       message = authFailureMessage({

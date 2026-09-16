@@ -2,10 +2,9 @@
 import "./auth-front-door.css";
 
 /**
- * One soft ring, once, where something has just worked: an address confirmed,
- * an account created. It is the smallest possible acknowledgement — a dot and
- * a ring that expands and is gone — and it does not run at all for somebody
- * who has asked for less motion.
+ * One soft ring, once, where something has just worked — the smallest
+ * possible acknowledgement, a dot and a ring that expands and is gone.
+ * Does not run at all for somebody who asked for less motion.
  */
 export function SuccessPulse({ label }: { label: string }) {
   return (

@@ -27,9 +27,8 @@ export type SignUpVerificationResult = z.infer<typeof signUpVerificationResultSc
 
 /**
  * What an invitation link may say to whoever opens it: which organization is
- * asking, and who asked. Enough to decide whether to accept, and nothing that
- * would make a guessed code worth guessing — no address, no role, no
- * membership.
+ * asking, and who asked — enough to decide, but nothing that makes a guessed
+ * code worth guessing (no address, no role, no membership).
  */
 export const inviteLandingSchema = z
   .object({

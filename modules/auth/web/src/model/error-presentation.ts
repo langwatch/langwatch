@@ -16,11 +16,9 @@ export type ExplainErrorCode = (error: AuthHandledError) => AuthErrorExplanation
 let installed: ExplainErrorCode = frontDoorErrorCopy;
 
 /**
- * Hands the front door this composition's error copy.
- *
- * Called once, by the frontend feature that installs these screens. Returns
- * the way to put the previous explainer back, which is what lets a suite
- * install a stub without leaking it into the next file.
+ * Hands the front door this composition's error copy. Called once, by the
+ * feature that installs these screens. Returns the way to put the previous
+ * explainer back, so a suite can install a stub without leaking into the next file.
  */
 export function installAuthErrorExplainer(explain: ExplainErrorCode): () => void {
   const previous = installed;

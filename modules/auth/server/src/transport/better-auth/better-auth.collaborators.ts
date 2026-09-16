@@ -21,8 +21,7 @@ export abstract class BetterAuthStorage {
 export abstract class BetterAuthFederation {
   /**
    * Whether this deployment registers any federated method at all.
-   *
-   * Synchronous, and answering `false` leaves every route untouched - which is
+   * Synchronous; answering `false` leaves every route untouched, which is
    * the zero-behaviour-change path an email-mode deployment takes.
    */
   abstract federationCapable(): boolean;

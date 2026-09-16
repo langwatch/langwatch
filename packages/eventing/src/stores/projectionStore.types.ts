@@ -3,11 +3,8 @@ import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Projection } from "../domain/types.ts";
 
 /**
- * Zod schema for projection store read context.
- * Context for reading projections from the projection store.
- *
- * **Security Note:** tenantId is REQUIRED for tenant isolation.
- * All queries MUST filter by tenant to prevent cross-tenant data access.
+ * Read context for the projection store.
+ * **Security:** tenantId is REQUIRED — queries must filter by tenant.
  */
 export const ProjectionStoreReadContextSchema = z.object({
   /**

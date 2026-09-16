@@ -8,10 +8,9 @@ function hasWindow(): boolean {
 }
 
 /**
- * Leave the app for `url`, keeping this page in session history.
- *
- * The back button returns to where the user was, which is what you want for a
- * link out and for a redirect the user may want to undo.
+ * Leave the app for `url`, keeping this page in session history — the back
+ * button returns to where the user was, which is what you want for a link
+ * out or a redirect the user may want to undo.
  */
 export function hardNavigate(url: string): void {
   if (!hasWindow()) return;
@@ -19,10 +18,9 @@ export function hardNavigate(url: string): void {
 }
 
 /**
- * Go to `url` and drop the current page from session history.
- *
- * For a page the user must not be able to go back to — a consumed one-time
- * link, or a sign-in screen once the session exists.
+ * Go to `url` and drop the current page from session history — for a page
+ * the user must not go back to: a consumed one-time link, or a sign-in
+ * screen once the session exists.
  */
 export function replaceLocation(url: string): void {
   if (!hasWindow()) return;
@@ -30,11 +28,9 @@ export function replaceLocation(url: string): void {
 }
 
 /**
- * Rebuild the current page from the server.
- *
- * A blunt instrument: it discards every in-memory cache and unmounts the app,
- * which takes any toast or in-flight interaction with it. Prefer invalidating
- * the queries that actually moved.
+ * Rebuild the current page from the server — a blunt instrument: it discards
+ * every in-memory cache and unmounts the app, taking any toast or in-flight
+ * interaction with it. Prefer invalidating the queries that actually moved.
  */
 export function reloadPage(): void {
   if (!hasWindow()) return;

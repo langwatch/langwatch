@@ -49,11 +49,9 @@ export function CredentialSignInForm({
   callbackUrl?: string;
   onUseDifferentEmail: () => void;
   /**
-   * Told when the address turned out to have no account, so a confirmation
-   * link went out instead. The password typed here is NOT kept — it is chosen
-   * once, after the address is confirmed, on the screen built to ask for it.
-   * Absent where an account is already known to exist, in which case a refusal
-   * is only ever a wrong password.
+   * Told when the address had no account, so a confirmation link went out
+   * instead. The password typed here is NOT kept — it's chosen once the
+   * address is confirmed, not here.
    */
   onSignUpStarted?: (email: string) => void;
 }) {
@@ -131,14 +129,9 @@ export function CredentialSignInForm({
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
-        {/* The address the password is for, held in a quiet pill the way the
-            board draws it: settled, not editable here, one link out.
-
-            Only when there IS one. The local door can be asked for by name
-            (`?local=1`) and renders this form without an address having been
-            typed, and an empty pill is a row of furniture holding nothing —
-            it reads as a field that failed to load rather than one that was
-            never asked for. */}
+        {/* The address the password is for, in a quiet settled pill. Shown only
+            when there IS one — an empty pill reads as a field that failed to
+            load, not one that was never asked for (e.g. `?local=1`). */}
         {email ? (
           <EmailPill
             email={email}

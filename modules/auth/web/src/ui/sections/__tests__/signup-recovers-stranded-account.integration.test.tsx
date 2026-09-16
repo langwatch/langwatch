@@ -55,10 +55,9 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
 import SignUp from "../signup-screen.tsx";
 
 /**
- * What a tRPC rejection carrying a handled error looks like on the wire: the
- * payload nests under `data.error` and the message IS the code slug (#5984),
- * which is exactly why the screen must read the payload rather than the
- * message.
+ * A tRPC rejection carrying a handled error, on the wire: payload nests
+ * under `data.error`, and the message IS the code slug (#5984) — why the
+ * screen must read the payload, not the message.
  */
 const alreadyRegistered = () =>
   Object.assign(new Error("email_already_registered"), {

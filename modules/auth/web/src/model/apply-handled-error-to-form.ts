@@ -42,14 +42,10 @@ export function applyHandledErrorToForm<TFieldValues extends FieldValues>({
   const nonEmpty = Object.entries(fieldErrors).filter(([, messages]) => messages.length > 0);
   const applicable = nonEmpty.filter((entry) => isPaintedField({ form, field: entry[0] }));
 
-  // Only the errors this form can actually put on screen count towards
-  // claiming it. See `hasFormErrorSlot`.
-  //
-  // Capped the same way tips are: `meta` on a relayed error is forwarded
-  // verbatim from an upstream body, so the number of complaints is not ours to
-  // trust. Falling short of the full set makes `claimsEverything` false below,
-  // which is the safe direction — the caller still toasts, so nothing the form
-  // declined to render is lost.
+  // Only errors this form can render count toward claiming it (see
+  // `hasFormErrorSlot`). `meta` on a relayed error is forwarded verbatim from
+  // an upstream body, so falling short makes `claimsEverything` false — the
+  // safe direction, since the caller still toasts what the form declined.
   const showableFormErrors = hasFormErrorSlot ? formErrors.slice(0, MAX_FORM_ERRORS) : [];
 
   // Whether the form can show the WHOLE rejection. When it can't, the caller

@@ -14,18 +14,16 @@ const PASSKEY: SignInMethod = {
 };
 
 /**
- * The server's code for "that address already has an account", refused before
- * the ceremony so no system prompt opens for it. Kept in step with
- * `server/better-auth/passkey-signup.ts`, which is the only thing that sends
- * it.
+ * The server's code for "that address already has an account", refused
+ * before the ceremony so no system prompt opens for it. Kept in step with
+ * `server/better-auth/passkey-signup.ts`, the only thing that sends it.
  */
 const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 
 /**
- * The `code` off a client error, where it carried one. The client types the
- * error as "a code, or not" depending on which leg failed — the ceremony's own
- * failures always name one, a server refusal names one only if the endpoint
- * set it — so it has to be asked for rather than read.
+ * The `code` off a client error, where it carried one — the ceremony's own
+ * failures always name one, a server refusal only if the endpoint set it,
+ * so it has to be asked for rather than read directly.
  */
 function readCode(error: object): string | undefined {
   return "code" in error && typeof error.code === "string" ? error.code : void 0;
@@ -44,9 +42,8 @@ type Refusal =
 
 /**
  * Runs the ceremony and says what came of it. The address travels as the
- * registration `context`: it is baked into the stored challenge, so the
- * account created at the end is for the address the ceremony was started for
- * and cannot be swapped for another in between.
+ * registration `context`, baked into the stored challenge, so the created
+ * account is for the address the ceremony started with — not swappable mid-flow.
  */
 async function createAccountWithPasskey(email: string): Promise<Refusal | "created"> {
   try {
@@ -71,14 +68,10 @@ async function createAccountWithPasskey(email: string): Promise<Refusal | "creat
 function readRefusal(error: { status: number } & object): Refusal {
   const code = readCode(error);
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
-  // Saying "something went wrong" about a cancelled prompt would be telling
-  // somebody off for deciding, and the password fields are still on screen.
-  //
-  // Only the explicit abort is that decision, though: a client-side failure
-  // also arrives with no status, and treating every status-less error as a
-  // cancel left a FAILED ceremony saying nothing at all — the button stopped
-  // spinning, the screen did not change, and the reader was given no reason to
-  // try anything else.
+  // Saying "went wrong" about a cancelled prompt would scold somebody for
+  // deciding. But only the explicit abort is that: a status-less client
+  // failure isn't, and treating every status-less error as a cancel left a
+  // FAILED ceremony spinning silently forever with no way to retry.
   if (isCeremonyAbandoned({ code })) {
     return { kind: "silent" };
   }

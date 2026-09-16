@@ -10,12 +10,9 @@ export const PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME =
 export const PROCESS_RETENTION_FAILURES_METRIC_NAME = "process_manager_retention_failures_total";
 
 /**
- * Process-manager retention sweep counts, pushed over OTLP.
- *
- * The failure counter is separate from the swept-rows counter for the reason
- * the App's own comment gives: without it, a family that fails every hour and
- * a family with nothing to sweep report the same zero, and silent retention
- * failure is the exact incident this sweep exists to prevent.
+ * Process-manager retention sweep counts, pushed over OTLP. The failure
+ * counter is kept separate from swept-rows so a failing family can't hide
+ * behind one with nothing to sweep — both would otherwise report zero.
  */
 export class OtelProcessRetentionMetricsAdapter extends ProcessRetentionMetrics {
   static create(): OtelProcessRetentionMetricsAdapter {

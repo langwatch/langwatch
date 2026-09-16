@@ -5,8 +5,7 @@ import { authApi as api } from "./auth-api.ts";
 /**
  * The screens' one link to the router (ADR-117 §6): an address goes out, a
  * decision comes back, and the screen renders it. No routing lives here —
- * this hook does not read the decision it carries, and could not branch on it
- * if it wanted to.
+ * this hook doesn't read the decision it carries, and couldn't branch on it.
  */
 export function useSignInRouting(): {
   decision: RoutingDecision | null;

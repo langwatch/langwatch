@@ -10,11 +10,9 @@ import type { BetterAuthAnnouncements } from "./better-auth.collaborators.ts";
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
 
 /**
- * What passkey sign-up needs from sign-up's address confirmation.
- *
- * Named here rather than taken from the identity package because the process
- * that composes better-auth owns the identity services and their wiring: a
- * consumer that names the one method it calls needs nothing else.
+ * What passkey sign-up needs from sign-up's address confirmation. Named here
+ * rather than taken from identity, since the process composing better-auth
+ * owns that wiring — a consumer naming the one method it calls needs nothing else.
  */
 export interface SignUpVerification {
   requestVerification(input: { email: string }): Promise<void>;
@@ -23,10 +21,9 @@ export interface SignUpVerification {
 const logger = createLogger("langwatch:better-auth:passkey-signup");
 
 /**
- * The code the sign-up screen watches for, so an address that already has an
- * account turns the screen into the log-in one rather than reporting a failed
- * ceremony. Refused BEFORE the ceremony, which is why no system prompt opens
- * for it.
+ * The code the sign-up screen watches for, so an already-registered address
+ * turns the screen into log-in rather than reporting a failed ceremony —
+ * refused BEFORE the ceremony, so no system prompt ever opens for it.
  */
 export const PASSKEY_SIGNUP_EMAIL_TAKEN = "EMAIL_ALREADY_REGISTERED";
 
@@ -59,12 +56,9 @@ function provisionalHandle({
 /** The address the ceremony was started for, or a refusal. */
 function requireEmail(context: string | null | undefined): string {
   const email = normalizeIdentifierValue(context ?? "");
-  // Deliberately shallow. This is the shape check that keeps junk out of a
-  // User row; whether the address RECEIVES mail is settled by the confirmation
-  // that follows somebody in, not by a regular expression standing in front of
-  // them (ADR-117 §6).
-  // An empty string contains no "@" either, so it is refused by the same
-  // clause rather than by one of its own.
+  // Deliberately shallow: whether the address RECEIVES mail is settled by
+  // the confirmation that follows, not by a regex (ADR-117 §6). An empty
+  // string has no "@" either, so it's refused by the same clause.
   if (!email.includes("@") || email.length > 320) {
     throw new APIError("BAD_REQUEST", {
       code: PASSKEY_SIGNUP_EMAIL_INVALID,

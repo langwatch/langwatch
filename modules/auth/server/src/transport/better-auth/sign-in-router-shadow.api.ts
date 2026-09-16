@@ -27,10 +27,9 @@ const logger = createLogger("langwatch:identity:signin-router-shadow");
 export type SignInRouterMode = "off" | "shadow" | "enforce";
 
 /**
- * The paths that START a login. Deliberately narrower than the gate's path
- * classification: shadow mode is a per-LOGIN comparison, and running it on
- * session reads would compare the router against a request the legacy front
- * door never routed.
+ * The paths that START a login — deliberately narrower than the gate's path
+ * classification, since shadow mode is a per-LOGIN comparison and running it
+ * on session reads would compare against a request the legacy door never routed.
  */
 const SIGNIN_INITIATION_SUFFIXES = [
   "/sign-in/email",
@@ -55,9 +54,8 @@ const DID_NOT_RUN: ShadowRun = { ran: false };
 
 /**
  * Reads the address out of a sign-in request without trusting it. Only
- * `/sign-in/email` carries one; a social or OIDC initiation has none, which is
- * exactly the no-address case the router answers with the sole-connection
- * rule.
+ * `/sign-in/email` carries one — a social/OIDC initiation has none, which is
+ * exactly the no-address case the router answers with the sole-connection rule.
  */
 function submittedIdentifier(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
@@ -74,12 +72,9 @@ function breakGlassRequested(url: string): boolean {
 }
 
 /**
- * Shadow mode's whole live-path footprint (ADR-117 §7).
- *
- * It cannot change a sign-in: it returns a report and throws nothing. Every
- * failure inside — an unreachable database, a router defect, a port that has
- * not been composed — is caught here and logged, because the one thing a
- * shadow comparison must never do is become the reason someone cannot log in.
+ * Shadow mode's whole live-path footprint (ADR-117 §7). It cannot change a
+ * sign-in: it returns a report and throws nothing, since a shadow comparison
+ * must never become the reason someone cannot log in.
  */
 export async function runSignInRouterShadow({
   pathname,

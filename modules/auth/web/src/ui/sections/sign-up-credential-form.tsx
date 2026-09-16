@@ -23,14 +23,11 @@ import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
 import { PasswordInput } from "../elements/password-input.tsx";
 import { MethodDivider } from "./sign-in-method-picker.tsx";
 
-// No name. Onboarding asks for it, in a place where it is worth asking —
-// putting it here charges a field at the one moment somebody has least
-// patience for one, to learn something the next screen learns anyway.
-//
-// The rules come from `@langwatch/identity-contract`, which the mutation behind this
-// form reads too, so the form cannot accept what the server refuses. Asked as
-// a refinement rather than restated as zod constraints for the same reason:
-// restating them is how they drift.
+// No name here: onboarding asks for it where it's worth asking, not at the
+// moment somebody has least patience, to learn something the next screen
+// learns anyway. Rules come from `@langwatch/identity-contract`, read by the
+// same mutation, asked as a refinement rather than restated zod constraints
+// (restating is how they drift).
 const signUpSchema = z
   .object({
     password: z.string().superRefine((value, ctx) => {
@@ -85,10 +82,9 @@ export function SignUpCredentialForm({
   });
 
   /**
-   * Judge a field on the way out of it, but only once there is something to
-   * judge. A sign-up form has three fields to tab through, and answering an
-   * empty one with "required" tells somebody off for looking around before
-   * they have tried anything.
+   * Judge a field on the way out of it, but only once there's something to
+   * judge — answering an empty field with "required" while somebody is
+   * still tabbing through three fields tells them off before they've tried.
    */
   const blurJudged = (field: keyof SignUpValues) => ({
     onBlur: () => {
@@ -172,14 +168,10 @@ export function SignUpCredentialForm({
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
-        {/* Every failure this card can have shows in one place, at the top.
-
-            The marker below is a false positive, not an exemption: the title
-            is a string constant and is the only thing that slot can render.
-            The raw-message scanner reaches it because `onSubmit` holds a local
-            assigned from a `?.message`, and that file-level taint arrives at a
-            literal — the identical alerts on the log-in screen, in files
-            without such a local, are not flagged. */}
+        {/* Every failure shows in one place, at the top. The marker below is a
+            false positive, not an exemption: `onSubmit`'s local assigned from
+            `?.message` taints a literal title, which the raw-message scanner
+            then flags — the identical alert on log-in, with no such local, isn't. */}
         <HandledErrorAlert
           error={passkeyError}
           fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The other ways in must not stay live while a passkey ceremony has already
- * handed the screen to the browser: a second click on top of it would open a
- * competing WebAuthn prompt.
+ * The other ways in must not stay live once a passkey ceremony has handed
+ * the screen to the browser — a second click would open a competing prompt.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";

@@ -24,12 +24,9 @@ export type AuthServerConfig = ConfigValue<typeof authServerConfigDefinition>;
 export const authServerConfigSchema = compileRuntimeConfig(authServerConfigDefinition);
 
 /**
- * Refuses a browser session that is half configured.
- *
- * Applied to the RESOLVED value rather than declared as a refinement on the
- * schema: the leaves transform as they parse, so the schema's output is not
- * its own input and a second parse of the result would refuse a value it had
- * just produced.
+ * Refuses a browser session that is half configured. Applied to the RESOLVED
+ * value, not a schema refinement: the leaves transform as they parse, so a
+ * second parse of the output would refuse a value it just produced.
  */
 export function assertAuthServerConfig(config: AuthServerConfig): void {
   const secret = config.sessionSecret?.trim();

@@ -84,12 +84,9 @@ export function HorizontalFormControl({
         <Box minWidth={direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]}>
           {children}
           {/*
-            Under the field it belongs to, not beside it. As a sibling of this
-            Box it was a third column in the row, so it took whatever width was
-            left over — "Passwords don't match" arrived as three stacked words
-            in a gutter next to the input, which reads as damage rather than as
-            an explanation. Inside the Box it takes the input's own width and
-            sits directly beneath it, where the eye already is.
+            Under the field it belongs to: as a sibling it took a third column's
+            leftover width, so "Passwords don't match" arrived as stacked words
+            in the gutter. Inside the Box it takes the input's width, under the eye.
           */}
           <FormErrorDisplay error={error} />
         </Box>

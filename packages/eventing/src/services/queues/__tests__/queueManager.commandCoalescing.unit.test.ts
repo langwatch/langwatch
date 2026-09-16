@@ -11,10 +11,9 @@ import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
 
 /**
- * Which producers get a batch processor installed. Coalescing only engages
- * above a bound of one, so a registration that names no bound must be left on
- * the plain per-item append path: a command that appends one event per human
- * action would otherwise wait for a batch it can never fill.
+ * Which producers get a batch processor. Coalescing only engages above a
+ * bound of one, so an unbounded registration stays on the per-item append
+ * path — else a one-event-per-action command would wait for a batch it can never fill.
  */
 
 const payloadSchema = z.object({

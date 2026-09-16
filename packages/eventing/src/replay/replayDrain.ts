@@ -29,10 +29,9 @@ function foldGroupActiveKey({
 }
 
 /**
- * Map and state groupIds may end in a projection-defined key, which cannot be
- * reconstructed from discovered aggregates. Drain those lanes by scanning for
- * any active group below their job-path prefix. Fold groups use the exact-key
- * path above and intentionally never enter this scan.
+ * Map/state groupIds may end in a projection-defined key that can't be
+ * reconstructed from discovered aggregates, so drain by scanning below the
+ * job-path prefix; fold groups use the exact-key path above and skip this scan.
  */
 async function hasActiveGroups({
   redis,

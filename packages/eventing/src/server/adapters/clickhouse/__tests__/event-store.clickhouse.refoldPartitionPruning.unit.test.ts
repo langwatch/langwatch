@@ -100,10 +100,9 @@ describe("re-fold reads prune partitions — paged, time-local aggregate", () =>
 });
 
 /**
- * The safety half of the contract. `global` and `billing_report` aggregate
- * over arbitrary time ranges, so a window around any single event WOULD drop
- * their history. `rehydrationLowerBoundMs` returns undefined for them and the
- * read must stay unbounded — slow, but correct.
+ * Safety half of the contract: `global` and `billing_report` aggregate over
+ * arbitrary time ranges, so `rehydrationLowerBoundMs` returns undefined for
+ * them and the read stays unbounded — slow, but correct.
  */
 describe("re-fold reads prune partitions — long-lived aggregate type", () => {
   it("issues no lower bound, leaving the scan unbounded", async () => {

@@ -3,11 +3,9 @@ import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
 
 /**
- * The browser programs read `packages/browser-types/better-auth-react.d.ts` instead of
- * better-auth's own declarations, which reach a SQL query builder. This suite
- * runs against the REAL package — vitest resolves it normally — so a method
- * the contract promises and the library has dropped fails here rather than in
- * a sign-in nobody type-checked.
+ * The browser reads a trimmed `better-auth-react.d.ts`, not better-auth's own
+ * declarations (which reach a SQL query builder). This suite runs against the
+ * REAL package, so a dropped method fails here, not in an unchecked sign-in.
  */
 describe("given the browser reads a trimmed better-auth contract", () => {
   const client = createAuthClient({ plugins: [passkeyClient()] });

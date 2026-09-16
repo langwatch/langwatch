@@ -3,9 +3,8 @@ export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted" as 
 
 /**
  * The same outcome, as the converted transport puts it on the wire. A handled
- * error travels as its CODE rather than its sentence, so both spellings are
- * recognised: the sentence for a deployment still on the old door, the code for
- * one on the annotated runtime.
+ * error travels as its CODE, not its sentence — so both spellings are
+ * recognised: the sentence for the old door, the code for the annotated runtime.
  */
 export const INVITE_ALREADY_ACCEPTED_CODE = "invite_already_accepted" as const;
 

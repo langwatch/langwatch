@@ -1,9 +1,7 @@
 /**
- * The form bridge's job is to put a rejected submission back where the user is
- * looking. Its subtler job is knowing when NOT to — a validation error about
- * something this form doesn't own must fall through to a toast rather than
- * being silently absorbed, which would leave the user staring at a form that
- * looks fine and a save that didn't happen.
+ * The form bridge puts a rejected submission back where the user is looking
+ * — its subtler job is knowing when NOT to: an error this form doesn't own
+ * must fall through to a toast, not vanish into a form that looks fine.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,10 +13,9 @@ type FormStub = {
 };
 
 /**
- * What react-hook-form records for a field an input registered AND mounted:
- * a `_f` descriptor holding the live ref. That ref is the whole signal — it is
- * the difference between a key the form knows about and a key the user can
- * see.
+ * What react-hook-form records for a registered-AND-mounted field: a `_f`
+ * descriptor holding the live ref — the whole signal distinguishing a key the
+ * form knows about from a key the user can actually see.
  */
 const registered = (name: string) => ({ _f: { name, ref: {} } });
 
@@ -188,10 +185,9 @@ describe("applyHandledErrorToForm", () => {
 
   describe("given a field whose value is an array", () => {
     /**
-     * Ownership follows registration, not the shape of the value. A
-     * multi-select is one input holding a list, and it renders its own error
-     * perfectly well — the previous check declined it purely for being an
-     * object, which sent a complaint the form could show to a toast instead.
+     * Ownership follows registration, not the value's shape. A multi-select
+     * renders its own error fine — the previous check declined it purely for
+     * being an object, sending a complaint to a toast instead.
      */
     it("claims a multi-select, which is one input holding a list", () => {
       const form = formWithFields("channels");

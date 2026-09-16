@@ -25,10 +25,9 @@ describe("given the front door on a small viewport", () => {
 
   describe("when a field takes focus", () => {
     /**
-     * Every file that renders an INPUT, which is now two: the password boxes
-     * moved into `PasswordInput` when the reveal toggle went inside them, so
-     * asserting this on the forms that merely compose it would pass while
-     * checking nothing.
+     * Every file that renders an INPUT — now two, since the password boxes
+     * moved into `PasswordInput`. Asserting on forms that merely compose it
+     * would pass while checking nothing.
      */
     it("asks for at least 16px, and a target big enough to hit", () => {
       for (const file of [
@@ -74,10 +73,9 @@ describe("given the front door in either colour mode", () => {
     });
 
     /**
-     * The colours moved out of the stylesheet and into the theme, which is
-     * what lets a component write `bg="frontDoor.action"`. These two used to
-     * read the CSS; they read the token source now, because that is where the
-     * pair is declared.
+     * Colours moved out of the stylesheet and into the theme, letting a
+     * component write `bg="frontDoor.action"`. These tests read the token
+     * source now, since that's where the pair is declared.
      */
     it("declares both grounds where the brand values are written down", () => {
       const theme = sourceOf("model/front-door-theme.ts");
@@ -107,9 +105,8 @@ describe("given the front door in either colour mode", () => {
 
     /**
      * The wide-gamut block upgrades the theme's OWN emitted variables. A
-     * rename in the theme would leave it overriding variables nobody reads —
-     * no build error, just a silent loss of the P3 colours — so the two are
-     * pinned to each other here.
+     * rename in the theme would silently lose the P3 colours (no build
+     * error), so the two are pinned to each other here.
      */
     it("upgrades the same variables the theme emits, on a display that can show them", () => {
       const styles = sourceOf("ui/elements/auth-front-door.css");

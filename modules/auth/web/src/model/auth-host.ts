@@ -94,12 +94,9 @@ export function useAuthHost(): AuthHostApi {
 }
 
 /**
- * The host, or nothing.
- *
- * For the modules that have a correct answer without one — the error alert
- * degrades to the generic line, the fine print to the built-in legal links —
- * so a suite that renders a fragment in isolation does not have to compose a
- * whole application first.
+ * The host, or nothing — for modules that have a correct answer without one:
+ * the error alert degrades to the generic line, the fine print to the
+ * built-in legal links, so a fragment test needn't compose a whole app.
  */
 export function useOptionalAuthHost(): AuthHostApi | null {
   return useContext(AuthHostContext);

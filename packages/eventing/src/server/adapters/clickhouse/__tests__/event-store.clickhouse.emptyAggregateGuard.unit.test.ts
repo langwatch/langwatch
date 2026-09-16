@@ -8,12 +8,9 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * `event_log` is `ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)`.
- * A read with `AggregateId = ''` seeks to the empty-id key range, which holds
- * every event ever written without an aggregate id, and materialises all their
- * `EventPayload` blobs — in prod this exceeds `max_memory_usage_per_query`
- * (Code 241) and degrades the whole instance. No aggregate type uses an empty
- * id, so the store must short-circuit such reads instead of issuing them.
+ * `AggregateId = ''` seeks the key range holding every no-aggregate-id event
+ * ever written, which can exceed `max_memory_usage_per_query` in prod (Code
+ * 241). No aggregate type uses an empty id, so the store short-circuits it.
  */
 describe("EventStoreClickHouse - empty aggregateId guard", () => {
   const tenantId = createTenantId("test-tenant");

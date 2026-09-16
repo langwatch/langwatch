@@ -89,12 +89,9 @@ export const isEmailPasswordEnabled = (deployment: {
 }): boolean => deployment.authProvider === "email" || !deployment.isSaas;
 
 /**
- * Wires Better Auth's secondary storage to the process's Redis connection.
- * Used by rate limiting (below) so limits are enforced across pods. The
- * presence of the connection decides the session strategy (ADR-093).
- *
- * A process with no connection still gets a store rather than nothing: reads
- * degrade to a miss the database answers, and every dropped write is reported.
+ * Wires Better Auth's secondary storage to the process's Redis connection, so
+ * rate limits are enforced across pods (ADR-093 ties this to session strategy).
+ * With no connection: reads degrade to a database miss, writes are reported.
  */
 export function createSecondaryStorage(
   redis: RedisConnection | null,
@@ -105,11 +102,9 @@ export function createSecondaryStorage(
 }
 
 /**
- * Seals better-auth's own sign-up route, unconditionally, before any licence
- * or gate state is read. Local account creation belongs to `user.register`,
- * which writes the pending-confirmation latch; runs before the email-mode
- * early return below or plain email-mode sign-up (the fleet's common case)
- * would stay wide open to the raw route.
+ * Seals better-auth's own sign-up route unconditionally, before any licence
+ * is read: creation belongs to `user.register`'s pending-confirmation latch,
+ * else email-mode (the common case) would stay wide open to the raw route.
  */
 function refuseDirectEmailSignUp(pathname: string): void {
   if (!pathname.endsWith("/sign-up/email")) return;

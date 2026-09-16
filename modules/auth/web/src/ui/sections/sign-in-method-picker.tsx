@@ -176,10 +176,9 @@ export function AlternativeMethods({
 }
 
 /**
- * The seat any other way in sits in while a passkey ceremony is running. A
- * system sheet is already over the page, so `inert` makes it fully
- * unavailable (no pointer events, no focus, out of tab order) rather than
- * merely faint, restored the moment the ceremony ends.
+ * The seat any other way in sits in while a passkey ceremony runs. A system
+ * sheet is already over the page, so `inert` makes it fully unavailable (no
+ * pointer, no focus, out of tab order), restored the moment it ends.
  */
 function StandsBackWhileBusy({ isBusy, children }: { isBusy: boolean; children: ReactNode }) {
   return (
@@ -290,12 +289,10 @@ function MethodEntry({
     );
   }
 
-  // A passkey is local — this deployment authenticates it — but it is a
-  // BUTTON, so it wears its badge floated on the seat the way the providers
-  // do rather than stacked above it like a form. Drawn here rather than by
-  // each door, so both doors offer it identically. Never stood back from its
-  // own busy flag — it is the seat the ceremony started from, and it already
-  // shows its own working state and takes no second press.
+  // A passkey is local but a BUTTON, so its badge floats on the seat like
+  // the providers, not stacked like a form. Drawn here so both doors offer
+  // it identically. Never stood back from its own busy flag — it's the seat
+  // the ceremony started from, and already shows its own working state.
   if (method.kind === "passkey") {
     return (
       <PasskeySignInButton

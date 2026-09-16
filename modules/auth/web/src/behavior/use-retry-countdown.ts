@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * The rate limiter's remaining window, counted down where somebody can see it.
- *
- * The screen learns the real wait from the refusal that carried it, so this
- * counts what the server said rather than guessing. `null` is the ordinary
- * state and also the honest one for a refusal that named no window: a submit
- * disabled for a duration nobody knows is a worse guess than no guess.
+ * The rate limiter's remaining window, counted down where somebody can see
+ * it. The screen counts what the server's refusal said, never guesses;
+ * `null` is also honest for a refusal naming no window — no guess beats a bad one.
  */
 export function useRetryCountdown(): {
   secondsToWait: number | null;

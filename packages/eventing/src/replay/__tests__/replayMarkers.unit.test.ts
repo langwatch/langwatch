@@ -15,11 +15,8 @@ import {
 } from "../replayMarkers.ts";
 
 /**
- * Create a minimal Redis mock with pipeline support.
- *
- * Simulates ioredis pipeline semantics: pipeline methods are queued
- * and executed atomically on `exec()`. Each pipeline method returns
- * the pipeline itself (for optional chaining).
+ * Minimal Redis mock: pipeline methods queue ops, executed atomically on
+ * `exec()`, mirroring ioredis pipeline semantics.
  */
 function createRedisMock() {
   const store = new Map<string, Map<string, string>>(); // HSET storage

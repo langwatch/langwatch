@@ -48,10 +48,9 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
 }
 
 /**
- * An expired invitation is recoverable, so it gets the screen that recovers
- * it. Everything else is the quiet dead end, which describes nothing on
- * purpose — a refusal that explained itself would be a way to learn which
- * organizations exist by guessing at codes.
+ * An expired invitation is recoverable, so it gets a recovery screen.
+ * Everything else stays a quiet dead end on purpose — a refusal that
+ * explained itself would let someone learn which organizations exist by guessing codes.
  */
 function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: string }) {
   const code = readHandledError(error)?.code;
@@ -68,12 +67,9 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
 }
 
 /**
- * An expired invitation, with the one thing its holder can actually do.
- *
- * They cannot mint themselves a new link — only an admin can, and that is
- * what keeps expiry meaningful — so the button asks on their behalf and the
- * screen then says so. It deliberately never names who was asked: who runs
- * an organization is not something an expired link should teach.
+ * An expired invitation, with the one thing its holder can do: only an admin
+ * can mint a new link, so the button asks on their behalf. It never names
+ * who was asked — who runs an organization isn't something an expired link should teach.
  */
 function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: string }) {
   const ask = api.frontDoor.requestFreshInvite.useMutation();
@@ -186,12 +182,10 @@ function SignedOutInvite({
           )}
         />
       ) : routing.error ? (
-        // A routing failure used to leave this card on an empty document
-        // below the inviter's name — no picker, no retry, nothing the reader
-        // could do about it. The alert above says what happened; this is the
-        // way forward the sibling sign-in screen gives the same failure by
-        // way of its address form staying live for a resubmit — there is no
-        // form here to resubmit, so the retry is its own control.
+        // A routing failure used to leave this card empty below the inviter's
+        // name — no picker, no retry. The sibling sign-in screen gives the
+        // same failure a retry via its address form staying live; there's no
+        // form here, so this button is its own retry control.
         <HStack>
           <Button
             colorPalette="orange"

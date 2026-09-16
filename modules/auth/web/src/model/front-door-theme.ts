@@ -77,10 +77,9 @@ export const frontDoorThemeConfig = defineConfig({
 });
 
 /**
- * The one word of the headline that carries a gradient, and the ground's own
- * atmosphere. Gradients are not colour tokens — Chakra's `colors` namespace
- * holds colours — so they stay custom properties, declared beside the token
- * block in `authFrontDoor.css` and read by name here.
+ * The one word of the headline with a gradient, and the ground's atmosphere.
+ * Gradients aren't colour tokens (Chakra's `colors` namespace holds colours),
+ * so they stay custom properties in `authFrontDoor.css`, read by name here.
  */
 export const FRONT_DOOR_GRADIENT = {
   accent: "var(--lw-front-door-accent-gradient)",
@@ -94,10 +93,9 @@ export const SHAPE = {
 } as const;
 
 /**
- * Headings on the site are set in Sentient. The font file is not in this
- * repository, so headings land on the serif fallback until it is: a real serif
- * stack, in the same weight and tracking, which reads as the same decision
- * rather than as a missing one.
+ * Headings are set in Sentient. Its font file isn't in this repository, so
+ * headings land on a real serif fallback (same weight and tracking) until it
+ * is — reading as the same decision, not a missing one.
  */
 export const HEADING_FONT = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 

@@ -5,12 +5,9 @@ import { LEGAL_LINKS } from "../../model/legal-links.ts";
 import "../elements/auth-front-door.css";
 
 /**
- * The small print both doors carry: what continuing means, said once, in the
- * quietest voice on the card. The links go to the site's own legal pages, so
- * the words a person agrees to live in exactly one place.
- *
- * Hosted only: the terms are the cloud's terms, and a company's own
- * installation answers to that company's, which we cannot link to.
+ * The small print both doors carry, said once. Links go to the site's own
+ * legal pages, so the words a person agrees to live in one place. Hosted
+ * only: a self-hosted install answers to that company's own terms, which we can't link to.
  */
 export function FrontDoorFinePrint() {
   const publicEnv = usePublicEnv();

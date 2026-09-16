@@ -4,21 +4,15 @@ import { moduleApi } from "@langwatch/runtime-composition";
 import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
 
 /**
- * Everything the auth module does for a caller: the browser session a signed-in
- * person holds, and the signed-out front door that stands before they have one.
- *
- * One interface because it is one module and one application. The two halves
- * meet at the same person: the door decides where an address signs in and mints
- * the account, and the session half is what the browser holds afterwards.
+ * Everything the auth module does for a caller: the signed-in browser session,
+ * and the signed-out front door that stands before they have one — one
+ * interface because it is one module, meeting at the same person.
  */
 export interface AuthApi {
   /**
-   * Whether Better Auth accepts the session token these headers carry.
-   *
-   * The deployment's own request boundary, and the half that carries the RAW
-   * auth-session id an impersonation is started and stopped against. A process
-   * that composed no sign-in door answers null, so its callers are anonymous
-   * rather than failing.
+   * Whether Better Auth accepts the token. Carries the RAW auth-session id
+   * an impersonation starts/stops against; a process with no sign-in door
+   * composed answers null, so callers are anonymous rather than failing.
    */
   tryVerifyBrowserSession(input: {
     headers: Headers;
@@ -59,21 +53,17 @@ export interface AuthApi {
    */
   requestFreshInvite(input: Readonly<{ inviteCode: string }>): Promise<void>;
   /**
-   * Which sign-in mode the deployment offers.
-   *
-   * ADR-027: reports "email" whenever the license gate denies SSO, so the
-   * sign-in page renders the email form and never auto-redirects to a disabled
-   * identity provider. This is the single source of truth.
+   * Which sign-in mode the deployment offers. ADR-027: reports "email"
+   * whenever the license gate denies SSO, so the page never auto-redirects
+   * to a disabled identity provider. Single source of truth.
    */
   resolveAuthProvider(): Promise<string>;
 }
 
 /**
- * The browser-session half of the API, for the callers that need only it: the
- * request boundary that resolves a cookie, and the features that end somebody's
- * sessions. Named rather than spelled out, because it is the same four
- * operations everywhere and a caller asking for the whole module would be
- * asking for the signed-out door as well.
+ * The browser-session half of the API, for callers needing only it: the
+ * cookie-resolving request boundary and the session-ending features. Named
+ * rather than spelled out — the whole module also pulls in the sign-in door.
  */
 export type BrowserSessionApi = Pick<
   AuthApi,

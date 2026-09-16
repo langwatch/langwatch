@@ -11,10 +11,8 @@ export interface CliDeviceSessionRepository {
 
   /**
    * Writes one value with a lifetime ONLY when the key is free, answering
-   * whether this caller is the one that wrote it.
-   *
-   * The poll throttle's whole mechanism: `false` means someone already claimed
-   * this window.
+   * whether this caller wrote it. The poll throttle's whole mechanism:
+   * `false` means someone already claimed this window.
    */
   setIfAbsent(input: { key: string; value: string; ttlSeconds: number }): Promise<boolean>;
 
@@ -22,11 +20,9 @@ export interface CliDeviceSessionRepository {
   delete(key: string): Promise<void>;
 
   /**
-   * Adds token keys to a user's index and re-stamps its lifetime.
-   *
-   * The index is what a deactivation sweep walks, so its own expiry is bumped
-   * to the longest-lived member on every mint and rotation: it must outlive
-   * every token it names, and self-evict once none of them can be live.
+   * Adds token keys to a user's index and re-stamps its lifetime. A
+   * deactivation sweep walks this index, so its expiry is bumped to the
+   * longest-lived member on every mint: it must outlive every token it names.
    */
   indexTokens(input: {
     indexKey: string;

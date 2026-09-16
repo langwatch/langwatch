@@ -8,12 +8,9 @@ import {
 } from "../model/passkey-failure.ts";
 
 /**
- * The waiting half: ask whether the browser can do this at all, then leave a
- * request pending for as long as the screen lives.
- *
- * `isLive` is read rather than passed, because it is read AFTER the await —
- * the whole point is to know whether the door is still open when somebody
- * finally picks a passkey, which may be a minute later.
+ * The waiting half: ask whether the browser can do this, then leave a
+ * request pending for as long as the screen lives. `isLive` is read (not
+ * passed) since it's checked AFTER the await, when the door may have closed.
  */
 async function offerPasskeyFromAutofill({
   isLive,
@@ -31,14 +28,10 @@ async function offerPasskeyFromAutofill({
     const result = await authClient.signIn.passkey({ autoFill: true });
     if (!isLive() || !result) return;
 
-    // Up to here nobody had started anything, and silence was right. Past
-    // here somebody PICKED a credential and is waiting for a door to open, so
-    // a refusal they never see reads as the click having done nothing at all.
-    // The plugin does not throw an abandoned ceremony — it RESOLVES it,
-    // carrying a 400, straight into the branch below that reads a 400 as "the
-    // server looked at this credential and said no". Only a ceremony that
-    // genuinely resolved with a refusal is reported; an abandoned one stays
-    // silent, same as before.
+    // Past this point somebody PICKED a credential, so a refusal they never
+    // see reads as the click doing nothing. The plugin RESOLVES an abandoned
+    // ceremony (doesn't throw) carrying a 400 — same as a real "no" from the
+    // server — so only a genuine refusal is reported, an abandoned one stays silent.
     if (result.error) {
       if (!isCeremonyAbandoned({ code: readPasskeyErrorCode(result.error) })) {
         onError(passkeyFailureFrom(result.error));

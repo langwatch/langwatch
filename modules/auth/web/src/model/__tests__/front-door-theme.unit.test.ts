@@ -66,10 +66,9 @@ describe("given the front door's theme tokens", () => {
     });
 
     /**
-     * The reason this is a namespace rather than an override of the app's own
-     * tokens: the front door borrows the marketing site's orange, and the app
-     * uses a different one. Nothing here is allowed to move a pixel anywhere
-     * else in the product.
+     * Why this is a namespace, not an override of the app's own tokens: the
+     * front door borrows the marketing site's orange, the app uses a
+     * different one — nothing here may move a pixel elsewhere in the product.
      */
     it("touches no token any other surface reads", () => {
       const foreign = [...allVariables()].filter(

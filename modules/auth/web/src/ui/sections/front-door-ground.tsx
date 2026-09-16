@@ -58,14 +58,10 @@ export function FrontDoorGround({ protect = "center" }: { protect?: keyof typeof
       }
       data-testid="front-door-ambient"
       aria-hidden="true"
-      // The dissolve and the width are the stage's, published as custom
-      // properties so the masks in the stylesheet read them. They cannot be
-      // Chakra tokens: they change per step and are tweened per frame, which
-      // is a value in motion rather than a value in the design system.
-      //
-      // `--lw-ground-hold` is where the colour is still solid; the mask runs
-      // from there to nothing at the far edge, so a bigger `fade` is a longer
-      // dissolve rather than a smaller cloud.
+      // The dissolve and width are custom properties (not Chakra tokens: they
+      // tween per frame, a value in motion). `--lw-ground-hold` is where the
+      // colour stays solid; the mask runs to nothing at the far edge, so a
+      // bigger `fade` is a longer dissolve.
       style={
         {
           "--lw-ground-hold": `${Math.round((1 - shift.fade) * 100)}%`,
@@ -142,11 +138,9 @@ export function FrontDoorGround({ protect = "center" }: { protect?: keyof typeof
 }
 
 /**
- * Follows the pointer by writing `--lw-lens-x/y` straight onto the lens node
- * — sixty writes a second is nothing for a style property and would be a
- * disaster as React state. The lens fades in on the first movement and back
- * out when the pointer leaves the page, so a keyboard-only visit never sees
- * it at all.
+ * Follows the pointer by writing `--lw-lens-x/y` onto the lens node directly
+ * — cheap as a style property, a disaster as React state. Fades in/out with
+ * pointer movement, so a keyboard-only visit never sees it.
  */
 function useLensPointer() {
   const lensRef = useRef<HTMLDivElement | null>(null);

@@ -6,17 +6,9 @@ import type { Direction, SnakeGame } from "../../model/castle-snake.ts";
 import { advance, advanceChaser, createGame, queueTurn } from "../../model/castle-snake.ts";
 
 /**
- * Easter egg snake game: double-tap castle, fixed canvas, arrows/Escape only.
- *
- * ── Motion ──────────────────────────────────────────────────────────────────
- * This is the one thing on the auth screens that moves under
- * `prefers-reduced-motion: reduce`, and that is deliberate, not an oversight.
- * The setting asks not to be moved at by a page; it does not ask for a game
- * that somebody just deliberately started to sit still. Everything ambient —
- * the entrance, the warp, the rise — stays stood down exactly as before.
- * Please do not "fix" this by gating it.
- *
- * Spec: specs/identity/auth-screen-castle-snake.feature
+ * Easter egg snake game. Deliberately still moves under
+ * `prefers-reduced-motion: reduce` — the setting asks not to be moved AT,
+ * not for a game somebody just started. Do not "fix" this by gating it.
  */
 
 /** The pitch of the ground's signal grid. Change one, change the other. */
@@ -391,11 +383,9 @@ function paintBurst({
 }
 
 /**
- * The snake's spine in pixels, head first: the head reaching for the node it
- * is on its way to, the tail retracting across the tick — which is what makes
- * the crawl continuous instead of a series of hops. Split into runs wherever
- * the lattice wrapped, so a crossing is never drawn as a dash across the
- * whole page.
+ * The snake's spine in pixels, head first, so the crawl looks continuous,
+ * not a series of hops. Split into runs where the lattice wrapped, so a
+ * crossing is never drawn as a dash across the page.
  */
 function spineRuns(game: SnakeGame, progress: number): { x: number; y: number }[][] {
   const step = STEP_PIXELS[game.direction];

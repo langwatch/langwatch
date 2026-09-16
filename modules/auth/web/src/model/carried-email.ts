@@ -35,9 +35,8 @@ export function readCarriedEmail(): string | undefined {
 
 /**
  * Take the address back out of the address bar, having read it.
- *
- * `replaceState` rather than assigning `location.hash`: assigning would push a
- * history entry, so Back would walk through the address the wipe was for.
+ * `replaceState` rather than assigning `location.hash`: assigning would push
+ * a history entry, so Back would walk through the address the wipe was for.
  */
 export function forgetCarriedEmail(): void {
   if (typeof window === "undefined") return;

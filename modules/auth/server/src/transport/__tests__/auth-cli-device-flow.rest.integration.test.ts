@@ -193,11 +193,9 @@ describe("given a CLI starting a device login", () => {
   });
 
   /**
-   * The no-paste API-key journey, and the window it opens. A device code lives
-   * ten minutes: between the browser approving a project and the CLI polling
-   * for it, an administrator can revoke the person's role on that project,
-   * archive it, or rotate its key. The approval stamp is a pointer to the
-   * project, never the answer.
+   * The no-paste API-key journey. A device code lives ten minutes, so between
+   * approval and the CLI polling for it an admin can revoke the role, archive
+   * the project, or rotate its key — the approval stamp is a pointer, never the answer.
    */
   describe("given a project-key grant approved for a project the person administers", () => {
     async function approvedProjectKeyGrant(world: ReturnType<typeof deviceFlowWorld>) {
@@ -291,10 +289,9 @@ describe("given a CLI starting a device login", () => {
   });
 
   /**
-   * The exclusive redemption claim. The poll window paces polls; it does not
-   * fence a redemption, because a redemption slower than the window leaves the
-   * record readable by the next poll — and a second redemption would hand out
-   * a second credential and revoke the first's key.
+   * The exclusive redemption claim. The poll window paces polls, not this: a
+   * redemption slower than the window leaves the record readable by the next
+   * poll, and a second redemption would hand out a second credential.
    */
   describe("given an approved device code being redeemed", () => {
     const claims = (world: ReturnType<typeof deviceFlowWorld>) =>
@@ -488,12 +485,9 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   }
 
   /**
-   * The keys currently held. Read by the redemption-claim tests, which assert
-   * on the presence of the claim itself: whether it survives a successful
-   * exchange is the whole point of it, and nothing else observes that.
-   *
-   * No expiry here. A test that wants a key gone deletes it, which is what an
-   * elapsed TTL amounts to.
+   * The keys currently held. Redemption-claim tests assert on the presence of
+   * the claim itself — whether it survives a successful exchange is the whole
+   * point. No expiry here: a test that wants a key gone deletes it.
    */
   keys(): string[] {
     return [...this.values.keys()];

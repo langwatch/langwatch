@@ -13,9 +13,8 @@ export interface CredentialSignInFailure {
   message: string;
   /**
    * How long until trying again is worth anything, or null when the refusal
-   * was not a rate limit or did not say. Null means the screen says the
-   * general sentence and leaves the button alone: a submit disabled for a
-   * duration nobody knows is a worse guess than no guess.
+   * wasn't a rate limit or didn't say. Null means the screen uses the
+   * general sentence: a submit disabled for an unknown duration is worse than no guess.
    */
   retryAfterSeconds: number | null;
 }

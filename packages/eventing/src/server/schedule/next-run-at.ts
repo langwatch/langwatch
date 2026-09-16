@@ -26,10 +26,9 @@ export function computeNextRunAt({
 }
 
 /**
- * A defensive bound on the catch-up walk (`computeCatchUp`). At the report
- * scheduler's ≥15-minute minimum cadence a walk of this length spans months, so
- * it never trips in practice — it exists only so a pathological/misconfigured
- * cron cannot spin the recovery loop unbounded.
+ * Defensive bound on the catch-up walk (`computeCatchUp`). At the scheduler's
+ * ≥15-minute minimum cadence this never trips in practice — it exists only so
+ * a misconfigured cron cannot spin the recovery loop unbounded.
  */
 const MAX_CATCH_UP_STEPS = 10_000;
 

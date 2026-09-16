@@ -9,12 +9,9 @@ export type StoredVerificationToken = {
 };
 
 /**
- * The two tables auth owns, in memory.
- *
- * Shared by both twins because they are one store: a test that mints a session
- * and then revokes it through the app must see one set of rows, and two
- * databases behind one repository set would let the app pass against state
- * nothing else can see.
+ * The two tables auth owns, in memory — shared by both twin repositories
+ * since they are one store: a test that mints a session then revokes it
+ * must see one set of rows, not state hidden behind a second database.
  */
 export class MemoryAuthDatabase {
   readonly sessions = new Map<string, StoredBrowserSession>();

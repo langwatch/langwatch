@@ -19,11 +19,9 @@ describe("Auth contract", () => {
 
   describe("when Better Auth answers with its own whole record", () => {
     /**
-     * What `auth.api.getSession` actually returns: the full session and user
-     * rows, plus the `additionalFields` the transport configures. The API
-     * composition passes this through unreshaped, so it is what the contract
-     * meets in production — and the trimmed object every other fixture in this
-     * repo hand-builds is a shape Better Auth never sends.
+     * `auth.api.getSession`'s real shape: full session/user rows plus the
+     * transport's `additionalFields`, passed through unreshaped. Every other
+     * fixture here hand-builds a trimmed shape Better Auth never actually sends.
      */
     const betterAuthSession = {
       session: {

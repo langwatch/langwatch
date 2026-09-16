@@ -25,12 +25,9 @@ import type {
 } from "../types.ts";
 
 /**
- * The replay engine against a real Redis (its markers and pause set live
- * there) and an in-memory event history behind the `ReplayEventSource` port.
- * The port is the seam the durable store sits behind, so a history double
- * exercises exactly the reads the engine makes — including the event-type
- * filter, which is what keeps a rebuild from paying for events no selected
- * projection consumes.
+ * Exercises the replay engine against real Redis (markers, pause set) and an
+ * in-memory event history behind the `ReplayEventSource` port — including the
+ * event-type filter, which stops a rebuild paying for events no projection wants.
  */
 
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";

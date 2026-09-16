@@ -12,12 +12,9 @@ const sessionSelect = {
 } as const;
 
 /**
- * The `Session` table, which auth owns outright: every row here is a browser
- * session, and nothing else in the product writes one.
- *
- * Deletes go through `deleteMany` rather than `delete` on purpose. A revocation
- * is idempotent - two tabs signing out race - and `delete` raises on a row that
- * has already gone, which would turn the second sign-out into an error.
+ * The `Session` table, which auth owns outright. Deletes go through
+ * `deleteMany` rather than `delete` on purpose: revocation is idempotent —
+ * two tabs signing out race — and `delete` would raise on an already-gone row.
  */
 export class PrismaAuthSessionRepository
   extends PrismaRepository.for("Session")

@@ -6,12 +6,9 @@ import { hardRedirect } from "./hard-redirect.ts";
 import { captureException, toError } from "./error-capture.ts";
 
 /**
- * Module-scoped set of invite codes that have already had a `mutate` call
- * dispatched during this page session. Living at module scope (not `useRef`)
- * means the guard survives real unmount/remount — parent re-keying, HMR,
- * back-nav with `?inviteCode=` still in the URL — and not just same-instance
- * double-invokes from StrictMode. A hard redirect (success or already-accepted)
- * reloads the page and wipes this set, which is the correct semantics.
+ * Module-scoped set of invite codes already `mutate`d this page session.
+ * Module scope (not `useRef`) survives real unmount/remount — re-keying, HMR,
+ * back-nav — not just StrictMode's double-invoke; a redirect wipes the set.
  */
 const submittedInviteCodes = new Set<string>();
 

@@ -10,10 +10,9 @@ import { SecurityError } from "../services/errorHandling.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Generates a unique, k-sortable event ID using a KSUID.
- * The KSUID embeds a second-precision timestamp, making it naturally sortable.
- * All contextual fields (tenantId, aggregateId, etc.) are stored as separate
- * columns on the event, so the ID needs no composite structure.
+ * Generates a k-sortable event ID (KSUID): its embedded second-precision
+ * timestamp makes it naturally sortable, so the ID needs no composite
+ * structure — contextual fields are stored as separate columns instead.
  */
 function generateEventId(): string {
   return generate("event").toString();

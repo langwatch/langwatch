@@ -20,12 +20,9 @@ export const REHYDRATION_WINDOW_DAYS = 45;
 export const REHYDRATION_WINDOW_MS = REHYDRATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 /**
- * Returns the `EventOccurredAt` lower bound (ms) to apply to an aggregate's
- * rehydration scan, or `undefined` when the scan must stay unbounded.
- *
- * Unbounded (returns undefined) when the aggregate type is not time-local, or
- * when no usable anchor time is available — in both cases the caller falls back
- * to the full, partition-spanning scan.
+ * Returns the `EventOccurredAt` lower bound (ms) for an aggregate's
+ * rehydration scan, or `undefined` — when the type isn't time-local or no
+ * anchor time is available — meaning the caller falls back to a full scan.
  */
 export function rehydrationLowerBoundMs(
   aggregateType: AggregateType,

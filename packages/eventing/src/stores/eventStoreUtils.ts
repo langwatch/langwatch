@@ -74,10 +74,8 @@ export function eventToRecord<EventType extends Event>(event: EventType): EventR
 }
 
 /**
- * Parses raw EventPayload from storage into a usable object.
- *
- * Handles: JSON strings, already-parsed objects, empty strings (→ null).
- * Throws StoreError for unexpected types or malformed JSON.
+ * Parses raw EventPayload from storage: JSON strings, already-parsed objects,
+ * empty strings (→ null). Throws StoreError for anything else malformed.
  */
 export function parseEventPayload(rawPayload: unknown): unknown {
   if (typeof rawPayload === "string") {

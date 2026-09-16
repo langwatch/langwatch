@@ -14,11 +14,8 @@ export interface EventRepositoryMemoryOptions {
 }
 
 /**
- * In-memory implementation of EventRepository.
- * Stores events in a Map keyed by tenantId:aggregateType:aggregateId.
- *
- * **WARNING: NOT THREAD-SAFE**
- * This implementation is NOT safe for concurrent access.
+ * In-memory `EventRepository`, keyed by tenantId:aggregateType:aggregateId.
+ * NOT THREAD-SAFE — unsafe for concurrent access.
  */
 export class EventRepositoryMemory implements EventRepository {
   // Partition by tenant + aggregateType + aggregateId

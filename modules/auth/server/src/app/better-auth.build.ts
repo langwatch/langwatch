@@ -58,12 +58,9 @@ export class PrismaBetterAuthStorage extends BetterAuthStorage {
 }
 
 /**
- * ADR-027's licence questions.
- *
- * The hosted product is licensed by definition; a self-hosted install reports
- * unlicensed here, because this module reads no licence. That is exactly what
- * the deleted composition answered — the api process passed it no licensing
- * store either — and {@link buildBetterAuth} says so once at boot.
+ * ADR-027's licence questions. The hosted product is licensed by definition;
+ * a self-hosted install reports unlicensed here, since this module reads no
+ * licence — matching what the deleted composition answered.
  */
 export class ModuleBetterAuthFederation extends BetterAuthFederation {
   static create(options: {

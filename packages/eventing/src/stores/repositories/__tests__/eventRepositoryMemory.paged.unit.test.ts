@@ -3,10 +3,9 @@ import type { EventRecord } from "../eventRepository.types.ts";
 import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 
 /**
- * `getEventRecordsUpToPaged` is the cursor-paginated read the streaming
- * store-miss re-fold walks so a huge aggregate's history never lands in memory
- * whole. The ClickHouse repository mirrors this exact cursor + upper-bound +
- * (EventTimestamp, EventId) order, so locking the behaviour here guards both.
+ * The cursor-paginated read the streaming re-fold walks so a huge aggregate
+ * never loads whole. ClickHouse mirrors this exact cursor/order, so locking
+ * the behaviour here guards both.
  */
 function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
   return {

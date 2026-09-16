@@ -27,11 +27,9 @@ const MAX_TIPS = 4;
 const MAX_PROSE_LENGTH = 200;
 
 /**
- * Server prose, clamped to something that can only ever be a sentence.
- *
- * A length clamp, not a safety boundary — the callers pass text LangWatch
- * wrote about the customer's own input. Sliced by code point, because cutting
- * a surrogate pair in half renders a replacement character.
+ * Server prose, clamped to a sentence — a length clamp, not a safety
+ * boundary, since callers pass text LangWatch wrote. Sliced by code point
+ * to avoid cutting a surrogate pair in half.
  */
 export function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();

@@ -4,11 +4,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { forgetCarriedEmail, readCarriedEmail, signUpHref } from "../carried-email.ts";
 
 /**
- * The address is carried between the two doors in the URL FRAGMENT, and the
- * whole point of that is what the fragment does NOT do: it never reaches the
- * server, so it lands in no access log and no `Referer`. These pin the two
- * halves of that promise — that nothing writes the address into the query, and
- * that the screen which reads it puts it back down afterwards.
+ * The address is carried in the URL FRAGMENT: it never reaches the server,
+ * so it lands in no access log and no `Referer`. These pin that promise —
+ * nothing writes it into the query, and the reading screen clears it after.
  */
 describe("given an address carried between the front door's two screens", () => {
   beforeEach(() => {

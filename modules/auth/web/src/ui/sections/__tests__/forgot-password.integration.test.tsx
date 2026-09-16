@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the /auth/forgot-password page. The full component
- * tree renders under Chakra; only the BetterAuth client (network boundary) and
- * the public-env hook are mocked.
+ * Integration tests for /auth/forgot-password: the full tree renders under
+ * Chakra; only the BetterAuth client and the public-env hook are mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

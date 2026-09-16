@@ -16,11 +16,9 @@ export type BetterAuthHookOrganization = {
 };
 
 /**
- * Private persistence boundary for the Better Auth database hooks — the
- * ADR-027 SSO gate, ADR-101 identifier reconciliation and the ADR-116 SSO
- * auto-join. One boundary because every hook in `better-auth-hooks.api.ts`
- * reads and writes the same handful of rows (User, Organization, Account,
- * OrganizationUser).
+ * Private persistence boundary for the Better Auth database hooks — ADR-027
+ * SSO gate, ADR-101 identifier reconciliation, ADR-116 SSO auto-join. One
+ * boundary since every hook reads/writes the same rows (User, Org, Account).
  */
 export abstract class BetterAuthHooksRepository {
   abstract tryFindUserForHooks(input: { userId: string }): Promise<BetterAuthHookUser | null>;

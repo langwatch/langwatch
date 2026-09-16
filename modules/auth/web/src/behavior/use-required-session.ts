@@ -62,21 +62,16 @@ export const noOrgBouncerRoutes = [
   // no_default_routing_policy until a default policy exists, and that
   // happens before the org has any project.
   "/gateway/routing-policies",
-  // Personal-scope pages — persona-1 (org-less CLI/IDE devs) is a
-  // first-class persona per the persona-aware-chrome spec. They have
-  // a legitimate home at /me + /me/configure without needing to create
-  // an org first. Without this exemption, CommandBar's global
-  // useOrganizationTeamProject({redirectToOnboarding: true}) wins the
-  // race and dumps them on /onboarding/welcome — exact opposite of the
-  // p1 storyboard.
+  // Personal-scope pages: persona-1 (org-less CLI/IDE devs) has a legitimate
+  // home at /me + /me/configure with no org required. Without this exemption,
+  // CommandBar's onboarding redirect wins the race and dumps them on
+  // /onboarding/welcome — the opposite of the p1 storyboard.
   "/me",
   "/me/configure",
-  // The root index is responsible for picking the right home per
-  // persona (`pages/index.tsx` resolves via api.governance.resolveHome
-  // for org-having users + falls back to /me for org-less p1). The
-  // global no-org bouncer must defer to the index page's own logic
-  // here, otherwise CommandBar wins the race and dumps p1 on
-  // /onboarding/welcome before the resolver effect fires.
+  // `pages/index.tsx` already resolves the right home per persona (via
+  // api.governance.resolveHome, falling back to /me for org-less p1). The
+  // no-org bouncer must defer to it, or CommandBar wins the race and dumps
+  // p1 on /onboarding/welcome before the resolver effect fires.
   "/",
 ];
 

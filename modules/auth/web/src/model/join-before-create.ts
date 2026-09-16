@@ -11,12 +11,9 @@ export interface JoinBeforeCreateInput {
    *  account exists at this point in sign-up. */
   verifiedEmail: string;
   /**
-   * Whether that address has actually been PROVED.
-   *
-   * The gate, not a hint. An unverified address answers `create_workspace`
-   * without consulting the lookup at all, which is what makes "nothing is
-   * looked up and nothing is offered" true of the decision as well as of the
-   * screen that calls it.
+   * Whether that address has actually been PROVED — the gate, not a hint.
+   * An unverified address answers `create_workspace` without consulting the
+   * lookup at all, so nothing is looked up and nothing offered.
    */
   verified: boolean;
   /**

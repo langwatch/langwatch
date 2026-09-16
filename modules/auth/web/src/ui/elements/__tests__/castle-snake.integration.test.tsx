@@ -1,16 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The castle Snake, checked for the only things that could hurt anybody: that
- * it cannot start by accident, cannot come between somebody and the form, and
- * gives everything back when it stops.
- *
- * The game's own rules are checked without a DOM in
- * `model/__tests__/castle-snake.unit.test.ts`. jsdom has no 2D context, so no
- * frame is ever painted here — which is exactly the right level for these
- * scenarios, since none of them are about what the game looks like.
- *
- * Spec: specs/identity/auth-screen-castle-snake.feature
+ * The castle Snake, checked for what could hurt anybody: it can't start by
+ * accident, can't come between somebody and the form, and gives everything
+ * back when it stops. Spec: specs/identity/auth-screen-castle-snake.feature
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

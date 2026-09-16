@@ -3,11 +3,9 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { useSearchParams } from "../../behavior/use-route.ts";
 
 /**
- * Email verification magic-link landing page; renders only, no request; proof stays in URL.
- * There's no expired-link state here on purpose: this page never spends the link, so it can
- * never learn whether the token is expired, used or invented — making that request here is
- * exactly what a scanner spending someone else's verification would exploit. That state lives
- * where the token is actually spent instead (the initiating window, and the sign-up page).
+ * Magic-link landing page: renders only, no request — proof stays in URL.
+ * This page never spends the link (so it can't learn expired/used/invented),
+ * which is exactly what a scanner spending someone else's link would exploit.
  */
 export default function VerifyEmail() {
   const query = useSearchParams();

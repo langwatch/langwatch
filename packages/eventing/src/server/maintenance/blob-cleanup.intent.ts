@@ -12,10 +12,9 @@ export interface BlobCleanupDeps {
 }
 
 /**
- * The sweep's external work, kept out of the process definition so the
- * definition stays pure and synchronous. Redelivery is safe: the sweep is a
- * scan that reclaims only blobs no queue still references, so a second pass
- * over the same keyspace reclaims nothing a first pass already took.
+ * External work kept out of the process definition to stay pure/synchronous.
+ * Redelivery-safe: a scan reclaims only unreferenced blobs, so a repeat pass
+ * over the same keyspace reclaims nothing already taken.
  */
 export function runBlobCleanup(deps: BlobCleanupDeps) {
   return async (): Promise<void> => {

@@ -1,8 +1,6 @@
 /**
- * The browser sessions this module owns, as rows.
- *
- * Every operation is keyed by a session id or a user id, which is the whole of
- * what session lifecycle needs: nothing here queries by anything else, and the
+ * The browser sessions this module owns, as rows. Every operation is keyed by
+ * a session id or a user id — nothing here queries by anything else — and the
  * token column is read only so a revocation can evict the matching cache entry.
  */
 export type StoredBrowserSession = {
