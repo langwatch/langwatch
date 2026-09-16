@@ -587,3 +587,44 @@ tag (`@vitest-environment`, `@see`) into the JSDoc as its own ` * @tag` line so
 the discount regex sees it. The second is the better fix where it applies — the
 JSDoc form is what 1,292 files in this tree already use, 746 of them for
 `jsdom`, where a directive that failed to register would break the test outright.
+
+## Wave 5 — `modules/api-key` and `modules/dataset`
+
+26. **`extendLoginKeyExpiry` also scopes by name prefix.**
+    `modules/api-key/server/src/repositories/api-key.repository.ts` and its
+    `prisma.` sibling. The doc dropped "scoped by name prefix as well as
+    id/organization/user". This one is not recoverable from the type: the
+    interface signature has **no `name` parameter**, so nothing tells a reader
+    that the implementation additionally filters by the CLI-login name prefix.
+    A caller reasoning from the signature alone will expect a wider match than
+    they get.
+
+27. **Why the empty-grid message sits inside the border rather than below it.**
+    `modules/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx`.
+    The placement survived; its reason did not. Gone: it sits **inside** the
+    grid's border, where the missing rows would have been, because below it the
+    reader gets a blank box with an unattached sentence underneath. That is a
+    layout decision someone will "tidy up" without the sentence explaining it.
+
+### A pre-existing defect found by the sweep, not caused by it
+
+`modules/dataset/web/src/model/dataset-editor-copy.ts` carries a docblock whose
+prose describes `noSearchMatchesMessage` ("Shown in place of the grid when a
+search matched nothing…") while physically sitting above `plainRecordCount`,
+which has a doc of its own directly beneath it. `noSearchMatchesMessage` itself
+has no doc at all. A past reorder stranded it. The lane correctly shrank it in
+place and refused to move it, since relocating a comment onto a different
+declaration is outside a comment-sweep's mandate — it is recorded here and
+fixed separately.
+
+### A second blind spot in the comment-only checker
+
+`comment-only.py` flagged two api-key test files as having changed code when
+every one of their 23 changed lines is comment-shaped. The cause is **backticks
+inside comments**: its stripper treats a backtick as opening a template literal,
+so a comment edit that changes the number of backticks desyncs the state machine
+for the rest of the file. This is separate from the regex-literal blind spot
+already recorded. Neither check is sound alone — the changed-line pattern check
+is blind to JSX `{/* */}` continuation lines, and the strip-and-compare check is
+blind to backticks and regex literals. Run both and reconcile the disagreements
+by hand; that is what the pair is for.
