@@ -9,17 +9,31 @@ user's direction. They are independent; pick either.
 
 ## Exact next action
 
-**Wave 8 (the fallible-naming family) is started, not finished.** 145 of 2,104
-cleared. The next tranche is **class C**, and it has a ruling already - read
-"The naming ruling" below before writing its manifest, because a previous
-attempt at this family was reverted wholesale for getting it wrong.
+**Two decisions are open and both block a lane rather than waiting on one.**
 
-Then: `comment-block-size` still has 659, with `packages/api` and
-`packages/architecture-enforcer` still deliberately held.
+1. **The scenario naming collision.** `ScenarioRepository` / `ScenarioService` /
+   `ScenarioApi` / `ScenarioApp` each already declare a **throwing sibling**
+   under the name that dropping `try` would produce, so the standard fix
+   collides. Decide which of the two keeps the plain name. A lane refused this
+   correctly; do not let one guess.
+2. **Class C, 741 findings, still deferred** - see "Why class C is not next".
 
-Drive B (web import cycles) was **not touched in this session** - the
-studio-column-vocabulary decision in section B is still open and still blocks
-web-12's dependency deletion.
+Unblocked work, in order of value:
+
+- Classes A/B/D/E still have ~870 findings across 40 areas, and wave 9 proved
+  the recipe. Avoid the peer-active areas listed in `.claude/coordinator/LANES.md`.
+- `packages/eventing`'s `getKey` and `tryGet` still need one lane owning
+  eventing + scenario + suite together; `tryGetProjection` and
+  `tryExtractSuiteId` are already done.
+- `comment-block-size` has 659 left, with `packages/api` and
+  `packages/architecture-enforcer` still deliberately held.
+
+**Before collecting any rename slice, run
+`dev/scripts/wire/orphaned-consumers.py`.** It exists because a collected slice
+broke six modules - see "The regression that check was written for".
+
+Drive B (web import cycles) is untouched; the studio-column-vocabulary decision
+in section B is still open.
 
 
 ---
@@ -141,8 +155,8 @@ register before its slice was collected. Do this every time.
 
 | | drive start | now |
 | --- | ---: | ---: |
-| `fallible-result-naming` + `no-try-prefix` | 2,104 | **1,959** |
-| oxlint total | 9,886 (session start) | **9,170** |
+| `fallible-result-naming` + `no-try-prefix` | 2,104 | **1,719** |
+| oxlint total | 9,886 (session start) | **8,932** |
 
 Landed: `c859531848` (29 hedges -> 5, 79 files) and `f4d4c4bdce` (83 files across
 github, project, user, suite). Served surface verified unchanged on both.
@@ -206,6 +220,54 @@ corrupt record failed a whole listing. **The user's ruling: a single-record read
 throws; a list skips the corrupt member and logs it at warn with the id.** The
 catch is narrowed with `instanceof` so a Redis outage still propagates. Look for
 this shape in every module this family touches next.
+
+
+### The regression that check was written for
+
+A collected slice renamed `UserApi.tryFindById` to `findById`. `UserApi` is in a
+**contract** package, so its consumers are everywhere, and the lane owned four
+modules. Every other consumer was left calling a method the interface no longer
+declared: `role`, `auth`, `presence`, `data-retention`, `ops`, `sso`, and a
+`Pick<UserApi, "tryFindById" | "updateProfile">` in SCIM that selected the dead
+key by name. **34 sites across 20 files**, repaired in `57effbb1a5` and
+`c867f14ade`.
+
+Three collection checks passed it: scope checks the slice, the served-surface
+diff reads routes and none moved, the package suites run the package. **A
+consumer three modules away is outside all three.**
+
+Half of it was invisible to the type checker as well. Five SCIM doubles built
+from `vi.fn()` object literals kept the old key without a type error and failed
+only at runtime with `this.userService.findById is not a function`. **A rename is
+verified by RUNNING the tests of every affected package, never only by compiling
+them.**
+
+`dev/scripts/wire/orphaned-consumers.py` now takes the names a diff renamed away
+and searches the tree for survivors outside the changed files. On its first real
+use it found a second breakage nobody would have caught: `modules/analytics`'s
+`memory-safety-structural-invariants` test `readFileSync`s trace's
+`trace-legacy-read.repository.ts` and matches `/async getTopicCounts/` and
+`/async getDistinctFieldNames/` **against the source text**. Both had become
+`find*`, so four assertions silently matched nothing.
+
+### Why class C is not next
+
+Class C is **741** and its bulk is domain verbs, not lookups: 61 `resolve*`,
+57 `parse*`, 56 `read*`, 52 `get*`, 23 `extract*`, 415 other. Its most frequent
+names - `mintTurnToken`, `consumeNonce`, `verifyInstallState` - are names wave 8
+**correctly created**, because dropping `try` leaves a nullable return that
+immediately trips the absence branch. Fixing them means deciding per site
+whether minting a token should throw. That is 741 product judgements on the
+exact call lanes have misjudged twice. Give it a small proving slice first.
+
+### One more trap, paid for twice
+
+A lane reported `complete` while `typecheck:one` **could not run** (it was
+blocked by the regression above). Two real defects were hiding behind the unrun
+check - a class D return annotation that named the first of two `.build()` calls,
+and two test doubles left at `new Payloads(null)` after the constructor became
+`string`. **A required check that did not run makes the status `partial` or
+`blocked`, never `complete`.**
 
 ### Traps this wave paid for
 
