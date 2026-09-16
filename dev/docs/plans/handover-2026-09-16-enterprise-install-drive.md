@@ -161,6 +161,19 @@ Collapsing the four is a later drive (option A), deliberately not now.
 
 ## Traps that have each cost real time
 
+- **No slice in this drive was verified by CI, and none could have been.** The
+  package-suites job has been dead since `e702359c53`: two bare names in
+  `.github/package-suites.excluded` made the runner exit before discovering a
+  single package, and a suite that never starts cannot fail, so it read green
+  throughout. Fixed by a peer session on 2026-09-17. Every "checks passed" in
+  this drive's handoffs is a local run, which is what they say - but do not read
+  a green CI on any of these commits as a second opinion, because there was not
+  one.
+- **The suite script is `test`, not `test:unit`** (`8337098ae3`, workspace-wide).
+  Both governance modules re-verified under the new name after the rename:
+  `@langwatch/enterprise-governance-server` 7 files / 65 tests,
+  `@langwatch/enterprise-scim-server` 13 files / 108 tests.
+
 - **`governance: []` in the generated members file is correct output, not a
   failure.** The generator derives that list from `static readonly reads` alone
   (`dev/scripts/generate-modules.mjs:53`); boot adds the chosen repository tier's
