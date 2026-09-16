@@ -9,7 +9,7 @@ describe("LlmConfigRepository", () => {
     });
   });
 
-  describe("getConfigByIdOrHandleWithLatestVersion", () => {
+  describe("findConfigByIdOrHandleWithLatestVersion", () => {
     describe("when version parameters provided", () => {
       it.todo("filters by version when version param provided");
       it.todo("filters by versionId when versionId param provided");

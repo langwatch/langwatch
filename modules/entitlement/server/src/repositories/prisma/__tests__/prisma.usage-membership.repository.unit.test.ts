@@ -440,8 +440,8 @@ describe("PrismaUsageMembershipRepository", () => {
     });
   });
 
-  describe("getCurrentMonthCost", () => {
-    /** @scenario "getCurrentMonthCost remains available in the repository" */
+  describe("findCurrentMonthCost", () => {
+    /** @scenario "findCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
       mockPrisma.project.findMany.mockResolvedValue([{ id: "proj-1" }, { id: "proj-2" }]);
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 150.5 } });
@@ -506,7 +506,7 @@ describe("PrismaUsageMembershipRepository", () => {
     });
   });
 
-  describe("getCurrentMonthCostForProjects", () => {
+  describe("findCurrentMonthCostForProjects", () => {
     it("aggregates cost for specified project IDs", async () => {
       mockPrisma.cost.aggregate.mockResolvedValue({ _sum: { amount: 75.25 } });
       const projectIds = ["proj-a", "proj-b", "proj-c"];
