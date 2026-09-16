@@ -231,3 +231,64 @@ Classes as defined in the Sep-14 document.
 - Credential health is in `credentialChecks` in the report, `[base, candidate]`.
   Read it before reading any count: a run whose project key died compares two
   refusals and its agreement means nothing.
+
+## `GET /api/simulation-runs` — why the 503 is not a wiring change
+
+The windowed-read seam that first blocked this is gone: the partition-window
+policy now lives in `@langwatch/clickhouse-client` (`801acfe7fe`), and
+`SimulationClickHouseRepository.create(resolveClient)` takes no collaborator.
+The route still 503s, for a different and larger reason.
+
+`ScenarioApp` reads `simulations` off `setup.members.simulations`. It is typed
+non-optional and eighteen call sites use it unguarded, but **no process supplies
+it**, so it is `undefined` everywhere — in the api and in the worker alike, whose
+module-provided `ScenarioApp` is what `peers.bind(ScenarioApi, scenarios)`
+hands the agent runtime. One call site,
+`getRunDataForAllSuites`, guards with `ScenarioSimulationsUnavailableError`;
+that is the 503. The other seventeen would `TypeError`.
+
+There is no seam that can supply it:
+
+- **Members are a closed platform registry.** `reads()` is typed
+  `readonly MemberName[]` over fourteen names (`packages/infrastructure/src/members.ts:144`),
+  and `createProcessMembers` accepts overrides only for those. `withMembers()`
+  takes arbitrary strings but resolves through the same source. A feature
+  service can never be a member, and `packages/infrastructure` importing
+  `@langwatch/scenario-server` would invert the layering.
+- **Repositories can carry the reads.** A bundle declares `requires` and is
+  handed those members, so `requires = ["prisma", "clickhouse"]` builds the
+  ClickHouse read repository. `SimulationRepository` is read-only —
+  every one of its eighteen methods is a get/find/count. This half is
+  unblocked and correct, and `ScenarioRepositories`' own comment already flags
+  it ("Run state, results and configurations are ClickHouse-backed,
+  unregistered here").
+- **Repositories cannot carry the writes.** `SimulationExecutionRepository`
+  dispatches through the `simulation_processing` pipeline's registered
+  commands — the `apps/tasks` recipe at
+  `stalled-runs-backfill.composition.ts:156`. A bundle doing that
+  unconditionally would double-register: the worker already registers the same
+  pipeline as a consumer, and `eventSourcing.register` refuses with
+  `Pipeline "…" is already registered on this runtime.`
+  (`packages/eventing/src/eventSourcing.ts:248`). `ProducerOnlySimulationExecution`
+  is a stand-in inside the definition that refuses all ten writes, not a
+  dispatcher.
+
+So `simulations` cannot be split across two seams without an optional
+collaborator, and cannot live wholly in either. Two ways forward, both
+architectural:
+
+1. **Convert scenario's eventing.** `defineServerModule` already has
+   `.withEventing(...)`; scenario does not declare it. The module would own the
+   `simulation_processing` definition in both registration modes, and the
+   execution repository would come from the registration rather than from a
+   process. Largest, and the one the code already calls "the module handover"
+   (`worker-agent-apps.composition.ts`, `scenario.server.ts:12`).
+2. **Give the builder a per-module infrastructure seam** — a typed way for a
+   process to hand one module its bespoke collaborators, which is what
+   `ScenarioAppInfrastructure` has always assumed and never had. Smaller, but
+   it is new framework surface, and thirteen other members in that same bag
+   would immediately want it.
+
+Until one is chosen, `ScenarioSimulationsUnavailableError` stays: it is a
+truthful refusal, and ADR-133 would retire it only once a process can actually
+compose the thing.
