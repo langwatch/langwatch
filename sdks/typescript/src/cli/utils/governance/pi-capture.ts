@@ -22,11 +22,16 @@
  * on this axis is tightening to files created after the run started, which drops
  * every resumed session because a resumed file already existed.
  *
- * One narrowing does exist and is unused: the session header carries `cwd`, the
- * directory pi ran in (`pi-session-file.ts:100`). A hand-started pi in another
- * directory could be excluded on it. Nothing here reads it. Not done, not
- * impossible. #8132 is a different problem, and points the other way: it wants
- * plain `pi` runs captured, not excluded.
+ * The session header carries `cwd`, the directory pi ran in
+ * (`pi-session-file.ts:100`), and nothing here reads it. It is not a free
+ * narrowing, which is why it is unused rather than pending: the case it would
+ * have to catch is a second terminal in the same project, where `cwd` matches,
+ * and the header is written once at session creation, so a session resumed from
+ * elsewhere still reports its original directory and would be dropped. Both
+ * narrowings cost the same category they are meant to protect.
+ *
+ * #8132 is a different problem, and points the other way: it wants plain `pi`
+ * runs captured, not excluded.
  *
  * **A failed post is retried, not swallowed.** The codex streamer marks a turn
  * emitted only after a successful post, so a transient failure retries on the

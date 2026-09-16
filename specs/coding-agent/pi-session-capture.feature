@@ -202,13 +202,15 @@ Feature: pi session capture
   #
   # pi writes no marker saying which process launched it, so a second pi the
   # user starts by hand during this run writes rows on the same clock and is
-  # captured. The session header does carry cwd, the directory pi ran in, which
-  # would narrow this: a hand-started pi in another directory could be excluded.
-  # Nothing reads it today. That is an open improvement, not a limit.
+  # captured. The session header carries cwd, the directory pi ran in, and
+  # nothing reads it. It is not a free narrowing: the case it would have to
+  # catch is a second terminal in the same project, where cwd is identical, and
+  # the header is written once at session creation, so a session resumed from
+  # a different directory still reports the original one and would be dropped.
   # Tightening the file stamp instead, to files created after the run started,
   # would drop every resumed session, because a resumed file already existed.
-  # That is a whole category lost, which is why the over-capture is the side we
-  # err on.
+  # Both narrowings cost the same category, which is why the over-capture is
+  # the side we err on.
   # Both halves are asserted, never just the absence: a run that captured
   # nothing at all would satisfy the absence on its own.
   @unit

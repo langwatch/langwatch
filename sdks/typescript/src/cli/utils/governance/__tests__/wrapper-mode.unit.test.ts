@@ -1336,6 +1336,13 @@ describe("pi's forced ingestion is honest about itself", () => {
 		await expect(
 			resolveWrapperMode(cfg, "pi", {}, [], undefined),
 		).rejects.not.toThrow(/path that cannot exist/i);
+		// The positive half. An earlier version of this test matched
+		// /sign-in|settings/, which the false string satisfied too ("its own
+		// model settings"), so it pinned nothing. This phrase appears only in
+		// the honest wording.
+		await expect(
+			resolveWrapperMode(cfg, "pi", {}, [], undefined),
+		).rejects.toThrow(/would hide your own pi sign-in/);
 
 		// The control: for every other tool both levers are real, so the
 		// generic either-or advice is still what gets printed.
