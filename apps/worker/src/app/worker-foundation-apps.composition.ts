@@ -28,6 +28,7 @@ import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { entitlementServer } from "@langwatch/entitlement-server";
 import { identityServer } from "@langwatch/identity-server";
+import { redisRateLimiter } from "@langwatch/infrastructure";
 import { createApp, membersFrom, type ResourceScope } from "@langwatch/runtime-composition";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ProjectInfrastructure } from "@langwatch/project-server";
@@ -47,6 +48,9 @@ import type { WorkerEventingRuntime } from "../platform/eventing/worker-eventing
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { resolveWorkerStoredSecretCipher } from "./worker-automation-graph.composition.ts";
 import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
+
+/** The api's own default window, matched so the two processes cannot drift. */
+const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
 /** The worker's installed, complete callable tenancy surfaces. */
 export type WorkerTenancy = Readonly<{
@@ -154,6 +158,11 @@ export async function createWorkerFoundationApps(options: {
       // The SAME cipher the automation graph reads stored credentials with —
       // a second cipher would not fail, it would decrypt to noise.
       encryption: resolveWorkerStoredSecretCipher(options.config),
+      // `auth` reads a limiter unconditionally, because the operation behind
+      // /api/auth/validate needs one and a module cannot know which doors a
+      // process mounts. Real and Redis-backed over the same connection, and
+      // never consulted here: this process mounts `workerClosedDoors()`.
+      rateLimiter: redisRateLimiter(options.redis, WORKER_RATE_ALLOWANCE),
     }),
   })
     .withTransports(workerClosedDoors())
