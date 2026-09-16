@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { normalizeDocsUrl, docsCommand, scenarioDocsCommand } from "../docs";
 
 describe("normalizeDocsUrl()", () => {
-  describe("for langwatch docs", () => {
+  describe("when given langwatch docs", () => {
     it("returns the llms.txt index when no input is provided", () => {
       expect(normalizeDocsUrl(undefined, "langwatch")).toBe("https://langwatch.ai/docs/llms.txt");
     });
@@ -80,7 +80,7 @@ describe("normalizeDocsUrl()", () => {
     });
   });
 
-  describe("for scenario docs", () => {
+  describe("when given scenario docs", () => {
     it("returns the scenario llms.txt index when no input is provided", () => {
       expect(normalizeDocsUrl(undefined, "scenario")).toBe(
         "https://langwatch.ai/scenario/llms.txt",

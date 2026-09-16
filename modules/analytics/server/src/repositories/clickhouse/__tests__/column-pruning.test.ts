@@ -60,7 +60,7 @@ describe("column-pruning", () => {
     timeScale: 60,
   };
 
-  describe("trace dedup subquery column pruning", () => {
+  describe("when pruning columns in the trace dedup subquery", () => {
     describe("when requesting trace_count metric", () => {
       /** @scenario Trace dedup subquery selects only columns required by the query */
       it("does not use SELECT * in the dedup subquery", () => {
@@ -168,7 +168,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("metric query unused-column pruning", () => {
+  describe("when pruning unused columns from a metric query", () => {
     describe("when a summary query references only a subset of trace columns", () => {
       // Mirrors the metadata-cardinality + cost summary shape that exceeded the
       // per-query memory limit in prod: it reads only TraceId, two Attributes
@@ -233,7 +233,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("evaluation runs subquery column pruning", () => {
+  describe("when pruning columns in the evaluation runs subquery", () => {
     describe("when referencing an evaluation metric", () => {
       /** @scenario Evaluation runs subquery selects only needed evaluation columns */
       it("does not use SELECT * in the evaluation_runs subquery", () => {
@@ -289,7 +289,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("stored spans JOIN column pruning", () => {
+  describe("when pruning columns in the stored spans JOIN", () => {
     describe("when grouping by metadata.span_type", () => {
       /** @scenario Stored spans JOIN selects only needed span columns */
       it("does not include wide span columns like Input and Output", () => {
@@ -378,7 +378,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("sentiment metrics column pruning", () => {
+  describe("when pruning columns for sentiment metrics", () => {
     describe("when requesting sentiment.thumbs_up_down", () => {
       it("does not include wide span columns like Input and Output", () => {
         const result = buildTimeseriesQuery({
@@ -411,7 +411,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("threads metrics column pruning", () => {
+  describe("when pruning columns for threads metrics", () => {
     describe("when requesting threads.average_duration_per_thread", () => {
       it("does not use SELECT * in the trace_summaries subquery", () => {
         const result = buildTimeseriesQuery({
@@ -443,7 +443,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("query correctness after pruning", () => {
+  describe("when checking query correctness after pruning", () => {
     describe("when building a timeseries query for trace_count", () => {
       /** @scenario Pruned query generates syntactically valid SQL */
       /** @scenario Pruned query resolves all column references from pruned sources */
@@ -493,7 +493,7 @@ describe("column-pruning", () => {
     });
   });
 
-  describe("test guard: fieldMappings column coverage", () => {
+  describe("when guarding fieldMappings column coverage", () => {
     it("ensures all trace_summaries field mappings reference columns in the identity set or known metric/groupBy columns", () => {
       const traceSummaryMappings = Object.entries(fieldMappings).filter(
         ([_, mapping]) => mapping.table === "trace_summaries",

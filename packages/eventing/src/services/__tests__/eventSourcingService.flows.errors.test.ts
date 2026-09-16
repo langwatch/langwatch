@@ -27,7 +27,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     vi.restoreAllMocks();
   });
 
-  describe("event storage errors", () => {
+  describe("when event storage fails", () => {
     it("storage errors propagate (critical path)", async () => {
       const eventStore = createMockEventStore<Event>();
       const storageError = new Error("Storage failed");
@@ -75,7 +75,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("map projection (handler) errors", () => {
+  describe("when map projection handlers fail", () => {
     it("individual map projection errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
@@ -176,7 +176,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("fold projection update errors", () => {
+  describe("when fold projection updates fail", () => {
     it("individual fold projection errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
@@ -289,7 +289,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("missing dependencies", () => {
+  describe("when dependencies are missing", () => {
     it("service works with minimal configuration", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({

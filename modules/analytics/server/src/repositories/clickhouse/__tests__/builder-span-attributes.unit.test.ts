@@ -23,7 +23,7 @@ describe("memory-safety", () => {
     timeScale: 60,
   };
 
-  describe("SpanAttributes access in builder-generated queries", () => {
+  describe("when analytics queries access SpanAttributes", () => {
     /**
      * Regex matching bare "SpanAttributes" not followed by `['key']` access
      * — i.e. the full Map column being read, which can be gigabytes wide.

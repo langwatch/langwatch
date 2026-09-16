@@ -551,7 +551,7 @@ describe("resolveWrapperPath", () => {
     });
   });
 
-  describe("prompt copy", () => {
+  describe("when checking the prompt copy", () => {
     it("asks how the tool should run and names both paths in human terms", () => {
       expect(pathChoiceMessage("claude")).toBe("How should `langwatch claude` run?");
       expect(otlpChoiceTitle("claude")).toBe("Using a Claude subscription");

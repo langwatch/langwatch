@@ -12,8 +12,8 @@ describe("filter-translator", () => {
     resetParamCounter();
   });
 
-  describe("translateFilter", () => {
-    describe("topic filters", () => {
+  describe("translateFilter()", () => {
+    describe("when filtering by topic", () => {
       it("translates topics.topics filter with parameterized query", () => {
         const result = translateFilter("topics.topics", ["topic-1", "topic-2"]);
         expect(result.whereClause).toContain("ts.TopicId IN");
@@ -30,7 +30,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("metadata filters", () => {
+    describe("when filtering by metadata", () => {
       it("translates metadata.user_id filter with parameterized query", () => {
         const result = translateFilter("metadata.user_id", ["user-1", "user-2"]);
         expect(result.whereClause).toContain("ts.Attributes[{metaValues_0_key:String}]");
@@ -85,7 +85,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("trace filters", () => {
+    describe("when filtering by trace attributes", () => {
       describe("when filtering by origin", () => {
         /** @scenario "ClickHouse origin filter for specific values" */
         it("translates non-application origin values with IN clause", () => {
@@ -149,7 +149,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("span filters", () => {
+    describe("when filtering by span attributes", () => {
       it("translates spans.type filter with parameterized IN subquery", () => {
         const result = translateFilter("spans.type", ["llm", "agent"]);
         // Regression guard: issue #2660
@@ -219,7 +219,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("evaluation filters", () => {
+    describe("when filtering by evaluation attributes", () => {
       it("translates evaluations.evaluator_id filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.evaluator_id", ["eval-1", "eval-2"]);
         expect(result.whereClause).not.toContain("EXISTS");
@@ -316,7 +316,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("event filters", () => {
+    describe("when filtering by event attributes", () => {
       it("translates events.event_type filter with parameterized IN subquery", () => {
         const result = translateFilter("events.event_type", ["thumbs_up_down", "feedback"]);
         // Regression guard: issue #2660
@@ -361,7 +361,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("annotation filters", () => {
+    describe("when filtering by annotation attributes", () => {
       it("translates annotations.hasAnnotation filter for true", () => {
         const result = translateFilter("annotations.hasAnnotation", ["true"]);
         expect(result.whereClause).toContain("ts.HasAnnotation = true");
@@ -375,7 +375,7 @@ describe("filter-translator", () => {
       });
     });
 
-    describe("edge cases", () => {
+    describe("when given edge case inputs", () => {
       it("returns no-op for empty values array", () => {
         const result = translateFilter("topics.topics", []);
         expect(result.whereClause).toBe("1=1");
@@ -397,7 +397,7 @@ describe("filter-translator", () => {
     });
   });
 
-  describe("combineFilters", () => {
+  describe("combineFilters()", () => {
     it("combines multiple filter translations with AND", () => {
       const filters: FilterTranslation[] = [
         { whereClause: "a = 1", requiredJoins: [], params: { a: 1 } },
@@ -459,7 +459,7 @@ describe("filter-translator", () => {
     });
   });
 
-  describe("translateAllFilters", () => {
+  describe("translateAllFilters()", () => {
     it("translates simple array filters with params", () => {
       const filters = {
         "topics.topics": ["topic-1"],
@@ -516,7 +516,7 @@ describe("filter-translator", () => {
     });
   });
 
-  describe("SQL injection prevention", () => {
+  describe("when filter values contain SQL injection attempts", () => {
     it("safely handles malicious topic values", () => {
       const result = translateFilter("topics.topics", ["'; DROP TABLE trace_summaries; --"]);
       // With parameterized queries, value goes in params, not SQL string

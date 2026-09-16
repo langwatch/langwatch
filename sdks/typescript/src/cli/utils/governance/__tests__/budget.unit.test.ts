@@ -124,7 +124,7 @@ describe("renderBudgetExceeded", () => {
     expect(out).not.toContain("Admin:");
   });
 
-  describe("period rendering — gateway emits lowercased GatewayBudgetWindow root form", () => {
+  describe("when the gateway emits a lowercased GatewayBudgetWindow root form", () => {
     it.each([
       ["month", "monthly budget"],
       ["week", "weekly budget"],

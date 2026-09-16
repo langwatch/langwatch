@@ -106,7 +106,7 @@ function createRedisMock() {
 }
 
 describe("replayMarkers", () => {
-  describe("aggregateKey", () => {
+  describe("aggregateKey()", () => {
     it("formats as tenantId:aggregateType:aggregateId", () => {
       expect(
         aggregateKey({
@@ -118,7 +118,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("markPendingBatch", () => {
+  describe("markPendingBatch()", () => {
     it("sets pending markers for all aggregate keys", async () => {
       const redis = createRedisMock();
       await markPendingBatch({
@@ -153,7 +153,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("markCutoffBatch", () => {
+  describe("markCutoffBatch()", () => {
     it("sets cutoff markers in timestamp:eventId format", async () => {
       const redis = createRedisMock();
       const cutoffs = new Map([
@@ -185,7 +185,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("unmarkBatch", () => {
+  describe("unmarkBatch()", () => {
     it("removes cutoff markers and adds to completed set", async () => {
       const redis = createRedisMock();
 
@@ -226,7 +226,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("markCompletedBatch", () => {
+  describe("markCompletedBatch()", () => {
     it("drops the active cutoff marker, writes a short-TTL done marker, and records completion", async () => {
       const redis = createRedisMock();
       const cutoffs = new Map([
@@ -277,7 +277,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("removeInFlightMarkers", () => {
+  describe("removeInFlightMarkers()", () => {
     it("removes cutoff fields across all projections, leaving completed set and done markers untouched", async () => {
       const redis = createRedisMock();
 
@@ -366,7 +366,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("clearFailedBatchMarkers", () => {
+  describe("clearFailedBatchMarkers()", () => {
     describe("when marker cleanup fails", () => {
       it("resolves without throwing and logs the cleanup failure", async () => {
         const failingRedis = {
@@ -427,7 +427,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("getCompletedSet", () => {
+  describe("getCompletedSet()", () => {
     it("returns a Set of completed aggregate keys", async () => {
       const redis = createRedisMock();
       await markPendingBatch({
@@ -464,7 +464,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("getCutoffMarkers", () => {
+  describe("getCutoffMarkers()", () => {
     it("returns a Map of all pending/cutoff markers", async () => {
       const redis = createRedisMock();
       await markPendingBatch({
@@ -483,7 +483,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("cleanupAll", () => {
+  describe("cleanupAll()", () => {
     it("removes both cutoff and completed keys", async () => {
       const redis = createRedisMock();
       await markPendingBatch({ redis, projectionName: "p", aggKeys: ["k1"] });
@@ -496,7 +496,7 @@ describe("replayMarkers", () => {
     });
   });
 
-  describe("hasPreviousRun", () => {
+  describe("hasPreviousRun()", () => {
     describe("when no previous run exists", () => {
       it("returns zero counts", async () => {
         const redis = createRedisMock();

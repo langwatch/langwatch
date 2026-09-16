@@ -143,7 +143,7 @@ describe("the codex AGENTS.md guidance block", () => {
     });
   });
 
-  describe("the block itself", () => {
+  describe("when checking the guidance block itself", () => {
     it("renders nothing of its own as markdown structure", () => {
       const block = buildCodexAgentGuidanceBlock();
       for (const line of block.split("\n")) {

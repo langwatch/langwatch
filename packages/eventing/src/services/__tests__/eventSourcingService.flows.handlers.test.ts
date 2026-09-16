@@ -22,7 +22,7 @@ describe("EventSourcingService - Handler Flows", () => {
     cleanupTestEnvironment();
   });
 
-  describe("error handling", () => {
+  describe("when handling errors", () => {
     it("map projection errors are logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");

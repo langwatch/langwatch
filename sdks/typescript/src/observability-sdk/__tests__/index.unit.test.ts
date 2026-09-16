@@ -17,7 +17,7 @@ describe("index.ts", () => {
     testEnv.cleanup();
   });
 
-  describe("module exports", () => {
+  describe("when checking module exports", () => {
     it("exports createLangWatchSpan function", () => {
       expect(indexModule.createLangWatchSpan).toBeDefined();
       expect(typeof indexModule.createLangWatchSpan).toBe("function");
@@ -62,7 +62,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("module structure", () => {
+  describe("when checking module structure", () => {
     it("has expected named exports", () => {
       const expectedExports = [
         "createLangWatchSpan",
@@ -100,7 +100,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("functionality verification", () => {
+  describe("when verifying functionality", () => {
     it("provides working createLangWatchSpan function", () => {
       const mockSpan = {
         setAttribute: () => mockSpan,
@@ -170,7 +170,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("re-exports integrity", () => {
+  describe("when checking re-export integrity", () => {
     it("res-export the same functions from their original modules", () => {
       expect(indexModule.createLangWatchSpan).toBe(createLangWatchSpan);
       expect(indexModule.getLangWatchTracer).toBe(getLangWatchTracer);
@@ -180,7 +180,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("TypeScript compatibility", () => {
+  describe("when checking TypeScript compatibility", () => {
     it("supports static imports", () => {
       // This test verifies that the modules can be imported statically
       expect(createLangWatchSpan).toBeDefined();
@@ -197,7 +197,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("import patterns", () => {
+  describe("when checking import patterns", () => {
     it("supports named destructuring imports", () => {
       const {
         createLangWatchSpan: destructuredCreateSpan,
@@ -221,7 +221,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("component integration", () => {
+  describe("when integrating components", () => {
     it("allows creating spans from tracer and enhancing them", () => {
       const mockProvider = new MockTracerProvider();
       const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "integration-test");
@@ -292,7 +292,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("workflow integration", () => {
+  describe("when integrating workflows", () => {
     it("supports complete span lifecycle with all components", () => {
       const mockProvider = new MockTracerProvider();
       const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "workflow-test");
@@ -415,7 +415,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("error handling integration", () => {
+  describe("when integrating error handling", () => {
     it("handles errors gracefully across components", async () => {
       const tracer = indexModule.getLangWatchTracer("error-integration");
 
@@ -452,7 +452,7 @@ describe("index.ts", () => {
     });
   });
 
-  describe("performance integration", () => {
+  describe("when integrating for performance", () => {
     it("handles rapid span creation efficiently", () => {
       const mockProvider = new MockTracerProvider();
       const tracer = indexModule.getLangWatchTracerFromProvider(mockProvider, "perf-test");

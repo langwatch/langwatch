@@ -244,7 +244,7 @@ describe("ApiKeysApiService", () => {
     });
   });
 
-  describe("auth header", () => {
+  describe("when setting the auth header", () => {
     it("sends Authorization Bearer header", async () => {
       let capturedAuth = "";
       server.use(

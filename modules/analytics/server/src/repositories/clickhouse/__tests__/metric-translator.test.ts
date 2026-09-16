@@ -8,7 +8,7 @@ import {
 } from "../clickhouse.metric-translator.mapper.ts";
 
 describe("metric-translator", () => {
-  describe("percentileToPercent", () => {
+  describe("when reading percentileToPercent", () => {
     it("maps percentile names to decimal values", () => {
       expect(percentileToPercent.median).toBe(0.5);
       expect(percentileToPercent.p90).toBe(0.9);
@@ -17,7 +17,7 @@ describe("metric-translator", () => {
     });
   });
 
-  describe("isPercentileAggregation", () => {
+  describe("isPercentileAggregation()", () => {
     it("identifies percentile aggregations", () => {
       expect(isPercentileAggregation("median")).toBe(true);
       expect(isPercentileAggregation("p90")).toBe(true);
@@ -32,7 +32,7 @@ describe("metric-translator", () => {
     });
   });
 
-  describe("buildMetricAlias", () => {
+  describe("buildMetricAlias()", () => {
     it("builds basic alias with index, metric, and aggregation", () => {
       expect(buildMetricAlias(0, "performance.total_cost", "sum")).toBe(
         "0__performance_total_cost__sum",
@@ -58,8 +58,8 @@ describe("metric-translator", () => {
     });
   });
 
-  describe("translateMetric", () => {
-    describe("metadata metrics", () => {
+  describe("translateMetric()", () => {
+    describe("when translating metadata metrics", () => {
       it("translates metadata.trace_id", () => {
         const result = translateMetric("metadata.trace_id", "cardinality", 0);
         expect(result.selectExpression).toContain("uniq(");
@@ -82,7 +82,7 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("Attributes['gen_ai.conversation.id']");
       });
 
-      describe("metadata.span_type", () => {
+      describe("when the metric is metadata.span_type", () => {
         // @regression: metadata.span_type with cardinality aggregation translates to
         // uniq(ts.TraceId) which only uses trace_summaries. The stored_spans JOIN was
         // incorrectly required, causing fan-out that inflated trace-level SUM metrics
@@ -101,7 +101,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("performance metrics", () => {
+    describe("when translating performance metrics", () => {
       it("translates performance.completion_time with avg", () => {
         const result = translateMetric("performance.completion_time", "avg", 0);
         expect(result.selectExpression).toContain("avg(");
@@ -200,7 +200,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("evaluation metrics", () => {
+    describe("when translating evaluation metrics", () => {
       it("translates evaluations.evaluation_score and requires JOIN", () => {
         const result = translateMetric("evaluations.evaluation_score", "avg", 0);
         expect(result.selectExpression).toContain("es.Score");
@@ -233,7 +233,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("event metrics", () => {
+    describe("when translating event metrics", () => {
       it("translates events.event_type and requires stored_spans JOIN", () => {
         const result = translateMetric("events.event_type", "cardinality", 0);
         expect(result.requiredJoins).toContain("stored_spans");
@@ -251,7 +251,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("sentiment metrics", () => {
+    describe("when translating sentiment metrics", () => {
       describe("when aggregation is cardinality", () => {
         it("counts traces with thumbs_up_down events using countIf", () => {
           const result = translateMetric("sentiment.thumbs_up_down", "cardinality", 0);
@@ -337,7 +337,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("threads metrics", () => {
+    describe("when translating threads metrics", () => {
       it("translates threads.average_duration_per_thread with subquery", () => {
         const result = translateMetric("threads.average_duration_per_thread", "avg", 0);
         expect(result.requiresSubquery).toBe(true);
@@ -347,7 +347,7 @@ describe("metric-translator", () => {
       });
     });
 
-    describe("aggregation types", () => {
+    describe("when translating different aggregation types", () => {
       it("uses uniq() for cardinality aggregation", () => {
         const result = translateMetric("metadata.trace_id", "cardinality", 0);
         expect(result.selectExpression).toContain("uniq(");
@@ -376,7 +376,7 @@ describe("metric-translator", () => {
     });
   });
 
-  describe("translatePipelineAggregation", () => {
+  describe("translatePipelineAggregation()", () => {
     it("creates subquery for per-user aggregation", () => {
       const result = translatePipelineAggregation(
         "performance.total_cost",

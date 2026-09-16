@@ -23,7 +23,7 @@ describe("EventSourcingService - Projection Flows", () => {
     cleanupTestEnvironment();
   });
 
-  describe("getProjectionByName", () => {
+  describe("getProjectionByName()", () => {
     it("retrieves projection from fold store", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldStore = createMockFoldProjectionStore();
@@ -88,7 +88,7 @@ describe("EventSourcingService - Projection Flows", () => {
     });
   });
 
-  describe("hasProjectionByName", () => {
+  describe("hasProjectionByName()", () => {
     it("returns true when projection exists", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldStore = createMockFoldProjectionStore();
@@ -173,7 +173,7 @@ describe("EventSourcingService - Projection Flows", () => {
     });
   });
 
-  describe("getProjectionNames", () => {
+  describe("getProjectionNames()", () => {
     it("returns all registered fold projection names", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
@@ -197,7 +197,7 @@ describe("EventSourcingService - Projection Flows", () => {
     });
   });
 
-  describe("storeEvents dispatches to fold projections incrementally", () => {
+  describe("when storeEvents dispatches to fold projections incrementally", () => {
     it("applies each event incrementally to fold projections", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");

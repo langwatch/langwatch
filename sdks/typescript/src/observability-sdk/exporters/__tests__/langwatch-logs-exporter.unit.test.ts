@@ -40,7 +40,7 @@ describe("LangWatchLogsExporter", () => {
     vi.clearAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates exporter with default values when no options provided", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -82,7 +82,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("environment variable fallbacks", () => {
+  describe("when falling back to environment variables", () => {
     it("fallbacks to LANGWATCH_API_KEY environment variable", () => {
       const apiKey = "env-api-key";
       process.env.LANGWATCH_API_KEY = apiKey;
@@ -138,7 +138,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("header configuration", () => {
+  describe("when configuring headers", () => {
     it("includes all required SDK headers", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -168,7 +168,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("URL construction", () => {
+  describe("when constructing the URL", () => {
     it("constructs URL correctly with default endpoint", () => {
       const exporter = new LangWatchLogsExporter();
 
@@ -205,7 +205,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("inheritance from OTLPLogExporter", () => {
+  describe("when inheriting from OTLPLogExporter", () => {
     it("extends OTLPLogExporter", () => {
       new LangWatchLogsExporter();
 
@@ -224,7 +224,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles empty string API key", () => {
       const exporter = new LangWatchLogsExporter({ apiKey: "" });
 
@@ -258,7 +258,7 @@ describe("LangWatchLogsExporter", () => {
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("accepts valid LangWatchLogsExporterOptions", () => {
       const options: LangWatchLogsExporterOptions = {
         apiKey: "test-key",

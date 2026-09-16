@@ -11,7 +11,7 @@ describe("EventUtils - Event ID", () => {
   const aggregateType = "test_aggregate" as AggregateType;
   const eventType = TEST_EVENT_TYPES[0];
 
-  describe("createEvent - event ID format", () => {
+  describe("when createEvent formats the event ID", () => {
     it("generates a KSUID-based event ID", () => {
       const event = EventUtils.createEvent({
         aggregateType,
@@ -52,7 +52,7 @@ describe("EventUtils - Event ID", () => {
     });
   });
 
-  describe("createEvent - occurredAt", () => {
+  describe("when createEvent sets occurredAt", () => {
     it("defaults occurredAt to timestamp when not provided", () => {
       const timestamp = 5000000;
       const event = EventUtils.createEvent({
@@ -104,7 +104,7 @@ describe("EventUtils - Event ID", () => {
     });
   });
 
-  describe("createEvent with trace context - event ID format", () => {
+  describe("when createEvent formats the event ID with trace context", () => {
     it("generates a KSUID-based event ID", () => {
       const event = EventUtils.createEvent({
         aggregateType,

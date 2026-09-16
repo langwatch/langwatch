@@ -210,7 +210,7 @@ describe("Error classes", () => {
 });
 
 describe("handleError", () => {
-  describe("with BaseEventSourcingError", () => {
+  describe("when given a BaseEventSourcingError", () => {
     it("throws when category is CRITICAL", () => {
       const err = new SecurityError("op", "breach");
       expect(() => handleError(err, ErrorCategory.NON_CRITICAL)).toThrow(err);
@@ -267,7 +267,7 @@ describe("handleError", () => {
     });
   });
 
-  describe("with plain Error", () => {
+  describe("when given a plain Error", () => {
     it("throws when category is CRITICAL", () => {
       const err = new Error("boom");
       expect(() => handleError(err, ErrorCategory.CRITICAL)).toThrow(err);
@@ -296,7 +296,7 @@ describe("handleError", () => {
     });
   });
 
-  describe("with non-Error value", () => {
+  describe("when given a non-Error value", () => {
     it("logs and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
       expect(() =>

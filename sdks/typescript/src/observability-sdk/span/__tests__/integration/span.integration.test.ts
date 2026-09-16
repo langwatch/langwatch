@@ -80,7 +80,7 @@ describe("Span Integration Tests", () => {
     trace.disable();
   });
 
-  describe("data format serialization", () => {
+  describe("when serializing data formats", () => {
     it("serializes complex input/output data correctly", async () => {
       const tracer = getLangWatchTracer("data-serialization-test");
 
@@ -325,7 +325,7 @@ describe("Span Integration Tests", () => {
     });
   });
 
-  describe("attributes and metadata", () => {
+  describe("when setting attributes and metadata", () => {
     it("handles RAG context data correctly", async () => {
       const tracer = getLangWatchTracer("rag-context-test");
 
@@ -453,7 +453,7 @@ describe("Span Integration Tests", () => {
     });
   });
 
-  describe("span lifecycle integration", () => {
+  describe("when integrating span lifecycle", () => {
     it("properly handles manual span lifecycle", () => {
       const tracer = getLangWatchTracer("manual-lifecycle-test");
 
@@ -522,7 +522,7 @@ describe("Span Integration Tests", () => {
     });
   });
 
-  describe("error handling and edge cases", () => {
+  describe("when handling errors or edge cases", () => {
     it("handles invalid data gracefully", async () => {
       const tracer = getLangWatchTracer("invalid-data-test");
 

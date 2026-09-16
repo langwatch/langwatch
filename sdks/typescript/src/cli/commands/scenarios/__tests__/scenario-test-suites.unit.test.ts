@@ -184,7 +184,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("createScenarioCommand() with --test-suite", () => {
+  describe("when createScenarioCommand is called with --test-suite", () => {
     /** @scenario "Create a scenario inside a test suite" */
     it("creates the scenario inside that test suite", async () => {
       mockSuitesList.mockResolvedValue([makeTestSuite()]);
@@ -235,7 +235,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("updateScenarioCommand() with --test-suite", () => {
+  describe("when updateScenarioCommand is called with --test-suite", () => {
     /** @scenario "Move a scenario to another test suite" */
     it("moves the scenario into the named test suite", async () => {
       mockSuitesList.mockResolvedValue([makeTestSuite({ id: "suite_xyz", name: "Chargebacks" })]);

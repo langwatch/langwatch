@@ -20,7 +20,7 @@ import * as semconv from "../../semconv";
 describe("Metadata and Labels E2E", () => {
   const setup = setupE2ETest();
 
-  describe("SDK (OpenTelemetry span attributes)", () => {
+  describe("when set via the SDK (OpenTelemetry span attributes)", () => {
     it(
       "ingests user_id, thread_id, and customer_id",
       async () => {
@@ -160,7 +160,7 @@ describe("Metadata and Labels E2E", () => {
     );
   });
 
-  describe("REST API (direct HTTP)", () => {
+  describe("when set via the REST API (direct HTTP)", () => {
     /**
      * Sends a trace directly via the REST API collector endpoint.
      */

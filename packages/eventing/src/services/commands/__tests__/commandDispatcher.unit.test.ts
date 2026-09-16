@@ -89,7 +89,7 @@ describe("processCommand", () => {
 
   // ─── 1. Valid flow ──────────────────────────────────────────────
 
-  describe("valid flow", () => {
+  describe("when the flow is valid", () => {
     it("validates payload, invokes handler, and stores resulting events", async () => {
       const event = makeValidEvent();
       const handler = createMockHandler([event]);
@@ -114,7 +114,7 @@ describe("processCommand", () => {
 
   // ─── 2. Schema validation failure ──────────────────────────────
 
-  describe("schema validation failure", () => {
+  describe("when schema validation fails", () => {
     it("throws ValidationError when commandSchema.validate returns failure", async () => {
       const commandSchema = createMockCommandSchema({
         validate: vi.fn().mockReturnValue({
@@ -134,7 +134,7 @@ describe("processCommand", () => {
 
   // ─── 3. Handler returns undefined ──────────────────────────────
 
-  describe("handler returns undefined", () => {
+  describe("when the handler returns undefined", () => {
     it("throws ValidationError mentioning 'returned undefined'", async () => {
       const handler: CommandHandler<any, Event> = {
         handle: vi.fn().mockResolvedValue(undefined),
@@ -149,7 +149,7 @@ describe("processCommand", () => {
 
   // ─── 5. Handler returns non-array ──────────────────────────────
 
-  describe("handler returns non-array value", () => {
+  describe("when the handler returns a non-array value", () => {
     it("throws ValidationError mentioning 'non-array value'", async () => {
       const handler: CommandHandler<any, Event> = {
         handle: vi.fn().mockResolvedValue("not-an-array" as any),
@@ -164,7 +164,7 @@ describe("processCommand", () => {
 
   // ─── 6. Handler returns array with undefined at index ──────────
 
-  describe("handler returns array with undefined element", () => {
+  describe("when the handler returns an array with an undefined element", () => {
     it("throws ValidationError mentioning the index", async () => {
       const handler: CommandHandler<any, Event> = {
         handle: vi.fn().mockResolvedValue([makeValidEvent(), undefined, makeValidEvent()]),
@@ -179,7 +179,7 @@ describe("processCommand", () => {
 
   // ─── 7. Handler returns invalid event ──────────────────────────
 
-  describe("handler returns invalid event", () => {
+  describe("when the handler returns an invalid event", () => {
     it("throws ValidationError with zod validation details", async () => {
       const invalidEvent = { id: "some-id" }; // missing required fields
       const handler: CommandHandler<any, Event> = {
@@ -195,7 +195,7 @@ describe("processCommand", () => {
 
   // ─── 8. Handler returns empty array ────────────────────────────
 
-  describe("handler returns empty array", () => {
+  describe("when the handler returns an empty array", () => {
     it("does not call storeEventsFn", async () => {
       const handler = createMockHandler([]);
       const storeEventsFn = vi.fn();
@@ -210,7 +210,7 @@ describe("processCommand", () => {
 
   // ─── 9. Correct tenantId extraction ────────────────────────────
 
-  describe("tenantId extraction", () => {
+  describe("when extracting tenantId", () => {
     it("uses createTenantId(String(validated.tenantId)) for tenant isolation", async () => {
       const numericTenantPayload = {
         tenantId: 12345,

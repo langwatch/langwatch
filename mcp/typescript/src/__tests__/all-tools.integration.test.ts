@@ -882,7 +882,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 1. fetch_langwatch_docs
   // =====================
-  describe("fetch_langwatch_docs", () => {
+  describe("fetch_langwatch_docs()", () => {
     it("resolves the trusted docs index", () => {
       expect(resolveDocumentationUrl("langwatch").toString()).toBe(
         "https://langwatch.ai/docs/llms.txt",
@@ -905,7 +905,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 2. fetch_scenario_docs
   // =====================
-  describe("fetch_scenario_docs", () => {
+  describe("fetch_scenario_docs()", () => {
     it("resolves the trusted Scenario docs index", () => {
       expect(resolveDocumentationUrl("scenario").toString()).toBe(
         "https://langwatch.ai/scenario/llms.txt",
@@ -922,7 +922,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 3. discover_schema
   // =====================
-  describe("discover_schema", () => {
+  describe("discover_schema()", () => {
     describe("when category is filters", () => {
       /** @scenario Agent discovers available filter fields */
       it("returns filter field documentation", async () => {
@@ -1022,7 +1022,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 4. search_traces
   // =====================
-  describe("search_traces", () => {
+  describe("search_traces()", () => {
     describe("when traces are found", () => {
       /** @scenario Agent searches traces with a text query */
       it("returns formatted trace digests", async () => {
@@ -1109,7 +1109,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 5. get_trace
   // =====================
-  describe("get_trace", () => {
+  describe("get_trace()", () => {
     describe("when trace exists", () => {
       /** @scenario Agent gets a single trace by ID in AI-readable format */
       it("returns formatted trace with metadata and evaluations", async () => {
@@ -1154,7 +1154,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 6. get_analytics
   // =====================
-  describe("get_analytics", () => {
+  describe("get_analytics()", () => {
     describe("when data is available", () => {
       it("returns formatted analytics with markdown table", async () => {
         const { handleGetAnalytics } = await import("../tools/get-analytics.js");
@@ -1190,7 +1190,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 7. platform_create_prompt
   // =====================
-  describe("platform_create_prompt", () => {
+  describe("platform_create_prompt()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with prompt details", async () => {
         const { handleCreatePrompt } = await import("../tools/create-prompt.js");
@@ -1211,7 +1211,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 8. platform_list_prompts
   // =====================
-  describe("platform_list_prompts", () => {
+  describe("platform_list_prompts()", () => {
     describe("when prompts exist", () => {
       it("returns formatted prompt list", async () => {
         const { handleListPrompts } = await import("../tools/list-prompts.js");
@@ -1229,7 +1229,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 9. platform_get_prompt
   // =====================
-  describe("platform_get_prompt", () => {
+  describe("platform_get_prompt()", () => {
     describe("when prompt exists", () => {
       it("returns formatted prompt details with messages and deployments", async () => {
         const { handleGetPrompt } = await import("../tools/get-prompt.js");
@@ -1250,7 +1250,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 10. platform_update_prompt
   // =====================
-  describe("platform_update_prompt", () => {
+  describe("platform_update_prompt()", () => {
     describe("when updating a prompt", () => {
       it("returns success message", async () => {
         const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
@@ -1327,7 +1327,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 11. platform_create_scenario
   // =====================
-  describe("platform_create_scenario", () => {
+  describe("platform_create_scenario()", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
         const { handleCreateScenario } = await import("../tools/create-scenario.js");
@@ -1347,7 +1347,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 12. platform_list_scenarios
   // =====================
-  describe("platform_list_scenarios", () => {
+  describe("platform_list_scenarios()", () => {
     describe("when scenarios exist", () => {
       it("returns formatted scenario list", async () => {
         const { handleListScenarios } = await import("../tools/list-scenarios.js");
@@ -1372,7 +1372,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 13. platform_get_scenario
   // =====================
-  describe("platform_get_scenario", () => {
+  describe("platform_get_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns formatted scenario details", async () => {
         const { handleGetScenario } = await import("../tools/get-scenario.js");
@@ -1410,7 +1410,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 14. platform_update_scenario
   // =====================
-  describe("platform_update_scenario", () => {
+  describe("platform_update_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns update confirmation with updated details", async () => {
         const { handleUpdateScenario } = await import("../tools/update-scenario.js");
@@ -1428,7 +1428,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 15. platform_archive_scenario
   // =====================
-  describe("platform_archive_scenario", () => {
+  describe("platform_archive_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
         const { handleArchiveScenario } = await import("../tools/archive-scenario.js");
@@ -1446,7 +1446,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 16. platform_create_evaluator
   // =====================
-  describe("platform_create_evaluator", () => {
+  describe("platform_create_evaluator()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with evaluator details", async () => {
         const { handleCreateEvaluator } = await import("../tools/create-evaluator.js");
@@ -1466,7 +1466,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 17. platform_list_evaluators
   // =====================
-  describe("platform_list_evaluators", () => {
+  describe("platform_list_evaluators()", () => {
     describe("when evaluators exist", () => {
       it("returns formatted evaluator list", async () => {
         const { handleListEvaluators } = await import("../tools/list-evaluators.js");
@@ -1485,7 +1485,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 18. platform_get_evaluator
   // =====================
-  describe("platform_get_evaluator", () => {
+  describe("platform_get_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns formatted evaluator details with config and fields", async () => {
         const { handleGetEvaluator } = await import("../tools/get-evaluator.js");
@@ -1518,7 +1518,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 19. platform_update_evaluator
   // =====================
-  describe("platform_update_evaluator", () => {
+  describe("platform_update_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns update confirmation", async () => {
         const { handleUpdateEvaluator } = await import("../tools/update-evaluator.js");
@@ -1537,7 +1537,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 20. platform_set_model_provider
   // =====================
-  describe("platform_set_model_provider", () => {
+  describe("platform_set_model_provider()", () => {
     describe("when setting a provider with API key", () => {
       it("returns success confirmation with provider details", async () => {
         const { handleSetModelProvider } = await import("../tools/set-model-provider.js");
@@ -1571,7 +1571,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 21. platform_list_model_providers
   // =====================
-  describe("platform_list_model_providers", () => {
+  describe("platform_list_model_providers()", () => {
     describe("when providers exist", () => {
       it("returns formatted provider list with status and key info", async () => {
         const { handleListModelProviders } = await import("../tools/list-model-providers.js");
@@ -1637,7 +1637,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Run Plan Tools
   // =====================
-  describe("platform_run_plan", () => {
+  describe("platform_run_plan()", () => {
     it("runs a configuration and reports the plan it created", async () => {
       const { handleRunPlan } = await import("../tools/run-plan.js");
       const result = await handleRunPlan({
@@ -1655,7 +1655,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_list_run_plans", () => {
+  describe("platform_list_run_plans()", () => {
     it("returns formatted run plan list", async () => {
       const { handleListRunPlans } = await import("../tools/list-run-plans.js");
       const result = await handleListRunPlans({});
@@ -1665,7 +1665,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_run_plan", () => {
+  describe("platform_get_run_plan()", () => {
     it("returns the plan configuration", async () => {
       const { handleGetRunPlan } = await import("../tools/get-run-plan.js");
       const result = await handleGetRunPlan({ id: "plan_abc" });
@@ -1676,7 +1676,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_rerun_run_plan", () => {
+  describe("platform_rerun_run_plan()", () => {
     it("runs the stored configuration again and reports it joined the plan", async () => {
       const { handleRerunRunPlan } = await import("../tools/rerun-run-plan.js");
       const result = await handleRerunRunPlan({ id: "plan_abc" });
@@ -1687,7 +1687,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_archive_run_plan", () => {
+  describe("platform_archive_run_plan()", () => {
     it("archives the run plan", async () => {
       const { handleArchiveRunPlan } = await import("../tools/archive-run-plan.js");
       const result = await handleArchiveRunPlan({ id: "plan_abc" });
@@ -1700,7 +1700,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Test Suite Tools
   // =====================
-  describe("platform_list_test_suites", () => {
+  describe("platform_list_test_suites()", () => {
     it("returns formatted test suite list", async () => {
       const { handleListTestSuites } = await import("../tools/list-test-suites.js");
       const result = await handleListTestSuites({});
@@ -1710,7 +1710,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_test_suite", () => {
+  describe("platform_create_test_suite()", () => {
     it("creates a test suite and returns confirmation", async () => {
       const { handleCreateTestSuite } = await import("../tools/create-test-suite.js");
       const result = await handleCreateTestSuite({ name: "New Suite" });
@@ -1721,7 +1721,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_test_suite", () => {
+  describe("platform_get_test_suite()", () => {
     it("returns the suite with the scenarios filed in it", async () => {
       const { handleGetTestSuite } = await import("../tools/get-test-suite.js");
       const result = await handleGetTestSuite({ id: "suite_abc" });
@@ -1731,7 +1731,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_rename_test_suite", () => {
+  describe("platform_rename_test_suite()", () => {
     it("renames the test suite", async () => {
       const { handleRenameTestSuite } = await import("../tools/rename-test-suite.js");
       const result = await handleRenameTestSuite({
@@ -1743,7 +1743,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_archive_test_suite", () => {
+  describe("platform_archive_test_suite()", () => {
     it("archives the suite and says the filed scenarios went with it", async () => {
       const { handleArchiveTestSuite } = await import("../tools/archive-test-suite.js");
       const result = await handleArchiveTestSuite({ id: "suite_abc" });
@@ -1753,7 +1753,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_run_test_suite", () => {
+  describe("platform_run_test_suite()", () => {
     it("runs the suite against a target and reports the derived plan", async () => {
       const { handleRunTestSuite } = await import("../tools/run-test-suite.js");
       const result = await handleRunTestSuite({
@@ -1769,7 +1769,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Simulation Run Tools
   // =====================
-  describe("platform_list_simulation_runs", () => {
+  describe("platform_list_simulation_runs()", () => {
     it("returns formatted run list", async () => {
       const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.js");
       const result = await handleListSimulationRuns({});
@@ -1779,7 +1779,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_simulation_run", () => {
+  describe("platform_get_simulation_run()", () => {
     it("returns run details with conversation", async () => {
       const { handleGetSimulationRun } = await import("../tools/get-simulation-run.js");
       const result = await handleGetSimulationRun({ scenarioRunId: "run_abc" });
@@ -1793,7 +1793,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Monitor Tools
   // =====================
-  describe("platform_list_monitors", () => {
+  describe("platform_list_monitors()", () => {
     it("returns formatted monitor list", async () => {
       const { listMonitors } = await import("../langwatch-api-monitors.js");
       const monitors = await listMonitors();
@@ -1803,7 +1803,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_monitor", () => {
+  describe("platform_get_monitor()", () => {
     it("returns monitor details", async () => {
       const { getMonitor } = await import("../langwatch-api-monitors.js");
       const monitor = await getMonitor("mon_abc");
@@ -1813,7 +1813,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_monitor", () => {
+  describe("platform_create_monitor()", () => {
     it("creates a monitor and returns metadata", async () => {
       const { createMonitor } = await import("../langwatch-api-monitors.js");
       const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
@@ -1822,7 +1822,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_update_monitor", () => {
+  describe("platform_update_monitor()", () => {
     it("updates a monitor", async () => {
       const { updateMonitor } = await import("../langwatch-api-monitors.js");
       const monitor = await updateMonitor({ id: "mon_abc", enabled: false });
@@ -1831,7 +1831,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_delete_monitor", () => {
+  describe("platform_delete_monitor()", () => {
     it("deletes a monitor", async () => {
       const { deleteMonitor } = await import("../langwatch-api-monitors.js");
       const result = await deleteMonitor("mon_abc");
@@ -1843,7 +1843,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Secret Tools
   // =====================
-  describe("platform_list_secrets", () => {
+  describe("platform_list_secrets()", () => {
     it("returns formatted secret list", async () => {
       const { listSecrets } = await import("../langwatch-api-secrets.js");
       const secrets = await listSecrets();
@@ -1852,7 +1852,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_secret", () => {
+  describe("platform_create_secret()", () => {
     it("creates a secret and returns metadata", async () => {
       const { createSecret } = await import("../langwatch-api-secrets.js");
       const secret = await createSecret({ name: "NEW_SECRET", value: "sk-123" });
@@ -1861,7 +1861,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_update_secret", () => {
+  describe("platform_update_secret()", () => {
     it("updates a secret value", async () => {
       const { updateSecret } = await import("../langwatch-api-secrets.js");
       const secret = await updateSecret({ id: "secret_abc", value: "new-val" });
@@ -1870,7 +1870,7 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_delete_secret", () => {
+  describe("platform_delete_secret()", () => {
     it("deletes a secret", async () => {
       const { deleteSecret } = await import("../langwatch-api-secrets.js");
       const result = await deleteSecret("secret_abc");
@@ -1882,7 +1882,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Agent Tools
   // =====================
-  describe("platform_get_agent", () => {
+  describe("platform_get_agent()", () => {
     it("returns one agent by id", async () => {
       const agent = await getAgent("agent_abc");
       expect(agent.id).toBe("agent_abc");
@@ -1890,14 +1890,14 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_update_agent", () => {
+  describe("platform_update_agent()", () => {
     it("updates an agent and returns it", async () => {
       const agent = await updateAgent({ id: "agent_abc", name: "Test Agent" });
       expect(agent.id).toBe("agent_abc");
     });
   });
 
-  describe("platform_delete_agent", () => {
+  describe("platform_delete_agent()", () => {
     it("deletes an agent", async () => {
       const result = await deleteAgent("agent_abc");
       expect(result.id).toBe("agent_abc");
@@ -1907,7 +1907,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Agent Run Tool
   // =====================
-  describe("platform_run_workflow", () => {
+  describe("platform_run_workflow()", () => {
     it("executes a workflow and returns result", async () => {
       const { handleRunWorkflow } = await import("../tools/run-workflow.js");
       const result = await handleRunWorkflow({ id: "wf_abc" });

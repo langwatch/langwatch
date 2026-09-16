@@ -67,7 +67,7 @@ describe("Tracer Integration Tests", () => {
     trace.disable();
   });
 
-  describe("span creation and data flow", () => {
+  describe("when creating spans and data flows", () => {
     it("creates spans with proper LangWatch attributes through real OpenTelemetry", async () => {
       const tracer = getLangWatchTracer("integration-test-tracer");
 
@@ -229,7 +229,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("startSpan method integration", () => {
+  describe("when integrating the startSpan method", () => {
     it("creates enhanced spans via startSpan with proper data flow", () => {
       const tracer = getLangWatchTracer("start-span-test");
 
@@ -256,7 +256,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("tracer-specific functionality", () => {
+  describe("when using tracer-specific functionality", () => {
     it("handles tracer provider integration correctly", async () => {
       const tracer = getLangWatchTracer("provider-integration-test");
 
@@ -284,7 +284,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("global tracer provider integration", () => {
+  describe("when integrating with the global tracer provider", () => {
     it("uses the globally configured tracer provider", () => {
       // Get tracer using global provider
       const tracer1 = getLangWatchTracer("global-test-1");
@@ -305,7 +305,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("performance and concurrency", () => {
+  describe("when checking performance and concurrency", () => {
     it("handles concurrent span creation efficiently", async () => {
       const tracer = getLangWatchTracer("concurrent-test");
 
@@ -413,7 +413,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("attribute and metadata validation", () => {
+  describe("when validating attributes and metadata", () => {
     it("validates and sanitize attribute values", async () => {
       const tracer = getLangWatchTracer("attribute-validation-test");
 
@@ -489,7 +489,7 @@ describe("Tracer Integration Tests", () => {
     });
   });
 
-  describe("error boundary and recovery", () => {
+  describe("when errors occur and recovery is needed", () => {
     it("handles span operation failures gracefully", async () => {
       const tracer = getLangWatchTracer("span-failure-test");
 

@@ -111,7 +111,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("log record creation and data flow", () => {
+  describe("when creating log records and data flows", () => {
     it("creates log records with proper LangWatch attributes through real OpenTelemetry", async () => {
       const logger = getLangWatchLogger("integration-test-logger-1");
 
@@ -229,7 +229,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("data capture integration", () => {
+  describe("when integrating data capture", () => {
     it("preserves log record body when output capture is enabled by default", async () => {
       const logger = getLangWatchLogger("data-capture-test-logger-4");
 
@@ -443,7 +443,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("logger naming and versioning", () => {
+  describe("when naming and versioning the logger", () => {
     it("handles different logger names correctly", async () => {
       const loggers = [
         getLangWatchLogger("app-logger-11"),
@@ -503,7 +503,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("GenAI-specific logging", () => {
+  describe("when logging GenAI-specific data", () => {
     it("handles GenAI-specific attributes correctly", async () => {
       const logger = getLangWatchLogger("genai-test-logger-17");
 
@@ -577,7 +577,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("performance and concurrency", () => {
+  describe("when checking performance and concurrency", () => {
     it("handles concurrent log record creation efficiently", async () => {
       const logger = getLangWatchLogger("concurrent-test-logger-19");
 
@@ -686,7 +686,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("attribute and metadata validation", () => {
+  describe("when validating attributes and metadata", () => {
     it("validates and sanitize attribute values", async () => {
       const logger = getLangWatchLogger("attribute-validation-test-logger-22");
 
@@ -761,7 +761,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("error boundary and recovery", () => {
+  describe("when errors occur and recovery is needed", () => {
     it("handles log record operation failures gracefully", async () => {
       const logger = getLangWatchLogger("log-failure-test-logger-24");
 
@@ -824,7 +824,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("current logger provider integration", () => {
+  describe("when integrating with the current logger provider", () => {
     it("uses the currently configured logger provider", () => {
       // Get loggers using current provider
       const logger1 = getLangWatchLogger("current-test-26");
@@ -851,7 +851,7 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
     });
   });
 
-  describe("custom logger provider integration", () => {
+  describe("when integrating with a custom logger provider", () => {
     it("works with custom logger providers", async () => {
       // A provider owned by the caller, not the one setupObservability registers
       const customExporter = new InMemoryLogRecordExporter();

@@ -265,7 +265,7 @@ describe("langwatch-api", () => {
     });
   });
 
-  describe("getPrompt() with tag options", () => {
+  describe("when getPrompt is called with tag options", () => {
     describe("when called with tag option", () => {
       it("appends tag query parameter", async () => {
         const { getPrompt } = await import("../langwatch-api.js");
@@ -309,7 +309,7 @@ describe("langwatch-api", () => {
     });
   });
 
-  describe("createPrompt() with tags", () => {
+  describe("when createPrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
         const { createPrompt } = await import("../langwatch-api.js");
@@ -329,7 +329,7 @@ describe("langwatch-api", () => {
     });
   });
 
-  describe("updatePrompt() with tags", () => {
+  describe("when updatePrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
         const { updatePrompt } = await import("../langwatch-api.js");

@@ -4,7 +4,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { DEFAULT_SERVICE_NAME } from "../../../internal/constants.js";
 
 describe("utils.ts", () => {
-  describe("isConcreteProvider", () => {
+  describe("isConcreteProvider()", () => {
     it("returns false for null/undefined", () => {
       expect(utils.isConcreteProvider(null)).toBe(false);
       expect(utils.isConcreteProvider(undefined)).toBe(false);
@@ -47,7 +47,7 @@ describe("utils.ts", () => {
     });
   });
 
-  describe("createMergedResource", () => {
+  describe("createMergedResource()", () => {
     it("merges attributes, serviceName, and givenResource", () => {
       const attributes = { foo: "bar", bar: 1 };
       const serviceName = "my-service";

@@ -10,7 +10,7 @@ import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("memory-safety", () => {
-  describe("metric prefix column-pruning test coverage", () => {
+  describe("when checking that every metric prefix has a column-pruning test", () => {
     describe("when comparing metric-translator prefixes to column-pruning tests", () => {
       /** @scenario Every metric prefix in metric-translator has a column-pruning test */
       it("has at least one column-pruning test for every registered metric prefix", () => {

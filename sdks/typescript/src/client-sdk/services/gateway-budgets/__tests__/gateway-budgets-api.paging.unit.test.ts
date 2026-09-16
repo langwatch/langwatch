@@ -290,7 +290,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
     });
   });
 
-  describe("filtering by your own identifier", () => {
+  describe("when filtering by your own identifier", () => {
     it("sends external_id as an exact-match query filter", async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse(page(["a"], null)));
 

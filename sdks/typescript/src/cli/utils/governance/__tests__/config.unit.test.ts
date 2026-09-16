@@ -38,7 +38,7 @@ describe("governance config persistence", () => {
     expect(isLoggedIn(cfg)).toBe(false);
   });
 
-  describe("self-hosted gateway-URL inference", () => {
+  describe("when inferring the self-hosted gateway URL", () => {
     let prevEndpoint: string | undefined;
     let prevGateway: string | undefined;
     beforeEach(() => {
@@ -182,7 +182,7 @@ describe("governance config persistence", () => {
     });
   });
 
-  describe("isCanonicalVkSecret", () => {
+  describe("isCanonicalVkSecret()", () => {
     it("accepts vk-lw- prefixed secrets", () => {
       expect(isCanonicalVkSecret("vk-lw-01HZX9N4ABCDEF")).toBe(true);
     });

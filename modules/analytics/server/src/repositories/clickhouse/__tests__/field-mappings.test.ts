@@ -13,7 +13,7 @@ import {
 } from "../clickhouse.field-mappings.mapper.ts";
 
 describe("field-mappings", () => {
-  describe("fieldMappings", () => {
+  describe("when reading fieldMappings", () => {
     it("has mappings for trace identity fields", () => {
       expect(fieldMappings.trace_id).toBeDefined();
       expect(fieldMappings.trace_id?.table).toBe("trace_summaries");
@@ -66,7 +66,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getFieldMapping", () => {
+  describe("getFieldMapping()", () => {
     it("returns mapping for known fields", () => {
       const mapping = getFieldMapping("trace_id");
       expect(mapping).toBeDefined();
@@ -80,7 +80,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getTableForField", () => {
+  describe("getTableForField()", () => {
     it("returns trace_summaries for trace fields", () => {
       expect(getTableForField("trace_id")).toBe("trace_summaries");
       expect(getTableForField("metrics.total_cost")).toBe("trace_summaries");
@@ -101,7 +101,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getColumnExpression", () => {
+  describe("getColumnExpression()", () => {
     it("returns column expression for known fields", () => {
       expect(getColumnExpression("trace_id")).toBe("TraceId");
       expect(getColumnExpression("metrics.total_cost")).toBe("TotalCost");
@@ -116,7 +116,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("requiresJoin", () => {
+  describe("requiresJoin()", () => {
     it("returns null for trace_summaries fields", () => {
       expect(requiresJoin("trace_id")).toBeNull();
       expect(requiresJoin("metrics.total_cost")).toBeNull();
@@ -132,7 +132,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getFieldsRequiringTable", () => {
+  describe("getFieldsRequiringTable()", () => {
     it("returns fields for stored_spans table", () => {
       const fields = getFieldsRequiringTable("stored_spans");
       expect(fields).toContain("spans.span_id");
@@ -148,7 +148,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("tableAliases", () => {
+  describe("when reading tableAliases", () => {
     it("has correct aliases for all tables", () => {
       expect(tableAliases.trace_summaries).toBe("ts");
       expect(tableAliases.stored_spans).toBe("ss");
@@ -156,7 +156,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getTableAlias", () => {
+  describe("getTableAlias()", () => {
     it("returns correct alias for each table", () => {
       expect(getTableAlias("trace_summaries")).toBe("ts");
       expect(getTableAlias("stored_spans")).toBe("ss");
@@ -164,7 +164,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("buildJoinClause", () => {
+  describe("buildJoinClause()", () => {
     it("returns empty string for trace_summaries", () => {
       expect(buildJoinClause({ table: "trace_summaries" })).toBe("");
     });
@@ -246,7 +246,7 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("qualifiedColumn", () => {
+  describe("qualifiedColumn()", () => {
     it("prefixes simple columns with table alias", () => {
       expect(qualifiedColumn("trace_id")).toBe("ts.TraceId");
       expect(qualifiedColumn("spans.span_id")).toBe("ss.SpanId");

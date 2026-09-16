@@ -83,7 +83,7 @@ describe("public HTTP request security", () => {
     });
   });
 
-  describe("real HTTP request", () => {
+  describe("when making a real HTTP request", () => {
     let server: Server;
     let port: number;
     let hits = 0;

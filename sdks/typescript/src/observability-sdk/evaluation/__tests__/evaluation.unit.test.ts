@@ -49,7 +49,7 @@ describe("addEvaluation", () => {
     expect(ATTR_LANGWATCH_EVALUATION_CUSTOM).toBe(EVENT_NAME);
   });
 
-  describe("span.addEvaluation", () => {
+  describe("when calling span.addEvaluation", () => {
     it("emits a langwatch.evaluation.custom event with the snake_case payload", () => {
       const mockSpan = new MockSpan("evaluation-target");
       const span = createLangWatchSpan(mockSpan);
@@ -244,7 +244,7 @@ describe("addEvaluation", () => {
     });
   });
 
-  describe("tracer.addEvaluation (trace-level)", () => {
+  describe("when calling tracer.addEvaluation (trace-level)", () => {
     it("emits the evaluation event onto the currently active span", () => {
       const mockProvider = new MockTracerProvider();
       const tracer = getLangWatchTracerFromProvider(mockProvider, "evaluation-test-tracer");

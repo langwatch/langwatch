@@ -3,7 +3,7 @@ import { z } from "zod";
 import { commandEnvelopeSchema, stripEnvelope, withCommandEnvelope } from "../commandEnvelope.ts";
 
 describe("commandEnvelope", () => {
-  describe("commandEnvelopeSchema", () => {
+  describe("when reading commandEnvelopeSchema", () => {
     it("validates tenantId, occurredAt, and optional idempotencyKey", () => {
       const result = commandEnvelopeSchema.safeParse({
         tenantId: "tenant-1",

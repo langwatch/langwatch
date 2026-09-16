@@ -7,7 +7,7 @@ describe("runtime.ts", () => {
     resetRuntimeCache();
   });
 
-  describe("detectRuntime", () => {
+  describe("detectRuntime()", () => {
     it("detects node", () => {
       expect(detectRuntime({ process: { versions: { node: "18.0.0" } } })).toBe("node");
     });
@@ -42,7 +42,7 @@ describe("runtime.ts", () => {
     });
   });
 
-  describe("getRuntime", () => {
+  describe("getRuntime()", () => {
     it("caches the runtime detection result", () => {
       const firstCall = getRuntime();
       const secondCall = getRuntime();

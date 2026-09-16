@@ -159,7 +159,7 @@ describe("Tag CRUD", () => {
     });
   });
 
-  describe("PromptsFacade.tags", () => {
+  describe("when calling PromptsFacade.tags", () => {
     let promptsApiService: MockProxy<PromptsApiService>;
     let facade: PromptsFacade;
     let localPromptsService: MockProxy<LocalPromptsService>;
@@ -219,7 +219,7 @@ describe("Tag CRUD", () => {
     });
   });
 
-  describe("tag type is widened to string", () => {
+  describe("when the tag type is widened to string", () => {
     it("passes an arbitrary string tag through to the API service", async () => {
       // Verifies that GetPromptOptions.tag accepts any string, not just "production"|"staging"
       // Verify the get method is called with the custom tag

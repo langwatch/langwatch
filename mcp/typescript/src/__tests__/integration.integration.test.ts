@@ -158,7 +158,7 @@ describe("MCP tools integration", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  describe("search_traces", () => {
+  describe("search_traces()", () => {
     it("returns formatted trace digests from mock server", async () => {
       const { handleSearchTraces } = await import("../tools/search-traces.js");
       const result = await handleSearchTraces({
@@ -171,7 +171,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("get_trace", () => {
+  describe("get_trace()", () => {
     it("returns formatted trace digest from mock server", async () => {
       const { handleGetTrace } = await import("../tools/get-trace.js");
       const result = await handleGetTrace({ traceId: "trace-001" });
@@ -182,7 +182,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("get_analytics", () => {
+  describe("get_analytics()", () => {
     it("returns formatted analytics data from mock server", async () => {
       const { handleGetAnalytics } = await import("../tools/get-analytics.js");
       const result = await handleGetAnalytics({
@@ -195,7 +195,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_list_prompts", () => {
+  describe("platform_list_prompts()", () => {
     it("returns formatted prompt list from mock server", async () => {
       const { handleListPrompts } = await import("../tools/list-prompts.js");
       const result = await handleListPrompts();
@@ -205,7 +205,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_prompt", () => {
+  describe("platform_get_prompt()", () => {
     it("returns formatted prompt details from mock server", async () => {
       const { handleGetPrompt } = await import("../tools/get-prompt.js");
       const result = await handleGetPrompt({ idOrHandle: "greeting-bot" });
@@ -216,7 +216,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_prompt", () => {
+  describe("platform_create_prompt()", () => {
     it("returns success message from mock server", async () => {
       const { handleCreatePrompt } = await import("../tools/create-prompt.js");
       const result = await handleCreatePrompt({
@@ -229,7 +229,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("platform_update_prompt", () => {
+  describe("platform_update_prompt()", () => {
     it("returns success message from mock server", async () => {
       const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
       const result = await handleUpdatePrompt({

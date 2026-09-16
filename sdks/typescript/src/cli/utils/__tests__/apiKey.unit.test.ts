@@ -132,7 +132,7 @@ describe("resolveCredentials()", () => {
     vi.restoreAllMocks();
   });
 
-  describe("resolution order", () => {
+  describe("when resolving the API key", () => {
     /** @scenario an explicit --api-key value beats the environment */
     it("prefers an explicit key argument over the environment", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";
@@ -294,7 +294,7 @@ describe("resolveCredentials()", () => {
     });
   });
 
-  describe("session-liveness gate (revocation cannot be bypassed by the cached key)", () => {
+  describe("when the session-liveness gate blocks a cached key", () => {
     /** @scenario a device session uses the cached key without a network call while validation is fresh */
     it("uses the cached key without revalidating inside the window", async () => {
       mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
@@ -367,7 +367,7 @@ describe("resolveCredentials()", () => {
     });
   });
 
-  describe("daemon discipline (no resolved key in the shared env)", () => {
+  describe("when the daemon keeps the resolved key out of the shared env", () => {
     /** @scenario the resolved session key never touches the shared process env */
     it("does not materialize the session key into process.env", async () => {
       mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);

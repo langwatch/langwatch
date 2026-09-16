@@ -21,7 +21,7 @@ describe("span.ts", () => {
     testEnv.cleanup();
   });
 
-  describe("createLangWatchSpan", () => {
+  describe("createLangWatchSpan()", () => {
     it("creates a LangWatchSpan from an OpenTelemetry Span", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
@@ -42,7 +42,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("OpenTelemetry Span method compatibility", () => {
+  describe("when checking OpenTelemetry Span method compatibility", () => {
     it("supports fluent API for setAttribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setAttribute("test.key", "test-value");
@@ -134,7 +134,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("setType", () => {
+  describe("setType()", () => {
     it("sets the span type attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setType("llm");
@@ -160,7 +160,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("setRequestModel and setResponseModel", () => {
+  describe("when calling setRequestModel or setResponseModel", () => {
     it("sets request model attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan.setRequestModel("gpt-4");
@@ -184,7 +184,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("RAG context methods", () => {
+  describe("when calling RAG context methods", () => {
     it("uses the canonical RAG contexts attribute key", () => {
       expect(intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS).toBe("langwatch.rag.contexts");
     });
@@ -214,7 +214,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("setMetrics", () => {
+  describe("setMetrics()", () => {
     it("sets metrics attribute", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const metrics = testData.metrics();
@@ -246,8 +246,8 @@ describe("span.ts", () => {
     });
   });
 
-  describe("input/output methods", () => {
-    describe("setInput", () => {
+  describe("when calling input/output methods", () => {
+    describe("setInput()", () => {
       it("sets JSON input", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = { prompt: "Hello", temperature: 0.7 };
@@ -298,7 +298,7 @@ describe("span.ts", () => {
       });
     });
 
-    describe("setInputString", () => {
+    describe("setInputString()", () => {
       it("sets string input with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = "String input for LLM";
@@ -315,7 +315,7 @@ describe("span.ts", () => {
       });
     });
 
-    describe("setOutput", () => {
+    describe("setOutput()", () => {
       it("sets JSON output", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = { response: "Hello there!", tokens: 15 };
@@ -347,7 +347,7 @@ describe("span.ts", () => {
       });
     });
 
-    describe("setOutputString", () => {
+    describe("setOutputString()", () => {
       it("sets string output with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = "Generated text response";
@@ -365,7 +365,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("method chaining", () => {
+  describe("when chaining methods", () => {
     it("supports fluent API chaining", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const result = langwatchSpan
@@ -386,7 +386,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles empty/null inputs gracefully", () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
       expect(() => langwatchSpan.setInput(null)).not.toThrow();
@@ -425,7 +425,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("behavioral testing", () => {
+  describe("when checking span lifecycle behaviour", () => {
     it("maintains proper span lifecycle", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
@@ -473,7 +473,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("performance characteristics", () => {
+  describe("when checking performance characteristics", () => {
     it("handles high-frequency attribute setting efficiently", async () => {
       const { langwatchSpan } = testScenarios.createSpanTest();
 
@@ -503,7 +503,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("setInput and setOutput function overloads", () => {
+  describe("when calling setInput or setOutput overloads", () => {
     it("supports explicit type overloads for setInput", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 

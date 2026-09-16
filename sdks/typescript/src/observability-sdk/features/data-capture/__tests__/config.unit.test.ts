@@ -29,7 +29,7 @@ describe("Data Capture Config", () => {
     resetObservabilitySdkConfig();
   });
 
-  describe("initialization", () => {
+  describe("when initializing", () => {
     it("initializes config is allowed any number of times", () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({ logger });
@@ -62,7 +62,7 @@ describe("Data Capture Config", () => {
     });
   });
 
-  describe("data capture modes", () => {
+  describe("when using different data capture modes", () => {
     it('respects "none" mode', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({

@@ -13,7 +13,7 @@ import {
 } from "../types";
 
 describe("Evaluation Types", () => {
-  describe("evaluationStatusSchema", () => {
+  describe("when validating with evaluationStatusSchema", () => {
     it("accepts valid statuses", () => {
       expect(evaluationStatusSchema.parse("processed")).toBe("processed");
       expect(evaluationStatusSchema.parse("error")).toBe("error");
@@ -27,7 +27,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("targetTypeSchema", () => {
+  describe("when validating with targetTypeSchema", () => {
     it("accepts valid target types", () => {
       expect(targetTypeSchema.parse("prompt")).toBe("prompt");
       expect(targetTypeSchema.parse("agent")).toBe("agent");
@@ -40,7 +40,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("targetMetadataSchema", () => {
+  describe("when validating with targetMetadataSchema", () => {
     it("accepts valid metadata objects", () => {
       const metadata = {
         model: "gpt-4",
@@ -69,7 +69,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("targetInfoSchema", () => {
+  describe("when validating with targetInfoSchema", () => {
     it("parses valid target info", () => {
       const target = {
         id: "target-1",
@@ -105,7 +105,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("evaluationResultSchema", () => {
+  describe("when validating with evaluationResultSchema", () => {
     it("parses minimal evaluation result", () => {
       const result = {
         name: "accuracy",
@@ -165,7 +165,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("batchEntrySchema", () => {
+  describe("when validating with batchEntrySchema", () => {
     it("parses valid batch entry", () => {
       const entry = {
         index: 0,

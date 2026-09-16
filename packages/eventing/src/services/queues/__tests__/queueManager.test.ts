@@ -135,7 +135,7 @@ describe("QueueManager", () => {
     vi.restoreAllMocks();
   });
 
-  describe("shared pipeline queue", () => {
+  describe("when using a shared pipeline queue", () => {
     it("registers all job types in the global job registry", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
@@ -324,7 +324,7 @@ describe("QueueManager", () => {
     });
   });
 
-  describe("initializeHandlerQueues", () => {
+  describe("initializeHandlerQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
         aggregateType,
@@ -600,7 +600,7 @@ describe("QueueManager", () => {
     });
   });
 
-  describe("initializeProjectionQueues", () => {
+  describe("initializeProjectionQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
         aggregateType,
@@ -701,7 +701,7 @@ describe("QueueManager", () => {
     });
   });
 
-  describe("initializeCommandQueues", () => {
+  describe("initializeCommandQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
         aggregateType,
@@ -866,7 +866,7 @@ describe("QueueManager", () => {
     });
   });
 
-  describe("initializeProjectionSubscriberQueues", () => {
+  describe("initializeProjectionSubscriberQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
         aggregateType,
@@ -1037,7 +1037,7 @@ describe("QueueManager", () => {
     });
   });
 
-  describe("close", () => {
+  describe("close()", () => {
     it("facade close is a no-op (global queue lifecycle owned by EventSourcing)", async () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();

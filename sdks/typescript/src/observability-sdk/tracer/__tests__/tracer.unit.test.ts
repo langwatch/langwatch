@@ -32,7 +32,7 @@ describe("tracer.ts", () => {
     testEnv.cleanup();
   });
 
-  describe("getLangWatchTracerFromProvider", () => {
+  describe("getLangWatchTracerFromProvider()", () => {
     it("creates a LangWatch tracer from a tracer provider", () => {
       expect(langwatchTracer).toBeDefined();
       expect(typeof langwatchTracer.startSpan).toBe("function");
@@ -50,7 +50,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("getLangWatchTracer", () => {
+  describe("getLangWatchTracer()", () => {
     it("gets tracer from global provider", () => {
       // Mock the global tracer provider
       const globalGetTracerSpy = vi
@@ -67,7 +67,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("startSpan", () => {
+  describe("startSpan()", () => {
     it("creates a LangWatchSpan", () => {
       const span = langwatchTracer.startSpan("test-span");
 
@@ -103,7 +103,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("startActiveSpan", () => {
+  describe("startActiveSpan()", () => {
     it("executes callback with LangWatchSpan", () => {
       const callback = vi.fn((span: LangWatchSpan) => {
         expect(span).toBeDefined();
@@ -180,8 +180,8 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("withActiveSpan", () => {
-    describe("async callback behavior", () => {
+  describe("withActiveSpan()", () => {
+    describe("when the callback is async", () => {
       it("executes async callback with automatic span management", async () => {
         const callback = vi.fn(async (span: LangWatchSpan) => {
           expect(span).toBeDefined();
@@ -294,7 +294,7 @@ describe("tracer.ts", () => {
       });
     });
 
-    describe("sync callback behavior", () => {
+    describe("when the callback is sync", () => {
       it("works with synchronous callbacks", () => {
         const callback = vi.fn((span: LangWatchSpan) => {
           span.setType("tool");
@@ -390,7 +390,7 @@ describe("tracer.ts", () => {
       });
     });
 
-    describe("edge cases and promise-like objects", () => {
+    describe("when given edge cases or promise-like objects", () => {
       it("handles promise-like objects (thenables)", async () => {
         const thenable = {
           then: vi.fn((onFulfilled: any) => {
@@ -455,7 +455,7 @@ describe("tracer.ts", () => {
       });
     });
 
-    describe("parameter handling", () => {
+    describe("when handling different parameter shapes", () => {
       it("handles options parameter", async () => {
         const options = { kind: SpanKind.PRODUCER };
         const callback = vi.fn(() => "result");
@@ -495,7 +495,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("argument normalization", () => {
+  describe("when normalizing overloaded call arguments", () => {
     it("handles different argument patterns for startActiveSpan", () => {
       // Test all valid argument combinations
       const callback = vi.fn(() => "result");
@@ -548,7 +548,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("proxy behavior", () => {
+  describe("when checking the tracer proxy shape", () => {
     it("has the expected LangWatch methods", () => {
       // Test that the proxy provides the LangWatch-specific methods
       expect(typeof langwatchTracer.startSpan).toBe("function");
@@ -581,7 +581,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("withActiveSpan error handling improvements", () => {
+  describe("when withActiveSpan handles errors", () => {
     it("handles complex error scenarios with proper cleanup", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "error-tracer", "1.0.0");
@@ -632,7 +632,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("performance and concurrency improvements", () => {
+  describe("when handling performance and concurrency", () => {
     it("handles high-frequency span creation without performance degradation", async () => {
       const mockProvider = new MockTracerProvider();
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "perf-tracer", "1.0.0");
@@ -697,7 +697,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("argument validation and edge cases", () => {
+  describe("when validating arguments or given edge cases", () => {
     it("provides clear error messages for invalid arguments", () => {
       const { langwatchTracer } = testScenarios.createTracerTest();
 
@@ -728,7 +728,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("memory and resource management", () => {
+  describe("when managing memory and resources", () => {
     it("does not leak spans in memory", () => {
       const { mockTracer } = testScenarios.createTracerTest();
 
@@ -773,7 +773,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("integration scenarios", () => {
+  describe("when running integration scenarios", () => {
     it("supports nested spans with proper parent-child relationships", async () => {
       const parentCallback = vi.fn(async (parentSpan: LangWatchSpan) => {
         parentSpan.setType("workflow");
@@ -846,7 +846,7 @@ describe("tracer.ts", () => {
     });
   });
 
-  describe("default langwatch.origin attribute", () => {
+  describe("when setting the default langwatch.origin attribute", () => {
     describe("when no origin is provided", () => {
       it("injects langwatch.origin = application on startSpan", () => {
         langwatchTracer.startSpan("my-span");

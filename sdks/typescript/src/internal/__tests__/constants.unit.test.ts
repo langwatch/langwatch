@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { detectRuntime } from "../runtime";
 
 describe("runtime.ts", () => {
-  describe("detectRuntime", () => {
+  describe("detectRuntime()", () => {
     it("detects node", () => {
       expect(detectRuntime({ process: { versions: { node: "18.0.0" } } })).toBe("node");
     });

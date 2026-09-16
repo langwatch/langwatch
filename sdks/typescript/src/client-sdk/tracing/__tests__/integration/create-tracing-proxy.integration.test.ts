@@ -46,7 +46,7 @@ describe("createTracingProxy Integration Tests", () => {
     trace.disable();
   });
 
-  describe("basic functionality", () => {
+  describe("when using basic functionality", () => {
     it("creates a proxy that traces public methods", async () => {
       class TestClass {
         publicMethod() {
@@ -154,7 +154,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("decorator functionality", () => {
+  describe("when using decorator functionality", () => {
     it("uses decorator methods when available", async () => {
       class TestClass {
         publicMethod() {
@@ -258,7 +258,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("method arguments and return values", () => {
+  describe("when passing method arguments and return values", () => {
     it("passes arguments correctly to traced methods", async () => {
       class TestClass {
         publicMethod(arg1: string, arg2: number) {
@@ -366,7 +366,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("decorator span access", () => {
+  describe("when the decorator accesses the span", () => {
     it("calls decorator method with correct context", async () => {
       class TestClass {
         publicMethod() {
@@ -406,7 +406,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("span lifecycle", () => {
+  describe("when checking span lifecycle", () => {
     it("handles multiple method calls", async () => {
       class TestClass {
         method1() {
@@ -438,7 +438,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("method filtering", () => {
+  describe("when filtering methods", () => {
     it("does not trace getters", async () => {
       class TestClass {
         // eslint-disable-next-line @typescript-eslint/class-literal-property-style
@@ -502,7 +502,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles target with no methods", async () => {
       class EmptyClass {}
 
@@ -808,7 +808,7 @@ describe("createTracingProxy Integration Tests", () => {
     });
   });
 
-  describe("performance and concurrency", () => {
+  describe("when checking performance and concurrency", () => {
     it("handles concurrent method calls efficiently", async () => {
       class TestClass {
         async publicMethod(index: number) {

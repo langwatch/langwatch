@@ -72,7 +72,7 @@ describe("AbstractMapProjection", () => {
     append: vi.fn(),
   };
 
-  describe("eventTypes", () => {
+  describe("when reading eventTypes", () => {
     it("derives event types from schemas", () => {
       const projection = new TestMapProjection(mockStore);
       expect(projection.eventTypes).toEqual(["lw.test.foo_happened", "lw.test.bar_happened"]);

@@ -35,7 +35,7 @@ describe("Prompt Retrieval", () => {
     vi.clearAllMocks();
   });
 
-  describe("Scenario: Default Behavior (Materialized First)", () => {
+  describe("when using default behaviour (materialized first)", () => {
     /** @scenario Fetch without tag returns latest */
     it("returns local version and does NOT call API when prompt exists locally", async () => {
       // Given the prompt exists locally and on server
@@ -50,7 +50,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Materialized First - Fallback to Server", () => {
+  describe("when materialized-first falls back to the server", () => {
     it("returns server version when prompt does NOT exist locally", async () => {
       // Given prompt does NOT exist locally but exists on server
       localPromptsService.get.mockResolvedValue(null);
@@ -70,7 +70,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Prompt Not Found Anywhere", () => {
+  describe("when the prompt is not found anywhere", () => {
     /** @scenario "Prompt not found anywhere throws error" */
     it("throws error when prompt does NOT exist locally or on server", async () => {
       // Given prompt does NOT exist locally or on server
@@ -86,7 +86,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Always Fetch - Happy Path", () => {
+  describe("when always-fetch succeeds", () => {
     /** @scenario "ALWAYS_FETCH returns server prompt" */
     it("calls API first and returns server version", async () => {
       // Given prompt exists locally and on server
@@ -106,7 +106,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Always Fetch - API Failure Fallback", () => {
+  describe("when always-fetch falls back after an API failure", () => {
     /** @scenario "ALWAYS_FETCH falls back to local when API fails" */
     it("returns local version upon API failure", async () => {
       // Given API is down but prompt exists locally
@@ -125,7 +125,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Materialized Only", () => {
+  describe("when using materialized-only fetch policy", () => {
     /** @scenario "MATERIALIZED_ONLY throws when local file not found" */
     it("does NOT call API and throws error when prompt not found locally", async () => {
       // Given prompt does NOT exist locally
@@ -156,7 +156,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache TTL - First Fetch", () => {
+  describe("when the cache TTL policy performs its first fetch", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
@@ -179,7 +179,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache TTL - Hit", () => {
+  describe("when the cache TTL policy hits the cache", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
@@ -205,7 +205,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache TTL - Expiration", () => {
+  describe("when the cache TTL expires", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
@@ -230,7 +230,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache TTL - API Failure Fallback", () => {
+  describe("when the cache TTL policy falls back after an API failure", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
@@ -253,7 +253,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Shorthand syntax passthrough (thin client)", () => {
+  describe("when using shorthand syntax passthrough (thin client)", () => {
     describe("when fetching with colon-separated shorthand", () => {
       /** @scenario Shorthand syntax passes through to API without client-side parsing */
       it("passes the full string to the API without parsing", async () => {
@@ -272,7 +272,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache TTL - Version Isolation", () => {
+  describe("when the cache TTL policy isolates by version", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
@@ -312,7 +312,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Fetch by Tag", () => {
+  describe("when fetching by tag", () => {
     describe("when fetching with a tag using MATERIALIZED_FIRST", () => {
       /** @scenario Fetch prompt by tag via options */
       it("passes tag through to API service when no local prompt exists", async () => {
@@ -358,7 +358,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Invalid Tag Error", () => {
+  describe("when the tag is invalid", () => {
     describe("when the API returns an error for an invalid tag", () => {
       /** @scenario Unassigned tag returns error */
       it("throws an error when API rejects and no local fallback exists", async () => {
@@ -377,7 +377,7 @@ describe("Prompt Retrieval", () => {
     });
   });
 
-  describe("Scenario: Cache Key Isolation by Tag", () => {
+  describe("when the cache key is isolated by tag", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 

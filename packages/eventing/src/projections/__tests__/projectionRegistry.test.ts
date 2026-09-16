@@ -47,7 +47,7 @@ describe("ProjectionRegistry", () => {
     vi.restoreAllMocks();
   });
 
-  describe("registerFoldProjection", () => {
+  describe("registerFoldProjection()", () => {
     describe("when projection is registered", () => {
       it("registers successfully", () => {
         const registry = new ProjectionRegistry();
@@ -69,7 +69,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("registerMapProjection", () => {
+  describe("registerMapProjection()", () => {
     it("registers successfully", () => {
       const registry = new ProjectionRegistry();
       const mapProj = createMockMapProjectionDefinition("myMap");
@@ -89,7 +89,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("initialize", () => {
+  describe("initialize()", () => {
     describe("when called twice without close", () => {
       it("throws ConfigurationError", () => {
         const registry = new ProjectionRegistry();
@@ -120,7 +120,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("dispatch", () => {
+  describe("dispatch()", () => {
     describe("when not initialized", () => {
       it("logs warning and drops events", async () => {
         const registry = new ProjectionRegistry();
@@ -155,7 +155,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("registerSubscriber", () => {
+  describe("registerSubscriber()", () => {
     describe("when fold exists", () => {
       it("registers successfully", () => {
         const registry = new ProjectionRegistry();
@@ -195,7 +195,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("hasProjections", () => {
+  describe("hasProjections()", () => {
     describe("when subscribers are registered alongside their folds", () => {
       it("returns true", () => {
         const registry = new ProjectionRegistry();
@@ -215,7 +215,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("initialize with subscribers", () => {
+  describe("when initializing with registered subscribers", () => {
     describe("when subscribers are registered", () => {
       it("creates subscriber queues", () => {
         const registry = new ProjectionRegistry();
@@ -229,7 +229,7 @@ describe("ProjectionRegistry", () => {
     });
   });
 
-  describe("close", () => {
+  describe("close()", () => {
     it("closes queue manager when initialized", async () => {
       const registry = new ProjectionRegistry();
       const fold = createMockFoldProjectionDefinition("myFold");

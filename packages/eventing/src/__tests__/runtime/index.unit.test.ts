@@ -25,7 +25,7 @@ describe("EventSourcingPipeline", () => {
     vi.restoreAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates instance with correct name property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "test-pipeline",
@@ -98,7 +98,7 @@ describe("EventSourcingPipeline", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("works with minimal definition containing only required fields", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
         name: "minimal-pipeline",

@@ -202,7 +202,7 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
   });
 
-  describe("duplicate prevention does not break map projection dispatch", () => {
+  describe("when duplicate prevention does not break map projection dispatch", () => {
     it("duplicate events are dispatched to map projections even after storage dedup", async () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");

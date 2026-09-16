@@ -43,7 +43,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     vi.restoreAllMocks();
   });
 
-  describe("priority 1 — `--endpoint` flag wins over everything", () => {
+  describe("when the --endpoint flag is set", () => {
     it("flag wins over env", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
       const result = resolveControlPlaneEndpoint({
@@ -72,7 +72,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 2 — LANGWATCH_ENDPOINT env wins over config + default", () => {
+  describe("when LANGWATCH_ENDPOINT is set without an --endpoint flag", () => {
     it("env wins over persisted config", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";
       const result = resolveControlPlaneEndpoint({
@@ -98,7 +98,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 3 — persisted config wins over default", () => {
+  describe("when persisted config exists without a flag or env var", () => {
     it("config wins when neither flag nor env is set", () => {
       const result = resolveControlPlaneEndpoint({
         cfg: cfgFixture({ control_plane_url: "https://config.example.com" }),
@@ -118,7 +118,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("priority 4 — built-in default", () => {
+  describe("when nothing else is set", () => {
     it("default fires when nothing else is set", () => {
       const result = resolveControlPlaneEndpoint({});
       expect(result.url).toBe("https://app.langwatch.ai");
@@ -126,7 +126,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("LANGWATCH_URL legacy alias is DROPPED", () => {
+  describe("when only the legacy LANGWATCH_URL alias is set", () => {
     it("does NOT read LANGWATCH_URL even when LANGWATCH_ENDPOINT is unset", () => {
       process.env.LANGWATCH_URL = "https://legacy.example.com";
       const result = resolveControlPlaneEndpoint({});
@@ -190,7 +190,7 @@ describe("resolveControlPlaneEndpoint — 4-source priority", () => {
     });
   });
 
-  describe("resolveControlPlaneUrl convenience", () => {
+  describe("resolveControlPlaneUrl()", () => {
     /** @scenario every CLI command resolves the endpoint via the same single function */
     it("returns just the URL string", () => {
       process.env.LANGWATCH_ENDPOINT = "https://env.example.com";

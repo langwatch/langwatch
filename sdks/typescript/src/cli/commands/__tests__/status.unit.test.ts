@@ -330,7 +330,7 @@ describe("statusCommand", () => {
     });
   });
 
-  describe("attention sections", () => {
+  describe("when rendering the needs-attention sections", () => {
     it("flags errored traces, a running experiment and an at-risk budget", async () => {
       mockGET.mockImplementation(async (path: string) => {
         if (path.startsWith("/api/v1/experiments/runs")) {
@@ -516,7 +516,7 @@ describe("statusCommand", () => {
   // Every one of these covers a way status used to print a green all-clear over
   // a scan it knew was partial — the failure mode the `errors` map exists to
   // prevent. The load-bearing assertion in each is the NEGATIVE one.
-  describe("false all-clear regressions", () => {
+  describe("when guarding against false all-clear regressions", () => {
     const experimentFixture = (overrides: Record<string, unknown> = {}) => ({
       id: "exp_1",
       slug: "eval-x",

@@ -15,7 +15,7 @@ import {
 } from "..";
 
 describe("LangWatchCallbackHandler", () => {
-  describe("message conversion", () => {
+  describe("when converting messages", () => {
     it("converts standard langchain message types", () => {
       const messages = [
         { content: "Hello", type: "human", lc_serializable: false },
@@ -120,7 +120,7 @@ describe("LangWatchCallbackHandler", () => {
     });
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates instance without throwing", () => {
       expect(() => new LangWatchCallbackHandler()).not.toThrow();
     });
@@ -160,7 +160,7 @@ describe("LangWatchCallbackHandler", () => {
     });
   });
 
-  describe("span management", () => {
+  describe("when a span is missing", () => {
     it("handles missing spans gracefully", () => {
       const handler = new LangWatchCallbackHandler();
 
@@ -176,7 +176,7 @@ describe("LangWatchCallbackHandler", () => {
     });
   });
 
-  describe("error scenarios", () => {
+  describe("when given malformed or invalid input", () => {
     it("handles malformed serialized objects", () => {
       const handler = new LangWatchCallbackHandler();
 
@@ -237,7 +237,7 @@ describe("LangWatchCallbackHandler", () => {
     });
   });
 
-  describe("data validation", () => {
+  describe("when validating LLMResult data", () => {
     it("handles various LLMResult formats", () => {
       const handler = new LangWatchCallbackHandler();
 
@@ -285,7 +285,7 @@ describe("LangWatchCallbackHandler", () => {
 });
 
 describe("Helper Functions", () => {
-  describe("className", () => {
+  describe("className()", () => {
     it("extracts class name from id array", () => {
       const serialized = {
         id: ["langchain", "llms", "OpenAI"],
@@ -311,7 +311,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("shorten", () => {
+  describe("shorten()", () => {
     it("shortens long strings", () => {
       const longString = "a".repeat(150);
       const result = shorten(longString);
@@ -329,7 +329,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("previewInput", () => {
+  describe("previewInput()", () => {
     it("returns shortened string for long text", () => {
       const longText = "a".repeat(150);
       expect(previewInput(longText)).toBe("a".repeat(119) + "…");
@@ -351,7 +351,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("ctxSkip", () => {
+  describe("ctxSkip()", () => {
     it("skips ChannelWrite classes", () => {
       const serialized = { id: ["ChannelWrite"], lc: 1, type: "not_implemented" } as any;
       expect(ctxSkip(serialized)).toBe(true);
@@ -373,7 +373,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("wrapNonScalarValues", () => {
+  describe("wrapNonScalarValues()", () => {
     it("returns primitive values unchanged", () => {
       expect(wrapNonScalarValues("string")).toBe("string");
       expect(wrapNonScalarValues(123)).toBe(123);
@@ -407,8 +407,8 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("deriveNameAndType", () => {
-    describe("LLM/Chat naming", () => {
+  describe("deriveNameAndType()", () => {
+    describe("when naming an LLM or Chat run", () => {
       it("names LLM with provider and model", () => {
         const result = deriveNameAndType({
           runType: "llm",
@@ -456,7 +456,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("LangGraph node naming", () => {
+    describe("when naming a LangGraph node", () => {
       it("names nodes with step number", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -494,7 +494,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Router vs Node prioritization", () => {
+    describe("when prioritizing router naming over node naming", () => {
       it("prioritizes routers over nodes when both are present", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -567,7 +567,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Router naming", () => {
+    describe("when naming a router", () => {
       it("names routers with path and decision", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -662,7 +662,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Tool naming", () => {
+    describe("when naming a tool", () => {
       it("names tools with input preview", () => {
         const result = deriveNameAndType({
           runType: "tool",
@@ -683,7 +683,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Graph runner naming", () => {
+    describe("when naming a graph runner", () => {
       it("names graph runners", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -694,7 +694,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Fallback naming", () => {
+    describe("when no specific naming rule matches", () => {
       it("names agents", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -732,7 +732,7 @@ describe("Helper Functions", () => {
       });
     });
 
-    describe("Edge cases and error handling", () => {
+    describe("when given edge cases or invalid input", () => {
       it("handles null/undefined metadata gracefully", () => {
         const result = deriveNameAndType({
           runType: "chain",
@@ -953,7 +953,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("buildLangChainMetadataAttributes", () => {
+  describe("buildLangChainMetadataAttributes()", () => {
     it("filters out LangGraph metadata keys", () => {
       const metadata = {
         langgraph_node: "analyze",
@@ -986,7 +986,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("applyGenAIAttrs", () => {
+  describe("applyGenAIAttrs()", () => {
     it("sets gen_ai attributes from metadata", () => {
       const span = {
         setAttribute: vi.fn(),
@@ -1032,7 +1032,7 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("getResolvedParentContext", () => {
+  describe("getResolvedParentContext()", () => {
     it("returns active context when no runId provided", () => {
       const result = getResolvedParentContext(undefined, {}, {});
       expect(result).toBeDefined();

@@ -114,7 +114,7 @@ describe("guardProjectId — FeatureFlagExperimentSetting", () => {
 });
 
 describe("guardProjectId — exempt org-scoped gateway models", () => {
-  describe("findMany on GatewayBudget with only organizationId filter", () => {
+  describe("when findMany on GatewayBudget with only organizationId filter", () => {
     it("does NOT throw (org-scoped; projectId is not applicable)", async () => {
       await expect(
         runGuard({
@@ -126,7 +126,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("findMany on GatewayBudgetLedger with only budgetId filter", () => {
+  describe("when findMany on GatewayBudgetLedger with only budgetId filter", () => {
     it("does NOT throw (ledger descends from VirtualKey.projectId via virtualKeyId)", async () => {
       await expect(
         runGuard({
@@ -138,7 +138,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("create on GatewayChangeEvent without projectId in data", () => {
+  describe("when create on GatewayChangeEvent without projectId in data", () => {
     it("does NOT throw — change-events allow null projectId for org-wide mutations", async () => {
       await expect(
         runGuard({
@@ -160,7 +160,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
   // binding join table was dropped; chain ordering moved to
   // RoutingPolicy.modelProviderIds.
 
-  describe("findMany on GatewayCacheRule with only organizationId filter", () => {
+  describe("when findMany on GatewayCacheRule with only organizationId filter", () => {
     it("does NOT throw (org-scoped; cache rules apply across every VK in the org)", async () => {
       await expect(
         runGuard({
@@ -172,7 +172,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("findFirst on RoutingPolicy with org-scoped filter", () => {
+  describe("when findFirst on RoutingPolicy with org-scoped filter", () => {
     // Regression: /api/auth/cli/exchange → approveDeviceCode →
     // PersonalVirtualKeyService.ensureDefault → RoutingPolicyService.
     // resolveDefaultForUser threw "requires projectId" inside the
@@ -196,7 +196,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("create on RoutingPolicy without projectId in data", () => {
+  describe("when create on RoutingPolicy without projectId in data", () => {
     it("does NOT throw (org-scoped; admin-defined templates carry organizationId+scope)", async () => {
       await expect(
         runGuard({
@@ -216,7 +216,7 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("create on GatewayCacheRule without projectId in data", () => {
+  describe("when create on GatewayCacheRule without projectId in data", () => {
     it("does NOT throw — cache rules carry organizationId, never projectId", async () => {
       await expect(
         runGuard({
@@ -245,7 +245,7 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
   // upsert/findUnique on the (projectId, traceId) compound unique key.
   // The allowlist must include projectId_traceId alongside the other
   // compound keys (projectId_slug / projectId_date / etc).
-  describe("findUnique on PinnedTrace with projectId_traceId compound key", () => {
+  describe("when findUnique on PinnedTrace with projectId_traceId compound key", () => {
     it("does NOT throw (compound key carries projectId)", async () => {
       await expect(
         runGuard({
@@ -261,7 +261,7 @@ describe("guardProjectId — projectId_traceId compound key (PinnedTrace)", () =
     });
   });
 
-  describe("upsert on PinnedTrace with projectId_traceId compound key", () => {
+  describe("when upsert on PinnedTrace with projectId_traceId compound key", () => {
     it("does NOT throw (compound key carries projectId)", async () => {
       await expect(
         runGuard({
@@ -379,7 +379,7 @@ describe("guardProjectId — shared WebhookEndpointDelivery log", () => {
 });
 
 describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
-  describe("findMany on VirtualKey WITHOUT any tenancy predicate", () => {
+  describe("when findMany on VirtualKey WITHOUT any tenancy predicate", () => {
     it("STILL throws — VirtualKey requires organizationId/id/scope (regression guard)", async () => {
       await expect(
         runGuard({
@@ -391,7 +391,7 @@ describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
     });
   });
 
-  describe("findMany on VirtualKey WITH organizationId in where", () => {
+  describe("when findMany on VirtualKey WITH organizationId in where", () => {
     it("does NOT throw (canonical org-scoped query)", async () => {
       await expect(
         runGuard({
@@ -409,7 +409,7 @@ describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
  * without a projectId column, preventing accidental cross-tenant queries.
  */
 describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
-  describe("ModelProvider.findMany without any tenancy predicate", () => {
+  describe("when ModelProvider.findMany without any tenancy predicate", () => {
     /** @scenario A query without a tenancy predicate throws */
     it("THROWS — bare findMany must not walk every tenant", async () => {
       await expect(
@@ -422,7 +422,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.findMany with the cascade-walk OR predicate", () => {
+  describe("when ModelProvider.findMany with the cascade-walk OR predicate", () => {
     /** @scenario A query with scope predicate succeeds */
     it("does NOT throw — scope OR ladder is the canonical access pattern", async () => {
       await expect(
@@ -447,7 +447,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.findFirst by id alone", () => {
+  describe("when ModelProvider.findFirst by id alone", () => {
     /** @scenario A single-row lookup by id passes */
     it("does NOT throw — id IS the tenancy proof for single-row lookup", async () => {
       await expect(
@@ -460,7 +460,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.create without scopes", () => {
+  describe("when ModelProvider.create without scopes", () => {
     /** @scenario A create without scopes throws */
     it("THROWS — every create needs a scopes relation in the payload", async () => {
       await expect(
@@ -473,7 +473,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProvider.create with scopes relation", () => {
+  describe("when ModelProvider.create with scopes relation", () => {
     /** @scenario A nested-create through the scopes relation passes */
     it("does NOT throw — nested-create through the scopes relation carries tenancy", async () => {
       await expect(
@@ -494,7 +494,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProviderScope.findMany without modelProviderId or scope", () => {
+  describe("when ModelProviderScope.findMany without modelProviderId or scope", () => {
     /** @scenario Join-table bare findMany throws */
     it("THROWS — bare findMany on the join walks every tenant's bindings", async () => {
       await expect(
@@ -507,7 +507,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProviderScope.findMany with modelProviderId", () => {
+  describe("when ModelProviderScope.findMany with modelProviderId", () => {
     /** @scenario Join-table read with parent FK passes */
     it("does NOT throw — parent FK is the tenancy proof for joins", async () => {
       await expect(
@@ -520,7 +520,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
     });
   });
 
-  describe("ModelProviderScope.deleteMany without parent FK or scope", () => {
+  describe("when ModelProviderScope.deleteMany without parent FK or scope", () => {
     /** @scenario Join-table deleteMany requires a parent FK or scope predicate */
     it("THROWS — bare deleteMany would wipe every tenant's bindings", async () => {
       await expect(
@@ -633,7 +633,7 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
 });
 
 describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
-  describe("ModelDefaultConfig.findMany without any tenancy predicate", () => {
+  describe("when ModelDefaultConfig.findMany without any tenancy predicate", () => {
     it("THROWS — would walk every tenant's defaults", async () => {
       await expect(
         runGuard({
@@ -645,7 +645,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.findMany with scopes.some.OR cascade", () => {
+  describe("when ModelDefaultConfig.findMany with scopes.some.OR cascade", () => {
     it("does NOT throw — canonical resolver pattern", async () => {
       await expect(
         runGuard({
@@ -669,7 +669,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.findMany with scopeId: { in: [...] } list predicate", () => {
+  describe("when ModelDefaultConfig.findMany with scopeId: { in: [...] } list predicate", () => {
     /** @scenario List-shaped scopeId predicates pass the scope check */
     it("does NOT throw — org admins read across N teams + M projects via Prisma's { in: [...] } list", async () => {
       // getDefaultModelsForProject builds visibleScopeFilter with this
@@ -702,7 +702,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.findMany with scopeId: { in: [] } empty list", () => {
+  describe("when ModelDefaultConfig.findMany with scopeId: { in: [] } empty list", () => {
     /** @scenario Empty in-lists are not a valid tenancy constraint */
     it("THROWS — empty list constrains to zero scopes, so the branch is unsafe", async () => {
       await expect(
@@ -723,7 +723,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.findMany with one OR branch missing scopeId", () => {
+  describe("when ModelDefaultConfig.findMany with one OR branch missing scopeId", () => {
     /** @scenario A single bad OR branch invalidates the whole scope predicate */
     it("THROWS — every OR branch must constrain a tenancy boundary", async () => {
       await expect(
@@ -747,7 +747,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.findMany with AND-wrapped scope predicate", () => {
+  describe("when ModelDefaultConfig.findMany with AND-wrapped scope predicate", () => {
     it("does NOT throw — exclude-id pattern wraps in AND but a child clause carries scope", async () => {
       await expect(
         runGuard({
@@ -772,7 +772,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.update by id", () => {
+  describe("when ModelDefaultConfig.update by id", () => {
     it("does NOT throw — id is the tenancy proof", async () => {
       await expect(
         runGuard({
@@ -787,7 +787,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.create without scopes", () => {
+  describe("when ModelDefaultConfig.create without scopes", () => {
     it("THROWS — every config must attach to at least one scope at create time", async () => {
       await expect(
         runGuard({
@@ -799,7 +799,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfig.create with nested scopes relation", () => {
+  describe("when ModelDefaultConfig.create with nested scopes relation", () => {
     it("does NOT throw — nested create through the scopes relation", async () => {
       await expect(
         runGuard({
@@ -818,7 +818,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfigScope.findMany without configId or scope", () => {
+  describe("when ModelDefaultConfigScope.findMany without configId or scope", () => {
     it("THROWS — bare findMany walks every tenant's attachments", async () => {
       await expect(
         runGuard({
@@ -830,7 +830,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfigScope.findMany with configId", () => {
+  describe("when ModelDefaultConfigScope.findMany with configId", () => {
     it("does NOT throw — parent FK is the tenancy proof for joins", async () => {
       await expect(
         runGuard({
@@ -842,7 +842,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfigScope.createMany with configId+scope per record", () => {
+  describe("when ModelDefaultConfigScope.createMany with configId+scope per record", () => {
     it("does NOT throw — every entry has the join-shape tenancy keys", async () => {
       await expect(
         runGuard({
@@ -863,7 +863,7 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
     });
   });
 
-  describe("ModelDefaultConfigScope.createMany missing scopeId on one entry", () => {
+  describe("when ModelDefaultConfigScope.createMany missing scopeId on one entry", () => {
     it("THROWS — every entry must carry the full join shape", async () => {
       await expect(
         runGuard({
@@ -1051,7 +1051,7 @@ describe("project-tenancy regime partition", () => {
  * NOTHING else is. Every write stays project-scoped; these lock the real shapes in.
  */
 describe("guardProjectId — ShareLink", () => {
-  describe("findUnique by token (the anonymous capability lookup)", () => {
+  describe("when findUnique by token (the anonymous capability lookup)", () => {
     it("does NOT throw — projectId cannot be known before the row is read", async () => {
       await expect(
         runGuard({
@@ -1063,7 +1063,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("findUnique by id", () => {
+  describe("when findUnique by id", () => {
     it("does NOT throw", async () => {
       await expect(
         runGuard({
@@ -1075,7 +1075,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("findFirst by resourceType + resourceId without projectId", () => {
+  describe("when findFirst by resourceType + resourceId without projectId", () => {
     it("throws — only the token/id capability lookups are exempt", async () => {
       // Regression guard: the exemption once covered this shape for a
       // repository method that no longer exists; nothing may quietly start
@@ -1090,7 +1090,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("updateMany scoped by id + projectId + view cap (consumeView)", () => {
+  describe("when updateMany scoped by id + projectId + view cap (consumeView)", () => {
     it("does NOT throw", async () => {
       await expect(
         runGuard({
@@ -1109,7 +1109,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("update scoped only by primary key", () => {
+  describe("when update scoped only by primary key", () => {
     it("throws — a write must carry projectId", async () => {
       await expect(
         runGuard({
@@ -1124,7 +1124,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("create carrying projectId in data", () => {
+  describe("when create carrying projectId in data", () => {
     it("does NOT throw", async () => {
       await expect(
         runGuard({
@@ -1143,7 +1143,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("deleteMany scoped by id + projectId (revokeById)", () => {
+  describe("when deleteMany scoped by id + projectId (revokeById)", () => {
     it("does NOT throw", async () => {
       await expect(
         runGuard({
@@ -1155,7 +1155,7 @@ describe("guardProjectId — ShareLink", () => {
     });
   });
 
-  describe("count scoped by projectId (hasActiveShareForResource)", () => {
+  describe("when count scoped by projectId (hasActiveShareForResource)", () => {
     it("does NOT throw", async () => {
       await expect(
         runGuard({

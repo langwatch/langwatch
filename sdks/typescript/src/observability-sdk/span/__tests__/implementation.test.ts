@@ -30,7 +30,7 @@ describe("LangWatchSpan Implementation", () => {
     vi.clearAllMocks();
   });
 
-  describe("setInput method overloads", () => {
+  describe("when calling setInput overloads", () => {
     it("handles explicit text type", () => {
       const result = langwatchSpan.setInput("text", "Hello world");
 
@@ -124,7 +124,7 @@ describe("LangWatchSpan Implementation", () => {
     });
   });
 
-  describe("setOutput method overloads", () => {
+  describe("when calling setOutput overloads", () => {
     it("handles explicit text type", () => {
       const result = langwatchSpan.setOutput("text", "Response");
 
@@ -215,7 +215,7 @@ describe("LangWatchSpan Implementation", () => {
     });
   });
 
-  describe("type preference behavior", () => {
+  describe("when checking type preference behaviour", () => {
     it("prefers explicit types over auto-detection for setInput", () => {
       // Object that would auto-detect as "json", but explicit "text" should be preferred
       const obj = { key: "value" };
@@ -234,7 +234,7 @@ describe("LangWatchSpan Implementation", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when handling errors", () => {
     it("handles invalid input gracefully", () => {
       const result = (langwatchSpan.setInput as any)("invalid_type", "test");
 

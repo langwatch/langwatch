@@ -111,7 +111,7 @@ describe("pickFreshEvents", () => {
     });
   });
 
-  describe("input immutability", () => {
+  describe("when checking input immutability", () => {
     it("does not mutate the next array (.reverse() must be on a copy)", () => {
       const original = [
         mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T08:00:01.000Z" }),

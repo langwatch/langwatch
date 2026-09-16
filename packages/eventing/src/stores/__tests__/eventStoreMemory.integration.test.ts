@@ -17,7 +17,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
     store = EventStoreMemory.createForTesting();
   });
 
-  describe("getEvent", () => {
+  describe("getEvent()", () => {
     it("loads one event only inside its tenant-bound aggregate stream", async () => {
       const event = EventUtils.createEvent({
         aggregateType,
@@ -91,7 +91,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
     });
   });
 
-  describe("getEvents - deduplication", () => {
+  describe("when getEvents deduplicates", () => {
     it("returns deduplicated events (same Event ID appears once)", async () => {
       const context = { tenantId };
       const timestamp = 1000;
@@ -269,7 +269,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
     });
   });
 
-  describe("storeEvents - deduplication", () => {
+  describe("when storeEvents deduplicates", () => {
     it("skips inserts if Event ID already exists", async () => {
       const context = { tenantId };
       const timestamp = 1000;
@@ -341,7 +341,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
     });
   });
 
-  describe("recordToEvent - backward compatibility", () => {
+  describe("when recordToEvent handles backward compatibility", () => {
     it("falls back occurredAt to timestamp when EventOccurredAt is 0 (old event)", async () => {
       const context = { tenantId };
       const timestamp = 5000;

@@ -122,7 +122,7 @@ describe("the real command tree", () => {
     );
   });
 
-  describe("every leaf command", () => {
+  describe("when checking every leaf command", () => {
     /** Leaf path -> why the port cannot serve it. */
     const holdouts = new Map<string, string>([
       // Raw byte stream / file destination: the payload is not a document.

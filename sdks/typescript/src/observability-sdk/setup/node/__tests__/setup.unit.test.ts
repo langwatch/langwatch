@@ -274,7 +274,7 @@ describe("data capture configuration", () => {
     resetObservabilitySdkConfig();
   });
 
-  describe("default behavior", () => {
+  describe("when using default behaviour", () => {
     it("captures both input and output by default", () => {
       setupObservability(defaultOptions);
 
@@ -283,7 +283,7 @@ describe("data capture configuration", () => {
     });
   });
 
-  describe("static mode configuration", () => {
+  describe("when configuring static mode", () => {
     it("respects 'none' mode", () => {
       setupObservability({
         ...defaultOptions,
@@ -325,7 +325,7 @@ describe("data capture configuration", () => {
     });
   });
 
-  describe("preset configurations", () => {
+  describe("when using preset configurations", () => {
     it("works with CAPTURE_ALL preset", () => {
       setupObservability({
         ...defaultOptions,
@@ -367,7 +367,7 @@ describe("data capture configuration", () => {
     });
   });
 
-  describe("config object format", () => {
+  describe("when passed a config object", () => {
     it("works with config object containing mode", () => {
       setupObservability({
         ...defaultOptions,

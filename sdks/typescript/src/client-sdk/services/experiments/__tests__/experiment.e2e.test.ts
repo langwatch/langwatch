@@ -544,7 +544,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
 // Unit tests that don't require backend
 describe("Evaluation Unit", () => {
-  describe("humanReadableId", () => {
+  describe("humanReadableId()", () => {
     /** @scenario "Run ID generation" */
     it("generates adjective-adjective-noun pattern", async () => {
       const { generateHumanReadableId } = await import("../humanReadableId.js");
@@ -566,7 +566,7 @@ describe("Evaluation Unit", () => {
     });
   });
 
-  describe("withTarget dataset entry capture", () => {
+  describe("when withTarget captures a dataset entry", () => {
     it("sends correct entry data for each target in concurrent execution", async () => {
       // This test verifies the fix for the race condition where concurrent
       // withTarget() calls would capture wrong item data due to shared state

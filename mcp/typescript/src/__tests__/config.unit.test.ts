@@ -98,7 +98,7 @@ describe("config", () => {
     });
   });
 
-  describe("requireApiKey", () => {
+  describe("requireApiKey()", () => {
     it("returns the API key when it is set", () => {
       initConfig({ apiKey: "test-key" });
       expect(requireApiKey()).toBe("test-key");
@@ -112,7 +112,7 @@ describe("config", () => {
     });
   });
 
-  describe("getConfig", () => {
+  describe("getConfig()", () => {
     it("throws when config has not been initialized", async () => {
       // globalThis survives vi.resetModules(), so clear it explicitly
       delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;

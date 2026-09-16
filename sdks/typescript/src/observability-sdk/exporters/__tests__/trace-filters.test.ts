@@ -23,8 +23,8 @@ function createMockSpan(name: string, scopeName: string): ReadableSpan {
 }
 
 describe("trace-filters", () => {
-  describe("valueMatches", () => {
-    describe("equals matcher", () => {
+  describe("valueMatches()", () => {
+    describe("when using the equals matcher", () => {
       it("matches exact string (case-sensitive by default)", () => {
         const rule: Match = { equals: "test" };
         expect(valueMatches("test", rule)).toBe(true);
@@ -54,7 +54,7 @@ describe("trace-filters", () => {
       });
     });
 
-    describe("startsWith matcher", () => {
+    describe("when using the startsWith matcher", () => {
       it("matches prefix (case-sensitive by default)", () => {
         const rule: Match = { startsWith: "test" };
         expect(valueMatches("test", rule)).toBe(true);
@@ -86,7 +86,7 @@ describe("trace-filters", () => {
       });
     });
 
-    describe("regex matcher", () => {
+    describe("when using the regex matcher", () => {
       it("matches regex pattern", () => {
         const rule: Match = { matches: /^(GET|POST)\s/ };
         expect(valueMatches("GET /api", rule)).toBe(true);
@@ -123,7 +123,7 @@ describe("trace-filters", () => {
       });
     });
 
-    describe("edge cases", () => {
+    describe("when given edge case inputs", () => {
       it("handles null/undefined values as empty strings", () => {
         const rule: Match = { equals: "" };
         expect(valueMatches(null as any, rule)).toBe(true);
@@ -149,7 +149,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("matchesCriteria", () => {
+  describe("matchesCriteria()", () => {
     it("matches when instrumentationScopeName criteria is met", () => {
       const span = createMockSpan("operation", "ai");
       const criteria: Criteria = {
@@ -233,7 +233,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("isVercelAiSpan", () => {
+  describe("isVercelAiSpan()", () => {
     it("returns true for ai scope (case-insensitive)", () => {
       expect(isVercelAiSpan(createMockSpan("op", "ai"))).toBe(true);
       expect(isVercelAiSpan(createMockSpan("op", "AI"))).toBe(true);
@@ -253,7 +253,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("isHttpRequestSpan", () => {
+  describe("isHttpRequestSpan()", () => {
     function createSpanWith({
       name,
       scopeName,
@@ -363,7 +363,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("applyPreset", () => {
+  describe("applyPreset()", () => {
     const spans = [
       createMockSpan("GET /users", "http"),
       createMockSpan("chat.completion", "ai"),
@@ -384,7 +384,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("applyFilterRule", () => {
+  describe("applyFilterRule()", () => {
     const spans = [
       createMockSpan("GET /users", "http"),
       createMockSpan("chat.completion", "ai"),
@@ -424,7 +424,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("applyFilters", () => {
+  describe("applyFilters()", () => {
     const spans = [
       createMockSpan("GET /users", "http"),
       createMockSpan("chat.completion", "ai"),
@@ -489,7 +489,7 @@ describe("trace-filters", () => {
     });
   });
 
-  describe("integration scenarios", () => {
+  describe("when running integration scenarios", () => {
     it("handles complex real-world scenario", () => {
       const spans = [
         createMockSpan("GET /health", "http"),

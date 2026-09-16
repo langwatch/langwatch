@@ -76,7 +76,7 @@ describe("createTracingProxy", () => {
     }
   }
 
-  describe("basic functionality", () => {
+  describe("when using basic functionality", () => {
     it("creates a proxy that traces public methods", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -132,7 +132,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("span creation and attributes", () => {
+  describe("when creating spans and setting attributes", () => {
     it("creates spans with correct name format", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -170,7 +170,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("method execution", () => {
+  describe("when executing methods", () => {
     it("executes methods with arguments correctly", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -207,7 +207,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when handling errors", () => {
     it("handles synchronous errors", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -414,7 +414,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("decorator functionality", () => {
+  describe("when using decorator functionality", () => {
     // Decorator class for testing
     class TestDecorator {
       private target: TestClass;
@@ -501,7 +501,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("proxy behavior", () => {
+  describe("when checking proxy behaviour", () => {
     it("returns non-function properties as-is", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -530,7 +530,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles class with no public methods", () => {
       class EmptyClass {
         private _privateMethod() {
@@ -592,7 +592,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("concurrent execution", () => {
+  describe("when executing concurrently", () => {
     it("handles concurrent method calls", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
@@ -633,7 +633,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("decorator error handling", () => {
+  describe("when the decorator handles errors", () => {
     class ErrorDecorator {
       private target: TestClass;
 
@@ -682,7 +682,7 @@ describe("createTracingProxy", () => {
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("maintains type safety for the proxy", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);

@@ -16,8 +16,8 @@ function promptWithTemplate(template: string): Prompt {
 }
 
 describe("Prompt", () => {
-  describe("Liquid template support", () => {
-    describe("#compile()", () => {
+  describe("when using Liquid template support", () => {
+    describe("when calling compile()", () => {
       describe("when template has if/else conditions", () => {
         it("renders the matching branch", () => {
           const prompt = promptWithTemplate(
@@ -100,7 +100,7 @@ describe("Prompt", () => {
       });
     });
 
-    describe("#compileStrict()", () => {
+    describe("when calling compileStrict()", () => {
       describe("when template has undefined variables in Liquid tags", () => {
         it("throws a PromptCompilationError", () => {
           const prompt = promptWithTemplate("{% if mood == 'happy' %}Great!{% endif %}");

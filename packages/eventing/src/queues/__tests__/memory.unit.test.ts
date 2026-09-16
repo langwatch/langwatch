@@ -22,7 +22,7 @@ describe("EventSourcedQueueProcessorMemory", () => {
     vi.clearAllMocks();
   });
 
-  describe("send", () => {
+  describe("send()", () => {
     it("immediately processes payload through process function", async () => {
       const processFn = vi.fn().mockResolvedValue(void 0);
       const definition: EventSourcedQueueDefinition<{ id: string }> = {
@@ -114,7 +114,7 @@ describe("EventSourcedQueueProcessorMemory", () => {
     });
   });
 
-  describe("close", () => {
+  describe("close()", () => {
     it("completes without errors", async () => {
       const processFn = vi.fn().mockResolvedValue(void 0);
       const definition: EventSourcedQueueDefinition<{ id: string }> = {

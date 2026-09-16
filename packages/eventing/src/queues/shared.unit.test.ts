@@ -34,7 +34,7 @@ describe("getBackoffMs", () => {
     });
   });
 
-  describe("cumulative retry budget", () => {
+  describe("when tracking the cumulative retry budget", () => {
     it("provides at least 2 hours of total wait across all 24 backoff gaps", () => {
       let total = 0;
       for (let attempt = 1; attempt < JOB_RETRY_CONFIG.maxAttempts; attempt++) {

@@ -252,7 +252,7 @@ export function scopedPrismaClient<const Models extends readonly PrismaTableMode
   const exceptions = Object.freeze(
     (options.relationExceptions ?? []).map((exception) => {
       const target = relations.get(exception.model)?.get(exception.relation);
-      if (
+      const isInvalidRelationException =
         !Object.hasOwn(prismaTableCatalogue, exception.model) ||
         !target ||
         typeof exception.relation !== "string" ||
@@ -261,8 +261,9 @@ export function scopedPrismaClient<const Models extends readonly PrismaTableMode
         typeof exception.removalCondition !== "string" ||
         !exception.reason.trim() ||
         !exception.removalCondition.trim() ||
-        !RELATION_READ_OPERATIONS.has(exception.operation)
-      ) {
+        !RELATION_READ_OPERATIONS.has(exception.operation);
+
+      if (isInvalidRelationException) {
         throw new Error(
           "A Prisma relation exception must name a read relation, reason, and removal condition.",
         );

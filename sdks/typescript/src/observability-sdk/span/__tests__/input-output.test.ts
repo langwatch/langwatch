@@ -83,7 +83,7 @@ describe("isValidInputOutputType", () => {
 });
 
 describe("processSpanInputOutput", () => {
-  describe("explicit type scenarios", () => {
+  describe("when an explicit type is given", () => {
     it("processes text type correctly", () => {
       const result = processSpanInputOutput("text", "Hello world");
 
@@ -196,7 +196,7 @@ describe("processSpanInputOutput", () => {
     });
   });
 
-  describe("auto-detection scenarios", () => {
+  describe("when the type is auto-detected", () => {
     it("autoes-detect string as text", () => {
       const result = processSpanInputOutput("Hello world");
 
@@ -318,7 +318,7 @@ describe("processSpanInputOutput", () => {
     });
   });
 
-  describe("edge cases and error handling", () => {
+  describe("when given edge cases or errors", () => {
     it("handles functions gracefully", () => {
       const fn = () => "test";
       const result = processSpanInputOutput(fn);
@@ -378,7 +378,7 @@ describe("processSpanInputOutput", () => {
     });
   });
 
-  describe("validation fallbacks", () => {
+  describe("when validation falls back", () => {
     it("handles extreme edge cases gracefully", () => {
       // Test with undefined values
       const result1 = processSpanInputOutput("text", undefined);

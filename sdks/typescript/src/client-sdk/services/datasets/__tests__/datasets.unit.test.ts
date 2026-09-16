@@ -174,7 +174,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
     // ── Error Mapping ───────────────────────────────────────────────
 
-    describe("error mapping", () => {
+    describe("when mapping errors", () => {
       let service: DatasetService;
       let mockClient: ReturnType<typeof createMockApiClient>;
 
@@ -267,7 +267,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
   // ── Client-side validation ──────────────────────────────────────
 
-  describe("DatasetsFacade validation", () => {
+  describe("when validating with DatasetsFacade", () => {
     const langwatch = new LangWatch({
       apiKey: "test-key",
       endpoint: "http://localhost:5560",

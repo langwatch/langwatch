@@ -37,7 +37,7 @@ describe("config commands", () => {
     vi.restoreAllMocks();
   });
 
-  describe("set daemon", () => {
+  describe("when calling configSetCommand for daemon", () => {
     it("persists the opt-out", async () => {
       await configSetCommand("daemon", "off");
 
@@ -58,7 +58,7 @@ describe("config commands", () => {
     });
   });
 
-  describe("get daemon", () => {
+  describe("when calling configGetCommand for daemon", () => {
     let writeSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
@@ -81,7 +81,7 @@ describe("config commands", () => {
     });
   });
 
-  describe("list", () => {
+  describe("configListCommand()", () => {
     it("shows the daemon setting", async () => {
       await configSetCommand("daemon", "off");
       logSpy.mockClear();
@@ -93,7 +93,7 @@ describe("config commands", () => {
     });
   });
 
-  describe("the url keys", () => {
+  describe("given a URL key", () => {
     it("still validate their values as URLs", async () => {
       await expect(configSetCommand("endpoint", "not a url")).rejects.toThrow(
         "process.exit called",

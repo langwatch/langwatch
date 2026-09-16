@@ -33,7 +33,7 @@ describe("formatLoginCeremony", () => {
     return slug !== undefined && slug !== "open";
   };
 
-  describe("AI tools block", () => {
+  describe("when rendering the AI tools block", () => {
     describe("when the org publishes coding-assistant tools", () => {
       it("lists exactly those tools as runnable commands with their names", () => {
         const lines = formatLoginCeremony({
@@ -68,7 +68,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("model providers block", () => {
+  describe("when rendering the model providers block", () => {
     describe("when providers are supplied", () => {
       it("renders providers under a clearly distinct virtual-key heading", () => {
         const lines = formatLoginCeremony({
@@ -154,7 +154,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("budget overview lines (per-budget, labelled)", () => {
+  describe("when rendering per-budget labelled overview lines", () => {
     const orgBudget = {
       spentUsd: 2.43,
       limitUsd: 100,
@@ -292,7 +292,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("open hint", () => {
+  describe("when rendering the open hint", () => {
     it("appears by default", () => {
       const lines = formatLoginCeremony(baseInput);
       expect(lines).toContain("Or open the app in your browser:");
@@ -308,7 +308,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("full ceremony output (golden)", () => {
+  describe("when rendering the full ceremony output (golden)", () => {
     it("renders the two distinct sections end-to-end", () => {
       const lines = formatLoginCeremony({
         email: "jane@acme.com",

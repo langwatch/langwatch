@@ -40,7 +40,7 @@ function makeTestCommand(tenantId = "tenant-1") {
 }
 
 describe("defineCommand()", () => {
-  describe("returned class", () => {
+  describe("when defineCommand returns a class", () => {
     it("has a zero-arg constructor", () => {
       const handler = new TestCommand();
       expect(handler).toBeDefined();
@@ -154,7 +154,7 @@ describe("defineCommand()", () => {
     });
   });
 
-  describe("schema validation", () => {
+  describe("when validating command data", () => {
     it("validates command data with envelope fields", () => {
       const result = TestCommand.schema.validate({
         tenantId: "t-1",

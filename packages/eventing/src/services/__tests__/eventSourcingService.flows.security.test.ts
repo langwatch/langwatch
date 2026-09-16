@@ -29,7 +29,7 @@ describe("EventSourcingService - Security Flows", () => {
     vi.restoreAllMocks();
   });
 
-  describe("tenant isolation", () => {
+  describe("when enforcing tenant isolation", () => {
     it("tenantId is required in all contexts", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
@@ -121,7 +121,7 @@ describe("EventSourcingService - Security Flows", () => {
     });
   });
 
-  describe("context validation", () => {
+  describe("when validating context", () => {
     it("missing tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
@@ -195,7 +195,7 @@ describe("EventSourcingService - Security Flows", () => {
     });
   });
 
-  describe("aggregate type scoping", () => {
+  describe("when scoping by aggregate type", () => {
     it("correct aggregateType is used for all operations", async () => {
       const eventStore = createMockEventStore<Event>();
       const customAggregateType = "trace" as const;
@@ -248,7 +248,7 @@ describe("EventSourcingService - Security Flows", () => {
     });
   });
 
-  describe("security boundaries", () => {
+  describe("when enforcing security boundaries", () => {
     it("stores enforce tenant isolation", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({

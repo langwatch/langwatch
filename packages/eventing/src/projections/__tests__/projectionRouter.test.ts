@@ -37,7 +37,7 @@ describe("ProjectionRouter", () => {
     vi.restoreAllMocks();
   });
 
-  describe("dispatch", () => {
+  describe("dispatch()", () => {
     describe("when fold projection has eventTypes filter (inline)", () => {
       it("skips events that do not match the fold's eventTypes", async () => {
         const queueManager = createMockQueueManager();
@@ -699,7 +699,7 @@ describe("ProjectionRouter", () => {
     });
   });
 
-  describe("map subscribers", () => {
+  describe("when dispatching to map subscribers", () => {
     describe("when a map subscriber is registered on a map projection", () => {
       /** @scenario A subscriber without a relevance guard fires for every event */
       it("fires after map projection succeeds inline", async () => {
@@ -799,7 +799,7 @@ describe("ProjectionRouter", () => {
     });
   });
 
-  describe("getProjectionByName", () => {
+  describe("getProjectionByName()", () => {
     describe("when a custom key is provided", () => {
       it("calls store.get with the custom key", async () => {
         const queueManager = createMockQueueManager();
@@ -873,7 +873,7 @@ describe("ProjectionRouter", () => {
     });
   });
 
-  describe("processFoldProjectionBatch (coalescing)", () => {
+  describe("when processFoldProjectionBatch coalesces events for one aggregate", () => {
     function makeBatchEvent(id: string, occurredAt: number): Event {
       return createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -1038,7 +1038,7 @@ describe("ProjectionRouter", () => {
     });
   });
 
-  describe("replay marker on map projections", () => {
+  describe("when a replay marker exists on map projections", () => {
     describe("when marker returns 'skip'", () => {
       it("does not invoke map.append for that event", async () => {
         const queueManager = createMockQueueManager();

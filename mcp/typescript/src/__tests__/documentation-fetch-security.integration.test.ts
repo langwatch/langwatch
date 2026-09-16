@@ -14,7 +14,7 @@ const MCP_HEADERS = {
 };
 
 describe("MCP documentation fetch security", () => {
-  describe("URL validation", () => {
+  describe("resolveDocumentationUrl()", () => {
     /** @scenario A documentation tool accepts its own trusted HTTPS pages */
     it.each([
       ["langwatch" as const, undefined, "https://langwatch.ai/docs/llms.txt"],
@@ -90,7 +90,7 @@ describe("MCP documentation fetch security", () => {
     ).rejects.toThrow(/unexpected content type/);
   });
 
-  describe("HTTP tool transport", () => {
+  describe("when documentation tools go through the HTTP transport", () => {
     let mcpServer: Server;
     let targetServer: Server;
     let mcpPort: number;

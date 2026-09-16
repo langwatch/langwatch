@@ -23,7 +23,7 @@ describe("LocalPromptsService", () => {
     service = new LocalPromptsService(config);
   });
 
-  describe("get", () => {
+  describe("get()", () => {
     describe("when prompt has direct file path in config", () => {
       it("returns prompt from the file", async () => {
         const filePath = "custom-path/my-prompt.prompt.yaml";

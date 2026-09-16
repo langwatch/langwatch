@@ -224,7 +224,7 @@ describe("cli-api — auth contract", () => {
 });
 
 describe("cli-api — request shape", () => {
-  describe("listIngestionSources", () => {
+  describe("listIngestionSources()", () => {
     it("hits /api/auth/cli/governance/ingest/sources without query params by default", async () => {
       const { fetchImpl, seen } = spyFetch(ok({ sources: [] }));
       await listIngestionSources(baseCfg(), { fetchImpl });
@@ -278,7 +278,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getEventsForSource", () => {
+  describe("getEventsForSource()", () => {
     it("URL-encodes the sourceId in the path", async () => {
       const { fetchImpl, seen } = spyFetch(ok({ events: [] }));
       await getEventsForSource(baseCfg(), "src/with spaces", { fetchImpl });
@@ -330,7 +330,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getSourceHealth", () => {
+  describe("getSourceHealth()", () => {
     it("hits the /:id/health endpoint and returns the {source, health} envelope verbatim", async () => {
       const fixture = {
         source: { id: "src-1", name: "Source 1", status: "active" },
@@ -350,7 +350,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getGovernanceStatus", () => {
+  describe("getGovernanceStatus()", () => {
     it("hits /governance/status and returns the {setup} envelope", async () => {
       const fixture = {
         setup: {
@@ -369,7 +369,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getCliBootstrap", () => {
+  describe("getCliBootstrap()", () => {
     it("hits /api/auth/cli/bootstrap and returns the {tools, providers, budget} payload", async () => {
       const fixture = {
         tools: [
@@ -437,7 +437,7 @@ describe("cli-api — request shape", () => {
       expect(sawSignal).toBeUndefined();
     });
   });
-  describe("ingestion-templates clone-from-platform", () => {
+  describe("when cloning an ingestion template from the platform", () => {
     /**
      * The command posted to `/ingestion-templates/clone-from-platform`. The route is
      * `/ingestion-templates/clone`, which is also what the spec and the governance guide

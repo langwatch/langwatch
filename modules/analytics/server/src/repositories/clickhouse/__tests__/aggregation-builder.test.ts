@@ -26,7 +26,7 @@ describe("aggregation-builder", () => {
     resetParamCounter();
   });
 
-  describe("buildTimeseriesQuery", () => {
+  describe("buildTimeseriesQuery()", () => {
     const baseInput = {
       projectId: "test-project",
       startDate: new Date("2024-01-01T00:00:00Z"),
@@ -1285,7 +1285,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("buildDataForFilterQuery", () => {
+  describe("buildDataForFilterQuery()", () => {
     const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
@@ -1386,7 +1386,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("buildTopDocumentsQuery", () => {
+  describe("buildTopDocumentsQuery()", () => {
     const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
@@ -1487,7 +1487,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("buildFeedbacksQuery", () => {
+  describe("buildFeedbacksQuery()", () => {
     const projectId = "test-project";
     const startDate = new Date("2024-01-01T00:00:00Z");
     const endDate = new Date("2024-01-02T00:00:00Z");
@@ -1598,7 +1598,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("mapEvalAggregationToOuter", () => {
+  describe("mapEvalAggregationToOuter()", () => {
     const cases: { expression: string; expected: string }[] = [
       { expression: "avgIf(toFloat64(es.Passed), cond)", expected: "avg" },
       { expression: "sumIf(es.Score, cond)", expected: "sum" },
@@ -1625,7 +1625,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("extractTraceAggregationColumn", () => {
+  describe("extractTraceAggregationColumn()", () => {
     it("returns null for expressions that do not contain a column reference", () => {
       // No `<alias>.<column>` shape at all — should not match anything.
       expect(extractTraceAggregationColumn("some_udf(42)")).toBeNull();
@@ -1644,7 +1644,7 @@ describe("aggregation-builder", () => {
     });
   });
 
-  describe("hasEvalMixedWithTraceMetrics", () => {
+  describe("hasEvalMixedWithTraceMetrics()", () => {
     // Minimal MetricTranslation-shaped fixtures — the helper only inspects
     // `requiredJoins`, so other fields are intentionally stub values.
     type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
@@ -1683,7 +1683,7 @@ describe("aggregation-builder", () => {
   // metrics silently collapsed: grouped total_tokens returned prompt_tokens
   // only, grouped cost_billed returned the un-subtracted total. Every term
   // must survive the rewrite.
-  describe("transformMetricForDedup composite metrics", () => {
+  describe("when transforming composite metrics for dedup", () => {
     const { transformMetricForDedup } = __testOnly__ as unknown as {
       transformMetricForDedup: (expr: string, alias: string) => string;
     };

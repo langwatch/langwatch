@@ -205,7 +205,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
   });
 
-  describe("duplicate event prevention", () => {
+  describe("when preventing duplicate events", () => {
     it("prevents storing duplicate events in repository", async () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");

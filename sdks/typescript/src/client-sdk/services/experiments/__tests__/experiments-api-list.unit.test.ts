@@ -38,7 +38,7 @@ describe("ExperimentsApiService list endpoints", () => {
     else process.env.LANGWATCH_ENDPOINT = previousEndpoint;
   });
 
-  describe("listExperiments", () => {
+  describe("listExperiments()", () => {
     describe("given the API returns a valid payload", () => {
       describe("when called without arguments", () => {
         it("hits /api/v1/experiments with no query string", async () => {
@@ -91,7 +91,7 @@ describe("ExperimentsApiService list endpoints", () => {
     });
   });
 
-  describe("listRuns", () => {
+  describe("listRuns()", () => {
     describe("given a valid experiment slug", () => {
       describe("when called", () => {
         it("hits the runs endpoint with experimentSlug query param", async () => {

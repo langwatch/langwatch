@@ -265,7 +265,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── List Datasets ──────────────────────────────────────────────
 
-  describe("platform_list_datasets", () => {
+  describe("platform_list_datasets()", () => {
     describe("when the project has datasets", () => {
       /** @scenario "List datasets returns a formatted summary of all datasets" */
       it("returns a formatted list showing both datasets with their names, slugs, and record counts", async () => {
@@ -310,7 +310,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Get Dataset ────────────────────────────────────────────────
 
-  describe("platform_get_dataset", () => {
+  describe("platform_get_dataset()", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Get dataset by slug returns metadata and a preview of records" */
       it("returns the dataset name, slug, and column definitions", async () => {
@@ -349,7 +349,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Create Dataset ─────────────────────────────────────────────
 
-  describe("platform_create_dataset", () => {
+  describe("platform_create_dataset()", () => {
     describe("when creating with name and columns", () => {
       /** @scenario "Create a dataset with name and columns" */
       it("returns confirmation including the generated slug", async () => {
@@ -381,7 +381,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Update Dataset ─────────────────────────────────────────────
 
-  describe("platform_update_dataset", () => {
+  describe("platform_update_dataset()", () => {
     describe("when updating the dataset name", () => {
       /** @scenario "Update a dataset name" */
       it("returns confirmation reflecting the new name", async () => {
@@ -421,7 +421,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Delete Dataset ─────────────────────────────────────────────
 
-  describe("platform_delete_dataset", () => {
+  describe("platform_delete_dataset()", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Delete a dataset archives it" */
       it("returns confirmation that the dataset was deleted", async () => {
@@ -442,7 +442,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Create Records ─────────────────────────────────────────────
 
-  describe("platform_create_dataset_records", () => {
+  describe("platform_create_dataset_records()", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Add records to a dataset" */
       it("returns confirmation with the count of records created", async () => {
@@ -475,7 +475,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Update Record ──────────────────────────────────────────────
 
-  describe("platform_update_dataset_record", () => {
+  describe("platform_update_dataset_record()", () => {
     describe("when the record exists", () => {
       /** @scenario "Update a single record entry" */
       it("returns confirmation that the record was updated", async () => {
@@ -506,7 +506,7 @@ describe("MCP dataset tools integration", () => {
 
   // ── Delete Records ─────────────────────────────────────────────
 
-  describe("platform_delete_dataset_records", () => {
+  describe("platform_delete_dataset_records()", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Delete records by IDs" */
       it("returns confirmation with the count of records deleted", async () => {

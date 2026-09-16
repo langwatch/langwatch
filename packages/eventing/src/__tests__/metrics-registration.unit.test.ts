@@ -399,7 +399,7 @@ describe("ES pipeline metrics", () => {
     });
   });
 
-  describe("withMetrics", () => {
+  describe("withMetrics()", () => {
     it("calls onComplete with elapsed duration on success", async () => {
       let recordedMs = -1;
       const result = await withMetrics({

@@ -16,8 +16,8 @@ describe("Main API", () => {
     setEnvironment("prod");
   });
 
-  describe("generate", () => {
-    it("should generate a valid KSUID", () => {
+  describe("generate()", () => {
+    it("generates a valid KSUID", () => {
       const ksuid = generate("user");
 
       expect(ksuid).toBeInstanceOf(Ksuid);
@@ -26,7 +26,7 @@ describe("Main API", () => {
       expect(ksuid.toString()).toMatch(/^user_[A-Za-z0-9]{29}$/);
     });
 
-    it("should generate KSUID with custom environment", () => {
+    it("generates KSUID with custom environment", () => {
       setEnvironment("dev");
       const ksuid = generate("user");
 
@@ -34,26 +34,26 @@ describe("Main API", () => {
       expect(ksuid.toString()).toMatch(/^dev_user_[A-Za-z0-9]{29}$/);
     });
 
-    it("should throw error for empty resource", () => {
+    it("throws an error for empty resource", () => {
       expect(() => {
         generate("");
       }).toThrow("resource must not be empty");
     });
 
-    it("should throw error for non-string resource", () => {
+    it("throws an error for non-string resource", () => {
       expect(() => {
         generate(123 as never);
       }).toThrow("resource must be a string");
     });
 
-    it("should generate unique KSUIDs", () => {
+    it("generates unique KSUIDs", () => {
       const ksuid1 = generate("user");
       const ksuid2 = generate("user");
 
       expect(ksuid1.toString()).not.toBe(ksuid2.toString());
     });
 
-    it("should handle sequence IDs correctly", () => {
+    it("handles sequence IDs correctly", () => {
       // Mock Date.now to return the same timestamp
       const mockTime = 1234567890000;
       vi.spyOn(Date, "now").mockReturnValue(mockTime);
@@ -70,9 +70,9 @@ describe("Main API", () => {
     });
   });
 
-  describe("parse", () => {
+  describe("parse()", () => {
     /** @scenario "Generated identifiers stay prefixed and parse back" */
-    it("should parse a valid KSUID", () => {
+    it("parses a valid KSUID", () => {
       const original = generate("user");
       const parsed = parse(original.toString());
 
@@ -83,7 +83,7 @@ describe("Main API", () => {
       expect(parsed.sequenceId).toBe(original.sequenceId);
     });
 
-    it("should parse KSUID with environment prefix", () => {
+    it("parses KSUID with environment prefix", () => {
       setEnvironment("dev");
       const original = generate("user");
       const parsed = parse(original.toString());
@@ -92,21 +92,21 @@ describe("Main API", () => {
       expect(parsed.resource).toBe("user");
     });
 
-    it("should throw error for invalid KSUID", () => {
+    it("throws an error for invalid KSUID", () => {
       expect(() => {
         parse("invalid-ksuid");
       }).toThrow("ID is invalid");
     });
 
-    it("should throw error for non-string input", () => {
+    it("throws an error for non-string input", () => {
       expect(() => {
         parse(123 as never);
       }).toThrow("Input must be a string");
     });
   });
 
-  describe("environment management", () => {
-    it("should get and set environment", () => {
+  describe("when getting and setting environment", () => {
+    it("gets and sets environment", () => {
       expect(getEnvironment()).toBe("prod");
 
       setEnvironment("dev");
@@ -116,13 +116,13 @@ describe("Main API", () => {
       expect(getEnvironment()).toBe("staging");
     });
 
-    it("should throw error for invalid environment", () => {
+    it("throws an error for invalid environment", () => {
       expect(() => {
         setEnvironment("invalid-env!");
       }).toThrow("environment contains invalid characters");
     });
 
-    it("should accept valid environment names", () => {
+    it("accepts valid environment names", () => {
       const validEnvs = ["prod", "dev", "staging", "test", "local", "env1", "env2"];
 
       validEnvs.forEach((env) => {
@@ -134,8 +134,8 @@ describe("Main API", () => {
     });
   });
 
-  describe("instance management", () => {
-    it("should get and set instance", () => {
+  describe("when getting and setting instance", () => {
+    it("gets and sets instance", () => {
       const currentInstance = getInstance();
       expect(currentInstance).toBeInstanceOf(Instance);
 
@@ -145,15 +145,15 @@ describe("Main API", () => {
       expect(getInstance()).toBe(newInstance);
     });
 
-    it("should throw error for invalid instance", () => {
+    it("throws an error for invalid instance", () => {
       expect(() => {
         setInstance({} as never);
       }).toThrow("instance must be an instance of Instance");
     });
   });
 
-  describe("integration tests", () => {
-    it("should generate and parse KSUIDs consistently", () => {
+  describe("when generating and parsing end to end", () => {
+    it("generates and parses KSUIDs consistently", () => {
       const resources = ["user", "order", "product", "session"];
 
       resources.forEach((resource) => {
@@ -165,7 +165,7 @@ describe("Main API", () => {
       });
     });
 
-    it("should handle different environments correctly", () => {
+    it("handles different environments correctly", () => {
       const environments = ["dev", "staging", "test"];
 
       environments.forEach((env) => {
@@ -180,7 +180,7 @@ describe("Main API", () => {
       });
     });
 
-    it("should generate sortable KSUIDs", () => {
+    it("generates sortable KSUIDs", () => {
       const ksuids: Ksuid[] = [];
 
       // Generate multiple KSUIDs with small delays

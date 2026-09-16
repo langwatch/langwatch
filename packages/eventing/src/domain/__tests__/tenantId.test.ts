@@ -113,7 +113,7 @@ describe("createTenantId", () => {
     });
   });
 
-  describe("security considerations", () => {
+  describe("when checking security error messages", () => {
     it("error message contains [SECURITY] prefix", () => {
       expect(() => {
         createTenantId("");

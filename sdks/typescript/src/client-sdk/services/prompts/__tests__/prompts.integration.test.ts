@@ -107,7 +107,7 @@ describe("Prompts Integration", () => {
     server.close();
   });
 
-  describe("CRUD operations", () => {
+  describe("when performing CRUD operations", () => {
     it("creates prompt", async () => {
       const prompt = await langwatch.prompts.create({ handle: "test" });
       expect(prompt?.handle).toBe("test");
@@ -128,7 +128,7 @@ describe("Prompts Integration", () => {
     });
   });
 
-  describe("get prompt", () => {
+  describe("when getting a prompt", () => {
     let cli: CliRunner;
     let testDir: string;
     let originalCwd: string;

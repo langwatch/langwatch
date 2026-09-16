@@ -31,7 +31,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
     });
   });
 
-  describe("counts events before a specific timestamp correctly", () => {
+  describe("countEventsBefore()", () => {
     it("returns 0 for first event in aggregate", async () => {
       const context = { tenantId };
       const timestamp = 1000;

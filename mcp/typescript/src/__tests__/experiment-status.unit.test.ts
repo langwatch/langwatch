@@ -45,7 +45,7 @@ describe("deriveRunStatus()", () => {
     });
   });
 
-  describe("terminal classification", () => {
+  describe("isTerminalStatus()", () => {
     it("treats completed and stopped as terminal", () => {
       expect(isTerminalStatus("completed")).toBe(true);
       expect(isTerminalStatus("stopped")).toBe(true);

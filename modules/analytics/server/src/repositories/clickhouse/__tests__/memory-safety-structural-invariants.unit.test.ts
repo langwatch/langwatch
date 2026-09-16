@@ -25,7 +25,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 1: Analytics queries access SpanAttributes only via key extraction
   // -------------------------------------------------------------------------
-  describe("SpanAttributes access in builder-generated queries", () => {
+  describe("when analytics queries access SpanAttributes", () => {
     /**
      * Regex that matches bare "SpanAttributes" NOT followed by ['key'] access. We
      * check the outermost SELECT by splitting on subquery boundaries.
@@ -119,7 +119,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 2: Topic and field-discovery queries access only specific attributes
   // -------------------------------------------------------------------------
-  describe("topic and field-discovery query attribute access", () => {
+  describe("when topic and field-discovery queries access attributes", () => {
     /**
      * Read the actual production source of clickhouse-trace.service.ts and
      * extract the method bodies for findTopicCounts and findDistinctFieldNames.
@@ -171,7 +171,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 3: Topic counting query includes a LIMIT clause
   // -------------------------------------------------------------------------
-  describe("topic counting query LIMIT clause", () => {
+  describe("when the topic counting query is checked for a LIMIT clause", () => {
     const traceServicePath = path.resolve(
       __dirname,
       "../../../../../../trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
@@ -194,7 +194,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 4: Field discovery query includes a LIMIT clause
   // -------------------------------------------------------------------------
-  describe("field discovery query LIMIT clause", () => {
+  describe("when the field discovery query is checked for a LIMIT clause", () => {
     const traceServicePath = path.resolve(
       __dirname,
       "../../../../../../trace/server/src/repositories/clickhouse/trace-legacy-read.repository.ts",
@@ -234,7 +234,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 5: All query execution paths include memory safety settings
   // -------------------------------------------------------------------------
-  describe("memory safety settings on query execution paths", () => {
+  describe("when checking that query execution paths include memory safety settings", () => {
     describe("when ANALYTICS_CLICKHOUSE_SETTINGS is inspected in source", () => {
       /** @scenario "Analytics queries include a memory spill-to-disk safety setting" */
       it("defines max_bytes_before_external_group_by with a positive value", () => {
@@ -306,7 +306,7 @@ describe("memory-safety", () => {
   // -------------------------------------------------------------------------
   // Scenario 6: Every metric prefix in metric-translator has a column-pruning test
   // -------------------------------------------------------------------------
-  describe("metric prefix column-pruning test coverage", () => {
+  describe("when checking that every metric prefix has a column-pruning test", () => {
     describe("when comparing metric-translator prefixes to column-pruning tests", () => {
       /** @scenario Every metric prefix in metric-translator has a column-pruning test */
       it("has at least one column-pruning test for every registered metric prefix", () => {

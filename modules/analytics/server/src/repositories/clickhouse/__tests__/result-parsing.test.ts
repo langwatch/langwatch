@@ -9,7 +9,7 @@ import { buildMetricAlias } from "../clickhouse.metric-translator.mapper.ts";
  * so the lookup key is the bare alias name.
  */
 describe("result-parsing", () => {
-  describe("alias consistency", () => {
+  describe("when generating aliases", () => {
     // Test with a single series (index 0)
     it("generates consistent aliases for single metric", () => {
       const series = {
@@ -83,7 +83,7 @@ describe("result-parsing", () => {
     });
   });
 
-  describe("UserThreads-like query", () => {
+  describe("when building a UserThreads-like query", () => {
     it("generates correct aliases for all 4 UserThreads metrics", () => {
       const userThreadsSeries: AnalyticsSeries[] = [
         {
@@ -138,7 +138,7 @@ describe("result-parsing", () => {
     });
   });
 
-  describe("LLMSummary-like query", () => {
+  describe("when building an LLMSummary-like query", () => {
     it("generates correct aliases for all LLMSummary metrics", () => {
       const llmSummarySeries: AnalyticsSeries[] = [
         {
@@ -192,7 +192,7 @@ describe("result-parsing", () => {
     });
   });
 
-  describe("simulated result parsing", () => {
+  describe("when parsing simulated ClickHouse results", () => {
     it("correctly matches simulated ClickHouse JSONEachRow response to aliases", () => {
       // This simulates what ClickHouse would return for a UserThreads query
       // Note: ClickHouse JSONEachRow does NOT include backticks in column names

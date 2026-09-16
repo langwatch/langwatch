@@ -75,7 +75,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("/health endpoint", () => {
+  describe("when calling GET /health", () => {
     it("returns ok status without authentication", async () => {
       const response = await fetch(`${baseUrl}/health`);
       const body = await response.json();
@@ -85,7 +85,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("CORS headers", () => {
+  describe("when checking CORS headers", () => {
     it("sends no Access-Control-Allow-Origin when the request has no Origin", async () => {
       const response = await fetch(`${baseUrl}/health`);
 
@@ -121,7 +121,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("/mcp endpoint (Streamable HTTP)", () => {
+  describe("when calling POST /mcp (Streamable HTTP)", () => {
     describe("when no Bearer token is provided", () => {
       it("returns 401 on initialize request", async () => {
         const response = await fetch(`${baseUrl}/mcp`, {
@@ -204,7 +204,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("DELETE /mcp", () => {
+  describe("when calling DELETE /mcp", () => {
     it("closes an existing session", async () => {
       const initResponse = await fetch(`${baseUrl}/mcp`, {
         method: "POST",
@@ -238,8 +238,8 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("OAuth 2.0 endpoints", () => {
-    describe("/.well-known/oauth-authorization-server", () => {
+  describe("when using OAuth 2.0 endpoints", () => {
+    describe("when calling GET /.well-known/oauth-authorization-server", () => {
       it("returns OAuth metadata with token endpoint", async () => {
         const response = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
         const body = await response.json();
@@ -250,7 +250,7 @@ describe("HTTP transport", () => {
       });
     });
 
-    describe("/oauth/token", () => {
+    describe("when calling POST /oauth/token", () => {
       it("returns 400 for unsupported grant type", async () => {
         const response = await fetch(`${baseUrl}/oauth/token`, {
           method: "POST",
@@ -341,7 +341,7 @@ describe("HTTP transport", () => {
     });
   });
 
-  describe("/sse endpoint (legacy SSE)", () => {
+  describe("when calling GET /sse (legacy SSE)", () => {
     it("returns 401 without authorization", async () => {
       const controller = new AbortController();
 

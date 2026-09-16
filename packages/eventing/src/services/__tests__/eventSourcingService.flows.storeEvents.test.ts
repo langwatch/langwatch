@@ -27,7 +27,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     vi.restoreAllMocks();
   });
 
-  describe("event publishing", () => {
+  describe("when publishing events", () => {
     it("publishes events after successful storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
@@ -92,7 +92,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     });
   });
 
-  describe("event handler dispatch", () => {
+  describe("when dispatching to event handlers", () => {
     it("dispatches events to handlers after storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
@@ -116,7 +116,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     });
   });
 
-  describe("projection updates", () => {
+  describe("when updating projections", () => {
     it("updates projections after storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
@@ -207,7 +207,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     });
   });
 
-  describe("event storage", () => {
+  describe("when storing events", () => {
     it("handles events with same Event ID correctly", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
@@ -245,7 +245,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     });
   });
 
-  describe("combined flows", () => {
+  describe("when flows are combined", () => {
     it("executes all components in correct order", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");

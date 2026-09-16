@@ -143,7 +143,7 @@ describe("MCP scenario tools integration", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  describe("platform_list_scenarios", () => {
+  describe("platform_list_scenarios()", () => {
     describe("when the API returns scenarios", () => {
       it("returns a non-empty result", async () => {
         const { handleListScenarios } = await import("../tools/list-scenarios.js");
@@ -161,7 +161,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("platform_get_scenario", () => {
+  describe("platform_get_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
         const { handleGetScenario } = await import("../tools/get-scenario.js");
@@ -178,7 +178,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("platform_create_scenario", () => {
+  describe("platform_create_scenario()", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
         const { handleCreateScenario } = await import("../tools/create-scenario.js");
@@ -205,7 +205,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("platform_update_scenario", () => {
+  describe("platform_update_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
         const { handleUpdateScenario } = await import("../tools/update-scenario.js");
@@ -230,7 +230,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("platform_archive_scenario", () => {
+  describe("platform_archive_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
         const { handleArchiveScenario } = await import("../tools/archive-scenario.js");

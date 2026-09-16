@@ -516,7 +516,7 @@ describe("setupObservability Integration - Configuration Options", () => {
     await handle.shutdown();
   });
 
-  describe("data capture configuration", () => {
+  describe("when configuring data capture", () => {
     it('sets "none" mode in observability config', async () => {
       const logger = createMockLogger();
       const options: SetupObservabilityOptions = {

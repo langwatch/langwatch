@@ -53,7 +53,7 @@ describe("LangWatchExporter", () => {
     vi.clearAllMocks();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates exporter with default values when no options provided", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -95,7 +95,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("environment variable fallbacks", () => {
+  describe("when falling back to environment variables", () => {
     it("fallbacks to LANGWATCH_API_KEY environment variable", () => {
       const apiKey = "env-api-key";
       process.env.LANGWATCH_API_KEY = apiKey;
@@ -151,7 +151,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("header configuration", () => {
+  describe("when configuring headers", () => {
     it("includes all required SDK headers", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -183,7 +183,7 @@ describe("LangWatchExporter", () => {
 
   // deprecated options removed
 
-  describe("URL construction", () => {
+  describe("when constructing the URL", () => {
     it("constructs URL correctly with default endpoint", () => {
       const exporter = new LangWatchTraceExporter();
 
@@ -220,7 +220,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("inheritance from OTLPTraceExporter", () => {
+  describe("when inheriting from OTLPTraceExporter", () => {
     it("extends OTLPTraceExporter", () => {
       new LangWatchTraceExporter();
 
@@ -239,7 +239,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("edge cases", () => {
+  describe("when given edge case inputs", () => {
     it("handles empty string API key", () => {
       const exporter = new LangWatchTraceExporter({ apiKey: "" });
 
@@ -273,7 +273,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("type safety", () => {
+  describe("when checking type safety", () => {
     it("accepts valid LangWatchExporterOptions", () => {
       const options: LangWatchTraceExporterOptions = {
         apiKey: "test-key",
@@ -303,7 +303,7 @@ describe("LangWatchExporter", () => {
     });
   });
 
-  describe("filters pipeline", () => {
+  describe("when running the filters pipeline", () => {
     function makeSpans() {
       return [
         {

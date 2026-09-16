@@ -17,7 +17,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
     store = EventStoreMemory.createForTesting();
   });
 
-  describe("counts events before a specific timestamp correctly", () => {
+  describe("countEventsBefore()", () => {
     it("returns 0 for first event in aggregate", async () => {
       const context = { tenantId };
       const timestamp = 1000;

@@ -55,7 +55,7 @@ describe("EventSourcing", () => {
     vi.unstubAllEnvs();
   });
 
-  describe("constructor", () => {
+  describe("constructor()", () => {
     it("creates with default options (enabled, no clients)", () => {
       const es = new EventSourcing();
 
@@ -84,7 +84,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("createForTesting", () => {
+  describe("createForTesting()", () => {
     it("uses injected event store", () => {
       const mockEventStore = createMockEventStore<Event>();
       const es = EventSourcing.createForTesting({
@@ -104,7 +104,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("createWithStores", () => {
+  describe("createWithStores()", () => {
     it("uses injected event store and global queue", () => {
       const mockEventStore = createMockEventStore<Event>();
       const mockGlobalQueue = {
@@ -122,7 +122,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("getEventStore", () => {
+  describe("getEventStore()", () => {
     it("returns the same event store instance on multiple calls", () => {
       const mockEventStore = createMockEventStore<Event>();
       const es = EventSourcing.createForTesting({
@@ -149,7 +149,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("register", () => {
+  describe("register()", () => {
     it("returns a DisabledPipeline when no event store available", () => {
       const es = EventSourcing.createForTesting({
         eventStore: void 0,
@@ -246,7 +246,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("close", () => {
+  describe("close()", () => {
     it("clears all registered pipelines", async () => {
       const mockEventStore = createMockEventStore<Event>();
       const es = EventSourcing.createForTesting({
@@ -260,7 +260,7 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("getPipeline", () => {
+  describe("getPipeline()", () => {
     it("throws when pipeline not registered", () => {
       const es = EventSourcing.createForTesting({
         eventStore: createMockEventStore<Event>(),

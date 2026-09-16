@@ -272,7 +272,7 @@ describe("explicit Prisma lifecycle", () => {
     expect(seed.clients).toEqual([client]);
   });
 
-  describe("forwardPrismaEvent", () => {
+  describe("forwardPrismaEvent()", () => {
     it("lands an emitted error event on the logger as one structured call", () => {
       const logger = fakeLogger();
       const timestamp = new Date("2026-09-09T00:00:00.000Z");

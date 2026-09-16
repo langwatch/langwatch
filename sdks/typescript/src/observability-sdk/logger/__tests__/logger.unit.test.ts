@@ -60,7 +60,7 @@ describe("LangWatch Logger", () => {
     resetObservabilitySdkConfig();
   });
 
-  describe("setLangWatchLoggerProvider", () => {
+  describe("setLangWatchLoggerProvider()", () => {
     it("sets the logger provider for LangWatch logging", () => {
       const customLoggerInstance = {
         emit: vi.fn(),
@@ -85,7 +85,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("getLangWatchLogger", () => {
+  describe("getLangWatchLogger()", () => {
     it("creates a logger with the given name", () => {
       const logger = getLangWatchLogger("test-logger");
 
@@ -126,7 +126,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("getLangWatchLoggerFromProvider", () => {
+  describe("getLangWatchLoggerFromProvider()", () => {
     it("creates a logger from a specific provider", () => {
       const customProvider = {
         getLogger: vi.fn().mockReturnValue(mockLogger),
@@ -154,7 +154,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("LangWatchLogger emit functionality", () => {
+  describe("when LangWatchLogger emits", () => {
     it("emits log records with LangWatch attributes", () => {
       const logger = getLangWatchLogger("test-logger");
 
@@ -207,7 +207,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Data capture functionality", () => {
+  describe("when capturing data", () => {
     it("preserves log record body when output capture is enabled", () => {
       // Initialize config with output capture enabled
       initializeObservabilitySdkConfig({
@@ -452,7 +452,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Logger naming and versioning", () => {
+  describe("when naming and versioning the logger", () => {
     it("handles different logger names", () => {
       const loggers = [
         getLangWatchLogger("app-logger"),
@@ -482,7 +482,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Integration with OpenTelemetry logs API", () => {
+  describe("when integrating with the OpenTelemetry logs API", () => {
     it("uses the current logger provider by default", () => {
       getLangWatchLogger("test-logger");
 
@@ -501,7 +501,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Error handling", () => {
+  describe("when handling errors", () => {
     it("handles undefined version gracefully", () => {
       const logger = getLangWatchLogger("test-logger", undefined);
 
@@ -517,7 +517,7 @@ describe("LangWatch Logger", () => {
     });
   });
 
-  describe("Type safety", () => {
+  describe("when checking type safety", () => {
     it("maintains LangWatchLogger type", () => {
       const logger = getLangWatchLogger("test-logger");
 

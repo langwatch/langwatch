@@ -4,7 +4,7 @@ import { analyticsMetrics } from "../schemas/analytics-metrics.js";
 import { analyticsGroups } from "../schemas/analytics-groups.js";
 
 describe("schemas", () => {
-  describe("filterFields", () => {
+  describe("when reading filterFields", () => {
     it("has at least 22 entries", () => {
       expect(filterFields.length).toBeGreaterThanOrEqual(22);
     });
@@ -28,7 +28,7 @@ describe("schemas", () => {
     });
   });
 
-  describe("analyticsMetrics", () => {
+  describe("when reading analyticsMetrics", () => {
     it("covers expected categories", () => {
       const categories = new Set(analyticsMetrics.map((m) => m.category));
       expect(categories).toContain("metadata");
@@ -61,7 +61,7 @@ describe("schemas", () => {
     });
   });
 
-  describe("analyticsGroups", () => {
+  describe("when reading analyticsGroups", () => {
     it("has at least 10 entries", () => {
       expect(analyticsGroups.length).toBeGreaterThanOrEqual(10);
     });
