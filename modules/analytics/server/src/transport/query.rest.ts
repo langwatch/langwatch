@@ -16,6 +16,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
@@ -138,7 +139,15 @@ export const lwqlSchemaSchema = z.object({
     .readonly(),
 });
 
-export const queryRest = defineRestRouter(AnalyticsQueryApi)
+/**
+ * The type is written out rather than inferred so the declaration emit
+ * stays portable.
+ */
+export const queryRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<AnalyticsQueryApi>;
+}> = defineRestRouter(AnalyticsQueryApi)
   .withNamespace("query")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("v1-only")

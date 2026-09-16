@@ -10,6 +10,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
+  type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
 import {
@@ -130,7 +131,15 @@ function widgetResource(
   };
 }
 
-export const dashboardWidgetRest = defineRestRouter(DashboardWidgetApi)
+/**
+ * The type is written out rather than inferred so the declaration emit
+ * stays portable.
+ */
+export const dashboardWidgetRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<DashboardWidgetApi>;
+}> = defineRestRouter(DashboardWidgetApi)
   .withNamespace("dashboard-widgets")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })

@@ -9,6 +9,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { zodErrorMessage } from "@langwatch/config";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -42,7 +43,11 @@ const LEGACY_DESCRIPTION =
  * rather than a child of it, so it owns no prefix and publishes exactly the one
  * address it answers at, beside the `/api/v1` twin it has always carried.
  */
-export const analyticsLegacyRest = defineRestRouter(AnalyticsApi)
+export const analyticsLegacyRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<AnalyticsApi>;
+}> = defineRestRouter(AnalyticsApi)
   .withNamespace("analytics-legacy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")

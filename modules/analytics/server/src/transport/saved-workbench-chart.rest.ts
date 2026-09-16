@@ -14,6 +14,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
+  type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
@@ -233,7 +234,15 @@ function chartResource(
   };
 }
 
-export const savedWorkbenchChartRest = defineRestRouter(SavedWorkbenchChartApi)
+/**
+ * The type is written out rather than inferred so the declaration emit
+ * stays portable.
+ */
+export const savedWorkbenchChartRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<SavedWorkbenchChartApi>;
+}> = defineRestRouter(SavedWorkbenchChartApi)
   .withNamespace("saved-workbench-charts")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")
