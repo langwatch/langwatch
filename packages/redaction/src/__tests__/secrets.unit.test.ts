@@ -1264,6 +1264,30 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
       expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
       expect(redactedCount).toBeGreaterThanOrEqual(1);
     });
+
+    it("redacts a credential the slashes split into sub-floor fragments", () => {
+      // A slash is a valid character INSIDE the bodies this rule accepts, so
+      // a key can arrive pre-split: each fragment under the 26-char shape
+      // floor, the joint head unmistakably a key. Per-segment checks alone
+      // would wave the whole span through on the record tail.
+      const input = `creds acme_Zx9Qm2Lp7Rt4/Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("redacts a key-shaped fragment padded with low-entropy segments", () => {
+      // The joint head's entropy can be dragged under the floor by filler;
+      // the per-segment view still catches the fragment that IS a key.
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
   });
 
   describe("given a slash-carrying key whose tail apes a digest or uuid prefix", () => {

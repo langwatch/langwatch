@@ -724,8 +724,13 @@ const VALUE_RULES: ValueRule[] = [
           body.slice(lastSlash + 1),
         )?.[1];
         if (tailPrefix && RECORD_ID_PREFIXES.has(tailPrefix.toLowerCase())) {
-          const headSegments = body.slice(0, lastSlash).split("/");
-          return headSegments.some(isKeyShapedBody);
+          // Key material ahead of the reference keeps its protection whether
+          // it reads as one segment or many: a slash is a valid character in
+          // the bodies this rule accepts, so a credential may itself be split
+          // across segments that are each under the shape floor while the
+          // joint head is unmistakably a key. Check both views.
+          const head = body.slice(0, lastSlash);
+          return isKeyShapedBody(head) || head.split("/").some(isKeyShapedBody);
         }
       }
       return isKeyShapedBody(body);
