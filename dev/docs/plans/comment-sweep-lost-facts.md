@@ -360,3 +360,42 @@ load-bearing sentence rather than cut.
 
 Unrelated, flagged so it is not mistaken for residue: a `no-port-vocabulary`
 finding at `server/maintenance/process-retention-sweep.intent.ts:14`.
+
+## Wave 3
+
+### modules/auth — `55322af683`
+
+11. **The two facts behind `isCeremonyAbandoned`.** `passkey-failure.ts`, 16
+    lines cut to one sentence, and the clearest attack-shape-plus-defence pair
+    the sweep has hit. Gone: (a) WebAuthn reports a dismissed sheet, a
+    superseded request and an abandoned prompt *identically* to "no credential
+    matched", deliberately, so that watching the prompt tells an attacker
+    nothing; (b) the better-auth passkey plugin does not throw on an abandoned
+    ceremony — it **resolves**, carrying a synthetic `code:
+    ERROR_CEREMONY_ABORTED` / `status: 400`, a refusal's clothes on something
+    the server never saw. (b) is the whole reason the check reads the resolved
+    `code` instead of a thrown exception's `name`, and it now looks arbitrary.
+
+12. **Why one shared passkey mapping function exists at all.**
+    `passkey-failure.ts`, top of file, 18 lines. Before it, every ceremony
+    failure — a thrown `DOMException`, or the plugin's `{ code, status }`,
+    neither matching the flat `{ error: "<code>" }` that `readHandledError`
+    reads — fell through to the generic "Something went wrong" line. It is
+    shared across the sign-up button, the sign-in button and the address
+    field's autofill offer precisely so those three cannot map one refusal
+    three different ways, which is what used to happen.
+
+Recoverable, noted only: `cli-device-session.repository.ts` dropped that the
+token index self-evicts once none of its tokens can be live (the kept sentence,
+that index expiry must outlive every token it names, implies it);
+`credential-sign-in-form.tsx` dropped that an absent `onSignUpStarted` means an
+existing account (the prop's optionality carries it).
+
+### modules/coding-agent — `0010609582`
+
+None parked. Every fact nothing in our code can prove was kept inside the
+shortened block: the dogfooding corpus sizes, the live-verified wire behaviour
+of the four external harnesses, the PR #5708 regression and the 2026-07-31
+quadratic backlog incident. That is the right instinct for this module — an
+external harness's behaviour is not derivable from our source and no test pins
+it.
