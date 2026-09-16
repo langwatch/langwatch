@@ -17,6 +17,11 @@
  * is returned once and never again — and a rule about which tenant a push
  * provisions have one place to live rather than four.
  */
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   isEnterpriseTier,
@@ -24,6 +29,7 @@ import {
 import {
   ScimApi,
   ScimProtocolError,
+  scimServerConfigSchema,
   type IssuedScimToken,
   type ScimApi as ScimApiContract,
   type ScimCreateGroupRequest,
@@ -34,6 +40,7 @@ import {
   type ScimListResponse,
   type ScimPatchRequest,
   type ScimReplaceGroupRequest,
+  type ScimServerConfig,
   type ScimService,
   type ScimDeliveryAdmission,
   type ScimTokenAuditEntry,
@@ -41,45 +48,33 @@ import {
   type ScimTokenSummary,
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { UserApi } from "@langwatch/user-contract";
 
+import { PostgresScimAdapter } from "../services/postgres-scim.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
+import type { ScimSyncLifecycle } from "./scim.members.ts";
 
 /**
- * The plan the organization is on, as the process resolves it. Structural: the
- * plan source is the process's, and this feature only ever asks whether it is
- * the Enterprise one.
+ * The durable directory-sync history (D08): not drawn from `reads()`, because
+ * it states facts on Identity's own `ScimSync` aggregate through guard and
+ * ledger primitives Identity's public API does not expose to a peer module
+ * today. A process composes one with `createScimSyncLifecycle`
+ * (`scim.server.ts`) and supplies it here the same way
+ * `ProjectInfrastructure.topicClustering` reaches `ProjectApp` in
+ * `project.app.ts`: a member that is neither a process read nor a peer
+ * capability, so it travels beside `reads()` rather than through it.
  */
-export type ScimPlanProvider = Readonly<{
-  getActivePlan(input: { organizationId: string }): Promise<Readonly<{ type: string }>>;
+export type ScimBespokeMembers = Readonly<{
+  lifecycle: ScimSyncLifecycle;
 }>;
 
-/**
- * The deployment's management-API audit ledger, described rather than
- * imported: it is the process's, and this feature only ever appends the two
- * entries its management door has always written.
- */
-export type ScimManagementAudit = (entry: {
-  userId: string;
-  organizationId: string;
-  action: `management.${string}.${string}`;
-  args?: Record<string, unknown>;
-}) => void;
-
-/** What the process composes this feature's application from. */
-export type ScimInfrastructure = Readonly<{
-  scim: ScimService;
-  planProvider: ScimPlanProvider;
-  /**
-   * The shared secret Auth0 signs its log stream with, or none. A function
-   * rather than a value, so a rotation without a restart works, and its
-   * absence is what makes the intake answer 404 rather than 401.
-   */
-  webhookSecret: () => string | undefined;
-  managementAudit: ScimManagementAudit;
-}>;
-
-type ScimSetup = FeatureSetup<Record<never, never>, ScimInfrastructure, undefined>;
+type ScimSetup = FeatureSetup<
+  typeof ScimApp.dependencies,
+  ScimBespokeMembers & MembersRead<typeof ScimApp.reads>,
+  ScimServerConfig
+>;
 
 /** The protocol's own document for one refusal, at one status. */
 function scimRefusal(status: number, detail: string): ScimProtocolError {
@@ -102,26 +97,71 @@ function findBearer(authorization: string | null): string | null {
 }
 
 export class ScimApp implements ScimApiContract {
-  static readonly contract: typeof ScimApi = ScimApi;
-  static readonly dependencies: Readonly<Record<string, never>> = {};
+  static readonly contract = ScimApi;
+  static readonly dependencies = {
+    authorization: AuthzApi,
+    users: UserApi,
+    auth: AuthApi,
+    governance: GovernanceApi,
+    entitlements: EntitlementApi,
+    auditLog: AuditLogApi,
+  };
+  static readonly configSchema = scimServerConfigSchema;
+  static readonly reads = reads("prisma");
 
   readonly #scim: ScimService;
-  readonly #plans: ScimPlanProvider;
-  readonly #audit: ScimManagementAudit;
+  readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
+  readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #webhook: ScimDirectoryStreamService;
 
-  private constructor(members: ScimInfrastructure) {
-    this.#scim = members.scim;
-    this.#plans = members.planProvider;
-    this.#audit = members.managementAudit;
+  private constructor(options: {
+    scim: ScimService;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
+    auditLog: Pick<AuditLogApi, "record">;
+    webhookSecret: () => string | undefined;
+  }) {
+    this.#scim = options.scim;
+    this.#entitlements = options.entitlements;
+    this.#auditLog = options.auditLog;
     this.#webhook = ScimDirectoryStreamService.create({
-      scim: members.scim,
-      webhookSecret: members.webhookSecret,
+      scim: options.scim,
+      webhookSecret: options.webhookSecret,
     });
   }
 
-  static create({ members }: ScimSetup): ScimApp {
-    return new ScimApp(members);
+  static create(setup: ScimSetup): ScimApp {
+    const { dependencies, members, config } = setup;
+    const scim = PostgresScimAdapter.create({
+      database: members.prisma,
+      writer: dependencies.authorization,
+      users: dependencies.users,
+      auth: dependencies.auth,
+      governance: dependencies.governance,
+      entitlements: dependencies.entitlements,
+      lifecycle: members.lifecycle,
+      provenOffboarding: config.provenOffboarding,
+    }).build();
+
+    return ScimApp.createWithService({
+      scim,
+      entitlements: dependencies.entitlements,
+      auditLog: dependencies.auditLog,
+      webhookSecret: () => config.auth0WebhookSecret,
+    });
+  }
+
+  /**
+   * Split from {@link create} so a test can substitute a fake SCIM service
+   * and the two peers the doors exercise, without a real database or the
+   * three peers `create` resolves only to build the service.
+   */
+  static createWithService(options: {
+    scim: ScimService;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
+    auditLog: Pick<AuditLogApi, "record">;
+    webhookSecret: () => string | undefined;
+  }): ScimApp {
+    return new ScimApp(options);
   }
 
   // ── The organization's provisioning tokens ───────────────────────────────
@@ -143,13 +183,13 @@ export class ScimApp implements ScimApiContract {
   }
 
   async isEnterpriseEntitled(input: { organizationId: string }): Promise<boolean> {
-    const plan = await this.#plans.getActivePlan({ organizationId: input.organizationId });
+    const plan = await this.#entitlements.getActivePlan({ organizationId: input.organizationId });
 
     return isEnterpriseTier(plan.type);
   }
 
   recordTokenAudit(entry: ScimTokenAuditEntry): void {
-    this.#audit({
+    void this.#auditLog.record({
       userId: entry.actorId,
       organizationId: entry.organizationId,
       action: entry.action,

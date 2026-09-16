@@ -3,12 +3,7 @@
  * The installer, the transport declarations a process mounts, and the two
  * adapters that build what the installer's members asks for.
  */
-export {
-  scimServer,
-  type ScimInfrastructure,
-  type ScimManagementAudit,
-  type ScimPlanProvider,
-} from "./scim.server.ts";
+export { scimServer, type ScimBespokeMembers } from "./scim.server.ts";
 
 // The four declared doors: three REST families and one tRPC namespace, each
 // inert until a process mounts it on its own runtime.
@@ -25,13 +20,11 @@ export type {
 export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";
 
 /**
- * What a process composes SCIM from: the provisioning service over its own
- * connection, and the durable directory-sync history that states what happened
- * as facts on the connection's identity aggregate.
+ * The one input `ScimApp` cannot build itself: the durable directory-sync
+ * history that states what happened as facts on the connection's identity
+ * aggregate (see `ScimBespokeMembers`, above).
  */
 export {
-  createScimService,
   createScimSyncLifecycle,
-  type PostgresScimAdapterOptions,
   type ScimSyncLifecycleAdapterDeps,
 } from "./scim.server.ts";

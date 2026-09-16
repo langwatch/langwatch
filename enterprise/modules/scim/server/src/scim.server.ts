@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The SCIM feature's installer: one application, four declared doors. A
- * process that composes the directory service, the plan source, the webhook
- * secret and the management audit ledger installs this and mounts what it
- * wants; one that composes none of them installs nothing.
+ * The SCIM feature's installer: one application, four declared doors.
+ * `ScimApp` declares what it reads off the process and which peer modules it
+ * depends on; a process that supplies both, plus the directory-sync history
+ * `createScimSyncLifecycle` builds, installs this and mounts what it wants.
  */
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 
-import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
-
 import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";
-import {
-  PostgresScimAdapter,
-  type PostgresScimAdapterOptions,
-} from "./services/postgres-scim.service.ts";
 import {
   ScimSyncLifecycleAdapter,
   type ScimSyncLifecycleAdapterDeps,
@@ -25,11 +19,7 @@ import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.t
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
-export type {
-  ScimInfrastructure,
-  ScimManagementAudit,
-  ScimPlanProvider,
-} from "./app/scim.app.ts";
+export type { ScimBespokeMembers } from "./app/scim.app.ts";
 
 export const scimServer = defineServerModule("scim")
   .withApp(ScimApp)
@@ -44,19 +34,14 @@ export const scimServer = defineServerModule("scim")
     }),
   ]);
 
-export type { PostgresScimAdapterOptions, ScimSyncLifecycleAdapterDeps };
+export type { ScimSyncLifecycleAdapterDeps };
 
 /**
- * What a process composes SCIM from: the provisioning service over its own
- * connection and peers, and the durable directory-sync history that states what
- * happened as facts on the connection's identity aggregate. The adapters behind
- * them stay private to this feature server.
+ * The durable directory-sync history for one deployment: the one input
+ * `ScimApp` cannot build from `reads()` or a peer alone (see
+ * `ScimBespokeMembers`). The adapter behind it stays private to this feature
+ * server.
  */
-export function createScimService(options: PostgresScimAdapterOptions): ScimServiceContract {
-  return PostgresScimAdapter.create(options).build();
-}
-
-/** The durable directory-sync history for one deployment. */
 export function createScimSyncLifecycle(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycle {
   return ScimSyncLifecycleAdapter.create(deps);
 }

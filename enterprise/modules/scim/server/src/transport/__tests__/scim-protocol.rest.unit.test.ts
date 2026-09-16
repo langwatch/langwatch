@@ -8,6 +8,7 @@
  * when wiring provisioning, so it must name the right resource.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolErrorHandler, scimProtocolRest } from "../scim-protocol.rest.ts";
@@ -129,6 +130,46 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toMatchObject({
         detail: "Bearer token is not valid",
+      });
+    });
+  });
+
+  describe("when the token is valid but the organization's plan does not include directory sync", () => {
+    it("answers the protocol's own 403 document, not a 401 or a 404", async () => {
+      class UnentitledDirectory extends ScimServiceFake {
+        override readonly verifyToken = vi.fn(async () =>
+          ({ status: "plan_not_entitled", organizationId: ORGANIZATION_ID }) as const,
+        );
+      }
+      const { app } = scimTestApp({ scim: new UnentitledDirectory() });
+      const runtime = createRestRuntime({
+        identity: {
+          authenticate: () => {
+            throw new Error("This family resolves its own credential.");
+          },
+          identify: ({ request }) =>
+            app
+              .authenticateDirectory({ authorization: request.headers.get("authorization") })
+              .then((scope) => ({
+                actor: { type: "api_key" as const, id: "scim-directory-token" },
+                scope: { tier: "organization" as const, id: scope.organizationId },
+              })),
+        },
+      });
+      const hono = runtime.mount(scimProtocolRest.router(), {
+        app: () => app,
+        onError: scimProtocolErrorHandler,
+      });
+
+      const response = await hono.fetch(
+        new Request("http://api.test/api/scim/v2/Users", { headers: { authorization: BEARER } }),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "403",
+        detail: ENTERPRISE_FEATURE_ERRORS.SCIM,
       });
     });
   });

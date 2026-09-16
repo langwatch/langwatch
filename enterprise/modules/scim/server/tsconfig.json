@@ -26,6 +26,12 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {
@@ -48,9 +54,6 @@
     },
     {
       "path": "../../../../modules/identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/identity/server/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/observability/tsconfig.build.json"
