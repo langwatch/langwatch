@@ -132,6 +132,84 @@ describe("resolving pi's session directory", () => {
 
       expect(resolved).toBe("/from-settings");
     });
+
+    /**
+     * pi expands a leading tilde before it writes (`utils/paths.js:58`, called
+     * at `core/session-manager.js:1207`), so the directory it writes into is
+     * never the literal `~`. For one commit this resolver returned the literal
+     * and every session of such a user was missed in silence — the same failure
+     * as reading the parent directory, from a different cause.
+     *
+     * A settings file is where this is unavoidable rather than unlucky: JSON
+     * has no expansion of its own, so a user who means their home directory can
+     * only write `~`. The assertions below name the expanded path and then say
+     * outright that the literal is not it, so reverting the expansion fails
+     * here rather than passing on a path nobody reads.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
+    it("reads the session from home when the settings start the path at a tilde", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "~/pi-sessions" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe(join(home, "pi-sessions"));
+      expect(resolved).not.toBe("~/pi-sessions");
+      expect(resolved.startsWith("~")).toBe(false);
+    });
+
+    /**
+     * The same expansion on the two higher-precedence sources. A shell expands
+     * an unquoted tilde before pi ever sees it, so these matter for a quoted
+     * flag and for a variable set from a file rather than a shell — narrower
+     * than the settings case, and the same one-line fix covers them.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
+    it("expands a tilde from the flag and from the environment too", async () => {
+      writeSettings(JSON.stringify({ theme: "dark" }));
+
+      const fromFlag = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "~/pi-sessions"],
+        env: {},
+        home,
+        cwd,
+      });
+      const fromEnv = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "~/pi-sessions" },
+        home,
+        cwd,
+      });
+
+      expect(fromFlag).toBe(join(home, "pi-sessions"));
+      expect(fromEnv).toBe(join(home, "pi-sessions"));
+    });
+
+    /**
+     * A tilde that does not start the path is a directory name, not a home
+     * reference, and pi leaves it alone. Without this the fix could be written
+     * as a replace-anywhere and still look correct.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
+    it("leaves a tilde alone when it is part of a directory name", async () => {
+      writeSettings(JSON.stringify({ sessionDir: "/srv/~backup/sessions" }));
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd,
+      });
+
+      expect(resolved).toBe("/srv/~backup/sessions");
+    });
   });
 
   describe("given nothing has moved the directory", () => {

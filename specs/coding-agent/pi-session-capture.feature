@@ -114,20 +114,29 @@ Feature: pi session capture
   # path passes on a promise: the path can be right and the read still never
   # happen. Reading is asserted by the capture scenarios, against a real file.
   #
-  # Every row here is a user who named a directory, and a directory a user
-  # names is used exactly as named. The user who named nothing is not a row: it
-  # resolves somewhere else entirely, one level down, and so it is its own
-  # scenario below rather than a fourth example with a different Then.
+  # Every row here is a user who named a directory, and pi writes sessions
+  # straight into the directory they named. The user who named nothing is not a
+  # row: it resolves somewhere else entirely, one level down, and so it is its
+  # own scenario below rather than a fourth example with a different Then.
+  #
+  # "The way pi reads it" is doing work in that Then, and it is not decoration.
+  # This scenario said "exactly as they named it" for one commit, which was
+  # false and was caught by running it: pi expands a leading tilde before it
+  # writes, and we were returning the tilde untouched, so a user whose settings
+  # file says `~/pi-sessions` had every session missed in silence. Settings
+  # files are the sharp case, since JSON cannot expand a tilde itself. The last
+  # row pins it.
   Scenario Outline: A session kept somewhere other than the default place is still found
     Given a user who set pi's session directory <how>
     When we work out where to look
-    Then we look in that directory, exactly as they named it
+    Then we look in that directory, the way pi reads it
 
     Examples:
-      | how                                |
-      | with a command flag                |
-      | with a variable in the environment |
-      | in pi's settings file              |
+      | how                                      |
+      | with a command flag                      |
+      | with a variable in the environment       |
+      | in pi's settings file                    |
+      | in pi's settings file, starting at home  |
 
   @unit
   # A user who has set nothing is the common case, and it used to record

@@ -10,22 +10,30 @@
  * finds it silently, with no file to fail on.
  *
  * The two branches differ in shape, and that difference is the whole reason
- * this file has a cwd argument. A directory the user named is used exactly as
- * given: pi writes its sessions straight into it. The default is not a
- * directory pi writes into at all — it is the parent of one directory per
- * working directory, named by encoding the cwd. So `~/.pi/agent/sessions`
- * holds no session file at any time; every file is one level below it. A
- * reader that resolves to the parent and does not descend finds nothing on a
- * default launch, which is every user who has set nothing — verified by
- * running the walker against a real pi installation: zero files at the parent,
- * seven one level down.
+ * this file has a cwd argument. A directory the user named is the directory pi
+ * writes its sessions straight into. The default is not a directory pi writes
+ * into at all — it is the parent of one directory per working directory, named
+ * by encoding the cwd. So `~/.pi/agent/sessions` holds no session file at any
+ * time; every file is one level below it. A reader that resolves to the parent
+ * and does not descend finds nothing on a default launch, which is every user
+ * who has set nothing — verified by running the walker against a real pi
+ * installation: zero files at the parent, seven one level down.
  *
  * Both shapes are pi's, read from its shipped source rather than inferred:
  * `session-manager.js` builds the encoded name in `getDefaultSessionDirPath`
- * and takes an explicit directory unchanged
+ * and takes an explicit directory through `normalizePath`
  * (`const dir = sessionDir ? normalizePath(sessionDir) : getDefaultSessionDir(cwd)`).
  * Resolving to pi's own per-project directory rather than widening the walk to
  * every project also keeps capture to the sessions of the project we are in.
+ *
+ * "Through `normalizePath`" is not "unchanged", and reading it as unchanged is
+ * what {@link normalizeNamedPiDir} exists to undo. pi expands a leading `~` and
+ * turns a `file://` URL into a path before it writes anywhere. A reader that
+ * takes the user's string literally looks for a directory named `~`, finds
+ * nothing, and says nothing — the same silent miss as reading the parent, from
+ * a different cause. Settings files are where this bites: JSON cannot expand a
+ * tilde, so a user who wants their home directory has no way to write it other
+ * than `~`, and pi honours that.
  *
  * Resolution reads; it never creates. The returned directory may not exist,
  * which is the normal state of a session pi has not written yet (pi defers the
@@ -41,6 +49,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The variable pi itself reads, second in its own precedence order. */
 export const PI_SESSION_DIR_ENV = "PI_CODING_AGENT_SESSION_DIR";
@@ -143,12 +152,49 @@ export async function readSettingsSessionDir(
 }
 
 /**
+ * A directory the user named, read the way pi reads it.
+ *
+ * Mirrors the two transformations pi's `normalizePath` applies with no options
+ * (`utils/paths.js:58`, called at `core/session-manager.js:1207`): a leading
+ * tilde becomes the home directory, and a `file://` URL becomes a path. pi
+ * applies both before it decides where to write, so a reader that skips them
+ * is looking somewhere pi never wrote.
+ *
+ * What is deliberately NOT mirrored: pi's Windows shell-path handling, which it
+ * applies only on win32 and which unquotes and unescapes a shell-mangled path.
+ * Capture on Windows is not covered by this feature's scenarios and adding an
+ * untested second spelling of someone else's parser is the worse risk. A
+ * Windows user who names a directory with shell quoting still resolves to the
+ * literal string, which is the behaviour before this change.
+ *
+ * Nothing here resolves a relative path or strips a trailing separator, because
+ * pi does neither: `normalizePath` returns both unchanged, and both name the
+ * same directory to the filesystem when read from the same working directory.
+ */
+export function normalizeNamedPiDir(named: string, home = homedir()): string {
+  if (named === "~") return home;
+  if (named.startsWith("~/")) return join(home, named.slice(2));
+  if (named.startsWith("file://")) {
+    try {
+      return fileURLToPath(named);
+    } catch {
+      // A malformed file:// URL is not worth an exit code on a capture path.
+      // pi would throw here; we fall back to the literal, which finds nothing
+      // and is no worse than the state before this function existed.
+      return named;
+    }
+  }
+  return named;
+}
+
+/**
  * The directory to read this pi session from, highest-precedence source first.
  * Always resolves to a path; the default is the last source, so there is no
  * "not found" case for the caller to handle.
  *
- * A named directory is returned as named, because that is what pi does with
- * it. Only the default gains the per-project segment, for the same reason.
+ * A named directory is returned as pi reads it — see
+ * {@link normalizeNamedPiDir}, which is not the same as "as typed". Only the
+ * default gains the per-project segment, for the same reason.
  */
 export async function resolvePiSessionDir({
   toolArgs = [],
@@ -164,13 +210,13 @@ export async function resolvePiSessionDir({
   cwd?: string;
 } = {}): Promise<string> {
   const fromArgs = sessionDirFromArgs(toolArgs);
-  if (fromArgs) return fromArgs;
+  if (fromArgs) return normalizeNamedPiDir(fromArgs, home);
 
   const fromEnv = env[PI_SESSION_DIR_ENV]?.trim();
-  if (fromEnv) return fromEnv;
+  if (fromEnv) return normalizeNamedPiDir(fromEnv, home);
 
   const fromSettings = await readSettingsSessionDir(piSettingsPath(home));
-  if (fromSettings) return fromSettings;
+  if (fromSettings) return normalizeNamedPiDir(fromSettings, home);
 
   return defaultPiProjectSessionsDir({ cwd, home });
 }
