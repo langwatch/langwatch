@@ -473,3 +473,30 @@ regression that nobody has fixed yet.
     because the surrounding catch falls back to a default encoding instead of
     throwing. A silent fallback with no record of its own history is the kind
     of thing that gets rediscovered from scratch.
+
+## Wave 4 — `modules/organization` and `modules/user`
+
+One candidate. The lane judged its other two recoverable from the code and was
+right: both keep the technical cause and drop only forensic detail.
+
+19. **What the `/api/teams` family's silent 404 actually cost.**
+    `modules/organization/server/src/transport/team.rest.ts` and its
+    `__tests__/team.rest.composition.unit.test.ts`. Both now say only that the
+    prior version lost its only caller silently and every operation 404'd.
+    Gone: the scale, which is the part that makes the story a warning rather
+    than an anecdote — the test factory asked a since-deleted `apps/api` mount
+    file to inject an authorization service and a project directory, that mount
+    file went out alongside **446 others**, and for a stretch all **nine**
+    operations 404'd while **two shipped SDKs, nine reference pages and a
+    Terraform resource** kept calling them. A composition root deleted in bulk
+    can take a public API surface with it and no test will say so; the counts
+    are what convey that this is cheap to do by accident.
+
+### A note for future lanes, not a lost fact
+
+A lane this wave wrote its working file list to `/tmp/w4-files.txt` and had it
+silently overwritten by a concurrent lane on the same machine — the contents
+became another lane's file list. It caught this before acting on it, and no
+repository file was affected. Scratch files belong in a per-job directory, or
+at minimum a PID-suffixed name; a guessable `/tmp` path is shared state between
+every agent running on the box.
