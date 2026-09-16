@@ -198,8 +198,10 @@ Feature: pi session capture
     When LangWatch runs
     Then that session is not captured
 
-  # pi ignores base-URL environment variables — every model's address is fixed in
-  # its own build — so a virtual key can never route pi through LangWatch. It is
+  # pi reads each model's endpoint from its own model settings and ignores
+  # base-URL environment variables, so the langwatch CLI cannot route pi through
+  # the gateway with a virtual key. (langy does route pi, by generating a
+  # models.json for it; the CLI must not copy that. ADR-132 §Invariants.) It is
   # captured from the file whether or not a key is present. Before this was
   # measured, the scenario here asserted the opposite, and the opposite is total
   # silent data loss for every user who holds a key. See ADR-132 revision v10.

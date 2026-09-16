@@ -4,12 +4,15 @@
  * The "CLI paths" section of the tile drawer, for a tool whose gateway route
  * the server forces off whatever the tile stores.
  *
- * pi ignores the base-URL environment variables the gateway route works by —
- * every model's address is fixed in pi's own build — so
- * `resolveToolPolicyOverrides` pins its allowVk to false. A switch an admin
- * can turn on while the server ignores it is worse than no switch: it reads
- * as a setting that took. Asserted with claude_code as the control, which is
- * governable on both routes and keeps a live switch. ADR-132 §7.
+ * pi reads each model's endpoint from its own model settings and ignores the
+ * base-URL environment variables the gateway route works by, so this CLI has
+ * no lever that moves it and `resolveToolPolicyOverrides` pins its allowVk to
+ * false. Not a claim that pi cannot be routed at all: langy routes it by
+ * generating a models.json, which the CLI is forbidden to do. A switch an
+ * admin can turn on while the server ignores it is worse than no switch: it
+ * reads as a setting that took. Asserted with claude_code as the control,
+ * which is governable on both routes and keeps a live switch.
+ * ADR-132 §Invariants.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -106,7 +109,7 @@ describe("<AiToolEntryDrawer /> CLI paths", () => {
     });
   });
 
-  describe("when the tile is a coding assistant the gateway cannot reach", () => {
+  describe("when the tile is a coding assistant the CLI cannot route through the gateway", () => {
     it("shows the gateway switch off, locked, and says why", () => {
       renderDrawerFor("pi");
 
