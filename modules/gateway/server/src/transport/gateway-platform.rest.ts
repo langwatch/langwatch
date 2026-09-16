@@ -31,6 +31,7 @@ import {
   gatewayCreateCacheRuleSchema,
   gatewayUpdateCacheRuleSchema,
   gatewayIdParamsSchema,
+  GatewayProviderBindingsGoneError,
   type GatewayCaller,
   type GatewayCacheRuleResource,
   type GatewayVirtualKeyScope,
@@ -38,10 +39,12 @@ import {
   type VirtualKeyBudgetInput,
 } from "@langwatch/gateway-contract";
 import {
+  apiErrorSchema,
   canonicalBaseResponses,
   canonicalConflictResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  resolver,
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
@@ -51,6 +54,18 @@ import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.
 const wirePages = GatewayWirePaginationAdapter.create();
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
+
+/**
+ * The 410 the four retired provider-binding addresses publish. Spread per
+ * route rather than folded into the canonical set, the way the 409 and 422
+ * helpers are, so it stays a statement that this route really answers 410.
+ */
+const canonicalGoneResponses = {
+  410: {
+    description: "Gone. Gateway provider bindings folded into ModelProvider in iteration 110.",
+    content: { "application/json": { schema: resolver(apiErrorSchema) } },
+  },
+} as const;
 
 /** The stable actor id every write records, from the door's resolved caller. */
 function actorUserIdOf(actor: GatewayCaller): string {
@@ -75,6 +90,16 @@ function createdAtIdCursor(
   if (!parts) return null;
   const createdAt = cursorInstant(parts[0]);
   return createdAt ? { createdAt, id: String(parts[1]) } : null;
+}
+
+/**
+ * A PATCH field's tri-state carried through: absent means no change, `null`
+ * means clear it, a date means set it.
+ */
+function expiresAtPatchValue(expiresAt: Date | null | undefined): Instant | null | undefined {
+  if (expiresAt === undefined) return undefined;
+  if (expiresAt === null) return null;
+  return Temporal.Instant.fromEpochMilliseconds(expiresAt.getTime());
 }
 
 function scopesFromWire(
@@ -323,12 +348,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       traceProjectId: input.trace_project_id,
       routingPolicyId: input.routing_policy_id,
       routingMode: input.routing_mode && toStoredEnum(input.routing_mode),
-      expiresAt:
-        input.expires_at === undefined
-          ? undefined
-          : input.expires_at === null
-            ? null
-            : Temporal.Instant.fromEpochMilliseconds(input.expires_at.getTime()),
+      expiresAt: expiresAtPatchValue(input.expires_at),
       budget: budgetFromWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,
@@ -764,6 +784,69 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     });
     const row = await app.archiveCacheRule({ id: input.id, organizationId, actorUserId });
     return { cache_rule: toCacheRuleDto(row) };
+  })
+
+  // ── Provider bindings, retired ───────────────────────────────────────────
+  // Folded into ModelProvider in iteration 110. The addresses stay served
+  // because a caller still on them needs to be told where the capability
+  // went; dropping them answers 404 and says nothing.
+
+  .get("/providers", "getApiGatewayV1Providers")
+  .withPermission("gatewayProviders:view")
+  .withDocs({
+    summary: "List provider bindings",
+    description:
+      "Retired. Gateway provider bindings are model-provider rows now; list them at GET /api/gateway/v1/model-providers.",
+    responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
+  })
+  .handle(() => {
+    throw new GatewayProviderBindingsGoneError(
+      "Use GET /api/gateway/v1/model-providers, or the Advanced (Gateway) tab in the dashboard.",
+    );
+  })
+
+  .post("/providers", "postApiGatewayV1Providers")
+  .withPermission("gatewayProviders:manage")
+  .withDocs({
+    summary: "Bind a model provider to the gateway",
+    description:
+      "Retired. Rate limits, rotation and fallback priority are configured on the model provider itself.",
+    responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
+  })
+  .handle(() => {
+    throw new GatewayProviderBindingsGoneError(
+      "Configure rate limits, provider configuration and fallback priority via the Advanced (Gateway) tab on /api/gateway/v1/model-providers.",
+    );
+  })
+
+  .patch("/providers/:id", "patchApiGatewayV1ProvidersById")
+  .withParams(gatewayIdParamsSchema)
+  .withPermission("gatewayProviders:update")
+  .withDocs({
+    summary: "Update provider binding",
+    description:
+      "Retired. The advanced gateway fields are patched on the model provider itself.",
+    responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
+  })
+  .handle(() => {
+    throw new GatewayProviderBindingsGoneError(
+      "Patch the advanced fields via PATCH /api/gateway/v1/model-providers/:id.",
+    );
+  })
+
+  .delete("/providers/:id", "deleteApiGatewayV1ProvidersById")
+  .withParams(gatewayIdParamsSchema)
+  .withPermission("gatewayProviders:manage")
+  .withDocs({
+    summary: "Disable provider binding",
+    description:
+      "Retired. Disabling the underlying model provider is the replacement.",
+    responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
+  })
+  .handle(() => {
+    throw new GatewayProviderBindingsGoneError(
+      "Disable the underlying model provider via DELETE /api/gateway/v1/model-providers/:id.",
+    );
   })
 
   .build();

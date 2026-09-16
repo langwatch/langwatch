@@ -9,6 +9,24 @@ import { z } from "zod";
 
 type ExternalIdResource = "virtual_key" | "budget";
 
+/**
+ * The gateway's own provider bindings were folded into ModelProvider in
+ * iteration 110. The address stays served so a caller still on it is told
+ * where the capability went, rather than reading a bare 404.
+ */
+export class GatewayProviderBindingsGoneError extends HandledError {
+  declare readonly code: "gateway_provider_bindings_gone";
+
+  constructor(replacement: string) {
+    super(
+      "gateway_provider_bindings_gone",
+      `Gateway provider bindings folded into ModelProvider in iteration 110. ${replacement}`,
+      { httpStatus: 410, fault: "customer" },
+    );
+    this.name = "GatewayProviderBindingsGoneError";
+  }
+}
+
 /** A project holds no live agent-cache entry under the requested name. */
 export class GatewayAgentCacheEntryNotFoundError extends HandledError {
   declare readonly code: "cache_entry_not_found";

@@ -1,4 +1,4 @@
-import { NOT_TARGETED, type FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
@@ -9,14 +9,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 export const CUSTOM_CHART_PLAYGROUND_FLAG = "release_custom_chart_playground";
 
 /**
- * Whether the playground is on for this project. Both collaborators are peer
- * APIs the analytics app already holds: the flag registry answers the
- * targeting question, and the project family answers which organization the
- * project belongs to. It read a monolith `featureFlagService` singleton and
- * a `PrismaClient` until that singleton stopped existing, which left this
- * module unable to answer the question at all — every dashboard-widgets
- * request died on `assertCustomChartPlaygroundEnabled is not callable` and
- * the caller was told "an unknown error occurred" (apidiff run 20260916-r8).
+ * Whether the playground is on for this project, over the two peer APIs the
+ * analytics app already holds rather than the monolith singleton and Prisma
+ * client this read used until that singleton stopped existing.
  */
 export async function customChartPlaygroundEnabled({
   featureFlags,
@@ -29,9 +24,12 @@ export async function customChartPlaygroundEnabled({
 }): Promise<boolean> {
   const organizationId = await projects.findOrganizationId(projectId);
 
+  // The organization is omitted rather than nulled when the project has none:
+  // an absent scope matches no rule naming it, which is the same answer the
+  // opted-out marker used to carry, without the second way of spelling it.
   return featureFlags.isEnabled(CUSTOM_CHART_PLAYGROUND_FLAG, {
-    distinctId: projectId,
+    kind: "project",
     projectId,
-    organizationId: organizationId ?? NOT_TARGETED,
+    ...(organizationId ? { organizationId } : {}),
   });
 }
