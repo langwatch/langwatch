@@ -55,8 +55,9 @@ describe("the guard's own transport", () => {
     it("completes the request rather than refusing the dispatcher", async () => {
       const response = await pinnedFetch(origin, {
         dispatcher: pinnedTo(["127.0.0.1"]),
+        redirect: "manual",
         signal: AbortSignal.timeout(5_000),
-      } as RequestInit);
+      });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ answered: true });
@@ -73,8 +74,9 @@ describe("the guard's own transport", () => {
         `http://this-name-does-not-resolve.invalid:${port}`,
         {
           dispatcher: pinnedTo(["127.0.0.1"]),
+          redirect: "manual",
           signal: AbortSignal.timeout(5_000),
-        } as RequestInit,
+        },
       );
 
       expect(response.status).toBe(200);

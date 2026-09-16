@@ -129,7 +129,13 @@ function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
       description="Provisioning runs against a single sign-on connection, so connecting one is the first step. After that your identity provider creates, updates and removes people here on its own."
       action={
         maySetUp ? (
-          <Button asChild size="sm" colorPalette="orange">
+          <Button
+            asChild
+            size="sm"
+            colorPalette="orange"
+            color="white"
+            _hover={{ color: "white" }}
+          >
             <RouterLink href="/settings/authentication">
               Set up single sign-on
             </RouterLink>

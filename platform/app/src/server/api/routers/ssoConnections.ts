@@ -117,6 +117,28 @@ export const ssoConnectionsRouter = createTRPCRouter({
       return ssoConnectionBackoffice().getById(input);
     }),
 
+  /**
+   * The connection's raw event history (ADR-117 SS5, D04), read the same way
+   * the organization's own authentication page reads it — same words, same
+   * events. Answers null for a connection that does not exist, exactly as
+   * `getById` does.
+   */
+  getHistory: protectedProcedure
+    .input(z.object({ connectionId: z.string().min(1) }))
+    .noPermission(NO_PERMISSION)
+    .query(async ({ ctx, input }) => {
+      const user = ctx.session.user.impersonator ?? ctx.session.user;
+      const operator = requireOperator(user);
+      await auditLog({
+        userId: operator.userId,
+        action: "ssoConnections.getHistory",
+        args: { connectionId: input.connectionId },
+        targetKind: "ssoConnection",
+        targetId: input.connectionId,
+      });
+      return ssoConnectionBackoffice().getHistory(input);
+    }),
+
   approveDomainClaim: protectedProcedure
     .input(domainTarget)
     .noPermission(NO_PERMISSION_FOR_ORGANIZATION)

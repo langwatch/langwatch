@@ -75,10 +75,13 @@ vi.mock("../../../utils/api", () => {
         removeConnection: mutation(removeMock),
         breakGlassBindings: empty(),
         breakGlassCandidates: empty(),
+        getHistory: empty(),
+        onHistoryActivity: { useSubscription: () => undefined },
       },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: vi.fn() },
+          getHistory: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
       }),

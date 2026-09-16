@@ -138,7 +138,7 @@ import {
 } from "./organization-mfa-adapters";
 import { AdminEmailPlatformOperators } from "./platform-operators";
 import { PriorSessionService } from "./prior-session.service";
-import { systemHostResolver } from "./public-egress";
+import { pinnedFetch, systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
@@ -175,6 +175,7 @@ import {
 import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-account-reconciliation.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
 import { PrismaSsoConnectionBackofficeRepository } from "./repositories/sso-connection-backoffice.prisma.repository";
+import { EventLogSsoConnectionHistoryRepository } from "./repositories/sso-connection-event-log.repository";
 import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
 import {
@@ -222,6 +223,7 @@ import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { SsoArrivalService } from "./sso-arrival.service";
 import { SsoAssertionService } from "./sso-assertion.service";
 import { SsoConnectionBackofficeService } from "./sso-connection-backoffice.service";
+import { SsoConnectionHistoryService } from "./sso-connection-history.service";
 import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
@@ -862,7 +864,11 @@ export function ssoSelfServe(): SsoSelfServeService {
     // provider, and the simulator — are the two it must not refuse, and they
     // are the same two the engine already dials at sign-in.
     discovery: new HttpSsoIssuerDiscovery(
-      fetch,
+      // The PAIRED fetch, not the global one. The dispatcher the guard pins
+      // each hop with comes from the workspace's undici and Node's built-in
+      // fetch rejects it outright, so handing the global in here reported
+      // every issuer unreachable however well it answered.
+      pinnedFetch,
       systemHostResolver,
       resolveDialableInternalOrigins({
         trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
@@ -1185,6 +1191,19 @@ export function ssoConnectionBackoffice(): SsoConnectionBackofficeService {
   return new SsoConnectionBackofficeService({
     reads: new PrismaSsoConnectionBackofficeRepository(prisma),
     connections: ssoConnections,
+    history: ssoConnectionHistory(),
+  });
+}
+
+/**
+ * A connection's raw event history (ADR-117 SS5, D04) — the log itself,
+ * read as a sequence. Both the organization's own authentication page and
+ * the back office read through this one factory; only the caller and its
+ * organization scoping differ.
+ */
+export function ssoConnectionHistory(): SsoConnectionHistoryService {
+  return new SsoConnectionHistoryService({
+    history: new EventLogSsoConnectionHistoryRepository(),
   });
 }
 

@@ -596,6 +596,7 @@ function ConnectionDrawer({
               {held.state === "VERIFIED" && (
                 <ActivationPanel connection={held} />
               )}
+              <ConnectionHistory connectionId={held.connectionId} />
             </VStack>
           )}
         </Drawer.Body>
@@ -671,6 +672,48 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
           {connection.rejection.note}
         </Text>
       )}
+    </Box>
+  );
+}
+
+/**
+ * What happened to this connection, newest first (ADR-117 SS5, D04) — the
+ * same read and the same words the organization's own identity provider
+ * page renders, over the back office's own gate (`ssoConnections.getHistory`)
+ * rather than the organization's `sso:manage`.
+ */
+function ConnectionHistory({ connectionId }: { connectionId: string }) {
+  const history = api.ssoConnections.getHistory.useQuery({ connectionId });
+  const rows = history.data ?? [];
+
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        History
+      </Text>
+      {history.isLoading && (
+        <Text color="fg.muted" fontSize="sm">
+          Loading…
+        </Text>
+      )}
+      {!history.isLoading && rows.length === 0 && (
+        <Text color="fg.muted" fontSize="sm">
+          Nothing has happened to this connection yet.
+        </Text>
+      )}
+      <VStack align="stretch" gap={1}>
+        {rows.map((entry) => (
+          <HStack key={entry.eventId} gap={3} fontSize="sm">
+            <Text color="fg.muted" minWidth="18ch" flexShrink={0}>
+              {formatDateTime(new Date(entry.occurredAtMs))}
+            </Text>
+            <Text>{entry.summary}</Text>
+            {entry.carriedOver && (
+              <Badge colorPalette="gray">carried over</Badge>
+            )}
+          </HStack>
+        ))}
+      </VStack>
     </Box>
   );
 }

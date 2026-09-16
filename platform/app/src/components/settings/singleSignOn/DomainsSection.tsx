@@ -157,6 +157,7 @@ export function DomainsSection({
         <PublishedRecord
           record={shownRecord}
           canManage={canManage}
+          alreadyProved={proved.has(shownRecord.domain)}
           organizationId={organizationId}
           connectionId={connectionId}
           minted={minted?.domain === shownRecord.domain ? minted.value : null}
@@ -318,10 +319,22 @@ function WhyADomainIsProved({
   }
   return (
     <VStack align="stretch" gap={1}>
+      {/* SAYING IT IS OPTIONAL IS THE POINT. This step asks for a DNS record,
+          which for most people means a ticket to another team — so somebody
+          who reads it as mandatory stops here, and the connection they have
+          already registered never goes live. It is not mandatory, it can be
+          done at any time afterwards, and an account manager can do it for
+          them. What it costs to skip is named rather than implied. */}
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-        A domain has to be proved before it decides how people sign in. You
-        publish a short value we give you in the domain&apos;s DNS, and we look
-        for it.
+        Proving a domain is optional, and you can come back to it at any time —
+        your account manager at LangWatch can also do it for you. You publish a
+        short value we give you in the domain&apos;s DNS, and we look for it.
+      </Text>
+      <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+        Until a domain is proved, people sign in through the link you give them
+        rather than being recognised by their email address — so there is no
+        automatic domain association, and nobody is sent to your identity
+        provider on their own.
       </Text>
       <Disclosure summary="What is a DNS record, and who can add one?">
         <Text>
@@ -379,7 +392,20 @@ function Disclosure({
       >
         {summary}
       </Box>
-      <VStack align="stretch" gap={2} paddingTop={2}>
+      {/* Indented under the summary, against a rule that starts at the
+          marker. Opened flush, four paragraphs of explanation read as the
+          page carrying on rather than as the answer to the line above, and
+          the reader loses track of what they opened. Matches
+          `SettingsDisclosure`, which folds the same kind of prose. */}
+      <VStack
+        align="stretch"
+        gap={2}
+        paddingTop={2}
+        paddingLeft={3}
+        marginLeft="7px"
+        borderLeftWidth="1px"
+        borderColor="border.muted"
+      >
         {children}
       </VStack>
     </Box>
@@ -417,9 +443,39 @@ function publishedRecordRows({
   ];
 }
 
+/**
+ * What this block is for, which changes once the domain is proved.
+ *
+ * An instruction is an instruction until it has been carried out. Afterwards
+ * it told somebody who had just proved a domain to go and publish a record
+ * and come back and check — the screen contradicting the thing it had itself
+ * confirmed a moment earlier, on the step people are least sure about.
+ */
+function RecordHeading({
+  domain,
+  alreadyProved,
+}: {
+  domain: string;
+  alreadyProved: boolean;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Heading size="xs">
+        {alreadyProved ? `${domain} is proved` : `Publish this on ${domain}`}
+      </Heading>
+      <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
+        {alreadyProved
+          ? "Leave the record published — we read it again from time to time, and a domain whose record disappears eventually stops being proved. The value below is the one that proved it."
+          : `Add it wherever ${domain}'s DNS is administered, then come back and check.`}
+      </Text>
+    </VStack>
+  );
+}
+
 function PublishedRecord({
   record,
   canManage,
+  alreadyProved,
   organizationId,
   connectionId,
   minted,
@@ -431,6 +487,16 @@ function PublishedRecord({
   onMinted: (minted: SelfServeIssuedDnsRecord) => void;
   record: NonNullable<SelfServeSetupView["record"]>;
   canManage: boolean;
+  /**
+   * Whether this domain is already proved.
+   *
+   * The two checks are a question with a known answer once it is — pressing
+   * one can only say yes, and a screen still asking somebody to go and check
+   * reads as though the thing they finished did not take. Minting a fresh
+   * value stays, because it is the way to prove the domain AGAIN if the
+   * record is ever removed, and that is the only reason to come back here.
+   */
+  alreadyProved: boolean;
   organizationId: string;
   connectionId: string;
 }) {
@@ -455,13 +521,7 @@ function PublishedRecord({
 
   return (
     <VStack align="stretch" gap={3} paddingTop={2}>
-      <VStack align="stretch" gap={2}>
-        <Heading size="xs">Publish this on {record.domain}</Heading>
-        <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
-          Add it wherever {record.domain}&apos;s DNS is administered, then come
-          back and check.
-        </Text>
-      </VStack>
+      <RecordHeading domain={record.domain} alreadyProved={alreadyProved} />
       {/* THE FIVE FACTS AND NOTHING ELSE: what kind of record, where it
           goes, and what goes in it. Everything a reader needed once is
           folded below. */}
@@ -513,21 +573,29 @@ function PublishedRecord({
       {canManage && (
         <VStack align="stretch" gap={2}>
           <HStack flexWrap="wrap">
-            <Button
-              loading={check.isPending}
-              onClick={() => check.mutate(target, settle)}
-            >
-              <RefreshCw size={14} />
-              Check for the record
-            </Button>
-            <Button
-              variant="outline"
-              loading={checkFile.isPending}
-              onClick={() => checkFile.mutate(target, settle)}
-            >
-              <RefreshCw size={14} />
-              Check for the file
-            </Button>
+            {/* Gone once the domain is proved. Both ask the same question and
+                the answer is already yes, so leaving them offered invites
+                somebody to press one looking for reassurance and read the
+                unchanged screen as a failure. */}
+            {!alreadyProved && (
+              <>
+                <Button
+                  loading={check.isPending}
+                  onClick={() => check.mutate(target, settle)}
+                >
+                  <RefreshCw size={14} />
+                  Check for the record
+                </Button>
+                <Button
+                  variant="outline"
+                  loading={checkFile.isPending}
+                  onClick={() => checkFile.mutate(target, settle)}
+                >
+                  <RefreshCw size={14} />
+                  Check for the file
+                </Button>
+              </>
+            )}
             {/* NOT A RETRY, THOUGH IT SITS BESIDE TWO. It mints a new value
                 and the old one stops counting, so pressing it after
                 publishing quietly makes the record in somebody's DNS console

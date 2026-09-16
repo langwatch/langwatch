@@ -211,10 +211,62 @@ export function pinnedTo(addresses: string[]): Agent {
  * that takes the default cannot get the combination wrong, and a caller that
  * passes its own is a test.
  */
-export const pinnedFetch: typeof fetch = undiciFetch;
+export const pinnedFetch: EgressFetch = undiciFetch;
+
+/**
+ * What a guarded hop reads off a response, and nothing else.
+ *
+ * Deliberately NOT the global `Response`. The two fetches disagree about
+ * types the guard never touches — undici's `Request` carries `duplex` and
+ * `textStream` and the DOM's does not — so annotating either one as the other
+ * is a claim about members nothing here reads. Naming the four that ARE read
+ * lets both be true at once and costs no safety: a response missing any of
+ * them would not compile.
+ */
+export interface EgressResponse {
+  ok: boolean;
+  status: number;
+  headers: { get(name: string): string | null };
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+  /**
+   * The stream, when there is one. A caller that caps a download reads it
+   * rather than trusting a `content-length` a stranger supplied.
+   *
+   * Spelled as the reader rather than as `ReadableStream`: the two fetches
+   * type the stream's payload differently (`any` against `Uint8Array`) and
+   * reconciling that generic is a fight about a parameter neither caller
+   * names. The two members a bounded read uses are the same in both.
+   */
+  body: {
+    getReader(): {
+      read(): Promise<
+        { done: false; value: Uint8Array } | { done: true; value?: undefined }
+      >;
+      cancel(): Promise<void>;
+    };
+  } | null;
+}
+
+/**
+ * A fetch that accepts a dispatcher — which is the whole point, and which
+ * `typeof fetch` cannot say: `dispatcher` is not a member of the DOM's
+ * `RequestInit`. That is why the call below used to end `} as RequestInit)`,
+ * a cast whose only job was to smuggle the agent past a type that denied it
+ * existed. Saying it in the type instead retires the cast.
+ */
+export type EgressFetch = (
+  url: string,
+  init: {
+    signal: AbortSignal;
+    redirect: "manual";
+    headers?: Record<string, string>;
+    dispatcher: Agent;
+  },
+) => Promise<EgressResponse>;
 
 export type PublicFetchOutcome =
-  | { ok: true; response: Response; finalUrl: string }
+  | { ok: true; response: EgressResponse; finalUrl: string }
   | { ok: false; refusal: EgressRefusal };
 
 /**
@@ -238,7 +290,7 @@ export async function fetchFollowingPublicHosts({
   url: string;
   /** Defaults to `pinnedFetch`, which is the only fetch the dispatcher below
    *  is valid for. A caller passes its own only in a test. */
-  fetchImpl?: typeof fetch;
+  fetchImpl?: EgressFetch;
   resolveHost: HostResolver;
   signal: AbortSignal;
   headers?: Record<string, string>;
@@ -262,7 +314,7 @@ export async function fetchFollowingPublicHosts({
       ...(headers === undefined ? {} : { headers }),
       // Only the addresses judged above, and only for this request.
       dispatcher: pinnedTo(judged.addresses),
-    } as RequestInit);
+    });
 
     const location = response.headers.get("location");
     if (!isRedirectStatus(response.status) || !location) {

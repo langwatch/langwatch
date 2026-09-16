@@ -3,6 +3,7 @@ import { Alert } from "@chakra-ui/react";
 // `identity-server` for it typed the refusal as `any`, which is how a
 // registry lookup keyed by a union of three codes stopped being checked.
 import type { SsoSelfServeAvailability } from "@langwatch/identity";
+import { HandledErrorAlert } from "~/features/errors";
 import { explainAnyError } from "~/features/errors/logic/presentation";
 import { toaster } from "../../ui/toaster";
 
@@ -20,6 +21,16 @@ import { toaster } from "../../ui/toaster";
  * Never an empty list and never a silent nothing: "we could not find out" and
  * "there is nothing here" are different facts, and showing the second when
  * the first is true is how somebody concludes their way back in vanished.
+ */
+/**
+ * DELIBERATELY NOT `HandledErrorAlert`, unlike `InlineRefusal` below.
+ *
+ * That alert stands down when a global interceptor has already reported the
+ * failure — right for a refusal the page answers elsewhere, and wrong here.
+ * A read that was refused for entitlement still leaves this list empty, and
+ * an empty list with nothing beside it says "there are none" when the truth
+ * is "we could not find out". Those are different facts and this component
+ * exists to keep them apart, so it reports unconditionally.
  */
 export function LoadFailure({ error, what }: { error: unknown; what: string }) {
   const copy = explainAnyError(error);
@@ -112,26 +123,22 @@ export function InlineRefusal({
    * has no registered copy of its own — "Registering that connection didn't
    * work" says more than "Something went wrong" does.
    *
-   * It is ONLY the fallback. A registered code's title is the one sentence
-   * written for that exact failure, and naming the act instead throws it
-   * away: `sso_issuer_unreachable` says "That address did not answer as an
-   * identity provider", which tells the reader which of the boxes in front of
-   * them is wrong. This used to render the act whenever it was passed, so
-   * every caller that named one got the generic title over the specific
-   * description — the two halves of the alert describing different failures.
+   * It is ONLY the fallback, and that rule is the alert's rather than ours
+   * now. A registered code's title is the one sentence written for that exact
+   * failure, and naming the act instead throws it away:
+   * `sso_issuer_unreachable` says "That address did not answer as an identity
+   * provider", which tells the reader which of the boxes in front of them is
+   * wrong.
    */
   what?: string;
 }) {
-  if (!error) return null;
-  const copy = explainAnyError(error);
-  const title = copy.isRegistered || !what ? copy.title : `${what} didn't work`;
   return (
-    <Alert.Root status="error" data-testid="sso-inline-refusal">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>{title}</Alert.Title>
-        <Alert.Description>{copy.description}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <HandledErrorAlert
+      error={error}
+      fallbackTitle={what === undefined ? undefined : `${what} didn't work`}
+      // The step it interrupted is still in front of the reader and still
+      // will not complete, so this is the only thing saying why.
+      dismissible={false}
+    />
   );
 }

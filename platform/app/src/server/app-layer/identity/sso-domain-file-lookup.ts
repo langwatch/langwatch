@@ -4,6 +4,8 @@ import type {
 } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import {
+  type EgressFetch,
+  type EgressResponse,
   fetchFollowingPublicHosts,
   type HostResolver,
   pinnedFetch,
@@ -74,7 +76,7 @@ export class HttpsDomainProofFileLookup implements SsoDomainFileLookup {
    * that needs the network to say anything at all.
    */
   constructor(
-    private readonly fetchImpl: typeof fetch = pinnedFetch,
+    private readonly fetchImpl: EgressFetch = pinnedFetch,
     private readonly resolveHost: HostResolver = systemHostResolver,
   ) {}
 
@@ -140,7 +142,9 @@ async function classifyFileResponse({
 }: {
   domain: string;
   url: string;
-  response: Response;
+  /** The guard's own contract, not the DOM's — this reads a status and a
+   *  body and nothing that the two fetches disagree about. */
+  response: EgressResponse;
 }): Promise<SsoDomainFileFetch> {
   // The two statuses that SAY the file is not there. Everything else
   // non-ok — a 403, a 500, a 503 — is the server refusing to answer the
@@ -175,7 +179,7 @@ async function classifyFileResponse({
 /** The body, up to the cap — or null once the cap is passed, so a server
  *  streaming forever costs a bounded read rather than our memory. */
 async function readBounded(
-  response: Response,
+  response: EgressResponse,
   cap: number,
 ): Promise<string | null> {
   const reader = response.body?.getReader();

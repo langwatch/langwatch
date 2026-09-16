@@ -16,6 +16,7 @@ import {
   publicHopFor,
   systemHostResolver,
 } from "./public-egress";
+import type { SsoConnectionHistoryEntryView } from "./sso-connection-history.service";
 
 /**
  * What the back office reads and commands (D05 tier 1).
@@ -95,6 +96,16 @@ export class SsoConnectionBackofficeService {
     private readonly deps: {
       reads: SsoConnectionBackofficeReadsPort;
       connections: () => SsoConnectionService;
+      /** The connection's raw event history (ADR-117 SS5), read exactly as
+       *  the organization's own authentication page reads it — the words are
+       *  the same, because the events are the same. */
+      history: {
+        getHistory(input: {
+          organizationId: string;
+          connectionId: string;
+          limit?: number;
+        }): Promise<SsoConnectionHistoryEntryView[]>;
+      };
       /** How an issuer's hostname is resolved before it is accepted. Injected
        *  so the refusal can be tested without a resolver on the network. */
       resolveHost?: HostResolver;
@@ -142,6 +153,32 @@ export class SsoConnectionBackofficeService {
     return toBackofficeConnection({
       state,
       organizationName: names.get(state.organizationId) ?? null,
+    });
+  }
+
+  /**
+   * One connection's raw event history, as an operator reads it (ADR-117
+   * SS5, D04).
+   *
+   * The organization is resolved from the connection rather than taken from
+   * the caller — this surface names a connection, never a tenant, and the
+   * history log is scoped by the SAME organization the projection already
+   * carries. Null for a connection that does not exist, which is the answer
+   * `getById` already gives for the identical case.
+   */
+  async getHistory({
+    connectionId,
+    limit,
+  }: {
+    connectionId: string;
+    limit?: number;
+  }): Promise<SsoConnectionHistoryEntryView[] | null> {
+    const state = await this.deps.reads.findById({ connectionId });
+    if (!state) return null;
+    return this.deps.history.getHistory({
+      organizationId: state.organizationId,
+      connectionId,
+      limit,
     });
   }
 

@@ -38,6 +38,7 @@ import { ArrivalsSection } from "./singleSignOn/ArrivalsSection";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
+import { HistorySection } from "./singleSignOn/HistorySection";
 import { RegisterConnection } from "./singleSignOn/RegisterConnection";
 import {
   AvailabilityRefusalNotice,
@@ -212,6 +213,17 @@ function ConnectedJourney({
         progress={progress}
         provesWithLicense={provesWithLicense}
       />
+
+      {/* Held to `sso:manage`, unlike everything above it on this screen —
+          see `ssoSetup.getHistory`'s own docblock for why the history is a
+          stronger disclosure than the state everyone with `sso:view` may
+          already read. */}
+      {canManage && (
+        <HistorySection
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+        />
+      )}
 
       {canManage && (
         <RemoveConnectionSection

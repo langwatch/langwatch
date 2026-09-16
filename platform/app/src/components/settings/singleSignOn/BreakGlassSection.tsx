@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { BREAK_GLASS_MAX_WINDOW_DAYS } from "@langwatch/identity";
 import type { SelfServeBreakGlassBindingView } from "@langwatch/identity-server";
 import { useState } from "react";
 import { api } from "../../../utils/api";
@@ -176,10 +177,15 @@ function GrantForm({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
+      {/* Bounded to the window the server enforces, so the picker cannot
+          offer a date that is going to be refused. The refusal stays as the
+          backstop — a date typed rather than picked still reaches it. */}
       <Input
         type="date"
         value={endsOn}
         aria-label="Until"
+        min={isoDateInDays(1)}
+        max={isoDateInDays(BREAK_GLASS_LAST_OFFERED_DAYS)}
         onChange={(event) => onEndsOnChange(event.target.value)}
       />
       <Button loading={pending} disabled={!userId || !endsOn} onClick={onGrant}>
@@ -280,17 +286,42 @@ function nameOf(binding: SelfServeBreakGlassBindingView): string {
 /**
  * How far out a new way back in is offered by default.
  *
- * Long enough that granting one is not a chore somebody repeats monthly,
- * short enough that a forgotten grant does not quietly become a permanent
- * second door. The administrator can pick any date; this is only where the
- * field starts.
+ * Thirty days, not the ninety the window allows. A default should be the
+ * answer somebody would have picked, and the longest permitted grant is not
+ * that: it is the most dangerous one the rules still allow. A way back in
+ * that outlives the incident it was opened for is the thing this whole
+ * section exists to prevent, and anybody who genuinely needs a quarter can
+ * say so in the field.
+ *
+ * It was ninety, which was also exactly the maximum — and `endOfDay` then
+ * rounded that UP to the last millisecond of the day, landing past
+ * `now + 90 days` by however long the day had left. So the default was not
+ * merely long, it was out of range: every grant taken at face value was
+ * refused with `sso_break_glass_expiry_out_of_range`, and the button could
+ * not be used at all without editing the date first.
  */
-const BREAK_GLASS_DEFAULT_DAYS = 90;
+const BREAK_GLASS_DEFAULT_DAYS = 30;
+
+/**
+ * The furthest date the picker offers.
+ *
+ * A day inside the window rather than on it, for the rounding reason above:
+ * the end of `today + 89` is always before `now + 90 days`, whatever time of
+ * day it is now, while the end of `today + 90` never is. The server still
+ * refuses anything out of range — this only stops the screen from offering a
+ * date it knows will be refused.
+ */
+const BREAK_GLASS_LAST_OFFERED_DAYS = BREAK_GLASS_MAX_WINDOW_DAYS - 1;
+
+/** A date `days` from today, as the `yyyy-mm-dd` a date input speaks. */
+function isoDateInDays(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 function defaultEndDate(): string {
-  const date = new Date();
-  date.setDate(date.getDate() + BREAK_GLASS_DEFAULT_DAYS);
-  return date.toISOString().slice(0, 10);
+  return isoDateInDays(BREAK_GLASS_DEFAULT_DAYS);
 }
 
 /**

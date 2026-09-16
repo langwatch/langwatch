@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { auditLog } from "@ee/audit-log/auditLog";
 import {
   ssoArrivalPolicySchema,
@@ -7,6 +8,7 @@ import { ssoIdpRegistrationSchema } from "@langwatch/identity-server";
 import { z } from "zod";
 import {
   ssoBreakGlass,
+  ssoConnectionHistory,
   ssoSelfServe,
 } from "~/server/app-layer/identity/runtime";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
@@ -43,6 +45,114 @@ const connectionInput = orgInput.extend({
 const domainInput = connectionInput.extend({
   domain: z.string().min(1).max(253),
 });
+
+/** How often `onHistoryActivity` re-reads the history to see whether the
+ *  newest event id moved. An administrator watching this page is not
+ *  watching a hot trace stream — a few seconds of latency on "a domain was
+ *  just verified" costs nothing a page reload wouldn't have cost anyway. */
+const HISTORY_ACTIVITY_POLL_MS = 4_000;
+
+/**
+ * Pure decision: has the connection's newest event changed since the
+ * previous poll? Factored out so the tick logic is testable without driving
+ * a live async generator against real timers.
+ */
+export function historyActivityChanged({
+  current,
+  previous,
+}: {
+  current: string | null;
+  previous: string | null;
+}): boolean {
+  return current !== previous;
+}
+
+/**
+ * Sleep for `ms`, or return early — never rejecting — when `signal` fires
+ * first. The subscription's own `while (!signal?.aborted)` guard is what
+ * actually ends the loop; this only keeps an aborted wait from surfacing as
+ * an unhandled rejection.
+ */
+async function sleepUnlessAborted({
+  ms,
+  signal,
+}: {
+  ms: number;
+  signal?: AbortSignal;
+}): Promise<void> {
+  try {
+    await delay(ms, undefined, { signal });
+  } catch {
+    // Aborted mid-sleep: the loop condition re-checks and exits.
+  }
+}
+
+/** The one call `onHistoryActivity` polls — narrowed to exactly what it
+ *  needs, so a test can hand in a fake without composing the whole
+ *  history service. */
+export interface HistoryActivityReadsPort {
+  getHistory(input: {
+    organizationId: string;
+    connectionId: string;
+    limit: number;
+  }): Promise<readonly { eventId: string }[]>;
+}
+
+/**
+ * The subscription's own tick loop, pulled out of the procedure so it is
+ * testable without driving a live async generator against real timers: a
+ * test hands in `pollMs: 0` and a fake reads port, then aborts the signal
+ * after however many ticks it wants to observe.
+ *
+ * ONLY EVER READS THE TENANT IT WAS GIVEN. There is no widening here — every
+ * tick calls `reads.getHistory` with the exact `organizationId` and
+ * `connectionId` this generator was constructed with, which is the same
+ * structural guarantee `EventLogSsoConnectionHistoryRepository` itself
+ * holds one layer down.
+ */
+export async function* ssoHistoryActivityTicks({
+  organizationId,
+  connectionId,
+  reads,
+  signal,
+  pollMs = HISTORY_ACTIVITY_POLL_MS,
+}: {
+  organizationId: string;
+  connectionId: string;
+  reads: HistoryActivityReadsPort;
+  signal?: AbortSignal;
+  pollMs?: number;
+}): AsyncGenerator<{ connectionId: string }> {
+  let previousEventId: string | null = null;
+  let observedFirstTick = false;
+
+  while (!signal?.aborted) {
+    try {
+      const [latest] = await reads.getHistory({
+        organizationId,
+        connectionId,
+        limit: 1,
+      });
+      const currentEventId = latest?.eventId ?? null;
+      if (
+        observedFirstTick &&
+        historyActivityChanged({
+          current: currentEventId,
+          previous: previousEventId,
+        })
+      ) {
+        yield { connectionId };
+      }
+      previousEventId = currentEventId;
+      observedFirstTick = true;
+    } catch {
+      // A transient read failure is not a signal that something changed;
+      // the next tick tries again rather than tearing the subscription
+      // down.
+    }
+    await sleepUnlessAborted({ ms: pollMs, signal });
+  }
+}
 
 /**
  * Record the attempt and answer the actor. The actor is minted from the
@@ -122,6 +232,66 @@ export const ssoSetupRouter = createTRPCRouter({
     )
     .permission("sso:view")
     .query(({ input }) => ssoSelfServe().getMigrationProgress(input)),
+
+  /**
+   * The connection's raw event history (ADR-117 SS5, D04): what happened,
+   * newest first — registered, domain claimed, verified or attested,
+   * activated, suspended, and so on.
+   *
+   * `sso:manage`, deliberately narrower than the rest of this router's
+   * reads. The overview and the setup journey answer "where does the
+   * connection stand"; the history is close to an audit trail of every
+   * actor who has touched it — including a claim's rejection note and an
+   * attestation's — and that is a stronger disclosure than state alone, so
+   * it is offered only to whoever could act on the connection, not to
+   * every reader who may merely see it.
+   */
+  getHistory: protectedProcedure
+    .input(connectionInput)
+    .permission("sso:manage")
+    .query(({ input }) =>
+      ssoConnectionHistory().getHistory({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+      }),
+    ),
+
+  /**
+   * "Something changed in this connection's history" — a bare signal
+   * `HistorySection` subscribes to so the identity provider page updates
+   * itself without a manual refresh (specs/identity/
+   * sso-connection-history.feature, "Live updates").
+   *
+   * SCOPED TO THIS PAGE, NOT A NEW TRANSPORT. This is one more procedure on
+   * this router, served by the existing generic tRPC-over-SSE bridge
+   * (`server/routes/sse.ts`) every other subscription in the product already
+   * uses. The browser opens it only from inside `HistorySection` while the
+   * identity provider page is mounted — there is no root layout, app shell
+   * or provider that opens one anywhere else, so leaving the page closes it
+   * the ordinary way an unmounted subscription always closes.
+   *
+   * NO NEW WRITE PATH. The handler is a bounded poll: on an interval, it
+   * calls the exact same `ssoConnectionHistory().getHistory` this router's
+   * own `getHistory` query calls, and yields only when the newest event id
+   * differs from the previous tick. Nothing is appended to any pipeline and
+   * no broadcaster is touched — the poll IS the read endpoint, called on a
+   * timer instead of on a page load.
+   *
+   * `sso:manage`, matching `getHistory` exactly: this signal exists to
+   * refresh that one query, so it needs that query's own permission and no
+   * other.
+   */
+  onHistoryActivity: protectedProcedure
+    .input(connectionInput)
+    .permission("sso:manage")
+    .subscription(({ input, signal }) =>
+      ssoHistoryActivityTicks({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        reads: ssoConnectionHistory(),
+        signal,
+      }),
+    ),
 
   /**
    * Register the organization's identity provider, with what it takes to

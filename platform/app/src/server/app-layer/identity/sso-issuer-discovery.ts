@@ -3,6 +3,7 @@ import {
   type SsoIssuerDiscoveryPort,
 } from "@langwatch/identity-server";
 import {
+  type EgressFetch,
   fetchFollowingPublicHosts,
   type HostResolver,
   pinnedFetch,
@@ -44,7 +45,7 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
    * that needs the network to say anything at all.
    */
   constructor(
-    private readonly fetchImpl: typeof fetch = pinnedFetch,
+    private readonly fetchImpl: EgressFetch = pinnedFetch,
     private readonly resolveHost: HostResolver = systemHostResolver,
     /** Origins somebody vouched for, which may answer inside a private
      *  network. Resolved by the composition root — see

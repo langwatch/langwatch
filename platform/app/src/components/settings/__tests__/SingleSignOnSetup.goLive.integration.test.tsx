@@ -95,10 +95,15 @@ vi.mock("../../../utils/api", () => {
             error: null,
           }),
         },
+        getHistory: {
+          useQuery: () => ({ data: [], isLoading: false, error: null }),
+        },
+        onHistoryActivity: { useSubscription: () => undefined },
       },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: vi.fn() },
+          getHistory: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
       }),

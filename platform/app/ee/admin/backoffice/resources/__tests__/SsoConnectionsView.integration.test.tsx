@@ -50,6 +50,9 @@ vi.mock("~/utils/api", () => {
               ? byIdState.current
               : { data: undefined, error: null },
         },
+        getHistory: {
+          useQuery: () => ({ data: [], isLoading: false, error: null }),
+        },
         approveDomainClaim: mutation("approveDomainClaim"),
         rejectDomainClaim: mutation("rejectDomainClaim"),
         attestDomain: mutation("attestDomain"),

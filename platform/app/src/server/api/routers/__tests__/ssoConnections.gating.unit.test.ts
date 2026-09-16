@@ -15,6 +15,7 @@ const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
   mockService: {
     list: vi.fn(),
     getById: vi.fn(),
+    getHistory: vi.fn(),
     approveDomainClaim: vi.fn(),
     rejectDomainClaim: vi.fn(),
     attestDomain: vi.fn(),
@@ -231,6 +232,7 @@ describe("the back-office single sign-on surface", () => {
         "attestDomain",
         "getAll",
         "getById",
+        "getHistory",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",

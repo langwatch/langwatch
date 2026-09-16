@@ -721,7 +721,8 @@ function GenerateTokenDialog({
               // `connectionId` is the placeholder until one is chosen, and
               // submitting without it is refused by the service as
               // `scim_connection_required` — a rejection the reader could
-              // see coming, arriving as a toast. The control says so instead.
+              // see coming, arriving as a toast. The control is held instead,
+              // and the line below says which of the two reasons it is.
               disabled={
                 tokens.generateMutation.isPending ||
                 !tokens.hasIssuableConnection ||
@@ -732,6 +733,20 @@ function GenerateTokenDialog({
                 ? "Save token"
                 : "Generate token"}
             </Button>
+            {/* A GREYED BUTTON WITH NO SENTENCE IS A DEAD END. The reader is
+                looking at the one control the dialog exists for, refusing to
+                be pressed and saying nothing — so they cannot tell whether
+                they have missed a field, hit a permission, or found a bug.
+                Not rendered while the mutation runs: the button is already
+                showing that, and a reason underneath would read as a fault. */}
+            {!tokens.generateMutation.isPending &&
+              (!tokens.hasIssuableConnection || !tokens.chosenConnectionId) && (
+                <Text color="fg.muted" fontSize="xs">
+                  {tokens.hasIssuableConnection
+                    ? "Choose which connection this token provisions for, above."
+                    : "A token provisions people for one single sign-on connection, so there has to be a live one first."}
+                </Text>
+              )}
           </VStack>
         </Dialog.Body>
       </Dialog.Content>

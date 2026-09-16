@@ -36,10 +36,14 @@ export function SettingsDisclosure({
           alignSelf="start"
           _hover={{ color: "fg" }}
         >
+          {/* The state lives on the TRIGGER, not on the icon, so `_open`
+              here matched nothing and the arrow never turned — it pointed
+              right at a fold that was already open, which is the one thing
+              the arrow exists to say. Read off the ancestor instead. */}
           <Box
             asChild
             transition="transform 0.15s ease"
-            _open={{ transform: "rotate(90deg)" }}
+            css={{ "[data-state=open] &": { transform: "rotate(90deg)" } }}
           >
             <ChevronRight size={14} />
           </Box>
@@ -47,7 +51,19 @@ export function SettingsDisclosure({
         </Button>
       </Collapsible.Trigger>
       <Collapsible.Content>
-        <Box paddingTop={2}>{children}</Box>
+        {/* Indented under the trigger, against a rule that starts at the
+            arrow. Opened flush it read as the next paragraph of the page
+            rather than as the answer to the line above it, which is what
+            left a reader wondering where the fold had gone. */}
+        <Box
+          paddingTop={2}
+          paddingLeft={3}
+          marginLeft="7px"
+          borderLeftWidth="1px"
+          borderColor="border.muted"
+        >
+          {children}
+        </Box>
       </Collapsible.Content>
     </Collapsible.Root>
   );
