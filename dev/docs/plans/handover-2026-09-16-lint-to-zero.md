@@ -11,16 +11,17 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | handover written | now |
-| --- | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 9,771 |
-| oxlint warnings | 17,947 | 1,631 | 1,632 |
-| oxlint total | 24,022 | 14,884 | **11,403** |
-| — of which `comment-block-size` | 6,168 | 6,168 | **2,685** |
-| architecture-enforcer | 3,137 | 2,761 | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **14,243** |
+| | drive start | handover written | wave 3 | now (wave 4 landed) |
+| --- | ---: | ---: | ---: | ---: |
+| oxlint errors | 6,075 | 13,253 | 9,771 | **9,208** |
+| oxlint warnings | 17,947 | 1,631 | 1,632 | **1,632** |
+| oxlint total | 24,022 | 14,884 | 11,403 | **10,840** |
+| — of which `comment-block-size` | 6,168 | 6,168 | 2,685 | **2,119** |
+| architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 (see note) |
+| **true total** | **27,159** | **17,645** | **14,243** | **13,680** |
 
-Down 12,916 from the drive's start, 3,402 of it in this session.
+Down 13,479 from the drive's start. The comment sweep has cleared **4,049 of
+6,168, or 66%**, across eighteen areas.
 
 **The enforcer number is not comparable to the 2,761.** Measured it prints
 `2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
@@ -28,6 +29,32 @@ rows)`. The 2,761 never stated whether stale rows were counted, so the real
 movement is either 99 down or 79 up. Whoever next touches the enforcer half
 should restate the baseline in the form the tool actually prints and stop
 carrying the ambiguous number forward.
+
+### The sweep is not a ratchet, and this is now measured
+
+Wave 4 cleared 578 findings and the tree fell by 566. The missing 12 are **new
+findings that appeared while the wave ran**, in roughly an hour:
+
+- 9 in files the other session has uncommitted — `packages/api/src/trpc/throttle.ts`
+  (3, untracked), `packages/infrastructure/src/redis-members.ts` and its test,
+  `packages/api/src/rest/declaration.ts`, `modules/auth/server/src/app/auth.app.ts`,
+  `apps/api/src/app/api-production.composition.ts`;
+- 3 in **committed** files under `modules/trace`, an area swept to zero in wave 1
+  — `tracked-event.rest.declaration.unit.test.ts` (2) and
+  `tracked-event-span.service.ts` (1).
+
+The last three deserve care, because the obvious reading is wrong. Neither file
+is a regression of swept code: `git cat-file -e` confirms **neither existed** at
+the trace sweep commit `e2bbe50397`, and both were created afterwards by
+`2722423f6f`. They are new code that arrived carrying over-budget comments.
+
+That is the finding. Nothing stops new code from adding `comment-block-size`
+findings, because the rule cannot gate anything while 10,840 findings already
+fail it. So the drive is filling a bucket with a hole in it — small, currently
+about a dozen an hour of concurrent work, but it means "reach zero" and "stay at
+zero" are two jobs and only the first is planned. Whoever finishes the sweep
+should land the gate in the same change, or the count starts climbing the day
+after.
 
 Typecheck held at its **114-error / 40-file** baseline throughout; verify
 against that number, not zero, and compare the error-code distribution and the
@@ -217,36 +244,26 @@ convert *to*, and for some there is not one.
 
 ### The mop-up nobody should forget
 
-**24 `comment-block-size` findings remain inside areas already swept.** None is a
-regression. Measured with an exact path boundary — note that
-`startswith("modules/auth")` also matches `modules/authz` and will tell you
-there are 100.
+**Was 24 findings inside already-swept areas. Nine are now cleared** (`47f42c4ca7`),
+leaving **15**, none a lane's work:
 
-| where | n | why |
-| --- | ---: | --- |
-| `modules/gateway` | 4 | inside another session's dirty files |
-| `modules/identity` | 3 | " |
-| `modules/auth` | 3 | all in `auth-cli-device-flow.rest.ts`, dirty |
-| `modules/ops` | 1 | " |
-| `modules/model-provider` | 1 | " |
-| `modules/analytics` | 6 | over-long comment *lines*, not blocks |
-| `sdks/typescript` | 3 | " |
-| `dev/scripts` | 3 | the two big headers, escalated — see below |
+- **12 blocked behind another session's uncommitted files** — gateway 4,
+  identity 3, auth 3, ops 1, model-provider 1. They cannot be swept while
+  someone else is mid-edit in them; re-measure once that session commits.
+- **3 the two `dev/scripts` headers**, below — a decision, not a task.
 
-So: **12 blocked behind another session's uncommitted work**, **9 are 100-column
-violations reported under the same rule id** (mostly `biome-ignore` /
-`eslint-disable` directives, which cannot simply be wrapped — the fix is the
-one-line relocation used in `095936beea`), and **3 are a deliberate decision**.
+The nine that are gone were over-long comment *lines*, not oversized blocks, and
+eight of the nine were `biome-ignore` directives. A directive cannot be wrapped
+without breaking it, so the fix was to move each explanation to a prose line
+above and leave a short reason on the directive — except where the directive sat
+flush against a JSDoc close, since an inserted line merges into that block and
+trades a column violation for a length one. Both shapes are in `47f42c4ca7` if
+you need the pattern again.
 
-At zero and verified: `modules/trace`, `modules/scenario`, `modules/automation`,
-`packages/eventing`, `modules/prompt`, `modules/coding-agent`,
-`enterprise/modules/governance`.
-
-The method lesson: **a slice built against a dirty tree silently under-reports
-its area, and the excluded files are invisible in the lane's own "zero findings"
-result.** Every lane here reported its area clean and every one was telling the
-truth about its slice. Re-measure an area against a clean tree before calling it
-done.
+**Measure residuals with an exact path boundary.** `startswith("modules/auth")`
+also matches `modules/authz` and reports 100 findings where there are 3. Match
+on `area + "/"`. This produced one wrong count in this drive already, and the
+wave-4 manifest for `modules/langy` + `modules/authz` had to say so explicitly.
 
 ### The two `dev/scripts` headers — a decision, not a task
 
