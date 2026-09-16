@@ -443,6 +443,14 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     Then it reports only what was spent under its own declaration
 
   @unit
+  Scenario: Usage a saturated record could not place is charged to no pull request
+    Given a session whose usage record is full, so later contexts went unrecorded
+    And two of its declared branches have a live pull request
+    When each pull request's usage is read
+    Then each reports only what the record places under its own branch
+    And the unplaceable usage lands on neither
+
+  @unit
   Scenario: A session that declared one branch for its whole life keeps its whole total
     Given a session whose row records usage under one declared branch, and some from before the declaration
     When its pull request's usage is read

@@ -77,6 +77,20 @@ export interface SessionContextUsage {
 }
 
 /**
+ * How many working contexts one session's usage record holds. Wider than
+ * `MAX_SET` because a long-lived agent that declares a branch per pull
+ * request reaches fifty in weeks, and a context past the bound is usage the
+ * pull-request read can no longer place; each entry is a few short strings
+ * and five numbers.
+ *
+ * Both sides of the record need it: the fold stops opening contexts here, and
+ * the read recognises a record of exactly this size as saturated and stops
+ * trusting the gap between the counters and the record to be the session's
+ * pre-declaration usage.
+ */
+export const MAX_USAGE_CONTEXTS = 200;
+
+/**
  * The key one context's usage is kept under. Repository fields are compared
  * case-folded everywhere the usage is read, so they are folded here too, and
  * a remote spelled two ways stays one context; a branch name is case

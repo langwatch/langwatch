@@ -35,7 +35,9 @@
  *     when the declarations began; a session that never declared keeps the
  *     legacy whole-session rule and lands on the pull request it opened
  *     first. A session that declared one branch for its whole life reads the
- *     same under both.
+ *     same under both. A session whose record SATURATED at
+ *     `MAX_USAGE_CONTEXTS` is the exception: its gap also holds contexts the
+ *     fold could not open, so no pull request takes it.
  *
  * A session with no record at all keeps the legacy rule whole: its full
  * total lands on its single winner, so nothing regresses to zero.
@@ -53,6 +55,7 @@
  *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
+import { MAX_USAGE_CONTEXTS } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.types";
 import {
   type AssignablePullRequest,
   assignDrivingSessionsToPullRequests,
@@ -218,18 +221,13 @@ function shareOfPullRequest({
     buckets.set(key, (buckets.get(key) ?? 0) + weightOf(usage));
   }
 
-  // Declared work anywhere, this repository or another, is what says the
-  // session's undeclared work came before its first declaration rather than
-  // being the whole of it.
-  const hasDeclaredWork = [...buckets].some(
-    ([key, weight]) => key !== UNSTAMPED_BUCKET && weight > 0,
-  );
-  const firstBranch = declaredBranches[0];
-  const unstampedWinner = hasDeclaredWork
-    ? firstBranch === undefined
-      ? undefined
-      : perBranch.get(firstBranch)
-    : legacyWinner;
+  const unstampedWinner = unstampedWinnerOf({
+    buckets,
+    declaredBranches,
+    perBranch,
+    legacyWinner,
+    saturated: session.usageByContext.length >= MAX_USAGE_CONTEXTS,
+  });
 
   const ownsBucket = (key: string): boolean => {
     if (key === ELSEWHERE_BUCKET) return false;
@@ -265,6 +263,49 @@ function shareOfPullRequest({
     },
     prRows,
   };
+}
+
+/**
+ * Which pull request the session's undeclared usage follows.
+ *
+ * Declared work anywhere, this repository or another, is what says the
+ * undeclared usage came before the session's first declaration rather than
+ * being the whole of it: then it follows the first branch the session
+ * declared. A session that declared nothing weighable keeps the legacy
+ * whole-session winner. Undefined when neither rule names a pull request,
+ * which leaves the bucket unowned.
+ *
+ * A SATURATED record is the third case, and it is why `saturated` is asked
+ * rather than inferred from the buckets. The fold stops opening contexts at
+ * `MAX_USAGE_CONTEXTS`, so a session past that bound keeps charging calls to
+ * the counters with nowhere to record where they went. Its gap is then part
+ * pre-declaration usage and part dropped later contexts, and the two cannot
+ * be told apart — following the first branch would charge a later branch's
+ * spend to the first pull request. So nobody owns it: the weight stays in the
+ * denominator, and every pull request's share shrinks by its own honest
+ * amount instead of one of them absorbing the lot.
+ */
+function unstampedWinnerOf({
+  buckets,
+  declaredBranches,
+  perBranch,
+  legacyWinner,
+  saturated,
+}: {
+  buckets: ReadonlyMap<string, number>;
+  declaredBranches: readonly string[];
+  perBranch: ReadonlyMap<string, number>;
+  legacyWinner: number | undefined;
+  saturated: boolean;
+}): number | undefined {
+  const hasDeclaredWork = [...buckets].some(
+    ([key, weight]) => key !== UNSTAMPED_BUCKET && weight > 0,
+  );
+  if (!hasDeclaredWork) return legacyWinner;
+  if (saturated) return undefined;
+  const firstBranch = declaredBranches[0];
+  if (firstBranch === undefined) return undefined;
+  return perBranch.get(firstBranch);
 }
 
 /**

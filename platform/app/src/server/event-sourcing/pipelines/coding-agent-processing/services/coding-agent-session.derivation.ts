@@ -19,6 +19,7 @@ import {
 import {
   type CodingAgentSessionData,
   contextUsageKey,
+  MAX_USAGE_CONTEXTS,
   type MetricSeriesFact,
   type SessionStep,
   type SessionTitleSource,
@@ -162,15 +163,6 @@ export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
   CODEX.SPAN.TURN,
 ]);
-
-/**
- * How many working contexts one session's usage record holds. Wider than
- * `MAX_SET` because a long-lived agent that declares a branch per pull
- * request reaches fifty in weeks, and a context past the bound is usage the
- * pull-request read can no longer place; each entry is a few short strings
- * and five numbers.
- */
-export const MAX_USAGE_CONTEXTS = 200;
 
 /**
  * The LangWatch vocabulary, the sibling of the {@link CLAUDE} adapter for the
@@ -698,7 +690,9 @@ function pricedFromTokens(facts: Record<string, unknown>): number {
  *
  * The record is bounded like every other map on the session: a context past
  * `MAX_USAGE_CONTEXTS` is not opened, and its calls stay in the counters
- * alone.
+ * alone. A record that reached the bound is therefore one whose gap no longer
+ * means "before the first declaration", and the read recognises that size and
+ * charges the gap to no pull request rather than to the first branch.
  */
 function chargeContextUsage({
   before,

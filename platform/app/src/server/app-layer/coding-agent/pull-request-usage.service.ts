@@ -517,19 +517,11 @@ export class PullRequestUsageService {
         pullRequests: toAssignable(pullRequests),
       });
 
-      // Discovery is personal: only the pull requests this project's own work
-      // touched become rows. Their NUMBERS then come from every project the
-      // caller may read, which is what makes a row the pull request's price
-      // rather than one person's share of it. Per branch, so a session that
-      // drove two pull requests surfaces both — each row then prices only its
-      // own share of the session.
-      const discovered = pullRequests.filter((pullRequest) =>
-        group.sessions.some((session) => {
-          const branchWinners = assignments.get(session.sessionId);
-          if (branchWinners === undefined) return false;
-          return [...branchWinners.values()].includes(pullRequest.prNumber);
-        }),
-      );
+      const discovered = pullRequestsPersonalWorkTouched({
+        group,
+        pullRequests,
+        assignments,
+      });
       if (discovered.length > 0) {
         rows.push(
           ...(await this.organizationRowsFor({
@@ -630,64 +622,28 @@ export class PullRequestUsageService {
     ]);
     const costProjects = new Set(costProjectIds);
 
-    return discovered.map((pullRequest) => {
-      const attribution = attributeSessionsToPullRequest({
-        sessions: candidates.sessions,
-        rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
-        pullRequests: toAssignable(attributable),
-        prNumber: pullRequest.prNumber,
+    return discovered.map((pullRequest) =>
+      personalRowFor({
+        pullRequest,
+        candidates,
+        attributable,
+        modelTotals,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        modelTotals,
-      });
-      const attached = attribution.sessions;
-      const rows = groupRows({
-        sessions: attached,
         costProjects,
         nonBillableAgents,
         projects,
-      });
-      const totals = totalsOf(rows);
-      return {
-        ...toIdentity(pullRequest),
-        title: pullRequest.title,
-        // Discovery runs on this project's own sessions, the share runs on
-        // the stamps, so a discovered pull request can end up with no session
-        // attached: every stamp of the session that found it landed on a
-        // neighbour. The row stays, reporting no tokens and no cost, and
-        // dates itself by the pull request rather than by the epoch.
-        lastActivityAtMs:
-          latestActivityAtMs(attached) ||
-          (pullRequest.prUpdatedAt ?? pullRequest.prCreatedAt).getTime(),
-        sessionsCount: totals.sessionsCount,
-        inputTokens: totals.inputTokens,
-        outputTokens: totals.outputTokens,
-        cacheReadTokens: totals.cacheReadTokens,
-        cacheCreationTokens: totals.cacheCreationTokens,
-        totalTokens: totals.totalTokens,
-        costUsd: totals.costUsd,
-        billedCostUsd: totals.billedCostUsd,
-        nonBilledCostUsd: totals.nonBilledCostUsd,
-        modelBreakdown: modelsFor({
-          sessions: attached,
-          modelTotals: attribution.modelTotals,
-          costProjects,
-        }),
-        contributorsSummary: contributorsSummaryFor({
-          sessions: attached,
-          projects,
-        }),
-      };
-    });
+      }),
+    );
   }
 
-  /** The shared body of the two organization-wide reads. */
-  private async gatherPullRequest(query: PullRequestUsageQuery): Promise<{
-    target: GithubPullRequestRow;
-    sessions: CodingAgentBranchSessionRow[];
-    rows: PullRequestUsageRow[];
-    modelBreakdown: ModelUsage[];
-  }> {
+  /**
+   * The pull request the query names, or the not-mapped error: a pull request
+   * the organization's installation never recorded has no usage to read.
+   */
+  private async requireMappedPullRequest(
+    query: PullRequestUsageQuery,
+  ): Promise<GithubPullRequestRow> {
     const target = await this.deps.pullRequests.findByNumber({
       organizationId: query.organizationId,
       repositoryHost: query.repositoryHost,
@@ -700,6 +656,17 @@ export class PullRequestUsageService {
         prNumber: query.prNumber,
       });
     }
+    return target;
+  }
+
+  /** The shared body of the two organization-wide reads. */
+  private async gatherPullRequest(query: PullRequestUsageQuery): Promise<{
+    target: GithubPullRequestRow;
+    sessions: CodingAgentBranchSessionRow[];
+    rows: PullRequestUsageRow[];
+    modelBreakdown: ModelUsage[];
+  }> {
+    const target = await this.requireMappedPullRequest(query);
 
     const empty = { target, sessions: [], rows: [], modelBreakdown: [] };
     if (query.permittedProjectIds.length === 0) return empty;
@@ -1270,6 +1237,110 @@ interface PersonalRepositoryGroup {
     costUsd: number;
     models: string[];
   }>;
+}
+
+/**
+ * One discovered pull request as a personal-page row: the candidate sessions
+ * scaled to it, grouped, totalled and broken down by model and contributor.
+ */
+function personalRowFor({
+  pullRequest,
+  candidates,
+  attributable,
+  modelTotals,
+  repositoryHost,
+  repositoryFullName,
+  costProjects,
+  nonBillableAgents,
+  projects,
+}: {
+  pullRequest: GithubPullRequestRow;
+  candidates: {
+    sessions: CodingAgentBranchSessionRow[];
+    rowMatchedSessionKeys: ReadonlySet<string>;
+  };
+  attributable: GithubPullRequestRow[];
+  modelTotals: SessionModelTotalsRow[];
+  repositoryHost: string;
+  repositoryFullName: string;
+  costProjects: ReadonlySet<string>;
+  nonBillableAgents: ReadonlySet<string>;
+  projects: Record<string, ContributorProject>;
+}): PersonalPullRequestRow {
+  const attribution = attributeSessionsToPullRequest({
+    sessions: candidates.sessions,
+    rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
+    pullRequests: toAssignable(attributable),
+    prNumber: pullRequest.prNumber,
+    repositoryHost,
+    repositoryFullName,
+    modelTotals,
+  });
+  const attached = attribution.sessions;
+  const totals = totalsOf(
+    groupRows({
+      sessions: attached,
+      costProjects,
+      nonBillableAgents,
+      projects,
+    }),
+  );
+  return {
+    ...toIdentity(pullRequest),
+    title: pullRequest.title,
+    // Discovery runs on this project's own sessions, the share runs on the
+    // stamps, so a discovered pull request can end up with no session
+    // attached: every stamp of the session that found it landed on a
+    // neighbour. The row stays, reporting no tokens and no cost, and dates
+    // itself by the pull request rather than by the epoch.
+    lastActivityAtMs:
+      latestActivityAtMs(attached) ||
+      (pullRequest.prUpdatedAt ?? pullRequest.prCreatedAt).getTime(),
+    sessionsCount: totals.sessionsCount,
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    cacheReadTokens: totals.cacheReadTokens,
+    cacheCreationTokens: totals.cacheCreationTokens,
+    totalTokens: totals.totalTokens,
+    costUsd: totals.costUsd,
+    billedCostUsd: totals.billedCostUsd,
+    nonBilledCostUsd: totals.nonBilledCostUsd,
+    modelBreakdown: modelsFor({
+      sessions: attached,
+      modelTotals: attribution.modelTotals,
+      costProjects,
+    }),
+    contributorsSummary: contributorsSummaryFor({
+      sessions: attached,
+      projects,
+    }),
+  };
+}
+
+/**
+ * Discovery is personal: only the pull requests this project's own work
+ * touched become rows. Their NUMBERS then come from every project the caller
+ * may read, which is what makes a row the pull request's price rather than
+ * one person's share of it. Per branch, so a session that drove two pull
+ * requests surfaces both, and each row then prices only its own share of
+ * the session.
+ */
+function pullRequestsPersonalWorkTouched({
+  group,
+  pullRequests,
+  assignments,
+}: {
+  group: PersonalRepositoryGroup;
+  pullRequests: GithubPullRequestRow[];
+  assignments: ReadonlyMap<string, ReadonlyMap<string, number>>;
+}): GithubPullRequestRow[] {
+  return pullRequests.filter((pullRequest) =>
+    group.sessions.some((session) => {
+      const branchWinners = assignments.get(session.sessionId);
+      if (branchWinners === undefined) return false;
+      return [...branchWinners.values()].includes(pullRequest.prNumber);
+    }),
+  );
 }
 
 function groupSessionsByRepository(

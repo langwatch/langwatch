@@ -8,6 +8,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { describe, expect, it, vi } from "vitest";
+import { MAX_USAGE_CONTEXTS } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.types";
 import type { GithubPullRequestRow } from "../../github/repositories/github-pull-requests.repository";
 import { traced } from "../../tracing";
 import type { PersonalSessionLookup } from "../pull-request-usage.service";
@@ -1818,6 +1819,53 @@ describe("PullRequestUsageService with the session row's per-context record", ()
       expect(usage.totals.sessionsCount).toBe(1);
       expect(usage.totals.inputTokens).toBe(30);
       expect(usage.totals.costUsd).toBeCloseTo(0.3, 10);
+    });
+  });
+
+  describe("given a session whose usage record saturated", () => {
+    // The fold stops opening contexts at MAX_USAGE_CONTEXTS, so the gap
+    // between the counters and the record holds both what came before the
+    // first declaration and every context the record had no room for. The
+    // first declared branch must not absorb the lot.
+    const fixture = () => ({
+      pullRequests: twoPullRequests(),
+      sessions: [
+        sessionRow({
+          agent: "codex",
+          gitBranches: ["feat/linkage", "feat/next"],
+          inputTokens: 1_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          costUsd: 10,
+          usageByContext: [
+            recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+            recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+            ...Array.from({ length: MAX_USAGE_CONTEXTS - 2 }, (_, index) =>
+              recorded(`feat/filler-${index}`, {
+                inputTokens: 1,
+                costUsd: 0.01,
+              }),
+            ),
+          ],
+        }),
+      ],
+    });
+
+    /** @scenario "Usage a saturated record could not place is charged to no pull request" */
+    it("charges each pull request its own branch and the unplaceable usage to neither", async () => {
+      const first = await serviceWith(fixture()).service.getPullRequestUsage(
+        QUERY,
+      );
+      const second = await serviceWith(fixture()).service.getPullRequestUsage({
+        ...QUERY,
+        prNumber: 8,
+      });
+
+      expect(first.totals.inputTokens).toBe(10);
+      expect(first.totals.costUsd).toBeCloseTo(0.1, 10);
+      expect(second.totals.inputTokens).toBe(30);
+      expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
     });
   });
 

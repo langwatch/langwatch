@@ -19,10 +19,12 @@ import type {
 import {
   isCodingAgentSessionSpan,
   MAX_SET,
-  MAX_USAGE_CONTEXTS,
   meanTtftMs,
 } from "../../services/coding-agent-session.derivation";
-import { contextUsageKey } from "../../services/coding-agent-session.types";
+import {
+  contextUsageKey,
+  MAX_USAGE_CONTEXTS,
+} from "../../services/coding-agent-session.types";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
