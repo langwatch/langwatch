@@ -543,3 +543,47 @@ conflicting-skill example (`lwql-charts` vs `playground-widgets` on
 keeping the feature-file path. The latter is **not** an enforced
 `@scenario "<title>"` annotation — the lane grepped and confirmed the file
 carries none — so spec-parity binding is unaffected.
+
+## Wave 5 — `modules/experiment` and `modules/workflow`
+
+Three candidates, all three a *mechanism* compressed to its *effect*. That is
+the recurring shape in execution-engine code: the effect is easy to restate
+short, the mechanism is what someone actually needed.
+
+23. **How the Lambda SSE prelude breaks the stream.**
+    `modules/workflow/server/src/adapters/lambda.workflow-studio-stream.adapter.ts`,
+    and the near-identical `channels/http/http.workflow-studio-stream.channel.ts`
+    and `adapters/workflow-studio-stream.adapter.ts`. Now says only that it
+    "drops the engine's first event". Gone: AWS Lambda response streaming can
+    deliver the prelude **in the same chunk as the first SSE frame**, and
+    forwarding it raw puts a bare `{` where the parser expects `data: `, which
+    is what costs the connect heartbeat. Without the mechanism, the guard reads
+    like a workaround for a flaky upstream rather than a precise fix.
+
+24. **What a dropped comparison-evaluator config actually does.**
+    `modules/experiment/contract/src/workbench/execution/build-execution-request.ts`,
+    `evaluatorOnTheWire`. Now says the "Phase-1/Phase-2 split breaks". Gone: the
+    evaluator gets attached to each target cell in Phase 1 as a plain per-row
+    evaluator and dispatches nlpgo an **empty payload**, which nlpgo answers
+    with a literal `Data required` error. That error string was the only thing
+    connecting a confusing runtime failure back to this line.
+
+25. **The DSPy error a silent empty `code` node produces.**
+    `modules/experiment` (mapping inference). Now says only that it must fail
+    loudly rather than silently build an empty `code` node. Gone: the symptom,
+    a confusing `user code must define one of...` DSPy error **on every row**.
+    The whole reason the loud failure exists is that the quiet one is
+    unrecognisable at the point it surfaces.
+
+### Confirmed about the rule itself
+
+The lane read `collectCommentBlocks` in
+`packages/oxlint-rules/grammar/comment-block-policy.mjs` and confirmed it
+**merges any run of comment-only lines regardless of delimiter boundaries** —
+two adjacent `/** */` blocks with no blank line between them are one block, as
+are a `//` line and the `/** */` below it. Two fixes follow from that and both
+are now in use: insert one blank line to split the run, or move a discounted
+tag (`@vitest-environment`, `@see`) into the JSDoc as its own ` * @tag` line so
+the discount regex sees it. The second is the better fix where it applies — the
+JSDoc form is what 1,292 files in this tree already use, 746 of them for
+`jsdom`, where a directive that failed to register would break the test outright.
