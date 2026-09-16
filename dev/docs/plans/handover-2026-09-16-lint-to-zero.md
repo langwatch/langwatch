@@ -9,56 +9,52 @@ measured this session, not inherited. Branch `feat/strict-feature-layout-v0`.
 **Every finding to zero.** Not the CI gate, not errors only — zero. Both halves
 of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
-## SCOREBOARD — session of 2026-09-16 (background job 4a7a3221)
+## SCOREBOARD — sessions of 2026-09-16/17 (background job 4a7a3221)
 
-    lint at session start   7,166
-    lint now                6,499
-    typecheck (3 apps)         65   none of them from this drive's lanes
+    lint at session start                7,166
+    true debt, once the ledger went     16,230
+    lint now                            12,673
+    typecheck (3 applications)              51   none from this drive, 0 new
+    lanes collected                         11
+    commits                                 45+
 
-What the remaining 6,610 is made of, and this is the number that decides how the
-drive ends:
+**The counter changed meaning on 2026-09-16.** The suppression ledger was
+deleted (`ca795a6573`), so the number is no longer 6,403-and-rising-slowly, it is
+the real one. Any before/after taken across that commit is not comparable; say
+which side a measurement is from.
 
-    2,881   grindable shape work            lanes eat this
-    1,712   a contract decision per site    no-try-prefix 448, fallible-result-naming 890, package-boundaries 374
-    2,017   everything else                 vitest 563, langwatch 823, react-hooks/eslint/ts 631
+### What is left, and which of it a lane can actually finish
 
-    6,925   suppressed, invisible to all of the above
+    1,158  module-app-only-across-packages   NOT grindable - 786 in apps/worker
+                                             alone, across four composition
+                                             files. ADR-144 architectural work:
+                                             a composition root reaching into a
+                                             module's server package instead of
+                                             through its *Api token.
+    1,059  cognitive-complexity              real refactoring, expensive per site
+      946  temporal-only                     grindable; 78 deferred with reasons
+                                             in .claude/handoffs/temporal-w1.md
+      893  fallible-result-naming            NOT grindable - see the measurement
+                                             below
+      634  condition-shape                   grindable, two waves done
+      600  no-nested-ternary                 grindable, visible only since the
+                                             ledger went
+      547  test-description-is-an-action     grindable, three waves done
+      448  no-try-prefix                     NOT grindable - 430 of 448 declare a
+                                             nullable result, so each is a
+                                             decision about what absence means;
+                                             six are a rename
+      374  package-boundaries                NOT grindable - only 4 of 108 in
+                                             free packages are the mechanical
+                                             "use the package specifier" kind;
+                                             83 need a capability exposed
+                                             through the owner's contract and 21
+                                             need constructor injection
 
-So grinding alone lands around **2,000 visible**, and "zero visible" still leaves
-~6,925 suppressed. `oxlint --fix` is **not** a shortcut for the third bucket -
-tested on a clean file carrying `no-nested-ternary` and `fallible-result-naming`,
-it changed nothing; neither is auto-fixable.
-
-**Collected this session:** `zod-contracts-w1` (`df52b47c8b`), 43 files across six
-contract packages, zod-object-composition 200 -> 0. The diff was checked for a
-dropped refinement - the one way that wave could ship a real bug - and carries
-none: 196 `.extend`/`.merge` removed, 154 `.shape` spreads, 37 `safeExtend`, zero
-`refine` removed. Its one `as X` cast was replaced with a type guard before commit.
-
-**`modules/dataset/contract` was held back on a wrong attribution, then committed.**
-It was dirty when the lane started, and this coordinator read "dirty" as "owned by
-the apidiff session". That session checked its own diff and had never touched
-`modules/dataset` at all - a THIRD session is live in this checkout too (job
-2e744849: `tools/thuishaven`, `services/idpsim`, `services/mailsim`,
-`specs/setup/**`), and every session commits as the same git user, so authorship
-cannot separate them. **Dirty does not identify an owner; read the diff content.**
-Verified independently (15 extend/merge/omit removed, 3 shape spreads, 9
-safeExtend, no refinement dropped, no cast) and committed.
-
-**A latent boot defect came out of that exchange.**
-`modules/server-module-members.generated.ts` had been regenerated partway: trace
-had gained `redis` but not `rateLimiter`, and analytics, auth, langy, prompt and
-scenario had gained nothing, while all six apps' committed `static readonly reads`
-name them. ADR-144 supplies exactly the declared union at boot **or refuses by
-member name**, so a short list is a refusal waiting for whichever process boots
-it. Regenerated and committed (`c1d551f3f2`), then checked the other way round -
-parsing each app's own `reads` and comparing module by module rather than trusting
-the generator that had just written the file. Zero disagreements.
-
-**Running:** `comment-w11`, `temporal-w1`, `condition-shape-w1`.
-**Queued, manifests written:** `trace-layout-w1` (feature-source-layout, 158 in
-trace/server, the largest single concentration), `service-classes-w1` (~120 across
-eight clean server packages).
+**The rule for the four marked NOT grindable: do not spawn a wave.** Each one
+can only be closed by producing the shape the naming decision forbids, or by an
+unreviewed behaviour change at every call site. Convert one when its code is
+being changed for another reason.
 
 ## Scoreboard
 
