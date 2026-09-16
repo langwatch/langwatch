@@ -99,13 +99,9 @@ async function deleteMonitor(id: string): Promise<void> {
 }
 
 /**
- * The shell commands the agent ran, one per line.
- *
- * Reads the Bash tool calls rather than the JSON of the whole transcript. A
- * command that quotes an argument before the one under test, such as
- * `export PATH="./bin:$PATH" && langwatch monitor create`, defeats a regex
- * written over that JSON, and a negative assertion then passes for the wrong
- * reason.
+ * The shell commands the agent ran, one per line. Reads the Bash tool calls
+ * rather than the whole transcript's JSON: a command quoting an earlier
+ * argument (`export PATH="./bin:$PATH" && ...`) defeats a regex over it.
  */
 function executedCommands(state: ScenarioExecutionStateLike): string {
   return bashCommands(state).join("\n");

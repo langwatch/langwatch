@@ -1,40 +1,8 @@
 #!/usr/bin/env node
 /**
- * Screen Studio style polish for a docs screen recording.
- *
- *   node docs/scripts/video/polish-recording.mjs <timeline.json> [options]
- *
- * READ THE GUIDE BEFORE YOU AUTHOR A TIMELINE:
+ * Screen Studio style polish for a docs screen recording. Usage, options and
+ * format: README.md next to this file. Read the guide first:
  * https://nexus.langwatch.ai/wiki/recording-video-for-docs
- *
- * That page carries the rules this script cannot enforce: how many zooms a
- * video can take before it is unwatchable, which targets earn one, when to pan
- * instead of zooming out and back in, and how to record a take that the polish
- * step can use. `README.md` next to this file is the format reference. The
- * guide is the judgement.
- *
- * What it renders, per frame:
- *
- *   background image  ->  soft shadow  ->  the recording, as a rounded window
- *                     ->  the click ripple  ->  the cursor
- *
- * The camera puts the click target at the centre of the frame and zooms
- * uniformly around it, so the window slides off the canvas and the background
- * fills what is left. That is the point of the background: it is what lets the
- * camera track the cursor instead of being pinned inside the recording.
- *
- * It reads the take through ffmpeg, composites every frame in plain
- * JavaScript, and writes the result back through ffmpeg. The only external
- * programs are `ffmpeg`, `ffprobe` and `rsvg-convert`, so there is nothing to
- * install from npm.
- *
- * Options:
- *   --out PATH          write here instead of the timeline's `output`
- *   --background PATH   override the background image
- *   --preview A:B       render only seconds A to B of the result (fast loop)
- *   --stills "1,4,8.5"  after encoding, write a PNG per listed second
- *   --stills-dir DIR    where those PNGs go (default: next to the output)
- *   --crf N             override the encoder quality (lower is better)
  */
 
 import { spawn } from "node:child_process";
@@ -133,11 +101,9 @@ async function loadImageCover(file, w, h) {
 // ------------------------------------------------------------------- cursors
 
 /**
- * Renders an SVG to an RGBA bitmap of the requested height.
- *
- * rsvg-convert writes PNG, and node cannot decode PNG on its own, so ffmpeg
- * turns the PNG into raw RGBA. Both are already required by the rest of the
- * script, which is why this takes two processes instead of a library.
+ * Renders an SVG to an RGBA bitmap of the requested height. rsvg-convert
+ * writes PNG, and node can't decode PNG on its own, so ffmpeg turns that PNG
+ * into raw RGBA — both already required elsewhere, hence two processes not a library.
  */
 async function rasterize(svgPath, height) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "polish-cursor-"));
@@ -517,17 +483,9 @@ function drawRipple(dst, dw, dh, px, py, radius, fillA, strokeA, strokeW, color)
 // -------------------------------------------------------------------- tracks
 
 /**
- * Turns the beats into camera keyframes and returns a lookup.
- *
- * Each zoomed beat contributes four keyframes: leave 1x, reach the target zoom
- * before the click, hold, return to 1x. At 1x the camera sits on the middle of
- * the recording; zoomed, it sits on the focus point, so zooming in and panning
- * to the target are one movement.
- *
- * When two beats are close enough that the second starts before the first has
- * returned, both 1x keyframes are dropped and the camera pans straight from
- * one focus point to the next. That is the rule for a corner target followed
- * by a central one: zoom once, then move.
+ * Turns the beats into camera keyframes. Each zoomed beat contributes four:
+ * leave 1x, reach the target zoom, hold, return to 1x. When two beats overlap
+ * before the first returns, both 1x keyframes drop and the camera pans straight between them.
  */
 function buildCameraTrack(beats, cfg, duration, midX, midY) {
   const groups = [];
@@ -736,23 +694,9 @@ function buildCursorTrack(beats, cfg) {
 }
 
 /**
- * Freezes the source frame wherever the cursor would have to move faster than
- * a viewer can follow, and maps between the source clock and the output clock.
- *
- * A frozen source is what buys the camera and the cursor their time. Without
- * it the only way to slow a move down is to cut the take differently, and the
- * two targets that need the most room are usually the two the take runs
- * through fastest. A beat asks for a freeze of its own with
- * `pause: { before, after }`, or `pause: 0.6` for a wait before the click.
- *
- * `skip: 1.2` on a beat is the same machinery in reverse: it drops the 1.2
- * seconds of source that come right before that beat, which is how a stretch
- * of dead air in the take is removed without re-cutting it. Check the source
- * really is still over that stretch first:
- *
- *   ffmpeg -v error -i cut.webm -vf \
- *     "trim=6.8:10.2,setpts=PTS-STARTPTS,select='gte(scene,0)',metadata=print:file=-" \
- *     -f null -
+ * Freezes the source frame wherever the cursor would move faster than a
+ * viewer can follow, mapping source and output clocks — `pause: { before,
+ * after }` asks for one; `skip: 1.2` drops dead air before a beat instead.
  */
 function buildPacing(beats, pace, cursorCfg) {
   const freezes = [];
@@ -908,12 +852,8 @@ const DEFAULTS = {
     // output width instead.
     fit: "native",
     radius: 13,
-    // How far the camera follows the focus point. 1 puts the focus dead
-    // centre of the frame, which is the only setting where the camera path is
-    // a straight function of the zoom; 0 keeps the window centred and never
-    // follows. Anything between is a blend of the two, and a blend bends the
-    // path slightly, so lower it only when a corner target shows more
-    // background than you want.
+    // How far the camera follows the focus point (1 = locks on target, 0 =
+    // window stays centred). See README.md "follow" for the zoom-path tradeoff.
     follow: 1,
     shadow: { blur: 44, offsetX: 0, offsetY: 20, spread: 2, opacity: 0.3 },
     border: { width: 1, color: [255, 255, 255], opacity: 0.45 },
@@ -1172,11 +1112,10 @@ async function main() {
     const winH = srcH * scale;
 
     // Two candidate positions: the window centred in the frame, and the
-    // window placed so the focus point is dead centre. `follow` blends them.
-    // Both are straight functions of the zoom, so the camera path has no kink.
-    // Clamping the window against the edge of the recording, which is what
-    // this used to do, put a kink in exactly one axis, and the eye read that
-    // as the page tilting and then snapping back.
+    // window placed so the focus point is dead centre. `follow` blends them,
+    // and both are straight functions of the zoom, so the path has no kink.
+    // Clamping the window against the recording's edge (the old approach)
+    // put a kink in one axis, which read as the page tilting and snapping back.
     const left = lerp((outW - winW) / 2, outW / 2 - cam.cx * scale, follow);
     const top = lerp((outH - winH) / 2, outH / 2 - cam.cy * scale, follow);
 

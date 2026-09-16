@@ -1,12 +1,7 @@
 /**
- * CI CANARY FIXTURE — DO NOT FIX THIS TEST.
- *
- * This test is deliberately failing. It exists to prove that the CI
- * failure-detection pipeline (vitest exit code + extract-failures.sh) works.
- * The ci-self-test job runs this file, captures the failure, and asserts
- * that detection succeeded. If you make this test pass, ci-self-test breaks.
- *
- * This file lives under .github/ and is excluded from normal test runs.
+ * CI CANARY FIXTURE — DO NOT FIX THIS TEST. It proves the CI failure-detection
+ * pipeline (vitest exit code + extract-failures.sh) works: ci-self-test
+ * captures this failure and asserts detection succeeded. If it passes, ci-self-test breaks.
  */
 
 import { expect, test } from "vitest";

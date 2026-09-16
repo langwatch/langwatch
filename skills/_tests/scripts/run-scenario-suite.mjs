@@ -1,24 +1,8 @@
 #!/usr/bin/env node
 /**
- * Runs the skill dogfood scenarios as ONE run on the platform.
- *
- * Every `scenario.run` reports under a batch id. Left alone, the Scenario SDK
- * derives that id from the parent process and the week, so each vitest
- * invocation opens a batch of its own and the Results sidebar fills with one
- * Run per scenario. This script generates a single id, exports it as
- * SCENARIO_BATCH_RUN_ID, and hands every file to one vitest run, so the whole
- * suite lands under one Run.
- *
- * The id reaches the vitest workers through the environment, and the Claude
- * Code adapter drops it from the sub process it spawns: several skills tell
- * the agent to write scenario tests and run them, and those runs belong to the
- * agent, not to this suite.
- *
- * Usage, from `skills/`:
- *   pnpm test:suite          the suite without the two longest files
- *   pnpm test:suite:all      every scenario file
- *   pnpm test:suite --workers 2
- *   SCENARIO_BATCH_RUN_ID=scenariobatch_… pnpm test:suite   join an open batch
+ * Runs the skill dogfood scenarios as ONE run: generates a single
+ * `SCENARIO_BATCH_RUN_ID` for every vitest worker, so scenarios land under
+ * one Run. Dropped from spawned sub-processes, so agent-written runs don't merge in.
  */
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -30,12 +14,9 @@ const testsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const skillsDir = path.resolve(testsDir, "..");
 
 /**
- * The files a default pass leaves out.
- *
- * Both ask the agent for a whole instrumentation, evaluation and test setup
- * per fixture, and they took about 80 and 63 minutes on their own. The skills
- * they cover are exercised by the rest of the suite as well, so a pass without
- * them still reaches every skill. `--all` puts them back.
+ * The files a default pass leaves out: both need a whole instrumentation,
+ * evaluation and test setup per fixture and take ~80/63 minutes alone. The
+ * skills they cover are exercised elsewhere, so `--all` is what adds them back.
  */
 const LONGEST_FILES = ["datasets.scenario.test.ts", "level-up.scenario.test.ts"];
 

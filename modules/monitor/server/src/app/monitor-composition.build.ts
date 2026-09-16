@@ -31,10 +31,8 @@ class ProcessMonitorEvaluators implements MonitorEvaluator {
 
 /**
  * Copying an evaluator's workflow, on a process that composed no replication
- * of the graph behind it. Both members refuse by name: a copy that silently
- * made a monitor without its workflow would be a structurally broken
- * replica. Ported verbatim from `api-production.composition.ts`'s
- * `unreplicatedEvaluatorWorkflows` (b383462d96^).
+ * of the graph behind it. Both members refuse by name — a silent copy without
+ * its workflow would be structurally broken. Ported from b383462d96^.
  */
 type MonitorWorkflowReplication = Readonly<{
   replicateEvaluatorWorkflow(
@@ -96,11 +94,8 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
 
 /**
  * The seven-day trend, over the SAME Evaluation application the analytics
- * page reads: `EvaluationApi.getMonitorPerformance` already owns the
- * ClickHouse read and the fold that turns its buckets into a guardrail's
- * pass rate or an evaluator's mean score. The comparison window is the
- * analytics page's own, so the trend covers the exact runs a reader sees
- * when they open analytics for this evaluation.
+ * page reads: `getMonitorPerformance` owns the ClickHouse read and the fold
+ * into a guardrail's pass rate or evaluator's mean score, over the same window.
  */
 function composeMonitorPerformance(
   evaluation: Pick<EvaluationApi, "getMonitorPerformance">,

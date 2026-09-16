@@ -770,14 +770,11 @@ const LEGACY_PARTIAL: string[] = [
   "specs/clickhouse/windowed-read-fallback.feature",
   "specs/coding-agent/cache-write-ttl-pricing.feature",
   "specs/coding-agent/terminal-view.feature",
-  // Reason: left LEGACY_INERT when this branch bound its scenarios. All four
-  // this branch authored are now tagged and bound. The six that remain
-  // untagged predate it and describe retention stamping it does not own:
-  // two need a test in the scenario and experiment pipelines, which assert
-  // no _retention_days today; one is a ClickHouse MATERIALIZED column only an
-  // integration test can prove; one is an absence-of-restamping invariant;
-  // and the trace-pipeline pair is proven for event_log but not yet for
-  // stored_metric_records or dspy_steps. Each needs a test, not a tag.
+  // Reason: left LEGACY_INERT before this branch's scenario binding. Its own
+  // four are now tagged and bound; six predate it and describe retention
+  // stamping it doesn't own — two need pipeline assertions, one needs a
+  // ClickHouse MATERIALIZED-column test, one is an absence invariant, and the
+  // trace-pipeline pair is proven only for event_log. Each needs a test, not a tag.
   "specs/data-retention/ingestion-stamping.feature",
   // Left LEGACY_INERT once this branch tagged the three event-log-category
   // scenarios (selection, rate limiting, parallel mutations) to

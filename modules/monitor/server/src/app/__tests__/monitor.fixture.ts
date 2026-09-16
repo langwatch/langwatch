@@ -1,8 +1,7 @@
 /**
  * The monitor application over memory repositories, for a test that wants the
- * real decisions and none of the datastores. The peer arrives as an API
- * fixture, so an operation the test did not stub refuses by name rather than
- * answering undefined; the three technical ports are recording doubles.
+ * real decisions and none of the datastores. An operation the test did not
+ * stub refuses by name rather than answering undefined; ports are recording doubles.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {

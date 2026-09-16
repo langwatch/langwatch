@@ -12,20 +12,16 @@ import { WORKSPACE_ROOTS, isIgnoredDirectory } from "./layout.ts";
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 
 /**
- * How deep below a workspace root a `package.json` may sit.
- *
- * Four is what the deepest glob in `pnpm-workspace.yaml` needs
- * (`enterprise/modules/<feature>/<role>`), and a bound is what keeps
- * this from descending through `apps/ui/src` — thousands of directories that
- * cannot contain a workspace manifest — on every lint run.
+ * How deep below a workspace root a `package.json` may sit. Four matches the
+ * deepest `pnpm-workspace.yaml` glob (`enterprise/modules/<feature>/<role>`);
+ * without a bound this would descend through `apps/ui/src` on every lint run.
  */
 const WORKSPACE_MANIFEST_DEPTH = 4;
 
 /**
  * Conditions read in the order a Node runtime would pick them, so a package
- * that ships different code to the server and the browser is followed the way
- * the server loads it. `types` is last, and only reached when a manifest offers
- * nothing else — a `.d.ts` is a dead end for a value walk.
+ * shipping different code per environment is followed the way it loads. `types`
+ * is last: reached only when nothing else applies, since a `.d.ts` is a dead end.
  */
 const EXPORT_CONDITIONS = ["node", "import", "require", "default", "types"];
 
@@ -35,10 +31,9 @@ export type ModuleImport = {
   specifier: string;
   nonLiteral: boolean;
   /**
-   * `import type` / `export type`, which the compiler erases. A value walk must
-   * skip these or every type annotation naming a component reads as a leak.
-   * Inline `{ type A, b }` is NOT type-only: `b` is a value, and under
-   * `verbatimModuleSyntax` even `{ type A }` alone still emits the import.
+   * `import type` / `export type` are compiler-erased and must be skipped, or
+   * every type annotation reads as a leak. Inline `{ type A, b }` is NOT
+   * type-only — under `verbatimModuleSyntax`, `b` alone still emits the import.
    */
   typeOnly: boolean;
   /** `import(...)` or `require(...)`: a real runtime edge, but not a static neighbour. */
@@ -175,12 +170,9 @@ type ImportRecordInput = {
 };
 
 /**
- * A dynamic `import(...)` in value position parses as a call; the two type
- * forms — `typeof import("x")` and `import("x").Foo` — parse as an
- * `ImportTypeNode` and never reach here. Deferring a heavy dependency behind
- * `await import()` is precisely how it is kept out of a boot graph, so a walk
- * blind to this edge would bless the one move most likely to smuggle the UI
- * stack back in at runtime.
+ * A dynamic `import(...)` in value position parses as a call; `typeof
+ * import("x")` parses as an `ImportTypeNode` instead. A walk blind to this
+ * would bless smuggling the UI stack back in via `await import()`.
  */
 function dynamicImportRecord(node: ts.CallExpression): ImportRecordInput | undefined {
   const dynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
@@ -283,12 +275,9 @@ export function valueImports({ file }: { file: string }): readonly ModuleImport[
 }
 
 /**
- * Whether the compiler emits a `react/jsx-runtime` import for this file.
- *
- * Under `jsx: "react-jsx"` that import appears nowhere in the source, so no
- * amount of reading specifiers will find it. An icon component with no import
- * statement at all still loads React, and without this it looks inert — a dead
- * end in the walk rather than the React leaf it is.
+ * Whether the compiler emits a `react/jsx-runtime` import for this file. Under
+ * `jsx: "react-jsx"` that import appears nowhere in source, so an icon component
+ * with no import at all still loads React and would otherwise look inert.
  */
 export function rendersJsx({ file }: { file: string }): boolean {
   return parseSource(file).rendersJsx;
@@ -677,11 +666,6 @@ export function walkValueImportGraph({
   return { children, seeds };
 }
 
-/**
- * Flooding backwards from forbidden seeds handles import cycles without caching
- * unsound "cannot reach" answers from cut cycles. Each node settles once,
- * keeping traversal O(files + imports).
- */
 /** Every edge's target mapped back to the files that reach it, the reverse of `graph.children`. */
 function parentsIndex(graph: ValueImportGraph): Map<string, string[]> {
   const parents = new Map<string, string[]>();

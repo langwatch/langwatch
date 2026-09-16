@@ -15,7 +15,6 @@ const DOCKERFILE = readFileSync(
 
 /**
  * The one `apt-get install` of the runtime stage, as a list of package names.
- *
  * Read from the runtime stage alone: the builder stages install their own
  * toolchains, and a package present only there never reaches a worker.
  */

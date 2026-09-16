@@ -20,12 +20,9 @@ const newSessionId = (): string => {
 };
 
 /**
- * The current session id, rotating it when the visit has gone quiet for longer
- * than {@link SESSION_INACTIVITY_MS}.
- *
- * Returns undefined when there is nowhere to keep it — Safari's private mode
- * throws on `sessionStorage`, and telemetry must never be the reason a page
- * fails to load.
+ * The current session id, rotating when the visit has gone quiet longer than
+ * {@link SESSION_INACTIVITY_MS}. Returns undefined when there's nowhere to
+ * keep it — Safari's private mode throws, and telemetry must never block a page.
  */
 export function currentSessionId(now = nowInstant().epochMilliseconds): string | undefined {
   let storage: Storage;

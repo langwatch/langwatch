@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * Guards the api lane's port actually being exported, not just computed and
- * left in the launcher's own shell. Driven as real processes: a stand-in
- * `pnpm` on PATH reports the argv/env it was handed instead of starting
- * anything, so a derivation that stops short of exporting fails here.
+ * Guards the api lane's port being exported, not just computed. Driven as
+ * real processes: a stand-in `pnpm` reports its argv/env instead of starting.
  */
 
 import { execFileSync, execSync } from "node:child_process";
@@ -21,8 +19,7 @@ const DERIVE_PORTS = path.join(REPO_ROOT, "dev/scripts/lib/derive-dev-ports.sh")
 /**
  * A PORT slot far from the default so a developer's own stack, or another
  * worktree's, can never be what this test measures. The pre-flight refuses to
- * run when any of the three is held, which would fail the test loudly rather
- * than quietly measuring someone else's process.
+ * run when any of the three is held, failing loudly rather than measuring it.
  */
 const SLOT = 5920;
 

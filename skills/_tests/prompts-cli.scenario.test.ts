@@ -161,7 +161,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
     async () => {
       const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-push-"));
 
-      // Set up a project with a prompt that exists both locally and remotely (simulate conflict scenario)
+      // Sets up a project with a prompt that exists both locally and remotely.
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,

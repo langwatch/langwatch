@@ -5,10 +5,9 @@ import { type Instant, nowInstant } from "@langwatch/time";
 import type { ArchitectureViolation } from "./types.ts";
 
 /**
- * One shape for every ratchet that ratchets: a version, the policy that owns
- * the file, and rows keyed in that policy's own grammar. Reading, validating,
- * comparing and writing all happen here, so a reader learns one mechanism and
- * a stale row is a stale row wherever it is found.
+ * One shape for every ratchet that ratchets: a version, the owning policy, and
+ * rows keyed in that policy's grammar. Reading, validating, comparing and
+ * writing all happen here, so a stale row looks the same wherever it is found.
  */
 
 export const BASELINE_VERSION = 1;

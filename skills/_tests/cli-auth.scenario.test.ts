@@ -22,12 +22,9 @@ const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
 const judgeModel = google("gemini-2.5-flash-lite");
 
 /**
- * Bare-CLI auth-discovery test.
- *
- * No skill files, no .env, no CLAUDE.md. Agent is dropped in an empty dir and
- * asked to do something that requires the LangWatch CLI. The CLI itself must
- * surface enough information (in its --help text and missing-key error) for the
- * agent to point the user at `${endpoint}/authorize` to obtain a key.
+ * Bare-CLI auth-discovery test: no skill files, no .env, no CLAUDE.md. The
+ * agent is asked to do something needing the CLI, which must surface enough
+ * in --help/missing-key error for the agent to point the user at `/authorize`.
  */
 describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
   it.skipIf(isCI)(
@@ -78,11 +75,9 @@ describe("LangWatch CLI Auth Discovery: bare CLI, no skill", () => {
 });
 
 /**
- * Regression for the customer report: a coding agent setting up experiments
- * ran `langwatch login`, signed in to a personal project, and the evaluations
- * went there. With the experiments skill (and the projects-and-api-keys shared
- * snippet), the agent must use the project API key already in `.env` and must
- * never run the AI-tools / device login or target a personal project.
+ * Regression for the customer report: a coding agent running `langwatch
+ * login` signed in to a personal project and evaluations went there. With
+ * the experiments skill, the agent must use the .env project key instead.
  */
 describe("given the experiments skill installed with a project key in .env", () => {
   describe("when the agent is asked to set up an evaluation", () => {

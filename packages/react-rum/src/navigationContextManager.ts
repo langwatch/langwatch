@@ -1,9 +1,7 @@
 /**
  * Lets an in-flight navigation parent the work it causes.
- * `StackContextManager` can't follow an `await`/React commit, so by the time
- * a page's effects fetch, the navigation's stack is long gone. Rather than
- * zone.js (rejected in ADR-058), a navigation publishes *ambient* context
- * while in flight: any otherwise-parentless span takes it instead.
+ * `StackContextManager` can't follow an `await`/React commit, so instead of
+ * zone.js (ADR-058) a navigation publishes *ambient* context while in flight.
  */
 
 import { type Context, trace } from "@opentelemetry/api";
@@ -36,11 +34,9 @@ export function resetAmbientContextForTesting(): void {
 
 export class NavigationContextManager extends StackContextManager {
   /**
-   * The active context, falling back to the in-flight navigation.
-   *
-   * Only spans that would otherwise be roots are affected: anything with a
-   * span already on the context keeps the parent it has, so synchronous
-   * nesting behaves exactly as it does without this class.
+   * The active context, falling back to the in-flight navigation. Only spans
+   * that would otherwise be roots are affected — one already on the context
+   * keeps its parent, so synchronous nesting behaves exactly as without this.
    */
   override active(): Context {
     const active = super.active();

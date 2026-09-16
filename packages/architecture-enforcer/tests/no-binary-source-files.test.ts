@@ -6,9 +6,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * No tracked source file may contain a raw NUL byte — git renders such a
- * blob as "Binary file not shown", invisible in editors and diffs. Checked
- * by reading bytes, not `grep -P '\x00'` (unreliable); fix by replacing the
- * raw byte with a `\u0000` escape.
+ * blob as "Binary file not shown", invisible in diffs. Checked by reading
+ * bytes (not `grep -P '\x00'`); fix by replacing it with a `\u0000` escape.
  */
 
 // The repository root. The platform copy of this guard resolved three levels

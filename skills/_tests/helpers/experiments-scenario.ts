@@ -88,12 +88,9 @@ export const experimentWasCreatedOrAdvanced = ({
   Array.from(after).some(([id, runsCount]) => !before.has(id) || runsCount > (before.get(id) ?? 0));
 
 /**
- * The shell commands the agent ran, one per line.
- *
- * Reads the Bash tool calls rather than the JSON of the whole transcript. A
- * command that quotes an argument before the one under test, such as
- * `export PATH="./bin:$PATH" && uv run script.py`, defeats a regex written
- * over that JSON, and the check then misses a command the agent did run.
+ * The shell commands the agent ran, one per line. Reads the Bash tool calls
+ * rather than the whole transcript's JSON: a command quoting an earlier
+ * argument (`export PATH="./bin:$PATH" && ...`) defeats a regex over that JSON.
  */
 export function executedCommandTranscript(state: {
   messages: Array<{ content: unknown }>;
@@ -102,12 +99,9 @@ export function executedCommandTranscript(state: {
 }
 
 /**
- * The Bash commands the agent ran, one entry each.
- *
- * Use this rather than the joined transcript whenever a check needs two
- * tokens to belong to the SAME command: the joined form lets `a[\s\S]*b`
- * match `a` in one command and `b` in another, which passes for a command
- * the agent never ran.
+ * The Bash commands the agent ran, one entry each. Use this over the joined
+ * transcript when a check needs two tokens in the SAME command: the joined
+ * form lets `a[\s\S]*b` match across two different commands.
  */
 export function executedCommands(state: { messages: Array<{ content: unknown }> }): string[] {
   return bashCommands(state as Parameters<typeof bashCommands>[0]);

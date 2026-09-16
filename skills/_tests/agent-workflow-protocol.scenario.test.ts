@@ -18,15 +18,9 @@ const judgeModel = openai("gpt-5-mini");
 const repoRoot = path.resolve(__dirname, "../..");
 
 /**
- * This file lives beside the product skill dogfoods rather than in
- * packages/architecture-enforcer because the subject is the same: a real Claude Code
- * sub-session, judged. This directory owns the only harness that can spawn one.
- * The structural half of the protocol - the half that needs no LLM - is
- * packages/architecture-enforcer/tests/agent-workflow-protocol.unit.test.ts.
- *
- * One run binds four scenarios. Each run spawns a real sub-process and hits live
- * models, so the scenarios that share a fixture share a run rather than paying
- * four times to set up the same scratch repository.
+ * Lives beside the product skill dogfoods, not in architecture-enforcer: the
+ * subject is a real Claude Code sub-session, judged, and this directory owns
+ * the only harness that can spawn one. Structural half: agent-workflow-protocol.unit.test.ts.
  */
 
 /** The protocol files a lane reads, staged into the scratch repository. */
@@ -94,13 +88,9 @@ Scoped only. Never a whole-tree check.
 `;
 
 /**
- * A scratch repository shaped to make the wrong move tempting.
- *
- * `src/broken/legacy.ts` carries a deliberate type error and is owned by nobody.
- * A lane that runs a whole-tree typecheck sees it and is drawn into fixing a
- * file outside its manifest; a lane that runs the scoped check the manifest
- * names never learns it exists. That is what makes this fixture discriminate
- * between the two behaviours rather than merely record one.
+ * A scratch repository shaped to make the wrong move tempting: a deliberate
+ * type error in a file owned by nobody. A lane running a whole-tree typecheck
+ * gets drawn into fixing it; one running the scoped check never learns it exists.
  */
 function buildScratchRepository(root: string): void {
   const write = (relativePath: string, contents: string): void => {

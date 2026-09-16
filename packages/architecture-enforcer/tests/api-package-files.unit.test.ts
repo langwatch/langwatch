@@ -6,11 +6,9 @@ const root = resolve(import.meta.dirname, "../../..");
 const API_SOURCE = join(root, "packages/api/src");
 
 /**
- * The whole source surface of `@langwatch/api`, named file by file.
- *
- * The legacy builder family and the 66 files only it reached are gone, so this
- * is no longer a target the package is converging on: it IS the package, and
- * the two assertions below hold it there in both directions.
+ * The whole source surface of `@langwatch/api`, named file by file. The legacy
+ * builder family (and the 66 files only it reached) is gone: this IS the
+ * package now, and the two assertions below hold it there in both directions.
  */
 const TARGET_FILES = new Set([
   "index.ts",

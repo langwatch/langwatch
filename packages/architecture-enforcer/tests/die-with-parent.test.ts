@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * Tests dev/scripts/die-with-parent.cjs (the hook playwright-mcp.sh loads so
- * an orphaned MCP shuts its browser down): real stand-in session/MCP/browser
- * processes, the session killed by pid, observing who is left. See
- * specs/setup/mcp-browser-lifecycle.feature.
+ * Tests dev/scripts/die-with-parent.cjs (the playwright-mcp.sh hook that
+ * kills an orphaned MCP's browser). See specs/setup/mcp-browser-lifecycle.feature.
  */
 
 import { spawn, spawnSync } from "node:child_process";

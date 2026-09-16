@@ -272,9 +272,8 @@ describe("the documentation paths the skills tell the agent to fetch", () => {
 
   /**
    * The paths, with the placeholders and the index (no path) left out.
-   *
-   * `scenario-docs` fetches the Scenario site, which is not in this tree, so
-   * only `langwatch docs` is checkable here.
+   * `scenario-docs` fetches the Scenario site, not in this tree, so only
+   * `langwatch docs` is checkable here.
    */
   function docsPaths(rendered: string): string[] {
     return extractAll(rendered, /langwatch docs ([a-z0-9/_-]+)/g);

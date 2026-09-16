@@ -17,10 +17,9 @@ const breakingFooterPattern = /^BREAKING[ -]CHANGE:/m;
 
 // A pin is the remediation this guard prints: one commit per component that
 // edits only that component's shim and carries one `Release-As:` footer.
-// release-please reads the footer per commit and routes it by the paths that
-// commit touched, so the shim edit and the footer are one mechanism. The guard
-// sees files per pull request rather than per commit, so it binds the two by
-// version: the footer has to name the version the shim records.
+// release-please routes each footer by the paths its commit touched, so the
+// guard binds the two per pull request by version: the footer must name the
+// version the shim records.
 const releaseAsPattern = /^[ \t]*Release-As:[ \t]*v?(\S+)[ \t]*$/gim;
 const shimNextPattern = /next:[ \t]*v?(\S+)/i;
 
@@ -96,12 +95,9 @@ export const bumpedComponents = (
 };
 
 /**
- * Where a component's pin marker lives: beside the component, except for the
- * root component, whose path is the whole tree and so needs a home chosen for
- * it. That home is `dev/` rather than the tidier-looking `.github/`, because
- * `.github` is one of the root component's `exclude-paths` in
- * release-please-config.json — a shim there would be a pin release-please
- * never sees change.
+ * Where a component's pin marker lives: beside the component, except the
+ * root component, whose path is the whole tree. That home is `dev/`, not
+ * `.github/`, which is excluded from the root component and would go unseen.
  */
 export const rootShimPath = "dev/.release-please-shim";
 
@@ -133,10 +129,9 @@ export type ComponentPin = {
 };
 
 /**
- * A component counts as pinned only with both halves in place. A shim edit
- * alone moves nothing, since release-please reads the version off the footer;
- * a footer alone cannot be attributed to a component, since only the paths a
- * commit touched route it. The version recorded in the shim binds them.
+ * A component counts as pinned only with both halves in place: a shim edit
+ * alone moves nothing since release-please reads the version off the footer,
+ * and a footer alone can't be attributed without the paths a commit touched.
  */
 export const componentPins = ({
   components,
@@ -232,18 +227,8 @@ const reportHalfDonePins = ({
 
 /**
  * A pin used to exempt a component here. It no longer does, and #4998 is why:
- * `Release-As:` overrides the version and nothing else, so a pinned component
- * still takes the other component's `BREAKING CHANGE:` note into its own
- * changelog. That pull request pinned the platform to 3.13.0 and the Go SDK's
- * two breaks were still filed under the platform's release.
- *
- * Squash is this repository's only merge method, so the per-component pin
- * commits the old procedure asked for collapse into one commit whose body is
- * every branch commit's body concatenated. #4998 came out of that with two
- * competing `Release-As:` footers at lines 353 and 372 of a 402-line body, and
- * the platform pin did not apply — it released 4.0.0, not the 3.13.0 it asked
- * for. One message cannot carry one pin per component, however the parser
- * resolves the collision, so splitting is what actually scopes a break.
+ * `Release-As:` overrides only the version, so a pinned component still takes
+ * another's `BREAKING CHANGE:` note — one squashed message can't carry one pin per component.
  */
 const reportPinsDoNotExempt = (pins: ComponentPin[]): void => {
   const pinned = pins.filter((pin) => pin.pinned !== undefined);

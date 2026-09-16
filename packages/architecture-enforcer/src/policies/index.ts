@@ -46,11 +46,9 @@ import { lintSourceFolderShape } from "./source-folder-shape.ts";
 import { lintTestQuality } from "./test-quality.ts";
 
 /**
- * One registration for every policy: what it is called, the spec its
- * scenarios live in, the baseline file it ratchets against (if any), and how
- * to run it against a workspace snapshot. `lintSnapshot` in `index.ts` folds
- * this list and nothing else; the CLI does the same, so a library caller of
- * `lintWorkspace()` and `pnpm lint` see the same set of policies run.
+ * One registration per policy: what it is called, the spec its scenarios live
+ * in, the baseline it ratchets against (if any), and how to run it. Both
+ * `lintSnapshot` and the CLI fold this same list, so they see the same set.
  */
 export type PolicyDefinition = {
   /** The registry's own name for the policy; usually kebab-cased from the `lint*` function. */

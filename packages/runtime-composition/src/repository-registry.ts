@@ -43,9 +43,8 @@ type ValidMembers<Provider, Members> = Members extends object
 
 /**
  * A provider whose `create` takes either nothing or exactly one record, whose
- * keys are exactly the members it declared it requires. A mismatch resolves to
- * `never`, which is what makes a factory reaching for an undeclared member a
- * compile error in the registry rather than a runtime `undefined`.
+ * keys are exactly the members it declared. A mismatch resolves to `never`,
+ * making a factory reaching for an undeclared member a compile error, not `undefined`.
  */
 type ValidProvider<Provider> =
   ProviderArguments<Provider> extends []
@@ -88,11 +87,9 @@ export type RepositoriesFor<Registry, Selected extends Tier> =
     : never;
 
 /**
- * A module's repositories, in both tiers.
- *
- * Both keys are required by the type. The memory twin is not a convenience for
- * tests: it is the twin of `unregistered-channels`, the thing that stops a
- * module shipping a live tier nothing can stand in for.
+ * A module's repositories, in both tiers. Both keys are required: the memory
+ * twin is not a test convenience — it is the twin of `unregistered-channels`,
+ * what stops a module shipping a live tier nothing can stand in for.
  */
 export function defineRepositories<
   const Live extends RepositoryProvider,

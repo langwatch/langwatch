@@ -19,12 +19,9 @@ const repoRoot = resolve(import.meta.dirname, "../..");
 const scriptPath = resolve(import.meta.dirname, "guard-breaking-change-scope.ts");
 
 /**
- * The version the manifest currently records for a component path.
- *
- * Read rather than hardcoded: the guard prints the live version, so a literal
- * here goes stale the moment that component is released, and the guard's own
- * test suite fails on a pull request that has nothing to do with it. That is
- * what happened when typescript-sdk went to 1.5.0.
+ * The version the manifest currently records for a component path. Read
+ * rather than hardcoded: a literal here goes stale the moment that component
+ * is released — this broke when typescript-sdk went to 1.5.0.
  */
 const currentVersion = (path: string): string => {
   const manifest = JSON.parse(
@@ -504,13 +501,11 @@ describe("breaking-change scope guard", () => {
   });
 
   describe("when replaying the pull request that motivated pin detection", () => {
-    // #6656: a stacked branch that inherited a `!` commit from its base, bumped
-    // three components, and pinned all three the way this guard's own
-    // remediation says to. The file list and the commits are the ones the
-    // workflow collects from the API, reduced to the messages that carry a
-    // marker or a footer, and the shim contents are the ones at its head. The
-    // guard failed it anyway, so the only unblock was the
-    // `multi-component-major` label, which asserted three majors nobody wanted.
+    // #6656: a stacked branch inherited a `!` commit from its base, bumped
+    // three components, and pinned all three the documented way. The guard
+    // failed it anyway — files/commits are the ones the workflow's API
+    // collects, reduced to messages carrying a marker/footer. The only
+    // unblock was `multi-component-major`, asserting majors nobody wanted.
     const files = [
       ".github/workflows/gateway-matrix.yaml",
       "dev/.release-please-shim",
@@ -609,14 +604,11 @@ describe("breaking-change scope guard", () => {
   });
 
   describe("when replaying the Go SDK break that majored the platform", () => {
-    // #4998. Two breaking footers, both describing the Go SDK, on a pull
-    // request that also carried ~1,700 lines of ordinary platform code. It
-    // pinned the platform to 3.13.0 the documented way and the guard passed it.
-    // Squash then merged seventeen commits into one whose body is all of theirs
-    // concatenated, leaving two competing pins in a single 402-line message.
-    // The platform pin did not apply: it went to 4.0.0 with the Go SDK's breaks
-    // filed under its changelog, release PR #6787 stalled on that major, and
-    // the #6842 Helm chart fix waited behind it.
+    // #4998. Two breaking footers, both for the Go SDK, on a PR with ~1,700
+    // lines of ordinary platform code. It pinned the platform to 3.13.0 the
+    // documented way and the guard passed it. Squashing seventeen commits
+    // left two competing pins in one message; the platform pin didn't apply
+    // and went to 4.0.0, stalling release PR #6787 behind the Go SDK's break.
     const files = [
       "dev/.release-please-shim",
       "platform/app/src/server/app-layer/traces/canonicalisation/extractors/genAi.ts",

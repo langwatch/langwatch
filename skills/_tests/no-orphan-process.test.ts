@@ -11,10 +11,9 @@ const skillsRoot = path.resolve(__dirname, "..");
 const harnessPath = path.join(__dirname, "helpers", "no-orphan-harness.ts");
 
 /**
- * A stand-in for the Claude Code CLI: it starts a child of its own, writes both
- * pids where the test can read them, and then runs until killed. Nothing here
- * reacts to the harness dying, so the only thing that can stop these two
- * processes is the lifecycle guard the Scenario SDK adapter installs.
+ * A stand-in for the Claude Code CLI: starts a child of its own, writes both
+ * pids where the test can read them, then runs until killed. Only the
+ * Scenario SDK adapter's lifecycle guard can stop these two processes.
  */
 function fakeClaudeScript(workingDirectory: string): string {
   return `#!/bin/sh

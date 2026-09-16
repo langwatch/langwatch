@@ -3,9 +3,8 @@ import { describe, expect, it } from "vitest";
 
 /**
  * System migrations must complete before a process serves traffic or
- * consumes jobs. The API and the worker both gate production `start` on the
- * tasks app's preflight chain, which must name the system-migrations pass
- * AFTER the schema migrations it depends on.
+ * consumes jobs. Both the API and worker gate production `start` on the
+ * tasks app's preflight chain, naming system-migrations AFTER schema migrations.
  */
 describe("system migration start ordering", () => {
   const read = (rel: string): { start: string; prepare: string } => {

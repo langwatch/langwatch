@@ -101,9 +101,8 @@ type WebPackage = ClassifiedPackage & { kind: "web"; feature: string };
 
 /**
  * Screens are allowed the typed client and React Query: the browser derives
- * its hooks from `@langwatch/api/web`. That one subpath and no other — the
- * rest of `@langwatch/api` is the server's transport — and still never
- * `@trpc/client` or `@trpc/react-query/*` raw.
+ * its hooks from `@langwatch/api/web` and nothing else in `@langwatch/api` —
+ * and never `@trpc/client` or `@trpc/react-query/*` raw.
  */
 function isScreenPortableTransport(specifier: string): boolean {
   return /^@tanstack\/react-query(?:\/|$)/.test(specifier) || specifier === "@langwatch/api/web";

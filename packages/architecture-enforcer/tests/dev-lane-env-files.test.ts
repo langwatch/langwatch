@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
- * Every api and worker script loads workspace env files with `--env-file-if-exists`, and Node
- * announces a file that flag didn't find (`../../.env.portless not found. Continuing without
- * it.`) on stderr, in a form no flag suppresses. That overlay is gone — haven hands its variables
- * to the processes it starts — so the workspace env file is the only one a lane loads, and only
- * when it's there. Corresponds to specs/setup/dev-stack-boot-noise.feature.
+ * Every api/worker script loads workspace env files via `--env-file-if-exists`,
+ * and Node warns on stderr when one is missing, in a form nothing suppresses.
+ * Corresponds to specs/setup/dev-stack-boot-noise.feature.
  */
 
 import { execFileSync } from "node:child_process";

@@ -118,10 +118,9 @@ describe("chooseSubject", () => {
 });
 
 /**
- * These run against a real temporary tree, not fictional paths: a specifier is
- * resolved by looking for the file it names, so `./thing` can mean `thing.ts`
- * or `thing/index.ts` and only the filesystem knows which. A lexical rewriter
- * would be faster and wrong.
+ * These run against a real temporary tree: a specifier is resolved by
+ * looking for the file it names, so `./thing` can mean `thing.ts` or
+ * `thing/index.ts` — a lexical rewriter would be faster and wrong.
  */
 describe("rewriteRelativeSpecifiers", () => {
   function tree(files: Record<string, string>): void {
@@ -285,10 +284,8 @@ describe("planTestColocation", () => {
   describe("given a test that reaches its subject through the package's own name", () => {
     /**
      * A sixth of the workspace's test files name their subject only this way.
-     * Node resolves a self-reference through the package's `exports`, which for
-     * these packages points back into `src`, so the subject is exactly as
-     * knowable as it is for a relative import — treating it as unresolvable
-     * would leave those tests in the mirror over a spelling.
+     * Node resolves a self-reference through the package's `exports`, which
+     * points back into `src` — as knowable as a relative import would be.
      */
     it("resolves the subpath against src", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));

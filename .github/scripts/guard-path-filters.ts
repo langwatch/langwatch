@@ -1,39 +1,7 @@
-// Guards the rules that make a native `on.paths` filter safe.
-//
-// Background. Most CI workflows here run unconditionally and decide internally
-// whether to do real work, then report through an `alls-green` aggregator named
-// `<name>-complete`. That shape exists so branch protection always has a check
-// to require: a workflow GitHub filters out never reports at all, and a
-// REQUIRED check that never reports leaves the pull request waiting forever.
-//
-// The cost is that deciding "nothing to do" still leases a runner — a gate job
-// spends five to eight seconds doing it. Workflows with no required check can
-// skip that entirely by filtering in `on:`, which GitHub evaluates before it
-// allocates anything. Three things go silently wrong when they do:
-//
-//   R1  A workflow keeps a `changes` gate for per-job filters AND adds
-//       `on.pull_request.paths`. If the `on.paths` list is not a superset of
-//       every path the gate filters on, the workflow never starts for those
-//       paths, so the job that filter guards never runs — and the pull request
-//       goes green having tested nothing.
-//
-//   R2  A workflow has both a pull-request path filter and a `*-complete`
-//       aggregator. Those two are contradictory: the aggregator exists to give
-//       branch protection a stable check, and the filter is what stops it
-//       reporting. Whichever was intended, the pair is a bug.
-//
-//   R3  This parser meets a filter it cannot decompose. A guard that cannot
-//       read a file must SAY SO rather than pass it. Every unreadable shape is
-//       reported, because silently returning "not filtered" would make the
-//       guard's own green meaningless — which is the failure mode R1 and R2
-//       exist to prevent, reproduced inside the guard.
-//
-// Deliberately dependency-free and line-based, matching guard-pull-request-
-// target.ts: these run on a bare runner with `node --experimental-strip-types`
-// and no install step, so there is no YAML library available. That is why R3
-// exists — hand parsing has blind spots, and the honest response to one is to
-// fail closed.
-//
+// Guards the rules that make a native `on.paths` filter safe (R1: filter not
+// a superset of an internal gate; R2: filter contradicts a `*-complete`
+// aggregator; R3: an unparseable filter reported rather than passed).
+// Dependency-free and line-based — no YAML library on a bare runner.
 // Spec: specs/ci/path-filters.feature
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -120,13 +88,9 @@ const findKeyAnyIndent = (lines: string[], keys: string[], minIndent: number): n
   });
 
 /**
- * Drop a trailing `# comment`, but only where YAML would treat it as one.
- *
- * A `#` starts a comment only outside a quoted scalar and only when preceded by
- * whitespace, so `paths: ["pkg # b/**"]` keeps its hash — a blanket
- * `/\s+#.*$/` truncated that to `paths: ["pkg` and the guard then reported R3
- * against a legal filter. Quoted entries also survive with no preceding space,
- * e.g. `["a#b"]`.
+ * Drop a trailing `# comment`, but only where YAML would treat it as one: a
+ * `#` starts a comment only outside a quoted scalar and preceded by
+ * whitespace, so `["a#b"]` and `"pkg # b/**"` both keep their hash.
  */
 export const stripComment = (line: string): string => {
   let quote: string | null = null;
@@ -149,14 +113,8 @@ export const stripComment = (line: string): string => {
 
 /**
  * The text after `key:` on its own line, with any trailing comment removed.
- *
- * `paths:  # only the Go tree` is a block list with a note on the key line, not
- * an inline value. Without the strip it read as the value `# only the Go tree`,
- * which is not decomposable, so the guard reported R3 against a perfectly legal
- * shape — a false positive, and the kind that teaches people to ignore it.
- *
- * Only a comment preceded by whitespace is stripped, so a `#` inside a quoted
- * entry (`["a#b"]`) survives.
+ * `paths:  # only the Go tree` is a block list with a note on the key line,
+ * not an inline value — without the strip it read as an undecomposable value.
  */
 const inlineValue = (line: string): string =>
   stripComment(line.trim())
@@ -164,12 +122,9 @@ const inlineValue = (line: string): string =>
     .trim();
 
 /**
- * Does the pull-request trigger filter by path, and if so, on what?
- *
- * Covers `pull_request` and `pull_request_target`, `paths` and `paths-ignore`,
- * block and flow sequences, quoted keys, and any indentation. Anything else
- * that looks like a filter but cannot be decomposed comes back `unparsed`
- * rather than `none`.
+ * Does the pull-request trigger filter by path, and if so, on what? Covers
+ * `pull_request`/`pull_request_target`, `paths`/`paths-ignore`, block and
+ * flow sequences, quoted keys, any indentation — else comes back `unparsed`.
  */
 export const pullRequestFilter = (source: string): FilterResult => {
   const lines = source.split("\n");
@@ -259,13 +214,9 @@ export const gateFilters = (source: string): FilterResult => {
 };
 
 /**
- * Job names ending in `-complete`.
- *
- * The job-key indent is read from the `jobs:` block rather than assumed to be
- * two, because two-space is a convention and not a rule. Hardcoding it meant a
- * four-space workflow had no detectable aggregators, so R2 could not fire and
- * the aggregator-plus-filter contradiction passed silently — the same fail-open
- * R3 exists to prevent, one rule over.
+ * Job names ending in `-complete`. The job-key indent is read from the
+ * `jobs:` block, not assumed to be two — hardcoding it left a four-space
+ * workflow with no detectable aggregators, so R2 never fired.
  */
 export const aggregatorJobs = (source: string): string[] => {
   const lines = source.split("\n");
@@ -323,12 +274,9 @@ const matches = (pattern: string, target: string): boolean => {
 };
 
 /**
- * Does the `on.paths` list, as a whole, cover `target`?
- *
- * Order matters and negation is real: GitHub applies `!pattern` entries as
- * exclusions, so `[pkg/**, !pkg/ssrf/**]` does NOT cover `pkg/ssrf/address.go`
- * even though the first entry matches it. Checking entries independently would
- * let the exact R1 failure through the rule that exists to catch it.
+ * Does the `on.paths` list, as a whole, cover `target`? Order and negation
+ * are real: `[pkg/**, !pkg/ssrf/**]` does NOT cover `pkg/ssrf/address.go`
+ * even though the first entry matches — checking entries independently would miss R1.
  */
 export const covers = (patterns: string[], target: string): boolean => {
   let covered = false;
@@ -350,10 +298,9 @@ export const inspect = (file: string, source: string): WorkflowIssue[] => {
 
   // An unparsed filter is still a FILTER — `pullRequestFilter` only reaches
   // this state having found a paths-like key under the pull-request trigger.
-  // So R2 still applies and is still checked below; only R1 is impossible,
-  // because there are no entries to compare against. Returning here instead
-  // would let the aggregator contradiction through on exactly the files the
-  // guard has already admitted it cannot fully read.
+  // R2 still applies; only R1 is impossible, since there's nothing to compare.
+  // Returning here instead would let the aggregator contradiction through on
+  // exactly the files the guard has already admitted it cannot fully read.
   if (filter.kind === "unparsed") {
     issues.push({ file, rule: "R3", detail: filter.detail });
   }

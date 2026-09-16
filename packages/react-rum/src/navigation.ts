@@ -32,11 +32,9 @@ export type NavigationType = "resolved" | "instant";
 
 export interface NavigationSpanHandle {
   /**
-   * Marks the moment the new route is on screen, naming the span for it. Separate from
-   * {@link NavigationSpanHandle.end} because the span's *duration* is what the user waited
-   * (click to page, measured to here), while its life as the ambient parent runs a little
-   * longer since the page dispatches its first fetches right after this. The route pattern
-   * arrives here, not at the start, because it is only knowable once the router has matched it.
+   * Marks the moment the new route is on screen, naming the span for it.
+   * Separate from {@link NavigationSpanHandle.end} since the span's
+   * *duration* is the user's wait; `route` arrives here, once the router has matched it.
    */
   commit({ route }: { route?: string }): void;
   /** Records that the navigation failed rather than completed. */
@@ -56,11 +54,8 @@ let inFlight: { span: Span; context: Context } | undefined;
 
 /**
  * Begins a navigation span and publishes it as the ambient parent for the
- * fetches the navigation triggers.
- *
- * A navigation started while another is in flight supersedes it: the tab is
- * going somewhere else, and the first navigation's outcome is no longer
- * something anyone waits for.
+ * fetches the navigation triggers. A navigation started while another is in
+ * flight supersedes it — the tab is going elsewhere, so the first's outcome is moot.
  */
 export function startNavigationSpan({
   toPath,

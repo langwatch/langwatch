@@ -386,11 +386,10 @@ describe("check queue", () => {
     /** @scenario "A run that waits too long runs anyway" */
     it("starts without a slot rather than hanging forever", async () => {
       // The overlap below is only observable while the holder is still inside
-      // the command, and the impatient run reaches it only after two node
-      // boots and its own maximum wait. The holder is killed as soon as the
-      // overlap has been read, so holding far longer than that costs the suite
-      // nothing and keeps a loaded machine from ending the holder first, which
-      // reads as the queue having serialized the two runs.
+      // the command, reached only after two node boots and the impatient run's
+      // own max wait. The holder is killed right after, so holding far longer
+      // costs nothing and keeps a loaded machine from ending it first — which
+      // would read as the queue having serialized the two runs.
       const holder = startRun({ tag: "holder", holdMs: 60_000 });
       await waitForHolder();
       // The hold must be wide enough that the run's start and end cannot

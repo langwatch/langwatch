@@ -109,7 +109,7 @@ describe("Scenarios Skill", () => {
               /from\s+(agent_tester|simulation_framework|langwatch\.testing|test_framework)/,
             );
 
-            // Verify the agent attempted to run the tests (look for pytest cache or execution evidence)
+            // Checks the agent attempted to run the tests (pytest cache or execution evidence).
             const ranTests =
               fs.existsSync(path.join(tempFolder, ".pytest_cache")) ||
               state.messages.some((m) => {
@@ -699,14 +699,11 @@ describe("Scenarios Skill", () => {
               /from\s+(agent_tester|simulation_framework|langwatch\.testing|voice_test_framework)/,
             );
 
-            // Voice-specific guardrails. At least ONE voice adapter
-            // shows up. The skill can't legitimately write a "voice
-            // scenario test" without picking up an audio transport.
-            // `ComposableVoiceAgent` is included because, for a text-only
-            // fixture without a hosted voice agent, the skill can validly
-            // wrap an STT+LLM+TTS chain rather than invent a fake hosted
-            // agent (verified by the dogfood run on the python-openai
-            // fixture, which has no voice transport of its own).
+            // Voice-specific guardrails: at least ONE voice adapter must
+            // show up. `ComposableVoiceAgent` counts too — for a text-only
+            // fixture with no hosted voice agent, wrapping an STT+LLM+TTS
+            // chain is valid (verified against the python-openai fixture,
+            // which has no voice transport of its own).
             expect(
               testContent,
               "Expected the test to instantiate a voice adapter (OpenAIRealtimeAgentAdapter / ElevenLabsAgentAdapter / PipecatAgentAdapter / GeminiLiveAgentAdapter / TwilioAgentAdapter / ComposableVoiceAgent) — bare mentions in comments or imports don't count.",
@@ -714,15 +711,11 @@ describe("Scenarios Skill", () => {
               /\b(?:scenario\.)?(?:OpenAIRealtimeAgentAdapter|ElevenLabsAgentAdapter|PipecatAgentAdapter|GeminiLiveAgentAdapter|TwilioAgentAdapter|ComposableVoiceAgent)\s*\(/,
             );
 
-            // The user simulator should carry a voice — either an
-            // ElevenLabs voice ID or an OpenAI TTS voice — otherwise
-            // the "caller" is silent and the scenario degrades to a
-            // text scenario with a voice adapter bolted on. The
-            // `voice=` kwarg must live INSIDE a `UserSimulatorAgent(...)`
-            // call, not in a comment, docstring, or unrelated dict. The
-            // value may be a module constant, which is what most runs
-            // write, so the voice id is looked for in the file rather
-            // than at the call.
+            // The user simulator should carry a voice (ElevenLabs voice ID or
+            // OpenAI TTS voice) or the "caller" is silent and the scenario
+            // degrades to text with a voice adapter bolted on. `voice=` must
+            // live INSIDE a `UserSimulatorAgent(...)` call, not a comment or
+            // docstring — though the value itself may be a module constant.
             expect(
               testContent,
               "Expected UserSimulatorAgent(voice=...) so the simulated caller speaks",

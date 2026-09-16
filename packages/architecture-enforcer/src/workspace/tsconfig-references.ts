@@ -3,10 +3,9 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 
 /**
- * Derives every TypeScript project reference from the pnpm workspace manifests.
- * A package's declaration producer is its own `tsconfig.build.json`; a member of
- * the cyclic web group produces through the group solution instead. Hand entries
- * the rules cannot derive live under `langwatchExtraReferences` in the same file.
+ * Derives every TypeScript project reference from the pnpm workspace
+ * manifests; a cyclic web-group member produces through the group solution
+ * instead of its own `tsconfig.build.json`. Manual overrides live in `langwatchExtraReferences`.
  */
 
 const GROUP_SOLUTION = "dev/tsconfig.web-declarations.json";
@@ -164,10 +163,9 @@ function unique(references: readonly string[]): string[] {
 }
 
 /**
- * The project a consumer references to get this package's declarations. It is
- * the build config, unless that config emits JavaScript only (`declaration:
- * false`, as `@langwatch/mail` does for its `.tsx` templates), in which case
- * the package's `tsconfig.declarations.json` is the producer instead.
+ * The project a consumer references for this package's declarations: the
+ * build config, unless it emits JS only (`declaration: false`, as
+ * `@langwatch/mail` does), in which case `tsconfig.declarations.json` produces.
  */
 function producerFile(directory: string): string | undefined {
   const build = join(directory, "tsconfig.build.json");
@@ -221,10 +219,9 @@ function firstCycle(
 }
 
 /**
- * TypeScript project references may not form a cycle, but package dependencies
- * may: two contracts can each name a type of the other. One edge of each cycle
- * is dropped - the first, in the cycle's own order, whose removal leaves the
- * whole graph acyclic, so a cycle through several packages costs one reference.
+ * TypeScript project references may not cycle, but package dependencies may:
+ * two contracts can each name a type of the other. One edge per cycle is
+ * dropped — the first, in order, whose removal leaves the graph acyclic.
  */
 function droppedEdges(edges: ReadonlyMap<string, readonly string[]>): Set<string> {
   const dropped = new Set<string>();

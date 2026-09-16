@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- * The gate that decides whether sdk-javascript-ci's `e2e` job runs — the only
- * check that boots a real server and posts real SDK telemetry at it. The
- * `ingest` path filter can be wrong two ways that read as fine: a pattern
- * matching nothing, or a key the detector never declares, which resolves to
- * an empty string and leaves the job skipped forever rather than failing.
+ * Guards sdk-javascript-ci's `e2e` job: an `ingest` filter that matches
+ * nothing, or an undeclared key resolving to empty, would skip it forever.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -36,21 +33,17 @@ const detector = load(readFileSync(DETECTOR, "utf8")) as Detector;
 
 /**
  * The `filters` input is a block scalar that dorny/paths-filter loads as YAML
- * in its own right, so the comments inside it are stripped exactly the way
- * they are here. Reading it any other way would not be reading what the action
- * reads.
+ * in its own right, so comments inside it are stripped the same way here.
+ * Reading it differently would not be reading what the action reads.
  */
 const filters = load(
   workflow.jobs.changes!.steps!.find((s) => s.id === "detect")!.with!.filters!,
 ) as Record<string, string[]>;
 
 /**
- * Every pattern in this workflow is one of two shapes: a directory prefix
- * ending in `/**`, or an exact repo-relative file path. The matcher below
- * understands those two and nothing else, which is why the shape is asserted
- * before anything is matched: a `*.ts`, a brace list or a `!negation` added
- * later would otherwise be evaluated as a literal filename and silently match
- * nothing, which is the failure this whole suite exists to catch.
+ * Every pattern here is one of two shapes: a directory prefix ending in
+ * `/**`, or an exact repo-relative file path — asserted before matching, since
+ * anything else would evaluate as a literal filename and silently match nothing.
  */
 const DIRECTORY_PREFIX_SUFFIX = "/**";
 const GLOB_METACHARACTERS = /[*?[\]{}()!+@]/;
@@ -108,11 +101,9 @@ const EVERY_PATTERN = Object.entries(filters).flatMap(([key, patterns]) =>
 );
 
 /**
- * File lists as `git show --name-only --format=` reports them, held here
- * rather than read from git because CI's shallow checkout can't reach either
- * revision. `wasFiles` is the historical evidence; `files` restates the same
- * change against today's tree, so the guard doesn't end up asserting that a
- * change nobody can make any more still triggers a lane.
+ * File lists as `git show --name-only --format=` reports them, since CI's
+ * shallow checkout can't reach either revision directly. `wasFiles` is
+ * historical evidence; `files` restates the same change against today's tree.
  */
 const BREAKS_INGEST = {
   sha: "cea66e8e12fd3de8720bf9ba6978b471d4bd9286",

@@ -70,12 +70,11 @@ describe("the code-changes skill", () => {
     });
   });
 
-  // The rules below come from a filmed dogfood where Langy probed for facts it
-  // had been handed, reached for the sandbox shell while a folder was
-  // connected, never asked a question the customer had explicitly offered,
-  // claimed a registration it had read the opposite of, and titled a pull
-  // request "Add comprehensive LangWatch tracing". Each is one sentence in the
-  // skill, and a sentence with no test is a sentence that comes back out.
+  // The rules below come from a filmed dogfood where Langy probed for facts
+  // it had been handed, reached for the sandbox shell with a folder
+  // connected, never asked a question the customer had offered, claimed a
+  // registration it had read the opposite of, and titled a PR "Add
+  // comprehensive LangWatch tracing". Each is one sentence with a test.
   describe("given a folder is connected", () => {
     /** @scenario "The workspace facts are the answer, not something to probe" */
     it("says the workspace facts are the answer rather than something to probe", () => {

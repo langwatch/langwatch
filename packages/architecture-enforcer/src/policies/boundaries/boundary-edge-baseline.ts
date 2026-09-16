@@ -75,9 +75,8 @@ export function boundaryEdgeBaselineFile(root: string): string {
 
 /**
  * Reads and validates `boundary-edge-baseline.json`. An expired entry fails
- * the run in its own right; an entry that no longer appears among
- * `currentEdges` is stale and must be deleted. With a `baselineReference`
- * (the merge-base copy), the file may only shrink.
+ * the run; a stale one (absent from `currentEdges`) must be deleted. With a
+ * `baselineReference` (the merge-base copy), the file may only shrink.
  */
 export function lintBoundaryEdgeBaseline(
   root: string,

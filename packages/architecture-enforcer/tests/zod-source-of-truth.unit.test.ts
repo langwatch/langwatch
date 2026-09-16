@@ -1,8 +1,6 @@
 /**
- * Zod schemas are written, not generated. The prepare step used to run
- * ts-to-zod over the tracer, dataset and experiment types, which printed
- * "File not found" warnings and quietly widened shapes to `z.any()`.
- *
+ * Zod schemas are written, not generated: the prepare step used to run
+ * ts-to-zod over tracer/dataset/experiment types, silently widening to `z.any()`.
  * @see specs/dependencies/zod-first-schema-source-of-truth.feature
  */
 import { execFileSync } from "node:child_process";

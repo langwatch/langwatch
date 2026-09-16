@@ -17,11 +17,10 @@ export interface InlineOptions {
   // Partials are always frontmatter-stripped when spliced in.
   stripFrontmatter?: boolean;
   // `_shared/` partials to drop entirely, by basename without the extension
-  // (e.g. "cli-setup"). For readers that already have what the partial sets
-  // up: the in-product agent is provisioned with its credentials and its CLI
-  // before a skill loads, so the setup sections are instructions it is told to
-  // skip, priced at every token it reads. An unknown name is an error rather
-  // than a silent no-op, so a renamed partial cannot quietly re-inline.
+  // (e.g. "cli-setup"): for readers already provisioned with what the
+  // partial sets up (the in-product agent has credentials and CLI before a
+  // skill loads), priced at every token it reads regardless. An unknown name
+  // is an error, not a silent no-op, so a renamed partial can't re-inline.
   excludeShared?: string[];
 }
 

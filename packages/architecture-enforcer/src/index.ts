@@ -199,12 +199,9 @@ export {
 export type { FilenameMigrationPlan, FilenameRename } from "./tools/filename-migration.ts";
 
 /**
- * The registry ids a `false` option means "do not compute at all", because
- * disabling them once meant skipping their own call outright and every one
- * of their findings shares that one option — running them just to discard
- * the result is not free. `declarations` alone compiles a TypeScript
- * program per package to emit its `.d.ts` output; that is minutes, not
- * milliseconds, wasted for a caller who asked to skip it.
+ * The registry ids a `false` option means "do not compute at all" — running a
+ * policy just to discard its findings isn't free. `declarations` alone compiles
+ * a TypeScript program per package for `.d.ts` output: minutes, not milliseconds.
  */
 const DECLARATIONS_POLICY = "declarations";
 const LEGACY_FEATURE_FRAGMENTS_POLICY = "legacy-feature-fragments";
@@ -224,10 +221,8 @@ export function enabledPolicies(
 
 /**
  * `application-boundaries` mixes edges the legacy-migration option can turn
- * off (`application-migration`, `application-migration-baseline`) with ones
- * it cannot (`application-boundary`), and the legacy checks are cheap
- * (no TypeScript program), so unlike the two above it always runs; a
- * `false` option only drops the findings its own `policy` field names.
+ * off with ones it cannot (`application-boundary`); unlike those it always
+ * runs. A `false` option only drops findings its own `policy` field names.
  */
 export function excludedPolicyIds(
   options: Pick<LintWorkspaceOptions, "legacyApplicationMigration">,
@@ -258,12 +253,9 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
 }
 
 /**
- * The same run against a snapshot the caller already built, so a run reads
- * the tree once. Iterates the policy registry and nothing else — a library
- * caller of `lintSnapshot`/`lintWorkspace` and `pnpm lint` see the same set
- * of policies run. A caller after a subset calls `lintPolicies` with a
- * filtered registry (`enabledPolicies`) instead of discarding findings
- * after the fact, so an expensive policy asked to be skipped never runs.
+ * The same run against a snapshot the caller already built, so a run reads the
+ * tree once. A subset caller uses `lintPolicies` with a filtered registry
+ * (`enabledPolicies`) so an expensive policy asked to be skipped never runs.
  */
 export function lintSnapshot(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   return lintPolicies(snapshot, POLICIES);

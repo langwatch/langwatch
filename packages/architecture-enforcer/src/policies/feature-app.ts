@@ -7,10 +7,8 @@ import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } 
 
 /**
  * Three files folded into one concept: the contract vocabulary a feature API
- * must declare, the canonical factory shape its concrete app must have, and
- * the setup-infrastructure types a contract may not leak. Each keeps its own
- * registered policy id and its own `lint*` entry in policies/index.ts; only
- * the module they live in is shared.
+ * must declare, its concrete app's canonical factory shape, and the
+ * setup-infrastructure types a contract may not leak — each with its own id.
  */
 
 function source(file: string): ts.SourceFile {
@@ -1525,10 +1523,9 @@ function validDefinedApp(
 }
 
 /**
- * What a module may state after its app, each at most once: the doors it
- * opens, the background work it contributes, the one-shot work it exposes and
- * its event sourcing. Every one of them answers a declaration that is already
- * installable, so the order between them carries no meaning.
+ * What a module may state after its app, each at most once: doors, background
+ * work, one-shot work, and event sourcing. Each answers a declaration that is
+ * already installable, so the order between them carries no meaning.
  */
 const DECLARED_MODULE_STAGES = new Set([
   "withTransports",

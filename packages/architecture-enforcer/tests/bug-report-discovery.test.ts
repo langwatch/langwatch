@@ -7,9 +7,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Every agent access point carries the report notice: these tests pin the
- * generated llms files, the docs entry pages, and the support guide so a
- * regeneration or docs edit cannot silently drop the invitation.
- * Corresponds to specs/support/agent-report-discovery.feature.
+ * generated llms files, docs entry pages, and support guide against silent
+ * drift. Corresponds to specs/support/agent-report-discovery.feature.
  */
 const REPO_ROOT = join(HERE, "../../..");
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");

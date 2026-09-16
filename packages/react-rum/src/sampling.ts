@@ -1,10 +1,7 @@
 /**
- * Head sampling for browser telemetry — the volume lever, configuration rather than a constant
- * (frontend telemetry scales with tabs open, not requests served). Sampling is per SESSION, not
- * per trace: a per-trace sampler gives a fraction of every visit, while RUM needs whole visits to
- * answer "what was this person doing when it broke". A browser decision is final for the whole
- * stack — an unsampled browser trace makes the server's `ParentBasedSampler` drop its spans too
- * (server work with no browser parent is untouched). See ADR-058.
+ * Head sampling for browser telemetry — the volume lever, since frontend telemetry scales with
+ * tabs open, not requests served. Per SESSION, not per trace: RUM needs whole visits, and an
+ * unsampled browser trace makes the server's `ParentBasedSampler` drop its spans too. See ADR-058.
  */
 
 import type { Attributes, Context, Link, SpanKind } from "@opentelemetry/api";
@@ -23,11 +20,9 @@ const SAMPLED: SamplingResult = {
 const DROPPED: SamplingResult = { decision: SamplingDecision.NOT_RECORD };
 
 /**
- * Samples whole sessions at `ratio`.
- *
- * The decision is derived from the session id rather than drawn per trace, so
- * every trace in a visit agrees without any state to keep, and a session that
- * rotates (see {@link currentSessionId}) is re-drawn as the new visit it is.
+ * Samples whole sessions at `ratio`. The decision is derived from the session
+ * id rather than drawn per trace, so every trace in a visit agrees with no
+ * state kept; a rotated session (see {@link currentSessionId}) redraws as the new visit it is.
  */
 export class SessionRatioSampler implements Sampler {
   private readonly ratio: number;

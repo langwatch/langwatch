@@ -21,10 +21,8 @@ const UNLIMITED_MESSAGES = 999_999_999;
 
 /**
  * The monthly usage allowance an organization with no cap is reported against.
- *
- * `Number.MAX_SAFE_INTEGER` rather than `Infinity`: the same value
- * {@link UsageStatsService.getMessageLimitStatus} already reads as "no cap", and the largest
- * one that survives JSON and the declared `z.number()` on the wire.
+ * `Number.MAX_SAFE_INTEGER`, not `Infinity`, since it already means "no cap"
+ * to {@link UsageStatsService.getMessageLimitStatus} and survives JSON/`z.number()`.
  */
 export const UNCAPPED_MONTHLY_USAGE_LIMIT = Number.MAX_SAFE_INTEGER;
 
@@ -171,12 +169,9 @@ export class UsageStatsService {
   }
 
   /**
-   * Get the maximum monthly usage limit for the organization. FIXME: This still takes the
-   * organizationId as a parameter but answers the same uncapped figure for everybody.
-   *
-   * Finite on purpose. The reading crosses a wire and is declared `z.number()`, and neither
-   * JSON nor Zod carries `Infinity` — returning it made every usage read a 500 rather than an
-   * uncapped allowance.
+   * FIXME: still takes `organizationId` but answers the same uncapped figure
+   * for everybody. Finite on purpose: `Infinity` crosses no wire as `z.number()`,
+   * and returning it once made every usage read a 500, not an uncapped allowance.
    */
   private async getMaxMonthlyUsageLimit(_organizationId: string): Promise<number> {
     return UNCAPPED_MONTHLY_USAGE_LIMIT;

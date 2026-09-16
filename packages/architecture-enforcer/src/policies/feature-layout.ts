@@ -284,11 +284,9 @@ const TESTING_ENTRY_DOUBLE =
 const SOURCE_FILE_EXTENSIONS = [".ts", ".tsx"] as const;
 
 /**
- * `export` / `import` targets from a package.json manifest field
- * (`exports` or `imports`), flattened across every condition. A leaf may be a
- * bare string or a nested `{ types, import, default, ... }` object, and only
- * the first string found under a key is needed here — every branch of a
- * condition points at the same source file on disk.
+ * `export` / `import` targets from a package.json manifest field, flattened
+ * across every condition. Only the first string under a key is needed —
+ * every branch of a condition points at the same source file on disk.
  */
 function firstManifestTarget(value: unknown): string | undefined {
   if (typeof value === "string") return value;
@@ -457,11 +455,9 @@ function parseModule(file: string): ts.SourceFile {
 }
 
 /**
- * Follows one binding (`name`, exported by `file`, one way or another) back
- * to the file that actually declares it — through local declarations,
- * `import { name } from "./elsewhere"`, and `export { name } from
- * "./elsewhere"` chains — and reports whether that file lives under a
- * feature server's private directories.
+ * Follows one binding (`name`, exported by `file`) back to the file that
+ * actually declares it — through local declarations and
+ * `import`/`export … from` chains — reporting if that file is private.
  */
 function resolveBindingOrigin(
   file: string,
@@ -542,11 +538,10 @@ function resolveBindingOrigin(
 }
 
 /**
- * Whether `file`, followed through its own exports (`export *`, named
- * re-exports, and locally declared values), ultimately exposes any value
- * declared under a feature server's private directories.
+ * The named-export elements from `file` (via `export *`, named re-exports, or
+ * local declarations) whose binding is declared under a feature server's
+ * private directories.
  */
-/** The named-export elements whose binding is declared in a private module. */
 function privateNamedExports({
   origin,
   clause,

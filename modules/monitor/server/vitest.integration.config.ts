@@ -2,10 +2,8 @@ import { defineConfig } from "vitest/config";
 
 /**
  * Integration lane: `*.integration.test.ts` and the repository contract suite
- * under `src/`. The contract suite runs its cases against the Prisma
- * repository when `LANGWATCH_TEST_DATABASE_URL` names a database, and against
- * the memory twin either way — which is what makes the two answers comparable
- * in one report.
+ * under `src/`. The contract suite runs against Prisma when
+ * `LANGWATCH_TEST_DATABASE_URL` is set, and against the memory twin either way.
  */
 export default defineConfig({
   test: {

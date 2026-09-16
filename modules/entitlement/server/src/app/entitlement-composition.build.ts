@@ -54,10 +54,8 @@ const ENTITLEMENT_CONSEQUENCE = {
 
 /**
  * The month's billable volume was asked for on a deployment with no
- * Enterprise billing rollup composed. Structurally honest rather than a
- * confident zero: {@link USAGE_UNKNOWN} is the sentinel every reader of
- * {@link UsageCounter} already treats as "the counting store could not
- * answer", which is exactly this module's own situation at core tier.
+ * Enterprise billing rollup composed. {@link USAGE_UNKNOWN} is what every
+ * {@link UsageCounter} reader treats as "the counting store could not answer".
  */
 class AbsentUsageCounter implements UsageCounter {
   static create(report: EntitlementAbsenceReport): AbsentUsageCounter {
@@ -98,10 +96,8 @@ class AbsentUsageWarning implements UsageWarning {
 
 /**
  * The deployment's own starting plan, before any paid source is consulted.
- * Adapted from `@langwatch/plans`'s catalogue rather than the Enterprise
- * billing contract's `PLAN_LIMITS.FREE`: the two are disputed to carry the
- * same numbers (see `packages/plans/src/catalogue-data.ts` `disputed` field),
- * but only the catalogue one is reachable from core tier.
+ * Adapted from `@langwatch/plans`'s catalogue, not the Enterprise contract's
+ * `PLAN_LIMITS.FREE` — disputed to match (catalogue-data.ts's `disputed` field).
  */
 function coreBaseline(isSaas: boolean): Plan {
   const plan: CataloguePlan = isSaas ? BASELINES.cloud : BASELINES["self-hosted"];

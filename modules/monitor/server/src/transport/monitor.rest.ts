@@ -1,10 +1,7 @@
 /**
  * The `/api/monitors` family: the online evaluations a project runs over its
- * live traffic.
- *
- * Every rule about a monitor is {@link MonitorApi}'s — what an unmentioned
- * field on a partial update means, and what a write does to one. This family
- * owns only its own wire shape and its status codes.
+ * live traffic. Every rule about a monitor is {@link MonitorApi}'s; this
+ * family owns only its own wire shape and status codes.
  */
 import {
   badRequestSchema,

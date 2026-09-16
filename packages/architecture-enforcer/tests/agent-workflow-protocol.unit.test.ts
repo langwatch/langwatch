@@ -62,9 +62,8 @@ describe("every status named anywhere in the protocol is one of the seven", () =
 
   /**
    * Status-shaped tokens, read only from the three structural spots a status
-   * actually appears - a table cell, a "Lane reports `x`" event, or a
-   * "Status: <a | b | c>" line - never from running prose, where "review" and
-   * "complete" are ordinary English words.
+   * appears — a table cell, a "Lane reports `x`" or "Status: <a | b | c>" line
+   * — never from prose, where "review"/"complete" are ordinary English words.
    */
   function statusTokensIn(text: string): string[] {
     const found: string[] = [];

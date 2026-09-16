@@ -27,22 +27,15 @@ interface EndpointGroup {
   pathPrefixes: string[];
   overviewDescription: string;
   /**
-   * `METHOD /path` keys, in the order a reader should meet them.
-   *
-   * The default sort is CRUD-shaped (list, create, get, update, delete), which
-   * is right for a resource but wrong for a family that is a sequence of steps.
-   * A group whose overview describes a lifecycle sets this so the sidebar and
-   * the prose agree; anything the list omits falls in behind, still sorted the
-   * default way.
+   * `METHOD /path` keys, in the order a reader should meet them. CRUD is the
+   * default sort, wrong for a lifecycle sequence — a group can set this so
+   * sidebar and prose agree; anything omitted falls in behind, CRUD-sorted.
    */
   endpointOrder?: string[];
   /**
    * Hand-written pages that belong to this family but document no single
-   * operation, appended after the generated endpoint pages.
-   *
-   * They have to be declared here rather than edited into `docs.json`, because
-   * this generator replaces the whole API Reference anchor on every run: a page
-   * added to the nav by hand survives until the next run and then vanishes.
+   * operation, appended after the generated ones. Declared here, not
+   * `docs.json` — this generator replaces the whole anchor every run.
    */
   extraPages?: string[];
 }
@@ -60,9 +53,8 @@ const INTRO_GROUP = {
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
 /**
- * Reasons per family, shared by the paths that belong to the same surface.
- * A reason states which kind of exclusion this is: a retired surface that is
- * intentionally undocumented, or a live surface that is not yet documented in
+ * Reasons per family, shared by paths on the same surface: a retired,
+ * intentionally undocumented surface, or a live one not yet documented in
  * the API reference.
  */
 const RETIRED_GATEWAY_PROVIDER_BINDINGS =
@@ -87,14 +79,9 @@ const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
 
 /**
- * The dated (`2026-08-07`) and literal-`latest`-segment address of an
- * operation this generator already skips, or already documents, at its
- * default address. These families are not `bareMount`, so each registered
- * date mounts its own route and its own `/api/v1` twin — with the version
- * segment landing BEFORE the family's own path segment (`/api/v1/{version}/
- * governance/ingestion-templates`, not `/api/v1/governance/{version}/
- * ingestion-templates`) — which is a shape no `pathPrefixes` entry can match
- * and which per-version reference pages are not generated for regardless.
+ * The dated (`2026-08-07`) or literal-`latest` address of an operation this
+ * generator already skips or documents at its default address — the version
+ * segment lands BEFORE the family's path segment, a shape no `pathPrefixes` entry can match.
  */
 const UNDOCUMENTED_DATED_VERSION_PIN =
   "Not yet documented in the API reference: this is the dated or 'latest'-pinned address of an operation already covered above; per-version reference pages are not generated.";
@@ -614,16 +601,8 @@ function generateFileName(method: string, apiPath: string, op: OpenAPIOperation)
 
 /**
  * The `/api/{family}` twin of a spec path served at `/api/v1/{family}`, or
- * null when `apiPath` carries no `/api/v1` generation segment to strip.
- *
- * Decision 20 (2026-09-04) mounts every REST family at both `/api/{family}`
- * and `/api/v1/{family}`, but ENDPOINT_GROUPS and SKIP_PATHS still name only
- * the bare form for every family except the four this generator only ever
- * documented at v1 (Agents, Run Plans, Test Suites, Query). Rather than
- * duplicate every prefix and skip reason under `/api/v1`, ownership and skip
- * lookups fall back to this bare twin whenever the literal path matches
- * nothing — which leaves the four v1-only families alone, since their own
- * literal `/api/v1/...` prefix already matches first.
+ * null with no `/api/v1` segment to strip (Decision 20, 2026-09-04). Lookups
+ * fall back to this bare twin, except the four families only ever documented at v1.
  */
 function bareTwinOf(apiPath: string): string | null {
   if (apiPath === "/api/v1" || !apiPath.startsWith("/api/v1/")) return null;
@@ -638,13 +617,9 @@ function isSkipped(apiPath: string): boolean {
 }
 
 /**
- * How much of `apiPath` this group's best prefix covers, or 0 when none match.
- * Ownership goes to the longest match, so `/api/gateway/v1/spend-events` beats
- * a shorter sibling prefix and a sub-path like `/spend-events/replay` lands in
- * the same group as its parent instead of nowhere. Checked against `apiPath`
- * and its `/api/v1` bare twin (see {@link bareTwinOf}), so a family with no
- * literal `/api/v1` entry of its own still resolves through the address it
- * is actually documented under.
+ * How much of `apiPath` this group's best prefix covers, or 0 when none
+ * match. Ownership goes to the longest match, checked against `apiPath` and
+ * its `/api/v1` bare twin (see {@link bareTwinOf}).
  */
 function matchStrength(apiPath: string, group: EndpointGroup): number {
   const bare = bareTwinOf(apiPath);
@@ -768,13 +743,11 @@ function main() {
     process.exit(1);
   }
 
-  // An `endpointOrder` key only sorts the group that declares it, so a key is
-  // invisible unless it names an operation THAT group owns: the sort silently
-  // falls back to the default for it. A drifted path parameter name, a casing
-  // slip, or a key naming a sibling group's path therefore reshuffles the
-  // sidebar with no diagnostic at all, which is exactly what a hand-written
-  // key list is prone to. The two failures get separate reports because their
-  // remedies differ: one is a typo, the other is a key in the wrong group.
+  // An `endpointOrder` key only sorts the group that declares it — a key
+  // naming an operation another group owns silently falls back to the
+  // default sort, with no diagnostic. A drifted param name, a casing slip,
+  // or a sibling group's path key all reshuffle the sidebar silently. The
+  // two failures get separate reports since their remedies differ.
   const specOperations = new Set<string>();
   const operationOwner = new Map<string, EndpointGroup>();
   const groupOperations = new Map<EndpointGroup, Set<string>>(

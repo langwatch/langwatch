@@ -9,10 +9,9 @@ import {
 import type { ArchitectureViolation } from "../../types.ts";
 
 /**
- * The debt register for the oxlint rules that read `oxlint-baseline.json`.
- * The linter itself decides what still fires, so this side validates the file
- * and refuses growth against the merge base; a stale row is reported where the
- * rules run, not here.
+ * The debt register for oxlint rules that read `oxlint-baseline.json`. The
+ * linter decides what still fires; this validates the file and refuses
+ * growth against the merge base — a stale row is reported where rules run.
  */
 const BASELINE_FILE = "oxlint-baseline.json";
 

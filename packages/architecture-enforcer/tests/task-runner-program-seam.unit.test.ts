@@ -22,11 +22,9 @@ const BARRELS_THE_RUNNER_DOES_NOT_NEED = [
 ] as const;
 
 /**
- * Measured at 2,191 the day the two barrels above were replaced by
- * `./composition/*` subpaths — the runner's own tests included, which the
- * compiler's own project excludes. It is a ceiling, not a target. Lower it
- * when a change earns it; never raise it without saying in the commit what
- * the graph bought.
+ * Measured at 2,191 when the two barrels above were replaced by
+ * `./composition/*` subpaths (the runner's own tests included). A ceiling,
+ * not a target — lower it when earned; never raise it without saying why.
  */
 const CEILING = 2_300;
 

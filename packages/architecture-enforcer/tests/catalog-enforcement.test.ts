@@ -1,9 +1,8 @@
 /**
  * @vitest-environment node
- *
  * Fails when a manifest declares an explicit range for a dependency already
- * in the default `catalog:` (unless listed below). See
- * dev/docs/best_practices/typescript.md, "pnpm catalogs".
+ * in the default `catalog:`. See dev/docs/best_practices/typescript.md,
+ * "pnpm catalogs".
  */
 
 import { globSync, readFileSync } from "node:fs";
@@ -19,8 +18,7 @@ const DEP_FIELDS = ["dependencies", "devDependencies", "optionalDependencies"] a
 
 /**
  * `<manifest dir>|<dependency>` pairs allowed an explicit range: their
- * resolved version genuinely differs and either nothing on file says why
- * (candidates for a follow-up bump, not for growing this list), or — for
+ * resolved version differs and either nothing on file says why, or — for
  * `@langwatch/scenario` — pnpm-workspace.yaml's "Named catalogs" comment does.
  */
 const EXPLICIT_RANGE_EXCEPTIONS = new Set([

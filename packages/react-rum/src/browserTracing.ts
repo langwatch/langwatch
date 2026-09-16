@@ -1,8 +1,7 @@
 /**
  * Browser tracing: the half of a trace that happens before the request leaves the tab. Exports
- * OTLP to the app's own origin, not a collector directly (no CORS, no internet-facing collector;
- * the host app proxies {@link RUM_TRACES_PATH} on, see ADR-058). Best-effort throughout: the
- * whole bootstrap is wrapped so telemetry that breaks the page it measures leaves it untraced.
+ * OTLP to the app's own origin via {@link RUM_TRACES_PATH}, not a collector directly (ADR-058).
+ * Best-effort throughout: telemetry that breaks the page it measures leaves it untraced.
  */
 
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
@@ -107,9 +106,8 @@ export function startBrowserTracing({
 
 /**
  * Read once at construction: the exporter's headers are fixed, and the session
- * travels per-span as `session.id` anyway. This header exists so the ingest
- * route can rate limit per browser instead of per IP, where an office behind
- * one address would throttle each other.
+ * travels per-span as `session.id` anyway. Exists so the ingest route can rate
+ * limit per browser, not per IP — an office behind one address would collide.
  */
 function sessionHeader(): Record<string, string> {
   const sessionId = currentSessionId();

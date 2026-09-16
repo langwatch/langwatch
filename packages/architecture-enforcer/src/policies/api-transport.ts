@@ -21,9 +21,8 @@
 
 /**
  * Two files folded into one concept: the handler-boundary policy (routes
- * dispatch through the framework, never a string path or a raw construction)
- * and the through-framework policy above. Each keeps its own registered
- * policy id and its own `lint*` entry in policies/index.ts.
+ * dispatch through the framework, not a raw path) and the through-framework
+ * policy above, each with its own id and `lint*` entry in policies/index.ts.
  */
 
 import { existsSync } from "node:fs";
@@ -1907,12 +1906,9 @@ function lintSource(transport: TransportSource): ArchitectureViolation[] {
     violations.push(...rawHonoViolations(transport.file, source));
   }
 
-  // Absolute, deliberately. `lintAll` relativises every violation once, at the
-  // end, against the same root — so doing it here too relativised twice: the
-  // second pass resolved an already-relative path against the lint package's
-  // own directory and reported all thirteen findings under
-  // `packages/architecture-enforcer/apps/api/...`, a path that does not exist. The
-  // reader could not open the file the rule named.
+  // Absolute, deliberately: `lintAll` relativises every violation once, at the
+  // end, against the same root. Doing it here too resolved an already-relative
+  // path against this package's own directory — a path that did not exist.
   return violations;
 }
 

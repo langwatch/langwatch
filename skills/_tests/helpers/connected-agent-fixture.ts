@@ -50,11 +50,9 @@ interface AgentProcess {
 }
 
 /**
- * Runs `support_agent.py` from `workingDirectory`.
- *
- * `uv run --with ...` installs the fixture's dependencies in an ephemeral
- * environment, with the `langwatch` package taken from `sdks/python` of this
- * checkout, so the test machine needs `uv` on PATH and nothing else.
+ * Runs `support_agent.py` from `workingDirectory`. `uv run --with ...`
+ * installs the fixture's dependencies in an ephemeral environment, from
+ * `sdks/python` of this checkout, so the test machine needs only `uv`.
  */
 function spawnAgentProcess({
   workingDirectory,
@@ -203,11 +201,9 @@ function deleteAgentRow({ workingDirectory, id }: { workingDirectory: string; id
 }
 
 /**
- * Starts the `python-connected-agent` fixture from `workingDirectory` and waits
- * until the platform lists it Online. The fixture reads `LANGWATCH_API_KEY`,
- * `OPENAI_API_KEY` and `AGENT_NAME` from the environment, so the caller passes
- * the keys and a name unique to this run: two test runs in the same project
- * must never share an agent row.
+ * Starts the `python-connected-agent` fixture and waits until the platform
+ * lists it Online. Reads `LANGWATCH_API_KEY`/`OPENAI_API_KEY`/`AGENT_NAME`
+ * from the environment — the caller's name must be unique per run.
  */
 export async function startConnectedAgentFixture({
   workingDirectory,

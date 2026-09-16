@@ -43,12 +43,9 @@ export interface CataloguePlan {
   /** The tier, monthly and annual variants collapsed onto one. */
   tier: string;
   /**
-   * Every plan type that sits on this rung, the tier itself included.
-   *
-   * The mapping is the catalogue's own fact and lives with it: which types are
-   * billing periods of one tier, and which are currency cuts of it, is not
-   * something a policy can work out from a name without eventually being wrong
-   * about one.
+   * Every plan type that sits on this rung, the tier itself included. The
+   * mapping is the catalogue's own fact: which types are billing periods of
+   * one tier, and which are currency cuts, is not for a policy to guess from a name.
    */
   types: readonly string[];
   name: string;
@@ -122,10 +119,8 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
 
 /**
  * What the constructor actually reads off `dependencies`: the caller
- * directory alone. `license` is consumed once, by `create`, to build this
- * app's {@link EntitlementInfrastructure} — the constructor never reads it
- * off `dependencies` directly, so a hand-built test app does not need to
- * supply a license source it has no use for.
+ * directory alone. `license` is consumed once, by `create`, to build
+ * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
  */
 type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
 
@@ -133,11 +128,9 @@ type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
   /**
-   * `license` is mandatory in every role: a process that installs
-   * `entitlementServer` without a `withProvided(ActivatedLicenseSource, ...)`
-   * line refuses to boot (`MissingProviderError`) instead of silently
-   * resolving the baseline plan for a licensed deployment. See
-   * `ActivatedLicenseSource` for why the token is a peer-API shape.
+   * `license` is mandatory in every role: a process installing
+   * `entitlementServer` without `withProvided(ActivatedLicenseSource, ...)`
+   * refuses to boot rather than silently resolving the baseline. See `ActivatedLicenseSource`.
    */
   static readonly dependencies = { users: UserApi, license: ActivatedLicenseSource };
   static readonly configSchema = entitlementAppConfigSchema;
@@ -182,10 +175,8 @@ export class EntitlementApp implements EntitlementApiContract {
 
   /**
    * Constructs the app directly over a hand-built {@link EntitlementInfrastructure},
-   * bypassing {@link buildEntitlementInfrastructure} entirely. For tests only:
-   * production always goes through `create`, so every collaborator this
-   * module composes for itself is exercised the same way a real boot
-   * exercises it.
+   * bypassing {@link buildEntitlementInfrastructure}. For tests only —
+   * production always goes through `create`, exercising every collaborator the same way.
    */
   static createForTesting(setup: {
     repositories: EntitlementRepositories;

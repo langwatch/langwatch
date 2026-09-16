@@ -1,10 +1,7 @@
 /**
- * Script to generate openapi-evals.json from AVAILABLE_EVALUATORS
- *
- * Fetches the evaluators.generated.ts from the langwatch/langevals repo
- * and generates the OpenAPI spec with proper code samples.
- *
- * Run with: npx tsx scripts/generate-openapi-evals.ts
+ * Generates openapi-evals.json from AVAILABLE_EVALUATORS: fetches
+ * evaluators.generated.ts from langwatch/langevals and builds the OpenAPI
+ * spec with code samples. Run with: npx tsx scripts/generate-openapi-evals.ts
  */
 
 const EVALUATORS_URL =

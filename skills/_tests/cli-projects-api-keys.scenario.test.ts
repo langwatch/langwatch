@@ -23,11 +23,8 @@ const judgeModel = openai("gpt-5-mini");
 
 /**
  * Whether this machine can reach the organization API of LangWatch.
- *
- * `langwatch api-keys` manages the keys of an organization, so it refuses a
- * project API key and reads the credential of `langwatch login` instead. The
- * scenario below therefore runs on the login of the developer, and skips when
- * there is none, the same way the rest of this suite skips without keys.
+ * `langwatch api-keys` refuses a project API key and reads the credential of
+ * `langwatch login` instead, so this scenario skips without a developer login.
  */
 function hasOrganizationLogin(): boolean {
   const cliPath = path.resolve(__dirname, "../../sdks/typescript/dist/cli/index.js");
@@ -73,10 +70,9 @@ function runOnOrganizationLogin(args: string[]): string {
 }
 
 /**
- * Archives the project the scenario asked the agent to create.
- *
- * Every run of this scenario adds a real project to the organization, so
- * without this the dogfood suite fills the account with them.
+ * Archives the project the scenario asked the agent to create. Every run
+ * adds a real project to the organization, so without this the dogfood
+ * suite fills the account with them.
  */
 function archiveProjectsNamed(name: string): void {
   let projects: Array<{ id: string; name: string }> = [];

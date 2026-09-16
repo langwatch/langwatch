@@ -1,10 +1,7 @@
 /**
- * Regression test for issue #3903 AC 5: no new postinstall network calls.
- * pnpm install must not trigger automatic binary downloads — a lifecycle
- * script that shells out to curl/wget/fetch or hits an HTTP(S) URL blocks
- * air-gapped setups and makes installs non-deterministic. Scans every
- * tracked package.json (`git ls-files`, not a glob) since an untracked
- * manifest runs no lifecycle script during a clone.
+ * Regression test for issue #3903 AC 5: no new postinstall network calls —
+ * a lifecycle script that shells to curl/wget/fetch or hits an HTTP(S) URL
+ * blocks air-gapped setups. Scans tracked package.json via `git ls-files`.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

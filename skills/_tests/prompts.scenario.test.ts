@@ -346,11 +346,9 @@ describe("Prompts Skill", () => {
             const mainPy = fs.readFileSync(path.join(tempFolder, "main.py"), "utf8");
 
             // The tag has to travel INTO the fetch call. A bare `tag = ...`
-            // anywhere in the file used to satisfy this, so a file that
-            // defined PROMPT_TAG = "production" and then fetched the prompt
-            // without it passed while doing the opposite of what is asked.
-            // The value itself may still be a constant, which is the shape
-            // most runs write, so only the argument has to sit at the call.
+            // anywhere in the file used to satisfy this, so a file that set
+            // PROMPT_TAG = "production" without using it at the call site
+            // passed while doing the opposite of what was asked.
             const passesATag =
               /prompts\s*\.\s*get\s*\([^)]*\btag\s*=/.test(mainPy) ||
               /prompts\s*\.\s*get\s*\([^)]*\{[^}]*\btag\s*:/.test(mainPy);

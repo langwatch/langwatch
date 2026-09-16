@@ -1,15 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Tests for scripts/kill-dev-tree.sh, the command `pnpm dev` offers when a
- * port is already held.
- *
- * Driven as real processes and real sockets, because the bug it exists to fix
- * only appears against a stack that answers being killed by starting a
- * replacement: it survives SIGTERM, and its port is free for a moment in
- * between, long enough for anything watching the port to call it done.
- *
- * Corresponds to specs/setup/dev-stack-lifecycle.feature.
+ * Tests scripts/kill-dev-tree.sh against real processes: the bug only shows
+ * against a stack that survives SIGTERM by restarting, freeing its port
+ * briefly. Corresponds to specs/setup/dev-stack-lifecycle.feature.
  */
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
@@ -70,12 +63,9 @@ function bindable(port: number): Promise<boolean> {
 }
 
 /**
- * A port nothing is listening on, picked from BELOW the ephemeral range that
- * both Linux (32768+) and macOS (49152+) allocate from. Asking the kernel for
- * an ephemeral port instead would leave a window where it hands that same port
- * to an unrelated process before the stack binds it, and the script under test
- * takes down the process group holding the port it is given. A busy CI runner
- * is exactly where that would land on someone else.
+ * A port nothing is listening on, picked from BELOW the ephemeral range
+ * (Linux 32768+, macOS 49152+). An ephemeral port could be handed to an
+ * unrelated process before the stack binds it — one a busy CI runner then kills.
  */
 async function freePort(): Promise<number> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -106,11 +96,9 @@ function listening(port: number): boolean {
 }
 
 /**
- * Members of a process group that are actually running. Zombies are excluded
- * deliberately: the stack's leader is a child of this test process, so between
- * it being killed and vitest reaping it, it lingers as a `Z` that still answers
- * `kill(-pgid, 0)`. That is the test runner's bookkeeping, not a live stack,
- * and it holds neither a port nor any memory.
+ * Members of a process group that are actually running. Zombies are excluded:
+ * between the leader being killed and vitest reaping it, it lingers as a `Z`
+ * that still answers `kill(-pgid, 0)` while holding neither a port nor memory.
  */
 function liveMembers(pgid: number): number {
   const result = spawnSync("ps", ["-Ao", "pgid=", "-o", "stat="], {
@@ -123,14 +111,9 @@ function liveMembers(pgid: number): number {
 }
 
 /**
- * A lane that touches a file once its listen has actually succeeded. That file
- * is how these tests know the port is held by THIS stack rather than by
- * whatever else the machine may have raced them to it: the script takes down
- * the group behind the listener, so proceeding on "something is listening"
- * would be enough to take down a stranger.
- *
- * A file taking arguments rather than a `node -e` string, so no JavaScript is
- * ever built by interpolation.
+ * A lane that touches a file once its listen has succeeded — how these tests
+ * know the port is held by THIS stack, not whatever else raced them to it.
+ * Takes arguments rather than a `node -e` string, so nothing is built by interpolation.
  */
 function writeLane(): string {
   const file = path.join(scratch, "lane.js");
@@ -165,14 +148,9 @@ function realPathOf(tool: string): string {
 }
 
 /**
- * A PATH built from nothing but the utilities the script needs plus a stand-in
- * `ss`, which is how the Linux-only branch gets exercised on a laptop that has
- * no `ss` and how it stays exercised on a runner that does.
- *
- * Assembled rather than prepended for both reasons at once. iproute2 puts a
- * real `ss` in /usr/bin, which would shadow the stand-in and quietly turn these
- * into tests of the host's tools; and lsof lives in /usr/bin on Linux, which
- * would send the script down the lsof branch and never reach `ss` at all.
+ * A PATH built only from the utilities the script needs plus a stand-in `ss`,
+ * exercising the Linux-only branch anywhere. Assembled, not prepended: a real
+ * `ss` in /usr/bin would shadow the stand-in and test the host's tools instead.
  */
 function pathWithStubbedSs(stub: string[]): string {
   const bin = mkdtempSync(path.join(scratch, "bin-"));
@@ -206,13 +184,9 @@ function pathWithBrokenSs(): string {
 }
 
 /**
- * An `ss` that can see the socket but fails the moment it is asked who holds
- * it, which is what a host that cannot map sockets to processes looks like.
- * Seeing a listener you cannot attribute is not the same as seeing one that
- * belongs to somebody else.
- *
- * Only options are inspected for the `-p`, since the filter expression the
- * script passes contains "sport".
+ * An `ss` that sees the socket but fails when asked who holds it — a host
+ * that cannot map sockets to processes. Only options are checked for `-p`,
+ * since the script's filter expression contains "sport".
  */
 function pathWithUnattributableSs(port: number): string {
   return pathWithStubbedSs([
@@ -265,13 +239,8 @@ const strangerReadyFile = (named: string) => path.join(scratch, `${named}-is-up`
 
 /**
  * A listener that is emphatically not one of ours: the same node binary,
- * reached through a symlink under another name, so it is a real process
- * holding a real port that the script must leave where it is. Cheaper and
- * more portable than reaching for a second language runtime.
- *
- * The name is a parameter because it is the whole question. `node_exporter`
- * holds a port on plenty of machines and is nobody's dev lane, and it is
- * exactly what a "does the command line mention node" test gets wrong.
+ * symlinked under another name so the script must leave it alone. Named
+ * because `node_exporter` holds ports on plenty of machines, nobody's dev lane.
  */
 function startStranger({ port, named = "dev-listener" }: { port: number; named?: string }): number {
   const asAnother = path.join(scratch, named);

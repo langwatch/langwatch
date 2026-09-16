@@ -1,9 +1,7 @@
 /**
  * One monitor resource's platform address: the app's `publicBaseUrl`, the
  * project's slug, and the path the caller already resolved. Mirrors
- * `suite-platform-url.rules.ts` / `agent-platform-url.rules.ts` — the REST
- * declaration is a static object with no request-scoped builder, so the app
- * composes the link itself.
+ * `suite-platform-url.rules.ts` — the REST declaration has no request-scoped builder.
  */
 export function monitorPlatformUrl({
   publicBaseUrl,

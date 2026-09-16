@@ -41,13 +41,11 @@
     (e.__SV = 1));
 })(document, window.posthog || []);
 
-// api_host is the first-party reverse proxy served by the langwatch.ai
-// deployment (same PostHog EU project); direct *.posthog.com requests get
-// dropped by ad blockers, which our developer audience uses heavily. The
-// docs live under langwatch.ai/docs, so production traffic is same-origin;
-// Mintlify preview hosts send cross-origin, which PostHog's CORS allows.
-// The snippet above derives the array.js URL from api_host, so the script
-// also loads through the proxy (/ingest/static/array.js).
+// api_host is the first-party reverse proxy served by langwatch.ai (same
+// PostHog EU project); direct *.posthog.com requests get dropped by ad
+// blockers, which our developer audience uses heavily. Production traffic
+// is same-origin; Mintlify preview hosts send cross-origin, which PostHog's
+// CORS allows. The array.js URL is derived from api_host too.
 posthog.init("phc_oOlj3H19T2JlGbFXmrGrjSLbDPDNyPKYdIFaTdrkXOY", {
   api_host: "https://langwatch.ai/ingest",
   ui_host: "https://eu.posthog.com",
@@ -163,10 +161,9 @@ document.addEventListener("keydown", function (e) {
 });
 
 // --- Agent report line in the attribution footer ---
-// The theme's own attribution footer (#footer, the Powered by band) is the
-// one block every page renders below the content, so the invitation for
-// agents lives there, one line above the Powered by row. Mintlify swaps the
-// page through RSC on client-side navigation, footer included, so a
+// The theme's own attribution footer (#footer, Powered by band) is the one
+// block every page renders below the content, so the agent invitation lives
+// there. Mintlify swaps pages via RSC on client nav, footer included, so a
 // MutationObserver re-adds the line whenever it disappears.
 function addAgentReportLine() {
   var footer = document.getElementById("footer");

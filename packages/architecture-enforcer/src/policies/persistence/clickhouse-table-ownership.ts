@@ -17,10 +17,9 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 
 /**
- * The ClickHouse twin of `prisma-table-ownership`. ClickHouse has no schema
- * file and no generated client, so the table list is replayed from the goose
- * migrations and access is read out of the SQL a module writes. One module
- * writes a table; everybody else goes through that module's api.
+ * The ClickHouse twin of `prisma-table-ownership`. With no schema file or
+ * generated client, the table list is replayed from goose migrations and
+ * access read from SQL; one module writes a table, everyone else uses its api.
  */
 
 const MIGRATIONS = "packages/clickhouse-client/migrations";

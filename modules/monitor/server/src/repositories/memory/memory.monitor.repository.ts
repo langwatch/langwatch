@@ -1,8 +1,7 @@
 /**
  * The monitor rows, in memory, answering exactly what the Prisma repository
- * answers: the same ordering, the same project scoping, the same canonical
- * mappings on the way out, and the same refusal when a write names a row the
- * project does not hold.
+ * answers: the same ordering, project scoping, and canonical mappings, and
+ * the same refusal when a write names a row the project does not hold.
  */
 import {
   enabledGuardrailMonitorSchema,

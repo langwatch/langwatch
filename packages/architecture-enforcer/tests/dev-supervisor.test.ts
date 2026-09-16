@@ -60,12 +60,9 @@ afterEach(async () => {
 const readyFile = () => path.join(scratch, "stack-is-up");
 
 /**
- * A stand-in stack. It touches a readiness file first, which is what the tests
- * wait on: counting marker processes is not enough, because the launcher's own
- * command line carries the marker too, so a count-based wait can be satisfied
- * before the supervisor has even read the group it has to watch. Killing the
- * launcher in that window leaves nothing to watch and the stack runs
- * unsupervised, which is correct behaviour and a useless test.
+ * A stand-in stack. It touches a readiness file first, since counting marker
+ * processes isn't enough — the launcher's own command line carries the marker
+ * too, so a count-based wait can pass before the supervisor even watches it.
  */
 function writeStack(body: string): string {
   const file = path.join(scratch, `${marker}-stack.sh`);
@@ -86,12 +83,9 @@ wait
 `;
 
 /**
- * The real `pnpm dev`, in miniature. `start.sh` runs
- * `concurrently --restart-tries -1`, so SIGTERM kills the lanes and
- * concurrently immediately starts new ones, while the direct child (pnpm
- * start) exits promptly. A supervisor that treats its own child exiting as
- * "the stack is down" walks away here and leaves the respawned lanes holding
- * the ports, which is exactly what a real stack did.
+ * The real `pnpm dev`, in miniature: `concurrently --restart-tries -1`
+ * respawns SIGTERM'd lanes immediately, even as the direct child exits — a
+ * supervisor watching only that child would walk away holding nothing.
  */
 const RESTARTING_STACK = `
 (
@@ -107,11 +101,9 @@ wait
 `;
 
 /**
- * Runs `command` from a detached shell, so the shell is its own process-group
- * leader exactly like the launcher in the real leak. Returns the launcher pid.
- *
- * The command goes through a file rather than `sh -c`, so no path built from
- * the environment is ever spliced into a shell command line.
+ * Runs `command` from a detached shell, its own process-group leader like the
+ * launcher in the real leak; returns the launcher pid. Goes through a file,
+ * not `sh -c`, so no env-derived path is spliced into a shell command line.
  */
 function launchFrom(command: string, env: Record<string, string> = {}): number {
   const file = path.join(scratch, `${marker}-launcher.sh`);
@@ -199,10 +191,9 @@ async function waitUntil(predicate: () => boolean, { timeoutMs = 6000 } = {}): P
 }
 
 /**
- * Runs the supervisor as its own process-group leader, which is the shape an
- * interactive shell produces: there is no separate leader above it to watch,
- * and the tty already sends SIGHUP to the whole job. `spawnSync` cannot do this
- * (it has no `detached`), so this has to be the async spawn.
+ * Runs the supervisor as its own process-group leader, the shape an
+ * interactive shell produces: no separate leader above it, and the tty
+ * already sends SIGHUP to the whole job. `spawnSync` can't do this (no `detached`).
  */
 function runAsGroupLeader(args: string[]): Promise<{ stdout: string; status: number | null }> {
   return new Promise((resolve) => {
@@ -233,10 +224,9 @@ function runSupervised(
 }
 
 /**
- * A copy of the supervisor with one string replaced, for the failures that
- * cannot be provoked from the outside: a sentinel that will not spawn, or one
- * that comes up and names no stack. The copy is the real script otherwise, and
- * it imports nothing but node builtins, so it runs anywhere.
+ * A copy of the supervisor with one string replaced, for failures that can't
+ * be provoked from outside: a sentinel that won't spawn, or one that comes up
+ * naming no stack. Otherwise the real script, importing only node builtins.
  */
 function supervisorWith(from: string, to: string): string {
   const source = readFileSync(SUPERVISOR, "utf8");
@@ -362,9 +352,8 @@ describe("dev stack supervisor", () => {
   describe("given a stack whose supervisor is killed outright", () => {
     /**
      * The supervisor's pid, found by its command line: it carries this test's
-     * marker (the stack path is its argument) and is not the sentinel. The
-     * launcher does not match, because ps shows its argv (`bash .../launcher.sh`),
-     * not the script body that mentions the supervisor.
+     * marker and is not the sentinel. The launcher doesn't match — ps shows
+     * its argv (`bash .../launcher.sh`), not the script body naming the supervisor.
      */
     function supervisorPid(): number | null {
       const [pid] = markedPids(

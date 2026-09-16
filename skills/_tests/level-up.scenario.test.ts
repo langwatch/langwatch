@@ -27,12 +27,9 @@ function copySkillToWorkDir(tempFolder: string) {
 }
 
 /**
- * Asserts that the instrumentation reached the source of the agent.
- *
- * Reads every source file of the workspace rather than the entry file alone.
- * The agent is free to move the model calls into a module of its own, which
- * several runs do, and the tracing then correctly sits next to the calls
- * instead of in the entry file.
+ * Asserts that the instrumentation reached the source of the agent. Reads
+ * every source file rather than the entry file alone — the agent may move
+ * model calls into their own module, and tracing correctly follows them there.
  */
 function expectTracingInSource({
   tempFolder,

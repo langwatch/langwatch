@@ -1,9 +1,7 @@
 /**
- * A lane that fails takes the stack down, it is not rebooted in a loop.
- *
- * Corresponds to specs/setup/dev-stack-lifecycle.feature. The flags are read
- * from dev-stack.sh itself, so the test runs concurrently the way `pnpm dev`
- * does; a fixed flag list here would keep passing after the script drifted.
+ * A lane that fails takes the stack down; it is not rebooted in a loop.
+ * Corresponds to specs/setup/dev-stack-lifecycle.feature. Flags are read from
+ * dev-stack.sh itself, so a fixed list here would silently drift from the script.
  */
 
 import { spawnSync } from "node:child_process";

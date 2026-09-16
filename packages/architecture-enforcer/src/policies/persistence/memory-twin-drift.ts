@@ -18,9 +18,8 @@ import type { ArchitectureViolation } from "../../types.ts";
 
 /**
  * A repository whose Prisma implementation and memory twin declare different
- * method sets. `feature-shape` only asks whether a twin exists; a twin three
- * methods short passes that and throws inside a fixture. README, "The dead-code
- * guards"; ADR-137.
+ * method sets — `feature-shape` only checks a twin exists, so one three
+ * methods short still passes. README "The dead-code guards"; ADR-137.
  */
 
 const BASELINE_FILE = "memory-twin-drift-baseline.json";

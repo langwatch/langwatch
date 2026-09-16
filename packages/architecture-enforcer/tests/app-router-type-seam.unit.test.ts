@@ -16,11 +16,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 const APP_ROUTER_TYPES = join(REPO_ROOT, "apps", "api", "src", "app-trpc", "app-trpc.types.ts");
 
 /**
- * Measured at 3,746 the day ADR-130 was written, after the composed-feature
- * records moved out of their compositions. It is a ceiling, not a target: the
- * target is under 500, which is what declaring `AppRouter` from the feature
- * contracts would leave. Lower it when a change earns it; never raise it
- * without saying in the commit what the graph bought.
+ * Measured at 3,746 the day ADR-130 was written, after composed-feature
+ * records moved out of their compositions. A ceiling, not a target — the
+ * target is under 500. Lower it when earned; never raise it without saying why.
  */
 const CEILING = 3_850;
 

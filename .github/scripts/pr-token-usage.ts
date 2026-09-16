@@ -1,18 +1,8 @@
 // Builds and upserts the sticky "coding agent usage" comment on a pull
-// request, from the LangWatch pull-request usage API
-// (GET /api/v1/coding-agent/pull-request-usage): sessions, tokens and estimated
-// cost per contributor and agent, plus a per-model breakdown, over the pull
-// request's whole lifetime.
-//
-// Deliberately non-blocking, like pr-impact-map: this script only describes
-// what the work cost, it never judges it. A LangWatch outage logs a warning
-// and exits 0, so the job can sit on every pull request without ever
-// painting a red X for a reporting failure.
-//
-// Deliberately dependency-free and run with `node --experimental-strip-types`,
-// matching guard-path-filters.ts: there is no install step on the runner.
-//
-// Spec: specs/ci/pr-token-usage.feature
+// request, from the LangWatch pull-request usage API: sessions, tokens, cost
+// and a per-model breakdown, over the pull request's whole lifetime.
+// Deliberately non-blocking, like pr-impact-map: a LangWatch outage logs a
+// warning and exits 0. Spec: specs/ci/pr-token-usage.feature
 
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";

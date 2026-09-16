@@ -27,9 +27,8 @@ const BASELINE_FILE = "composed-exports-baseline.json";
 
 /**
  * The process entrypoints. Compositions are deliberately NOT roots: a
- * composition module that no entrypoint reaches is exactly the hole this rule
- * exists to see, and seeding the walk with it would hide every capability
- * wired into an orphan composition.
+ * composition no entrypoint reaches is exactly the hole this rule exists to
+ * see, and seeding the walk with it would hide every orphan composition.
  */
 const ENTRYPOINTS = [
   "apps/api/src/api.entrypoint.ts",
@@ -89,10 +88,9 @@ function subdirectories(path: string): string[] {
 }
 
 /**
- * The server package indexes this rule reads: every feature's `server` role,
- * core and enterprise alike, plus the server-side infrastructure packages under
- * `packages/`. Derived rather than listed -- a hand-written list only guards the
- * package somebody remembered to add.
+ * The server package indexes this rule reads: every feature's `server` role
+ * and the server-side infrastructure packages under `packages/`. Derived, not
+ * listed — a hand-written list only guards what somebody remembered to add.
  */
 export function serverPackageIndexes({ root }: { root: string }): string[] {
   const indexes: string[] = [];
@@ -254,10 +252,9 @@ export function collectComposedExportSubjects({
 }
 
 /**
- * Trees the walk stops on. A contract package publishes wire shapes, a web
- * package is browser code and a `dist` directory is build output: none of the
- * three composes anything, and none of them leads to a module that does, so
- * descending into them buys nothing and costs a quarter of the parse budget.
+ * Trees the walk stops on: a contract package publishes wire shapes, a web
+ * package is browser code, `dist` is build output — none composes anything,
+ * so descending into them buys nothing and costs a quarter of the parse budget.
  */
 const TERMINAL = /(?:\/dist\/|\/contract\/|-contract\/|\/web\/|-web\/)/;
 

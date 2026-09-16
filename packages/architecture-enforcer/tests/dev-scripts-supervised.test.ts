@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * dev/scripts/dev-supervisor.mjs is only worth anything to the scripts that
- * actually route through it, so this checks `dev`, `dev:ui`, `dev:api` and
- * `dev:worker` all do rather than starting commands directly.
+ * dev/scripts/dev-supervisor.mjs only matters to scripts that route through
+ * it, so this checks `dev`, `dev:ui`, `dev:api` and `dev:worker` do.
  * Corresponds to specs/setup/dev-stack-lifecycle.feature.
  */
 

@@ -1,8 +1,7 @@
 /**
  * The server half of `limits.*`. The read takes `organization:view` — every
- * member sees the allowance they work inside. The notification takes
- * `organization:manage`: it mails the administrators with caller-supplied
- * counts, so a non-admin must not be able to trigger it.
+ * member sees their own allowance. The notification takes `organization:manage`,
+ * since it mails administrators with caller-supplied counts.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { EntitlementApi, usageLimitsTrpc } from "@langwatch/entitlement-contract";

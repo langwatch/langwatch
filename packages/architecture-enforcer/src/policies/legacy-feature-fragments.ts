@@ -104,10 +104,9 @@ function compareFragments(left: LegacyFeatureFragment, right: LegacyFeatureFragm
 }
 
 /**
- * Collects only path-shaped legacy fragments for features which already have a
- * physical canonical surface. The catalogue, rather than English name guessing
- * or source parsing, is the ownership authority. A segment must equal a
- * catalogue subject (or its mechanical plural) to be included.
+ * Collects only path-shaped legacy fragments for features with a physical
+ * canonical surface. The catalogue — not name guessing or parsing — is the
+ * ownership authority: a segment must equal a subject or its plural.
  */
 export function collectLegacyFeatureFragments(
   root: string,

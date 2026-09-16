@@ -4,12 +4,9 @@
  */
 
 /**
- * Options every package shares are written once at the root; the one option
- * that must NOT be shared — where a package caches what it checked — is written
- * per package. A shared build-info path is invisible: both packages typecheck
- * clean while discarding each other's cache, so checks silently get slower.
- * Only workspace members are subjects; `sdks/typescript/examples/*` and
- * `dev/dogfood/*` are standalone copies a tsconfig here wouldn't compile elsewhere.
+ * Options every package shares are written once at the root; the one that
+ * must NOT be shared — a package's own build-info cache path — is written
+ * per package, or both typecheck clean while silently discarding each other's cache.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -25,10 +22,8 @@ const NON_MEMBER_PREFIXES = ["sdks/typescript/examples/", "dev/dogfood/"];
 
 /**
  * A tsconfig read as JSON with comments — which every one of these files is.
- *
- * The comment strip walks the text rather than running a regex over it: a glob
- * is not a comment, `"./examples/**\/*"` carries both delimiters inside a
- * string literal, and a regex blind to quotes eats the rest of the file.
+ * The strip walks the text rather than regexing it: a glob is not a comment,
+ * and a string literal can carry both comment delimiters without being one.
  */
 function readTsconfig(file: string): Record<string, unknown> {
   const raw = readFileSync(file, "utf8");

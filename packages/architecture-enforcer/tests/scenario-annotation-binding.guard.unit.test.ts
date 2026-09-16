@@ -18,20 +18,17 @@ const APP_ROOT = resolve(HERE, "../..");
 
 /**
  * Every tree that can hold a test file. Deliberately not scoped to a few
- * governance directories: a walk scoped to where a bug was found reports
- * zero everywhere else it doesn't look, so a new dangling annotation outside
- * that scope never fails anything. Walk everything; carry existing debt as data.
+ * governance directories — a scoped walk reports zero everywhere it doesn't
+ * look, so a new dangling annotation outside that scope never fails.
  */
 const ROOTS = ["src", "ee", "scripts"];
 
 const TEST_FILE_RE = /\.(?:unit|integration|e2e)\.test\.tsx?$/;
 
 /**
- * Dangling annotations that already existed when this guard was written, by
- * file, with the exact count in each. A count rather than a file allow list:
- * an exact count keeps every file live, ratcheting both ways — a new
- * dangling annotation moves the number up and fails, fixing one moves it
- * down and fails until the entry is lowered to match.
+ * Dangling annotations that existed when this guard was written, by file with
+ * an exact count. A count, not an allow list, ratchets both ways: a new
+ * dangling annotation moves it up and fails; fixing one fails until lowered.
  */
 const KNOWN_DEBT: Record<string, number> = {
   "src/components/settings/__tests__/ModelProviderForm.advanced-gateway.integration.test.tsx": 3,
@@ -79,11 +76,8 @@ const KNOWN_DEBT: Record<string, number> = {
 
 /**
  * Below this many scanned files, assume the walk broke rather than that the
- * repository lost its tests. Roughly 3,580 match today.
- *
- * A zero from an empty walk proves nothing, and this guard's whole complaint is
- * about silent nothings — it would be the same defect to ship a guard that
- * passes because it found no files to read.
+ * repository lost its tests (roughly 3,580 match today). A zero from an
+ * empty walk proves nothing — the same defect as a guard with no files to read.
  */
 const SCANNED_FILE_FLOOR = 2_000;
 
@@ -124,10 +118,9 @@ function scannedTestFiles(): string[] {
 }
 
 /**
- * Annotations the checker reads and then silently discards.
- *
- * This is `collectAllBindings`' own loop with the `continue` inverted: it
- * collects exactly what that function throws away.
+ * Annotations the checker reads and then silently discards — this is
+ * `collectAllBindings`'s own loop with the `continue` inverted, collecting
+ * exactly what that function throws away.
  */
 function danglingAnnotations(
   source: string,
@@ -199,10 +192,8 @@ describe("given the parity checker drops an annotation it cannot bind", () => {
   describe("when the annotation sits inside a block whose prose runs on below it", () => {
     /**
      * The reproduction, kept verbatim: the third annotation opens the second
-     * line of a block comment whose prose runs on below it and binds
-     * nothing — which is how it shipped. Both halves are mutation-proven:
-     * forcing `isFollowedByTestCall` true, or `findScenarioAnnotations` empty,
-     * each turn this red.
+     * line of a block comment whose prose runs on below it and binds nothing.
+     * Mutation-proven: forcing either half true/empty each turns this red.
      */
     it("catches the annotation that actually shipped unbound", () => {
       const shipped = [

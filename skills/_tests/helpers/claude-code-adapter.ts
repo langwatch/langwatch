@@ -59,14 +59,9 @@ export function copyFixtureToWorkDir({
 }
 
 /**
- * Inline a SKILL.mdx (resolving its `_shared/*.mdx` imports) and write it as
- * SKILL.md into a `.skills/<dir>/` folder under the agent's working directory.
- * `skillSubpath` is relative to `skills/`, e.g. `"tracing"` or
- * `"recipes/debug-instrumentation"`. `installAs` defaults to the basename of
- * `skillSubpath` and controls the directory the agent sees under `.skills/`.
- *
- * This mirrors what sync.ts does for langwatch/skills publishes, so scenario
- * tests exercise the same self-contained markdown that real consumers receive.
+ * Inline a SKILL.mdx (resolving `_shared/*.mdx` imports) and write it as
+ * SKILL.md into `.skills/<dir>/` under the agent's working directory —
+ * mirroring sync.ts, so tests exercise the same markdown real consumers get.
  */
 export function installSkillToWorkDir({
   workingDirectory,
@@ -87,11 +82,9 @@ export function installSkillToWorkDir({
 const cliDistPath = path.resolve(__dirname, "../../../sdks/typescript/dist/cli/index.js");
 
 /**
- * Sets up a local `langwatch` CLI wrapper in the temp folder's bin/ directory.
- * Always called from createClaudeCodeAgent so the spawned Claude Code session
- * sees the locally-built CLI (with `docs`, `scenario-docs`, etc.) on PATH
- * instead of any globally-installed npm version. Skill scenario tests rely on
- * the new CLI commands being available. This is non-optional.
+ * Sets up a local `langwatch` CLI wrapper in the temp folder's bin/. Always
+ * called from createClaudeCodeAgent so the spawned session sees the
+ * locally-built CLI on PATH instead of any global npm version.
  */
 export function setupLocalCli(workingDirectory: string): void {
   if (!fs.existsSync(cliDistPath)) {
@@ -112,29 +105,9 @@ exec node "${cliDistPath}" "$@"
 }
 
 /**
- * Creates the Claude Code agent under test, the `claudeCodeAgent` of
- * `@langwatch/scenario` configured for skill testing.
- *
- * Skills are CLI-only, and the locally built `langwatch` CLI is always wired
- * onto PATH so the agent can use `langwatch docs`, `langwatch scenario-docs`,
- * and every platform command. No MCP server is configured; skills must work
- * end-to-end through the CLI. The turn comes back as AI SDK messages with
- * `tool-call` and `tool-result` parts, so the judge reads what the agent ran
- * and the run view renders it as tool calls. The SDK keeps the spawned Claude
- * in its own process group and kills it, with everything it started, when
- * the test process dies, so an interrupted run leaves no Claude behind.
- *
- * @param workingDirectory - The directory to run Claude Code in
- * @param skillPath - Optional path to a SKILL.md to copy into the working directory
- * @param cleanEnv - When true, strips LANGWATCH_API_KEY, OPENAI_API_KEY, and
- *   ANTHROPIC_API_KEY from the spawned process environment. Use this to test
- *   cold-start flows where the agent must discover keys from .env files.
- * @param omitEnvKeys - Additional variables to keep in the test process but
- *   remove from Claude Code, such as a provider key used only by the judge.
- * @param extraEnv - Variables to add to the spawned Claude Code process,
- *   such as LANGWATCH_CLI_CONFIG, which points the CLI at its own config
- *   file so the `langwatch login` of the developer machine never reaches
- *   a scenario that must start with no credential at all.
+ * Creates the Claude Code agent under test: CLI-only (no MCP), locally-built
+ * `langwatch` always on PATH, killed with its process group at test exit.
+ * `cleanEnv`/`extraEnv`/`omitEnvKeys` isolate credentials per scenario.
  */
 export function createClaudeCodeAgent({
   workingDirectory,

@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
  * @see specs/setup/dev-nlp-engine-port.feature
- * Tests resolve-nlp-service.sh, sourced as dev-stack.sh sources it before
- * picking the Go NLP engine's port: the launcher sees only the calling shell,
- * not .env (which only the app loads), so the helper reads that file itself.
- * Driven via `bash -s`, reading the resulting env.
+ * Tests resolve-nlp-service.sh as dev-stack.sh sources it: the launcher sees
+ * only the calling shell, not .env, so the helper reads that file itself.
  */
 
 import { execSync } from "node:child_process";

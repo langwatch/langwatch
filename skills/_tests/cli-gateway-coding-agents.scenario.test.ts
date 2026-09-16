@@ -1,30 +1,7 @@
 /**
- * Coding-agent gateway matrix.
- *
- * One cell per major coding CLI: claude-code, codex, gemini-cli, opencode.
- * Each cell points the CLI at the LangWatch AI Gateway via a freshly-seeded
- * matrix-{provider} virtual key, asks the agent to do a real coding task —
- * "implement a React hello world with Vite" — and verifies that the resulting
- * traces land in LangWatch with non-zero token counts, captured cost, and
- * non-zero cache-read tokens (these CLIs all aggressively cache system
- * prompts, so a multi-turn task naturally exercises the cache path).
- *
- * The React-vite task naturally exercises `tool_use` (Read, Write, Bash)
- * and `caching` (system-prompt re-send across many turns) — so this single
- * cell per CLI claims both of those scenario dimensions implicitly. Plain
- * simple/stream/structured-outputs cells live in the Lane A provider matrix
- * (services/aigateway/tests/matrix/) where they belong: the CLI's behaviour
- * isn't the unit under test, the gateway → provider plumbing is.
- *
- * Cells skip when:
- *   - The CLI binary is not on PATH
- *   - The required env (LANGWATCH_API_KEY, LANGWATCH_GATEWAY_VK_<PROVIDER>,
- *     LANGWATCH_GATEWAY_VK_<PROVIDER>_ID) is missing
- *   - CI=1 (these tests cost real money against real providers)
- *
- * On success, each cell prints a single matrix line:
- *   [matrix] cli=claude-code task=react_vite_hello_world duration=124s
- *            cost=$0.0432 cache_read=8421 file=...
+ * Coding-agent gateway matrix: one cell per major CLI, pointed at the
+ * Gateway via a seeded VK, checked for traces with tokens/cost/cache reads.
+ * Skips without the CLI/VK env, or under CI=1. Plain cells live in Lane A.
  */
 import { spawnSync } from "child_process";
 import dotenv from "dotenv";
@@ -48,11 +25,9 @@ const GATEWAY_BASE_V1 = `${GATEWAY_BASE}/v1`;
 type ProviderName = "openai" | "anthropic" | "gemini";
 
 /**
- * Seeded matrix VKs from scripts/seed-gateway-dogfood.ts — one per provider
- * the gateway can route to. Set in skills/_tests/.env or shell:
- *   LANGWATCH_GATEWAY_VK_OPENAI=lw_vk_test_…       LANGWATCH_GATEWAY_VK_OPENAI_ID=vk_…
- *   LANGWATCH_GATEWAY_VK_ANTHROPIC=lw_vk_test_…    LANGWATCH_GATEWAY_VK_ANTHROPIC_ID=vk_…
- *   LANGWATCH_GATEWAY_VK_GEMINI=lw_vk_test_…       LANGWATCH_GATEWAY_VK_GEMINI_ID=vk_…
+ * Seeded matrix VKs from scripts/seed-gateway-dogfood.ts, one per provider.
+ * Set in skills/_tests/.env or shell: LANGWATCH_GATEWAY_VK_<PROVIDER> and
+ * LANGWATCH_GATEWAY_VK_<PROVIDER>_ID, for OPENAI / ANTHROPIC / GEMINI.
  */
 function vkFor(provider: ProviderName): { secret: string; id: string } | null {
   const env = provider.toUpperCase();
@@ -79,12 +54,9 @@ interface TraceMetrics {
 }
 
 /**
- * Polls the LangWatch traces API for traces in a time window, optionally
- * filtered client-side by a substring of the trace's input (since the
- * traces/search filter shape for span attributes — e.g. langwatch.virtual_key_id
- * — isn't exposed cleanly through the public REST endpoint today).
- *
- * A coding session fires many requests; we sum tokens + cost across them.
+ * Polls the traces API for a time window, optionally filtered client-side by
+ * a substring of the input (span-attribute search isn't exposed cleanly via
+ * the public REST endpoint yet). Sums tokens/cost across a session's many requests.
  */
 async function assertSessionTraces(opts: {
   /** Start of the test window (used as startDate) */
@@ -189,13 +161,9 @@ function logMatrixCell(opts: {
 }
 
 /**
- * Best-effort check that the agent actually scaffolded a React-vite project.
- * We log a warning rather than fail when artifacts are missing — different
- * CLIs negotiate tool-use differently (some need explicit prompting; codex
- * with low reasoning may answer the question without invoking shell). The
- * cell's primary purpose is proving CLI → gateway → provider → trace; the
- * artifact check is informational evidence the model actually executed work
- * vs. just answered.
+ * Best-effort check that the agent scaffolded a React-vite project. Warns
+ * rather than fails when artifacts are missing — CLIs negotiate tool-use
+ * differently; the cell's real job is proving CLI → gateway → provider → trace.
  */
 function checkReactViteArtifacts(workDir: string, cliName: string): void {
   const pkg = path.join(workDir, "package.json");
@@ -288,12 +256,10 @@ describe("AI Gateway — coding-agent matrix", () => {
         inputSubstring: TASK_INPUT_MARKER,
         minTraces: 1,
       });
-      // Cache assertion is informational on this cell: Claude 4.5 prompt
-      // caching is in beta on the test account (same provider-side limit
-      // documented in Priority 2's anthropic/cache cell). When the account
-      // gets GA cache access, cache_read should be >0; until then the
-      // session still proves CLI → gateway → provider → trace + cost
-      // end-to-end, which is the cell's primary purpose.
+      // Cache assertion is informational: Claude 4.5 prompt caching is beta
+      // on the test account (same limit as Priority 2's anthropic/cache
+      // cell). Once GA, cache_read should be >0; until then the session
+      // still proves CLI → gateway → provider → trace + cost end-to-end.
       if (metrics.cacheReadTokens === 0) {
         // eslint-disable-next-line no-console
         console.warn(
@@ -395,24 +361,10 @@ describe("AI Gateway — coding-agent matrix", () => {
   );
 
   // ============================================================
-  // gemini-cli (Google Gemini API)
-  //
-  // Iter-110 retracted andre's earlier "inherent skip" — gemini-cli IS
-  // re-pointable via env vars. The Google @google/genai SDK that gemini-cli
-  // wraps reads `GOOGLE_GEMINI_BASE_URL` and uses it as the API host (with
-  // `x-goog-api-key` for auth). The blocker was the GATEWAY side: it had
-  // no Gemini-native routes (only /v1/chat/completions, /v1/messages,
-  // /v1/responses, /v1/embeddings, /v1/models), so gemini-cli's POST to
-  // /v1beta/models/<model>:generateContent landed on a 404. Once
-  // alexis's v1beta passthrough lands, this cell:
-  //   - Sets GOOGLE_GEMINI_BASE_URL=<gateway>/v1beta
-  //   - Sets GEMINI_API_KEY=<matrix-gemini VK secret>
-  //   - Spawns gemini -p TASK_PROMPT non-interactive
-  //   - Asserts a trace lands + cost > 0
-  // Cache-read assertion is informational on this CLI (gemini implicit
-  // caching needs paid-tier billing; explicit cachedContents flow is
-  // exercised in Lane A's TestGemini_Cache).
-  // ============================================================
+  // gemini-cli (Google Gemini API): blocked pending a v1beta passthrough —
+  // the gateway has no Gemini-native routes, so gemini-cli's POST 404s.
+  // Cache-read here is also informational: implicit caching needs paid-tier
+  // billing (Lane A's TestGemini_Cache covers explicit caching).
   it.skipIf(skipMatrix || !cliAvailable("gemini") || !vkFor("gemini"))(
     "gemini-cli · React vite hello world · trace + cost + cache captured",
     async () => {
@@ -429,15 +381,11 @@ describe("AI Gateway — coding-agent matrix", () => {
       const geminiHome = path.join(tempFolder, ".gemini-home");
       fs.mkdirSync(geminiHome, { recursive: true });
 
-      // Pure-text task — no tool_use / no shell exec. Lets the cell
-      // verify the end-to-end transport (gemini-cli → gateway → Gemini
-      // API → trace + cost on the LangWatch platform) without depending
-      // on the agent's npm-create-vite tool-use chain landing cleanly,
-      // which gemini-cli's headless --yolo mode handles less reliably
-      // than claude-code / codex (multi-step tool calls under
-      // non-interactive mode get inconsistent confirmation in 0.32.x).
-      // The Lane A provider matrix already covers tool_calling on
-      // gemini directly; this cell's job is the CLI-on-gateway path.
+      // Pure-text task — no tool_use / no shell exec. Verifies the transport
+      // (gemini-cli → gateway → Gemini API → trace + cost) without depending
+      // on the vite tool-use chain: gemini-cli's headless --yolo mode handles
+      // multi-step tool calls under non-interactive mode inconsistently in
+      // 0.32.x. The Lane A matrix already covers tool_calling on gemini directly.
       const GEMINI_TASK_PROMPT =
         `[task=${TASK_INPUT_MARKER}] In 4 sentences, explain what React + ` +
         "Vite is and what scaffolding `npm create vite@latest` produces. " +
@@ -450,12 +398,10 @@ describe("AI Gateway — coding-agent matrix", () => {
           cwd: tempFolder,
           encoding: "utf-8",
           timeout: 600_000,
-          // Explicit stdio['ignore', 'pipe', 'pipe'] — without it,
-          // gemini-cli hangs indefinitely under vitest's spawnSync
-          // (no model traffic, ~0% CPU, /dev/ptmx fd's stuck waiting
-          // for a TTY that vitest's subprocess pipe doesn't provide).
-          // Verified: same env + spawnSync invocation from a
-          // standalone `node -e ...` returned in seconds.
+          // Explicit stdio: without it, gemini-cli hangs indefinitely under
+          // vitest's spawnSync (no model traffic, ~0% CPU, /dev/ptmx stuck
+          // waiting for a TTY vitest's subprocess pipe doesn't provide).
+          // Verified: same invocation from standalone `node -e` returns in seconds.
           stdio: ["ignore", "pipe", "pipe"],
           env: {
             ...process.env,

@@ -47,10 +47,9 @@ afterEach(() => {
 });
 
 /**
- * Expands the lane command the way the shell that runs it would. Goes through
- * an unquoted heredoc, since bash expands `${VAR:-default}` there while
- * leaving every quote literal — interpolating into `bash -c '...'` would need
- * escaping for both quotes and backslashes, which is its own bug to get right.
+ * Expands the lane command the way the shell that runs it would: an unquoted
+ * heredoc, since bash expands `${VAR:-default}` there while leaving quotes
+ * literal — interpolating into `bash -c '...'` would need its own escaping.
  */
 function expandLaneCommand({
   command,

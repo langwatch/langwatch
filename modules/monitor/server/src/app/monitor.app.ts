@@ -128,10 +128,8 @@ export class MonitorApp implements MonitorApi {
 
   /**
    * Builds this process's own {@link MonitorAppInfrastructure} from its
-   * evaluator and evaluation peers, then composes exactly as
-   * {@link MonitorApp.fromInfrastructure} does. Replaces
-   * `apps/api/src/features/monitor/monitor.composition.ts`'s hand
-   * composition (deleted by b383462d96).
+   * evaluator/evaluation peers, then composes as {@link MonitorApp.fromInfrastructure}
+   * does. Replaces apps/api's hand composition, deleted in b383462d96.
    */
   static create(setup: MonitorSetup): MonitorApp {
     const infrastructure = buildMonitorInfrastructure({
@@ -213,11 +211,9 @@ export class MonitorApp implements MonitorApi {
   }
 
   /**
-   * Creates or replaces the monitor an experiment is published as.
-   *
-   * A wizard experiment publishes to exactly one monitor, and the experiment id
-   * is what identifies it — so "Save as monitor" pressed a second time edits the
-   * monitor the first press created rather than adding another one beside it.
+   * Creates or replaces the monitor an experiment is published as. A wizard
+   * experiment publishes to exactly one monitor, keyed by experiment id — so
+   * "Save as monitor" pressed twice edits the same monitor, not a second one.
    */
   upsertForExperiment(input: MonitorExperimentUpsertInput): Promise<Monitor> {
     return this.#monitors.upsertForExperiment(input);
@@ -269,10 +265,8 @@ export class MonitorApp implements MonitorApi {
 
   /**
    * The last seven days of score and pass-rate for each of the project's
-   * monitors, against the window before it.
-   *
-   * The window, the guardrail flag each monitor carries into the query, and the
-   * short answer for a project with no monitors are all decided here.
+   * monitors, against the window before it. The window, each monitor's
+   * guardrail flag, and the answer for a project with no monitors live here.
    */
   async performanceForProject(
     input: MonitorPerformanceInput,

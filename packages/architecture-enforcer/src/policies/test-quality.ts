@@ -160,11 +160,9 @@ function containsAssertion(callback: TestCallback, assertionHelpers: ReadonlySet
 }
 
 /**
- * A function TypeScript itself calls an assertion: `asserts x is T`, or the
- * bare `asserts x`. Such a helper narrows by THROWING rather than by calling a
- * matcher, so its body holds no `expect` for `nodeContainsAssertion` to find —
- * `assertExceeded` in the usage service tests is exactly that, and every test
- * calling it read as empty.
+ * A function TypeScript calls an assertion (`asserts x is T`, or bare `asserts
+ * x`): it narrows by THROWING, not calling a matcher, so its body holds no
+ * `expect` — `assertExceeded` read as an empty test before this existed.
  */
 function assertsType(node: ts.SignatureDeclaration): boolean {
   return (

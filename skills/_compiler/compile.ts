@@ -1,10 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
  * Prompt compiler — generates self-contained copy-paste prompts from AgentSkills.
- *
- * Usage:
  *   tsx skills/_compiler/compile.ts --skills tracing --mode platform
- *   tsx skills/_compiler/compile.ts --skills tracing,experiments --mode docs
  *   tsx skills/_compiler/compile.ts --skills level-up --mode platform --api-key sk-lw-xxx
  */
 

@@ -1,16 +1,13 @@
 /**
  * The seam between a module and the event-sourced half of a process (ADR-144).
- * Composition reads `build` and `connect` and names no pipeline, projection or
- * subscriber, which keeps `@langwatch/eventing` and the Prisma, ioredis and
- * ClickHouse graph behind it off this package. `defineEventingModule` satisfies
- * these shapes structurally.
+ * Composition names no pipeline, projection or subscriber, keeping
+ * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
 
 /**
  * Whether this process only sends on a pipeline, or also drains it. The api
- * produces; the worker folds, maps, subscribes and runs process managers. A
- * pipeline that reads its own projections builds a different definition for
- * each, which is the one branch a declaration is allowed to take.
+ * produces; the worker folds, maps, subscribes and runs process managers —
+ * the one branch a declaration reading its own projections is allowed to take.
  */
 export type EventingParticipation = "produce" | "consume";
 
@@ -63,8 +60,7 @@ export interface EventingHost {
 /**
  * The eventing runtime a process holds, or nothing. Read by name, the way a
  * repository tier reads `prisma`: a module never names the member, so a
- * process that runs no event sourcing declares none and every declaration is
- * inert.
+ * process running no event sourcing declares none and every declaration is inert.
  */
 export function eventingHostFrom(pool: unknown): EventingHost | undefined {
   if (typeof pool !== "object" || pool === null) return void 0;

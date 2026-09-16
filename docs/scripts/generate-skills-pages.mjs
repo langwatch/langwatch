@@ -1,23 +1,8 @@
-// Generates the skill accordion markup inside docs pages, between
-// {/* lw-generated:<section>:start */} and {/* lw-generated:<section>:end */}
-// markers, from docs/skills/skills-pages-manifest.json plus the compiled
-// prompts in skills/_compiled/. Manifest keys are docs-root-relative paths,
-// so any docs page can carry a generated section.
-//
-// The markup is plain lowercase HTML elements on purpose: Mintlify only
-// server-renders page content, never components imported from snippets, and
-// it strips <details>/<summary> entirely, so a div-based accordion driven by
-// docs/posthog.js (event delegation on data attributes) is the only shape
-// that both renders server-side for search engines and stays interactive.
-//
-// Mintlify's server pipeline also drops attributes whose values contain
-// non-ASCII characters (or grow into multi-kilobyte multi-line strings) and
-// strips <polyline>/<line> from svg icons, so: prompts ship as hidden fenced
-// code blocks (real content, copied via data-copy-source in posthog.js),
-// every icon uses <path>-only drawing, and only short ASCII values may go
-// into data attributes.
-//
-// Run via: bash docs/scripts/sync-prompts.sh (compiles skills first)
+// Generates the skill accordion markup inside docs pages (between
+// lw-generated markers) from skills-pages-manifest.json and skills/_compiled/.
+// Plain lowercase HTML only: Mintlify server-renders elements but not
+// components, and strips <details> and non-ASCII/multi-line attributes —
+// hence hidden fenced code blocks and <path>-only icons. Run: docs/scripts/sync-prompts.sh
 
 import fs from "fs";
 import path from "path";

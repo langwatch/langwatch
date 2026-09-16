@@ -52,15 +52,10 @@ function featureFlagOf(src: string): string | undefined {
 }
 
 // The single definition of the public set: curated FEATURE_SKILLS plus every
-// recipe under skills/recipes/. The native set below extends this, so everything
-// published also ships with Langy while product-only capabilities stay private.
-//
-// A recipe declaring `feature-flag` still appears here — the native/Langy
-// pipeline needs its content regardless, since Langy resolves the flag live,
-// per caller, at offer time. The PUBLIC publish step (`_publish/sync.ts`) is
-// the one place that must NOT ship a flag-gated recipe: there is no viewer to
-// gate for on a static public directory, so it filters on `featureFlag`
-// itself rather than this function silently dropping the skill everywhere.
+// recipe under skills/recipes/. The native set below extends this, so
+// everything published also ships with Langy while product-only stays private.
+// A flagged recipe still appears here — Langy resolves the flag live per
+// caller; only the PUBLIC publish step filters on `featureFlag`.
 export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
   const out: PublishedSkill[] = FEATURE_SKILLS.map((slug) => {
     const src = path.join(skillsRoot, slug, "SKILL.mdx");

@@ -2,10 +2,8 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * What the repository tree is, spelled once: the roots a policy scans, the
- * directories no walk descends into, and the single walk that reads both.
- * Seven constants across seven policy files used to disagree about the last
- * of those, so two policies looking at "the workspace" saw different trees.
+ * What the repository tree is, spelled once: the roots a policy scans and the
+ * directories no walk descends into. Seven policies used to disagree on this.
  */
 
 /** Where a workspace package may be declared. Mirrors `pnpm-workspace.yaml`. */
@@ -49,11 +47,9 @@ export const BOOT_SCAN_ROOTS = [
 ];
 
 /**
- * Build output, dependencies, and tool state. A dot directory is excluded by
- * name rather than by list because agent worktrees live under `.claude/` and
- * `.codex/`: 165,000 TypeScript files from other checkouts of this same
- * repository, which a walk from the root would otherwise lint as if they were
- * this one.
+ * Build output, dependencies, and tool state. Dot directories are excluded by
+ * name because agent worktrees live under `.claude/`/`.codex/` and would
+ * otherwise be walked as if they were this repository.
  */
 export const IGNORED_DIRECTORIES = new Set(["coverage", "dist", "node_modules"]);
 

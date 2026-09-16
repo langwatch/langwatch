@@ -14,12 +14,9 @@ export interface MemberSource<Members> {
 }
 
 /**
- * A process that opens no client.
- *
- * Absence of a member is a refusal only when a module actually reads one, and
- * the eager build already refuses by name. A test that installs modules
- * reading nothing therefore needs no source at all, and saying so here keeps
- * `createApp` free of a dependency on the package that builds real clients.
+ * A process that opens no client. Absence of a member is a refusal only when
+ * a module actually reads one — a test installing modules that read nothing
+ * needs no source, keeping `createApp` free of the real-client package.
  */
 export function noMembers<Members>(): MemberSource<Members> {
   return {
@@ -32,12 +29,9 @@ export function noMembers<Members>(): MemberSource<Members> {
 }
 
 /**
- * The members a caller hands in, as a source.
- *
- * This is the whole of ruling 11's test seam: a member passed is used, and a
- * member absent is refused BY NAME when a module reads it, never quietly
- * replaced. It opens nothing, so a test that needs a frozen clock and a memory
- * cache says so and gets no client library with it.
+ * The members a caller hands in, as a source. This is ruling 11's test seam:
+ * a member passed is used, one absent is refused BY NAME when read, never
+ * quietly replaced — so a frozen clock plus memory cache needs no client library.
  */
 export function membersFrom<Members>(
   supplied: Readonly<Partial<Members>>,
@@ -79,12 +73,9 @@ export interface MemberClaim {
 }
 
 /**
- * Builds every claimed member once, in the source's construction order, and
- * hands back the record boot slices each module's own view out of.
- *
- * The order matters and is the source's, not the claim order: `prisma` is open
- * before `clickhouse` and `objectStorage` place a tenant through it, and
- * `redis` is open before the three members built over it.
+ * Builds every claimed member once, in the source's own construction order —
+ * not the claim order — and hands back the record each module slices its
+ * view from: `prisma` before `clickhouse`/`objectStorage`, `redis` before its members.
  */
 export function buildClaimedMembers<Members>(options: {
   source: MemberSource<Members>;

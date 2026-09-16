@@ -1,11 +1,8 @@
 // Renders the README images in this folder with Playwright's Chromium, at 2x.
-//
 //   node .github/readme/render.mjs                 # every page below
 //   node .github/readme/render.mjs cover           # one page
-//   node .github/readme/render.mjs cover --theme dark --bg grid --out /tmp/x.png
-//
-// Edit the HTML, run this, commit the HTML and the image together.
-// Playwright comes from platform/app (a normal `pnpm install` at the root provides it).
+// Edit the HTML, run this, commit the HTML and the image together. Playwright
+// comes from platform/app (a normal `pnpm install` at the root provides it).
 import { createRequire } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";

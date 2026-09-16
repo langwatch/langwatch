@@ -18,9 +18,8 @@ import type { ArchitectureViolation } from "../../types.ts";
 
 /**
  * A member of the `<Feature>Infrastructure` interface beside a module's App
- * that no app, service or repository in the owning package reaches: a boot
- * requirement every process pays for and nothing uses. README, "The dead-code
- * guards"; ADR-137.
+ * that no app, service or repository in the package reaches — a boot cost
+ * every process pays for and nothing uses. README "The dead-code guards"; ADR-137.
  */
 
 const BASELINE_FILE = "infrastructure-member-unused-baseline.json";

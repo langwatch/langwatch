@@ -64,10 +64,9 @@ export class PrismaUsageMembershipRepository implements UsageMembershipRepositor
   }
 
   /**
-   * Counts Lite Member users in organization:
-   * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - PENDING invites (not expired, or no expiration) with EXTERNAL role AND
-   *   (no custom role OR view-only custom role)
+   * Counts Lite Member users: EXTERNAL role with no custom role (or a
+   * view-only one), plus PENDING invites meeting the same criteria (not
+   * expired, or no expiration).
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
