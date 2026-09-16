@@ -284,7 +284,9 @@ describe("matchesTriggerFilters", () => {
       expect(matchesTriggerFilters(data, filters)).toBe(true);
     });
 
-    it("falls back to the bare attribute when the canonical key is blank", () => {
+    it("matches the bare attribute when the canonical key is blank", () => {
+      // A blank canonical value is still a candidate, not a missing one, so
+      // this goes through the same any-candidate match rather than a fallback.
       const data = buildPreconditionTraceDataFromFoldState(
         makeFoldStateWithAttributes({
           "langwatch.origin": "application",

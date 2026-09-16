@@ -649,9 +649,10 @@ describe("evaluatePreconditions()", () => {
 
     describe("when a trace arrives with custom metadata env 'production'", () => {
       it("anchors against the value itself, not a serialized container", () => {
-        // A regex is tested against a stringified array when the resolver
-        // hands back a list, so ^-anchored patterns silently stop matching.
-        // The resolver must stay a plain string for a single candidate.
+        // End-to-end check that an anchored pattern reaches the value. It does
+        // not pin the resolver's return shape — the rule tests array elements
+        // too, so this passes either way. The shape guard lives in
+        // filters/__tests__/triggerFilter.matcher.unit.test.ts.
         const traceData = makeTraceData({
           customMetadata: { env: "production" },
         });
