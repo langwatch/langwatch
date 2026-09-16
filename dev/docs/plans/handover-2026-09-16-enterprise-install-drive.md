@@ -74,6 +74,35 @@ put the CLI/ingest bag behind an optional slot so boot can supply what is left.
 
 `.claude/manifests/gov-rest-serves-25.md` carries the steps.
 
+## What apidiff cannot see, and why it still does not change the plan
+
+apidiff fetches the served OpenAPI document (`/api/openapi.json`,
+`tools/apidiff/spec.go:18`) and compares the operations in it. Anything not in
+that document is invisible to it **on both sides**.
+
+`governanceCliRest` declares eleven routes under `/api/auth/cli/*`, and six of
+them carry no "governance" in the path (`bootstrap`, `budget-overview`,
+`budget/status`, `personal-project`, `project-key`, `virtual-key`). A grep for
+"governance" over `findings.jsonl` misses all of them - check the prefix, not the
+word. Done properly, the answer is **zero findings name `/api/auth/cli` at all**,
+of any kind.
+
+`origin/main` does serve them (`git grep -ohE '"/api/auth/cli/[a-z/-]+"'
+origin/main -- 'platform/**'`). So they are a real parity gap - just not one
+apidiff measures, and **not one this drive introduces**: nothing installs
+`governanceServer` today, so those routes 404 on the branch whether or not the
+transport is in `.withTransports(...)`. Installing `governanceRest` alone is
+strictly better than the status quo and never worse.
+
+State it honestly when reporting: the 25 are what apidiff measures and what this
+drive closes. The `/api/auth/cli/*` surface needs the 102-operation facade and
+`createGovernanceInstallation`, and is its own drive.
+
+**The other 56.** `absent-on-branch` totals 81; 25 are this drive and the rest
+belong to other modules. The 143 `probe-failed` findings are not missing routes -
+they are parameterised paths where an `{id}` resolves on one side only, so the
+operation exists on both and simply is not behaviour-compared.
+
 ## The four `moduleApi("governance")` tokens
 
 Rev 2 found two. There are **four**, and the two extra are declared in transport
@@ -172,6 +201,23 @@ Collapsing the four is a later drive (option A), deliberately not now.
 
 ## Outstanding defects, none blocking
 
+- **Two of `@langwatch/installed-modules`' three exports have no importers.**
+  `./web` (`web-modules.generated.ts`) has zero - web modules install through
+  `apps/ui/src/features/catalogue.json` instead, so this is residue from before
+  that mechanism. `./members` (`server-module-members.generated.ts`) has zero
+  too: the only references anywhere are the generator that writes it and
+  `packages/architecture-enforcer/tests/generated-module-lists.unit.test.ts:36`,
+  which reads the generator's in-memory output rather than the file. **Boot does
+  not consult it** - it computes each module's members at runtime from `reads`
+  plus the selected repository tier's `requires`. That is the deeper reason
+  `governance: []` was never a failure signal, and it means the file presents as
+  machinery while being documentation. `./server` has one consumer, `apps/api`,
+  and earns its keep on a different argument: its 44 imports must resolve, so
+  some manifest must declare them, and having the generator own
+  `modules/package.json` is what keeps it from rewriting an app manifest people
+  hand-edit. Worth a residue sweep to delete the two dead exports; not during a
+  parity drive.
+
 - `PersonalSourceTypeNotAllowedError` (`governance.errors.ts:60`) is a plain
   `Error`, so the allow-list refusal reaches customers as a generic unknown, while
   `ingestion_key_source_not_allowed` sits registered at `app-codes.ts:237` with
@@ -208,44 +254,51 @@ report before any count.
 One lane is running: `gov-rest-serves-25`. When it lands, collect it, then run
 apidiff at the enterprise tier. Nothing else is outstanding.
 
-### The build tier is not a decision, and rev 2 was wrong to call it one
+### The build tier: what is actually true, third revision of this answer
 
-Rev 2 said the install was "blocked on one decision that is the user's", between
-amending ADR-144 §6, forcing the flag in `start:prepare:files`, or accepting the
-OSS 404. **None of those is needed.** Traced end to end:
+Rev 2 called it a decision for the user. Rev 3 called it "a prefix on the apidiff
+command". **Both are wrong.** The prefix claim came from reading
+`havenrun.Env` - which does pass `LANGWATCH_BUILD_TIER` through untouched - and
+stopping there, without checking whether anything downstream regenerates.
+Nothing does, on the path the drive documents. Traced properly:
 
-- `dev/scripts/generate-modules.mjs:172` reads `LANGWATCH_BUILD_TIER` from the
-  process environment and widens `tiers` to `["core","enterprise"]`.
-- `start:prepare:files` (root `package.json:54`) runs `generate:modules`.
-- apidiff runs `pnpm run start:prepare:files` on each side with
-  `havenEnv(state.environ(), slug)`, and `havenrun.Env`
-  (`tools/havenrun/havenrun.go:110`) inherits **everything** except
-  `ManagedEnvKeys` - `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`,
-  `REDIS_DB_INDEX`, `LANGWATCH_SLUG` - plus apidiff's one extra,
-  `LANGWATCH_INSTANCE_ADMIN_API_KEY`.
+| Path | Prepare steps | Regenerates? |
+| ---- | ------------- | ------------ |
+| `-no-haven` | `modularProfile.prepareArgvs`, `tools/apidiff/profile.go:52` - prisma generate, `langwatch` build, mcp-server build, `ensure:built` | **No.** `generate:modules` is not among them, and `ensure-built.mjs` does not call it. The committed core list boots and the variable is inert. |
+| haven | `havenrun.PrepareCommands`, `tools/havenrun/prepare.go:53` - `env -u CI pnpm install --frozen-lockfile`, then `pnpm run start:prepare:files`, then `ensure-built.mjs` | **Yes, but too late.** |
 
-`LANGWATCH_BUILD_TIER` is in none of those lists, so it passes straight through.
-Measuring the enterprise build is:
+"Too late" is the substantive finding. Since `036ed58a11` the generator derives
+`modules/package.json` from the installed set, so at the enterprise tier it
+rewrites that manifest from 44 dependencies to 49 - **after** the install has
+already run. The five enterprise packages are never linked into
+`modules/node_modules`, and boot dies with `ERR_MODULE_NOT_FOUND`. The lockfile
+makes it worse in the other direction: its `modules` importer carries exactly 44
+entries and **zero** enterprise ones, so a `--frozen-lockfile` install against a
+regenerated manifest is rejected outright.
+
+So the order any enterprise build needs is **generate, then install, then run** -
+and the install cannot be frozen, because the lockfile is a core-tier artefact:
 
 ```bash
-LANGWATCH_BUILD_TIER=enterprise <the apidiff invocation>
+LANGWATCH_BUILD_TIER=enterprise node dev/scripts/generate-modules.mjs
+env -u CI pnpm install --no-frozen-lockfile
 ```
 
-No ADR amendment, no committed enterprise-tier generated list, no licensing call.
-ADR-144 §6 says enterprise entries are emitted only in the enterprise build; this
-measures the enterprise build, which is precisely what §6 describes.
+Neither apidiff path does this today. Fixing apidiff properly means making the
+tier an input to boot and moving generation ahead of install; that is its own
+task and it is **not** needed to prove the routes are served (below).
 
-Verified on today's tree, in process, writing nothing:
+### Proving the routes without booting anything
 
-```
-enterprise server modules: 49 (core: 44)
-governanceServer present: true   scimServer present: true
-governance: []   scim: ["prisma"]
-```
+`apps/api/src/tasks/openapi-document/openapi-generate.task.ts` builds the OpenAPI
+document from `serverModules` and the modules' own REST declarations - no
+database, no server, no stack. apidiff compares that same document, fetched from
+a running instance at `/api/openapi.json` (`tools/apidiff/spec.go:18`). So an
+operation present in the generated document is an operation apidiff will see.
 
-**Report it honestly when it passes**: what reaches parity is the *enterprise*
-build. The OSS build deliberately serves less, and the two-image split the user
-asked for is the follow-up that makes that deliberate rather than incidental.
+Run it in a throwaway worktree, after the generate-then-install order above, and
+grep the document for the 25 paths. That is minutes rather than an hour, touches
+no peer session, and answers the only question the drive is asking.
 
 ### Then
 
