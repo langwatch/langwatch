@@ -6,7 +6,7 @@
  *
  * Built through {@link ScimApp.createWithService}, not {@link ScimApp.create}:
  * the production path also resolves four peers it needs only to build the
- * `ScimService` (`AuthzApi`, `UserApi`, `AuthApi`, `GovernanceApi`) and reads
+ * `ScimService` (`AuthzApi`, `UserApi`, `AuthApi`, `GovernanceRestApi`) and reads
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";

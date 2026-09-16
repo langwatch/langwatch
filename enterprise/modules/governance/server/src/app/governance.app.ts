@@ -28,7 +28,7 @@
  * CLI without knowing which it is serving.
  */
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   NoEligibleProvidersError,
   PersonalVirtualKeyNotFoundError,
@@ -39,6 +39,7 @@ import {
   type CliBootstrapResult,
   type CreateRoutingPolicyInput,
   type DeleteRoutingPolicyInput,
+  type Department,
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
@@ -57,9 +58,9 @@ import {
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
@@ -295,7 +296,12 @@ export interface GovernanceIngestMembers {
   rateLimit?: GovernanceIngestRateLimiter | undefined;
 }
 
-/** What the process composes this feature's application from. */
+/**
+ * What this application is assembled from, once its three peers have been
+ * resolved from {@link GovernanceApp.dependencies} and merged with the
+ * bespoke members: the private view the constructor holds, not the shape a
+ * process supplies.
+ */
 export interface GovernanceAppDependencies {
   governance: GovernanceApi;
   /**
@@ -331,17 +337,53 @@ export interface GovernanceCaller {
   readonly displayEmail?: string | null;
 }
 
-/** How a process installs this application: one members object, no peers. */
-type GovernanceSetup = FeatureSetup<Record<never, never>, GovernanceAppDependencies, undefined>;
+/**
+ * What a process cannot hand this application from a peer's API: the
+ * governance capability itself and the four bespoke directories behind it.
+ *
+ * Every one of these is a conversion debt with a named destination — the
+ * capability becomes what this app IS rather than something injected into it,
+ * the two personal-virtual-key checks and the actor lookup become repository
+ * reads, and the CLI and ingest bags split into peers, channels and config.
+ * Until then they travel beside the process's own members the way
+ * `ScimBespokeMembers` does, so that what is genuinely unfinished is visible
+ * in the type rather than hidden inside one undifferentiated bag.
+ */
+export type GovernanceBespokeMembers = Omit<
+  GovernanceAppDependencies,
+  "projects" | "organizations" | "permissions"
+>;
+
+/** How a process installs this application: three peers, and what is left. */
+type GovernanceSetup = FeatureSetup<
+  typeof GovernanceApp.dependencies,
+  GovernanceBespokeMembers,
+  undefined
+>;
 
 export class GovernanceApp
   implements GovernanceRestApi, GovernanceCliRestApi, GovernanceIngestRestApi
 {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly dependencies: Readonly<Record<string, never>> = {};
+  /**
+   * The three peer modules this application reads. A peer is never a member:
+   * the process resolves each token and hands the app the peer's own API, so
+   * governance names what it needs rather than being handed a narrowed copy
+   * whichever composition root happened to build it.
+   */
+  static readonly dependencies = {
+    projects: ProjectApi,
+    organizations: OrganizationApi,
+    permissions: AuthzApi,
+  };
 
-  static create({ members }: GovernanceSetup): GovernanceApp {
-    return new GovernanceApp(members);
+  static create({ members, dependencies }: GovernanceSetup): GovernanceApp {
+    return new GovernanceApp({
+      ...members,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      permissions: dependencies.permissions,
+    });
   }
 
   private constructor(private readonly dependencies: GovernanceAppDependencies) {
@@ -546,6 +588,25 @@ export class GovernanceApp
       sourceTemplateId: input.sourceTemplateId,
       surface: by.surface,
     });
+  }
+
+  // ── Departments ────────────────────────────────────────────────────────────
+
+  /** Finds a department by name, or creates it, for SCIM cost-center sync. */
+  async departmentResolveByNameOrCreate(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<Department> {
+    return this.dependencies.governance.departmentResolveByNameOrCreate(input);
+  }
+
+  /** Assigns (or clears) a member's department, for SCIM cost-center sync. */
+  async departmentAssignUser(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<void> {
+    return this.dependencies.governance.departmentAssignUser(input);
   }
 
   // ── Personal virtual keys ─────────────────────────────────────────────────

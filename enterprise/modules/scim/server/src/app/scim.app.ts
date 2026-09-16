@@ -21,7 +21,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   isEnterpriseTier,
@@ -102,7 +102,7 @@ export class ScimApp implements ScimApiContract {
     authorization: AuthzApi,
     users: UserApi,
     auth: AuthApi,
-    governance: GovernanceApi,
+    governance: GovernanceRestApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
   };

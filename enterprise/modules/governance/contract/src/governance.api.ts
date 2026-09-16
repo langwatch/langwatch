@@ -375,6 +375,16 @@ export interface GovernanceRestApi {
     input: { sourceTemplateId: string },
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate>;
+
+  departmentResolveByNameOrCreate(input: {
+    organizationId: string;
+    name: string;
+  }): Promise<Department>;
+  departmentAssignUser(input: {
+    organizationId: string;
+    userId: string;
+    departmentId: string | null;
+  }): Promise<void>;
 }
 
 export const GovernanceRestApi = moduleApi<GovernanceRestApi>("governance");
