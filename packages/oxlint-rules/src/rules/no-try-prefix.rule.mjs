@@ -16,9 +16,13 @@ export const noTryPrefixRule = defineRule({
       what: "`{{name}}` is named for how it behaves on failure, not for what it returns.",
       why: "A caller reading the call site cannot tell a lookup from a hedge, and the two need different handling.",
       fix:
-        "If `{{name}}` genuinely answers with absence and its callers branch on that,"
-        + " rename it `find<Noun>` for the thing it looks up. Otherwise drop `try` from"
-        + " the name and let it answer or throw.",
+        "Decide what it answers, then drop `try` either way. If it answers one thing"
+        + " that may not exist, name it `get<Noun>` — or `getBy<Key>` when the key is"
+        + " what distinguishes it — and throw the domain error instead of null. If it"
+        + " answers none or many, return an array and name it `find<Noun>`: the empty"
+        + " array is the absence. Renaming it to a `find*` that still answers null is"
+        + " the one move to avoid — `find` states cardinality, so that name would"
+        + " promise a list and hand back a maybe.",
     },
   },
   create(context) {

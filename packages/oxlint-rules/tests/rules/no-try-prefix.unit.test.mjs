@@ -60,8 +60,11 @@ describe("given a strict feature port module", () => {
 
       expect(found[0].message).not.toMatch(/catch/i);
       expect(found[0].message).toContain("named for how it behaves on failure");
-      expect(found[0].message).toContain("find<Noun>");
       expect(found[0].message).toContain("drop `try`");
+      expect(found[0].message).toContain("get<Noun>");
+      expect(found[0].message).toContain("find<Noun>");
+      expect(found[0].message).toContain("throw the domain error instead of null");
+      expect(found[0].message).toMatch(/find\*.*still answers null/);
     });
   });
 
