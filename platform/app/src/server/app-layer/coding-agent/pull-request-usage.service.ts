@@ -503,13 +503,14 @@ export class PullRequestUsageService {
     });
 
     for (const group of byRepository) {
+      const queriedBranches = [
+        ...new Set(group.sessions.flatMap((s) => s.headBranches)),
+      ];
       const pullRequests = await this.deps.pullRequests.findAllByBranches({
         organizationId,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
-        headBranches: [
-          ...new Set(group.sessions.flatMap((s) => s.headBranches)),
-        ],
+        headBranches: queriedBranches,
       });
       const assignments = assignDrivingSessionsToPullRequestsPerBranch({
         sessions: group.sessions,
@@ -535,6 +536,7 @@ export class PullRequestUsageService {
             group,
             discovered,
             pullRequests,
+            queriedBranches,
             permittedProjectIds,
             costProjectIds,
             projects,
@@ -574,6 +576,7 @@ export class PullRequestUsageService {
     group,
     discovered,
     pullRequests,
+    queriedBranches,
     permittedProjectIds,
     costProjectIds,
     projects,
@@ -583,6 +586,8 @@ export class PullRequestUsageService {
     group: PersonalRepositoryGroup;
     discovered: GithubPullRequestRow[];
     pullRequests: GithubPullRequestRow[];
+    /** The branches `pullRequests` already answers for. */
+    queriedBranches: readonly string[];
     permittedProjectIds: string[];
     costProjectIds: string[];
     projects: Record<string, ContributorProject>;
@@ -608,19 +613,28 @@ export class PullRequestUsageService {
       organizationId,
       agents: candidates.sessions.map((session) => session.agent),
     });
-    const modelTotals =
-      await this.deps.sessionEvents.sumTokensByModelPerSession({
+    const [modelTotals, attributable] = await Promise.all([
+      this.deps.sessionEvents.sumTokensByModelPerSession({
         tenantIds: permittedProjectIds,
         sessionIds: candidates.sessions.map((session) => session.sessionId),
         fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-      });
+      }),
+      this.pullRequestsForAttribution({
+        organizationId,
+        repositoryHost: group.repositoryHost,
+        repositoryFullName: group.repositoryFullName,
+        known: pullRequests,
+        queriedBranches,
+        sessions: candidates.sessions,
+      }),
+    ]);
     const costProjects = new Set(costProjectIds);
 
     return discovered.map((pullRequest) => {
       const attribution = attributeSessionsToPullRequest({
         sessions: candidates.sessions,
         rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
-        pullRequests: toAssignable(pullRequests),
+        pullRequests: toAssignable(attributable),
         prNumber: pullRequest.prNumber,
         repositoryHost: group.repositoryHost,
         repositoryFullName: group.repositoryFullName,
@@ -690,15 +704,6 @@ export class PullRequestUsageService {
     const empty = { target, sessions: [], rows: [], modelBreakdown: [] };
     if (query.permittedProjectIds.length === 0) return empty;
 
-    // Every pull request the branch ever hosted, because the tenure rule needs
-    // the neighbours to know where this one's era ends.
-    const siblings = await this.deps.pullRequests.findAllByBranches({
-      organizationId: query.organizationId,
-      repositoryHost: target.repositoryHost,
-      repositoryFullName: target.repositoryFullName,
-      headBranches: [target.headBranch],
-    });
-
     const [owner, name] = target.repositoryFullName.split("/");
     if (!owner || !name) return empty;
 
@@ -711,17 +716,31 @@ export class PullRequestUsageService {
       branches: [target.headBranch],
       fromMs: toMs - USAGE_SESSION_WINDOW_MS,
     });
-    const modelTotals =
-      await this.deps.sessionEvents.sumTokensByModelPerSession({
+    // Every pull request the branch ever hosted, because the tenure rule
+    // needs the neighbours to know where this one's era ends, plus the pull
+    // requests of every other branch the candidates drove, so a session is
+    // attributed here exactly as the personal page attributes it.
+    const [modelTotals, attributable] = await Promise.all([
+      this.deps.sessionEvents.sumTokensByModelPerSession({
         tenantIds: query.permittedProjectIds,
         sessionIds: candidates.sessions.map((session) => session.sessionId),
         fromMs: toMs - USAGE_SESSION_WINDOW_MS,
-      });
+      }),
+      this.pullRequestsForAttribution({
+        organizationId: query.organizationId,
+        repositoryHost: target.repositoryHost,
+        repositoryFullName: target.repositoryFullName,
+        known: [],
+        queriedBranches: [],
+        sessions: candidates.sessions,
+        branches: [target.headBranch],
+      }),
+    ]);
 
     const attribution = attributeSessionsToPullRequest({
       sessions: candidates.sessions,
       rowMatchedSessionKeys: candidates.rowMatchedSessionKeys,
-      pullRequests: toAssignable(siblings),
+      pullRequests: toAssignable(attributable),
       prNumber: target.prNumber,
       repositoryHost: target.repositoryHost,
       repositoryFullName: target.repositoryFullName,
@@ -750,6 +769,51 @@ export class PullRequestUsageService {
         costProjects,
       }),
     };
+  }
+
+  /**
+   * The pull requests the tenure rule needs to attribute the candidate
+   * sessions: the ones already read (`known`, answering for
+   * `queriedBranches`) plus, in one further read, the pull requests of every
+   * other branch a candidate drove, and of `branches` when they were not
+   * asked about yet. The rule reads a session's whole branch history, so both
+   * surfaces have to hand it the same pull requests or a session that drove
+   * several branches lands on different ones depending on who asks.
+   */
+  private async pullRequestsForAttribution({
+    organizationId,
+    repositoryHost,
+    repositoryFullName,
+    known,
+    queriedBranches,
+    sessions,
+    branches = [],
+  }: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    known: GithubPullRequestRow[];
+    queriedBranches: readonly string[];
+    sessions: readonly CodingAgentBranchSessionRow[];
+    branches?: readonly string[];
+  }): Promise<GithubPullRequestRow[]> {
+    const queried = new Set(queriedBranches);
+    const missing = [
+      ...new Set([
+        ...branches,
+        ...sessions.flatMap((session) => branchesOf(session)),
+      ]),
+    ].filter((branch) => !queried.has(branch));
+    if (missing.length === 0) return known;
+
+    const fetched = await this.deps.pullRequests.findAllByBranches({
+      organizationId,
+      repositoryHost,
+      repositoryFullName,
+      headBranches: missing,
+    });
+    const seen = new Set(known.map((row) => row.prNumber));
+    return [...known, ...fetched.filter((row) => !seen.has(row.prNumber))];
   }
 
   /**

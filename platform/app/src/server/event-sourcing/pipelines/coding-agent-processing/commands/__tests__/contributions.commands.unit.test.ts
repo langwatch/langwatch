@@ -104,7 +104,7 @@ function makeCommand<T>(type: string, data: T) {
 describe("ContributeSpanFactsCommand", () => {
   describe("when a coding-agent span's facts are contributed", () => {
     it("emits one session-keyed span_facts_contributed event", async () => {
-      const handler = new ContributeSpanFactsCommand();
+      const handler = spanFactsHandler();
       const events = await handler.handle(
         makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, spanFactsData()),
       );
@@ -122,7 +122,7 @@ describe("ContributeSpanFactsCommand", () => {
   describe("when the same span is delivered twice", () => {
     /** @scenario re-delivered telemetry does not inflate a session */
     it("collapses both deliveries to one idempotency key", async () => {
-      const handler = new ContributeSpanFactsCommand();
+      const handler = spanFactsHandler();
       const [a] = await handler.handle(
         makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, spanFactsData()),
       );
@@ -149,6 +149,113 @@ describe("ContributeSpanFactsCommand", () => {
     });
   });
 
+  describe("when the session declared its working context", () => {
+    /** A model-call span: the kind whose tokens the fold charges somewhere. */
+    const modelCallSpan = (overrides?: Record<string, unknown>) =>
+      spanFactsData({
+        name: "claude_code.llm_request",
+        facts: { model: "claude-fable-5", input_tokens: 100 },
+        ...overrides,
+      });
+
+    /** @scenario A model-call span after a declaration carries the declared context */
+    it("stamps a model-call span with the declared repository and branch", async () => {
+      const memo = new InMemorySessionContextMemo();
+      await logFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_LOG_FACTS_COMMAND_TYPE, declarationData()),
+      );
+      const [event] = await spanFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, modelCallSpan()),
+      );
+
+      expect(event!.data.repositoryHost).toBe("github.com");
+      expect(event!.data.repositoryOwner).toBe("acme");
+      expect(event!.data.repositoryName).toBe("widgets");
+      expect(event!.data.branch).toBe("main");
+    });
+
+    it("stamps a codex turn span, the span-only agent's model call", async () => {
+      const memo = new InMemorySessionContextMemo();
+      await logFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_LOG_FACTS_COMMAND_TYPE, declarationData()),
+      );
+      const [event] = await spanFactsHandler(memo).handle(
+        makeCommand(
+          CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
+          spanFactsData({
+            agent: "codex",
+            name: "session_task.turn",
+            scopeName: "codex_exec",
+            facts: { "gen_ai.usage.input_tokens": "2936" },
+          }),
+        ),
+      );
+
+      expect(event!.data.branch).toBe("main");
+    });
+
+    /** @scenario A span that carries no tokens is not stamped */
+    it("leaves a tool span unstamped", async () => {
+      const memo = new InMemorySessionContextMemo();
+      await logFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_LOG_FACTS_COMMAND_TYPE, declarationData()),
+      );
+      const [event] = await spanFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, spanFactsData()),
+      );
+
+      expect(event!.data.repositoryHost).toBeUndefined();
+      expect(event!.data.branch).toBeUndefined();
+    });
+
+    it("never writes the memo itself", async () => {
+      const memo = new InMemorySessionContextMemo();
+      await spanFactsHandler(memo).handle(
+        makeCommand(CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE, modelCallSpan()),
+      );
+
+      expect(
+        await memo.get({ tenantId: TENANT, sessionId: SESSION }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the session has not declared a working context", () => {
+    /** @scenario A model-call span before any declaration is contributed unstamped */
+    it("contributes the model-call span unstamped", async () => {
+      const [event] = await spanFactsHandler().handle(
+        makeCommand(
+          CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
+          spanFactsData({
+            name: "claude_code.llm_request",
+            facts: { model: "claude-fable-5", input_tokens: 100 },
+          }),
+        ),
+      );
+
+      expect(event!.data.repositoryHost).toBeUndefined();
+      expect(event!.data.branch).toBeUndefined();
+    });
+
+    it("contributes the span unstamped when the memo cannot be read", async () => {
+      const failing: SessionContextMemo = {
+        get: async () => {
+          throw new Error("memo down");
+        },
+        set: async () => {},
+      };
+      const [event] = await spanFactsHandler(failing).handle(
+        makeCommand(
+          CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
+          spanFactsData({ name: "claude_code.llm_request" }),
+        ),
+      );
+
+      expect(event!.type).toBe(SPAN_FACTS_CONTRIBUTED_EVENT_TYPE);
+      expect(event!.data.branch).toBeUndefined();
+    });
+  });
+
   it("routes the command by session, not by trace", () => {
     expect(ContributeSpanFactsCommand.getAggregateId(spanFactsData())).toBe(
       SESSION,
@@ -159,7 +266,7 @@ describe("ContributeSpanFactsCommand", () => {
     describe("when both sessions' spans arrive on the same trace", () => {
       /** @scenario an interactive child session stands alone */
       it("routes each to its own aggregate, so the child's work never joins the parent's totals", async () => {
-        const handler = new ContributeSpanFactsCommand();
+        const handler = spanFactsHandler();
         const CHILD = "b7d1f0aa-child-session";
 
         const [parent] = await handler.handle(
@@ -181,6 +288,12 @@ describe("ContributeSpanFactsCommand", () => {
     });
   });
 });
+
+function spanFactsHandler(memo?: SessionContextMemo) {
+  return new ContributeSpanFactsCommand({
+    contextMemo: memo ?? new InMemorySessionContextMemo(),
+  });
+}
 
 function logFactsHandler(memo?: SessionContextMemo) {
   return new ContributeLogFactsCommand({

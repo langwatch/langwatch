@@ -3,15 +3,24 @@
  * request.
  *
  * A session's cumulative counters stay the source of truth for WHAT was spent;
- * its stamped fact rows decide WHERE. Each `model_call` row carries the
- * repository and branch that were active when the call happened, so per pull
- * request the split is:
+ * a per-context record decides WHERE. Two records exist, read in this order:
  *
- *   share      = (event tokens whose stamp lands on this pull request)
- *              / (all of the session's event tokens)
+ *   1. The session row's own `usageByContext` (migration 00097): the tokens
+ *      and cost of every model call, charged by the fold to the repository
+ *      and branch the call was stamped with. It covers every agent, including
+ *      the ones whose tokens ride spans and so never reach the fact table.
+ *      The gap between the counters and the record's sum is what the session
+ *      spent before it declared anything (or before the column existed).
+ *   2. The per-call `model_call` fact rows, each stamped the same way, for a
+ *      row folded before the record existed. Log-carrier agents only.
+ *
+ * Per pull request the split is then:
+ *
+ *   share      = (record weight whose stamp lands on this pull request)
+ *              / (the session's whole record weight)
  *   PR portion = share x the session's cumulative counters
  *
- * Three buckets partition a session's event tokens, so its shares across pull
+ * Three buckets partition a session's weight, so its shares across pull
  * requests can never sum past one and a repository's pull requests never sum
  * to more than was spent:
  *
@@ -19,11 +28,16 @@
  *     (`assignDrivingSessionsToPullRequestsPerBranch`).
  *   - Stamped on another repository: counted in the denominator only; that
  *     repository's own read prices it.
- *   - Unstamped (history from before the stamp, sessions that never declared):
- *     follows the legacy whole-session rule, and ONLY in the repository the
- *     session's own row points at — the same place the legacy read charged it.
+ *   - Unstamped (before the first declaration, history from before the
+ *     record, sessions that never declared): priced ONLY in the repository
+ *     the session's own row points at. Where the session has declared work,
+ *     it follows the FIRST branch the session declared, the branch it was on
+ *     when the declarations began; a session that never declared keeps the
+ *     legacy whole-session rule and lands on the pull request it opened
+ *     first. A session that declared one branch for its whole life reads the
+ *     same under both.
  *
- * A session with no event rows at all keeps the legacy rule whole: its full
+ * A session with no record at all keeps the legacy rule whole: its full
  * total lands on its single winner, so nothing regresses to zero.
  *
  * The token counters are whole numbers, so the split hands out whole units by
@@ -58,10 +72,26 @@ export interface PullRequestAttribution {
   /**
    * The per-model event totals that belong to THIS pull request: rows stamped
    * onto its branch, plus each attached session's unstamped rows where this
-   * pull request is the legacy winner. Per-call facts, deliberately unscaled —
-   * they are measurements, not shares.
+   * pull request owns the unstamped bucket. Per-call facts, deliberately
+   * unscaled — they are measurements, not shares.
    */
   modelTotals: SessionModelTotalsRow[];
+}
+
+/**
+ * One stamped amount, from either record: where it was spent, and how much.
+ * `SessionModelTotalsRow` and `SessionContextUsage` both have this shape.
+ */
+interface StampedUsage {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
 }
 
 /**
@@ -140,18 +170,18 @@ function shareOfPullRequest({
   session: CodingAgentBranchSessionRow;
   prRows: SessionModelTotalsRow[];
 } | null {
-  const { weightOf, totalWeight } = weighing(rows);
+  const ledger = ledgerOf({ session, rows });
+  const { weightOf, totalWeight } = weighing(ledger);
 
   // The stamps may name branches the session row's bounded branch set no
   // longer holds, so the tenure rule is asked about the union of both.
-  const stampedBranches = rows
-    .filter((row) =>
-      isStampedOnRepository({ row, repositoryHost, repositoryFullName }),
+  const stampedBranches = [...ledger, ...rows]
+    .filter((usage) =>
+      isStampedOnRepository({ usage, repositoryHost, repositoryFullName }),
     )
-    .map((row) => row.branch);
-  const headBranches = [
-    ...new Set([...branchesOf(session), ...stampedBranches]),
-  ];
+    .map((usage) => usage.branch);
+  const declaredBranches = branchesOf(session);
+  const headBranches = [...new Set([...declaredBranches, ...stampedBranches])];
   const assignable = [
     {
       sessionId: session.sessionId,
@@ -169,7 +199,7 @@ function shareOfPullRequest({
     pullRequests,
   }).get(session.sessionId);
 
-  // No event rows, or rows that report neither tokens nor cost: nothing to
+  // No record, or one that reports neither tokens nor cost: nothing to
   // divide by, so the legacy whole-session rule stands — and only where the
   // session's own row lives, like always.
   if (totalWeight === 0) {
@@ -177,23 +207,34 @@ function shareOfPullRequest({
     return { session, prRows: [] };
   }
 
-  // Bucket the rows by a key that depends on the SESSION alone, never on
+  // Bucket the record by a key that depends on the SESSION alone, never on
   // which pull request is being asked about. That is what makes the integer
   // allocation below the same answer in every read: each pull request takes a
   // disjoint set of whole buckets, so their counters cannot sum past the
   // session's own however many reads ask.
   const buckets = new Map<string, number>();
-  const bucketOf = new Map<SessionModelTotalsRow, string>();
-  for (const row of rows) {
-    const key = bucketKeyOf({ row, repositoryHost, repositoryFullName });
-    bucketOf.set(row, key);
-    buckets.set(key, (buckets.get(key) ?? 0) + weightOf(row));
+  for (const usage of ledger) {
+    const key = bucketKeyOf({ usage, repositoryHost, repositoryFullName });
+    buckets.set(key, (buckets.get(key) ?? 0) + weightOf(usage));
   }
+
+  // Declared work anywhere, this repository or another, is what says the
+  // session's undeclared work came before its first declaration rather than
+  // being the whole of it.
+  const hasDeclaredWork = [...buckets].some(
+    ([key, weight]) => key !== UNSTAMPED_BUCKET && weight > 0,
+  );
+  const firstBranch = declaredBranches[0];
+  const unstampedWinner = hasDeclaredWork
+    ? firstBranch === undefined
+      ? undefined
+      : perBranch.get(firstBranch)
+    : legacyWinner;
 
   const ownsBucket = (key: string): boolean => {
     if (key === ELSEWHERE_BUCKET) return false;
     if (key === UNSTAMPED_BUCKET) {
-      return rowMatched && legacyWinner === prNumber;
+      return rowMatched && unstampedWinner === prNumber;
     }
     return perBranch.get(branchOfBucketKey(key)) === prNumber;
   };
@@ -202,7 +243,11 @@ function shareOfPullRequest({
   const prWeight = ownKeys.reduce((total, key) => total + buckets.get(key)!, 0);
   if (prWeight <= 0) return null;
 
-  const prRows = rows.filter((row) => ownsBucket(bucketOf.get(row)!));
+  // The model breakdown follows the same ownership, whichever record set the
+  // weights: a fact row lands on the pull request that owns its bucket.
+  const prRows = rows.filter((row) =>
+    ownsBucket(bucketKeyOf({ usage: row, repositoryHost, repositoryFullName })),
+  );
   const allocated = allocateCounters({
     session,
     buckets,
@@ -222,25 +267,69 @@ function shareOfPullRequest({
   };
 }
 
-/** The bucket a row falls in, named without reference to any pull request. */
+/**
+ * The record the split weighs a session by: the row's own per-context usage
+ * when it carries any, the per-call fact rows otherwise.
+ *
+ * The row's record only holds stamped calls, so what the counters hold above
+ * its sum is the session's undeclared usage and joins the record as one
+ * unstamped entry. Never negative: the counters and the record are charged
+ * from the same calls, so the difference can only be what came before the
+ * record, but a stray inconsistency must not eat another bucket's share.
+ */
+function ledgerOf({
+  session,
+  rows,
+}: {
+  session: CodingAgentBranchSessionRow;
+  rows: readonly SessionModelTotalsRow[];
+}): readonly StampedUsage[] {
+  const recorded = session.usageByContext.filter(
+    (usage) => tokensOf(usage) > 0 || costOf(usage) > 0,
+  );
+  if (recorded.length === 0) return rows;
+
+  const remainder = (field: keyof StampedUsage & keyof typeof session) =>
+    Math.max(
+      0,
+      session[field] -
+        recorded.reduce((total, usage) => total + usage[field], 0),
+    );
+  return [
+    ...recorded,
+    {
+      repositoryHost: "",
+      repositoryOwner: "",
+      repositoryName: "",
+      branch: "",
+      inputTokens: remainder("inputTokens"),
+      outputTokens: remainder("outputTokens"),
+      cacheReadTokens: remainder("cacheReadTokens"),
+      cacheCreationTokens: remainder("cacheCreationTokens"),
+      costUsd: remainder("costUsd"),
+    },
+  ];
+}
+
+/** The bucket an amount falls in, named without reference to any pull request. */
 const UNSTAMPED_BUCKET = "\0unstamped";
 const ELSEWHERE_BUCKET = "\0elsewhere";
 const BRANCH_BUCKET_PREFIX = "branch\0";
 
 function bucketKeyOf({
-  row,
+  usage,
   repositoryHost,
   repositoryFullName,
 }: {
-  row: SessionModelTotalsRow;
+  usage: StampedUsage;
   repositoryHost: string;
   repositoryFullName: string;
 }): string {
-  if (isUnstamped(row)) return UNSTAMPED_BUCKET;
-  if (!isStampedOnRepository({ row, repositoryHost, repositoryFullName })) {
+  if (isUnstamped(usage)) return UNSTAMPED_BUCKET;
+  if (!isStampedOnRepository({ usage, repositoryHost, repositoryFullName })) {
     return ELSEWHERE_BUCKET;
   }
-  return `${BRANCH_BUCKET_PREFIX}${row.branch}`;
+  return `${BRANCH_BUCKET_PREFIX}${usage.branch}`;
 }
 
 function branchOfBucketKey(key: string): string {
@@ -311,14 +400,16 @@ function allocateCounters({
 }
 
 /**
- * A row written before its session declared a working context. Stamps are
+ * An amount from before its session declared a working context. Stamps are
  * written all-or-nothing (`isStampableContext`), so any missing field means
- * the whole stamp is absent; checking each guards a partially stamped row
+ * the whole stamp is absent; checking each guards a partially stamped entry
  * from ever matching a pull request by accident.
  */
-function isUnstamped(row: SessionModelTotalsRow): boolean {
+function isUnstamped(usage: StampedUsage): boolean {
   return (
-    row.repositoryOwner === "" || row.repositoryName === "" || row.branch === ""
+    usage.repositoryOwner === "" ||
+    usage.repositoryName === "" ||
+    usage.branch === ""
   );
 }
 
@@ -328,24 +419,24 @@ function isUnstamped(row: SessionModelTotalsRow): boolean {
  * stay case sensitive and are compared by the caller.
  */
 function isStampedOnRepository({
-  row,
+  usage,
   repositoryHost,
   repositoryFullName,
 }: {
-  row: SessionModelTotalsRow;
+  usage: StampedUsage;
   repositoryHost: string;
   repositoryFullName: string;
 }): boolean {
-  if (isUnstamped(row)) return false;
+  if (isUnstamped(usage)) return false;
   return (
-    row.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
-    `${row.repositoryOwner}/${row.repositoryName}`.toLowerCase() ===
+    usage.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
+    `${usage.repositoryOwner}/${usage.repositoryName}`.toLowerCase() ===
       repositoryFullName.toLowerCase()
   );
 }
 
 /**
- * The unit one session's rows are weighed in, and their total in that unit.
+ * The unit one session's record is weighed in, and its total in that unit.
  *
  * Tokens whenever the session reports any: every agent reports them, and they
  * are what the counters being split are made of. A session that priced its
@@ -354,34 +445,34 @@ function isStampedOnRepository({
  * falling back to the legacy rule. The unit is picked per session, so one
  * ratio never mixes dollars with tokens.
  */
-function weighing(rows: readonly SessionModelTotalsRow[]): {
-  weightOf: (row: SessionModelTotalsRow) => number;
+function weighing(entries: readonly StampedUsage[]): {
+  weightOf: (usage: StampedUsage) => number;
   totalWeight: number;
 } {
-  const tokenWeight = sum(rows, tokensOf);
+  const tokenWeight = sum(entries, tokensOf);
   if (tokenWeight > 0) return { weightOf: tokensOf, totalWeight: tokenWeight };
-  return { weightOf: costOf, totalWeight: sum(rows, costOf) };
+  return { weightOf: costOf, totalWeight: sum(entries, costOf) };
 }
 
-function tokensOf(row: SessionModelTotalsRow): number {
+function tokensOf(usage: StampedUsage): number {
   return (
-    row.inputTokens +
-    row.outputTokens +
-    row.cacheReadTokens +
-    row.cacheCreationTokens
+    usage.inputTokens +
+    usage.outputTokens +
+    usage.cacheReadTokens +
+    usage.cacheCreationTokens
   );
 }
 
-/** Never negative: a stray negative cost would eat another row's share. */
-function costOf(row: SessionModelTotalsRow): number {
-  return row.costUsd > 0 ? row.costUsd : 0;
+/** Never negative: a stray negative cost would eat another entry's share. */
+function costOf(usage: StampedUsage): number {
+  return usage.costUsd > 0 ? usage.costUsd : 0;
 }
 
 function sum(
-  rows: readonly SessionModelTotalsRow[],
-  of: (row: SessionModelTotalsRow) => number,
+  entries: readonly StampedUsage[],
+  of: (usage: StampedUsage) => number,
 ): number {
-  return rows.reduce((total, row) => total + of(row), 0);
+  return entries.reduce((total, usage) => total + of(usage), 0);
 }
 
 export function sessionKey(session: {
