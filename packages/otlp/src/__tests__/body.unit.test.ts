@@ -21,7 +21,7 @@ const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
 function buildTraceRequest(): {
-  resourceSpans: Array<Record<string, unknown>>;
+  resourceSpans: Record<string, unknown>[];
 } {
   const startNano = "1700000000000000000";
   const endNano = "1700000000100000000";
@@ -96,7 +96,7 @@ function makeRequest(body: ArrayBuffer | Buffer, headers: Record<string, string>
 }
 
 function spanCountOf(parsed: {
-  resourceSpans?: Array<{ scopeSpans?: Array<{ spans?: unknown[] }> }>;
+  resourceSpans?: { scopeSpans?: Array<{ spans?: unknown[] }> }[];
 }): number {
   return (parsed.resourceSpans ?? []).flatMap((rs) =>
     (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),

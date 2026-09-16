@@ -27,12 +27,12 @@ function write(path: string, content: string): void {
 }
 
 function writeCatalogue(
-  features: Array<{
+  features: {
     id: string;
     root?: string;
     screens?: string[];
     surfaces?: string[];
-  }>,
+  }[],
   governedWebPackages?: string[],
 ): void {
   const declaredCapabilities = features.flatMap((feature) => [

@@ -48,7 +48,7 @@ const input = (maxOpenConnections: number): ClickHouseClientCreationInput => ({
 
 /** A driver whose statements finish only when the test says so. */
 function deferrableClient() {
-  const pending: Array<() => void> = [];
+  const pending: (() => void)[] = [];
   let started = 0;
 
   const settle = async () => {
@@ -137,7 +137,7 @@ describe("given a statement that fails transiently and is retried", () => {
     it("holds its slot for the whole statement, not per attempt", async () => {
       let attempts = 0;
       let statementsStarted = 0;
-      const releases: Array<() => void> = [];
+      const releases: (() => void)[] = [];
 
       const retryingClient = {
         query: async () => {

@@ -57,7 +57,7 @@ function overlappingHolders(journal: string): string[] {
   return overlaps;
 }
 
-function journalEvents(journal: string): Array<{ event: string; id: string | undefined }> {
+function journalEvents(journal: string): { event: string; id: string | undefined }[] {
   return journal
     .trim()
     .split("\n")

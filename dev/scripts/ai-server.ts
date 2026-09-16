@@ -79,7 +79,7 @@ const CLIENT_ID_HEADER = "x-client-id";
 
 type RequestBody = {
   model?: string;
-  messages?: Array<{ role: string; content: string }>;
+  messages?: { role: string; content: string }[];
 };
 
 function jsonResponse(res: import("node:http").ServerResponse, status: number, data: unknown) {

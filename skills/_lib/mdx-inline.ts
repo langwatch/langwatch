@@ -35,11 +35,11 @@ interface EsmNode {
   value: string;
   data?: {
     estree?: {
-      body?: Array<{
+      body?: {
         type: string;
         specifiers?: Array<{ type: string; local?: { name?: string } }>;
         source?: { value?: string };
-      }>;
+      }[];
     };
   };
 }

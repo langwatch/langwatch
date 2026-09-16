@@ -180,6 +180,7 @@ function addIfAssertionHelper(
   fn: ts.ArrowFunction | ts.FunctionExpression,
 ): void {
   if (assertsType(fn)) helpers.add(name);
+
   if (nodeContainsAssertion(fn.body)) helpers.add(name);
 }
 
@@ -189,6 +190,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name && node.body) {
       if (assertsType(node)) helpers.add(node.name.text);
+
       if (nodeContainsAssertion(node.body)) helpers.add(node.name.text);
     } else if (ts.isVariableDeclaration(node)) {
       if (ts.isIdentifier(node.name)) {
@@ -198,6 +200,7 @@ function collectAssertionHelpers(source: ts.SourceFile): Set<string> {
           if (ts.isArrowFunction(initializer)) {
             addIfAssertionHelper(helpers, node.name.text, initializer);
           }
+
           if (ts.isFunctionExpression(initializer)) {
             addIfAssertionHelper(helpers, node.name.text, initializer);
           }
@@ -339,7 +342,9 @@ function isSchemaLiteralEchoAssertion(node: ts.CallExpression): boolean {
   const input = actual.arguments[0];
 
   if (!ts.isIdentifier(schema)) return false;
+
   if (!/schema$/i.test(schema.text)) return false;
+
   if (!input) return false;
 
   const inputKey = literalKey(input);
@@ -371,6 +376,7 @@ function collectImportBindings(source: ts.SourceFile): ImportBinding[] {
 
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
     const clause = statement.importClause;

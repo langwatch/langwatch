@@ -112,7 +112,7 @@ describe("the plugin manifests", () => {
       expect(marketplace.name).toBe(PLUGIN_NAME);
       expect((marketplace.owner as Record<string, unknown>).name).toBe("LangWatch");
 
-      const plugins = marketplace.plugins as Array<Record<string, unknown>>;
+      const plugins = marketplace.plugins as Record<string, unknown>[];
       expect(plugins).toHaveLength(1);
       expect(plugins[0]?.name).toBe(PLUGIN_NAME);
       expect(plugins[0]?.source).toBe("./");
@@ -127,9 +127,9 @@ describe("the plugin hook configuration", () => {
     it("declares the two session events, each running the committed launcher under a timeout", () => {
       const events = hooks.hooks as Record<
         string,
-        Array<{
+        {
           hooks: Array<{ type: string; command: string; timeout?: number }>;
-        }>
+        }[]
       >;
 
       expect(Object.keys(events).sort()).toEqual(["SessionStart", "Stop"]);

@@ -22,7 +22,7 @@ function makeWriter() {
 function makeFakeSession() {
   let release: (() => void) | undefined;
   let rejectRun: ((error: Error) => void) | undefined;
-  const promptCalls: Array<{ prompt: string; systemPrompt: string }> = [];
+  const promptCalls: { prompt: string; systemPrompt: string }[] = [];
   let abortCount = 0;
   const appliedSystemPrompts: string[] = [];
   const session: SessionLike = {

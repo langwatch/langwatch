@@ -52,7 +52,7 @@ const child = spawn(command as string, commandArgs, {
   },
 });
 
-const events: Array<Record<string, unknown>> = [];
+const events: Record<string, unknown>[] = [];
 let buffer = "";
 let failed = false;
 

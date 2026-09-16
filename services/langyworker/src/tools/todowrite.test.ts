@@ -78,7 +78,7 @@ describe("normalizeTodos", () => {
      * by the same table on both sides because this package cannot import it.
      */
     it("reads every synonym the same way, whatever its case or spacing", () => {
-      const cases: Array<[string, string]> = [
+      const cases: [string, string][] = [
         ["done", "completed"],
         ["Complete", "completed"],
         ["FINISHED", "completed"],

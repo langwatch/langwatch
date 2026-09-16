@@ -113,7 +113,7 @@ setup("authenticate", async ({ page, request }) => {
   );
   console.log("getAll status:", getAllResponse.status());
   const getAllData = await getAllResponse.json().catch(() => null);
-  const orgs: Array<{ teams: Array<{ projects: Array<unknown> }> }> =
+  const orgs: { teams: Array<{ projects: Array<unknown> }> }[] =
     getAllData?.["0"]?.result?.data?.json ?? [];
   console.log(
     "Orgs found:",

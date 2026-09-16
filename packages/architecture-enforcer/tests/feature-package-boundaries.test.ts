@@ -61,12 +61,12 @@ function featurePackage({
   const catalogue = existsSync(cataloguePath)
     ? (JSON.parse(readFileSync(cataloguePath, "utf8")) as {
         version: 0;
-        features: Array<{
+        features: {
           id: string;
           root: string;
           classification: "core" | "enterprise";
           subjects: string[];
-        }>;
+        }[];
       })
     : { version: 0 as const, features: [] };
   const entry = {

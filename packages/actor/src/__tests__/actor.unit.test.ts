@@ -5,7 +5,7 @@ describe("the actor vocabulary", () => {
   describe("given a rich actor headed for the ledger", () => {
     /** @scenario "Every ledger fact names its actor from one vocabulary" */
     it("serializes every actor kind through the one seam", () => {
-      const cases: Array<[Actor, { type: string; id: string }]> = [
+      const cases: [Actor, { type: string; id: string }][] = [
         [
           { type: "user", id: "user_1" },
           { type: "user", id: "user_1" },
@@ -30,7 +30,7 @@ describe("the actor vocabulary", () => {
     });
 
     it("maps every named system surface, with no hand-built strings", () => {
-      for (const name of Object.keys(SYSTEM_ACTORS) as Array<keyof typeof SYSTEM_ACTORS>) {
+      for (const name of Object.keys(SYSTEM_ACTORS) as (keyof typeof SYSTEM_ACTORS)[]) {
         expect(toLedgerActor({ type: "system", name })).toEqual({
           type: "system",
           id: SYSTEM_ACTORS[name],

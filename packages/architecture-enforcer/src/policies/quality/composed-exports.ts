@@ -82,6 +82,7 @@ function parseFile(file: string): ts.SourceFile {
 
 function subdirectories(path: string): string[] {
   if (!existsSync(path)) return [];
+
   const stat = statSync(path);
   if (!stat.isDirectory()) return [];
 
@@ -111,12 +112,14 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
 
   for (const name of subdirectories(join(root, "packages"))) {
     let isExcludedPackage = false;
+
     for (const suffix of EXCLUDED_PACKAGE_SUFFIXES) {
       if (name.endsWith(suffix)) {
         isExcludedPackage = true;
         break;
       }
     }
+
     if (isExcludedPackage) continue;
 
     const serverDir = join(root, "packages", name, "src", "server");
@@ -187,6 +190,7 @@ function exportedNames({
     if (ts.isClassDeclaration(statement)) {
       if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
     }
+
     if (ts.isFunctionDeclaration(statement)) {
       if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
     }
@@ -337,15 +341,22 @@ function valueReferences({
     }
 
     if (ts.isImportDeclaration(node)) return;
+
     if (ts.isExportDeclaration(node)) return;
+
     if (ts.isImportEqualsDeclaration(node)) return;
+
     if (ts.isTypeAliasDeclaration(node)) return;
+
     if (ts.isInterfaceDeclaration(node)) return;
+
     if (ts.isTypeNode(node)) return;
 
     if (ts.isIdentifier(node)) {
       if (!wanted.has(node.text)) return;
+
       if (declaredHere.has(node.text)) return;
+
       if (isDeclarationName(node)) return;
 
       found.push(node.text);
@@ -378,6 +389,7 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
 
   for (const file of reachableFiles({ root, resolver })) {
     if (!/\.[cm]?tsx?$/.test(file)) continue;
+
     if (file.endsWith(".d.ts")) continue;
 
     const words = mentionedWords({ file });
@@ -385,6 +397,7 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
 
     for (const word of words) {
       if (!wanted.has(word)) continue;
+
       if (composed.has(word)) continue;
 
       candidate = true;

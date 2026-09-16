@@ -155,16 +155,16 @@ export class Node {
       const os = require("os") as {
         networkInterfaces: () => Record<
           string,
-          Array<{
+          {
             internal: boolean;
             mac: string;
-          }>
+          }[]
         >;
       };
-      const interfaces = Object.values(os.networkInterfaces()).flat() as Array<{
+      const interfaces = Object.values(os.networkInterfaces()).flat() as {
         internal: boolean;
         mac: string;
-      }>;
+      }[];
 
       const int = interfaces.find(
         (i) => !i.internal && i.mac !== "00:00:00:00:00:00" && !i.mac.startsWith("02:42"),

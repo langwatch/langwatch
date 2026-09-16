@@ -75,7 +75,7 @@ function runOnOrganizationLogin(args: string[]): string {
  * suite fills the account with them.
  */
 function archiveProjectsNamed(name: string): void {
-  let projects: Array<{ id: string; name: string }> = [];
+  let projects: { id: string; name: string }[] = [];
   try {
     const listed = JSON.parse(runOnOrganizationLogin(["projects", "list"]));
     projects = Array.isArray(listed) ? listed : (listed.data ?? []);

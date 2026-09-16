@@ -23,16 +23,16 @@ interface AttributeHolder {
 }
 
 interface ReceiverSpan extends AttributeHolder {
-  events?: Array<AttributeHolder | null> | null;
-  links?: Array<AttributeHolder | null> | null;
+  events?: (AttributeHolder | null)[] | null;
+  links?: (AttributeHolder | null)[] | null;
 }
 
 interface ReceiverMetricDataPoint extends AttributeHolder {
-  exemplars?: Array<{ filteredAttributes?: OtlpKeyValue[] | null } | null> | null;
+  exemplars?: ({ filteredAttributes?: OtlpKeyValue[] | null } | null)[] | null;
 }
 
 interface ReceiverMetricSeries {
-  dataPoints?: Array<ReceiverMetricDataPoint | null> | null;
+  dataPoints?: (ReceiverMetricDataPoint | null)[] | null;
 }
 
 interface ReceiverMetric extends AttributeHolder {
@@ -45,23 +45,23 @@ interface ReceiverMetric extends AttributeHolder {
 
 interface ReceiverScopeGroup {
   scope?: (AttributeHolder & { name?: string | null }) | null;
-  spans?: Array<ReceiverSpan | null> | null;
-  logRecords?: Array<AttributeHolder | null> | null;
-  metrics?: Array<ReceiverMetric | null> | null;
+  spans?: (ReceiverSpan | null)[] | null;
+  logRecords?: (AttributeHolder | null)[] | null;
+  metrics?: (ReceiverMetric | null)[] | null;
 }
 
 interface ReceiverResourceGroup {
   resource?: AttributeHolder | null;
-  scopeSpans?: Array<ReceiverScopeGroup | null> | null;
-  scopeLogs?: Array<ReceiverScopeGroup | null> | null;
-  scopeMetrics?: Array<ReceiverScopeGroup | null> | null;
+  scopeSpans?: (ReceiverScopeGroup | null)[] | null;
+  scopeLogs?: (ReceiverScopeGroup | null)[] | null;
+  scopeMetrics?: (ReceiverScopeGroup | null)[] | null;
 }
 
 /** Mutation view of an already parsed export; unrelated wire fields stay untouched. */
 export interface OtlpReceiverRequest {
-  resourceSpans?: Array<ReceiverResourceGroup | null> | null;
-  resourceLogs?: Array<ReceiverResourceGroup | null> | null;
-  resourceMetrics?: Array<ReceiverResourceGroup | null> | null;
+  resourceSpans?: (ReceiverResourceGroup | null)[] | null;
+  resourceLogs?: (ReceiverResourceGroup | null)[] | null;
+  resourceMetrics?: (ReceiverResourceGroup | null)[] | null;
 }
 
 export function applyOtlpReceiverPolicy(
@@ -125,7 +125,7 @@ function applyResourceAttributes(
 }
 
 function protectScopes(
-  scopes: Array<ReceiverScopeGroup | null>,
+  scopes: (ReceiverScopeGroup | null)[],
   signal: Signal,
   allowed: Set<string> | undefined,
 ): number {

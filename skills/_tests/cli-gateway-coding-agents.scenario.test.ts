@@ -89,7 +89,7 @@ async function assertSessionTraces(opts: {
     });
     if (res.ok) {
       const body = (await res.json()) as {
-        traces?: Array<{
+        traces?: {
           input?: { value?: string };
           metrics?: {
             total_cost?: number;
@@ -97,7 +97,7 @@ async function assertSessionTraces(opts: {
             completion_tokens?: number;
             cache_read_input_tokens?: number;
           };
-        }>;
+        }[];
       };
       const all = body.traces ?? [];
       // Substring filter is best-effort: some agents (notably opencode) emit
@@ -309,7 +309,7 @@ describe("AI Gateway — coding-agent matrix", () => {
           // Responses-API model registry yet. gpt-4o-mini is recognised
           // and cheap.
           "-c",
-          'model="gpt-4o-mini"',
+          'model="gpt-5-mini"',
           "-c",
           'model_reasoning_effort="low"',
           TASK_PROMPT,

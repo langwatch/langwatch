@@ -44,4 +44,4 @@ export const planLimitsSchema = z.object({
 });
 export type PlanLimits = z.infer<typeof planLimitsSchema>;
 
-export const LIMIT_NAMES = Object.keys(planLimitsSchema.shape) as ReadonlyArray<keyof PlanLimits>;
+export const LIMIT_NAMES = Object.keys(planLimitsSchema.shape) as readonly (keyof PlanLimits)[];

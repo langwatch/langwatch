@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
   runPass: vi.fn(),
-  errors: [] as Array<Record<string, unknown>>,
+  errors: [] as Record<string, unknown>[],
 }));
 
 vi.mock("@langwatch/observability", async (importOriginal) => {

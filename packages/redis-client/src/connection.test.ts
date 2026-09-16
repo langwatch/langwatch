@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const standaloneCalls: Array<[string, Record<string, unknown>]> = [];
-const clusterCalls: Array<[unknown, Record<string, unknown>]> = [];
+const standaloneCalls: [string, Record<string, unknown>][] = [];
+const clusterCalls: [unknown, Record<string, unknown>][] = [];
 
 class FakeConnection {
   readonly handlers = new Map<string, (...args: unknown[]) => void>();

@@ -32,7 +32,7 @@ async function main() {
     callbacks: [langWatchCallback],
   });
 
-  const conversationHistory: Array<HumanMessage | SystemMessage> = [
+  const conversationHistory: (HumanMessage | SystemMessage)[] = [
     new SystemMessage(
       "You are a helpful assistant that can answer questions and help with tasks. You may use markdown to format your responses.",
     ),

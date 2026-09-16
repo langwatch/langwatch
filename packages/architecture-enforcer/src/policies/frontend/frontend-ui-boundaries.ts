@@ -401,8 +401,11 @@ function resolvedWebUse(
   const capability = capabilityForSpecifier(webPackages, specifier);
 
   if (!target) return void 0;
+
   if (!capability) return void 0;
+
   if (capability.kind !== "surface") return void 0;
+
   const exports = packageExports(target);
   if (!exports.has(capability.exportPath)) return void 0;
 
@@ -485,9 +488,11 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   if (/^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier)) {
     return "server, API, worker, or Prisma implementation";
   }
+
   if (/^@langwatch\/prisma-client(?:\/|$)/.test(specifier)) {
     return "server, API, worker, or Prisma implementation";
   }
+
   if (specifier.startsWith("@prisma/")) {
     return "server, API, worker, or Prisma implementation";
   }
@@ -495,6 +500,7 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   if (/^(?:@app|@ee)(?:\/|$)/.test(specifier)) {
     return "legacy platform/app implementation";
   }
+
   if (/(?:^|\/)platform\/app(?:\/|$)/.test(specifier)) {
     return "legacy platform/app implementation";
   }
@@ -502,9 +508,11 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
   if (/^(?:~|@)\/(?:server|env)(?:\/|$)/.test(specifier)) {
     return "environment module";
   }
+
   if (/^(?:~|@)\/utils\/env(?:\/|$)/.test(specifier)) {
     return "environment module";
   }
+
   if (/(?:^|\/)env(?:\/|$)/.test(specifier)) {
     return "environment module";
   }
@@ -776,6 +784,7 @@ function forbiddenWebPresentationImport({
   if (/^(?:~|@)\//.test(specifier)) {
     return "an application or package source alias";
   }
+
   if (specifier.startsWith("#")) {
     return "an application or package source alias";
   }
@@ -983,6 +992,7 @@ function lintDeclaredCapabilities(
 
           continue;
         }
+
         if (!pkg) {
           violations.push({
             policy: "ui-web-capability-declaration",
@@ -993,7 +1003,9 @@ function lintDeclaredCapabilities(
 
           continue;
         }
+
         const exports = packageExports(pkg);
+
         if (!exports.has(capability.exportPath)) {
           violations.push({
             policy: "ui-web-capability-declaration",
@@ -1433,6 +1445,7 @@ function lintUiSourceBoundaries(
       }
 
       const screens = importerFeature.uses.screens;
+
       if (capability.kind === "screen" && !screens.includes(sourceImport.specifier)) {
         violations.push({
           policy: "ui-screen-declaration",
@@ -1444,6 +1457,7 @@ function lintUiSourceBoundaries(
       }
 
       const surfaces = importerFeature.uses.surfaces;
+
       if (capability.kind === "surface" && !surfaces.includes(sourceImport.specifier)) {
         violations.push({
           policy: "ui-surface-declaration",
@@ -1617,6 +1631,7 @@ function lintWebScreenClosures(
 
         continue;
       }
+
       if (!existsSync(entry)) {
         violations.push({
           policy: "ui-screen-closure",
@@ -1719,6 +1734,7 @@ function surfaceClosureStep({
 
     return { violations, next };
   }
+
   if (escapedSurface) {
     violations.push({
       policy: "ui-surface-closure",
@@ -1731,6 +1747,7 @@ function surfaceClosureStep({
 
     return { violations, next };
   }
+
   if (surfaceId !== void 0 && surfaceId !== capability.id) {
     violations.push({
       policy: "ui-surface-closure",
@@ -1839,6 +1856,7 @@ function lintWebSurfaceClosures(
 
         continue;
       }
+
       if (!existsSync(entry)) {
         violations.push({
           policy: "ui-surface-closure",
@@ -1919,6 +1937,7 @@ function webPrivateModuleForFile(
 
   if (segments.length === 1) {
     if (isWebRootException(file)) return { kind: "package-entry" };
+
     if (flatPublicEntries.has(file)) return { kind: "package-entry" };
   }
 
@@ -1937,6 +1956,7 @@ function webPrivateModuleForFile(
         uiLayer: void 0,
       };
     }
+
     if (third === "ui") {
       if (fourth !== void 0 && WEB_UI_LAYERS.has(fourth)) {
         return {
@@ -1960,6 +1980,7 @@ function webPrivateModuleForFile(
       uiLayer: void 0,
     };
   }
+
   if (first === "ui") {
     if (second !== void 0 && WEB_UI_LAYERS.has(second)) {
       return {
@@ -2056,6 +2077,7 @@ function readWebFeatureDeclarations(sourceRoot: string): {
     }
 
     const dependencies = result.data.dependencies;
+
     if (dependencies.includes(entry.name)) {
       violations.push({
         policy: "ui-web-feature-declaration",
@@ -2200,6 +2222,7 @@ function webPrivateImportViolations({
 
       return violations;
     }
+
     if (target.kind === "feature-entry" && target.feature !== module.feature) {
       violations.push({
         policy: "ui-web-feature-entry-leakage",
@@ -2276,6 +2299,7 @@ function webPrivateImportViolations({
       ) {
         return violations;
       }
+
       if (canPrivateLayerDependOn(module, target)) {
         return violations;
       }
@@ -2524,9 +2548,13 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
       const capability = capabilityForSpecifier(webPackages, specifier, catalogue);
 
       if (!target) continue;
+
       if (!governed.has(target.name)) continue;
+
       if (!capability) continue;
+
       if (capability.kind !== "surface") continue;
+
       const exports = packageExports(target);
       if (!exports.has(capability.exportPath)) continue;
 

@@ -21,10 +21,10 @@ async function main() {
   console.log('🤖 AI Chatbot started! Type "quit" to exit.');
   console.log("---");
 
-  const conversationHistory: Array<{
+  const conversationHistory: {
     role: "user" | "assistant" | "system";
     content: string;
-  }> = [
+  }[] = [
     {
       role: "system",
       content:

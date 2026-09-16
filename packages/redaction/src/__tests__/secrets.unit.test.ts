@@ -41,7 +41,7 @@ describe("redactSecretsInText", () => {
   describe("given a built-in provider or cloud key", () => {
     // Provider keys use realistic base64url bodies (`_` and `-`, no inner word
     // boundary): the shape a `[A-Za-z0-9]+\b` rule silently misses.
-    const cases: Array<[string, string]> = [
+    const cases: [string, string][] = [
       ["an AWS access key id", "creds AKIAIOSFODNN7EXAMPLE here"],
       ["a GitHub token", `token ghp_${"a".repeat(36)} here`],
       ["an OpenAI project key", "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here"],
@@ -80,7 +80,7 @@ describe("redactSecretsInText", () => {
 
     /** @scenario "A connection URL keeps its scheme whatever shape the scheme has" */
     it("keeps every shape of scheme and redacts only the password", () => {
-      const cases: Array<[string, string]> = [
+      const cases: [string, string][] = [
         ["redis://default:Ab3xY9zQ@cache-01:6379", "redis://default:[SECRET]@cache-01:6379"],
         [
           "mongodb+srv://admin:p%40ss@cluster0.mongodb.net",
@@ -249,7 +249,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
   });
 
   describe("given credentials from widely used developer services", () => {
-    const vendorKeys: Array<[string, string]> = [
+    const vendorKeys: [string, string][] = [
       ["GitLab", `GITLAB_TOKEN=glpat-${BODY.slice(0, 21)}`],
       ["npm", `npm_${BODY.slice(0, 36)}`],
       ["Docker Hub", `dckr_pat_${BODY.slice(0, 28)}`],
@@ -286,7 +286,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     // rather than the body means a truncated one still redacts; `ik-lw-` used
     // to be covered by nothing at all, and `sk-lw-` only by the generic `sk-`
     // rule once the body reached 20 characters.
-    const ownKeys: Array<[string, string]> = [
+    const ownKeys: [string, string][] = [
       ["API key", `sk-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
       ["ingest key", `ik-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
       ["legacy personal access token", `pat-lw-${BODY.slice(0, 12)}_${BODY}`],
@@ -319,7 +319,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
   });
 
   describe("given credentials the vendor list had missed", () => {
-    const missed: Array<[string, string]> = [
+    const missed: [string, string][] = [
       ["Google OAuth client secret", `GOCSPX-${BODY.slice(0, 24)}`],
       ["LangWatch virtual key", `vk-lw-${BODY.slice(0, 12)}_${BODY.slice(0, 32)}`],
       ["a short LangWatch virtual key", "vk-lw-123af"],
@@ -418,7 +418,7 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
  * file paths used to be is not a usable trace. All strings genuinely occur.
  */
 describe("redactSecretsInText, given text that only looks like secrets", () => {
-  const leaveAlone: Array<[string, string]> = [
+  const leaveAlone: [string, string][] = [
     ["a commit hash", "fix in commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5"],
     ["short commit hashes", "reverted 5ebf89d6f4 and f05d495818"],
     ["a UUID", "id 550e8400-e29b-41d4-a716-446655440000 done"],
@@ -603,7 +603,7 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
   });
 
   describe("when the input is shaped to stall a careless pattern", () => {
-    const adversarial: Array<[string, string]> = [
+    const adversarial: [string, string][] = [
       ["a long underscore run", "a_".repeat(50_000)],
       ["a long hyphen run", "a-".repeat(50_000)],
       ["a keyword followed by filler", `api_key: ${"a".repeat(100_000)}`],

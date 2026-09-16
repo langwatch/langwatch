@@ -32,7 +32,7 @@ function recordingClient(): ClickHouseVendorClient & { calls: unknown[] } {
 }
 
 class CollectingLogger extends ClickHouseManagedClientLogger {
-  readonly errors: Array<{ fields: Record<string, unknown>; message: string }> = [];
+  readonly errors: { fields: Record<string, unknown>; message: string }[] = [];
 
   info(): void {}
   warn(): void {}
@@ -168,7 +168,7 @@ describe("the ClickHouse tenant-scope guard", () => {
   describe("when the managed client builds a client for each configured instance", () => {
     /** @scenario "every client is built the same way" */
     it("gives the shared and the private instance the same tenant guard", async () => {
-      const created: Array<ClickHouseVendorClient & { calls: unknown[] }> = [];
+      const created: (ClickHouseVendorClient & { calls: unknown[] })[] = [];
       class Factory extends ClickHouseVendorClientFactory<ClickHouseVendorClient> {
         create(_options: ClickHouseVendorClientOptions): ClickHouseVendorClient {
           const client = recordingClient();

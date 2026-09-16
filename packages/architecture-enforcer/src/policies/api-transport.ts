@@ -95,6 +95,7 @@ function dynamicCompositionImports(source: ts.SourceFile): ts.CallExpression[] {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         if (node.arguments.length === 1) {
           const firstArgument = node.arguments[0];
+
           if (firstArgument !== undefined) {
             if (ts.isStringLiteral(firstArgument)) {
               if (firstArgument.text === "@langwatch/api/composition") {
@@ -429,6 +430,7 @@ function inspectHandler(
       : resolved;
 
   if (!resolvedHandler) return;
+
   if (ts.isArrowFunction(resolvedHandler)) {
     // handled below
   } else if (ts.isFunctionExpression(resolvedHandler)) {
@@ -540,6 +542,7 @@ function inspectRawContextBody(
 ): void {
   const visit = (node: ts.Node): void => {
     let property: string | undefined;
+
     if (ts.isPropertyAccessExpression(node)) {
       property = node.name.text;
     } else if (ts.isElementAccessExpression(node)) {
@@ -549,6 +552,7 @@ function inspectRawContextBody(
     }
 
     let receiver: string | undefined;
+
     if (ts.isPropertyAccessExpression(node)) {
       if (ts.isIdentifier(node.expression)) {
         receiver = node.expression.text;
@@ -599,6 +603,7 @@ function importFindings(
 ): void {
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
     const specifier = statement.moduleSpecifier.text;
@@ -606,6 +611,7 @@ function importFindings(
     const names = importedBindings(statement);
 
     const specifierSegments = specifier.split("/");
+
     if (specifierSegments.includes("rbac")) {
       report({
         line,
@@ -835,6 +841,7 @@ function scriptKind(file: string): ts.ScriptKind {
   if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
 
   if (file.endsWith(".mjs")) return ts.ScriptKind.JS;
+
   if (file.endsWith(".cjs")) return ts.ScriptKind.JS;
 
   return ts.ScriptKind.TS;
@@ -978,14 +985,19 @@ function forbiddenImportReason(
   if (importsRepository) return "repository";
 
   if (specifier === "@prisma/client") return "Prisma or a generated database client";
+
   if (specifier.startsWith("@prisma/")) return "Prisma or a generated database client";
+
   if (specifier === "@langwatch/prisma-client") return "Prisma or a generated database client";
+
   if (specifier.startsWith("@langwatch/prisma-client/")) {
     return "Prisma or a generated database client";
   }
 
   if (basename === "env") return "environment module";
+
   if (segments.includes("env")) return "environment module";
+
   if (/(?:^|[.-])env$/.test(basename)) return "environment module";
 
   const appImplementation =
@@ -1003,7 +1015,9 @@ function forbiddenImportReason(
 function declarationName(node: ts.NamedDeclaration): string | null {
   const name = node.name;
   if (!name) return null;
+
   if (ts.isIdentifier(name)) return name.text;
+
   if (ts.isStringLiteral(name)) return name.text;
 
   return null;
@@ -1084,9 +1098,11 @@ function handlerForEndpoint(
     if (methodName === "handle") {
       return resolveHandler(call.arguments[0], functions);
     }
+
     if (methodName === "registerRoute") {
       return resolveHandler(call.arguments[3], functions);
     }
+
     if (methodName === "register") {
       return resolveHandler(call.arguments[2], functions);
     }
@@ -1134,6 +1150,7 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 
   while (true) {
     if (!ts.isCallExpression(receiver)) break;
+
     if (!ts.isPropertyAccessExpression(receiver.expression)) break;
 
     const methodName = receiver.expression.name.text;
@@ -1146,6 +1163,7 @@ function isFluentEndpointHandle(call: ts.CallExpression): boolean {
 
   while (current.parent) {
     current = current.parent;
+
     if (!ts.isArrowFunction(current)) {
       if (!ts.isFunctionExpression(current)) continue;
     }
@@ -1176,14 +1194,17 @@ function unwrapHandlerExpression(expression: ts.Expression): ts.Expression {
       current = current.expression;
       continue;
     }
+
     if (ts.isAsExpression(current)) {
       current = current.expression;
       continue;
     }
+
     if (ts.isTypeAssertionExpression(current)) {
       current = current.expression;
       continue;
     }
+
     if (ts.isSatisfiesExpression(current)) {
       current = current.expression;
       continue;
@@ -1300,6 +1321,7 @@ function handlerBoundaryViolations(file: string, source: ts.SourceFile): Archite
       const member = directContextMemberName(node);
 
       let propertyName: string | null;
+
       if (ts.isPropertyAccessExpression(node)) {
         propertyName = node.name.text;
       } else if (ts.isStringLiteral(node.argumentExpression)) {
@@ -1453,6 +1475,7 @@ function resolveHandler(
   candidate = unwrapHandlerExpression(candidate);
 
   if (ts.isArrowFunction(candidate)) return candidate;
+
   if (ts.isFunctionExpression(candidate)) return candidate;
 
   if (ts.isIdentifier(candidate)) return functions.get(candidate.text) ?? null;
@@ -1769,7 +1792,9 @@ function honoBindings(source: ts.SourceFile): ReadonlySet<string> {
 
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
+
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+
     if (statement.moduleSpecifier.text !== "hono") continue;
 
     const clause = statement.importClause;
@@ -1903,7 +1928,9 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
   const inspectMethodDispatch = (node: ts.MethodDeclaration | ts.MethodSignature): void => {
     const methodName = declarationName(node);
     if (methodName !== "query" && methodName !== "mutate") return;
+
     if (!parameterIsString(node.parameters[0])) return;
+
     if (!returnsPromise(node.type)) return;
 
     violations.push({
@@ -1921,10 +1948,14 @@ function stringLocatorViolations(file: string, source: ts.SourceFile): Architect
   ): void => {
     const propertyName = declarationName(node);
     if (propertyName !== "query" && propertyName !== "mutate") return;
+
     if (node.type === void 0) return;
+
     if (!ts.isFunctionTypeNode(node.type)) return;
+
     const dispatchType = node.type;
     if (!parameterIsString(dispatchType.parameters[0])) return;
+
     if (!returnsPromise(dispatchType.type)) return;
 
     violations.push({

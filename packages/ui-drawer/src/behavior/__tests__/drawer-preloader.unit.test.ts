@@ -12,7 +12,7 @@ import { makeUsePreload } from "../drawer-preloader.ts";
 const preloadDrawer = vi.fn((_drawer: string) => Promise.resolve());
 const usePreloadDrawer = makeUsePreload(preloadDrawer);
 
-let idleCallbacks: Array<(() => void) | undefined> = [];
+let idleCallbacks: ((() => void) | undefined)[] = [];
 
 const becomeIdle = () => {
   for (const callback of idleCallbacks) callback?.();

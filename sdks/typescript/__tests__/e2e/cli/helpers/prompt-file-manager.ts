@@ -9,10 +9,10 @@ export interface PromptConfig {
     maxTokens?: number;
     [key: string]: any;
   };
-  messages: Array<{
+  messages: {
     role: "system" | "user" | "assistant";
     content: string;
-  }>;
+  }[];
   [key: string]: any;
 }
 

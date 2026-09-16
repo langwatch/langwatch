@@ -27,12 +27,12 @@ const sections: SectionCase[] = [
 test("complex product areas share one local navigation layout", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 2048, height: 1200 });
   const projectSlug = await getProjectSlug(page);
-  const measurements: Array<{
+  const measurements: {
     name: string;
     navigationWidth: number;
     containerWidth: number;
     borderColor: string;
-  }> = [];
+  }[] = [];
 
   for (const section of sections) {
     await page.goto(section.path(projectSlug));

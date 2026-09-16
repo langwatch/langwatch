@@ -93,7 +93,7 @@ export const experimentWasCreatedOrAdvanced = ({
  * argument (`export PATH="./bin:$PATH" && ...`) defeats a regex over that JSON.
  */
 export function executedCommandTranscript(state: {
-  messages: Array<{ content: unknown }>;
+  messages: { content: unknown }[];
 }): string {
   return bashCommands(state as Parameters<typeof bashCommands>[0]).join("\n");
 }
@@ -103,7 +103,7 @@ export function executedCommandTranscript(state: {
  * transcript when a check needs two tokens in the SAME command: the joined
  * form lets `a[\s\S]*b` match across two different commands.
  */
-export function executedCommands(state: { messages: Array<{ content: unknown }> }): string[] {
+export function executedCommands(state: { messages: { content: unknown }[] }): string[] {
   return bashCommands(state as Parameters<typeof bashCommands>[0]);
 }
 

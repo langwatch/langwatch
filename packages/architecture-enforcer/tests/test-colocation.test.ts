@@ -45,7 +45,7 @@ function featurePackage(feature: string, role: "contract" | "server" | "web"): v
   );
 }
 
-function relativeMoves(): Array<[string, string]> {
+function relativeMoves(): [string, string][] {
   return planTestColocation(root).moves.map(({ from, to }) => [
     from.slice(root.length + 1),
     to.slice(root.length + 1),

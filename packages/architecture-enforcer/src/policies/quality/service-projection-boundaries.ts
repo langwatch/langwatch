@@ -21,7 +21,9 @@ function isDomainServiceFile(path: string): boolean {
 
 function declarationName(node: ts.DeclarationName | undefined): string | null {
   if (!node) return null;
+
   if (ts.isIdentifier(node)) return node.text;
+
   if (ts.isStringLiteral(node)) return node.text;
 
   return null;
@@ -112,11 +114,15 @@ function signatureTypeNodes(
 
 function memberTypeNodes(member: ts.TypeElement | ts.ClassElement): ts.TypeNode[] {
   if (ts.isPropertySignature(member)) return member.type ? [member.type] : [];
+
   if (ts.isPropertyDeclaration(member)) return member.type ? [member.type] : [];
 
   if (ts.isMethodSignature(member)) return signatureTypeNodes(member);
+
   if (ts.isMethodDeclaration(member)) return signatureTypeNodes(member);
+
   if (ts.isGetAccessorDeclaration(member)) return signatureTypeNodes(member);
+
   if (ts.isSetAccessorDeclaration(member)) return signatureTypeNodes(member);
 
   return [];
@@ -246,6 +252,7 @@ function lintServiceFile(
 
   for (const statement of sourceFile.statements) {
     if (!ts.isClassDeclaration(statement)) continue;
+
     const serviceName = statement.name?.text;
     if (!serviceName?.endsWith("Service")) continue;
 

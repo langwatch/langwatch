@@ -694,7 +694,7 @@ function main() {
   const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
 
   type NavPage = string | { group: string; pages: string[] };
-  const allNavGroups: Array<{ group: string; pages: NavPage[] }> = [];
+  const allNavGroups: { group: string; pages: NavPage[] }[] = [];
   let totalCreated = 0;
   let totalExisting = 0;
 
@@ -812,11 +812,11 @@ function main() {
 
     const existingMdx = findExistingMdxFiles(dirPath);
 
-    const endpoints: Array<{
+    const endpoints: {
       method: string;
       path: string;
       op: OpenAPIOperation;
-    }> = [];
+    }[] = [];
 
     for (const [apiPath, methods] of Object.entries(spec.paths)) {
       if (owners.get(apiPath) !== group) continue;

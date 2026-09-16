@@ -270,14 +270,14 @@ describe("the launcher running the session context hook", () => {
       expect(request.authorization).toBe(`Bearer ${INGEST_KEY}`);
 
       const record = JSON.parse(request.body) as {
-        resourceLogs: Array<{
+        resourceLogs: {
           scopeLogs: Array<{
             logRecords: Array<{
               eventName: string;
               attributes: Array<{ key: string; value: { stringValue: string } }>;
             }>;
           }>;
-        }>;
+        }[];
       };
       const logRecord = record.resourceLogs[0]?.scopeLogs[0]?.logRecords[0];
       expect(logRecord?.eventName).toBe("langwatch.session_context");

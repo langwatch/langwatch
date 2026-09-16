@@ -21,7 +21,7 @@ describe("ProtocolWriter", () => {
   describe("when the sink completes asynchronously (backpressure)", () => {
     it("keeps ordering and resolves emit only after the write callback fires", async () => {
       const chunks: string[] = [];
-      const pending: Array<() => void> = [];
+      const pending: (() => void)[] = [];
       const sink: ProtocolSink = (chunk, callback) => {
         chunks.push(chunk);
         pending.push(() => callback());

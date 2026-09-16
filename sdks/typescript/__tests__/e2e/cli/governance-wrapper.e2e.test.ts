@@ -19,12 +19,12 @@ let cpServer: http.Server;
 let gwServer: http.Server;
 let cpUrl: string;
 let gwUrl: string;
-let recordedGwRequests: Array<{
+let recordedGwRequests: {
   path: string;
   method: string;
   authorization: string;
   body: string;
-}> = [];
+}[] = [];
 let cpBudgetResponse: { status: number; body: unknown } = {
   status: 200,
   body: { ok: true },

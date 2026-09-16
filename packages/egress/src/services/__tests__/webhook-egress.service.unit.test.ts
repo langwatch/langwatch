@@ -22,7 +22,7 @@ const mockedSend = vi.mocked(sendHttpDestination);
 
 /** Answers whatever it is told, and remembers what it was asked. */
 class ScriptedRateLimiter extends WebhookDispatchRateLimiter {
-  readonly calls: Array<{ key: string; windowSeconds: number; max: number }> = [];
+  readonly calls: { key: string; windowSeconds: number; max: number }[] = [];
 
   constructor(private readonly answer: WebhookDispatchRateLimitResult) {
     super();

@@ -146,7 +146,7 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
     "0"?: {
       result?: {
         data?: {
-          json?: Array<{ id: string; teams?: Array<{ id: string }> }>;
+          json?: { id: string; teams?: Array<{ id: string }> }[];
         };
       };
     };
