@@ -60,11 +60,12 @@ Feature: The fallible-result-naming lint rule
     And it says renaming it to find is not the fix
 
   @unit
-  Scenario: Absence belongs to find methods alone
+  Scenario: A nullable result is reported unless the name is find-prefixed
     Given a method whose result type is nullable and is not named try*
     When the fallible-result-naming rule runs over it
     Then it reports nullableWithoutFind unless the method is named find*
     And a getter that always answers or throws is left alone
+    And the fix it offers names get or getBy and throwing, never a new nullable find*
 
   @unit
   Scenario: A nullable try-prefixed method reports the rename once, not twice

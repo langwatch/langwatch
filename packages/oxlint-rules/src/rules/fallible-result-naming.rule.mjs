@@ -226,14 +226,18 @@ export const fallibleResultNamingRule = defineRule({
         + " method always answers, and `T | null` only when `{{name}}` begins with `find`.",
     },
     nullableWithoutFind: {
-      what: "`{{name}}` can answer null or undefined, but only a `find*` method may answer with absence.",
+      what: "`{{name}}` answers null or undefined, which is not a shape new code writes.",
+      why: "A caller cannot tell whether absence here is an ordinary answer or a failure.",
       fix:
-        "Choose by what absence means here. If the caller branches on it, rename"
-        + " `{{name}}` to `find<Noun>` for the thing it looks up — never `find` bolted"
-        + " onto this name — and keep the nullable. If absence means the domain refused,"
-        + " throw the domain error and drop null and undefined from the return type. If"
-        + " this is a write whose target may normally be absent, return an explicit"
-        + " result union instead of null.",
+        "Decide what the absence means. If it is one thing that may not exist, name it"
+        + " `get<Noun>` — or `getBy<Key>` when the key is what distinguishes it — and"
+        + " throw the domain error, dropping null and undefined from the return type, so"
+        + " the caller gets the answer or the reason there is none. If it is really none"
+        + " or many, return an array and name it `find<Noun>`: the empty array is the"
+        + " absence. If it is a write whose target may normally be absent, return an"
+        + " explicit result union. Do not answer this by adding a nullable `find*` —"
+        + " `find` states cardinality, and the existing nullable ones are left as they"
+        + " are rather than joined by new ones.",
     },
     repositoryServiceVocabulary: {
       what: "Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.",

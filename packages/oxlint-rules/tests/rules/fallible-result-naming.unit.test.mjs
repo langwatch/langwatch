@@ -149,7 +149,7 @@ describe("given a strict feature port module", () => {
   });
 
   describe("when a nullable result is not a find method", () => {
-    /** @scenario "Absence belongs to find methods alone" */
+    /** @scenario "A nullable result is reported unless the name is find-prefixed" */
     it("reports nullableWithoutFind on a getter that may answer nothing", () => {
       const found = report(
         "export abstract class AgentPort { abstract getById(): Promise<string | undefined>; }",
@@ -158,14 +158,14 @@ describe("given a strict feature port module", () => {
       expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
     });
 
-    /** @scenario "Absence belongs to find methods alone" */
+    /** @scenario "A nullable result is reported unless the name is find-prefixed" */
     it("accepts a find method that answers with undefined", () => {
       expect(
         report("export abstract class AgentPort { abstract findById(): string | undefined; }"),
       ).toEqual([]);
     });
 
-    /** @scenario "Absence belongs to find methods alone" */
+    /** @scenario "A nullable result is reported unless the name is find-prefixed" */
     it("accepts a getter that always answers or throws", () => {
       expect(report("export abstract class AgentPort { abstract getById(): string; }")).toEqual(
         [],
@@ -388,6 +388,25 @@ describe("given a nullable function named for a conversion rather than a lookup"
       );
 
       expect(found.map((entry) => entry.messageId)).toContain("noResultType");
+    });
+  });
+});
+
+describe("given the guidance the nullableWithoutFind message hands a reader", () => {
+  describe("when a nullable non-find method is reported", () => {
+    /** @scenario "A nullable result is reported unless the name is find-prefixed" */
+    it("names get and throwing, and refuses a new nullable find, per the 2026-09-16 naming decision", () => {
+      const found = report(
+        "export class AgentService { resolveOwner(): string | undefined { return undefined; } }",
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+
+      const advice = `${found[0].message ?? ""} ${found[0].fix ?? ""}`;
+      expect(advice).toContain("get<Noun>");
+      expect(advice).toContain("throw");
+      expect(advice).not.toMatch(/rename .* to `find<Noun>`[^]*keep the nullable/);
     });
   });
 });
