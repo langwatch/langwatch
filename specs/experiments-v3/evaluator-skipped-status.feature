@@ -33,6 +33,18 @@ Feature: A skipped evaluation shows as skipped in the workbench
     Then the evaluator result has status skipped
     And it carries the reason
 
+  # The order of the branches matters. A run that failed never got as far as
+  # declining, so a skipped status left in its outputs is stale. Reading it
+  # first would hide a real failure behind a benign-looking skip — the same
+  # confusion as the original bug, pointing the other way.
+  @unit
+  Scenario: A failed run is an error even when its outputs carry a skip
+    Given an evaluator node whose run failed with an error
+    And its outputs still carry status skipped and a reason
+    When the node result is mapped to an evaluator result
+    Then the evaluator result has status error
+    And it carries the error, not the skip reason
+
   @unit
   Scenario: The stored row keeps the reason a row was skipped
     Given an evaluator result with status skipped and a reason

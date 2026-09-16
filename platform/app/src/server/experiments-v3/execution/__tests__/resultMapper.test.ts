@@ -1273,6 +1273,21 @@ describe("mapThrownErrorEvent", () => {
         expect(unreported.result).not.toHaveProperty("cost");
       }
     });
+
+    /** @scenario "A failed run is an error even when its outputs carry a skip" */
+    it("still reports an error when a failed run also carries a skip", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "error",
+        error: "Judge container died",
+        outputs: { status: "skipped", details: "Input is empty" },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.result.status).toBe("error");
+        expect(result.result.details).toBe("Judge container died");
+      }
+    });
   });
 
   describe("when a workflow evaluator declined the row", () => {
