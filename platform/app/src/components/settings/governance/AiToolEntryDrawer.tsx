@@ -868,7 +868,7 @@ function CliPathsSection({
             <Text fontSize="sm">Allow gateway (virtual key)</Text>
             <Text fontSize="xs" color="fg.muted">
               {isIngestionOnly
-                ? "pi takes its endpoint from its own model settings, which the LangWatch launcher does not change, so the gateway route never applies."
+                ? "pi sets its endpoint in its own model settings, so the gateway route never applies."
                 : "Route through the LangWatch gateway with a personal virtual key."}
             </Text>
           </VStack>
