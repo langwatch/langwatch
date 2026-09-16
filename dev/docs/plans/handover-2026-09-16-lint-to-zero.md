@@ -11,22 +11,30 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | handover written | wave 3 | wave 4 | now (wave 5 landed) |
+| | drive start | handover written | wave 4 | wave 5 | now (wave 6 landed) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 | 9,771 | 9,208 | **8,695** |
-| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,632** |
-| oxlint total | 24,022 | 14,884 | 11,403 | 10,840 | **10,327** |
-| — of which `comment-block-size` | 6,168 | 6,168 | 2,685 | 2,119 | **1,593** |
+| oxlint errors | 6,075 | 13,253 | 9,208 | 8,695 | **8,242** |
+| oxlint warnings | 17,947 | 1,631 | 1,632 | 1,632 | **1,636** |
+| oxlint total | 24,022 | 14,884 | 10,840 | 10,327 | **9,878** |
+| — of which `comment-block-size` | 6,168 | 6,168 | 2,119 | 1,593 | **1,170** |
 | architecture-enforcer | 3,137 | 2,761 | 2,840 | 2,840 | 2,840 (see note) |
-| **true total** | **27,159** | **17,645** | **14,243** | **13,680** | **13,167** |
+| **true total** | **27,159** | **17,645** | **13,680** | **13,167** | **12,718** |
 
-Down 13,992 from the drive's start. The comment sweep has cleared **4,575 of
-6,168, or 74%**, across twenty-four areas.
+Down 14,441 from the drive's start. The comment sweep has cleared **4,998 of
+6,168, or 81%**, across twenty-eight areas.
 
-Wave 5 cleared 525 and the tree fell by 526 — one *better* than arithmetic, the
-first tranche not to leak. Contrast wave 4, which cleared 578 and moved 566.
-The difference is how much concurrent work landed alongside, not anything about
-the sweep; see the ratchet note below, which still stands.
+**Two milestones this wave.** The whole-tree total is below 10,000 for the first
+time in the drive. And `comment-block-size` is no longer the largest rule —
+`fallible-result-naming` (1,347) has overtaken it. The next tranche of this
+drive is arguably no longer the comment sweep.
+
+**One caveat on the 1,170, stated because it would otherwise flatter the
+number.** About 142 of the findings counted as cleared belong to
+`w6-evaluator-server-mcp`, whose slice is **deliberately uncommitted** — 19 of
+them were cleared by splitting blocks rather than shortening them, and a
+correction lane is merging those back. Its edits are in the working tree, so
+oxlint already counts them. If that slice were reverted rather than corrected,
+the figure returns to roughly 1,312.
 
 **The enforcer number is not comparable to the 2,761.** Measured it prints
 `2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
