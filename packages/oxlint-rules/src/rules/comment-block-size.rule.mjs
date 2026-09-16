@@ -1,6 +1,3 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   COMMENT_BLOCK_ERROR_FIX,
   COMMENT_BLOCK_ERROR_LINES,
@@ -16,7 +13,6 @@ import {
   structuralTagLines,
   marksLicenseHeader,
   mayContainReviewBlock,
-  rootCovers,
 } from "../../grammar/comment-block-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
@@ -38,79 +34,7 @@ const COMMENT_EXCLUDED_DIRECTORIES = new Set([
   "vendor",
 ]);
 
-const changedFilesCache = new Map();
-const commentBlockRootsCache = new Map();
 const analysisCache = new Map();
-
-function gitOutput(cwd, arguments_) {
-  try {
-    return execFileSync("git", ["-C", cwd, ...arguments_], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-      maxBuffer: 16 * 1024 * 1024,
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-function gitPaths(cwd, arguments_) {
-  return (gitOutput(cwd, arguments_) ?? "").split("\0").filter((path) => path.length > 0);
-}
-
-function mergeBase(cwd) {
-  for (const reference of ["@{upstream}", "origin/main", "main"]) {
-    const base = gitOutput(cwd, ["merge-base", "HEAD", reference])?.trim();
-    if (base) return base;
-  }
-  return gitOutput(cwd, ["rev-parse", "HEAD^"])?.trim();
-}
-
-/**
- * Files introduced since the branch base, modified locally, or untracked, as
- * workspace-relative paths. `undefined` outside a git checkout, where every
- * file counts as changed — the same fallback the CLI takes.
- */
-function changedFiles(cwd) {
-  if (changedFilesCache.has(cwd)) return changedFilesCache.get(cwd);
-  let changed;
-  if (gitOutput(cwd, ["rev-parse", "--is-inside-work-tree"])) {
-    changed = new Set([
-      ...gitPaths(cwd, ["diff", "--name-only", "-z", "--diff-filter=ACMR", "HEAD"]),
-      ...gitPaths(cwd, ["ls-files", "--others", "--exclude-standard", "-z"]),
-    ]);
-    const base = mergeBase(cwd);
-    if (base) {
-      for (const path of gitPaths(cwd, [
-        "diff",
-        "--name-only",
-        "-z",
-        "--diff-filter=ACMR",
-        `${base}...HEAD`,
-      ])) {
-        changed.add(path);
-      }
-    }
-  }
-  changedFilesCache.set(cwd, changed);
-  return changed;
-}
-
-function commentBlockRoots(cwd) {
-  if (commentBlockRootsCache.has(cwd)) return commentBlockRootsCache.get(cwd);
-  const file = join(cwd, "packages", "architecture-enforcer", "src", "comment-block-roots.json");
-  let entries = [];
-  if (existsSync(file)) {
-    try {
-      const value = JSON.parse(readFileSync(file, "utf8"));
-      if (value.version === 0 && Array.isArray(value.roots)) entries = value.roots;
-    } catch {
-      entries = [];
-    }
-  }
-  commentBlockRootsCache.set(cwd, entries);
-  return entries;
-}
 
 export function isCommentScannedPath(workspacePath) {
   if (workspacePath.startsWith("../")) return false;
@@ -118,17 +42,6 @@ export function isCommentScannedPath(workspacePath) {
   const excluded = segments.some((segment) => COMMENT_EXCLUDED_DIRECTORIES.has(segment));
   if (excluded) return false;
   return !/\.(?:generated|gen)\.[cm]?[jt]sx?$/.test(workspacePath);
-}
-
-/**
- * Whether the burn-down allowlist still covers this file; a changed file never
- * is. Called only once a candidate exists: the lookup is wasted otherwise.
- */
-export function isCoveredByAllowedRoot(cwd, workspacePath) {
-  const changed = changedFiles(cwd);
-  if (!changed || changed.has(workspacePath)) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return commentBlockRoots(cwd).some((entry) => rootCovers(entry, workspacePath, today));
 }
 
 function commentRangesOf(program) {
@@ -226,7 +139,6 @@ export const commentBlockSizeRule = defineRule({
           (block) => block.lines >= COMMENT_BLOCK_ERROR_LINES,
         );
         if (oversized.length === 0 && analysis.columnOverflows.length === 0) return;
-        if (isCoveredByAllowedRoot(context.cwd, file.workspacePath)) return;
 
         for (const block of oversized) {
           context.report({

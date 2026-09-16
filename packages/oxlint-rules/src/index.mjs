@@ -20,7 +20,6 @@ export {
   commentBlockAnalysis,
   commentBlockSizeRule,
   isCommentScannedPath,
-  isCoveredByAllowedRoot,
 } from "./rules/comment-block-size.rule.mjs";
 export {
   cognitiveComplexity,

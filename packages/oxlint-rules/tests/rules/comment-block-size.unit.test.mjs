@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { afterAll, describe, expect, it } from "vitest";
 import { commentBlockSizeMessage } from "../../grammar/comment-block-policy.mjs";
 import { commentBlockSizeRule } from "../../src/index.mjs";
@@ -99,6 +98,23 @@ describe("given a source file outside the burn-down allowlist", () => {
     });
   });
 
+  describe("when a block's length is a test's level and environment annotations", () => {
+    /** @scenario "A test's level and environment annotations are not counted as commentary" */
+    it("reports nothing, because neither annotation can be deleted by its author", () => {
+      const code = [
+        "/**",
+        " * Runs the generated SQL against the shipped migrations.",
+        " * @see specs/analytics/clickhouse-memory-safety.feature",
+        " * @integration",
+        " * @vitest-environment node",
+        " */",
+        "export const x = 1;",
+      ].join("\n");
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
   describe("when a block has prose bulk beyond its tags", () => {
     /** @scenario "Prose past the limit is still reported alongside tags" */
     it("reports the block, counting only the commentary", () => {
@@ -124,55 +140,6 @@ describe("given a source file outside the burn-down allowlist", () => {
       const code = `/** @scenario "x" */\n${commentLines(9)}\nexport const x = 1;`;
 
       expect(report(code)).toEqual([]);
-    });
-  });
-});
-
-describe("given a file the burn-down allowlist covers", () => {
-  describe("when the same file has an oversized block", () => {
-    /** @scenario "A file the burn-down root covers is not reported" */
-    it("reports nothing", () => {
-      // The coverage check only applies inside a git checkout — outside one,
-      // "every file counts as changed", which never matches an allowlist
-      // root. A throwaway repo, committed once, is what lets this branch run
-      // at all.
-      const covered = createFixtureWorkspace({
-        files: {
-          "packages/architecture-enforcer/src/comment-block-roots.json": JSON.stringify({
-            version: 0,
-            roots: [{ root: "legacy", expires: "2999-01-01" }],
-          }),
-          "legacy/module.ts": `${commentLines(9)}\nexport const x = 1;`,
-        },
-      });
-      const git = (...arguments_) =>
-        execFileSync("git", ["-C", covered.cwd, ...arguments_], { stdio: "ignore" });
-      try {
-        git("init", "-q");
-        git("-c", "user.email=lint@langwatch.ai", "-c", "user.name=lint", "add", "-A");
-        git(
-          "-c",
-          "user.email=lint@langwatch.ai",
-          "-c",
-          "user.name=lint",
-          "-c",
-          "commit.gpgsign=false",
-          "commit",
-          "-q",
-          "-m",
-          "fixture",
-        );
-
-        const found = runRule(commentBlockSizeRule, {
-          code: `${commentLines(9)}\nexport const x = 1;`,
-          cwd: covered.cwd,
-          filename: "legacy/module.ts",
-        });
-
-        expect(found).toEqual([]);
-      } finally {
-        covered.cleanup();
-      }
     });
   });
 });

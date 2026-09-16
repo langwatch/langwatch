@@ -41,7 +41,7 @@ Machinery that hardcodes the layout:
   generated-file copy path).
 - `packages/architecture-enforcer/src/workspace/snapshot.ts` lines ~194–195 (`discoverFeatures`), ~271–436
   (enterprise root checks, the "aggregate outside packages/enterprise" rule, fixed roots).
-- `packages/architecture-enforcer/src/comment-block-roots.json`, `feature-shape-baseline.json`,
+- `packages/architecture-enforcer/src/feature-shape-baseline.json`,
   `boundary-edge-baseline.json`, `composed-exports-baseline.json`, `oxlint-baseline.json` (keys carry
   paths; **Fable rewrites these**, sorted code-unit order).
 - `packages/features/catalogue.json` `root` fields.

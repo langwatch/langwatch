@@ -95,7 +95,7 @@ const SCENARIO_ANNOTATION = /@scenario\b/;
  * are not here - those carry prose, and prose is what the limit measures.
  */
 const STRUCTURAL_TAG_LINE =
-  /^\s*(?:\/\*\*)?\s*\*?\s*@(?:param|returns?|throws|template|typeParam|defaultValue|see)\b/;
+  /^\s*(?:\/\*\*)?\s*\*?\s*@(?:param|returns?|throws|template|typeParam|defaultValue|see|integration|vitest-environment|regression)\b/;
 
 /** How many of a block's lines are structural JSDoc tags rather than commentary. */
 export function structuralTagLines(text) {
@@ -283,12 +283,3 @@ export function collectCommentBlocks({ source, ranges }) {
   return blocks;
 }
 
-/**
- * Whether a listed root still covers `relativePath`: the entry names the
- * file's root and has not expired as of `today`. An expired entry stops
- * covering its files, and the CLI reports it in its own right.
- */
-export function rootCovers(entry, relativePath, today) {
-  if (entry.expires < today) return false;
-  return relativePath === entry.root || relativePath.startsWith(`${entry.root}/`);
-}

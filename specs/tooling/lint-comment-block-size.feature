@@ -1,10 +1,11 @@
 Feature: The comment-block-size lint rule
-  A contiguous comment block of 9 or more lines, or a comment line past 100
-  columns, is reported — comments exist to make code readable and good code
-  needs almost none. This tier is an error and cannot be argued with: a
-  `@lint-keep` annotation is refused at this size, and the message says so.
-  A block carrying a `@scenario` annotation, or a file the burn-down allowlist
-  still covers, is exempt.
+  A contiguous comment block of 6 or more lines of commentary, or a comment
+  line past 100 columns, is reported — comments exist to make code readable and
+  good code needs almost none. There is one tier, it is an error, and it cannot
+  be argued with: a `@lint-keep` annotation is refused at this size and the
+  message says so. A block carrying a `@scenario` annotation is exempt, and
+  lines the author cannot cut — structural JSDoc tags, and the annotations that
+  select a test's level and environment — are not counted as commentary.
 
   @unit
   Scenario: An oversized comment block is reported with its measured line count
@@ -31,12 +32,6 @@ Feature: The comment-block-size lint rule
     Then it reports nothing
 
   @unit
-  Scenario: A file the burn-down root covers is not reported
-    Given a committed file with a 9-line comment block whose root is listed in the burn-down allowlist
-    When the comment-block-size rule runs over it
-    Then it reports nothing
-
-  @unit
   Scenario: The keep annotation does not suppress the error tier
     Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
     When the comment-block-size rule runs over it
@@ -59,6 +54,12 @@ Feature: The comment-block-size lint rule
     Given a comment block whose length is its @param and @returns tags
     When the comment-block-size rule runs over it
     Then it reports nothing, because the tag count comes from the signature
+
+  @unit
+  Scenario: A test's level and environment annotations are not counted as commentary
+    Given a comment block whose length is one line of prose beside @integration and @vitest-environment
+    When the comment-block-size rule runs over it
+    Then it reports nothing, because neither annotation can be deleted by its author
 
   @unit
   Scenario: Prose past the limit is still reported alongside tags
