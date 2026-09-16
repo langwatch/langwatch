@@ -481,6 +481,36 @@ assert the first.
 drive has touched none of `enterprise/**`, `packages/handled-error/**` or that
 test.
 
+## THE REPOSITORY'S OWN INVARIANT SUITE IS RED: 77 failures, 23 files
+
+`pnpm --filter @langwatch/architecture-enforcer test:unit` fails 77 tests across
+23 files. **None are from this drive** - checked rather than assumed: 8 of the 23
+files were touched by `comment-w11`, but every failure in them asserts about the
+repository, not about comments, and the lane's whole diff removes **zero**
+`@ts-expect-error`, `@vitest-environment`, `eslint-disable`, `@lint-keep` or
+`@scenario` directives and zero non-comment lines.
+
+A sample, which shows the class:
+
+    catalog-enforcement     modules/model-provider/server/package.json pins
+                            "nanoid": "^6.0.0" outside the default catalog
+    api-package-files       packages/api carries dates.ts, trpc/compose.ts and
+                            trpc/throttle.ts outside its allowed layout
+    ci-ingest-path-filter   an ingest pattern points at
+                            modules/trace/server/src/transport/api-rest/**,
+                            which does not exist
+    tsconfig-shared-base    20 tsconfigs do not extend the shared base
+    localDevLicense         imports ../../ee/licensing/... - dead since `ee/`
+                            was renamed to `enterprise/`
+
+**Why it matters to whoever picks this up.** This is the suite that would catch
+the next structural regression, and while it is this red nobody can tell a new
+break from the standing 77. It is the same failure mode as the two measurement
+defects this drive already found - a vendored bundle counted as debt, and a
+declarations gate that had silently stopped running - and it is larger than
+either. Most of it is branch state from the concurrent refactors, not one
+session's doing.
+
 ## Decisions the user made — do NOT relitigate
 
 1. **Target is every finding, not the CI gate.**
