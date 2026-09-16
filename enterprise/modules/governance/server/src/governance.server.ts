@@ -7,6 +7,46 @@
  * stays private to this feature server — a composition states which substrates
  * it has, never which class to construct.
  */
+import {
+  bindRestHeader,
+  bindRestMiddleware,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
+import { defineServerModule } from "@langwatch/runtime-composition";
+
+import { GovernanceApp } from "./app/governance.app.ts";
+import {
+  governanceRest,
+  governanceRestCaller,
+  governanceRestSurface,
+} from "./transport/governance.rest.ts";
+
+import {
+  GovernanceCliAccessService,
+  type GovernanceCliAccessApi,
+  type GovernanceCliAccessMembers,
+} from "./services/governance-cli-access.service.ts";
+import {
+  GovernanceCliActivityService,
+  type GovernanceCliActivityApi,
+  type GovernanceCliActivityMembers,
+} from "./services/governance-cli-activity.service.ts";
+import {
+  GovernanceCliCredentialService,
+  type GovernanceCliCredentialApi,
+  type GovernanceCliCredentialMembers,
+} from "./services/governance-cli-credentials.service.ts";
+import {
+  GovernanceIngestAccessService,
+  type GovernanceIngestAccessApi,
+  type GovernanceIngestAccessMembers,
+} from "./services/governance-ingest-access.service.ts";
+import {
+  GovernanceIngestReceiverService,
+  type GovernanceIngestReceiverApi,
+  type GovernanceIngestReceiverMembers,
+} from "./services/governance-ingest-receiver.service.ts";
+
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
@@ -86,6 +126,63 @@ import { PulledUsagePricingService } from "./services/pulled-usage-pricing.servi
 import { PulledUsageRecordService } from "./services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "./services/puller-registry.service.ts";
 import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
+
+/**
+ * The whole module, declared: one application and the REST family it answers.
+ * A process installs this and mounts what it wants; the repositories and
+ * services behind the application stay private to this feature server.
+ */
+export const governanceServer = defineServerModule("governance")
+  .withApp(GovernanceApp)
+  .withTransports(governanceRest)
+  // The member behind the project credential, and which surface asked. A
+  // legacy project key names no member, which is what the admin routes refuse.
+  .withTransportFacts(() => [
+    bindRestMiddleware(governanceRestCaller, (context) => {
+      const credential = projectCredentialOfRequest(context.req.raw);
+
+      return { viewerUserId: credential.type === "apiKey" ? credential.userId : null };
+    }),
+    bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+  ]);
+
+/**
+ * The three gates the CLI governance plane applies before it serves a route:
+ * the device bearer, the plan, and the organization permission.
+ */
+export function createGovernanceCliAccess(
+  members: GovernanceCliAccessMembers,
+): GovernanceCliAccessApi {
+  return GovernanceCliAccessService.create(members);
+}
+
+/** Everything `/api/auth/cli` hands back or mints, over one process's ports. */
+export function createGovernanceCliCredentials(
+  members: GovernanceCliCredentialMembers,
+): GovernanceCliCredentialApi {
+  return GovernanceCliCredentialService.create(members);
+}
+
+/** The Activity Monitor reads the CLI performs, each with its ownership proof. */
+export function createGovernanceCliActivity(
+  members: GovernanceCliActivityMembers,
+): GovernanceCliActivityApi {
+  return GovernanceCliActivityService.create(members);
+}
+
+/** The gate the push-mode receivers share: throttle, secret, then the path id. */
+export function createGovernanceIngestAccess(
+  members: GovernanceIngestAccessMembers,
+): GovernanceIngestAccessApi {
+  return GovernanceIngestAccessService.create(members);
+}
+
+/** Where a received payload of each signal is folded, priced and acknowledged. */
+export function createGovernanceIngestReceiver(
+  members: GovernanceIngestReceiverMembers,
+): GovernanceIngestReceiverApi {
+  return GovernanceIngestReceiverService.create(members);
+}
 
 /** The substrates one ingestion-pull worker installation is built over. */
 export type IngestionPullWorkerSubstrates = Readonly<{
@@ -221,7 +318,9 @@ export function findAgentsListings(options: {
  * connection and the peers it holds. Every repository and service behind it
  * stays private to this feature server.
  */
-export function createGovernanceInstallation(options: GovernanceInstallationOptions): GovernanceApi {
+export function createGovernanceInstallation(
+  options: GovernanceInstallationOptions,
+): GovernanceApi {
   return PrismaGovernanceInstallationRepository.create(options).build();
 }
 

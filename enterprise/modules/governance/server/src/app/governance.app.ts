@@ -41,8 +41,9 @@ import {
   type DeleteRoutingPolicyInput,
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
-  type GovernanceCallSurface,
   type GovernanceApi,
+  type GovernanceProjectCaller,
+  GovernanceRestApi,
   type IngestionTemplate,
   type IssuedPersonalVirtualKey,
   type ListPersonalVirtualKeysInput,
@@ -57,6 +58,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   PersonalUsageDashboardService,
@@ -243,22 +245,15 @@ export interface GovernanceCaller {
   readonly displayEmail?: string | null;
 }
 
-/**
- * Who a project-scoped REST call is attributed to.
- *
- * `userId` is absent for a legacy project API key, which is bound to a project
- * rather than to a person.
- */
-export interface GovernanceProjectCaller {
-  readonly projectId: string;
-  readonly userId?: string | null;
-  /** Which surface initiated the change, for the audit row. */
-  readonly surface: GovernanceCallSurface;
-}
+/** How a process installs this application: one members object, no peers. */
+type GovernanceSetup = FeatureSetup<Record<never, never>, GovernanceAppDependencies, undefined>;
 
-export class GovernanceApp {
-  static create(dependencies: GovernanceAppDependencies): GovernanceApp {
-    return new GovernanceApp(dependencies);
+export class GovernanceApp implements GovernanceRestApi {
+  static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
+  static readonly dependencies: Readonly<Record<string, never>> = {};
+
+  static create({ members }: GovernanceSetup): GovernanceApp {
+    return new GovernanceApp(members);
   }
 
   private constructor(private readonly dependencies: GovernanceAppDependencies) {

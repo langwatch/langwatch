@@ -8,7 +8,6 @@ export type { DepartmentService } from "./services/department.service.ts";
 export type { GovernanceSignalService } from "./services/governance-signal.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
-
 export type {
   GovernanceDirectoryProject,
   GovernanceMembershipStatus,
@@ -34,7 +33,6 @@ export type {
   GovernanceAppDependencies,
   GovernanceCaller,
   GovernancePersonalVirtualKeyMembers,
-  GovernanceProjectCaller,
 } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
@@ -116,36 +114,70 @@ export { TraceAlertTriggerMatchSubscriber } from "./eventing/trace-alert-trigger
 // converted to the declared `defineTrpcRouter` shape.
 
 /**
- * The public REST family this feature owns. The process supplies the bound REST security
- * service and resolvers for the governance and project services; the base path, access
- * declarations, schemas and delegation are the feature's.
+ * The public REST family this feature owns, as a declaration: its paths,
+ * permissions, schemas and handlers. The installer names it; a process mounts
+ * that installer rather than reaching for the declaration itself.
  */
-export { createGovernanceRestApp } from "./transport/governance.rest.ts";
+export {
+  governanceRest,
+  governanceRestCaller,
+  governanceRestSurface,
+} from "./transport/governance.rest.ts";
+export { GovernanceApp } from "./app/governance.app.ts";
+export { governanceServer } from "./governance.server.ts";
 
-// The CLI governance plane: thirteen routes under `/api/auth/cli` that
+// The CLI governance plane: fourteen routes under `/api/auth/cli` that
 // authenticate with a device-session bearer and dispatch into governance. They
 // sit under an auth path because the project-scoped governance REST rejects a
 // device token; the services underneath are the console's own.
+export { governanceCliRest, GovernanceCliRestApi } from "./transport/governance-cli.rest.ts";
 export {
-  createGovernanceCliRestApp,
-  type GovernanceCliAccessToken,
-  type GovernanceCliBudgetReader as GovernanceCliBudget,
-  type GovernanceCliCaller,
-  type GovernanceCliPersonalWorkspace,
-  type GovernanceCliRestDependencies as GovernanceCliRestMembers,
-} from "./transport/governance-cli.rest.ts";
+  createGovernanceCliAccess,
+  createGovernanceCliActivity,
+  createGovernanceCliCredentials,
+  createGovernanceIngestAccess,
+  createGovernanceIngestReceiver,
+} from "./governance.server.ts";
+export type {
+  GovernanceCliAccessApi,
+  GovernanceCliAccessMembers,
+  GovernanceCliAccessToken,
+  GovernanceCliCaller,
+  GovernanceCliMemberDirectory,
+} from "./services/governance-cli-access.service.ts";
+export type {
+  GovernanceCliActivityApi,
+  GovernanceCliActivityMembers,
+} from "./services/governance-cli-activity.service.ts";
+export type {
+  GovernanceCliBudgetReader,
+  GovernanceCliCredentialApi,
+  GovernanceCliCredentialMembers,
+  GovernanceCliPersonalWorkspace,
+  GovernanceCliPersonDirectory,
+} from "./services/governance-cli-credentials.service.ts";
 
 // The Activity Monitor's push-mode receivers. A signal whose collection this
-// process did not compose is not mounted at all, so an exporter gets a 404
-// rather than a 500 from a receiver that pretends to serve it.
+// process did not compose answers `not-served`, so an exporter gets a
+// permanent 404 rather than a 500 from a receiver that pretends to serve it.
 export {
-  createGovernanceIngestRestApp,
-  type GovernanceIngestLogCollectionChannel as GovernanceIngestLogCollection,
-  type GovernanceIngestMetricCollectionChannel as GovernanceIngestMetricCollection,
-  type GovernanceIngestRestMembers,
-  type GovernanceIngestSpend,
-  type GovernanceIngestTraceCollection,
+  governanceIngestRest,
+  GovernanceIngestRestApi,
 } from "./transport/governance-ingest.rest.ts";
+export type {
+  GovernanceIngestAccessApi,
+  GovernanceIngestAccessMembers,
+  GovernanceIngestAuthorization,
+} from "./services/governance-ingest-access.service.ts";
+export type {
+  GovernanceIngestLogCollectionChannel,
+  GovernanceIngestMetricCollectionChannel,
+  GovernanceIngestPrincipalDirectory,
+  GovernanceIngestReceiverApi,
+  GovernanceIngestReceiverMembers,
+  GovernanceIngestSpend,
+  GovernanceIngestTraceCollection,
+} from "./services/governance-ingest-receiver.service.ts";
 
 /**
  * The governance tools installed on a hosted MCP session. Exported from here, and not from the

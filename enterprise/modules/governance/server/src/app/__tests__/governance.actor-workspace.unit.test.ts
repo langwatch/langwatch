@@ -46,22 +46,24 @@ function buildApp(options: {
   const tryFindPersonalWorkspace = vi.fn(async () => options.workspace ?? null);
 
   const app = GovernanceApp.create({
-    governance: new TestGovernanceService(),
-    projects: {
-      getOrganizationId: unreachable<ProjectApi["getOrganizationId"]>(),
-      findInternal: unreachable<ProjectApi["findInternal"]>(),
+    members: {
+      governance: new TestGovernanceService(),
+      projects: {
+        getOrganizationId: unreachable<ProjectApi["getOrganizationId"]>(),
+        findInternal: unreachable<ProjectApi["findInternal"]>(),
+      },
+      organizations: {
+        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
+        tryFindPersonalWorkspace,
+      },
+      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
+      personalVirtualKeys: {
+        isOrganizationMember,
+        hasActivePersonalKeyLabelled:
+          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
+      },
+      actors: { findUser: tryFindUser },
     },
-    organizations: {
-      ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-      tryFindPersonalWorkspace,
-    },
-    permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
-    personalVirtualKeys: {
-      isOrganizationMember,
-      hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-    },
-    actors: { findUser: tryFindUser },
   });
 
   return { app, tryFindUser, isOrganizationMember, tryFindPersonalWorkspace };

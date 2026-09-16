@@ -3,8 +3,12 @@
  * application operation each verb dispatches to.
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
-import { createRestApiService, type RestApiServiceMembers } from "@langwatch/api/rest";
-import type { AppRestOrganizationVariables, AppRestProjectVariables } from "@langwatch/api/rest";
+import {
+  bindRestHeader,
+  bindRestMiddleware,
+  createRestRuntime,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   InvalidSourceTypeError,
@@ -16,16 +20,19 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
-import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
-} from "../governance.app.ts";
-import { createGovernanceRestApp } from "../../transport/governance.rest.ts";
-import { TestGovernanceService } from "./support/test-governance-service.ts";
+} from "../../app/governance.app.ts";
+import {
+  governanceRest,
+  governanceRestCaller,
+  governanceRestSurface,
+} from "../governance.rest.ts";
+import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
 
 /** A dependency this door never reaches; calling one is the test's own bug. */
 const unreachable = <Method>(): Method =>
@@ -73,61 +80,27 @@ function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate
 
 /**
  * The two things the process supplies and this package does not own: who the caller is, and how
- * a refusal is rendered.
+ * a refusal is rendered. A credential the door does not recognise and a permission outside the
+ * key's ceiling are both raised as handled errors, exactly as a real mount raises them.
  */
-function spine(grants: readonly string[]) {
-  const granted = new Set(grants);
-  const refusals: string[] = [];
+const renderHandled: RestErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json(
+      { error: error.code, message: error.message },
+      (error.httpStatus ?? 500) as ContentfulStatusCode,
+    );
+  }
 
-  const authenticateProject: MiddlewareHandler = async (c, next) => {
-    const presented =
-      c.req.header("X-Auth-Token") ?? c.req.header("Authorization")?.replace(/^Bearer /, "");
-    if (presented !== USER_BOUND_TOKEN && presented !== LEGACY_PROJECT_TOKEN) {
-      return c.json({ error: "Unauthorized", message: "Invalid credential" }, 401);
-    }
-    c.set("project", PROJECT);
-    c.set("apiKeyId", "api-key-1");
-    if (presented === USER_BOUND_TOKEN) c.set("apiKeyUserId", USER_ID);
-    await next();
-  };
+  return c.json({ error: "Internal server error" }, 500);
+};
 
-  const ports: RestApiServiceMembers = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: (error, c) => {
-      if (HandledError.isHandled(error)) {
-        return c.json(
-          { error: error.code, message: error.message },
-          (error.httpStatus ?? 500) as ContentfulStatusCode,
-        );
-      }
-      return c.json({ error: "Internal server error" }, 500);
-    },
-    canonicalErrorHandler: (error, c) => c.json({ error: { message: error.message } }, 500),
-    authenticateProject: () => authenticateProject,
-    authorizeProjectPermission: () => async (_c, next) => next(),
-    authorizeApiKeyCeiling:
-      ({ permission }) =>
-      async (c, next) => {
-        if (!granted.has(permission)) {
-          refusals.push(permission);
-          return c.json({ error: "Forbidden", message: "Outside the key's ceiling" }, 403);
-        }
-        await next();
-      },
-    authenticateOrganization: () => async (_c, next) => next(),
-    authorizeOrganizationPermission: () => async (_c, next) => next(),
-    authorizeRouteTeamPermission: () => async (_c, next) => next(),
-    authorizeRouteProjectPermission: () => async (_c, next) => next(),
-    authenticateOrganizationThrowing: async (_c, next) => next(),
-    authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),
-  };
+/** The member a presented credential names, or nothing for the legacy project token. */
+function viewerOf(request: Request): string | null {
+  const presented =
+    request.headers.get("X-Auth-Token") ??
+    request.headers.get("Authorization")?.replace(/^Bearer /, "");
 
-  return {
-    refusals,
-    security: createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports),
-  };
+  return presented === USER_BOUND_TOKEN ? USER_ID : null;
 }
 
 function buildApi(
@@ -140,27 +113,65 @@ function buildApi(
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
 
   const app = GovernanceApp.create({
-    governance,
-    projects: {
-      getOrganizationId,
-      findInternal: unreachable<ProjectApi["findInternal"]>(),
+    members: {
+      governance,
+      projects: {
+        getOrganizationId,
+        findInternal: unreachable<ProjectApi["findInternal"]>(),
+      },
+      organizations: {
+        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
+        tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
+      },
+      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
+      personalVirtualKeys: {
+        isOrganizationMember:
+          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
+        hasActivePersonalKeyLabelled:
+          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
+      },
+      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
     },
-    organizations: {
-      ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-      tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
-    },
-    permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
-    personalVirtualKeys: {
-      isOrganizationMember:
-        unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
-      hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-    },
-    actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });
 
-  const built = spine(options.grants ?? ["aiTools:view", "aiTools:manage"]);
-  const hono = createGovernanceRestApp({ security: built.security, app: () => app });
+  const granted = new Set(options.grants ?? ["aiTools:view", "aiTools:manage"]);
+  const refusals: string[] = [];
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: ({ request, permission }) => {
+        const presented =
+          request.headers.get("X-Auth-Token") ??
+          request.headers.get("Authorization")?.replace(/^Bearer /, "");
+
+        if (presented !== USER_BOUND_TOKEN && presented !== LEGACY_PROJECT_TOKEN) {
+          throw new HandledError("unauthorized", "Invalid credential", { httpStatus: 401 });
+        }
+
+        if (!granted.has(permission)) {
+          refusals.push(permission);
+          throw new HandledError("forbidden", "Outside the key's ceiling", { httpStatus: 403 });
+        }
+
+        return {
+          actor: null,
+          scope: { tier: "project", id: PROJECT.id } as const,
+        };
+      },
+    },
+  });
+
+  const hono = runtime.mount(governanceRest.router(), {
+    app: () => app,
+    credential: "project",
+    onError: renderHandled,
+    facts: [
+      bindRestMiddleware(governanceRestCaller, (context) => ({
+        viewerUserId: viewerOf(context.req.raw),
+      })),
+      bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
+    ],
+  });
 
   const requestWith =
     (token: string, header: string) =>
@@ -177,14 +188,14 @@ function buildApi(
 
   return {
     hono,
+    refusals,
     getOrganizationId,
     asUser: requestWith(`Bearer ${USER_BOUND_TOKEN}`, "Authorization"),
     asProjectKey: requestWith(LEGACY_PROJECT_TOKEN, "X-Auth-Token"),
-    ...built,
   };
 }
 
-describe("createGovernanceRestApp", () => {
+describe("the governance REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
       const templateListForUser = vi.fn(async () => []);
@@ -226,11 +237,8 @@ describe("createGovernanceRestApp", () => {
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
-        error: {
-          type: "forbidden",
-          code: "user_token_required",
-          message: expect.any(String),
-        },
+        error: "user_token_required",
+        message: expect.any(String),
       });
       expect(templateListForOrgAdmin).not.toHaveBeenCalled();
     });
@@ -248,8 +256,8 @@ describe("createGovernanceRestApp", () => {
       });
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("user_token_required");
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe("user_token_required");
       expect(templateCreateOrg).not.toHaveBeenCalled();
     });
   });
@@ -381,12 +389,11 @@ describe("createGovernanceRestApp", () => {
         body: JSON.stringify({ source_type: "Bad Source!", display_name: "Should Fail" }),
       });
 
-      expect(response.status).toBe(400);
-      const body = (await response.json()) as { error: { type: string; code: string } };
-      expect(body.error).toMatchObject({
-        type: "bad_request",
-        code: "invalid_source_type",
-      });
+      // 422, the status this framework gives every validation failure — the
+      // 400 this family used to answer was the deleted mapper's own choice.
+      expect(response.status).toBe(422);
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe(new InvalidSourceTypeError().code);
     });
 
     it("refuses a body with no display name before the application sees it", async () => {
@@ -478,11 +485,8 @@ describe("createGovernanceRestApp", () => {
       );
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: { type: string; code: string } };
-      expect(body.error).toMatchObject({
-        type: "forbidden",
-        code: "platform_template_immutable",
-      });
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe(new PlatformTemplateImmutableError().code);
     });
   });
 
@@ -513,11 +517,8 @@ describe("createGovernanceRestApp", () => {
       });
 
       expect(response.status).toBe(404);
-      const body = (await response.json()) as { error: { type: string; code: string } };
-      expect(body.error).toMatchObject({
-        type: "not_found",
-        code: "ingestion_template_not_found",
-      });
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe(new TemplateNotFoundError("nope").code);
     });
   });
 
@@ -637,8 +638,8 @@ describe("createGovernanceRestApp", () => {
       const response = await asProjectKey("/api/governance/ingestion-templates/tmpl-6");
 
       expect(response.status).toBe(403);
-      const body = (await response.json()) as { error: { code: string } };
-      expect(body.error.code).toBe("user_token_required");
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toBe("user_token_required");
       expect(templateGetByIdForOrg).not.toHaveBeenCalled();
     });
   });

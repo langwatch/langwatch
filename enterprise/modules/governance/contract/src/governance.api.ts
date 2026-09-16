@@ -9,6 +9,7 @@ import type {
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
 } from "./ingestion-pull.commands.ts";
+import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
 import type { TraceDepartmentInput } from "./department.ts";
 import type {
@@ -334,3 +335,46 @@ export interface GovernanceApi {
 }
 
 export const GovernanceApi = moduleApi<GovernanceApi>("governance");
+
+/**
+ * Who a project-scoped call is attributed to. `userId` is absent for a legacy
+ * project API key, which is bound to a project rather than to a person.
+ */
+export interface GovernanceProjectCaller {
+  readonly projectId: string;
+  readonly userId?: string | null;
+  /** Which surface initiated the change, for the audit row. */
+  readonly surface: GovernanceCallSurface;
+}
+
+/** What a template a member may pick is created from. */
+export interface GovernanceTemplateDraft {
+  sourceType: string;
+  displayName: string;
+  description?: string | null;
+  iconAsset?: string | null;
+  credentialSchema?: string | null;
+  ottlRules?: string;
+}
+
+/** The ingestion-template operations the governance REST family calls. */
+export interface GovernanceRestApi {
+  listIngestionTemplatesForMember(scope: { projectId: string }): Promise<IngestionTemplate[]>;
+  listIngestionTemplatesForAdmin(scope: { projectId: string }): Promise<IngestionTemplate[]>;
+  getIngestionTemplate(input: { projectId: string; id: string }): Promise<IngestionTemplate>;
+  createIngestionTemplate(
+    input: GovernanceTemplateDraft,
+    by: GovernanceProjectCaller,
+  ): Promise<IngestionTemplate>;
+  updateIngestionTemplateOttlRules(
+    input: { id: string; ottlRules: string },
+    by: GovernanceProjectCaller,
+  ): Promise<IngestionTemplate>;
+  archiveIngestionTemplate(input: { id: string }, by: GovernanceProjectCaller): Promise<void>;
+  cloneIngestionTemplate(
+    input: { sourceTemplateId: string },
+    by: GovernanceProjectCaller,
+  ): Promise<IngestionTemplate>;
+}
+
+export const GovernanceRestApi = moduleApi<GovernanceRestApi>("governance");

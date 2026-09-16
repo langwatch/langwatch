@@ -46,23 +46,25 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
   const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
 
   const app = GovernanceApp.create({
-    governance,
-    projects: {
-      getOrganizationId,
-      findInternal: unreachable<ProjectApi["findInternal"]>(),
+    members: {
+      governance,
+      projects: {
+        getOrganizationId,
+        findInternal: unreachable<ProjectApi["findInternal"]>(),
+      },
+      organizations: {
+        ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
+        tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
+      },
+      permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
+      personalVirtualKeys: {
+        isOrganizationMember:
+          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
+        hasActivePersonalKeyLabelled:
+          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
+      },
+      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
     },
-    organizations: {
-      ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
-      tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
-    },
-    permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
-    personalVirtualKeys: {
-      isOrganizationMember:
-        unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
-      hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-    },
-    actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });
 
   return { app, getOrganizationId };

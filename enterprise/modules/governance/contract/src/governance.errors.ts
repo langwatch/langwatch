@@ -63,3 +63,21 @@ export class PersonalSourceTypeNotAllowedError extends Error {
     this.name = "PersonalSourceTypeNotAllowedError";
   }
 }
+
+/**
+ * A legacy project API key reached a route that administers org governance
+ * templates. Those keys bypass the `aiTools:manage` ceiling, so the route
+ * demands the key name a member.
+ */
+export class UserBoundCallerRequiredError extends HandledError {
+  declare readonly code: "user_token_required";
+
+  constructor() {
+    super(
+      "user_token_required",
+      "This endpoint requires a user-bound API key; legacy project API keys cannot administer organization governance templates.",
+      { httpStatus: 403 },
+    );
+    this.name = "UserBoundCallerRequiredError";
+  }
+}
