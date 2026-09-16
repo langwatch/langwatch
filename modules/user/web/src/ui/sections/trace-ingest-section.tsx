@@ -18,12 +18,9 @@ import {
 const FALLBACK_ICON = <Bot size={20} />;
 
 /**
- * The mutation's error, but only if it was this template that raised it.
- *
- * `install` and `rotate` are one mutation each for the whole grid, and tRPC
- * keeps the last error until the next call — so the question a drawer has to
- * ask is never "did this fail" but "did this fail for the tool I'm showing".
- * `variables` is the request that failed, which is the only record of that.
+ * The mutation's error, but only if it was this template that raised it —
+ * `install`/`rotate` are one mutation each for the whole grid, and tRPC
+ * keeps the last error until the next call. `variables` is the only record of that.
  */
 function errorFor<TError, TVariables extends { sourceType: string }>(
   mutation: { error: TError | null; variables?: TVariables },
@@ -173,13 +170,9 @@ export function TraceIngestSection() {
           }}
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
-          // Both halves are gated on the template they belong to. A tRPC
-          // mutation's `error` outlives the drawer that caused it, and these
-          // two mutations are shared across every tile — so an ungated
-          // fallback meant a failed rotate on one tool was still on screen
-          // when you opened the next one's drawer, reported as that tool's
-          // failure. This drawer is the only place either failure is shown,
-          // which makes showing the wrong one worse than showing none.
+          // Both halves are gated on the template they belong to — a tRPC
+          // mutation's `error` outlives the drawer, and these mutations are
+          // shared across tiles, so an ungated fallback leaked stale failures.
           installError={
             errorFor(installMutation, openTemplate.sourceType) ??
             errorFor(rotateMutation, openTemplate.sourceType)

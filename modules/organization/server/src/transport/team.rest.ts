@@ -34,20 +34,8 @@ import { z } from "zod";
 
 /**
  * What the `/api/teams` family reaches, as flat operations the organization's
- * own application serves.
- *
- * Every member is implemented by `ServerOrganizationApp`, which declares
- * `implements TeamManagementApi` — so a route naming something the application
- * does not serve fails the build rather than the first request. This family
- * used to ask for two injected accessors (`authz()`, `projects()`) that only an
- * apps/api mount file supplied; when that file was deleted the family lost its
- * only caller and stopped being registered at all.
- *
- * The seven organization operations and the one authorization read are taken
- * straight off {@link OrganizationApi} and {@link AuthzApi} so they cannot
- * drift from the contracts that already declare them. `updateTeam` is spelled
- * out because it is implemented by `OrganizationService` and reached by this
- * door alone, so it has never been on the peer-facing contract.
+ * own application serves — taken off {@link OrganizationApi}/{@link AuthzApi}
+ * to avoid drift; `updateTeam` alone is `OrganizationService`'s, off the peer contract.
  */
 export interface TeamManagementApi
   extends

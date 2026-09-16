@@ -2,10 +2,8 @@ import { z } from "zod";
 import { organizationGroupBindingInputSchema } from "./group.ts";
 
 /**
- * The transport inputs the group surface publishes. A group belongs to exactly
- * one organization, so its transport contract lives beside the
- * organization's. The organization scope every one of these calls also carries
- * is `organizationApiScopeSchema`, in `organization.api.ts`.
+ * The transport inputs the group surface publishes; every call also carries
+ * `organizationApiScopeSchema` from `organization.api.ts`.
  */
 
 export const groupApiNameSchema = z.string().trim().min(1, "Group name is required").max(100);

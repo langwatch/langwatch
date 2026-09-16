@@ -1,9 +1,7 @@
 /**
- * The rows the two user repositories share.
- *
- * One store rather than two, because they share the `Account` table: a
- * credential minted by `createCredentialUser` is the row `findCredentialAccount`
- * reads back, exactly as it is in Postgres.
+ * The rows the two user repositories share — one store rather than two,
+ * since they share the `Account` table: a credential `createCredentialUser`
+ * mints is the row `findCredentialAccount` reads back, exactly as in Postgres.
  */
 export type MemoryUserRow = {
   id: string;

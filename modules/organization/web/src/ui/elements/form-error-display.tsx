@@ -39,11 +39,9 @@ export function extractErrorMessages(error: unknown): string[] {
 }
 
 /**
- * Robust form error display component that handles:
- * - Error objects: {message: "error"} or nested structures
- * - React elements: JSX elements to render directly
- * - Primitive errors: strings and numbers rendered as single error messages
- * - Arrays of errors: {field: [{message: "error1"}, {message: "error2"}]}
+ * Robust form error display: handles error objects ({message}), React
+ * elements, primitive strings/numbers, and arrays of per-field errors
+ * ({field: [{message}, ...]}).
  */
 export function FormErrorDisplay({ error }: FormErrorDisplayProps) {
   // If it's a React element, render it directly

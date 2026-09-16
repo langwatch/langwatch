@@ -1,9 +1,7 @@
 /**
- * Inviting somebody who is already in the organization.
- *
- * The refusal is a named one — the admin gets the address back and a reason,
- * not a generic unknown — so the batch is checked before any invite is
- * written.
+ * Inviting somebody who is already in the organization. The refusal is a
+ * named one — the admin gets the address back and a reason, not a generic
+ * unknown — so the batch is checked before any invite is written.
  */
 import { describe, expect, it, vi } from "vitest";
 

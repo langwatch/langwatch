@@ -3,12 +3,9 @@ import { api, type RouterOutputs } from "./organization-api.ts";
 export type DepartmentOption = RouterOutputs["departments"]["list"][number];
 
 /**
- * Shared data + gating for the department assignment control that members /
- * teams / projects pages render inline. The control only appears once the
- * org actually has departments configured (and the governance flag is on),
- * mirroring how the role/access columns only show what's relevant. Fetches
- * the list + current assignments once; consumers read the per-entity current
- * value out of the returned lookup maps.
+ * Shared data + gating for the department assignment control the members /
+ * teams / projects pages render inline, appearing only once the org has
+ * departments configured and the governance flag is on.
  */
 export function useDepartmentColumn(
   organizationId: string,

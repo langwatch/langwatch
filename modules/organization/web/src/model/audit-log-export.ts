@@ -1,7 +1,6 @@
 /**
- * What a downloaded audit report contains, separated from the save: what
- * the export says is pinned here, how it reaches disk is
- * `OrganizationHostApi.download`. Uses the same query as the table, so a
+ * What a downloaded audit report contains, separated from the save (that's
+ * `OrganizationHostApi.download`). Uses the same query as the table, so a
  * pre-filtered deep-link never silently widens to the whole organization.
  */
 
@@ -14,22 +13,16 @@ import { readableDate } from "./display-formatters.ts";
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 
 /**
- * CSV-cell cap for the JSON columns (args / before / after).
- *
- * 4 KB is enough for a typical gateway-shape diff while staying well under the
- * per-cell limits of common spreadsheet tools (Excel: 32K characters). `slice`
- * counts UTF-16 code units, so a fully non-ASCII payload can reach ~16 KB of
- * bytes — an acceptable upper bound.
+ * CSV-cell cap for the JSON columns (args/before/after): 4 KB is enough for
+ * a gateway-shape diff and well under Excel's 32K-character cell limit.
+ * `slice` counts UTF-16 units, so non-ASCII can reach ~16 KB — acceptable.
  */
 export const CSV_JSON_CAP = 4096;
 
 /**
- * A JSON-shaped value, stringified and capped for a CSV cell.
- *
- * A clipped cell carries an explicit marker so a downstream consumer can tell
- * truncated JSON from an empty value — the two look identical otherwise, and a
- * compliance reviewer reading a blank `after` column would conclude the change
- * set nothing.
+ * A JSON-shaped value, stringified and capped for a CSV cell. A clipped cell
+ * carries an explicit marker so it reads distinctly from an empty value —
+ * a blank `after` column would otherwise tell a compliance reviewer nothing changed.
  */
 export function truncateJsonForCsv(value: unknown): string {
   if (value == null) return "";
@@ -40,11 +33,9 @@ export function truncateJsonForCsv(value: unknown): string {
 }
 
 /**
- * The report's columns.
- *
- * Source / Target / Before / After mirror the on-screen gateway-shape columns,
- * so a downloaded report carries the diffs the page shows rather than a
- * narrower legacy shape.
+ * The report's columns. Source/Target/Before/After mirror the on-screen
+ * gateway-shape columns, so a downloaded report carries the same diffs the
+ * page shows rather than a narrower legacy shape.
  */
 export const AUDIT_LOG_CSV_FIELDS = [
   "Timestamp",
@@ -100,19 +91,16 @@ export function auditLogFileName(now: Instant): string {
 }
 
 /**
- * How many rows a single export request asks for.
- *
- * Bigger than a page on purpose: the export walks the whole filtered history,
- * and a 25-row walk over a year of gateway mutations is thousands of requests.
+ * How many rows a single export request asks for — bigger than a page on
+ * purpose, since the export walks the whole filtered history and a 25-row
+ * walk over a year of mutations would be thousands of requests.
  */
 export const AUDIT_LOG_EXPORT_BATCH_SIZE = 5000;
 
 /**
- * The offsets an export walks, given what the first batch reported.
- *
- * Stated as a function so the walk is assertable without a transport: an
- * off-by-one here is a report that silently misses its last page, which is the
- * kind of defect a compliance export cannot afford and nothing on screen shows.
+ * The offsets an export walks, given what the first batch reported — stated
+ * as a function so the walk is assertable without a transport. An off-by-one
+ * here silently drops the last page, a defect a compliance export cannot afford.
  */
 export function auditLogExportOffsets({
   totalCount,

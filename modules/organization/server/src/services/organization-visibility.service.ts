@@ -1,10 +1,7 @@
 /**
- * What one person is allowed to SEE of the organizations they belong to.
- *
- * Two reads live here, and both are redaction rather than retrieval: the
- * shell's own `organization.getAll`, which decides per viewer which stored
- * credentials and which colleagues travel, and the member picker, which shows
- * names to everybody and addresses only to an administrator.
+ * What one person is allowed to SEE of the organizations they belong to:
+ * `organization.getAll` redacts per viewer which credentials/colleagues
+ * travel; the member picker shows names to everybody, addresses only to an administrator.
  */
 
 import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
@@ -21,10 +18,9 @@ import type { OrganizationSettingsSecret } from "../app/organization.members.ts"
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 
 /**
- * How many permission questions one organization asks at once. Bounded rather
- * than a fan-out: an organization's project list can be long, and one decision
- * per project opened at once would starve the connection pool the request is
- * already running on.
+ * How many permission questions one organization asks at once, bounded
+ * rather than fanned out — a long project list opening one decision per
+ * project at once would starve the request's own connection pool.
  */
 const PERMISSION_PROBE_CONCURRENCY = 8;
 
@@ -197,10 +193,9 @@ export class OrganizationVisibilityService {
   }
 
   /**
-   * Which projects the caller may change, per organization. One batched
-   * resolution per organization rather than one check per project: a scoped
-   * check costs several queries, so a per-project fan-out would scale with the
-   * organization's project count.
+   * Which projects the caller may change, per organization — one batched
+   * resolution rather than one check per project, since a scoped check costs
+   * several queries and would otherwise scale with project count.
    */
   async #updatableProjectIds(input: {
     organizations: readonly FullyLoadedOrganization[];
@@ -225,10 +220,9 @@ export class OrganizationVisibilityService {
   }
 
   /**
-   * The stored credentials, decided per viewer. The S3 secret and the project
+   * The stored credentials, decided per viewer. The S3 secret and project
    * base key are write credentials: they go only to somebody who can change
-   * the thing they belong to, rather than to everybody on the trust that no
-   * screen renders them. The LangWatchQL key goes to nobody at all.
+   * the thing they belong to. The LangWatchQL key goes to nobody at all.
    */
   #redactStoredCredentials(input: {
     organization: FullyLoadedOrganization;

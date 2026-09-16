@@ -15,10 +15,9 @@ export const organizationApiMemberScopeSchema = z.object({
 export type OrganizationApiMemberScope = z.infer<typeof organizationApiMemberScopeSchema>;
 
 /**
- * The organization roles a member can hold, restated from the Postgres enum
- * `OrganizationUserRole`: a portable contract cannot depend on the generated
- * Prisma client, and the team roles beside it in `team.ts` are restated the
- * same way.
+ * Restated from the Postgres enum `OrganizationUserRole`, since a portable
+ * contract cannot depend on the generated Prisma client — `team.ts`'s roles
+ * are restated the same way.
  */
 export const organizationApiMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
 export type OrganizationApiMemberRole = z.infer<typeof organizationApiMemberRoleSchema>;

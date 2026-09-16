@@ -5,10 +5,9 @@ import { PrismaUserRepository, type UserDatabase } from "../prisma.user.reposito
 const ISSUER = "local:credential";
 
 /**
- * Every scalar column on `model User`. Prisma returns all of them from a
- * `create` that names no `select`, so a mock answering `{ id }` regardless is
- * a mock of a row shape the database never sends — which is how a `.strict()`
- * parse over the real row stayed green here while signup 500'd in production.
+ * Every scalar column on `model User`. A `create` naming no `select` returns
+ * all of them, so a mock answering `{ id }` regardless masks that shape —
+ * exactly how a `.strict()` parse stayed green here while signup 500'd in prod.
  */
 const FULL_USER_ROW = {
   id: "user-1",
@@ -133,11 +132,9 @@ describe("PrismaUserRepository credential creation", () => {
 
   describe("when the new row is read back", () => {
     /**
-     * `createdUserSchema` is `.strict()` on `{ id }`. A `create` that names no
-     * `select` hands it every scalar on `User`, and the parse throws
-     * `unrecognized_keys` — from inside the repository, on an unhandled
-     * channel, so both signup routes answered 500. Asking for the id alone is
-     * what keeps the row and the schema the same shape.
+     * `createdUserSchema` is `.strict()` on `{ id }`; a `create` naming no
+     * `select` hands every scalar on `User`, throwing `unrecognized_keys` from
+     * inside the repository — which is how both signup routes answered 500.
      */
     it("asks for the id alone, so a credential signup survives the full row", async () => {
       const { database, userCreate } = makeDatabase();

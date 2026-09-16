@@ -2,12 +2,9 @@
 import { z } from "zod";
 
 /**
- * The identity feature's own three settings, inlined rather than imported:
- * this package does not otherwise depend on `@langwatch/identity-contract`,
- * and adding that dependency mid-migration would touch the shared lockfile
- * while other lanes are editing it concurrently. Keep this in step with
- * `DOMAIN_JOIN_SETTINGS` in
- * `modules/identity/contract/src/join-matching.ts`.
+ * The identity feature's own three settings, inlined since this package does
+ * not depend on `@langwatch/identity-contract`. Keep in step with
+ * `DOMAIN_JOIN_SETTINGS` in `modules/identity/contract/src/join-matching.ts`.
  */
 const domainJoinSettingSchema = z.enum(["off", "request", "auto"]);
 

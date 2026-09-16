@@ -50,12 +50,9 @@ function shownPhoto(): string | null {
 }
 
 /**
- * Every photo on screen.
- *
- * The control shows two avatars at once while the dialog is open — the small
- * one on the settings page, which keeps showing what is SAVED, and the large
- * one in the dialog, which shows what would be saved. A preview is a claim
- * about the second, so the assertion reads the set rather than the first.
+ * Every photo on screen — two avatars show at once while the dialog is
+ * open: the small one on the settings page keeps showing what is SAVED, the
+ * large one in the dialog shows what would be saved. The assertion reads the set.
  */
 function shownPhotos(): (string | null)[] {
   return Array.from(document.querySelectorAll("img")).map((img) => img.getAttribute("src"));

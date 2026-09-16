@@ -232,13 +232,10 @@ export class UserNotOrganizationMemberError extends HandledError {
   }
 }
 
-/** Acting on somebody else's account without standing to. */
 /**
- * An impersonating operator asked to set or change the subject's password.
- * Refused outright: how an account signs in belongs to its owner. Without it,
- * `setOwnFirstPassword` — which demands no current-password proof, because it
- * exists for accounts holding none — would mint a durable way into exactly the
- * single-sign-on-only and passkey-only accounts it was built for.
+ * An impersonating operator asked to set or change the subject's password —
+ * refused outright, since how an account signs in belongs to its owner.
+ * Without it, `setOwnFirstPassword` would open single-sign-on/passkey-only accounts.
  */
 export class ImpersonationCannotChangeCredentialsError extends HandledError {
   declare readonly code: "impersonation_cannot_change_credentials";

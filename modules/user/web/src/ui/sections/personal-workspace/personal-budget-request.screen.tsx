@@ -72,13 +72,9 @@ export function PersonalBudgetRequestScreen() {
     },
     onError: (err) => {
       setSubmitState("idle");
-      // One report for every outcome. A failure we can name — an org with no
-      // administrator, for one — arrives as a handled error and takes its
-      // words from the code-keyed registry; anything else degrades to the
-      // fallback title plus a copyable error id. This used to branch on
-      // `err.message === "no_admin_found"`, a slug the router hand-wrote and
-      // this page string-matched: a second code system, invisible to the
-      // registry, and the exact thing ADR-045 exists to prevent.
+      // One report for every outcome: a named failure takes its words from
+      // the code-keyed registry; anything else degrades to a fallback title
+      // plus a copyable id. Never string-match `err.message` — ADR-045.
       showErrorToast({
         error: err,
         fallbackTitle: "Couldn't send your request",

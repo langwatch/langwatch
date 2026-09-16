@@ -101,9 +101,8 @@ export class InviteLifecycleService {
 
   /**
    * Extends a pending invite's expiration without rotating its code or
-   * sending anything (D11). Unlike `resendInvite`, the link already in the
-   * inbox starts working again rather than becoming stale under whoever is
-   * holding it — there is nothing new to mail them.
+   * sending anything (D11) — unlike `resendInvite`, the link already in the
+   * inbox starts working again, with nothing new to mail.
    */
   async extendInvite({
     organizationId,

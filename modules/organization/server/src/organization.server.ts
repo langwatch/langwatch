@@ -32,14 +32,11 @@ export const organizationServer = defineServerModule("organization")
     groupsRest,
     teamsRest,
   )
-  // Both families sit behind the organization credential and both require the
-  // Enterprise plan: groups arrive with SCIM, and the whole management surface
-  // is Enterprise-only. One plan lookup, through the SAME `entitlement` peer
-  // every seat and allowance check in this module already reads, so the REST
-  // gate and the application's own seat guard can never disagree about which
-  // plan an organization is on. Same refusal the deleted mounts raised:
-  // `EnterprisePlanRequiredError("MANAGEMENT_API")`, fail-closed on any lookup
-  // that rejects.
+  // Both families sit behind the organization credential and require the
+  // Enterprise plan, checked through the SAME `entitlement` peer every seat
+  // check in this module reads — so the REST gate and the seat guard can
+  // never disagree. Fail-closed: `EnterprisePlanRequiredError("MANAGEMENT_API")`
+  // on any lookup that rejects.
   .withTransportFacts(({ dependencies }) => {
     const requireEnterprise = async (context: { req: { raw: Request } }) => {
       const { organizationId } = organizationCredentialOfRequest(context.req.raw);

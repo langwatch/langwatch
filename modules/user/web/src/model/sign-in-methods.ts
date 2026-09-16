@@ -1,10 +1,7 @@
 /**
- * How a linked sign-in method is named and classified.
- *
- * Pure, because it is the part of the section that is worth stating: the Auth0
- * strategy encoding is a convention nothing enforces, and reading it wrong is
- * how a Google account starts calling itself "Email/Password" — which is the
- * one label that decides whether a Change Password control is offered.
+ * How a linked sign-in method is named and classified — the Auth0 strategy
+ * encoding is a convention nothing enforces, and reading it wrong is how a
+ * Google account starts calling itself "Email/Password" in the UI.
  */
 
 /** Title-cases a provider id that has no friendlier name. */
@@ -17,12 +14,9 @@ function titleCase(value: string): string {
 }
 
 /**
- * Under Auth0 the real provider is the first segment of the account id.
- *
- * `google-oauth2|1234` is a Google sign-in that arrived through the Auth0
- * tenant; `auth0|1234` is Auth0's own username-password database. Both come
- * back with `provider: "auth0"`, so the account id is the only thing that tells
- * them apart.
+ * Under Auth0 the real provider is the first segment of the account id:
+ * `google-oauth2|1234` is Google via the Auth0 tenant, `auth0|1234` is
+ * Auth0's own database — both arrive as `provider: "auth0"`.
  */
 const AUTH0_STRATEGY_NAMES: Readonly<Record<string, string>> = {
   auth0: "Email/Password",
@@ -43,12 +37,9 @@ export function providerDisplayName(provider: string, providerAccountId: string)
 }
 
 /**
- * Whether this account is the one a password belongs to.
- *
- * Only a credential account has a password to change. Getting this wrong in
- * either direction is a real defect: offering "Change Password" on a Google
- * account sends the reader to a dialog whose submit can only fail, and
- * withholding it from a credential account leaves them no way to change theirs.
+ * Whether this account is the one a password belongs to — only a credential
+ * account has one. Offering "Change Password" on a Google account sends the
+ * reader to a dialog that can only fail; withholding it on credential leaves them stuck.
  */
 export function isCredentialAccount(account: {
   provider: string;
@@ -61,24 +52,18 @@ export function isCredentialAccount(account: {
 }
 
 /**
- * Whether a password can be changed at all on this deployment.
- *
- * Email mode keeps the credential in this database; Auth0 mode keeps it in the
- * Auth0 tenant and the product still drives the change through it. Every other
- * mode — an OIDC provider, an enterprise connection — holds the credential
- * somewhere the product cannot reach, and offering to change it would be a lie.
+ * Whether a password can be changed at all on this deployment. Email and
+ * Auth0 modes keep the credential reachable; every other mode (OIDC, an
+ * enterprise connection) holds it elsewhere — offering to change it would lie.
  */
 export function canChangePassword(authProvider: string | undefined): boolean {
   return authProvider === "email" || authProvider === "auth0";
 }
 
 /**
- * Whether a linked method may be removed.
- *
- * Never the last one, and never any of them on an organization pinned to a
- * single sign-on provider: the server refuses the last account under a
- * serializable transaction, and this is the affordance saying so before the
- * click rather than after it.
+ * Whether a linked method may be removed — never the last one, and never
+ * any of them on an organization pinned to a single sign-on provider. The
+ * server refuses under a serializable transaction; this says so before the click.
  */
 export function isRemovableMethod({
   linkedCount,
@@ -100,12 +85,9 @@ export function isSecurityKey(passkey: { transports?: string | null }): boolean 
 }
 
 /**
- * What to call a passkey in a list of them.
- *
- * One registered from the sign-up screen is labelled with the address it was
- * created for; one added from settings carries whatever the browser chose,
- * which is often nothing. "Passkey" is the honest fallback — better than an id,
- * and it is exactly why renaming exists.
+ * What to call a passkey in a list of them. One from sign-up is labelled
+ * with its address; one from settings carries whatever the browser chose,
+ * often nothing. "Passkey" is the honest fallback — why renaming exists.
  */
 export function passkeyLabel(passkey: { name?: string | null }): string {
   return passkey.name?.trim() || "Passkey";

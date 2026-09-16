@@ -1,8 +1,7 @@
 /**
- * The wire shapes the `/api/organization` REST family publishes: the
- * management surface's profile, member and invite reads and writes. Narrower
- * than `organization.trpc-schemas.ts` on purpose - this is what an external
- * API caller sends and reads, not what the browser's own transport carries.
+ * The wire shapes the `/api/organization` REST family publishes: profile,
+ * member and invite reads/writes for an external API caller — narrower than
+ * `organization.trpc-schemas.ts`, which carries the browser's own transport.
  */
 import { z } from "zod";
 

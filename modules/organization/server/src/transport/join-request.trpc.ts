@@ -1,8 +1,7 @@
 /**
- * The server half of `joinRequests.*`. Half of it runs outside membership:
- * asking to join is the one action somebody takes on an organization they are
- * not in yet, so those handlers prove standing themselves and reveal nothing
- * about an organization that did not offer itself to the caller.
+ * The server half of `joinRequests.*`. Half runs outside membership, since
+ * asking to join is done by someone not in the organization yet — those
+ * handlers reveal nothing about an organization that did not offer itself.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

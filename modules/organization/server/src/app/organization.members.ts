@@ -47,11 +47,8 @@ export interface OrganizationInviteSeatCensus {
 export interface OrganizationInviteMail {
   /**
    * The invitation itself, carrying the already-built accept URL.
-   *
-   * `projectCount` and `inviter` are what an invitee cannot otherwise know
-   * before deciding: whether the workspace has anything in it, and who asked
-   * them. Both are optional because both are reads a process may not have
-   * composed, and a message that says less is the supported state.
+   * `projectCount` and `inviter` are optional — reads a process may not have
+   * composed — since a message that says less is the supported state.
    */
   sendInvite(
     input: Readonly<{
@@ -64,12 +61,9 @@ export interface OrganizationInviteMail {
     }>,
   ): Promise<void>;
   /**
-   * "Somebody is waiting", to one administrator of the organization.
-   *
-   * `seats` is passed only for an organization whose ceiling is the one it
-   * bought. An organization on enterprise or negotiated terms holds a ceiling
-   * that is its own, so nothing is passed rather than a public number that is
-   * not its number.
+   * "Somebody is waiting", to one administrator of the organization. `seats`
+   * is passed only when the ceiling is the one this organization bought — an
+   * enterprise or negotiated ceiling is not passed since it is not a public number.
    */
   sendInviteReRequest(
     input: Readonly<{
@@ -83,12 +77,9 @@ export interface OrganizationInviteMail {
 }
 
 /**
- * How much work is already in the workspace an invitee is being asked to join.
- *
- * A port rather than a call into the project feature, for the reason the mail
- * port gives: the count belongs to another aggregate, and a process that did
- * not compose it says so by not having one rather than by reporting zero,
- * which would tell every invitee the room is empty.
+ * How much work is already in the workspace an invitee is being asked to
+ * join. A port, not a call into the project feature — same reason as the
+ * mail port: an uncomposed process says so by absence, not by reporting zero.
  */
 export interface OrganizationInviteWorkspaceCensus {
   countProjects(organizationId: string): Promise<number>;
@@ -428,8 +419,7 @@ export interface OrganizationSignals {
 /**
  * The parts of the sign-up ceremony that belong to other features: the
  * standard AI-tool catalogue Enterprise governance seeds, and the first
- * project, created through the SAME project service every other door writes
- * through rather than a second creation path.
+ * project, created through the SAME project service every other door uses.
  */
 export interface OrganizationCeremony {
   ensureDefaultAiToolCatalog(input: Readonly<{ organizationId: string }>): Promise<void>;

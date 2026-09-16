@@ -272,11 +272,9 @@ export class InviteCreationService {
   }
 
   /**
-   * How many projects the organization has, when the process can answer.
-   *
-   * A failure here is not a failure of the invitation. The count is one line in
-   * the mail; the invitation is the durable fact, so a census that cannot be
-   * read leaves the line out and the invitation still goes.
+   * How many projects the organization has, when the process can answer. A
+   * failure here is not a failure of the invitation — the invitation is the
+   * durable fact, so a failed census leaves the line out and still goes.
    */
   private async tryCountProjects(organizationId: string): Promise<{ projectCount?: number }> {
     const workspace = this.deps.workspace;

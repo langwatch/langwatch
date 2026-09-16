@@ -3,10 +3,8 @@ import { z } from "zod";
 import { organizationTeamWithMembersSchema } from "./team.ts";
 
 /**
- * The project feature's own scalar value, mirrored rather than imported: this
- * package does not otherwise depend on `@langwatch/project-contract`, and
- * adding that dependency mid-migration would touch the shared lockfile while
- * other lanes are editing it concurrently. Keep this in step with
+ * The project feature's own scalar value, mirrored since this package does
+ * not depend on `@langwatch/project-contract`. Keep in step with
  * `projectSchema` in `modules/project/contract/src/project.ts`.
  */
 const teamProjectSchema = z

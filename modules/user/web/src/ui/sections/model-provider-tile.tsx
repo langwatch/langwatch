@@ -9,11 +9,8 @@ import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 
 /**
  * Personal-VK label rules (mirrors `PersonalVirtualKeyTrpcApi.issuePersonal`
- * Zod regex `/^[a-z0-9][a-z0-9_\-]*$/`): lowercase alphanumeric with dashes
- * or underscores, no spaces, must start with alnum. Admins fill the
- * catalog `defaultLabel` freeform — sanitise on the user side so spaces
- * become dashes ("Anthropic key" → "anthropic-key") instead of failing
- * the user's first issue attempt with a regex error.
+ * Zod regex `/^[a-z0-9][a-z0-9_\-]*$/`). Admins fill `defaultLabel` freeform,
+ * so sanitise here: spaces become dashes ("Anthropic key" → "anthropic-key").
  */
 function sanitizeDefaultLabel(raw: string | undefined): string {
   if (!raw) return "";
@@ -51,12 +48,9 @@ interface IssuedKey {
 }
 
 /**
- * tRPC's Zod input-validation errors arrive on the client as the raw
- * JSON-stringified ZodError array (e.g. `[{"validation":"regex",...,
- * "message":"Label must be lowercase..."}]`). End users shouldn't see
- * that shape — extract the human-readable `message` field(s). Falls
- * back to the raw string on shapes we don't recognise so we never lose
- * information. Surfaced as Ariana QA finding G31.
+ * tRPC's Zod input-validation errors arrive as the raw JSON-stringified
+ * ZodError array; end users shouldn't see that shape, so extract the
+ * human-readable `message` field(s), falling back to the raw string (Ariana QA G31).
  */
 function humanizeZodMessage(raw: string): string {
   const trimmed = raw.trim();

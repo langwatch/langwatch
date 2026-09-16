@@ -1,8 +1,7 @@
 /**
- * The server half of `group.*`. A group is an access grant, so every
- * procedure asks `organization:manage`. Groups arrive with SCIM, so listing
- * and creating one also clear the Enterprise plan gate, which the application
- * asks now rather than the door.
+ * The server half of `group.*`. Every procedure asks `organization:manage`.
+ * Listing and creating also clear the Enterprise plan gate SCIM requires,
+ * which the application asks now rather than the door.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * The personal coding-agent usage card, driven through its real tRPC query
  * boundary (mocked) across load / empty / data states.
- *
  * @see specs/coding-agent/personal-usage.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

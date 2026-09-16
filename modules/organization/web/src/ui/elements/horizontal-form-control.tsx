@@ -1,8 +1,7 @@
 /**
  * A FAMILY-LOCAL COPY of `platform/app/src/components/HorizontalFormControl.tsx`,
- * the same one `@langwatch/auth-web` and `@langwatch/evaluator-web` carry. Its
- * one `react-feather` glyph became the `lucide-react` twin, which is the icon
- * set every moved package already uses.
+ * also carried by `@langwatch/auth-web`/`@langwatch/evaluator-web`. Its one
+ * `react-feather` glyph became `lucide-react`, the icon set moved packages use.
  */
 
 import { Box, Field, HStack, Spacer, type SystemStyleObject, VStack } from "@chakra-ui/react";
@@ -91,12 +90,9 @@ export function HorizontalFormControl({
         <Box minWidth={direction === "vertical" ? "full" : ["full", "full", inputWidth ?? "50%"]}>
           {children}
           {/*
-            Under the field it belongs to, not beside it. As a sibling of this
-            Box it was a third column in the row, so it took whatever width was
-            left over — "Passwords don't match" arrived as three stacked words
-            in a gutter next to the input, which reads as damage rather than as
-            an explanation. Inside the Box it takes the input's own width and
-            sits directly beneath it, where the eye already is.
+            Under the field it belongs to, not beside it — as a sibling it took a
+            third column's leftover width, so "Passwords don't match" arrived as
+            three stacked words in a gutter. Inside the Box it takes the input's own width.
           */}
           <FormErrorDisplay error={error} />
         </Box>

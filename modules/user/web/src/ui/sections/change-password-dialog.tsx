@@ -20,12 +20,9 @@ type PasswordFields = {
 const EMPTY: PasswordFields = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
 /**
- * What the form itself refuses, before anything is sent.
- *
- * The two rules the server cannot state for us — that a current password is
- * present when one is being changed, and that the two new ones agree — plus
- * `passwordProblem`, which IS the server's rule and is called rather than
- * restated.
+ * What the form itself refuses, before anything is sent: that a current
+ * password is present when one is changing, and the two new ones agree —
+ * plus `passwordProblem`, the server's own rule, called rather than restated.
  */
 export function validatePasswordForm(
   values: PasswordFields,

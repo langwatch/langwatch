@@ -1,10 +1,7 @@
 /**
- * A complete `AuthzApi` boundary for the teams family's suite, with the four
- * operations that family really reaches backed by an in-memory binding table.
- *
- * Everything else refuses by name rather than answering, so a route that starts
- * reading authorization some other way fails loudly here instead of quietly
- * passing on a stub's default.
+ * A complete `AuthzApi` boundary for the teams family's suite: the four
+ * operations it reaches are backed by an in-memory binding table; everything
+ * else refuses by name, so unexpected authorization access fails loudly here.
  */
 import {
   DuplicateBindingError,

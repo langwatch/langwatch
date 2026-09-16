@@ -21,10 +21,9 @@ const TEAM = { label: "Research", value: "team-research" };
 const EMAIL = "dana@example.com";
 
 /**
- * Rendered with one team to choose from, which the form assigns up front —
- * the state the feature's Background describes. Each case that needs an empty
- * team list gets there the way an admin does, by removing that row, so the
- * warning is exercised on the path that leads to it.
+ * Rendered with one team to choose from, the state the feature's Background
+ * describes. A case needing an empty team list gets there by removing that
+ * row, the way an admin does, so the warning is exercised on its real path.
  */
 const renderForm = () => {
   const onSubmit = vi.fn();

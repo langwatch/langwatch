@@ -12,12 +12,9 @@ export function trpcErrorCode(error: unknown): string | undefined {
 }
 
 /**
- * The message the SERVER wrote, where a code says it is customer copy.
- *
- * Only ever read behind a `FORBIDDEN` on these screens, and that is the whole
- * reason it is safe: the personal-workspace guards are the only thing that
- * raises one here, and their message is a sentence written for the customer.
- * Every other failure resolves its words from the code.
+ * The message the SERVER wrote, where a code says it is customer copy —
+ * only ever read behind a `FORBIDDEN`, since the personal-workspace guards
+ * are the only thing raising one here with customer-written text.
  */
 export function trpcErrorMessage(error: unknown): string | undefined {
   const message = (error as { message?: unknown } | null)?.message;

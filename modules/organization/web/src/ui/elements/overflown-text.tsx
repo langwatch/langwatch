@@ -1,10 +1,7 @@
 /**
- * Text that shows its full value in a tooltip only when it is actually clipped.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/OverflownText.tsx`, which
- * stays for its remaining consumers. `@langwatch/trace-web` and
- * `@langwatch/prompt-web` each carry one; this is the third, and only the one
- * export the members table calls.
+ * Text that shows its full value in a tooltip only when actually clipped —
+ * a FAMILY-LOCAL COPY of `platform/app/src/components/OverflownText.tsx`.
+ * `@langwatch/trace-web`/`@langwatch/prompt-web` each carry one; this is the third.
  */
 
 import { Box, type BoxProps } from "@chakra-ui/react";

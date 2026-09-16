@@ -1,10 +1,7 @@
 /**
- * The one class in the deployment that ever holds a stored password hash.
- *
- * Everything here is about the boundary rather than about bcrypt: the service
- * reads a hash, compares it, writes a replacement, and answers with a word.
- * The transport above it — and the process composition that used to issue both
- * halves as `prisma.account` statements of its own — never sees the column.
+ * The one class in the deployment that ever holds a stored password hash —
+ * it reads, compares, replaces and answers with a word. The transport above
+ * it, and the composition that used to issue `prisma.account` itself, never see the column.
  */
 import type { UnlinkUserAccountOutcome, UserLinkedAccount } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";

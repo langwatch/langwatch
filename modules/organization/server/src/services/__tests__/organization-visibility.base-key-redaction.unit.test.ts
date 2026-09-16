@@ -42,11 +42,8 @@ function organizationPayload(): FullyLoadedOrganization[] {
 }
 
 /**
- * Grants exactly the permissions named in `granted`, and nothing implied by
- * them: `project:update` and `project:manage` are asked and answered
- * independently, so a case can hold one without the other. `organization:manage`
- * is never granted here - the base key is gated on the project, and an
- * organization-level answer would mask which question decided it.
+ * Grants exactly the permissions in `granted`. `organization:manage` is
+ * never granted here — the base key is gated on the project, not on the organization.
  */
 function testPermissions(granted: readonly string[]): AuthzApi {
   return {
@@ -109,10 +106,9 @@ describe("given the base key in the organizations payload", () => {
   });
 
   /**
-   * The LangWatchQL key is a control-plane secret, not a credential any client
-   * surface renders: it is withheld from everyone, unlike the base key, which
-   * is gated on permission. The caller who CAN manage the project is the case
-   * that matters - a permission-gated redaction would hand it to them.
+   * The LangWatchQL key is a control-plane secret withheld from everyone —
+   * unlike the base key, which is gated on permission. The caller who CAN
+   * manage the project is the case that matters here.
    */
   describe("when the LangWatchQL key is on the project", () => {
     it.each([

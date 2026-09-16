@@ -1,8 +1,7 @@
 /**
  * `/api/groups` - the organization's access groups, behind an organization
- * credential. Groups arrive with SCIM, so the whole family clears the
- * Enterprise plan gate the process binds; the grants-ledger attribution the
- * writes carry is the application's own, taken from the credential's member.
+ * credential, clearing the Enterprise plan gate SCIM groups require; writes
+ * attribute to the grants ledger as the credential's own member.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
@@ -32,9 +31,8 @@ import { z } from "zod";
 
 /**
  * Whether the credential's organization holds the Enterprise plan groups
- * require. Bound by the apps/api mount to the deployment's plan lookup, and
- * resolved right before each handler - after authentication and after the
- * permission check, the ordering the pre-conversion per-route gate held.
+ * require, resolved after authentication and after the permission check —
+ * the ordering the pre-conversion per-route gate held.
  */
 export const groupsRestEnterpriseGate = defineRestMiddleware(
   "groupsRestEnterpriseGate",

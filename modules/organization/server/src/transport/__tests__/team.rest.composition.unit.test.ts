@@ -1,20 +1,8 @@
 /**
  * @vitest-environment node
- * The `/api/teams` family against the application the composition builds, not a
- * stub shaped like the door's witness.
- *
- * This is the test the family did not have. It was ported as a factory that
- * asked its mount to inject an authorization service and a project directory;
- * when that mount file was deleted with 446 other files the family lost its
- * only caller, and the sweep that re-declared the sibling `groups` family
- * deleted teams' dangling import instead. All nine operations 404'd, while two
- * shipped SDKs, nine reference pages and a Terraform resource kept calling them.
- *
- * So: a real `ServerOrganizationApp` over the real `OrganizationService`, over
- * the module's own in-memory repositories, bound to a module-API token and
- * reached through the same proxy `transport-mounting` uses at boot.
- *
- * Spec: specs/teams/teams-rest-api.feature
+ * The `/api/teams` family against the real composed application, not a
+ * stub — the prior version lost its only caller silently and every
+ * operation 404'd for a stretch. Spec: specs/teams/teams-rest-api.feature
  */
 import type { Project } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
@@ -150,10 +138,9 @@ function projectRow(overrides: Partial<Project> = {}): Project {
 }
 
 /**
- * The application as `ServerOrganizationApp` is wired at boot: the real
- * organization service over the module's own in-memory repositories, the real
- * membership service over the same database, and the two peer boundaries the
- * teams family reaches — authorization and projects — as complete doubles.
+ * The application as `ServerOrganizationApp` is wired at boot: real
+ * organization and membership services over the module's own in-memory
+ * repositories, with authorization and projects as complete doubles.
  */
 function application() {
   const memory = MemoryOrganizationDatabase.create();
@@ -727,10 +714,9 @@ describe("given the teams REST family over the application the composition build
     });
 
     /**
-     * A service key acts as nobody, so the removal is attributed to the
-     * management API rather than crashing on an absent actor. `callerOf` and
-     * the ledger actor `addTeamMember` builds are two different shapes on
-     * purpose; this is the one the removal takes.
+     * A service key acts as nobody, so the removal attributes to the
+     * management API rather than crashing on an absent actor — the shape
+     * `callerOf` builds, distinct from the ledger actor `addTeamMember` uses.
      */
     it("carries out a removal asked for by a service key that acts as nobody", async () => {
       const { app, permissions } = application();

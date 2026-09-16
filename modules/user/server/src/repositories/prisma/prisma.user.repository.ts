@@ -53,10 +53,9 @@ const userFullProfileSelect = {
 } satisfies Prisma.UserSelect;
 
 /**
- * A freshly created user is read back as its id and nothing else, because
- * `createdUserSchema` is `.strict()` on exactly `{ id }`. Without this select
- * Prisma returns every scalar on `User` — fifteen of them — and the parse
- * throws `unrecognized_keys` on the one row shape no test ever built.
+ * A freshly created user is read back as its id alone, since
+ * `createdUserSchema` is `.strict()` on exactly `{ id }`. Without this
+ * select Prisma returns all fifteen scalars and the parse throws `unrecognized_keys`.
  */
 const createdUserSelect = { id: true } satisfies Prisma.UserSelect;
 

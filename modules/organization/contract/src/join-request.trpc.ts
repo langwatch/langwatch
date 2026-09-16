@@ -1,10 +1,7 @@
 /**
- * Every `joinRequests.*` procedure, declared once. Asking to join is the one
- * action somebody takes on an organization they are not in yet, so half this
- * namespace runs outside membership and the handler proves standing itself.
- *
- * `lookup` answers the identity feature's own join-matching decision, whose
- * shape that feature owns; it travels here unread.
+ * Every `joinRequests.*` procedure, declared once; asking to join runs partly
+ * outside membership since the caller isn't a member yet. `lookup` answers
+ * the identity feature's own join-matching decision, unread here.
  */
 
 import { defineTrpcContract } from "@langwatch/api/contract";

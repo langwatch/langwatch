@@ -92,10 +92,9 @@ export abstract class OrganizationInviteRepository {
     expiration: NonNullable<OrganizationInvite["expiration"]>;
   }): Promise<number>;
   /**
-   * Extends a pending invite's expiration in place, without rotating its
-   * code — the link already in the inbox starts working again rather than
-   * going stale under the reader. Answers how many rows moved; zero means
-   * the invite was not (still) pending.
+   * Extends a pending invite's expiration without rotating its code — so
+   * the link already in the inbox starts working again. Zero rows moved
+   * means the invite was not (still) pending.
    */
   abstract extendInviteExpiration(input: {
     inviteId: string;

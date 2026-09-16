@@ -23,10 +23,9 @@ import { PrismaOrganizationMembershipRepository } from "../prisma.organization-m
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 /**
- * The ledger the corrections are commanded through. Recording rather than
- * real: a binding's role is changed by the grant ledger, and what this
- * repository decides is WHICH bindings to command and to what — which is the
- * half the seat correction owns.
+ * The ledger the corrections are commanded through — recording, not real: a
+ * binding's role is changed by the grant ledger, and this repository decides
+ * only WHICH bindings to command and to what.
  */
 type RoleChange = { bindingId: string; role: string; customRoleId: string | null };
 

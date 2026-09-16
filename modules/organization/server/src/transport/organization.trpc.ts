@@ -36,11 +36,9 @@ const MANAGE_VIA_TEAM: AuthzDeclaration = {
 };
 
 /**
- * `auditLog:view` at the ORGANIZATION tier, always. The permission is grantable
- * at three tiers and `projectId` is an optional FILTER here, so leaving the
- * tier to be inferred would move the whole check to the project and leave the
- * organization the query is anchored on unauthorized. The extra project-tier
- * question a filter earns is asked in the application.
+ * `auditLog:view` at the ORGANIZATION tier, always — `projectId` is only an
+ * optional FILTER here, so inferring the tier would leave the anchoring
+ * organization unauthorized; the extra project-tier question is asked in the application.
  */
 const AUDIT_LOG_VIEW: AuthzDeclaration = {
   kind: "permission",
@@ -154,11 +152,9 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .handle(({ app, input, actor }, person) => app.getMemberOrRefuse(input, callerOf(actor, person)))
 
   /**
-   * Lenient, which is what the invite form has always done: a team assignment
-   * that cannot be granted is dropped and the remaining invitations are still
-   * created, rather than the admin losing a batch they typed by hand. The
-   * management REST family asks for `strict` instead - see
-   * `organization-management.rest.ts`.
+   * Lenient, as the invite form has always done: an ungrantable team
+   * assignment is dropped and the rest are still created, rather than losing
+   * a hand-typed batch. `organization-management.rest.ts` asks for `strict`.
    */
   .procedure("createInvites")
   .withFacts(organizationSessionPersonFact)

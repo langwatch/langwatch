@@ -16,12 +16,9 @@ import { InstallCliCard } from "../blocks/install-cli-card.tsx";
  * Signed-in CLI devices panel (revoke access).
  */
 export function DevicesPanel() {
-  // `organizationId` falls back to a placeholder while the organization is
-  // still loading, so it is never falsy and cannot gate anything. `ready` is
-  // what actually says the session and organization have arrived; without it
-  // the list query fires against the placeholder and its empty result renders
-  // as "No devices signed in", which tells the reader nothing is signed in
-  // when the truth is that nothing is known yet.
+  // `organizationId` falls back to a placeholder while loading, so it is
+  // never falsy and cannot gate anything — `ready` is what actually says
+  // the session has arrived; without it, loading would render as "No devices signed in".
   const { organizationId, ready } = usePersonalContext();
   const [pendingRevokeId, setPendingRevokeId] = useState<number | null>(null);
   const [isPendingRevokeAll, setIsPendingRevokeAll] = useState(false);

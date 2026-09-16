@@ -14,11 +14,9 @@ function renderEmpty(slug = "acme-personal") {
 }
 
 /**
- * The card is a PLACEHOLDER since the move: the trace explorer's table lives
- * under `platform/app`'s `features/traces-v2` and a feature-web package may not
- * reach into it, so the card renders the integrate pitch and never the ten
- * rows. What these cases pin is exactly what still ships — which is why they
- * travelled unchanged: every one of them was already about the empty state.
+ * The card is a PLACEHOLDER since the move: the trace explorer's table
+ * lives under `platform/app`, which a feature-web package may not reach
+ * into — so the card renders the integrate pitch and never the ten rows.
  */
 describe("PersonalRecentTracesTable", () => {
   afterEach(cleanup);

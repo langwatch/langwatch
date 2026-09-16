@@ -1,9 +1,7 @@
 /**
- * The wire shapes the `/api/teams` REST family publishes.
- *
- * The team it answers is narrower than the stored one: the personal-workspace
- * flags and the archive stamp are the app's business, not a management
- * client's, and the door has never sent them.
+ * The wire shapes the `/api/teams` REST family publishes — narrower than the
+ * stored team: the personal-workspace flags and archive stamp are the app's
+ * business, not a management client's, and the door never sends them.
  */
 import { z } from "zod";
 

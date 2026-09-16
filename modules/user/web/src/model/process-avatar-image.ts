@@ -10,9 +10,8 @@ export const AVATAR_OUTPUT_SIZE = 256;
 
 /**
  * Max size of the image file a user may pick (8 MB, matching LinkedIn's
- * profile-photo limit). Enforced client-side so the user gets immediate "too
- * large" feedback; the server applies the same ceiling on the (post-resize)
- * payload as a backstop. Kept in sync with AVATAR_MAX_BYTES.
+ * profile-photo limit), enforced client-side for immediate feedback; the
+ * server applies the same ceiling post-resize as a backstop. Sync with AVATAR_MAX_BYTES.
  */
 export const AVATAR_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 
@@ -77,10 +76,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Processes a selected file into a square, downscaled data URL.
- *
  * @throws {AvatarImageError} for a non-image, an oversized source file, or a
- *   decode/encoding failure. Render it with `showErrorToast` — the words come
- *   from the code's registry entry, not from `message`.
+ *   decode/encoding failure — rendered via `showErrorToast` from the registry.
  */
 export async function processAvatarImage(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {

@@ -1,8 +1,7 @@
 /**
- * The server half of `identity.*`. No permission applies and none is missing:
- * the session proves who the caller is and the ceremony proves the record is
- * pinned to them, so the ids in the input widen no scope.
- * Spec: specs/identity/identifier-model.feature.
+ * The server half of `identity.*`. No permission applies and none is
+ * missing: the session proves who the caller is and the ceremony proves the
+ * record is pinned to them. Spec: specs/identity/identifier-model.feature.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { identityTrpc, UserApi } from "@langwatch/user-contract";

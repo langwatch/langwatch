@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * Setting a FIRST password, for an account that has none. "Forgot password"
- * updates rows in place, so it never rescued one. What makes this safe with no
- * proof beyond the session is the refusal below: it fills an empty slot and
- * never replaces a full one. Spec: specs/identity/passkeys.feature
+ * Setting a FIRST password, for an account with none — the refusal below
+ * fills an empty slot and never replaces a full one. Spec: specs/identity/passkeys.feature
  */
 import {
   ImpersonationCannotChangeCredentialsError,
@@ -177,11 +175,9 @@ describe("setting a first password", () => {
   });
 
   /**
-   * The operation exists for accounts holding NO password, so it asks for no
-   * proof beyond the session — which is exactly why an operator must not reach
-   * it. A password minted here would be a way into the account that outlives
-   * the impersonation, on precisely the single-sign-on-only and passkey-only
-   * accounts the operation was built for.
+   * The operation exists for accounts holding NO password, so it asks for
+   * no proof beyond the session — exactly why an operator must not reach it:
+   * a minted password would outlive the impersonation on those accounts.
    */
   describe("given an operator browsing as somebody", () => {
     it("refuses outright, sets no password and ends no session", async () => {

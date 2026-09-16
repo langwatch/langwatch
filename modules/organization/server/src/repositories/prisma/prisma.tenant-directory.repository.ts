@@ -63,10 +63,9 @@ export class PrismaTenantDirectoryRepository {
 }
 
 /**
- * Binds this deployment's Postgres to the routing directory, for a process
- * that wants the {@link TenantDirectory} shape without booting the whole
- * organization module (the worker's tenancy lane). Replaces the deleted
- * `PostgresTenantDirectoryAdapter` class.
+ * Binds Postgres to the routing directory, for a process that wants the
+ * {@link TenantDirectory} shape without booting the whole organization
+ * module. Replaces the deleted `PostgresTenantDirectoryAdapter` class.
  */
 export function bindTenantDirectoryReader(
   database: PrismaClient,

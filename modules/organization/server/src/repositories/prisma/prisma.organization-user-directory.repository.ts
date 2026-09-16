@@ -4,12 +4,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 export type OrganizationUserDirectoryDatabase = Pick<PrismaClient, "user">;
 
 /**
- * The organization's own reads of the `User` table: matching an invited
- * address to an existing account, the legacy verified-email column for a
- * user with no identity-ledger entry, and display names for a page of
- * member ids. Not this module's table, but read narrowly through this
- * module's own repository, same as every other module reading `user` for a
- * directory concern does.
+ * The organization's own reads of the `User` table: an invited address, the
+ * legacy verified-email column, and member display names — read narrowly
+ * through this module's own repository, as every module does.
  */
 export class PrismaOrganizationUserDirectoryRepository {
   static create(

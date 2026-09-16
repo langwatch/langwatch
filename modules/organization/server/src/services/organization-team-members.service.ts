@@ -1,8 +1,7 @@
 /**
- * A team's people: adding and removing one, creating and updating a team with its whole
- * member list, and reading a team back with the members attached. Every write goes through the
- * authz grants ledger, and a change that would leave a team with no administrator is refused
- * before anything is written.
+ * A team's people: add/remove, create/update, read back with members
+ * attached. Every write goes through the authz grants ledger; a change
+ * leaving a team with no administrator is refused before it is written.
  */
 import {
   DuplicateBindingError,

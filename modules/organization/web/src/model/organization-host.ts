@@ -55,12 +55,9 @@ export type OrganizationRouteReading = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed.
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * sentence the screen composed — a handled error's wire message is its code
+ * slug, so home-written copy would print the slug at the customer.
  */
 export type OrganizationFailureNotice = {
   error: unknown;
@@ -97,33 +94,25 @@ export abstract class OrganizationHostApi {
   abstract currentUser(): OrganizationActor | undefined;
 
   /**
-   * The project in scope, or undefined when the address names none.
-   *
-   * The teams page reads exactly one thing off it: whether a row is the project
-   * the reader is currently inside, which is the one project it refuses to
-   * offer a delete for.
+   * The project in scope, or undefined when the address names none. The teams
+   * page reads one thing off it: whether a row is the project the reader is
+   * currently inside — the one project it refuses to offer a delete for.
    */
   abstract activeProject(): OrganizationProjectReading | undefined;
 
   /**
-   * Whether the organization is on the Enterprise plan.
-   *
-   * A PAIR with `isPlanLoading`, because still-arriving is a third state: the
-   * groups page gates its whole table on this, and collapsing "not yet" into
-   * "no" pitches an upgrade at a customer who already bought it for the length
-   * of a round trip.
+   * Whether the organization is on the Enterprise plan — a PAIR with
+   * `isPlanLoading`, since still-arriving is a third state. Collapsing
+   * "not yet" into "no" pitches an upgrade at a customer who already bought it.
    */
   abstract isEnterprise(): boolean;
 
   abstract isPlanLoading(): boolean;
 
   /**
-   * Whether this deployment can send email.
-   *
-   * Without it an invitation cannot be delivered, so the members page offers a
-   * copyable link instead of pretending a message went out. Fail-safe is
-   * FALSE — offering the link when mail would in fact have worked costs a
-   * click; the other way round loses the invitation.
+   * Whether this deployment can send email. Without it, the members page
+   * offers a copyable link rather than pretending a message went out.
+   * Fail-safe is FALSE: a false positive costs a click, a false negative loses the invitation.
    */
   abstract hasEmailProvider(): boolean;
 
@@ -153,12 +142,9 @@ export abstract class OrganizationHostApi {
   abstract navigate(to: string): void;
 
   /**
-   * Hands the reader a file.
-   *
-   * The one browser ability this family needs that is neither navigation nor a
-   * notice. `platform/app` did it inline — mint an object URL, append an
-   * anchor, click it, revoke — which is four browser globals a screen may not
-   * name and, more to the point, four things nothing could assert about.
+   * Hands the reader a file — the one browser ability this family needs that
+   * is neither navigation nor a notice. `platform/app` did it inline (object
+   * URL, anchor, click, revoke): four globals a screen may not name.
    */
   abstract download(file: OrganizationDownload): void;
 
@@ -171,11 +157,9 @@ const OrganizationHostContext = createContext<OrganizationHostApi | undefined>(v
 export const OrganizationHostProvider = OrganizationHostContext.Provider;
 
 /**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
+ * The host this screen is mounted in. Missing means the screen was rendered
+ * outside the frontend feature that owns it — a composition fault, not
+ * something a screen can degrade around.
  */
 export function useOrganizationHost(): OrganizationHostApi {
   const host = useContext(OrganizationHostContext);

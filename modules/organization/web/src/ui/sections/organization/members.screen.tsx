@@ -298,12 +298,9 @@ function MembersList({
         )}
         <Card.Root width="full" overflow="hidden">
           {/*
-            Card wraps the table in overflowX="auto" so the row never
-            clips the rightmost ⋮ actions menu on narrow viewports; the
-            department picker keeps its full width (do NOT shrink it), and
-            the email column truncates with a hover tooltip via
-            OverflownTextWithTooltip so long synthetic addresses don't
-            push the row width past the viewport.
+            overflowX="auto" so the row never clips the rightmost ⋮ menu. The
+            department picker keeps its full width (do NOT shrink it); the email
+            column truncates via OverflownTextWithTooltip so long addresses don't push the row.
           */}
           <Card.Body paddingY={0} paddingX={0} overflowX="auto">
             <Table.Root variant="line" size="md" width="full">

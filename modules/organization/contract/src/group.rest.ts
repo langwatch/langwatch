@@ -1,10 +1,7 @@
 /**
- * The wire shapes the `/api/groups` REST family publishes.
- *
- * Narrower than the domain shapes above them on purpose: the transport answers
- * a group without its `organizationId` and `updatedAt`, and a member without
- * the avatar, so the schemas that describe those answers live here rather than
- * being the domain schema with fields the door does not send.
+ * The wire shapes the `/api/groups` REST family publishes — narrower than the
+ * domain shapes: a group answers without `organizationId`/`updatedAt`, and a
+ * member without its avatar.
  */
 import { z } from "zod";
 

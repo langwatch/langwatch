@@ -100,10 +100,8 @@ function toUser(row: MemoryUserRow): User {
 
 /**
  * In-memory `OrganizationMembershipRepository`, for tests and a memory-backed
- * boot. Covers every method the abstract class declares; the transactional
- * admin-lockout guards the Postgres repository locks a row for are answered
- * here with a plain read, since a memory backend has no concurrent writer to
- * race against.
+ * boot. The admin-lockout guards the Postgres repository locks a row for are
+ * answered here with a plain read — no concurrent writer to race against.
  */
 export class MemoryOrganizationMembershipRepository implements OrganizationMembershipRepository {
   private constructor(private readonly memory: MemoryOrganizationDatabase) {}

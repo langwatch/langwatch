@@ -284,11 +284,9 @@ export function fakePersonalWorkspaceHost(
 }
 
 /**
- * The address, held where React can see it change.
- *
- * `setQuery` replaces the whole query string — a key left out is a key removed —
- * which is the contract the port states and the one the settings screen relies
- * on to drop `?tab=` when the reader goes back to the default tab.
+ * The address, held where React can see it change. `setQuery` replaces the
+ * whole query string — a key left out is a key removed — which is the
+ * contract the settings screen relies on to drop `?tab=` on the default tab.
  */
 function PersonalHostHarness({
   host,
@@ -310,10 +308,9 @@ function PersonalHostHarness({
 }
 
 /**
- * The tree a screen is mounted inside, as a Testing Library wrapper.
- *
- * A wrapper rather than a wrapped element, so `rerender` keeps the host and the
- * query state: Testing Library re-applies the wrapper on every re-render.
+ * The tree a screen is mounted inside, as a Testing Library wrapper — not a
+ * wrapped element, so `rerender` keeps the host and query state since
+ * Testing Library re-applies the wrapper on every re-render.
  */
 export function personalWorkspaceHostWrapper(host: FakePersonalWorkspaceHost) {
   return ({ children }: { children: ReactNode }) => (

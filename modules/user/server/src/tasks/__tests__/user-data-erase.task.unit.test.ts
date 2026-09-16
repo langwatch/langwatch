@@ -3,10 +3,9 @@ import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task
 import type { GdprUserDataEraseRepository } from "../../repositories/prisma/prisma.user-data-erase.repository.ts";
 
 /**
- * A repository double with no organizations, teams or projects for the user.
- * Built untyped and cast once at the seam, the same pattern this repo's
- * repository unit tests use for a `PrismaClient` double (e.g.
- * `prisma.organization.repository.settings.unit.test.ts`).
+ * A repository double with no organizations, teams or projects for the
+ * user. Built untyped and cast once at the seam, the same pattern this
+ * repo's repository unit tests use for a `PrismaClient` double.
  */
 function emptyRepository(overrides: Record<string, unknown> = {}): GdprUserDataEraseRepository {
   const base: Record<string, unknown> = {

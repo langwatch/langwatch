@@ -1,7 +1,6 @@
 /**
- * The server half of `user.*`. Every procedure acts on the session's own
- * account, so most ask no permission: there is no tenant scope to check. The
- * organization-scoped ones take `organization:view`. Nothing here catches.
+ * The server half of `user.*`, acting on the session's own account — most
+ * ask no permission; the organization-scoped ones take `organization:view`.
  * Spec: modules/user/specs/user.feature, specs/settings/user-avatar.feature.
  */
 import {

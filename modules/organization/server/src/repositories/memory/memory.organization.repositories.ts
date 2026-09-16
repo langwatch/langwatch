@@ -9,9 +9,8 @@ import { MemoryTenantDirectoryRepository } from "./memory.tenant-directory.repos
 
 /**
  * The memory-backed provider: one shared database for organization, team,
- * group and membership. The grant ledger is ignored here - a memory-backed
- * boot has no AuthZ peer to write through, so membership's own role columns
- * (`OrganizationUser.role`, `TeamUser.role`) are the whole answer.
+ * group and membership. The grant ledger is ignored — no AuthZ peer to write
+ * through — so `OrganizationUser.role`/`TeamUser.role` are the whole answer.
  */
 export const MemoryOrganizationRepositories = {
   requires: [] as const,

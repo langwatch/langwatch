@@ -6,11 +6,9 @@ import {
 } from "../resource-identifiers.service.ts";
 
 /**
- * Every value asserted below is written into a row the customer then owns, so
- * each assertion pins a persisted format rather than a preference. The KSUID
- * prefixes in particular are what the platform application has always minted;
- * a second composition root that spelled one differently would write rows
- * nothing else recognises.
+ * Every value asserted below is written into a row the customer then owns,
+ * so each assertion pins a persisted format — the KSUID prefixes are what
+ * the platform application has always minted; a second root must match.
  */
 describe("PersonalWorkspaceIdentityAdapter", () => {
   describe("when a personal workspace is created", () => {

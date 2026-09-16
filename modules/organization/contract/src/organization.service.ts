@@ -70,10 +70,8 @@ export abstract class OrganizationService {
   }): Promise<boolean>;
   /**
    * Which of the named organizations this person belongs to, in one read.
-   *
-   * Input order is kept and a non-membership is absent, so a caller can map
-   * its own list without the answer becoming a membership oracle for the
-   * organizations it is not in.
+   * Input order is kept and a non-membership is absent, so this cannot become
+   * a membership oracle for organizations the caller is not in.
    */
   abstract memberOrganizationIds(input: {
     userId: string;
@@ -84,11 +82,8 @@ export abstract class OrganizationService {
 
   /**
    * The organization that owns one team, or null when no such team exists.
-   *
-   * Absence is an answer rather than a refusal: usage metering and the
-   * personal-workspace reads ask it about a team id they were handed by a
-   * project row, and a team that has since gone means "no tenant to meter",
-   * not "the lookup broke".
+   * Absence is an answer, not a refusal: usage metering and personal-workspace
+   * reads treat a since-deleted team as "no tenant to meter", not a broken lookup.
    */
   abstract tryGetOrganizationIdByTeamId(
     input: GetOrganizationIdByTeamIdInput,

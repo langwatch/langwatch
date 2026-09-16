@@ -34,12 +34,9 @@ export function InstallCliCard({
 } = {}) {
   const { isSaas, appBaseUrl: baseHost } = usePersonalWorkspaceHost().deployment();
 
-  // On SaaS, the CLI's hardcoded default already points at app.langwatch.ai
-  // — no override needed. On self-hosted, pass the endpoint as a flag on
-  // `langwatch login` so the first authenticated call targets the right
-  // control plane (the login flow persists the value so subsequent CLI
-  // commands don't need the flag). `npm install` itself never talks to
-  // LangWatch, so no env / flag needed there.
+  // On SaaS, the CLI's hardcoded default already points at app.langwatch.ai.
+  // On self-hosted, pass the endpoint as a flag on `langwatch login` (the
+  // login flow persists it, so later commands don't need the flag).
   const installCommand = "npm install -g langwatch";
 
   const loginCommand = isSaas ? "langwatch login" : `langwatch login --endpoint ${baseHost}`;

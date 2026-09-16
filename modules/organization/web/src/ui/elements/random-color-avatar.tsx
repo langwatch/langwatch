@@ -1,9 +1,7 @@
 /**
- * A FAMILY-LOCAL COPY of `platform/app/src/components/RandomColorAvatar.tsx`,
- * taken for the reason the RBAC family took `principal-avatar`: sixteen
- * platform callers keep the original alive, and these rows carry a `userImage`
- * that an initials-only avatar would drop. The colour comes from the Design
- * System's own `rotating-colors` rather than from a second copy of the palette.
+ * A FAMILY-LOCAL COPY of `platform/app/src/components/RandomColorAvatar.tsx`
+ * (sixteen platform callers keep the original alive); these rows carry a
+ * `userImage` an initials-only avatar would drop. Colour: Design System's own `rotating-colors`.
  */
 
 import type { AvatarRootProps } from "@langwatch/design-system/avatar";

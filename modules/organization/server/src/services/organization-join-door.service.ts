@@ -1,8 +1,7 @@
 /**
  * `joinRequests.*` as this feature serves it: the caller's own verified
- * address resolved once, the ledger's folded state turned into the two shapes
- * the screens render, and the requester's address deliberately withheld from
- * the organization until they are a member of it.
+ * address resolved once, folded ledger state turned into the two screen
+ * shapes — the requester's address withheld from the organization until membership.
  */
 
 import { Temporal, toDate } from "@langwatch/time";

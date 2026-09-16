@@ -2,10 +2,8 @@ import { z } from "zod";
 import { organizationTeamMemberInputSchema } from "./team.ts";
 
 /**
- * The transport inputs the team surface publishes. A team belongs to exactly
- * one organization, so its transport contract lives beside the
- * organization's. The organization scope two of these reads carry is
- * `organizationApiScopeSchema`, in `organization.api.ts`.
+ * The transport inputs the team surface publishes; two of these reads also
+ * carry `organizationApiScopeSchema` from `organization.api.ts`.
  */
 
 /** A team addressed by its slug within an organization. */

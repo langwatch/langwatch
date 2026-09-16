@@ -12,12 +12,9 @@ export const TeamUserRole = {
   MEMBER: "MEMBER",
   VIEWER: "VIEWER",
   /**
-   * The role a CUSTOM role binding stores.
-   *
-   * The role picker offers built-in roles and custom ones side by side, and a
-   * custom pick stores this plus the custom role's id. `@langwatch/trace-web`'s
-   * copy of this enum omits it because nothing there reads it; this one needs
-   * it, which is exactly the drift a shared contract would settle.
+   * The role a CUSTOM role binding stores: the picker offers built-in and
+   * custom roles side by side, and a custom pick stores this plus the
+   * custom role's id. `@langwatch/trace-web`'s copy omits it — unused there.
    */
   CUSTOM: "CUSTOM",
 } as const;

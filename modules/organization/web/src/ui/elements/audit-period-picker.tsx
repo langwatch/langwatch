@@ -1,10 +1,7 @@
 /**
- * The window picker above the audit table.
- *
- * The presentation half of `model/audit-period.ts`, and narrowed the same way:
- * the platform control also offers two `datetime-local` inputs and an "All
- * time" entry, neither of which the audit page ever showed. Presets only, which
- * is what its URL has always carried.
+ * The window picker above the audit table — the presentation half of
+ * `model/audit-period.ts`, narrowed the same way: no `datetime-local`
+ * inputs or "All time" entry, presets only, matching what its URL carries.
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";

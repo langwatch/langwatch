@@ -14,11 +14,9 @@ import { Link } from "../elements/personal-link.tsx";
 const API_KEYS_SETTINGS_PATH = "/settings/api-keys";
 
 /**
- * The compact half of the trace explorer's `IntegratePaneShell`, inlined.
- *
- * The shell lives under `platform/app`'s `features/traces-v2` and takes a
- * `chrome` slot and a full-viewport branch, neither of which this card ever
- * used. What it needed was the safe-centred hero box, which is what this is.
+ * The compact half of the trace explorer's `IntegratePaneShell`, inlined —
+ * the shell (under `platform/app`) takes a `chrome` slot and a full-viewport
+ * branch this card never used; only the safe-centred hero box was needed.
  */
 const CompactIntegratePane: React.FC<{ children: React.ReactNode; ariaLabel?: string }> = ({
   children,

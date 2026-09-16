@@ -1,8 +1,7 @@
 /**
- * `/api/me` — the personal developer surface a project API key reads: the
- * spend, usage and model breakdown the /me dashboard renders, and the identity
- * of the project behind the key. Whether a key may answer for a PERSON is the
- * application's question, because the credential's class is half of it.
+ * `/api/me` — the personal developer surface a project API key reads: spend,
+ * usage, model breakdown, and the project's identity. Whether a key may
+ * answer for a PERSON is the application's question — the credential's class is half of it.
  */
 import {
   baseResponses,

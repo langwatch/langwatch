@@ -177,9 +177,8 @@ export const BindingInputRow = forwardRef<
     onReadyChange?: (isReady: boolean) => void;
     /**
      * The seat of the member these rows are written for. A Lite Member seat
-     * offers the Viewer role only, no custom roles, and no organization scope.
-     * The group editors pass nothing: a group has no seat, so every role stays
-     * available there.
+     * offers the Viewer role only, no custom roles, no organization scope.
+     * Group editors pass nothing — a group has no seat, so every role stays available.
      */
     organizationRole?: OrganizationUserRole;
     buttonLabel?: string;

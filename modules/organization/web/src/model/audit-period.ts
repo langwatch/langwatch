@@ -1,9 +1,7 @@
 /**
- * The window the audit trail is read over, as a value rather than as a
- * hook. A narrowed family-local copy of the old `PeriodSelector` (which
- * keeps its other twenty-odd callers): reading is pure over the host's
- * query, writes answer with the next whole query, and absolute-range
- * inputs / "All time" did not travel — the audit trail always has a window.
+ * The window the audit trail is read over, as a value not a hook — a
+ * narrowed copy of the old `PeriodSelector`. Absolute-range inputs and
+ * "All time" did not travel: the audit trail always has a window.
  */
 
 import {
@@ -51,11 +49,9 @@ export function isAuditPeriodPresetKey(value: unknown): value is AuditPeriodPres
 const isReadableDate = (value: string): boolean => !isNaN(toEpochMs(value));
 
 /**
- * The [start, end] window for a preset, anchored to `now`.
- *
- * Day-based presets snap the start to start-of-day, which is what makes
- * "Last 7 days" mean seven whole days rather than a hundred and sixty-eight
- * hours ending at an arbitrary minute.
+ * The [start, end] window for a preset, anchored to `now`. Day-based presets
+ * snap the start to start-of-day, so "Last 7 days" means seven whole days,
+ * not a hundred and sixty-eight hours ending at an arbitrary minute.
  */
 export function computeAuditWindow(presetKey: AuditPeriodPresetKey, now: Instant): AuditPeriod {
   const preset = PRESETS_BY_KEY.get(presetKey);
@@ -82,12 +78,9 @@ export type AuditPeriodReading = {
 const DEFAULT_PRESET: AuditPeriodPresetKey = "30d";
 
 /**
- * The window the address describes.
- *
- * An explicit `startDate`/`endDate` pair wins, and a reversed pair is clamped
- * rather than refused — a hand-edited URL should narrow to nothing visible, not
- * ask the server for a range that runs backwards. Anything else falls back to
- * the named preset, and then to thirty days.
+ * The window the address describes. An explicit `startDate`/`endDate` pair
+ * wins; a reversed pair clamps rather than refusing — narrowing to nothing
+ * visible rather than a range that runs backwards. Else: preset, then thirty days.
  */
 export function readAuditPeriod(
   query: Readonly<Record<string, string | undefined>>,

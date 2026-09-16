@@ -1,8 +1,7 @@
 /**
- * A FAMILY-LOCAL COPY of `platform/app/src/components/UserAvatar.tsx`, which
- * sixteen platform surfaces still render and the deletes-only ruling forbids
- * repointing. `@langwatch/trace-web` carries the same copy for the same reason;
- * this is the second, byte for byte.
+ * A FAMILY-LOCAL COPY of `platform/app/src/components/UserAvatar.tsx` —
+ * sixteen platform surfaces still render it and the deletes-only ruling
+ * forbids repointing. `@langwatch/trace-web` carries the same copy, byte for byte.
  */
 
 import { Avatar, type AvatarRootProps } from "@langwatch/design-system/avatar";

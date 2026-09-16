@@ -59,13 +59,10 @@ describe("buildEnvSnippet", () => {
   describe("when the template slug is gemini", () => {
     const snippet = buildEnvSnippet("gemini", ENDPOINT, TOKEN);
 
-    // gemini-cli 0.46 emits OTLP traces + log records only when this
-    // exact 6-knob combination is set on the env. Each knob is
-    // load-bearing — see typescript-sdk wrapper-mode tests for the
-    // per-knob why. Dropping ANY of them silently regresses gemini
-    // Path B to "metrics only" (the false-vendor-limit we shipped in
-    // an earlier matrix iteration). Pin them here so a refactor of
-    // this drawer can't quietly undo the fix.
+    // gemini-cli 0.46 emits OTLP traces + log records only with this exact
+    // 6-knob combination — see typescript-sdk wrapper-mode tests for the
+    // per-knob why. Dropping any of them silently regresses to "metrics
+    // only" (the false-vendor-limit shipped in an earlier matrix iteration).
     it("sets all 6 gemini telemetry knobs required for OTLP", () => {
       expect(snippet).toContain("export GEMINI_TELEMETRY_ENABLED=true");
       expect(snippet).toContain("export GEMINI_TELEMETRY_TARGET=local");

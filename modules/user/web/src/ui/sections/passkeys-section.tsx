@@ -269,11 +269,9 @@ export function PasskeysSection() {
   }, [passkeysEnabled, reload]);
 
   /**
-   * Says what happened, and says nothing at all about a decision.
-   *
-   * A cancelled prompt is somebody opening the operating system's dialog,
-   * looking at it and closing it. Reporting that as a failure is telling them
-   * off for deciding, which is why `cancelled` exists on the outcome at all.
+   * Says what happened, and says nothing at all about a decision. A
+   * cancelled prompt is somebody opening the OS dialog and closing it —
+   * reporting that as a failure is why `cancelled` exists on the outcome.
    */
   const report = async (
     outcome: PasskeyOutcome,

@@ -192,11 +192,9 @@ export const userAvatarResultSchema = z.object({ image: z.string() }).strict();
 export type UserAvatarResult = z.infer<typeof userAvatarResultSchema>;
 
 /**
- * What a completed email-verification ceremony answers.
- *
- * Deliberately one flag and nothing else: the caller already knows which
- * identifier they were verifying, and the ceremony has no other fact to hand
- * back that is not already theirs.
+ * What a completed email-verification ceremony answers — deliberately one
+ * flag and nothing else: the caller already knows which identifier they
+ * were verifying, and has no other fact to hand back that is not already theirs.
  */
 export const identityVerificationCompletedSchema = z.object({ verified: z.literal(true) }).strict();
 export type IdentityVerificationCompleted = z.infer<typeof identityVerificationCompletedSchema>;
@@ -239,20 +237,16 @@ export const registerCredentialAccountInputSchema = z
 export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;
 
 /**
- * The session row a credential write keeps. Null while an operator is
- * impersonating: the row is the OPERATOR's, so "end every session but this
- * one" would neither keep the subject's tab nor mean anything about their
- * devices.
+ * The session row a credential write keeps. Null while impersonating: the
+ * row is the OPERATOR's, so "end every session but this one" would neither
+ * keep the subject's tab nor mean anything about their devices.
  */
 const keptBrowserSession = z.string().min(1).nullable();
 
 /**
  * Who asked for a credential write, carried as a FACT rather than inferred.
- *
- * `keepSessionId` is null while impersonating too, but that is a statement
- * about which session to spare, not about who is asking — a request that
- * carried no browser session at all is null for a different reason. A write
- * that must be refused outright needs to be told, not to guess.
+ * `keepSessionId` is null both while impersonating and when no browser
+ * session existed — different reasons. A refusal needs to be told, not guess.
  */
 const credentialWriteCaller = userCallerSchema;
 

@@ -157,10 +157,9 @@ export class GdprUserDataEraseRepository {
   }
 
   /**
-   * In dependency order: nullify what points at the user from entities that
-   * outlive them, delete sole-owned projects and their children, delete
-   * sole-owned teams and organizations, drop shared memberships, then the
-   * user's own rows and the user itself.
+   * In dependency order: nullify references from entities that outlive the
+   * user, delete sole-owned projects/children, sole-owned teams/orgs, drop
+   * shared memberships, then the user's own rows and the user itself.
    */
   async eraseUserAndOwnedResources({
     userId,

@@ -29,11 +29,9 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { z } from "zod";
 
 /**
- * Whether the credential's organization holds the Enterprise plan this whole
- * family requires. Bound by the apps/api mount to the deployment's plan
- * lookup; resolved once per request, right before the handler runs, which is
- * after authentication and after the permission check - the same ordering the
- * pre-conversion middleware gate held.
+ * Whether the credential's organization holds the Enterprise plan this
+ * family requires, resolved once per request after authentication and after
+ * the permission check — the ordering the pre-conversion middleware held.
  */
 export const organizationManagementEnterpriseGate = defineRestMiddleware(
   "organizationManagementEnterpriseGate",

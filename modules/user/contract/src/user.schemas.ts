@@ -39,13 +39,10 @@ export const userApiUserInputSchema = z.object({ userId: z.string() });
 
 export const userApiSetAvatarInputSchema = z.object({
   organizationId: z.string(),
-  // A base64 image data URL (`data:image/...;base64,...`) produced by the
-  // client crop/resize step. Deliberately NOT bounded with a `.max()` here:
-  // `parseAvatarDataUrl` rejects at exactly the same ceiling before it scans
-  // or decodes anything, so a `.max()` only wins the race and turns the
-  // specific `avatar_image_too_large` ("Pick one under 8 MB") into the
-  // anonymous `validation_error`. The point of that code is that both halves
-  // of the check answer with it, whichever caught the file.
+  // A base64 image data URL (`data:image/...;base64,...`) from the client
+  // crop/resize step. Deliberately NOT bounded with `.max()`: `parseAvatarDataUrl`
+  // rejects at the same ceiling first, so both halves answer with the
+  // specific `avatar_image_too_large` rather than turning it into `validation_error`.
   imageDataUrl: z.string().min(1),
 });
 

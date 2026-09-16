@@ -53,10 +53,9 @@ export class OrganizationInvitationDoorService {
   private constructor(private readonly deps: OrganizationInvitationDoorDependencies) {}
 
   /**
-   * Invites a batch in the validation mode the ASKING TRANSPORT chose. Under
-   * `strict` a team or custom role that cannot be assigned refuses the whole
-   * batch by name; under `lenient` it drops that assignment - or the
-   * invitation - and the rest are created.
+   * Invites a batch in the validation mode the caller chose. `strict` refuses
+   * the whole batch by name on an unassignable team or role; `lenient` drops
+   * that assignment (or invitation) and creates the rest.
    */
   async create(
     input: OrganizationApiCreateInvitationsInput,
@@ -119,9 +118,8 @@ export class OrganizationInvitationDoorService {
 
   /**
    * Spends one invitation link. A revoked invitation reads exactly like a
-   * missing one: the journey ends quietly, revealing nothing about the
-   * organization or the inviter. Expired is different - the inviter resends in
-   * one click - so it gets its own named refusal.
+   * missing one, revealing nothing about the organization or inviter.
+   * Expired is different: the inviter resends in one click, its own refusal.
    */
   async accept(
     input: Readonly<{ inviteCode: string }>,
@@ -252,9 +250,8 @@ export class OrganizationInvitationDoorService {
 
   /**
    * Idempotent, and outside the acceptance: an unexpected failure here must
-   * not roll the membership back, and the next session's lazy backfill
-   * recovers it. Reported so a systemic regression is visible before people
-   * start noticing missing workspaces.
+   * not roll the membership back — the next session's lazy backfill recovers
+   * it. Reported so a systemic regression is visible before workspaces go missing.
    */
   async #provisionPersonalWorkspace(input: {
     organizationId: string;

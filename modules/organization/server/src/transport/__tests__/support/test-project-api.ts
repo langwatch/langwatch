@@ -1,8 +1,7 @@
 /**
- * A complete `ProjectApi` boundary for the teams family's suite. Only the one
- * read `GET /api/teams/:id/projects` makes is answered; everything else refuses
- * by name, so a route that starts reaching the project module some other way
- * fails here rather than passing on a stub's default.
+ * A complete `ProjectApi` boundary for the teams family's suite. Only the
+ * `GET /api/teams/:id/projects` read is answered; everything else refuses
+ * by name, so an unexpected route fails here rather than on a stub's default.
  */
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 

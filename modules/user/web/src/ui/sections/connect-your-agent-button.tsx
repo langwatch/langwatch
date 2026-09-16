@@ -17,10 +17,8 @@ export const EXPLORE_USAGE_LANGY_PROMPT =
 
 /**
  * The prompt handed to the reader's own coding agent. Exported for tests,
- * which also pin that the docs guide carries this exact prompt. A fresh
- * Claude Code session with the `langwatch` CLI available should be able to
- * paste it and immediately self-inspect: the CLI resolves the device-login
- * session on its own, so the prompt promises no API key and no env vars.
+ * which also pin that the docs guide carries this exact prompt — the CLI
+ * resolves the device-login session on its own, so it promises no API key or env vars.
  */
 export const EXPLORE_USAGE_AGENT_PROMPT = `Explore my LangWatch usage and tell me where my tokens and money went.
 

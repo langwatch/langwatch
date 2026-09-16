@@ -7,10 +7,9 @@ export type UserOrganizationDirectoryDatabase = Pick<
 >;
 
 /**
- * The `/me` view's own reads of organization and project rows: none of these
- * tables belong to this module, but the reads are narrow and local to what
- * `/me` renders, through this module's own repository — the same pattern
- * every other module reading a peer's table for a directory concern follows.
+ * The `/me` view's own reads of organization and project rows — none of
+ * these tables belong to this module, but the reads are narrow, local to
+ * what `/me` renders, and read through this module's own repository.
  */
 export class PrismaUserOrganizationDirectoryRepository {
   static create(

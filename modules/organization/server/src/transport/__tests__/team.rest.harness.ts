@@ -1,13 +1,7 @@
 /**
- * The `/api/teams` family on a runtime that stands in for the deployment: one
- * organization door, the two permissions its routes ask, and the canonical
- * error envelope the api process renders every family's refusals with.
- *
- * The door is handed its application through the SAME operations-only
- * feature-API proxy the composition hands it — not the object directly — so a
- * route naming an operation the application does not serve fails here the way
- * it fails in production. That the real `ServerOrganizationApp` serves them all
- * is `team.rest.composition.unit.test.ts`.
+ * The `/api/teams` family on a runtime standing in for the deployment,
+ * reached through the SAME operations-only feature-API proxy production
+ * uses, so a route naming an unserved operation fails here too.
  */
 import {
   createRestRuntime,
@@ -36,15 +30,9 @@ export const EVERY_PERMISSION = ["team:view", "team:manage"] as const;
 export const VIEWER_PERMISSIONS = [] as const;
 
 /**
- * The canonical envelope, as `apps/api/src/app/api-canonical-error.ts` renders
- * it for every family the api process mounts: a handled refusal answers its own
- * code and status below 5xx, a status-carrying refusal answers the status it
- * names, and anything else is an opaque 500.
- *
- * One deliberate difference is reproduced rather than papered over: that file
- * rewrites `validation_error` from the 422 the shared validator raises to 400.
- * It is a process-wide decision about the whole management surface, so the
- * tests below assert what a caller really receives.
+ * The canonical envelope `api-canonical-error.ts` renders for every mounted
+ * family, including its deliberate rewrite of `validation_error` from 422 to
+ * 400 — so the tests below assert what a caller really receives.
  */
 const VALIDATION_ERROR_STATUS = 400;
 

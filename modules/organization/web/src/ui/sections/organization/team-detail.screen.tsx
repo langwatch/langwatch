@@ -1,10 +1,7 @@
 /**
- * One team, at `/settings/teams/:team`.
- *
- * THE EDIT FORM AND THE ARCHIVE, over one read. Everything the form saves goes
- * in ONE mutation, so a rename and a membership change cannot half-apply, and
- * archiving the team leaves for the list rather than sitting on a page whose
- * subject is gone.
+ * One team, at `/settings/teams/:team` — THE EDIT FORM AND THE ARCHIVE, over
+ * one read. Everything the form saves goes in ONE mutation, so a rename and
+ * a membership change cannot half-apply; archiving leaves for the list.
  */
 
 import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
@@ -173,12 +170,9 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
   const host = useOrganizationHost();
 
   /**
-   * The baseline moves to the submitted values before the mutation answers, so
-   * a save the server rejected would otherwise stay on screen as the local
-   * truth: the form shows membership that was never written, and every later
-   * autosave resubmits it, so even a rename can no longer land. Rolling both
-   * the baseline and the form back to the team's persisted values puts the
-   * refused edit where the server left it.
+   * The baseline moves to the submitted values before the mutation answers,
+   * so a rejected save would otherwise stay as local truth and every later
+   * autosave resubmits it. On refusal, roll both back to the persisted values.
    */
   function restorePersistedTeamValues(): void {
     const persisted = getInitialValues(team);

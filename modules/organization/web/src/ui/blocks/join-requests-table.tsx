@@ -12,10 +12,9 @@ interface JoinRequestsTableProps {
 }
 
 /**
- * People waiting to join, beside the invitations (D12) — one panel so "who
- * is waiting on me?" has one answer. Approve has no role picker on purpose:
- * it grants the default role, and a formal invitation is what owns
- * roles/teams. Reject asks for no reason.
+ * People waiting to join, beside the invitations (D12) — one panel for "who
+ * is waiting on me?" Approve has no role picker: it grants the default role,
+ * a formal invitation owns roles/teams. Reject asks for no reason.
  */
 export function JoinRequestsTable({
   requests,

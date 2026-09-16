@@ -31,12 +31,9 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     ].join("\n");
   }
   if (slug === "codex") {
-    // Codex 0.130+ links the opentelemetry-otlp Rust SDK + reads
-    // standard OTEL_EXPORTER_OTLP_* env vars but the exporter is
-    // gated on a [otel] block in ~/.codex/config.toml. The CLI
-    // command surfaced below writes that block idempotently so the
-    // user pastes nothing manual; the export block is shown for the
-    // env-only path (CI, devcontainers, agents).
+    // Codex 0.130+ reads standard OTEL_EXPORTER_OTLP_* env vars, but the
+    // exporter is gated on a [otel] block in ~/.codex/config.toml — the CLI
+    // command below writes it idempotently; the export block covers CI/devcontainers/agents.
     return [
       `# Run once: langwatch ingest install codex`,
       `# (writes the [otel] block to ~/.codex/config.toml automatically)`,
@@ -47,12 +44,9 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     ].join("\n");
   }
   if (slug === "gemini") {
-    // gemini-cli 0.46 telemetry resolver only accepts target ∈ {local, gcp}.
-    // OTLP forwarding goes through target=local + useCollector=true (in-process
-    // exporters wired to OTLP via @opentelemetry/exporter-trace-otlp-http +
-    // exporter-logs-otlp-http). traces=true enables detailed attribute spans
-    // and logPrompts=true embeds the user prompt text so the receiver-side
-    // fold has something to lift onto langwatch.input.
+    // gemini-cli 0.46 only forwards OTLP via target=local + useCollector=true
+    // (in-process exporters to @opentelemetry/exporter-trace/logs-otlp-http).
+    // traces=true enables spans; logPrompts=true embeds prompt text for langwatch.input.
     return [
       `export GEMINI_TELEMETRY_ENABLED=true`,
       `export GEMINI_TELEMETRY_TARGET=local`,
@@ -121,10 +115,9 @@ export function IngestionTemplateInstallDrawer({
   /** The install/rotate mutation's error, passed straight through. */
   installError: unknown;
   /**
-   * True when the user already has an ingestion key for this source. Drives
+   * True when the user already has an ingestion key for this source, driving
    * the CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
-   * Without this signal the drawer would mint-only on every
-   * already-connected source.
+   * Without it the drawer would mint-only on an already-connected source.
    */
   hasExistingKey: boolean;
   /**

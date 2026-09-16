@@ -45,11 +45,9 @@ export function fieldProblems(error: unknown): Record<string, string> {
 }
 
 /**
- * What the server said about the submission as a whole.
- *
- * `meta.formErrors` is forwarded verbatim from an upstream body on a relayed
- * error, so the number of complaints is not ours to trust: the list is capped
- * rather than rendered whole.
+ * What the server said about the submission as a whole. `meta.formErrors`
+ * is forwarded verbatim from an upstream body on a relayed error, so the
+ * count is not ours to trust — the list is capped rather than rendered whole.
  */
 const MAX_FORM_ERRORS = 3;
 
@@ -64,11 +62,9 @@ export function formProblems(error: unknown): string[] {
 }
 
 /**
- * Longer than this and nobody wrote it for a customer.
- *
- * Authored copy is a sentence or two ("Current password is incorrect"). A stack
- * frame, a serialised query or a driver's diagnostic block runs to hundreds of
- * characters, and length alone separates them reliably.
+ * Longer than this and nobody wrote it for a customer. Authored copy is a
+ * sentence or two ("Current password is incorrect"); a stack frame or
+ * driver diagnostic runs to hundreds of characters — length separates them.
  */
 const MAX_AUTHORED_LENGTH = 200;
 

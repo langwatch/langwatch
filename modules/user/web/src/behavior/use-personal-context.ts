@@ -16,20 +16,17 @@ export type PersonalSummary = {
 };
 
 /**
- * Mirror of `api.user.budgetOverview`: every budget that binds the
- * user's own keys, most binding first, each labelled with its scope.
- * `gatewayAccess: false` means the org gives this user no member-facing
- * gateway path at all, so budget UI renders nothing (not an empty state).
+ * Mirror of `api.user.budgetOverview`: every budget binding the user's own
+ * keys, most binding first. `gatewayAccess: false` means the org gives no
+ * member-facing gateway path, so budget UI renders nothing, not an empty state.
  */
 export type PersonalBudgetOverview = {
   gatewayAccess: boolean;
   budgets: BudgetOverviewItemView[];
   /**
-   * True once the server has answered at least once. An empty `budgets`
-   * only means "no budget binds you" while this holds; before it, the
-   * list is empty because nothing has come back yet and a surface must
-   * not say so. A later refetch that fails leaves the last answer
-   * standing rather than blanking a card the member is reading.
+   * True once the server has answered at least once. Empty `budgets` means
+   * "no budget binds you" only while this holds — before it, nothing has
+   * come back yet. A failed refetch leaves the last answer standing.
    */
   isResolved: boolean;
 };
@@ -117,12 +114,10 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
-  // tRPC serializes Prisma Decimal fields as strings — coerce at the
-  // hook boundary so downstream UI (BudgetExceededBanner, /me dashboard)
-  // can use number arithmetic without re-coercing in every consumer.
-  // The chip needs always-on snapshot data even when status='ok'
-  // (under 80% used) — only collapse to bare {status:'ok'} when there
-  // is genuinely no applicable budget (no `limitUsd` on the wire).
+  // tRPC serializes Prisma Decimal fields as strings — coerce at the hook
+  // boundary so downstream UI can use number arithmetic. Collapse to bare
+  // {status:'ok'} only when there is genuinely no applicable budget
+  // (no `limitUsd` on the wire); the chip needs snapshot data even at status='ok'.
   const budget = useMemo<PersonalBudgetState>(() => {
     const raw = personalBudgetQuery.data;
     if (!raw) return { status: "ok" };
@@ -150,12 +145,9 @@ export function usePersonalContext(): PersonalContext {
       deviceHint: row.description ?? "Personal device",
       os: "Unknown",
       lastUsedAt: row.lastUsedAtMs === null ? null : readableDate(row.lastUsedAtMs).toISOString(),
-      // `fmtRelative` reads back this field via `Date.now() -
-      // new Date(iso).getTime()` and renders "N min/h/d ago". Sending
-      // a date-only `YYYY-MM-DD` made the JS Date parse as midnight
-      // UTC, so a key minted 3min ago rendered as "Created 18h ago"
-      // (Ariana QA option-C dogfood — visible regression on a
-      // freshly-minted key).
+      // `fmtRelative` computes `Date.now() - new Date(iso).getTime()` to
+      // render "N min/h/d ago" — a date-only `YYYY-MM-DD` parses as
+      // midnight UTC, so a key minted minutes ago would read hours old.
       createdAt: readableDate(row.createdAtMs).toISOString(),
     }));
   }, [personalKeysQuery.data]);

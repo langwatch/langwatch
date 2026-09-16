@@ -10,11 +10,9 @@ import {
 } from "../model/personal-workspace-host.ts";
 
 /**
- * The organization role that caps what a member's role bindings can do.
- *
- * Named as a string rather than imported from the generated Prisma client,
- * which is server code a web package may not reach. The one value the personal
- * surfaces compare against is this one.
+ * The organization role that caps what a member's role bindings can do —
+ * named as a string rather than imported from the generated Prisma client,
+ * server code a web package may not reach.
  */
 export const EXTERNAL_ORGANIZATION_ROLE = "EXTERNAL";
 
@@ -45,11 +43,9 @@ export function useCurrentUser(): PersonalActor | null {
 }
 
 /**
- * Whether this reader's organization gives them view-only access.
- *
- * A lite member is a member on the EXTERNAL organization role: reads work,
- * writes do not, and their own workspace keeps nothing they add to it. The
- * personal surfaces say so rather than letting the page look broken.
+ * Whether this reader's organization gives them view-only access. A lite
+ * member is on the EXTERNAL organization role: reads work, writes do not,
+ * and their own workspace keeps nothing they add to it.
  */
 export function useLiteMemberGuard(): { isLiteMember: boolean } {
   const host = usePersonalWorkspaceHost();

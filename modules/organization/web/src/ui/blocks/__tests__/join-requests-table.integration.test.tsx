@@ -1,8 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * The members area's join-requests panel (D12).
- *
  * Spec: specs/identity/join-requests.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

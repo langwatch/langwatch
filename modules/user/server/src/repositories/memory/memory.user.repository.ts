@@ -34,10 +34,9 @@ import { MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.t
 const CREDENTIAL_PROVIDER = "credential";
 
 /**
- * The Prisma user repository's observable behaviour over a map: the same
- * profiles parsed through the same contract schemas, the same "already_set"
- * refusal on a second first-password, and the same absence for a user nobody
- * created.
+ * The Prisma user repository's observable behaviour over a map: same
+ * profiles through the same contract schemas, same "already_set" refusal
+ * on a second first-password, same absence for a user nobody created.
  */
 export class MemoryUserRepository implements UserRepository {
   #database: MemoryUserDatabase;

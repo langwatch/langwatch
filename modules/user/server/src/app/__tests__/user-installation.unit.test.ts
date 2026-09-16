@@ -19,9 +19,8 @@ import {
 
 /**
  * The narrow slice of a generated Prisma client the organization directory
- * reads, faked so the installation test can boot `UserApp` on its `prisma`
- * member without a real database. Nothing this test does reaches these
- * tables, so every read answers "not found".
+ * reads, faked so the installation test can boot `UserApp` without a real
+ * database; every read here answers "not found".
  */
 function fakeUserPrisma(): PrismaClient {
   return {

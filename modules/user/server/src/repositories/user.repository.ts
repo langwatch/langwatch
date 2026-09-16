@@ -15,11 +15,9 @@ import type {
 } from "@langwatch/user-contract";
 
 /**
- * The issuer a credential account row is stored under.
- *
- * It travels with the write rather than being held by the repository, because
- * a repository is built from the connection alone: the deployment states the
- * issuer once and the app carries it down to the three writes that mint a row.
+ * The issuer a credential account row is stored under — it travels with the
+ * write rather than being held by the repository, since a repository is
+ * built from the connection alone; the app carries it to the three writes that mint a row.
  */
 export type UserCredentialIssuer = Readonly<{ issuer: string }>;
 

@@ -41,10 +41,9 @@ describe("changing an existing password", () => {
   });
 
   /**
-   * Knowing the current password does not make it the operator's to replace.
-   * An operator who does know it can already read everything the subject can;
-   * what they must not be able to do is leave behind a credential that still
-   * works once the impersonation has ended.
+   * Knowing the current password does not make it the operator's to replace
+   * — they can already read everything the subject can, but must not leave
+   * behind a credential that still works once the impersonation has ended.
    */
   describe("given an operator browsing as somebody", () => {
     it("refuses outright, and ends no session", async () => {

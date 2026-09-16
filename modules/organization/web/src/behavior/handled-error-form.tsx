@@ -4,11 +4,9 @@ import { Alert, Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { AlertCircle } from "lucide-react";
 
 /**
- * The generic line, shared by both slots below so the two never disagree.
- *
- * Word for word the application registry's unknown-error description, because
- * a failure that reads one way in a drawer and another way on the page behind
- * it is two products.
+ * The generic line, shared by both slots below so the two never disagree —
+ * word for word the application registry's unknown-error description, since
+ * a failure reading differently in a drawer than on the page is two products.
  */
 export const UNKNOWN_ERROR_DESCRIPTION = "We've been notified. Try again in a moment.";
 
@@ -41,11 +39,9 @@ export function readHandledError(error: unknown): HandledErrorShape | null {
 export const FORM_SERVER_ERROR = "root.serverError";
 
 /**
- * As much of a react-hook-form as these two helpers touch.
- *
- * Structural and deliberately loose: the forms that pass one in are typed by
- * their own value shapes, and narrowing `setError` to `string` would make every
- * caller cast.
+ * As much of a react-hook-form as these two helpers touch — structural and
+ * deliberately loose, since the forms passed in are typed by their own value
+ * shapes, and narrowing `setError` to `string` would make every caller cast.
  */
 type MinimalForm = {
   // oxlint-disable-next-line no-explicit-any
@@ -54,12 +50,9 @@ type MinimalForm = {
 };
 
 /**
- * Places a server's field-level rejection on the fields it named.
- *
- * Answers `true` when it placed something. A caller with no whole-form slot
- * gets `false` for a refusal that named no field, and is then free to render
- * the failure some other way — which is exactly what the create-project form
- * does with its inline alert.
+ * Places a server's field-level rejection on the fields it named. Answers
+ * `true` when it placed something; a caller with no whole-form slot gets
+ * `false` for a field-less refusal, free to render it another way.
  */
 export function applyHandledErrorToForm({
   error,
@@ -118,10 +111,9 @@ export interface HandledErrorAlertProps {
 }
 
 /**
- * A failure that is still true, said in place.
- *
- * The inline counterpart to the host's `failed` notice: a toast is for
- * something that just happened, an alert for a form that is still rejected.
+ * A failure that is still true, said in place — the inline counterpart to
+ * the host's `failed` notice: a toast is for something that just happened,
+ * an alert for a form that is still rejected.
  */
 export function HandledErrorAlert({ error, title, fallbackTitle }: HandledErrorAlertProps) {
   if (error === null || error === void 0) return null;

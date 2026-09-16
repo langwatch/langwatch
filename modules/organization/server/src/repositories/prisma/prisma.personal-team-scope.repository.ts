@@ -130,10 +130,9 @@ export class PrismaPersonalTeamScopeRepository {
 }
 
 /**
- * Binds this deployment's Postgres to the two personal-workspace reads, for a
- * process that wants the narrow {@link PersonalTeamScopeReader} shape without
- * booting the whole organization module (`role.*`, the worker's tenancy
- * lane). Replaces the deleted `PostgresPersonalTeamScopeAdapter` class.
+ * Binds Postgres to the two personal-workspace reads, for a process that
+ * wants the narrow {@link PersonalTeamScopeReader} shape without booting the
+ * whole organization module. Replaces the deleted `PostgresPersonalTeamScopeAdapter`.
  */
 export function bindPersonalTeamScopeReader(database: PrismaClient): PersonalTeamScopeReader {
   const scopes = PrismaPersonalTeamScopeRepository.create();

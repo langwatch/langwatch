@@ -1,8 +1,7 @@
 /**
  * The server half of `onboarding.*`. Both procedures run before the caller
- * belongs to any organization, so neither has a scope to be checked at. The
- * ceremony itself - the catalogue, the personal workspace, the first project,
- * the sign-up announcements - is the application's.
+ * belongs to any organization, so neither has a scope to check. The ceremony
+ * itself — catalogue, personal workspace, first project, announcements — is the application's.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

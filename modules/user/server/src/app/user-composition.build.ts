@@ -28,12 +28,9 @@ export function buildUserInfrastructure(input: {
 
   return {
     // The issuer a credential account row is stored under is a persisted
-    // format: `local:credential`, exactly what
-    // `BetterAuthAccountQueriesAdapter.issuerForProviderId("credential")`
-    // (`@langwatch/identity-server`) evaluates to for this one provider id.
-    // Restated as the literal here rather than imported, since a module may
-    // not value-import another module's server package (ADR-134) and the
-    // format is fixed for this input.
+    // format, `local:credential` — what `BetterAuthAccountQueriesAdapter
+    // .issuerForProviderId("credential")` evaluates to. Restated as a literal
+    // since a module may not value-import another module's server package (ADR-134).
     credentialIssuer: "local:credential",
     avatarStorage: {
       store: () =>
@@ -145,11 +142,9 @@ export function buildUserInfrastructure(input: {
 }
 
 /**
- * One person's own verified organization membership and the two ledger reads
- * `/me` renders: the support contact and the first project a caller may land
- * on. The Prisma reads are the deleted composition's own; the membership
- * check and the settings read go through the SAME organization application
- * every other member call is answered from.
+ * One person's own verified organization membership and the two ledger
+ * reads `/me` renders (support contact, first project). Membership check and
+ * settings read go through the SAME organization application every other member call uses.
  */
 function organizationDirectory(options: {
   directory: PrismaUserOrganizationDirectoryRepository;
@@ -184,11 +179,9 @@ function organizationDirectory(options: {
 const REDIS_RATE_LIMIT_PREFIX = "user:rate-limit:";
 
 /**
- * Per-key fixed-window counting for this module's own multi-budget throttles
- * (sign-up, first-password, avatar upload — each with its own window and
- * ceiling), which the process's shared `rateLimiter` member cannot serve:
- * that one is built with ONE fixed policy at boot. The same shape
- * `automation-composition.build.ts` already built for the identical reason.
+ * Per-key fixed-window counting for this module's multi-budget throttles
+ * (sign-up, first-password, avatar upload), since the shared `rateLimiter`
+ * is built with ONE fixed policy — same shape `automation-composition.build.ts` uses.
  */
 class RedisUserRateLimiter {
   constructor(private readonly redis: RedisConnection) {}

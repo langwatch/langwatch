@@ -1,8 +1,7 @@
 /**
- * In-memory fakes for the ports `InviteAcceptanceService`, `InviteLifecycleService`,
- * `InviteCreationService` and `InviteTeamAssignmentService` are composed from. Each stores
- * real state (a Map, a Set) rather than counting calls, so a test asserts the world the
- * services actually left behind.
+ * In-memory fakes for the ports the invite services are composed from. Each
+ * stores real state (a Map, a Set) rather than counting calls, so a test
+ * asserts the world the services actually left behind.
  */
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type {

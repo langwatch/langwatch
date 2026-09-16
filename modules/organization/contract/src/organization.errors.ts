@@ -15,9 +15,8 @@ export class OrganizationNotFoundError extends HandledError {
 
 /**
  * A capability this deployment did not compose, refused by name rather than
- * answered emptily. An empty invitation list tells an administrator nobody has
- * been invited, which is the one answer they act on by inviting the same
- * person twice.
+ * answered emptily — an empty invitation list reads as "nobody invited",
+ * which an administrator acts on by inviting the same person twice.
  */
 export class OrganizationCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";

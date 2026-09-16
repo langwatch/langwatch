@@ -24,11 +24,9 @@ const AUTH0_PROVIDER = "auth0";
 const AUTH0_DATABASE_SUBJECT_PREFIX = "auth0|";
 
 /**
- * The account rows behind the /settings/authentication screens.
- *
- * They read the same rows, with the same predicates, from inside the feature
- * that owns them — a `select` naming `password` used to live in the API
- * process's own composition, outside the package that owns the stored format.
+ * The account rows behind the /settings/authentication screens — read with
+ * the same predicates, from inside the feature that owns them. A `select`
+ * naming `password` used to live outside the package owning that format.
  */
 export class PrismaUserCredentialRepository
   extends PrismaRepository.transactionalFor("Account")

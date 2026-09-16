@@ -1,8 +1,7 @@
 /**
  * The server half of `personalWorkspaceFeatures.*`. Authorized by the caller
- * being the project's owner, which the application proves, rather than by an
- * organization permission: the bundle is a navigation predicate, so switching
- * it off hides navigation and deletes nothing.
+ * being the project's owner — not an organization permission — since the
+ * bundle is a navigation predicate: switching it off hides nav, deletes nothing.
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";

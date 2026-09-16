@@ -3,10 +3,9 @@ import { ensuredPersonalWorkspaceSchema } from "@langwatch/organization-contract
 import { z } from "zod";
 
 /**
- * The acknowledgement the account and credential writes answer with.
- *
- * Kept as one schema because it is one word: the caller asked for something to
- * happen and it happened. A refusal is an error, never a `success: false`.
+ * The acknowledgement the account and credential writes answer with — kept
+ * as one schema because it is one word: the caller asked for something to
+ * happen and it happened. A refusal is an error, never `success: false`.
  */
 export const userApiSuccessSchema = z.object({ success: z.literal(true) }).strict();
 
@@ -45,11 +44,9 @@ export const userApiPersonalContextSchema = z
   .strict();
 
 /**
- * The budget banner's state.
- *
- * Two shapes, and the bare one is not a degenerate case of the other: it is
- * what a caller with no personal workspace, no virtual key or no analytics
- * store gets, where there is no budget to describe at all.
+ * The budget banner's state — two shapes, and the bare one is not a
+ * degenerate case of the other: it is what a caller with no personal
+ * workspace, no virtual key, or no analytics store gets — no budget to describe.
  */
 export const userApiPersonalBudgetSchema = z.union([
   z.object({ status: z.literal("ok") }).strict(),

@@ -1,9 +1,7 @@
 /**
- * `/api/user-avatar/:projectId/:id` — a person's photo, readable by any
- * authenticated caller. An object is served only when BOTH its purpose and its
- * owner kind are the avatar ones, and every other outcome answers the same
- * refusal, so the route is no existence oracle over object ids.
- * Spec: specs/settings/user-avatar-upload.feature.
+ * `/api/user-avatar/:projectId/:id` — readable by any authenticated caller
+ * only when BOTH purpose and owner kind are the avatar ones; every other
+ * outcome answers the same refusal. Spec: specs/settings/user-avatar-upload.feature.
  */
 import { deferredScope } from "@langwatch/api/access";
 import {

@@ -9,10 +9,8 @@ import type { TenantOwnershipReader } from "../services/tenant-directory.service
 
 /**
  * The rows the organization module owns and constructs through
- * `ServerOrganizationApp.create`, chosen once at boot.
- *
- * Invitations are still composed on a separate path outside this module's
- * boot; that is tracked as follow-up work, not part of this pass.
+ * `ServerOrganizationApp.create`, chosen once at boot. Invitations are still
+ * composed on a separate path outside this module's boot (follow-up work).
  */
 export interface OrganizationRepositories {
   readonly organization: OrganizationRepository;

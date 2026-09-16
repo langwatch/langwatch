@@ -1,18 +1,13 @@
 /**
- * Validation for the create-project form.
- *
- * Recovered from `platform/app/src/components/projects/projectFormValidation.ts`,
- * deleted in `cc91631cd8` with the form it belonged to. Kept apart from the
- * form for the reason it was extracted in the first place: these are the two
- * rules a test can state without rendering anything.
+ * Validation for the create-project form, recovered from
+ * `platform/app/src/components/projects/projectFormValidation.ts` (deleted
+ * in `cc91631cd8`) — kept apart so a test can state these rules without rendering anything.
  */
 
 /**
- * The team value that means "make me a new one".
- *
- * A sentinel rather than a separate control, because the picker offers it in
- * the same list as the real teams — so the field holds one value either way,
- * and the name field below appears only when this is what is selected.
+ * The team value that means "make me a new one" — a sentinel rather than a
+ * separate control, since the picker offers it in the same list as real
+ * teams; the name field below appears only when this is selected.
  */
 export const NEW_TEAM_VALUE = "NEW" as const;
 
@@ -25,10 +20,9 @@ export function validateProjectName(name: string | undefined): string | true {
 }
 
 /**
- * Whether the new team's name is usable, when one is being created.
- *
- * Takes the selected team as well, because the field is only required when
- * that selection is the sentinel: an existing team needs no name typed.
+ * Whether the new team's name is usable, when one is being created. Takes
+ * the selected team too, since the name is only required when that
+ * selection is the sentinel — an existing team needs none typed.
  */
 export function validateNewTeamName(
   teamId: string | undefined,

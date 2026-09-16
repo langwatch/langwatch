@@ -57,10 +57,9 @@ export class CannotDisableSelfError extends HandledError {
 }
 
 /**
- * Disabling this membership would leave the organization without an active
- * administrator, so nobody could sign in and undo it. Raised by the storage
- * guard itself so every path that disables a member trips it, and handled so
- * the REST surface answers a stable 400 instead of an unknown 500.
+ * Disabling this membership would leave the organization with no active
+ * administrator able to sign in and undo it; the storage guard raises this
+ * on every disable path, and it maps to a stable 400.
  */
 export class CannotDisableLastAdminError extends HandledError {
   declare readonly code: "cannot_disable_last_admin";
@@ -77,9 +76,8 @@ export class CannotDisableLastAdminError extends HandledError {
 
 /**
  * Demoting this membership would leave the organization without an
- * administrator, the same lockout the disable guard refuses. Raised by the
- * storage guard itself so every role-change path trips it, and handled so the
- * REST surface answers a stable 400 instead of an unknown 500.
+ * administrator — the same lockout the disable guard refuses — on every
+ * role-change path, mapped to a stable 400.
  */
 export class CannotDemoteLastAdminError extends HandledError {
   declare readonly code: "cannot_demote_last_admin";
@@ -94,10 +92,8 @@ export class CannotDemoteLastAdminError extends HandledError {
 
 /**
  * Removing this membership would leave the organization without an active
- * administrator, the same lockout the disable and demote guards refuse, and
- * the only irreversible one of the three. Raised by the storage guard itself
- * so every removal path trips it, and handled so the REST surface answers a
- * stable 400 instead of an unknown 500.
+ * administrator — the same lockout the disable and demote guards refuse, and
+ * the only irreversible one of the three — mapped to a stable 400.
  */
 export class CannotRemoveLastAdminError extends HandledError {
   declare readonly code: "cannot_remove_last_admin";

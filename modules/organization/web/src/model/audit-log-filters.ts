@@ -6,10 +6,9 @@ const DEFAULT_PAGE_SIZE = 25;
 export type AuditPaging = { pageOffset: number; pageSize: number };
 
 /**
- * A number in the URL, or the default.
- *
- * Negative offsets are clamped to zero rather than sent: `skip: -25` is a
- * database error, and a hand-edited URL should land on the first page.
+ * A number in the URL, or the default — negative offsets clamp to zero
+ * rather than being sent, since `skip: -25` is a database error and a
+ * hand-edited URL should land on the first page.
  */
 function readNumber(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -26,11 +25,9 @@ export function readAuditPaging(query: Readonly<Record<string, string | undefine
 }
 
 /**
- * The gateway deep-link a Virtual Key or Budget detail page arrives with.
- *
+ * The gateway deep-link a Virtual Key or Budget detail page arrives with:
  * `/settings/audit-log?targetKind=virtual_key&targetId=vk_xxx` is a link one
- * screen writes and this one reads, so the two spellings are a contract between
- * them.
+ * screen writes and this one reads — the two spellings are a contract.
  */
 export type AuditTargetFilter = { targetKind: string; targetId: string } | undefined;
 
@@ -52,11 +49,9 @@ export function withoutAuditTarget(
 }
 
 /**
- * The next whole query for a changed filter.
- *
- * Paging always resets: page four of the old filter is not page four of the
- * new one, and leaving the offset behind is how a reader lands on an empty
- * table and concludes there is nothing to see.
+ * The next whole query for a changed filter. Paging always resets — page
+ * four of the old filter is not page four of the new one, and leaving the
+ * offset behind lands a reader on an empty table with nothing to see.
  */
 export function withAuditFilter(
   query: Readonly<Record<string, string | undefined>>,
@@ -82,12 +77,9 @@ export function withAuditPageSize(
 }
 
 /**
- * Where a deep-linked reader came from, when we can say.
- *
- * ONLY KINDS WITH A REAL `[id]` DETAIL ROUTE ARE MAPPED. `provider_binding` and
- * `cache_rule` are list-only surfaces today, so offering a back-link for one
- * would send the reader to a 404 — worse than offering nothing, because it
- * looks like the resource was deleted.
+ * Where a deep-linked reader came from, when we can say — ONLY KINDS WITH A
+ * REAL `[id]` DETAIL ROUTE ARE MAPPED. `provider_binding`/`cache_rule` are
+ * list-only today; a back-link for one would 404, looking like a deletion.
  */
 const RESOURCE_ROUTES: Readonly<Record<string, { path: string; label: string }>> = {
   virtual_key: { path: "gateway/virtual-keys", label: "Virtual key" },
