@@ -246,12 +246,23 @@
     // much of the component tree. Parity lands at 19; 20 is the round number
     // beside it and leaves .tsx a hair looser, at 1.29%.
     //
-    // This is a threshold, not an exemption: the 35 components still above 20
-    // are genuinely complex and stay reported.
+    // Re-measured 2026-09-17 over 3,787 scored functions in ten module, app and
+    // package trees, and 20 turned out to be the strict side of parity rather
+    // than the loose one: .ts at 15 reports 7.93% of its functions, while .tsx
+    // at 20 reported 9.29% of its own -- a component was MORE likely to be
+    // flagged than a plain function, which is the opposite of what the JSX
+    // argument above intends. Equal rates land at 24; 25 is the round number
+    // beside it, at 7.61%.
+    //
+    // 30 was considered and rejected: it reports 6.00%, which stops correcting
+    // for JSX and starts forgiving components specifically.
+    //
+    // This is a threshold, not an exemption: the components still above 25 are
+    // genuinely complex and stay reported, `LangyPanel` at 588 among them.
     {
       "files": ["**/*.tsx"],
       "rules": {
-        "langwatch/cognitive-complexity": ["error", { "max": 20 }]
+        "langwatch/cognitive-complexity": ["error", { "max": 25 }]
       }
     },
     // Test files are held to 40 -- a table-driven suite branches more than a
