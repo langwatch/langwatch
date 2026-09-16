@@ -9,6 +9,41 @@ measured this session, not inherited. Branch `feat/strict-feature-layout-v0`.
 **Every finding to zero.** Not the CI gate, not errors only — zero. Both halves
 of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
+## SCOREBOARD — session of 2026-09-16 (background job 4a7a3221)
+
+    lint at session start   7,166
+    lint now                6,610
+
+What the remaining 6,610 is made of, and this is the number that decides how the
+drive ends:
+
+    2,881   grindable shape work            lanes eat this
+    1,712   a contract decision per site    no-try-prefix 448, fallible-result-naming 890, package-boundaries 374
+    2,017   everything else                 vitest 563, langwatch 823, react-hooks/eslint/ts 631
+
+    6,925   suppressed, invisible to all of the above
+
+So grinding alone lands around **2,000 visible**, and "zero visible" still leaves
+~6,925 suppressed. `oxlint --fix` is **not** a shortcut for the third bucket -
+tested on a clean file carrying `no-nested-ternary` and `fallible-result-naming`,
+it changed nothing; neither is auto-fixable.
+
+**Collected this session:** `zod-contracts-w1` (`df52b47c8b`), 43 files across six
+contract packages, zod-object-composition 200 -> 0. The diff was checked for a
+dropped refinement - the one way that wave could ship a real bug - and carries
+none: 196 `.extend`/`.merge` removed, 154 `.shape` spreads, 37 `safeExtend`, zero
+`refine` removed. Its one `as X` cast was replaced with a type guard before commit.
+
+**Left uncommitted on purpose:** `modules/dataset/contract` - the lane edited 5
+files there before a scope correction reached it, and its fixes now sit on top of
+the concurrent apidiff session's in-progress content. Reverting uncommitted work
+is what cost this drive the langy lane; untangling it belongs to that session.
+
+**Running:** `comment-w11`, `temporal-w1`, `condition-shape-w1`.
+**Queued, manifests written:** `trace-layout-w1` (feature-source-layout, 158 in
+trace/server, the largest single concentration), `service-classes-w1` (~120 across
+eight clean server packages).
+
 ## Scoreboard
 
 | | drive start | wave 6 | wave 7 | wave 9 | wave 10 |
