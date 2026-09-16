@@ -11,12 +11,38 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | drive start | wave 6 | wave 7 | wave 9 | now (wave 10 part) |
+| | drive start | wave 6 | wave 7 | wave 9 | wave 10 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| oxlint errors | 6,075 | 8,242 | 7,721 | 7,973 | **6,664** |
-| oxlint warnings | 17,947 | 1,636 | 1,636 | 959 | **959** |
-| oxlint total | 24,022 | 9,878 | 9,357 | 8,932 | **7,623** |
-| - of which `comment-block-size` | 6,168 | 1,170 | 662 | 659 | **659** |
+| oxlint total | 24,022 | 9,878 | 9,357 | 8,932 | **7,255** |
+| - of which `comment-block-size` | 6,168 | 1,170 | 662 | 659 | **464** |
+| - of which the fallible family | - | - | - | 1,719 | **1,555** |
+
+Wave 10 collected four lanes:
+
+    decl-ts2883        the declaration build, and with it every package's typecheck
+    fallible-gateway   156 -> 47 in modules/gateway/server, 109 cleared, 69 files
+    fallible-trace     215 -> 189 in modules/trace, 20 renames, 28 files
+    comment-w10        195 -> 0 across eleven packages, 111 files
+
+### The decision wave 10 raised, and it is not a rename
+
+`modules/trace` is the inverse of `modules/gateway`. Gateway's findings were
+almost all genuine lookups and a careful lane cleared 70% of them. **182 of
+trace's remaining 189 sit on total conversions over untrusted span
+attributes** - `parseBase64DataUri`, `pcm16ToWavBase64`, `stringifySpanIO`,
+`extractTextFromMessages`, `redactSpanPatch`, the whole content-part dispatcher,
+the whole `rules/` folder.
+
+Neither half of the rule's message fits them. `find*` would be exactly the
+`findSafeRegex` / `findJsonArray` mistake that was reverted, because a parser is
+not a lookup. And making them throw would break the **deliberate fail-soft
+ingestion contract**: a malformed span attribute would start failing ingestion
+instead of degrading, which is the opposite of what that code is for.
+
+So the question is whether `langwatch(fallible-result-naming)` should fire on
+total conversions at all. Until that is answered these findings are not work,
+and any lane sent at them will either game the rule or break ingestion. Expect
+a similar population in every other ingestion path.
 
 **1,309 of the last drop was not lane work.** `plugins/langwatch/scripts/
 session-context.mjs` is a vendored bundle - 412 KB of minified output on one
