@@ -16,6 +16,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
 import type { TraceOriginService } from "../trace-origin.service";
@@ -340,6 +341,86 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
         }),
       );
       expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * A trace can carry both application spans (depth 0) and evaluator-emitted
+ * spans (depth >= 1). The ordinary attribute merge is existing-wins, which
+ * would let whichever span folded first pin the depth for the whole trace —
+ * so an application span arriving before the evaluator's would hold the
+ * trace at "0" and the loop guard would never fire on it. Depth answers
+ * "has this trace been through the evaluator", so it only climbs.
+ */
+describe("TraceAttributeAccumulationService.accumulateAttributes", () => {
+  function accumulateService() {
+    return new TraceAttributeAccumulationService({
+      stripLegacyMarkers: () => void 0,
+      hoistOrigin: () => void 0,
+      hoistSource: () => void 0,
+    } as unknown as TraceOriginService);
+  }
+
+  function accumulate(
+    existingDepth: string | undefined,
+    incomingDepth: number | string | undefined,
+  ): Record<string, string> {
+    const attributes: Record<string, string> = {};
+    if (existingDepth !== void 0) {
+      attributes["langwatch.reserved.causality_depth"] = existingDepth;
+    }
+    const spanAttributes: Record<string, unknown> = {};
+    if (incomingDepth !== void 0) {
+      spanAttributes["langwatch.reserved.causality_depth"] = incomingDepth;
+    }
+    return accumulateService().accumulateAttributes({
+      state: { attributes } as unknown as TraceSummaryData,
+      span: makeSpan({
+        spanAttributes: spanAttributes as NormalizedSpan["spanAttributes"],
+      }),
+      outputSource: "span",
+      inputIsFallback: false,
+      outputIsFallback: false,
+      inputMediaRefs: null,
+      outputMediaRefs: null,
+    });
+  }
+
+  describe("when a depth-0 span folded before the evaluator's depth-1 span", () => {
+    /** @scenario "A trace keeps the highest evaluator depth any of its spans carried" */
+    it("raises the trace to the evaluator depth", () => {
+      const result = accumulate("0", 1);
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+  });
+
+  describe("when a depth-1 span folded before a later depth-0 span", () => {
+    it("keeps the evaluator depth", () => {
+      const result = accumulate("1", 0);
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+  });
+
+  describe("when only one side carries a depth", () => {
+    it("takes the incoming depth when the trace has none", () => {
+      expect(accumulate(void 0, 2)["langwatch.reserved.causality_depth"]).toBe(
+        "2",
+      );
+    });
+
+    it("keeps the trace depth when the span has none", () => {
+      expect(
+        accumulate("3", void 0)["langwatch.reserved.causality_depth"],
+      ).toBe("3");
+    });
+  });
+
+  describe("when neither side carries a depth", () => {
+    it("leaves the key off the trace", () => {
+      expect(
+        accumulate(void 0, void 0)["langwatch.reserved.causality_depth"],
+      ).toBeUndefined();
     });
   });
 });

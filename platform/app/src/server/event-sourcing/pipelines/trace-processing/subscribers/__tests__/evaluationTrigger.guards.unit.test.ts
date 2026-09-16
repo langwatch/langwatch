@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MonitorSummary } from "~/server/app-layer/monitors/repositories/monitor.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
-import type { TraceProcessingEvent } from "../../schemas/events";
 import { evaluatorLoopBlockedCounter } from "~/server/metrics";
+import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
+import { TraceAttributeAccumulationService } from "../../projections/services/trace-attribute-accumulation.service";
+import type { TraceOriginService } from "../../projections/services/trace-origin.service";
+import type { TraceProcessingEvent } from "../../schemas/events";
+import type { NormalizedSpan } from "../../schemas/spans";
 import {
   createEvaluationTriggerSubscriber,
   type EvaluationTriggerSubscriberDeps,
@@ -265,14 +268,19 @@ describe("evaluationTrigger subscriber", () => {
 
   describe("when an evaluator-origin trace dispatches via origin_resolved", () => {
     /**
-     * Evaluator-emitted traces have no root span, so their origin is not
-     * resolved on span_received — the originGate subscriber resolves it later
-     * and emits origin_resolved. The causality loop guard only inspects the
-     * span payload, which that event does not carry, so before the fix it
-     * reported "no loop" and the trace was evaluated, producing another
-     * evaluator trace. Guard the deferred path off the fold state instead.
+     * A trace's origin is normally settled from its spans, non-root ones
+     * included. When no span has carried an origin yet, the originGate
+     * subscriber settles it later and emits origin_resolved. That event
+     * carries no span payload, so the causality loop guard — which only
+     * inspected the span — reported "no loop" and the trace was evaluated,
+     * producing another evaluator trace. Guard the deferred path off the
+     * accumulated trace state instead.
+     *
+     * How much real traffic takes this path is not established: it needs a
+     * trace whose depth-bearing spans arrive before any origin-bearing span.
+     * These tests define the path's behaviour, not its frequency.
      */
-    /** @scenario "origin_resolved on a trace with accumulated depth does not trigger evaluations" */
+    /** @scenario "A trace already produced by the evaluator does not start another evaluation round" */
     it("does not dispatch evaluations", async () => {
       const monitor = makeMonitor();
       const deps = createDeps();
@@ -302,7 +310,7 @@ describe("evaluationTrigger subscriber", () => {
       expect(await readBlockedCounter("depth_fold")).toBe(before + 1);
     });
 
-    /** @scenario "origin_resolved on a trace with no accumulated depth still triggers evaluations" */
+    /** @scenario "An ordinary trace still starts its evaluations when its origin settles late" */
     it("still dispatches for an application-origin trace", async () => {
       const monitor = makeMonitor();
       const deps = createDeps();
@@ -323,8 +331,8 @@ describe("evaluationTrigger subscriber", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
 
-    /** @scenario "A manual evaluation run inside the deferred window suppresses that trace's evaluations" */
-    it("also skips an application trace polluted by an evaluator child span", async () => {
+    /** @scenario "A manual evaluation run marks the customer trace it ran against" */
+    it("skips a customer trace that a manual evaluation run marked", async () => {
       const monitor = makeMonitor();
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
@@ -335,23 +343,73 @@ describe("evaluationTrigger subscriber", () => {
       const event = makeEvent({
         id: "evt-origin-resolved",
         type: "lw.obs.trace.origin_resolved",
-        data: { origin: "application" },
+        data: { origin: "evaluation" },
       } as unknown as Partial<TraceProcessingEvent>);
-      // A manual evaluation run against a not-yet-resolved application trace
-      // lands evaluator child spans on it. Fold accumulation is first-wins, so
-      // their depth sticks, and origin_resolved rewrites the folded origin to
-      // "application" — nothing left distinguishes this from an evaluator-born
-      // trace. Pinned as an accepted tradeoff, not as desired behaviour: see
-      // the @known-limitation scenario for the reasoning and the way out.
+      // A manual evaluation run against a customer trace whose origin has not
+      // settled lands the evaluator's own spans on that trace. Those spans
+      // carry BOTH an evaluation origin and a depth, so the trace resolves as
+      // evaluator-produced on its own — this guard is not what relabels it.
+      // A monitor filtering on an application origin already skips the trace;
+      // the guard only changes the outcome for a monitor with no origin
+      // filter. Pinned as an accepted tradeoff, not desired behaviour: see the
+      // @known-limitation scenario for the reasoning and the way out.
       const context = makeContext(
         {},
         {
-          "langwatch.origin": "application",
+          "langwatch.origin": "evaluation",
           "langwatch.reserved.causality_depth": "1",
         },
       );
 
       await subscriber.spec.handler(event, context);
+
+      expect(deps.evaluation).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The two tests above hand the subscriber an already-accumulated depth,
+     * and the accumulation tests exercise the service on its own. Neither
+     * would catch the depth being dropped BETWEEN them — which is the whole
+     * mechanism this fix depends on. So run the real accumulation service on
+     * a real evaluator span and feed its output straight into the real
+     * subscriber, with nothing hand-written in between.
+     */
+    it("carries the depth from the span through accumulation into the guard", async () => {
+      const accumulation = new TraceAttributeAccumulationService({
+        stripLegacyMarkers: () => void 0,
+        hoistOrigin: () => void 0,
+        hoistSource: () => void 0,
+      } as unknown as TraceOriginService);
+
+      const accumulated = accumulation.accumulateAttributes({
+        state: { attributes: {} } as unknown as TraceSummaryData,
+        span: {
+          spanAttributes: {
+            "langwatch.origin": "evaluation",
+            "langwatch.reserved.causality_depth": 1,
+          },
+          resourceAttributes: {},
+        } as unknown as NormalizedSpan,
+        outputSource: "span",
+        inputIsFallback: false,
+        outputIsFallback: false,
+        inputMediaRefs: null,
+        outputMediaRefs: null,
+      });
+
+      const deps = createDeps();
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        makeMonitor(),
+      ]);
+
+      const subscriber = createEvaluationTriggerSubscriber(deps);
+      const event = makeEvent({
+        id: "evt-origin-resolved",
+        type: "lw.obs.trace.origin_resolved",
+        data: { origin: "evaluation" },
+      } as unknown as Partial<TraceProcessingEvent>);
+
+      await subscriber.spec.handler(event, makeContext({}, accumulated));
 
       expect(deps.evaluation).not.toHaveBeenCalled();
     });

@@ -76,7 +76,9 @@ export function createEvaluationTriggerSubscriber(
       const { tenantId, aggregateId: traceId, state: foldState } = context;
 
       if (hasReachedProcessingCap({ tenantId, traceId, foldState })) return;
-      if (await causalityLoopGuardFired({ event, tenantId, traceId, foldState }))
+      if (
+        await causalityLoopGuardFired({ event, tenantId, traceId, foldState })
+      )
         return;
 
       // Origin is known — dispatch to monitors, precondition matchers filter by origin.

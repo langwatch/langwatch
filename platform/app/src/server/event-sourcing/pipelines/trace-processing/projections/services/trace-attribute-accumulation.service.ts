@@ -284,8 +284,7 @@ export class TraceAttributeAccumulationService {
         ? Number(causalityDepth)
         : NaN;
     if (Number.isFinite(causalityDepthNum))
-      result["langwatch.reserved.causality_depth"] =
-        String(causalityDepthNum);
+      result["langwatch.reserved.causality_depth"] = String(causalityDepthNum);
 
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
     if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
@@ -436,6 +435,22 @@ export class TraceAttributeAccumulationService {
     }
     // Remove the per-span key so it doesn't leak into trace-level attributes
     delete merged["langwatch.prompt.id"];
+
+    // Causality depth: highest across spans, NOT first-wins. A trace can carry
+    // a mix of application spans (depth 0) and evaluator-emitted spans
+    // (depth >= 1) — the origin and subscriber code below explicitly supports
+    // that. Under the plain `{ ...spanAttrs, ...state.attributes }` merge the
+    // first depth seen would stick, so a trace whose depth-0 span folds first
+    // would keep "0" forever and the loop guard would never fire on it. Depth
+    // is a "has this trace been through the evaluator" signal, so it only ever
+    // climbs.
+    const depthKey = "langwatch.reserved.causality_depth";
+    const existingDepth = Number(state.attributes[depthKey]);
+    const incomingDepth = Number(spanAttrs[depthKey]);
+    const depths = [existingDepth, incomingDepth].filter((d) =>
+      Number.isFinite(d),
+    );
+    if (depths.length > 0) merged[depthKey] = String(Math.max(...depths));
 
     // Metadata: deep-merge JSON objects, first-wins for primitives
     for (const key of Object.keys(merged)) {
