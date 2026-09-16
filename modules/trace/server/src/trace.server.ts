@@ -6,6 +6,7 @@ import { collectorRest } from "./transport/collector.rest.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
+import { trackedEventRest } from "./transport/tracked-event.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
@@ -27,6 +28,12 @@ export const traceServer = defineServerModule("trace")
     traceEditOverlayTrpcTransport,
     traceLegacyRest,
     tracesRest,
+    // `POST /api/events/track`, the tracked events an SDK reports against a
+    // trace it already sent. A literal, so it is mounted with the other
+    // literals and ahead of the OTLP receiver's wildcard. The `/api/track_event`
+    // alias beside it stays unmounted until an app can replay a request into
+    // this route - see transport/tracked-event.rest.ts.
+    trackedEventRest,
     // `POST /api/collector`, the one address a released SDK posts a trace to.
     // Public and resolves the project credential inside the handler, since
     // its refusal bodies predate the framework envelope. Mounted after the

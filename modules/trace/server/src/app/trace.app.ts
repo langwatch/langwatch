@@ -109,6 +109,21 @@ import type {
   OtlpTraceCollectionResult,
 } from "../transport/otlp-ingest.rest.ts";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import {
+  predefinedEventsSchemas,
+  predefinedEventTypes,
+  TRACK_EVENT_SPAN_NAME,
+  type TrackEventRESTParamsValidator,
+} from "@langwatch/trace-contract";
+import { generate } from "@langwatch/ksuid";
+import { TrackedEventSpanService } from "../services/ingestion/tracked-event-span.service.ts";
+
+/**
+ * The app's KSUID resource for a tracked event (`KSUID_RESOURCES.TRACKED_EVENT`).
+ * The literal lives here because that table is a web-package module and no
+ * server file may import one.
+ */
+const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
@@ -1476,6 +1491,63 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   /** A failure the door answered but did not raise, kept off the customer's body. */
   collectorReportError(error: Error, context: Readonly<{ projectId: string }>): void {
     logger.error({ error, projectId: context.projectId }, "the collector answered a failure");
+  }
+
+  // -- the tracked-event family's own members --------------------------------
+  // `transport/tracked-event.rest.ts` reads this application through the same
+  // operations-only proxy - every member below is a METHOD for that reason.
+
+  /**
+   * Refuses a payload whose `event_type` is one of the predefined kinds but
+   * whose body does not match that kind's schema. A custom event type is left
+   * alone: it has already satisfied the base schema and owns no second one.
+   */
+  assertPredefinedEventPayload(rawBody: Record<string, unknown>): void {
+    const eventType = rawBody.event_type;
+    if (typeof eventType !== "string") return;
+    if (!predefinedEventTypes.some((predefined) => predefined === eventType)) return;
+    predefinedEventsSchemas.parse(rawBody);
+  }
+
+  /** A fresh tracked-event id, for a caller that did not send one. */
+  generateEventId(): string {
+    return generate(TRACKED_EVENT_KSUID_RESOURCE).toString();
+  }
+
+  /** A rejected payload, kept in the log rather than in the customer's body. */
+  reportError(error: unknown): void {
+    logger.error({ error }, "the tracked-event route rejected a payload");
+  }
+
+  /**
+   * Dispatches the event's synthetic span through the same ingress command the
+   * collector uses, so a tracked event lands on its trace by exactly the route
+   * a span does. Refuses by name when the process registered no recorder.
+   */
+  async recordTrackedEvent(
+    input: Readonly<{
+      project: Readonly<{ id: string }>;
+      body: TrackEventRESTParamsValidator;
+      eventId: string;
+    }>,
+  ): Promise<void> {
+    const ingest = this.#dependencies.spanIngest;
+    if (!ingest) {
+      throw new TraceIngestionUnavailableError();
+    }
+    const occurredAtMs = input.body.timestamp ?? Date.now();
+    await ingest.recordSpan({
+      tenantId: input.project.id,
+      span: TrackedEventSpanService.buildSpan({
+        body: input.body,
+        eventId: input.eventId,
+        occurredAtMs,
+      }),
+      resource: null,
+      instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+      occurredAt: occurredAtMs,
+    });
   }
 
   // -- the OTLP receiver's own members ---------------------------------------
