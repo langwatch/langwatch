@@ -326,6 +326,10 @@ export function buildPreconditionTraceDataFromTrace({
       ),
     customMetadata:
       Object.keys(customMetadata).length > 0 ? customMetadata : null,
+    // Not available in legacy collector path — this shape carries parsed
+    // metadata only, so a `metadata.value` precondition on a bare OTEL
+    // resource attribute cannot resolve here.
+    attributes: null,
     annotationIds: [], // Not available in legacy collector path
     events:
       events?.map((e) => ({
@@ -369,6 +373,11 @@ export function buildPreconditionTraceDataFromCommand({
           (model): model is string => typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
+    // Not available at command time — ExecuteEvaluationCommandData carries
+    // customMetadata and no raw attributes (see the command schema), so a
+    // `metadata.value` precondition on a bare OTEL resource attribute
+    // cannot resolve here the way it does for automation triggers.
+    attributes: null,
     annotationIds: [], // Not available at command time
     events: events ?? null,
   };
