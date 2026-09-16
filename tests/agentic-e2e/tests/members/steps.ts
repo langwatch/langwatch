@@ -40,10 +40,15 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Click the "Add members" button and wait for the dialog to appear.
+ * Open the invite drawer from People and wait for it to appear.
+ *
+ * The trigger is called "Invite people" now, beside the inline invite box that
+ * launches the same drawer (`PeopleSection` -> `PeopleHeader`). Only the
+ * BUTTON was renamed: the drawer it opens still leads with "Add members",
+ * which is what the wait below still keys on.
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()

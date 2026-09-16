@@ -385,7 +385,7 @@ export async function whenIDeclineWhatTheShellOffersFirst(
     name: "Your colleagues are already here",
   });
   const nudge = page.getByTestId("secure-account-nudge");
-  for (let round = 0; round < 2; round++) {
+  for (let round = 0; round < 3; round++) {
     try {
       await takeover.or(nudge).first().waitFor({
         state: "visible",
@@ -395,16 +395,41 @@ export async function whenIDeclineWhatTheShellOffersFirst(
       return;
     }
 
-    if (await takeover.isVisible()) {
+    // WHICHEVER IS ON TOP, decided fresh every round rather than once. Each
+    // modal waits on its own query, so the nudge can paint first and the
+    // takeover open over it a beat later — and committing to the nudge on
+    // that first look left a click waiting fifteen seconds on a button the
+    // takeover had covered. The takeover goes first whenever it is up,
+    // because it is the one that covers the other.
+    // THE CLICK MAY MISS, AND THAT IS ALLOWED. Between the look above and the
+    // press below the modal can answer itself — its own query resolves to
+    // "nothing to offer", or a dismissal already in flight lands — and a
+    // press aimed at a button that has just gone is not a failure of
+    // anything. What matters is only that the modal ENDS UP gone, which is
+    // what the assertion after each press checks: a genuinely stuck modal
+    // still fails there, loudly, rather than being swallowed here.
+    if (await takeover.isVisible().catch(() => false)) {
       await takeover
         .getByRole("button", { name: /keep working on my own/ })
-        .click();
+        .click({ timeout: 5000 })
+        .catch(() => undefined);
       await expect(takeover).not.toBeVisible();
-    } else {
-      await nudge.getByRole("button", { name: "Not now" }).click();
-      await expect(nudge).not.toBeVisible();
-      return;
+      continue;
     }
+
+    if (await nudge.isVisible().catch(() => false)) {
+      // `exact`, because the takeover's way past is "Not now — keep working
+      // on my own": a substring match here reaches across to the other modal
+      // and answers the wrong question.
+      await nudge
+        .getByRole("button", { name: "Not now", exact: true })
+        .click({ timeout: 5000 })
+        .catch(() => undefined);
+      await expect(nudge).not.toBeVisible();
+      continue;
+    }
+
+    return;
   }
 }
 
