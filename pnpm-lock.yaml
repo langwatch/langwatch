@@ -3761,6 +3761,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-client-web':
+        specifier: workspace:*
+        version: link:../../../packages/api-client-web
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
@@ -3770,9 +3773,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/evaluator-web':
-        specifier: workspace:*
-        version: link:../../evaluator/web
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -3788,9 +3788,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../packages/ui-host
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../workflow/web
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -7775,6 +7772,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/api-client-web':
+        specifier: workspace:*
+        version: link:../../../packages/api-client-web
       '@langwatch/authz-web':
         specifier: workspace:*
         version: link:../../authz/web
@@ -7790,9 +7790,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/prompt-web':
+      '@langwatch/prompt-contract':
         specifier: workspace:*
-        version: link:../../prompt/web
+        version: link:../../prompt/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -7802,9 +7802,6 @@ importers:
       '@langwatch/ui-host':
         specifier: workspace:*
         version: link:../../../packages/ui-host
-      '@langwatch/workflow-web':
-        specifier: workspace:*
-        version: link:../../workflow/web
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
