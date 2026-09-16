@@ -500,3 +500,46 @@ became another lane's file list. It caught this before acting on it, and no
 repository file was affected. Scratch files belong in a per-job directory, or
 at minimum a PID-suffixed name; a guessable `/tmp` path is shared state between
 every agent running on the box.
+
+## Wave 4 — `modules/langy` and `modules/authz`
+
+Five candidates from the lane; three are worth keeping, and the second is the
+only one in the whole drive to drop a *named security property*.
+
+20. **Why the Langy bucket-coverage invariant exists at all.**
+    `modules/langy/contract/src/langy-permission-policy.ts`,
+    `LANGY_FAMILY_BUCKET_TOTAL`. The compressed comment keeps the invariant
+    (bucket total equals classified-set size) and drops its reason: a family
+    counted in two buckets is decided by `classifyForLangy`'s **branch order,
+    not by anyone's intent**. The invariant is not a tidiness check — it is
+    there because double-classification is a silent, order-dependent bug. A
+    future reader who does not know that can "fix" a failing coverage test by
+    adjusting the total.
+
+21. **A named security property is now unnamed.**
+    `modules/langy/server/src/rules/__tests__/langy-frame-auth.rules.unit.test.ts`.
+    The original named three guaranteed properties: tamper-evidence,
+    **field-boundary integrity**, and constant-time reject of garbage. The
+    compressed version keeps the first and third. Field-boundary integrity is
+    the property that stops a value from one field being reinterpreted as
+    another under concatenation; a test file that no longer claims it is a
+    test file nobody will notice has stopped covering it.
+
+22. **The CLI's per-command JSON response shapes.**
+    `modules/langy/contract/src/cards/__tests__/digest.unit.test.ts`. The
+    original enumerated them precisely: trace search returns
+    `{ traces, pagination.totalHits }`, dataset list `{ data,
+    pagination.total }`, prompt/evaluator/scenario lists are bare arrays,
+    experiment status is a single run document, analytics is a timeseries.
+    The compressed version keeps the first two and collapses the rest to
+    "others are bare arrays or documents", losing the analytics-timeseries
+    and experiment-status distinctions specifically.
+
+Two further cuts were judged minor and are recorded here only so the count is
+honest: a `TODO(merge)` in `langy-composer-palette.tsx` lost its concrete
+conflicting-skill example (`lwql-charts` vs `playground-widgets` on
+`release_custom_chart_playground`) while keeping the porting instructions, and
+`langy-context-target-css.unit.test.ts` lost a quoted scenario title while
+keeping the feature-file path. The latter is **not** an enforced
+`@scenario "<title>"` annotation — the lane grepped and confirmed the file
+carries none — so spec-parity binding is unaffected.
