@@ -21,6 +21,12 @@ Feature: Workspace resolution
   and having no organization is only ever something the graph SAID, never
   something inferred from its silence.
 
+  A refusal is the third answer, and it is silent in the same way — a read
+  that failed leaves the same absent list behind it as a read still in
+  flight. Nobody is sent to onboarding on it. The landing address has no
+  home to fall back to when it lands, so it is the one screen that has to
+  say the read failed rather than keep waiting on it.
+
   @integration
   Scenario: The workspace is still resolving while the session is
     Given my session has not resolved yet
@@ -54,6 +60,20 @@ Feature: Workspace resolution
     And my session has not resolved yet
     When a screen asks for my workspace
     Then it is told the workspace has resolved
+
+  @integration
+  Scenario: A graph that refused the read is not a graph still reading
+    Given my session has resolved
+    And the organization graph refused the read
+    When a screen asks for my workspace
+    Then it is told the read was refused
+
+  @integration
+  Scenario: The landing address says a refused read failed rather than waiting on it
+    Given the organization graph refused the read
+    When I open the landing address
+    Then I am shown that my workspace could not be opened
+    And I am not left watching a loading screen
 
   @unit
   Scenario: Belonging to no organization is something the graph said

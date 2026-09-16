@@ -49,6 +49,18 @@ function toResolvedHome(query: {
   };
 }
 
+/**
+ * What `/` has to draw, for the one case where it cannot redirect.
+ *
+ * Every other outcome is a destination, and a destination that has not been
+ * decided yet is a loading screen. A refused graph is neither: it will never
+ * decide, so a page that keeps waiting for it waits forever.
+ */
+export interface LandingRedirect {
+  /** The refusal the workspace read came back with. Absent until one does. */
+  workspaceError: unknown;
+}
+
 interface LandingInput {
   resolved: ResolvedHome;
   isReachableLoading: boolean;
@@ -148,8 +160,8 @@ function useReplaceOnce(): (destination: string | null) => void {
  * Specs: specs/ai-gateway/governance/persona-home-resolver.feature
  *        specs/navigation/navigation-v2-landing.feature
  */
-export function useLandingRedirect(): void {
-  const { project, organization, organizations, isLoading } =
+export function useLandingRedirect(): LandingRedirect {
+  const { project, organization, organizations, isLoading, workspaceError } =
     useOrganizationTeamProject({ redirectToOnboarding: false });
   const resolved = api.governance.resolveHome.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -197,4 +209,6 @@ export function useLandingRedirect(): void {
     reachableProducts,
     llmOpsProjectSlug,
   ]);
+
+  return { workspaceError };
 }

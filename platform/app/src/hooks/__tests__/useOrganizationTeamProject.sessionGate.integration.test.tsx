@@ -78,6 +78,11 @@ function workspaceIsResolving(
   return rendered.result.current.isLoading;
 }
 
+/** The refusal the last render carried, when the workspace read failed. */
+function workspaceFailure(rendered: ReturnType<typeof mount>): unknown {
+  return rendered.result.current.workspaceError;
+}
+
 /** The shape React Query reports for a query it was told not to run. */
 function switchedOff() {
   return {
@@ -235,6 +240,31 @@ describe("given a screen asking what workspace it is in", () => {
       mockOrganizationsQuery.mockReturnValue(switchedOff());
 
       expect(workspaceIsResolving(mount())).toBe(false);
+    });
+  });
+
+  describe("when the graph refused the read", () => {
+    /** @scenario "A graph that refused the read is not a graph still reading" */
+    it("carries the refusal rather than reporting another moment of resolving", () => {
+      session.status = "authenticated";
+      session.data = { user: { id: "user-jane" } };
+      const refusal = new Error("UNAUTHORIZED");
+      mockOrganizationsQuery.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isFetched: true,
+        isError: true,
+        error: refusal,
+        isRefetching: false,
+      });
+
+      const rendered = mount();
+
+      // Resolved AND failed: a refusal is an answer, so nothing waits on it.
+      // What it is not is an empty graph, which is why the refusal itself has
+      // to travel — `organizations` is `undefined` for both.
+      expect(workspaceIsResolving(rendered)).toBe(false);
+      expect(workspaceFailure(rendered)).toBe(refusal);
     });
   });
 });

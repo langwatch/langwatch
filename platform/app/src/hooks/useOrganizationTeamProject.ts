@@ -679,6 +679,9 @@ export const useOrganizationTeamProject = (
   if (isAwaitingOrganizations) {
     return {
       isLoading: true,
+      // Nothing has failed yet — the read is still out. A caller that draws a
+      // failure must not draw one for a workspace that is merely on its way.
+      workspaceError: undefined,
       project: publicShareProjectData,
       hasPermission: () => false,
       hasOrgPermission: () => false,
@@ -804,6 +807,14 @@ export const useOrganizationTeamProject = (
 
   return {
     isLoading: false,
+    // The third answer the graph can give, beside a list and an empty list: it
+    // refused. `organizations` is `undefined` for a refusal exactly as it is
+    // for a read still in flight, so a caller that has only those two cannot
+    // tell a workspace it may not read from one it does not have — and the one
+    // that sends people to onboarding must never confuse them. Carrying the
+    // error itself rather than a flag is what lets a screen resolve the
+    // customer-facing words from the code-keyed registry (ADR-045).
+    workspaceError: organizations.error,
     isRefetching: organizations.isRefetching,
     organizations: organizations.data,
     organization,
