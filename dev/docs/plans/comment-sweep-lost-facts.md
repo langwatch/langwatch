@@ -399,3 +399,35 @@ of the four external harnesses, the PR #5708 regression and the 2026-07-31
 quadratic backlog incident. That is the right instinct for this module — an
 external harness's behaviour is not derivable from our source and no test pins
 it.
+
+### enterprise/modules/governance — `c8b3268d29`
+
+13. **A retraction is timestamped by the day it corrects, not the day it
+    arrived.** `contract/src/pulled-usage.events.ts`, `PulledUsageRetracted`,
+    38 lines. `occurredAtMs` must carry the corrected day because the daily
+    comparator re-derives days from events — timestamp it on arrival and the
+    correction lands on the wrong day. Paired with it: the three address
+    dimensions are **required** on `PulledUsageRetracted` while
+    `PulledUsageObserved` may default them, because a retraction has no
+    pre-existing append-only history to read a default out of. Both survive
+    implicitly in the per-field comments; the cross-field rule tying them
+    together does not.
+
+14. **A partially failed adapter should bank its progress, not discard it.**
+    `contract/src/puller.ts`, `PullResult.unreadPage`. Return the advanced
+    cursor, the events already in hand, *and* the flag — rather than throwing
+    the batch away. The flag and its purpose survive; the pattern adapter
+    authors are meant to follow does not.
+
+15. **The removal condition for the `IconGlyph` wrapper.**
+    `source-type-icon-glyph.tsx`. Gone: the upstream citation `d4ea7c08bd`,
+    the statement that `@langwatch/design-system`'s `IconGlyph` is outside
+    this port's writable scope, and the explicit trigger — a design-system
+    change adding `testId` to `IconGlyph` directly would let the wrapper go.
+    The `display: contents` workaround's what and why survive; the condition
+    under which someone should delete it does not, which is how workarounds
+    become permanent.
+
+Citations verified still in the tree after the sweep: `Ariana QA finding G13`
+(wrapped across a line break, so a single-line grep misses it), all six
+dark-mode contrast ratios, and the `ISO 8601` reference.
