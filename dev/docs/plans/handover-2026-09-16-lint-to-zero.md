@@ -11,18 +11,27 @@ of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer lint`.
 
 ## Scoreboard
 
-| | session start | now |
-| --- | ---: | ---: |
-| oxlint errors | 6,075 | 13,253 |
-| oxlint warnings | 17,947 | 1,631 |
-| oxlint total | 24,022 | **14,884** |
-| architecture-enforcer | 3,137 | **2,761** |
-| **true total** | **27,159** | **17,645** |
+| | drive start | handover written | now |
+| --- | ---: | ---: | ---: |
+| oxlint errors | 6,075 | 13,253 | 10,540 |
+| oxlint warnings | 17,947 | 1,631 | 1,632 |
+| oxlint total | 24,022 | 14,884 | **12,172** |
+| — of which `comment-block-size` | 6,168 | 6,168 | **3,454** |
+| architecture-enforcer | 3,137 | 2,761 | 2,840 (see note) |
+| **true total** | **27,159** | **17,645** | **15,012** |
 
-Down 9,514. The error count rose on purpose — see "decisions" below. Typecheck
-held at its **114-error / 40-file** baseline throughout; verify against that
-number, not zero, and compare the error-code distribution and the erroring file
-set, not just the count.
+Down 12,147 from the drive's start, 2,633 of it in this session.
+
+**The enforcer number is not comparable to the 2,761.** Measured now it prints
+`2840 findings across 56 policies, exit 1 (2662 findings and 178 stale baseline
+rows)`. The 2,761 never stated whether stale rows were counted, so the real
+movement is either 99 down or 79 up. Whoever next touches the enforcer half
+should restate the baseline in the form the tool actually prints and stop
+carrying the ambiguous number forward.
+
+Typecheck held at its **114-error / 40-file** baseline throughout; verify
+against that number, not zero, and compare the error-code distribution and the
+erroring file set, not just the count.
 
 ## Decisions the user made — do NOT relitigate
 
@@ -73,6 +82,17 @@ Full numbers in `dev/docs/plans/lint-to-zero-2026-09-15.md`.
 ## The work, sliced into lanes
 
 ### Wave 1 — the comment sweep (6,168 findings, 3,585 files)
+
+**Progress: 2,714 of 6,168 cleared.** 1,813 by the first five lanes, 136 by a
+correction to the rule itself (`@integration`, `@vitest-environment` and
+`@regression` were being counted as prose though no author can delete them),
+and 765 by the second tranche.
+
+Collected so far: `sdks/typescript` 550, `modules/analytics` 408,
+`modules/trace` 381, `modules/scenario` 279, `modules/gateway` 204,
+`packages/eventing` 174 of 194 (partial), `modules/ops` 172,
+`modules/identity` 163, `modules/model-provider` 156.
+
 
 The bulk of the remaining total. **Sonnet, medium effort, standard context** —
 mechanical per block, but each needs judgement about what may be lost.
@@ -167,7 +187,38 @@ rest.**
 
 ## Next action
 
-Spawn wave 1 as five concurrent lanes (`comments-sdk-typescript`,
-`comments-analytics`, `comments-trace`, `comments-scenario`,
-`comments-gateway`), each Sonnet / medium effort / standard context, each owning
-only its own paths. Write their manifests to `.claude/manifests/` first.
+Collect the six lanes in flight (roster in `.claude/coordinator/LANES.md`), then
+slice the next tranche from a **fresh** whole-tree measurement — never from a
+stale `.tsv`, because the rule's discount list changed mid-drive and the old
+slices name findings that no longer exist.
+
+Areas still untouched, largest first, from the measurement above:
+`apps/worker` 110, `modules/organization` 108, `modules/langy` 105,
+`modules/authz` 97, `modules/api-key` 86, `packages/architecture-enforcer` 85,
+`apps/api` 82, `apps/ui` 81, `modules/dataset` 81, `modules/experiment` 77,
+`packages/clickhouse-client` 77, `modules/workflow` 69, `packages/api` 68, then
+a long tail.
+
+### The mop-up nobody should forget
+
+18 `comment-block-size` findings remain inside areas already swept and reported
+clean. They are not regressions, and they break down three ways:
+
+- **8 are inside files another session has dirty** (`gateway-composition.build.ts`,
+  `gateway-platform.rest.ts`, `ops-clickhouse-explain.rest.ts`,
+  `join-request-notifier.service.ts`,
+  `join-request-lifecycle-dispatcher.service.unit.test.ts`,
+  `model-provider-evidence-service.composition.ts`). Every lane correctly
+  skipped them. They can only be cut once that session's work lands.
+- **9 are over-long comment *lines*, not blocks** — 100-column violations
+  reported under the same rule id, in `modules/analytics/web` (6) and
+  `sdks/typescript` (3). Most are `biome-ignore` / `eslint-disable` directives,
+  which cannot simply be wrapped: the fix is the one-line relocation used in
+  commit `095936beea`.
+- **1 is a genuinely new block** in
+  `modules/gateway/server/src/repositories/prisma/prisma.gateway-organization-directory.repository.ts`,
+  in a clean file, written after the gateway sweep ran.
+
+That last one is the useful signal: **the sweep is not a ratchet.** Nothing stops
+a new over-budget block landing in a swept area, and one already has. Zero will
+not stay zero on its own.
