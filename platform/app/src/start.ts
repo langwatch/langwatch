@@ -85,6 +85,11 @@ import {
 } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import {
+  buildChartFrameHeaders,
+  buildChartFrameHtml,
+  CHART_FRAME_PATH,
+} from "./server/chartSandboxFrame";
 import { ConnectGateway } from "./server/connected-agents/connect.gateway";
 import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
 import {
@@ -255,6 +260,12 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     assetOrigin: assetBaseOrigin(getAssetBase()),
   });
 
+  // The chart sandbox frame document and its own headers, built once. Its CSP
+  // deliberately differs from the app-wide one — see server/chartSandboxFrame.ts
+  // and specs/analytics/custom-chart-sandbox-imports.feature.
+  const chartFrameHeaders = buildChartFrameHeaders();
+  const chartFrameHtml = buildChartFrameHtml();
+
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
   // first boot (cached in `.dev-certs/` so subsequent boots reuse).
@@ -280,6 +291,36 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
         res.setHeader(key, value);
+      }
+
+      // Chart sandbox frame document: its own permissive CSP replaces the
+      // app-wide one (and X-Frame-Options) for this response, so a widget may
+      // import any https origin. Safe because the frame document always runs at
+      // an opaque origin — the embedding iframe is sandbox="allow-scripts" with
+      // no allow-same-origin, and the frame CSP carries `sandbox allow-scripts`
+      // so a direct top-level navigation is sandboxed too. See
+      // specs/analytics/custom-chart-sandbox-imports.feature.
+      if (
+        (req.method === "GET" || req.method === "HEAD") &&
+        pathname === CHART_FRAME_PATH
+      ) {
+        // Drop the app-wide policy first so it cannot linger under a different
+        // header name. In dev the app emits Content-Security-Policy-Report-Only
+        // (a distinct header from Content-Security-Policy), which setHeader
+        // below would NOT overwrite — it would stay on the response and spew
+        // violation reports for exactly the CDN scripts this route allows.
+        res.removeHeader("Content-Security-Policy-Report-Only");
+        res.removeHeader("Content-Security-Policy");
+        for (const [key, value] of Object.entries(chartFrameHeaders)) {
+          res.setHeader(key, value);
+        }
+        res.statusCode = 200;
+        if (req.method === "HEAD") {
+          res.end();
+        } else {
+          res.end(chartFrameHtml);
+        }
+        return;
       }
 
       // MCP routes — intercept before everything
