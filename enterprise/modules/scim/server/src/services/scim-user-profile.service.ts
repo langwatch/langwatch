@@ -15,7 +15,7 @@ export type ScimSessionRevocation = Pick<BrowserSessionApi, "revokeAllBrowserSes
  * The two user reads and writes a SCIM profile update needs: the previous
  * profile, to see whether the email moved, and the write itself.
  */
-export type ScimUserProfileReadWrite = Pick<UserApi, "tryFindById" | "updateProfile">;
+export type ScimUserProfileReadWrite = Pick<UserApi, "findById" | "updateProfile">;
 
 /** Coordinates the session boundary that follows a SCIM-managed email change. */
 export class ScimUserProfileService {
@@ -33,7 +33,7 @@ export class ScimUserProfileService {
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const previous =
-      input.email === undefined ? null : await this.users.tryFindById({ id: input.id });
+      input.email === undefined ? null : await this.users.findById({ id: input.id });
     const updated = await this.users.updateProfile(input);
 
     if (

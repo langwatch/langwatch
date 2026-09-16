@@ -15,7 +15,7 @@ const now = (): Instant => NOW;
 
 /** Every id answers, and `inactive-target` answers as a retired account. */
 const users = new TestUserApi({
-  tryFindById: async ({ id }: { id: string }): Promise<UserProfile> => ({
+  findById: async ({ id }: { id: string }): Promise<UserProfile> => ({
     id,
     name: null,
     email: `${id}@example.com`,

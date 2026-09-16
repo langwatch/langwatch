@@ -384,7 +384,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
    * the caller's id rather than read off the request.
    */
   async #actor(userId: string): Promise<RetentionActor> {
-    const user = await this.#users.tryFindById({ id: userId });
+    const user = await this.#users.findById({ id: userId });
 
     return { userId, email: user?.email ?? null };
   }

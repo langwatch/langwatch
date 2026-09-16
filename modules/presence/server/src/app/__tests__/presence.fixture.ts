@@ -41,7 +41,7 @@ export function createPresenceTestProjects(enabled = true): ProjectApi {
 
 export function createPresenceTestUsers(profile?: Pick<PresenceUser, "name" | "image">): UserApi {
   return createApiFixture<UserApi>({
-    tryFindById: async ({ id }) =>
+    findById: async ({ id }) =>
       profile === undefined
         ? null
         : {

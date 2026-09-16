@@ -114,7 +114,7 @@ export class AdminBackofficeService {
     if ("email" in data && typeof data.email === "string") {
       const userId = String(input.params.id ?? "");
       const email = data.email.trim().toLowerCase();
-      const previous = await this.users.tryFindById({ id: userId });
+      const previous = await this.users.findById({ id: userId });
       const updated = await this.users.updateProfile({ id: userId, email });
       if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
         await this.auth.revokeAllBrowserSessions({ userId });

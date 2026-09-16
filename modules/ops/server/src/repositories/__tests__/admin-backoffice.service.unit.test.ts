@@ -59,7 +59,7 @@ describe("AdminBackofficeService user email updates", () => {
       order.push("profile");
       return { ...user, email: "new@example.com" };
     });
-    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
+    const users = new TestUserApi({ updateProfile, findById: async () => user });
     const auth = new AuthFake();
     auth.revokeAllBrowserSessions.mockImplementation(async () => {
       order.push("sessions");
@@ -81,7 +81,7 @@ describe("AdminBackofficeService user email updates", () => {
   /** @scenario "A change that only differs in case or spacing revokes nothing" */
   it("does not revoke sessions for a normalized case-only change", async () => {
     const updateProfile = updateProfileFake();
-    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
+    const users = new TestUserApi({ updateProfile, findById: async () => user });
     const auth = new AuthFake();
     const service = AdminBackofficeService.create({
       repository: new RepositoryFake(),
@@ -98,7 +98,7 @@ describe("AdminBackofficeService user email updates", () => {
   /** @scenario "A failed revocation still leaves the new backoffice email in place" */
   it("retains the profile update when browser-session revocation fails", async () => {
     const updateProfile = updateProfileFake("new@example.com");
-    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
+    const users = new TestUserApi({ updateProfile, findById: async () => user });
     const auth = new AuthFake();
     auth.revokeAllBrowserSessions.mockRejectedValue(new Error("redis unavailable"));
     const service = AdminBackofficeService.create({

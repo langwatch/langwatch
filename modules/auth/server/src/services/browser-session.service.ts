@@ -52,7 +52,7 @@ export class BrowserSessionService {
       return null;
     }
 
-    const user = await this.deps.users.tryFindById({ id: verified.user.id });
+    const user = await this.deps.users.findById({ id: verified.user.id });
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
@@ -80,7 +80,7 @@ export class BrowserSessionService {
     // The person being browsed as, read through the ONE directory this process
     // resolves anybody through: a retired account stops the impersonation here
     // rather than rendering the back office as somebody who is gone.
-    const impersonatedUser = await this.deps.users.tryFindById({ id: impersonation.data.id });
+    const impersonatedUser = await this.deps.users.findById({ id: impersonation.data.id });
     if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
       return session;
     }

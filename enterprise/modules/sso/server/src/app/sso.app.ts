@@ -233,7 +233,7 @@ export class SsoApp implements SsoApiContract {
    */
   async #requireOperator(by: SsoOperator): Promise<SsoConnectionLedgerOperator> {
     const userId = by.impersonatorId ?? by.id;
-    const profile = await this.#users.tryFindById({ id: userId });
+    const profile = await this.#users.findById({ id: userId });
     if (!this.#operators.isAdmin({ email: profile?.email })) throw new AdminSurfaceHiddenError();
 
     return { userId };

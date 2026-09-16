@@ -156,7 +156,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
    * a session under another member's name and avatar.
    */
   async #presenting(userId: string): Promise<PresenceUser> {
-    const profile = await this.#users.tryFindById({ id: userId });
+    const profile = await this.#users.findById({ id: userId });
 
     return { id: userId, name: profile?.name ?? null, image: profile?.image ?? null };
   }

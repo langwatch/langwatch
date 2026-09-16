@@ -58,7 +58,7 @@ function testProfile(id: string, email: string | null): UserProfile {
 
 export function createSsoTestUsers(profiles: Record<string, string | null> = {}): UserApi {
   return createApiFixture<UserApi>({
-    tryFindById: async ({ id }) => (id in profiles ? testProfile(id, profiles[id] ?? null) : null),
+    findById: async ({ id }) => (id in profiles ? testProfile(id, profiles[id] ?? null) : null),
   });
 }
 

@@ -8,8 +8,8 @@ import type { UserApi } from "@langwatch/user-contract";
 export class TestUserApi implements UserApi {
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
 
-  tryFindById: UserApi["tryFindById"] = (input) =>
-    this.overrides.tryFindById?.(input) ?? this.unimplemented("tryFindById");
+  findById: UserApi["findById"] = (input) =>
+    this.overrides.findById?.(input) ?? this.unimplemented("findById");
 
   updateProfile: UserApi["updateProfile"] = (input) =>
     this.overrides.updateProfile?.(input) ?? this.unimplemented("updateProfile");

@@ -332,7 +332,7 @@ export class RoleApp implements RoleApi {
     input: { organizationId: string },
     by: RoleUserCaller,
   ): Promise<AuthzAccessBreakdownOutput> {
-    const profile = await this.#users.tryFindById({ id: by.id });
+    const profile = await this.#users.findById({ id: by.id });
 
     return this.#permissions.getAccessBreakdown({
       organizationId: input.organizationId,

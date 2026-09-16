@@ -211,7 +211,7 @@ export class ScimProvisioningService {
       costCenter: this.costCenters.findFromRequest(request),
     });
 
-    const reloadedUser = await this.userService.tryFindById({ id: existingUser.id });
+    const reloadedUser = await this.userService.findById({ id: existingUser.id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
@@ -353,7 +353,7 @@ export class ScimProvisioningService {
       costCenter: this.costCenters.findFromRequest(request),
     });
 
-    const reloadedUser = await this.userService.tryFindById({ id });
+    const reloadedUser = await this.userService.findById({ id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
@@ -385,7 +385,7 @@ export class ScimProvisioningService {
       await this.patches.apply({ id, organizationId, connectionId, operation });
     }
 
-    const reloadedUser = await this.userService.tryFindById({ id });
+    const reloadedUser = await this.userService.findById({ id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }

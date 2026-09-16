@@ -225,7 +225,7 @@ export function createDataRetentionTestUsers(
   };
 
   return createApiFixture<UserApi>({
-    tryFindById: vi.fn(async ({ id }: { id: string }) => ({ ...profile, id })),
+    findById: vi.fn(async ({ id }: { id: string }) => ({ ...profile, id })),
     isAdmin: vi.fn(() => input.platformAdministrator === true),
   });
 }
