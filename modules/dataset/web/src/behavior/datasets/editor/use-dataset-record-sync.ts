@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { AutosaveState } from "../../../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../../../model/pending-saved-changes.ts";
 
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 

@@ -11,7 +11,7 @@ import {
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
 
 /**

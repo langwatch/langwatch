@@ -40,7 +40,7 @@ const refetchSpy = vi.fn();
 // read `datasetRecord`/`dataset` off the same workflow family's tRPC hooks
 // (the borrowed-procedures family it shares with the studio) - one module,
 // one mock.
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     datasetRecord: {
       getAll: { useQuery: (...args: unknown[]) => listPaginatedQuery(...args) },

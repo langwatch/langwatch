@@ -39,7 +39,7 @@ import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 import { downloadCsv } from "@langwatch/csv/download";
 import {
