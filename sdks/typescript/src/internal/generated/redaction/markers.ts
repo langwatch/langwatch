@@ -1,18 +1,17 @@
 /**
  * Typed redaction markers and the catalog that reads them back.
- *
- * Ingestion-time redaction replaces a matched substring with a marker that
- * names WHAT was removed: a PII entity (`[PHONE_NUMBER]`, `[EMAIL_ADDRESS]`,
- * ...) or `[SECRET]` for a credential. Naming the category, instead of a
- * generic `[REDACTED]`, lets the trace view show what kind of data was scrubbed
- * AND lets the PII / secrets evaluators still flag a leak that was already
- * redacted at the door (otherwise redaction would silently turn every such
- * evaluation green).
- *
- * This module is dependency-free on purpose: the trace-view banner imports it
- * from the client bundle, so it must not pull in the redaction engines or
- * `libphonenumber-js`. The entity set is pinned to the engines by a unit test
- * (see markers.unit.test.ts), mirroring `piiEntityLabels.ts`.
+ */
+
+/**
+ * Redaction replaces a match with a marker naming WHAT was removed (`[PHONE_NUMBER]`,
+ * `[SECRET]`, ...), not a generic `[REDACTED]` — so the PII/secrets evaluators can still flag a
+ * leak redacted at the door instead of the evaluation going silently green.
+ */
+
+/**
+ * Dependency-free on purpose: the trace-view banner imports it from the client bundle, so it
+ * must not pull in the redaction engines or `libphonenumber-js`. The entity set is pinned to
+ * the engines by a unit test (markers.unit.test.ts).
  */
 
 /** The marker written in place of a detected credential. */

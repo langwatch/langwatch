@@ -40,6 +40,13 @@ export function inspectWebhookUrl({
   return findWebhookUrlProblem(url, { allowInsecureOrigin: allowInsecureLocal });
 }
 
+/** The host unbracketed, if it was written as a bracketed IPv6 literal. */
+function unbracketedHost(host: string): string {
+  if (!host.startsWith("[")) return host;
+  if (!host.endsWith("]")) return host;
+  return host.slice(1, -1);
+}
+
 /**
  * If the URL's host is an IP literal that is private/loopback/link-local,
  * return it unbracketed; else null. `isIP` rejects bracketed IPv6, so without
@@ -52,8 +59,10 @@ function privateIpLiteral(url: string): string | null {
   } catch {
     return null;
   }
-  const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
-  return isIP(bare) !== 0 && isPrivateOrLocalhostIP(bare) ? bare : null;
+  const bare = unbracketedHost(host);
+  if (isIP(bare) === 0) return null;
+  if (!isPrivateOrLocalhostIP(bare)) return null;
+  return bare;
 }
 
 /**

@@ -211,7 +211,8 @@ describe("pollUntilDone", () => {
   }) {
     const polls: string[] = [];
     const fetchImpl = vi.fn().mockImplementation((url: string) => {
-      if (String(url).includes("/device-approval")) {
+      const urlText = String(url);
+      if (urlText.includes("/device-approval")) {
         return Promise.resolve(approval());
       }
       polls.push(String(url));
@@ -319,7 +320,8 @@ describe("pollUntilDone", () => {
     const pollTimes: number[] = [];
     let firstPollReturnedAt = 0;
     const fetchImpl = vi.fn().mockImplementation(async (url: string) => {
-      if (String(url).includes("/device-approval")) return approval();
+      const urlText = String(url);
+      if (urlText.includes("/device-approval")) return approval();
       pollTimes.push(Date.now());
       if (pollTimes.length > 2) return jsonResponse(200, sessionBody);
       if (pollTimes.length === 1) {

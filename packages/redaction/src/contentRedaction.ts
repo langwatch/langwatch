@@ -112,6 +112,24 @@ export function isIdentifierAttributeName(key: string): boolean {
   return lower === "id" || lower.endsWith("_id") || lower.endsWith(".id");
 }
 
+/** Whether `key` names a secret this policy redacts wholesale, regardless of shape. */
+function isSensitiveSecretAttribute({
+  policy,
+  value,
+  namesAnIdentifier,
+  key,
+}: {
+  policy: RedactionPolicy;
+  value: string;
+  namesAnIdentifier: boolean;
+  key: string;
+}): boolean {
+  if (!policy.secrets.enabled) return false;
+  if (value.length === 0) return false;
+  if (namesAnIdentifier) return false;
+  return isSensitiveAttributeKey(key);
+}
+
 /**
  * Redact one attribute. A NAME the deny-list recognizes as sensitive replaces
  * the whole value regardless of shape; otherwise it runs the normal native
@@ -132,12 +150,7 @@ export function redactAttributeNative({
 }): { text: string; redactedCount: number } {
   const reservesAnAddress = reservesTraceAddress({ key, value });
   const namesAnIdentifier = isIdentifierAttributeName(key);
-  if (
-    policy.secrets.enabled &&
-    value.length > 0 &&
-    !namesAnIdentifier &&
-    isSensitiveAttributeKey(key)
-  ) {
+  if (isSensitiveSecretAttribute({ policy, value, namesAnIdentifier, key })) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
   }
   return redactStringNative({

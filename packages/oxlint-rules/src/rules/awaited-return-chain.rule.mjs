@@ -2,6 +2,16 @@ import { defineRule } from "../define-rule.mjs";
 
 function chainsOffAwait(node) {
   if (node.type === "AwaitExpression") return false;
+  return walksToAwait(node);
+}
+
+/** Whether `call.callee` is a member expression sitting directly on an awaited value. */
+function calleeAwaitsDirectly(call) {
+  if (call.callee.type !== "MemberExpression") return false;
+  return call.callee.object.type === "AwaitExpression";
+}
+
+function walksToAwait(node) {
   let current = node;
   while (current) {
     if (current.type === "MemberExpression" || current.type === "OptionalMemberExpression") {
@@ -10,12 +20,7 @@ function chainsOffAwait(node) {
       continue;
     }
     if (current.type === "CallExpression" || current.type === "OptionalCallExpression") {
-      if (
-        current.callee.type === "MemberExpression" &&
-        current.callee.object.type === "AwaitExpression"
-      ) {
-        return true;
-      }
+      if (calleeAwaitsDirectly(current)) return true;
       current = current.callee;
       continue;
     }

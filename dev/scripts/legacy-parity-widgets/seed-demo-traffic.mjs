@@ -294,7 +294,8 @@ function randomTimestampOnDay(dayStartMs) {
     const second = randInt(0, 59);
     const t = new Date(dayStartMs);
     t.setUTCHours(hour, minute, second, 0);
-    if (rand() < activityWeight(t)) return t.getTime();
+    const weight = activityWeight(t);
+    if (rand() < weight) return t.getTime();
   }
   const t = new Date(dayStartMs);
   t.setUTCHours(12, 0, 0, 0);
@@ -394,8 +395,8 @@ async function main() {
     // mild upward trend: more recent days get slightly more traffic
     const trend = 0.8 + 0.4 * ((DAYS - 1 - d) / Math.max(1, DAYS - 1));
     const jitter = 0.75 + rand() * 0.5; // +/-25%
-    const dayWeekdayFactor =
-      dayStart.getUTCDay() === 0 || dayStart.getUTCDay() === 6 ? 0.5 : 1.0;
+    const dayOfWeek = dayStart.getUTCDay();
+    const dayWeekdayFactor = dayOfWeek === 0 || dayOfWeek === 6 ? 0.5 : 1.0;
     const count = Math.max(
       1,
       Math.round(PER_DAY * trend * jitter * dayWeekdayFactor),

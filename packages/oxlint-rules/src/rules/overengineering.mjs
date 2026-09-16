@@ -57,7 +57,8 @@ export function reportsFor(context, file, policy, program) {
     });
     findingsByProgram.set(program, findings);
   }
-  if (baselineSites(context.cwd).has(`${policy}|${file.workspacePath}`)) return [];
+  const baseline = baselineSites(context.cwd);
+  if (baseline.has(`${policy}|${file.workspacePath}`)) return [];
 
   return findings.filter((finding) => finding.policy === policy);
 }

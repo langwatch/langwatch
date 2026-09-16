@@ -114,7 +114,8 @@ function firstString(raw, keys) {
 /** Reads one line as the shared structured format; null for anything else. */
 export function parse(line) {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+  if (!trimmed.startsWith("{")) return null;
+  if (!trimmed.endsWith("}")) return null;
   let raw;
   try {
     raw = JSON.parse(trimmed);
@@ -129,7 +130,8 @@ export function parse(line) {
     const value = raw[key];
     if (typeof value === "string") {
       const parsed = new Date(value);
-      if (!Number.isNaN(parsed.getTime())) {
+      const timestamp = parsed.getTime();
+      if (!Number.isNaN(timestamp)) {
         at = parsed;
         used.add(key);
         break;
@@ -186,7 +188,9 @@ function renderValue(value) {
 
 /** Local wall time to the millisecond, or a blank column. */
 function timeColumn(at) {
-  if (!at || Number.isNaN(at.getTime())) return " ".repeat(TIME_WIDTH);
+  if (!at) return " ".repeat(TIME_WIDTH);
+  const millisAt = at.getTime();
+  if (Number.isNaN(millisAt)) return " ".repeat(TIME_WIDTH);
   const two = (value) => String(value).padStart(2, "0");
   const millis = String(at.getMilliseconds()).padStart(3, "0");
   return `${two(at.getHours())}:${two(at.getMinutes())}:${two(at.getSeconds())}.${millis}`;
@@ -244,4 +248,5 @@ function main() {
 }
 
 // Only when run as the command, so the test can import the renderer.
-if (process.argv[1]?.endsWith("log-render.mjs")) main();
+const entryFile = process.argv[1];
+if (entryFile?.endsWith("log-render.mjs")) main();

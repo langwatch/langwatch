@@ -126,13 +126,14 @@ export const refusalIsAHandledErrorRule = defineRule({
               )?.value
             : second;
 
-        if (isRefusingStatus(status) && keys.some((key) => key === "error" || key === "message")) {
-          context.report({ node, messageId: "handWrittenRefusal", data: { shape: "c.json" } });
-        }
+        if (!isRefusingStatus(status)) return;
+        if (!keys.some((key) => key === "error" || key === "message")) return;
+        context.report({ node, messageId: "handWrittenRefusal", data: { shape: "c.json" } });
       },
       ObjectExpression(node) {
         const keys = keysOf(node);
-        if (!keys.includes("status") || !keys.includes("body")) return;
+        if (!keys.includes("status")) return;
+        if (!keys.includes("body")) return;
 
         const ok = node.properties.find(
           (property) => property.type === "Property" && property.key?.name === "ok",

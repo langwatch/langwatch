@@ -12,7 +12,8 @@ import { blocked, type Category, classify, isPublicAddress } from "../address.ts
 function repoRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   while (dir !== dirname(dir)) {
-    if (existsSync(join(dir, "go.mod"))) return dir;
+    const goModPath = join(dir, "go.mod");
+    if (existsSync(goModPath)) return dir;
     dir = dirname(dir);
   }
   throw new Error("could not locate repo root (no go.mod found while walking up)");

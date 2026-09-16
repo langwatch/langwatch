@@ -140,46 +140,48 @@ async function main() {
 
       const nextBtn = page.getByRole("button", { name: "Next" });
       const finishBtn = page.getByRole("button", { name: "Finish" });
-      if (await nextBtn.isVisible().catch(() => false)) {
+      const nextVisible = await nextBtn.isVisible().catch(() => false);
+      if (nextVisible) {
         await nextBtn.click();
         await page.waitForTimeout(2000);
         // Try to finish or skip remaining steps
         for (let i = 0; i < 5; i++) {
-          if (
-            await page
-              .getByRole("button", { name: "Finish" })
-              .isVisible()
-              .catch(() => false)
-          ) {
-            if (!(await page.getByRole("button", { name: "Finish" }).isDisabled())) {
+          const finishVisible = await page
+            .getByRole("button", { name: "Finish" })
+            .isVisible()
+            .catch(() => false);
+          if (finishVisible) {
+            const finishDisabled = await page.getByRole("button", { name: "Finish" }).isDisabled();
+            if (!finishDisabled) {
               await page.getByRole("button", { name: "Finish" }).click();
               break;
             }
           }
-          if (
-            await page
-              .getByRole("button", { name: "Skip" })
-              .isVisible()
-              .catch(() => false)
-          ) {
+          const skipVisible = await page
+            .getByRole("button", { name: "Skip" })
+            .isVisible()
+            .catch(() => false);
+          if (skipVisible) {
             await page.getByRole("button", { name: "Skip" }).click();
             await page.waitForTimeout(2000);
             continue;
           }
-          if (
-            await page
-              .getByRole("button", { name: "Next" })
-              .isVisible()
-              .catch(() => false)
-          ) {
+          const nextStepVisible = await page
+            .getByRole("button", { name: "Next" })
+            .isVisible()
+            .catch(() => false);
+          if (nextStepVisible) {
             await page.getByRole("button", { name: "Next" }).click();
             await page.waitForTimeout(2000);
             continue;
           }
           break;
         }
-      } else if (await finishBtn.isVisible().catch(() => false)) {
-        await finishBtn.click();
+      } else {
+        const finishVisible = await finishBtn.isVisible().catch(() => false);
+        if (finishVisible) {
+          await finishBtn.click();
+        }
       }
       await page.waitForTimeout(3000);
     } else {

@@ -294,7 +294,19 @@ const upgrade = async ({
   const location = first.headers.get("location");
   const refused = refusalOf({ url, response: first });
   const target = location === null ? null : schemeUpgradeTarget({ url, location });
-  if (location === null || first.status === 303 || target === null || isStream(init?.body)) {
+  if (location === null) {
+    discard(spare);
+    throw refused;
+  }
+  if (first.status === 303) {
+    discard(spare);
+    throw refused;
+  }
+  if (target === null) {
+    discard(spare);
+    throw refused;
+  }
+  if (isStream(init?.body)) {
     discard(spare);
     throw refused;
   }

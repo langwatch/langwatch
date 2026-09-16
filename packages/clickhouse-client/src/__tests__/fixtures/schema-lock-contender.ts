@@ -8,11 +8,11 @@ import { ClickHouseSchemaLock } from "../../schema-lock.ts";
 
 async function main(): Promise<void> {
   const [lockPath, journalPath, id, holdMs] = process.argv.slice(2);
-  if (!lockPath || !journalPath || !id || !holdMs) {
-    throw new Error(
-      "usage: schemaLockContender.ts <lockPath> <journalPath> <id> <holdMs>",
-    );
-  }
+  const usage = "usage: schemaLockContender.ts <lockPath> <journalPath> <id> <holdMs>";
+  if (!lockPath) throw new Error(usage);
+  if (!journalPath) throw new Error(usage);
+  if (!id) throw new Error(usage);
+  if (!holdMs) throw new Error(usage);
 
   const lock = ClickHouseSchemaLock.create({
     lockPath,

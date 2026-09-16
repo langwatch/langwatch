@@ -8,6 +8,12 @@ import { defineRule } from "../define-rule.mjs";
 
 const strictPortBaselineCache = new Map();
 
+function isValidPortsFile(value) {
+  if (value.version !== 0) return false;
+  if (!Array.isArray(value.ports)) return false;
+  return value.ports.every((port) => typeof port === "string");
+}
+
 function strictPortBaseline(cwd) {
   const cached = strictPortBaselineCache.get(cwd);
   if (cached) return cached;
@@ -16,11 +22,7 @@ function strictPortBaseline(cwd) {
   if (existsSync(file)) {
     try {
       const value = JSON.parse(readFileSync(file, "utf8"));
-      if (
-        value.version === 0 &&
-        Array.isArray(value.ports) &&
-        value.ports.every((port) => typeof port === "string")
-      ) {
+      if (isValidPortsFile(value)) {
         ports = new Set(value.ports);
       }
     } catch {
@@ -171,8 +173,9 @@ export const featureModuleClassesRule = defineRule({
 
     return {
       Program(node) {
-        if (kind.suffix === "Port" && strictPortBaseline(context.cwd).has(normalized)) {
-          return;
+        if (kind.suffix === "Port") {
+          const portBaseline = strictPortBaseline(context.cwd);
+          if (portBaseline.has(normalized)) return;
         }
         if (kind.suffix === "Port" && hasInvalidExportedPort(node)) {
           context.report({

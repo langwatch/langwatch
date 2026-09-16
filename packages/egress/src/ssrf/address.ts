@@ -245,12 +245,16 @@ function bytesEqual({ a, b }: { a: Uint8Array; b: Uint8Array }): boolean {
  * parse failure fails closed rather than slipping through as "not obviously
  * private". Mirrors Go's ssrf.Classify.
  */
+function isMetadataAddress(addr: Uint8Array): boolean {
+  return METADATA_ADDRESSES.some((m) => bytesEqual({ a: m, b: addr }));
+}
+
 export function classify(ip: string): Category {
   const raw = ipToBytes(ip);
   if (!raw) return "special";
   const addr = unmap(raw);
 
-  if (METADATA_ADDRESSES.some((m) => bytesEqual({ a: m, b: addr }))) return "metadata";
+  if (isMetadataAddress(addr)) return "metadata";
   for (const prefix of SPECIAL_PREFIXES) {
     if (prefixContains({ prefix, addr })) return "special";
   }

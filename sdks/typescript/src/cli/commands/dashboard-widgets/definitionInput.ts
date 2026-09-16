@@ -63,13 +63,12 @@ const readQueriesFile = (path: string): DashboardWidgetQueryInput[] => {
   } catch {
     throw new WidgetInputError(`Queries file is not valid JSON: ${path}`);
   }
-  if (
-    !Array.isArray(parsed) ||
-    !parsed.every((entry) => typeof entry === "object" && entry !== null)
-  ) {
-    throw new WidgetInputError(
-      `Queries file must be a JSON array of { name, sql, parameters? }: ${path}`,
-    );
+  const shapeError = `Queries file must be a JSON array of { name, sql, parameters? }: ${path}`;
+  if (!Array.isArray(parsed)) {
+    throw new WidgetInputError(shapeError);
+  }
+  if (!parsed.every((entry) => typeof entry === "object" && entry !== null)) {
+    throw new WidgetInputError(shapeError);
   }
   return parsed as DashboardWidgetQueryInput[];
 };

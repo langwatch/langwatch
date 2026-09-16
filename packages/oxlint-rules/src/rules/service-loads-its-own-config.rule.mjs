@@ -15,6 +15,19 @@ function isFunctionLike(node) {
   return node?.type === "FunctionExpression" || node?.type === "ArrowFunctionExpression";
 }
 
+function isConfigVariableDeclarator(node) {
+  if (node.id.type !== "Identifier") return false;
+  if (!CONFIG_FUNCTION_NAMES.has(node.id.name)) return false;
+  return isFunctionLike(node.init);
+}
+
+function isConfigProperty(node) {
+  if (node.computed) return false;
+  if (node.key.type !== "Identifier") return false;
+  if (!CONFIG_FUNCTION_NAMES.has(node.key.name)) return false;
+  return isFunctionLike(node.value);
+}
+
 export const serviceLoadsItsOwnConfigRule = defineRule({
   name: "service-loads-its-own-config",
   kind: "problem",
@@ -51,9 +64,8 @@ export const serviceLoadsItsOwnConfigRule = defineRule({
         if (node.id && CONFIG_FUNCTION_NAMES.has(node.id.name)) reportFunction(node, node.id.name);
       },
       VariableDeclarator(node) {
-        if (node.id.type === "Identifier" && CONFIG_FUNCTION_NAMES.has(node.id.name) && isFunctionLike(node.init)) {
-          reportFunction(node, node.id.name);
-        }
+        if (!isConfigVariableDeclarator(node)) return;
+        reportFunction(node, node.id.name);
       },
       MethodDefinition(node) {
         if (!node.computed && node.key.type === "Identifier" && CONFIG_FUNCTION_NAMES.has(node.key.name)) {
@@ -61,14 +73,8 @@ export const serviceLoadsItsOwnConfigRule = defineRule({
         }
       },
       Property(node) {
-        if (
-          !node.computed &&
-          node.key.type === "Identifier" &&
-          CONFIG_FUNCTION_NAMES.has(node.key.name) &&
-          isFunctionLike(node.value)
-        ) {
-          reportFunction(node, node.key.name);
-        }
+        if (!isConfigProperty(node)) return;
+        reportFunction(node, node.key.name);
       },
       MemberExpression(node) {
         if (!isEnvironmentObject(node.object)) return;

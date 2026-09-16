@@ -26,7 +26,8 @@ function subjectOwners(cwd) {
     // package-boundaries, kept local here to avoid a cross-rule dependency.
     for (const entry of readEntries(featuresRoot)) {
       for (const role of ["contract", "server", "web"]) {
-        if (existsSync(join(featuresRoot, entry, role, "package.json"))) {
+        const packageJsonPath = join(featuresRoot, entry, role, "package.json");
+        if (existsSync(packageJsonPath)) {
           migrated.add(entry);
           break;
         }

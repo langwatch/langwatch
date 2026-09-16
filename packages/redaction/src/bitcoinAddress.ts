@@ -125,13 +125,19 @@ const BC_HRP_EXPANDED = [
   "c".charCodeAt(0) & 31,
 ];
 
+/** Whether `value` mixes lowercase and uppercase letters. */
+function hasMixedCase(value: string): boolean {
+  if (!/[a-z]/.test(value)) return false;
+  return /[A-Z]/.test(value);
+}
+
 /**
  * Whether a `bc1…` address carries a valid checksum. Only the mainnet HRP is
  * checked. BIP-350 pairs each witness version with its own constant (bech32
  * for 0, bech32m for 1-16) rather than accepting either for either.
  */
 export function isBech32Address(value: string): boolean {
-  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) return false;
+  if (hasMixedCase(value)) return false;
   const lower = value.toLowerCase();
   if (!lower.startsWith("bc1")) return false;
   const data = lower.slice(3);
@@ -196,7 +202,6 @@ function isValidWitnessProgram({
  * on lowercase alone once sent that form to the base58 decoder, a false miss.
  */
 export function isBitcoinAddress(raw: string): boolean {
-  return raw.toLowerCase().startsWith("bc1")
-    ? isBech32Address(raw)
-    : isBase58CheckAddress(raw);
+  const lower = raw.toLowerCase();
+  return lower.startsWith("bc1") ? isBech32Address(raw) : isBase58CheckAddress(raw);
 }

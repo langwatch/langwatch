@@ -465,9 +465,10 @@ function executeGoose({
   });
 
   if (result.error) {
-    const message = result.error.message.includes("ENOENT")
+    const errorMessage = result.error.message;
+    const message = errorMessage.includes("ENOENT")
       ? "Goose binary not found. Install from https://github.com/pressly/goose"
-      : result.error.message;
+      : errorMessage;
     throw new MigrationError(`Goose migration failed: ${message}`, "migrate");
   }
 
@@ -484,7 +485,11 @@ function executeGoose({
 
   if (result.status !== 0) {
     // "no next version found" means all migrations are already applied - not an error
-    if (output.includes("no next version found") || output.includes("no migrations to run")) {
+    if (output.includes("no next version found")) {
+      logger.info("All migrations are already applied");
+      return output;
+    }
+    if (output.includes("no migrations to run")) {
       logger.info("All migrations are already applied");
       return output;
     }

@@ -37,9 +37,10 @@ function isAllowedName(name, { isTest, isTypeOnly }) {
   if (typeof name !== "string") return false;
   if (isTypeOnly) return name.endsWith("Infrastructure");
   if (name.endsWith("Server")) return true;
-  if (name.endsWith("Rest") || name.endsWith("Trpc") || name.endsWith("Transport") || name.endsWith("Sse")) {
-    return true;
-  }
+  if (name.endsWith("Rest")) return true;
+  if (name.endsWith("Trpc")) return true;
+  if (name.endsWith("Transport")) return true;
+  if (name.endsWith("Sse")) return true;
   return isTest && name.endsWith("Fixture");
 }
 

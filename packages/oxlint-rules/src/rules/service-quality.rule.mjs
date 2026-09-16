@@ -60,22 +60,21 @@ export const serviceQualityRule = defineRule({
             member.type === "MethodDefinition" &&
             prior.type === "MethodDefinition" &&
             !prior.value?.body;
-          if (
-            prior &&
-            !overloadPair &&
-            !(accessor && prior.accessor && prior.kind !== member.kind)
-          ) {
-            context.report({
-              node: member,
-              messageId: "duplicateMember",
-              data: { name },
-            });
-          }
           names.set(key, member);
+          if (!prior) continue;
+          if (overloadPair) continue;
+          if (accessor && prior.accessor && prior.kind !== member.kind) continue;
+          context.report({
+            node: member,
+            messageId: "duplicateMember",
+            data: { name },
+          });
         }
       },
       ClassDeclaration(node) {
-        if (!node.id?.name.endsWith("Service") || node.abstract) return;
+        const className = node.id?.name;
+        if (!className?.endsWith("Service")) return;
+        if (node.abstract) return;
         const hasStaticCreate = node.body.body.some(
           (member) =>
             member.type === "MethodDefinition" && member.static && memberName(member) === "create",

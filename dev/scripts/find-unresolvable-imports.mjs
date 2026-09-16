@@ -192,12 +192,14 @@ const proposals = (name, declared) => {
   return [...out];
 };
 
+const isGeneratedPackage = (pkgName) => GENERATED.some((pkg) => pkgName.includes(pkg));
+
 export const findUnresolvable = (sources, workspace, surfaces) => {
   const declared = collectDeclarations(sources);
   const rows = [];
   for (const [file, src] of sources) {
     for (const m of src.matchAll(/import\s+\{([^}]*)\}\s*from\s*["'](@langwatch\/[^"']+)["']/g)) {
-      if (GENERATED.some((pkg) => m[2].includes(pkg))) continue;
+      if (isGeneratedPackage(m[2])) continue;
       const pkg = packageOf(m[2]);
       if (workspace && !workspace.has(pkg)) continue;
       // A subpath carries its own export map, which this does not read, so only
@@ -306,7 +308,8 @@ const listFiles = (target) => {
   }
   const walk = (dir) => readdirSync(dir, { withFileTypes: true })
     .flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
-  return (statSync(target).isDirectory() ? walk(target) : [target]).filter((f) => /\.tsx?$/.test(f));
+  const stats = statSync(target);
+  return (stats.isDirectory() ? walk(target) : [target]).filter((f) => /\.tsx?$/.test(f));
 };
 
 const target = process.argv[2];

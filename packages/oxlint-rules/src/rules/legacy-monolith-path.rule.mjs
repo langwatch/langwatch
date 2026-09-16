@@ -32,9 +32,13 @@ export const legacyMonolithPathRule = defineRule({
     return {
       Literal(node) {
         if (typeof node.value !== "string") return;
-        if (!LEGACY_PATH.test(node.value) && !MONOLITH_PATH.test(node.value)) return;
-
-        context.report({ data: { name: node.value }, messageId: "legacyMonolithPath", node });
+        if (LEGACY_PATH.test(node.value)) {
+          context.report({ data: { name: node.value }, messageId: "legacyMonolithPath", node });
+          return;
+        }
+        if (MONOLITH_PATH.test(node.value)) {
+          context.report({ data: { name: node.value }, messageId: "legacyMonolithPath", node });
+        }
       },
     };
   },

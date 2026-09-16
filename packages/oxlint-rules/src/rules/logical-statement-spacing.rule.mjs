@@ -119,7 +119,8 @@ export const logicalStatementSpacingRule = defineRule({
         }
       },
       CallExpression(node) {
-        if (!isChainTop(node) || !spansLines(node)) return;
+        if (!isChainTop(node)) return;
+        if (!spansLines(node)) return;
 
         const openers = chainSegments(node).filter((segment) =>
           CHAIN_GROUP_OPENERS.has(segment.name),
@@ -127,7 +128,8 @@ export const logicalStatementSpacingRule = defineRule({
         for (const segment of openers.slice(1)) {
           const objectEnd = segment.callee.object.range[1];
           const propertyStart = segment.callee.property.range[0];
-          if (BLANK_LINE.test(source.slice(objectEnd, propertyStart))) continue;
+          const between = source.slice(objectEnd, propertyStart);
+          if (BLANK_LINE.test(between)) continue;
 
           context.report({
             node: segment.callee.property,

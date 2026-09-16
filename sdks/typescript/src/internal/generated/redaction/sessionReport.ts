@@ -1,40 +1,8 @@
 /**
- * Session-report scrubbing: prepares a coding-agent session transcript (or a
- * free-form summary) for sending to the LangWatch team as an issue report.
- *
- * Everything here runs locally, before anything leaves the machine. Three
- * passes, strongest first:
- *
- *  1. Environment literals: the exact values of environment variables whose
- *     names look sensitive (keys, tokens, secrets, passwords) are removed
- *     wherever they appear, regardless of shape.
- *  2. Credential patterns: the same secret rules the LangWatch platform runs
- *     at ingestion (see `secrets.ts`): provider API keys (sk-...), AWS and
- *     Google keys, GitHub / Slack / Stripe tokens, JWTs, private-key blocks,
- *     connection-URL passwords, bearer tokens. JSON keys with sensitive names
- *     (password, api_key, authorization, cookie, ...) have their whole value
- *     scrubbed.
- *  3. Basic PII patterns: email addresses, phone numbers (international
- *     `+`-prefixed or punctuated formats), credit card numbers (Luhn-checked),
- *     public IPv4 addresses. Loopback, private-range, and link-local addresses
- *     are kept: they identify nobody and are essential to debug local setups.
- *     There is no IPv6 pattern, so a native IPv6 address is sent as written.
- *     An IPv4-mapped one loses its dotted-quad tail to the IPv4 pattern, which
- *     is a side effect rather than IPv6 coverage.
- *
- * Deliberate limits, so reports stay debuggable:
- *  - Bare unformatted digit runs only count as card numbers at lengths 14-16;
- *    a 13-digit run is far more often a millisecond timestamp and a 19-digit
- *    run a nanosecond timestamp than a card.
- *  - Phone numbers without a `+` prefix are only matched in punctuated forms
- *    like (415) 555-2671 or 415-555-2671, never as bare digit runs.
- *  - IPv6 is not scanned; public IPv6 addresses are rare in agent sessions
- *    and the pattern is too noisy against base64 and hex ids.
- *
- * This module is mirrored verbatim into the `langwatch` CLI
- * (`sdks/typescript/src/internal/generated/redaction/`), so this file is the
- * exact code that runs before a report is sent. A drift test pins the mirror
- * byte-for-byte.
+ * Session-report scrubbing: strips secrets/PII from a transcript locally,
+ * before it leaves the machine. Loopback/private IPs are kept (harmless);
+ * IPv6 is not scanned. Mirrored byte-for-byte into the `langwatch` CLI and
+ * drift-tested — a change here must land in both.
  */
 import { formatPiiMarker, SECRET_MARKER } from "./markers.ts";
 import { isSensitiveAttributeKey, redactSecretsInText } from "./secrets.ts";

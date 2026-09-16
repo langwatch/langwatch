@@ -148,7 +148,8 @@ exec "$real" "$@"
 function skipReason(env) {
   const ci = (env.CI ?? "").trim().toLowerCase();
   if (ci !== "" && ci !== "0" && ci !== "false") return "CI";
-  if ((env.NODE_ENV ?? "").trim().toLowerCase() === "production") {
+  const nodeEnv = (env.NODE_ENV ?? "").trim().toLowerCase();
+  if (nodeEnv === "production") {
     return "NODE_ENV=production";
   }
   return null;
@@ -230,12 +231,14 @@ function removeAll(binDirs) {
   for (const binDir of binDirs) {
     for (const name of TOOLS) {
       const entry = path.join(binDir, name);
-      if (!readIfText(entry)?.includes(MARKER)) continue;
+      const entryText = readIfText(entry);
+      if (!entryText?.includes(MARKER)) continue;
 
       const real = `${entry}.real`;
       try {
         fs.accessSync(real, fs.constants.X_OK);
-        if (readIfText(real)?.includes(MARKER)) {
+        const realText = readIfText(real);
+        if (realText?.includes(MARKER)) {
           throw new Error("launcher backup is itself a shim; run pnpm install");
         }
         fs.renameSync(real, entry);
@@ -281,9 +284,10 @@ function main(argv, env) {
 // which is what postinstall does). Importing this module — the guard test reads
 // TOOLS from it, so the list it asserts against is the list the installer uses
 // — must not rewrite anybody's bin entries as a side effect.
-if (
-  process.argv[1] !== undefined &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-) {
-  process.exitCode = main(process.argv.slice(2), process.env);
+const invokedPath = process.argv[1];
+if (invokedPath !== undefined) {
+  const resolvedInvokedPath = path.resolve(invokedPath);
+  if (resolvedInvokedPath === fileURLToPath(import.meta.url)) {
+    process.exitCode = main(process.argv.slice(2), process.env);
+  }
 }

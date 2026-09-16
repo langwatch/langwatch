@@ -23,7 +23,8 @@ export function currentCliLocation({
 } = {}): CliLocation | null {
   if (!entry) return null;
   const resolved = path.resolve(entry);
-  if (!fs.existsSync(resolved) || !fs.existsSync(execPath)) return null;
+  if (!fs.existsSync(resolved)) return null;
+  if (!fs.existsSync(execPath)) return null;
   return { node: execPath, entry: resolved };
 }
 

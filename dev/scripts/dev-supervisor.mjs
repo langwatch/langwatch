@@ -359,7 +359,8 @@ export function firstAppFrame(stack) {
  */
 export function collapseStackRecord(line) {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+  if (!trimmed.startsWith("{")) return null;
+  if (!trimmed.endsWith("}")) return null;
   let record;
   try {
     record = JSON.parse(trimmed);
@@ -745,7 +746,11 @@ export function stackControls({ target, graceMs }) {
     // that rather than on the child is the difference between a reaped stack
     // and one that respawns every lane behind us and keeps the ports.
     const deadline = Date.now() + graceMs;
-    while (Date.now() < deadline && anyAlive()) await sleep(50);
+    while (true) {
+      if (Date.now() >= deadline) break;
+      if (!anyAlive()) break;
+      await sleep(50);
+    }
 
     // Anything still up ignored SIGTERM or was restarted under it. SIGKILL
     // cannot be ignored, but a lane started moments before it lands can still
@@ -815,6 +820,10 @@ async function runSentinel(args, env) {
   });
   const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
   const watched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
+  const neitherWatched = () => {
+    if (watched(supervisorPid)) return false;
+    return !watched(leaderPid);
+  };
   let reported = false;
   const report = () => {
     if (reported) return;
@@ -828,7 +837,7 @@ async function runSentinel(args, env) {
     // Only once the stack has been seen to settle: a group that has not been
     // observed yet reads as "quiet" while the command is still being exec'd.
     if (reported && !stack.anyAlive()) break;
-    if (!watched(supervisorPid) && !watched(leaderPid)) {
+    if (neitherWatched()) {
       await stack.takeDown();
       break;
     }

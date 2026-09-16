@@ -261,7 +261,10 @@ async function followRedirect({
   // The method downgrade every HTTP client makes: 303 always becomes a GET, and
   // so does a POST through a redirect that is not 307 or 308. Carrying the body
   // through would re-send it to an address the original request never named.
-  if (status === 303 || (status !== 307 && status !== 308 && init.method === "POST")) {
+  if (status === 303) {
+    redirectInit.method = "GET";
+    redirectInit.body = undefined;
+  } else if (status !== 307 && status !== 308 && init.method === "POST") {
     redirectInit.method = "GET";
     redirectInit.body = undefined;
   }

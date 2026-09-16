@@ -83,7 +83,8 @@ export function parseRoutingTable(env: Record<string, string | undefined>): Rout
 
     // Guessing wrong here is a silent fail-open: the intended organisation
     // gets no route and its tenants fall through to shared.
-    if (suffix.slice(0, Math.max(separator, 0)).includes("__")) {
+    const prefix = suffix.slice(0, Math.max(separator, 0));
+    if (prefix.includes("__")) {
       ambiguous.push({ envVar, organizationId });
     }
 

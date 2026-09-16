@@ -36,10 +36,12 @@ const isSource = (file: string): boolean =>
 const walk = ({ dir, out = [] }: { dir: string; out?: string[] }): string[] => {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) {
-      if (entry !== "__tests__" && !SKIPPED_DIRS.has(relative(SRC_ROOT, path))) {
-        walk({ dir: path, out });
-      }
+    const stats = statSync(path);
+    if (stats.isDirectory()) {
+      if (entry === "__tests__") continue;
+      const relativePath = relative(SRC_ROOT, path);
+      if (SKIPPED_DIRS.has(relativePath)) continue;
+      walk({ dir: path, out });
     } else if (isSource(path)) {
       out.push(path);
     }

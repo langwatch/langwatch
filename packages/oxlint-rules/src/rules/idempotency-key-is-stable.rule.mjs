@@ -32,7 +32,8 @@ function calleeName(callee) {
 function isBindOnceInitializer(fn) {
   const call = fn.parent;
   if (call?.type !== "CallExpression") return false;
-  if (!BIND_ONCE_HOOKS.has(calleeName(call.callee) ?? "")) return false;
+  const name = calleeName(call.callee) ?? "";
+  if (!BIND_ONCE_HOOKS.has(name)) return false;
 
   return (call.arguments ?? []).includes(fn);
 }

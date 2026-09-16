@@ -61,7 +61,8 @@ function workspaceBundledNames(appDir) {
 
 function isInlined(id, workspaceBundled) {
   if (/^(\.\.?\/|\/|#)/.test(id)) return true;
-  if (workspaceBundled.has(basePackage(id))) return true;
+  const base = basePackage(id);
+  if (workspaceBundled.has(base)) return true;
   return !NEVER_INLINED.some((re) => re.test(id));
 }
 
@@ -114,10 +115,13 @@ function findUndeclaredExternals({ appDir, metafile, workspaceBundled, builtins 
     for (const imported of output.imports) {
       if (!imported.external) continue;
       const id = imported.path;
-      if (id.startsWith("node:") || builtins.has(basePackage(id))) continue;
-      if (id === ".prisma" || id.startsWith(".prisma/")) continue;
       const base = basePackage(id);
-      if (declared.has(base) || workspaceBundled.has(base) || optional.has(base)) continue;
+      if (id.startsWith("node:")) continue;
+      if (builtins.has(base)) continue;
+      if (id === ".prisma" || id.startsWith(".prisma/")) continue;
+      if (declared.has(base)) continue;
+      if (workspaceBundled.has(base)) continue;
+      if (optional.has(base)) continue;
       undeclared.add(base);
     }
   }

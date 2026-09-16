@@ -26,15 +26,19 @@ function tierOf(entry) {
 function declarationsFor({ root, catalogue, half, suffix, tiers }) {
   const declarations = [];
   for (const entry of catalogue.features) {
-    if (!tiers.includes(tierOf(entry))) continue;
+    const tier = tierOf(entry);
+    if (!tiers.includes(tier)) continue;
 
     const packagePath = resolve(root, entry.root, half, "package.json");
     const declarationPath = resolve(root, entry.root, half, "src", `${entry.id}.${half}.ts`);
     const indexPath = resolve(root, entry.root, half, "src", "index.ts");
-    if (!existsSync(packagePath) || !existsSync(declarationPath) || !existsSync(indexPath)) continue;
+    if (!existsSync(packagePath)) continue;
+    if (!existsSync(declarationPath)) continue;
+    if (!existsSync(indexPath)) continue;
 
     const symbol = `${camelCase(entry.id)}${suffix}`;
-    if (!new RegExp(`\\b${symbol}\\b`).test(readFileSync(indexPath, "utf8"))) continue;
+    const indexSource = readFileSync(indexPath, "utf8");
+    if (!new RegExp(`\\b${symbol}\\b`).test(indexSource)) continue;
 
     declarations.push({ symbol, package: JSON.parse(readFileSync(packagePath, "utf8")).name });
   }
@@ -65,8 +69,10 @@ function membersFor({ root, entry }) {
 function memberSourceFor({ root, catalogue, tiers }) {
   const rows = [];
   for (const entry of catalogue.features) {
-    if (!tiers.includes(tierOf(entry))) continue;
-    if (!existsSync(resolve(root, entry.root, "server", "package.json"))) continue;
+    const tier = tierOf(entry);
+    if (!tiers.includes(tier)) continue;
+    const packageJsonPath = resolve(root, entry.root, "server", "package.json");
+    if (!existsSync(packageJsonPath)) continue;
     rows.push([entry.id, membersFor({ root, entry })]);
   }
   rows.sort(([one], [other]) => one.localeCompare(other));

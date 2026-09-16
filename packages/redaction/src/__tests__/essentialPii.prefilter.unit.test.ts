@@ -96,7 +96,8 @@ describe("given the phone detector's digit gate", () => {
           const found = findPhoneNumbersInText(shape, { defaultCountry: "US" });
           if (found.length === 0) continue;
           recognised++;
-          if (!redact(shape).includes("[PHONE_NUMBER]")) missed.push(shape);
+          const redacted = redact(shape);
+          if (!redacted.includes("[PHONE_NUMBER]")) missed.push(shape);
         }
       }
       expect(recognised).toBeGreaterThan(500);

@@ -141,14 +141,18 @@ function readColumnList({
   throw new Error("unbalanced parentheses in CREATE TABLE column list");
 }
 
+/** Whether `definition` opens with a non-column keyword (INDEX, CONSTRAINT, ...). */
+function isNonColumnDefinition(definition: string): boolean {
+  const upper = definition.toUpperCase();
+  return NON_COLUMN_PREFIXES.some((prefix) => upper.startsWith(`${prefix} `));
+}
+
 function parseColumns(columnList: string): Column[] {
   const columns: Column[] = [];
   for (const raw of splitTopLevel({ text: columnList, separator: "," })) {
     const definition = raw.trim().replace(/\s+/g, " ");
     if (definition === "") continue;
-    if (NON_COLUMN_PREFIXES.some((prefix) => definition.toUpperCase().startsWith(`${prefix} `))) {
-      continue;
-    }
+    if (isNonColumnDefinition(definition)) continue;
     const named = definition.match(/^`?([A-Za-z_][A-Za-z0-9_]*)`?\s+(.+)$/);
     if (!named) continue;
     const rest = named[2]!;
@@ -238,9 +242,9 @@ function convertedType({
     text: sql.slice(argsStart, end),
     separator: ",",
   });
-  if (args.length !== 2 || args[0]!.trim().toLowerCase() !== "max") {
-    return undefined;
-  }
+  if (args.length !== 2) return undefined;
+  const first = args[0]!.trim().toLowerCase();
+  if (first !== "max") return undefined;
   return args[1]!.replace(/\s+/g, " ").trim();
 }
 

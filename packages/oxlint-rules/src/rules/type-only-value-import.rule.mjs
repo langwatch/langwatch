@@ -71,13 +71,13 @@ export const typeOnlyValueImportRule = defineRule({
               ? importSpecifier.imported.name
               : undefined;
           if (!name) continue;
-          if (kinds.typeOnly.has(name) && !kinds.value.has(name)) {
-            context.report({
-              node: importSpecifier,
-              messageId: "valueImportOfType",
-              data: { name, specifier },
-            });
-          }
+          if (!kinds.typeOnly.has(name)) continue;
+          if (kinds.value.has(name)) continue;
+          context.report({
+            node: importSpecifier,
+            messageId: "valueImportOfType",
+            data: { name, specifier },
+          });
         }
       },
     };

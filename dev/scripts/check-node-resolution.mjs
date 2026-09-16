@@ -128,15 +128,18 @@ export async function probeImport(absPath, { timeoutMs = 60_000 } = {}) {
  * ERR_MODULE_NOT_FOUND counts as a resolution failure — a module that
  * throws while *running* is a different defect class.
  */
+/** Whether an unknown-extension failure is the known, in-scope `.tsx` skip case. */
+function isSkippableTsxExtension({ code, message, relPath }) {
+  if (code !== "ERR_UNKNOWN_FILE_EXTENSION") return false;
+  if (!/\.tsx"?$/.test(message)) return false;
+  return isBrowserSkipPath(relPath);
+}
+
 export async function checkTarget(relPath, { timeoutMs = 60_000 } = {}) {
   const result = await probeImport(join(root, relPath), { timeoutMs });
 
   if (result.status === "maybe-skip-tsx") {
-    if (
-      result.code === "ERR_UNKNOWN_FILE_EXTENSION" &&
-      /\.tsx"?$/.test(result.message) &&
-      isBrowserSkipPath(relPath)
-    ) {
+    if (isSkippableTsxExtension({ code: result.code, message: result.message, relPath })) {
       return { target: relPath, status: "skipped", code: result.code, message: result.message };
     }
     // Any other import-time failure (including a non-skipped

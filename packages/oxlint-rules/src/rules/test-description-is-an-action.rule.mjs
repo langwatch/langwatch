@@ -57,6 +57,17 @@ function enclosingDescribe(node) {
   return undefined;
 }
 
+/** Reports a nested `describe` whose title is neither given/when/and nor an MDN-style unit name. */
+function checkDescribeTitle(node, context) {
+  const title = node.arguments[0];
+  const text = titleText(title);
+  if (text === undefined) return;
+  if (!enclosingDescribe(node)) return;
+  if (GIVEN_WHEN_AND.test(text)) return;
+  if (MDN_UNIT_NAME.test(text)) return;
+  context.report({ node: title, messageId: "nestedDescribeMissingGivenWhen" });
+}
+
 export const testDescriptionIsAnActionRule = defineRule({
   name: "test-description-is-an-action",
   kind: "problem",
@@ -89,16 +100,7 @@ export const testDescriptionIsAnActionRule = defineRule({
     return {
       CallExpression(node) {
         if (isDescribeCall(node)) {
-          const title = node.arguments[0];
-          const text = titleText(title);
-          if (
-            text !== undefined &&
-            enclosingDescribe(node) &&
-            !GIVEN_WHEN_AND.test(text) &&
-            !MDN_UNIT_NAME.test(text)
-          ) {
-            context.report({ node: title, messageId: "nestedDescribeMissingGivenWhen" });
-          }
+          checkDescribeTitle(node, context);
           return;
         }
 

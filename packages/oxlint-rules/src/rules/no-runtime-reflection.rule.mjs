@@ -76,20 +76,17 @@ export const noRuntimeReflectionRule = defineRule({
           }
           return;
         }
-        if (
-          callee.object.type === "Identifier" &&
-          callee.object.name === "Object" &&
-          callee.property.type === "Identifier" &&
-          callee.property.name === "defineProperty"
-        ) {
-          const target = node.arguments[0];
-          if (!isPrototypeTarget(target)) {
-            context.report({
-              node,
-              messageId: "defineProperty",
-              data: { target: targetTextOf(source, target) },
-            });
-          }
+        if (callee.object.type !== "Identifier") return;
+        if (callee.object.name !== "Object") return;
+        if (callee.property.type !== "Identifier") return;
+        if (callee.property.name !== "defineProperty") return;
+        const target = node.arguments[0];
+        if (!isPrototypeTarget(target)) {
+          context.report({
+            node,
+            messageId: "defineProperty",
+            data: { target: targetTextOf(source, target) },
+          });
         }
       },
     };

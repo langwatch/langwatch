@@ -41,7 +41,8 @@ export const typeOnlyNames = (src) => {
 /** The erased-extends sites in one source file. */
 export const findInSource = (src) => {
   const found = [];
-  if (!src.includes("extends") || !src.includes("type")) return found;
+  if (!src.includes("extends")) return found;
+  if (!src.includes("type")) return found;
   const typeOnly = typeOnlyNames(src);
   if (typeOnly.size === 0) return found;
   const declaration = /(^|\n)\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)([^{]*)\{/g;
@@ -89,7 +90,8 @@ const listFiles = (target) => {
       { encoding: "utf8", maxBuffer: 1 << 28 }).trim().split("\n");
   const walk = (dir) => readdirSync(dir, { withFileTypes: true })
     .flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]));
-  return statSync(target).isDirectory() ? walk(target).filter((f) => /\.tsx?$/.test(f)) : [target];
+  const stats = statSync(target);
+  return stats.isDirectory() ? walk(target).filter((f) => /\.tsx?$/.test(f)) : [target];
 };
 
 const target = process.argv[2];

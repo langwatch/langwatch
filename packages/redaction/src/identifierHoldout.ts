@@ -37,6 +37,12 @@ const IDENTIFIER_VALUE = /^[A-Za-z0-9._:-]+$/;
  */
 export const MAX_IDENTIFIER_LENGTH = 256;
 
+/** Whether `value` is digit-bearing and written with only identifier characters. */
+function isDigitBearingIdentifier(value: string): boolean {
+  if (!HAS_DIGIT.test(value)) return false;
+  return IDENTIFIER_VALUE.test(value);
+}
+
 /**
  * One identifier-shaped token (letters+digits+separators, uuid, hex digest,
  * or base64-style). The letter requirement keeps personal data in scope:
@@ -46,8 +52,9 @@ export function isIdentifierShapedValue(value: string): boolean {
   if (value.length > MAX_IDENTIFIER_LENGTH || !HAS_LETTER.test(value)) {
     return false;
   }
-  if (HAS_DIGIT.test(value) && IDENTIFIER_VALUE.test(value)) return true;
-  if (UUID_VALUE.test(value) || HEX_RUN_VALUE.test(value)) return true;
+  if (isDigitBearingIdentifier(value)) return true;
+  if (UUID_VALUE.test(value)) return true;
+  if (HEX_RUN_VALUE.test(value)) return true;
   return (
     BASE64ISH_VALUE.test(value) &&
     HAS_LOWERCASE.test(value) &&

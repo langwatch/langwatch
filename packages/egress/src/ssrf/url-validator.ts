@@ -73,7 +73,9 @@ interface ValidationContext {
 /** The host a URL was judged by: lowercased, and unbracketed if it is an IPv6 literal. */
 function bareHostname(parsedUrl: URL): string {
   const host = parsedUrl.hostname.toLowerCase();
-  return host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  if (!host.startsWith("[")) return host;
+  if (!host.endsWith("]")) return host;
+  return host.slice(1, -1);
 }
 
 function isBareLocalhostOrLocal(hostname: string): boolean {

@@ -43,13 +43,21 @@ export const noPortVocabularyRule = defineRule({
 
     return {
       Program(node) {
-        if (PORT_FILE.test(filename) || PORT_PATH.test(filename)) {
+        if (PORT_FILE.test(filename)) {
+          context.report({ node, messageId: "portFile", data: { name: filename } });
+          return;
+        }
+        if (PORT_PATH.test(filename)) {
           context.report({ node, messageId: "portFile", data: { name: filename } });
         }
       },
       ImportDeclaration(node) {
         const source = typeof node.source.value === "string" ? node.source.value : "";
-        if (PORT_PATH.test(source) || PORT_FILE.test(source)) {
+        if (PORT_PATH.test(source)) {
+          report(context, node, source);
+          return;
+        }
+        if (PORT_FILE.test(source)) {
           report(context, node, source);
         }
       },

@@ -66,9 +66,10 @@ function findBannedModels(text) {
 /** Whether `node` is the value of an object property literally named `regex`. */
 function isRegexPatternValue(node) {
   const { parent } = node;
-  if (!parent || parent.type !== "Property" || parent.computed || parent.value !== node) {
-    return false;
-  }
+  if (!parent) return false;
+  if (parent.type !== "Property") return false;
+  if (parent.computed) return false;
+  if (parent.value !== node) return false;
   const { key } = parent;
   if (key.type === "Identifier") return key.name === "regex";
   if (key.type === "Literal") return key.value === "regex";

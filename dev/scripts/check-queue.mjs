@@ -188,7 +188,8 @@ function isQueueCommand(command) {
  */
 function heldByQueueAncestor(candidate) {
   if (!Number.isInteger(candidate) || candidate <= 1) return false;
-  if (!isQueueCommand(psField(candidate, "args"))) return false;
+  const command = psField(candidate, "args");
+  if (!isQueueCommand(command)) return false;
   let current = process.pid;
   for (let hop = 0; hop < 64; hop++) {
     const parent = parentOfPid(current);
@@ -473,7 +474,8 @@ async function waitForTurn({ dir, ticket, slots, pollMs, maxWaitMs, heartbeatMs 
  * no haven to delegate to. CHECK_QUEUE_IMPL=js forces the JS path for tests.
  */
 function delegateToHaven(commandArgv, env) {
-  if ((env.CHECK_QUEUE_IMPL ?? "").trim().toLowerCase() === "js") {
+  const impl = (env.CHECK_QUEUE_IMPL ?? "").trim().toLowerCase();
+  if (impl === "js") {
     return Promise.resolve(null);
   }
   const bin = env.HAVEN_BIN || "haven";

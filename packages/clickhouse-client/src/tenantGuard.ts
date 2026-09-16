@@ -93,6 +93,18 @@ const isWordCharacter = (character: string | undefined): boolean =>
   character !== undefined && /[A-Za-z0-9_]/.test(character);
 
 /**
+ * Whether an `\bOR\b` token, by hand, starts at `masked[i]` (so `ORDER BY`
+ * and `colour` are not ORs).
+ */
+function isOrTokenAt(masked: string, i: number): boolean {
+  const character = masked[i];
+  if (character !== "o" && character !== "O") return false;
+  if (masked[i + 1] !== "r" && masked[i + 1] !== "R") return false;
+  if (isWordCharacter(masked[i - 1])) return false;
+  return !isWordCharacter(masked[i + 2]);
+}
+
+/**
  * Reports an `OR` that can disjoin the tenant predicate away. Depth is the test. An `OR` nested
  * inside a bracketed group cannot weaken a predicate outside it, so only one at the predicate's
  * own depth or shallower counts.
@@ -121,13 +133,7 @@ function hasWeakeningDisjunction({
       continue;
     }
 
-    // `\bOR\b` by hand, so `ORDER BY` and a column called `colour` are not ORs.
-    if (
-      (character === "o" || character === "O") &&
-      (masked[i + 1] === "r" || masked[i + 1] === "R") &&
-      !isWordCharacter(masked[i - 1]) &&
-      !isWordCharacter(masked[i + 2])
-    ) {
+    if (isOrTokenAt(masked, i)) {
       disjunctionDepths.push(depth);
     }
   }

@@ -303,6 +303,17 @@ export function hasRetentionTTL(engineFull: string): boolean {
   return engineFull.includes("_retention_days");
 }
 
+/** Whether this table should get the retention-only TTL rewrite (no cold storage). */
+function isRetentionOnlyEligible(
+  retentionTTLExpr: string | null,
+  tableConfig: TableTTLEntry,
+  engineFull: string,
+): boolean {
+  if (!retentionTTLExpr) return false;
+  if (!RETENTION_TTL_MANAGED_TABLES.includes(tableConfig.table)) return false;
+  return !hasRetentionTTL(engineFull);
+}
+
 interface ReconcileOptions {
   connectionUrl?: string;
   database?: string;
@@ -378,11 +389,7 @@ export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void
       // so collapse to the retention-only branch in both cases.
       if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-        if (
-          retentionTTLExpr &&
-          RETENTION_TTL_MANAGED_TABLES.includes(tableConfig.table) &&
-          !hasRetentionTTL(tableInfo.engine_full)
-        ) {
+        if (isRetentionOnlyEligible(retentionTTLExpr, tableConfig, tableInfo.engine_full)) {
           // No ON CLUSTER: whenever a cluster is configured the database uses
           // the Replicated engine (enforced in goose.ts), which auto-replicates
           // DDL to every replica via Keeper. Adding ON CLUSTER on a table inside

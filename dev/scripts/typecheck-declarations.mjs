@@ -20,10 +20,10 @@ function projectFrom(value) {
   if (typeof value !== "string" || !value.startsWith(".")) return value;
 
   const target = resolve(process.env.INIT_CWD ?? root, value);
-
-  return existsSync(target) && statSync(target).isDirectory()
-    ? join(target, "tsconfig.json")
-    : target;
+  if (!existsSync(target)) return target;
+  const stats = statSync(target);
+  if (!stats.isDirectory()) return target;
+  return join(target, "tsconfig.json");
 }
 
 const solution = projectFrom(

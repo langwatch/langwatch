@@ -114,7 +114,10 @@ function readCommandPath({
 	recognizes: (value: string) => boolean;
 }): { value: string; next: number } {
 	const first = args[index] ?? "";
-	if (recognizes(first) || !/^(?:\/|[A-Za-z]:\/)/.test(first)) {
+	if (recognizes(first)) {
+		return { value: first, next: index + 1 };
+	}
+	if (!/^(?:\/|[A-Za-z]:\/)/.test(first)) {
 		return { value: first, next: index + 1 };
 	}
 	let candidate = "";
@@ -169,7 +172,11 @@ function skipRuntimeOptions({
 		if (option === "--") return index + 1;
 		const name = option.split("=")[0]!;
 		if (!process.allowedNodeEnvironmentFlags.has(name)) return undefined;
-		if (!RUNTIME_VALUE_OPTIONS.has(name) || option.includes("=")) {
+		if (!RUNTIME_VALUE_OPTIONS.has(name)) {
+			index += 1;
+			continue;
+		}
+		if (option.includes("=")) {
 			index += 1;
 			continue;
 		}

@@ -326,7 +326,8 @@ export const findGraphResidue = ({ files, workspace, graph }) => {
 
   const findings = [];
   for (const file of files) {
-    if (TEST.test(file) || isDeclaredRoot(file, workspace)) continue;
+    if (TEST.test(file)) continue;
+    if (isDeclaredRoot(file, workspace)) continue;
     if (live.has(file)) continue;
     const importers = [...(importedBy.get(file) ?? [])];
     if (underTest.has(file)) {
@@ -456,7 +457,8 @@ const publishes = ({ surface, file, name }) => {
 const declarationSites = ({ files, workspace, readFile }) => {
   const byKey = new Map();
   for (const file of files) {
-    if (TEST.test(file) || DISCOVERED.test(file)) continue;
+    if (TEST.test(file)) continue;
+    if (DISCOVERED.test(file)) continue;
     const pkg = packageOf(file, workspace);
     for (const { name, line } of declarationsIn(readFile(join(ROOT, file)))) {
       const key = `${pkg}|${name}`;
@@ -841,7 +843,9 @@ const parseArguments = (argv) => {
 
 const runDetectors = ({ only, files, workspace, graph, known }) => {
   const findings = [];
-  if (only.has("orphan") || only.has("test-only")) {
+  if (only.has("orphan")) {
+    findings.push(...findGraphResidue({ files, workspace, graph }));
+  } else if (only.has("test-only")) {
     findings.push(...findGraphResidue({ files, workspace, graph }));
   }
   if (only.has("re-export")) findings.push(...findReExportShims({ files, workspace }));

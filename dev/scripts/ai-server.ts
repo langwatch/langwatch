@@ -253,7 +253,14 @@ const server = createServer(async (req, res) => {
       console.error(`[${timestamp}] 500 Generation error:`, errorMessage);
 
       // Check for common OpenAI errors
-      if (errorMessage.includes("401") || errorMessage.includes("invalid_api_key")) {
+      if (errorMessage.includes("401")) {
+        jsonResponse(res, 401, {
+          error: "Unauthorized",
+          message: "Invalid OpenAI API key",
+        });
+        return;
+      }
+      if (errorMessage.includes("invalid_api_key")) {
         jsonResponse(res, 401, {
           error: "Unauthorized",
           message: "Invalid OpenAI API key",

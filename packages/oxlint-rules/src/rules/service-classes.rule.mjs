@@ -61,13 +61,11 @@ export const serviceClassesRule = defineRule({
               }
             }
           }
-          if (
-            exported &&
-            declaration.type === "ClassDeclaration" &&
-            declaration.id?.name.endsWith("Service")
-          ) {
-            classes.push(declaration);
-          }
+          if (!exported) continue;
+          if (declaration.type !== "ClassDeclaration") continue;
+          const className = declaration.id?.name;
+          if (!className?.endsWith("Service")) continue;
+          classes.push(declaration);
         }
         if (classes.length === 0) {
           context.report({ node, messageId: "missing" });

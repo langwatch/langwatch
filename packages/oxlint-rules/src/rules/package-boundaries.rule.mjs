@@ -307,7 +307,8 @@ export const boundaryRule = defineRule({
           target.pkg.role === "web" &&
           classification.role === "web" &&
           /^\.\/surfaces\/[^/]+$/.test(subpath);
-        if (!target.pkg.exports.has(subpath)) {
+        const targetExports = target.pkg.exports;
+        if (!targetExports.has(subpath)) {
           context.report({
             node,
             messageId: "sealedExports",

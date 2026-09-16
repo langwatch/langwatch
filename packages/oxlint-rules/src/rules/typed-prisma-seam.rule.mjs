@@ -45,7 +45,8 @@ export const typedPrismaSeamRule = defineRule({
   },
   create(context, file) {
     if (!SEAM_PATH.test(file.workspacePath)) return {};
-    if (typedPrismaSeamBaseline(context.cwd).has(file.workspacePath)) return {};
+    const baseline = typedPrismaSeamBaseline(context.cwd);
+    if (baseline.has(file.workspacePath)) return {};
 
     return {
       Program() {

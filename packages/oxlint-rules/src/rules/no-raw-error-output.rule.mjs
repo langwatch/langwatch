@@ -24,15 +24,11 @@ function isErrorishArgument(node) {
 }
 
 function consoleMethod(callee) {
-  if (
-    callee.type !== "MemberExpression" ||
-    callee.computed ||
-    callee.object.type !== "Identifier" ||
-    callee.object.name !== "console" ||
-    callee.property.type !== "Identifier"
-  ) {
-    return undefined;
-  }
+  if (callee.type !== "MemberExpression") return undefined;
+  if (callee.computed) return undefined;
+  if (callee.object.type !== "Identifier") return undefined;
+  if (callee.object.name !== "console") return undefined;
+  if (callee.property.type !== "Identifier") return undefined;
   return callee.property.name;
 }
 

@@ -288,7 +288,8 @@ const IDENTIFIER_TOKEN_CHAR = /[A-Za-z0-9_-]/;
  * match holding whitespace (`+31 6 12345678`) covers more than one token, so never inside one.
  */
 function insideIdentifierToken(text: string, span: Span): boolean {
-  if (HAS_WHITESPACE.test(text.slice(span.start, span.end))) return false;
+  const matchedText = text.slice(span.start, span.end);
+  if (HAS_WHITESPACE.test(matchedText)) return false;
   const floor = Math.max(0, span.start - MAX_IDENTIFIER_LENGTH);
   let start = span.start;
   while (start > floor && IDENTIFIER_TOKEN_CHAR.test(text[start - 1]!)) start--;
