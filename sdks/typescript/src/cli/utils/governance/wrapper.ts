@@ -77,11 +77,70 @@ const PI_SESSION_POLL_MS = 2_500;
  * mount would hold the terminal open forever over a capture that is
  * explicitly allowed to fail.
  *
- * Ten seconds is the legitimate worst case rather than a guess: a tick's post
- * with up to five seconds left to time out, then the sweep's own post with
- * five of its own. Anything past that is not slow, it is stuck.
+ * Ten seconds covers the legitimate case rather than being a guess: a tick's
+ * post with up to five seconds left to time out, then the sweep's own post
+ * with five of its own. Anything past that is not slow, it is stuck.
+ *
+ * Since {@link drainPiCapture} the sweep is a loop rather than one pass, so on
+ * a resumed session with a large unread prefix ten seconds is a budget rather
+ * than a ceiling the work is guaranteed to fit inside. That is the deliberate
+ * trade — the shell is waiting, and the bound the user pays must not grow with
+ * the size of a file they resumed — and running out of it is not silent: the
+ * timeout line below says the sweep was cut short and the unread-bytes line
+ * beside it says how much of the file went unread.
  */
 const PI_FINAL_SWEEP_DEADLINE_MS = 10_000;
+
+/**
+ * Read every session file to its end, or until a pass stops making headway.
+ *
+ * One `harvest()` is not one file. The reader consumes a bounded window per
+ * file per pass — `pi-session-stream.ts:98` caps it at 8 MiB and
+ * `pi-session-stream.ts:319` takes `min(size, offset + cap)` — so a resumed
+ * session whose file carries a large historical prefix can spend a whole pass
+ * inside rows it has already seen. That pass emits nothing, posts nothing, and
+ * leaves the turns the user just produced sitting unread past the window. The
+ * single sweep this replaced would then exit on it, and the next run's row
+ * filter (`pi-capture.ts:238`, `event.timeUnixMs >= sinceMs`) is later than
+ * those turns, so nothing ever picks them up again.
+ *
+ * Why the loop cannot be driven by the event count: a window that lands
+ * entirely on history legitimately returns zero events while bytes remain, so
+ * "this pass emitted nothing" and "this file is finished" are different
+ * questions and only the second one ends a drain. {@link PiCapture.unreadBytes}
+ * answers the second directly, off the size each pass already stat'd.
+ *
+ * Why it cannot spin: a pass that fails to shrink the backlog ends it. That
+ * covers the cases where progress is impossible rather than slow — a file that
+ * became unreadable between the `stat` and the read, a window with no complete
+ * line in it — and also the case where progress is real but pi is still
+ * appending faster than we read, where stopping is the right answer anyway
+ * because the shell is already waiting on us.
+ *
+ * Deliberately NOT given a deadline of its own. It runs inside the existing
+ * race against PI_FINAL_SWEEP_DEADLINE_MS, which is what keeps the total bound
+ * the user pays unchanged; a second timer would silently double it.
+ *
+ * Exported for its own test rather than only through `runWrapped`. The property
+ * that matters most here is that it terminates, and a run through the wrapper
+ * cannot fail on a non-terminating loop: the deadline above would cut it off at
+ * ten seconds and the run would look merely slow. Driving it against a capture
+ * whose backlog never shrinks is the only arrangement in which a missing guard
+ * fails rather than hides.
+ */
+export async function drainPiCapture(capture: PiCapture): Promise<void> {
+	// Infinity rather than a first reading, so the first pass always runs. That
+	// is what makes this identical to the single `harvest()` it replaced on the
+	// common path: a file consumed to its end reports zero and the loop is over
+	// after one iteration.
+	let unread = Number.POSITIVE_INFINITY;
+	for (;;) {
+		await capture.harvest();
+		const remaining = capture.unreadBytes();
+		if (remaining === 0 || remaining >= unread) return;
+		unread = remaining;
+	}
+}
 
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
@@ -977,7 +1036,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 						// Resolved already when no tick is running, so this is a no-op
 						// in the common case and a real wait in the one that matters.
 						await piInFlight;
-						await piCapture.harvest();
+						await drainPiCapture(piCapture);
 					})(),
 					new Promise<void>((resolve) => {
 						// No `.unref()` here, unlike both intervals in this function
@@ -1018,6 +1077,25 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			process.stderr.write(
 				`${lwTag()} ${undelivered} pi turn${undelivered === 1 ? "" : "s"} ` +
 					`could not be sent to LangWatch and were not recorded.\n`,
+			);
+		}
+		// A third, independent thing that can be true, and the only one of the
+		// three the counters above cannot see. Pending and dropped both count
+		// events the reader already produced; this counts the file it never got
+		// to, which has produced no events at all. A drain that ended with bytes
+		// left — because the deadline cut it off, or because a pass stopped
+		// making headway — has left the user's last turns on disk, and they are
+		// not deferred to the next run: `readTurnsSince` keeps only rows at or
+		// after that run's start (`pi-capture.ts:238`), and these are older than
+		// it by then. Saying nothing here would rebuild the exact silent loss
+		// this drain was added to close, one door along.
+		const unread = piCapture.unreadBytes();
+		if (unread > 0) {
+			process.stderr.write(
+				`${lwTag()} pi session capture stopped ${unread} byte` +
+					`${unread === 1 ? "" : "s"} short of the end of this session's ` +
+					`file; the turns in that remainder were not read and will not be ` +
+					`recorded.\n`,
 			);
 		}
 	}

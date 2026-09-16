@@ -693,3 +693,142 @@ describe("given a default pi install, where pi writes below the sessions root", 
     };
   }
 });
+
+/**
+ * The resumed session whose last turn is past the first pass's window.
+ *
+ * This is the shape the exit sweep used to lose, reproduced at the size the
+ * window is injected down to rather than the eight megabytes it takes in
+ * production. A `pi --session` resume hands capture a file that already holds a
+ * long conversation; the run's own turn is appended at the end of it. One pass
+ * reads a window from the top — all of it historical, all of it dropped by the
+ * row clock in `readTurnsSince` — so it posts nothing and both counters stay at
+ * zero, while the turn the user just produced is still on disk.
+ *
+ * Unbound: no scenario describes the size of a pass. What the spec covers is
+ * the turn arriving, which is what the second test asserts.
+ */
+describe("given a resumed session whose current turn is past the first window", () => {
+  /** Old enough that the row clock rejects it, whatever `sinceMs` a test picks. */
+  const HISTORY_TIME_ISO = "2026-09-14T09:00:00.000Z";
+  const CURRENT_TIME_ISO = "2026-09-14T10:00:05.000Z";
+  /** Between the two, so history is out of the run and the last turn is in. */
+  const RUN_STARTED_MS = Date.parse("2026-09-14T09:30:00.000Z");
+
+  /**
+   * A file of historical rows with one current turn on the end, and the window
+   * width to read it under.
+   *
+   * The width is derived from the longest line rather than picked, so every row
+   * fits inside a window and the file is crossed by the cap alone. A width
+   * below the longest row would instead trip the long-row fallback, which reads
+   * to the end of the file in one go and would finish this session on the pass
+   * that is supposed to stop short of it — a fixture that passes without
+   * exercising anything.
+   *
+   * The production window is 8 MiB and the behaviour is the same at either
+   * size, because the window is a byte count and knows nothing of which one it
+   * was given.
+   */
+  async function writeResumedSession(
+    path: string,
+  ): Promise<{ maxBytesPerRead: number }> {
+    const pad = "h".repeat(400);
+    const history = ["aaaaaaaa", "bbbbbbbb", "cccccccc", "dddddddd"].map(
+      (rowId) =>
+        messageLine(rowId, HISTORY_TIME_ISO).replace('"hi"', `"hi${pad}"`),
+    );
+    const contents =
+      `${JSON.stringify({
+        type: "session",
+        id: SESSION_ID,
+        version: 3,
+        createdAt: "2026-09-14T08:00:00.000Z",
+      })}\n` +
+      `${history.join("")}${messageLine("eeeeeeee", CURRENT_TIME_ISO)}`;
+    await writeFile(path, contents, "utf8");
+    const longestLine = Math.max(
+      ...contents
+        .trimEnd()
+        .split("\n")
+        .map((line) => line.length + 1),
+    );
+    return { maxBytesPerRead: longestLine + 1 };
+  }
+
+  describe("when only one pass is made", () => {
+    it("posts nothing, holds nothing, drops nothing, and says bytes are unread", async () => {
+      const path = join(dir, "resumed.jsonl");
+      const { maxBytesPerRead } = await writeResumedSession(path);
+
+      const bodies: string[] = [];
+      const fetchImpl = vi.fn(
+        async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        },
+      ) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: RUN_STARTED_MS,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+        maxBytesPerRead,
+      });
+
+      expect(await capture.harvest()).toBe(0);
+
+      // Every counter a caller had before this change reads clean, which is the
+      // defect: nothing here distinguishes "the session is fully captured" from
+      // "the user's last turn is still on disk".
+      expect(bodies).toEqual([]);
+      expect(capture.pendingCount()).toBe(0);
+      expect(capture.droppedCount()).toBe(0);
+      // The one counter that does.
+      expect(capture.unreadBytes()).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when passes continue while bytes remain unread", () => {
+    it("posts the turn the first pass never reached", async () => {
+      const path = join(dir, "resumed.jsonl");
+      const { maxBytesPerRead } = await writeResumedSession(path);
+
+      const bodies: string[] = [];
+      const fetchImpl = vi.fn(
+        async (_url: unknown, init?: { body?: string }) => {
+          if (init?.body) bodies.push(init.body);
+          return { ok: true, status: 200 } as Response;
+        },
+      ) as unknown as typeof fetch;
+
+      const capture = createPiCapture({
+        sinceMs: RUN_STARTED_MS,
+        sessionsDir: dir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+        maxBytesPerRead,
+      });
+
+      let posted = 0;
+      let passes = 0;
+      // Bounded rather than `while`, so a signal that never reaches zero fails
+      // this test instead of hanging it.
+      for (let pass = 0; pass < 40; pass++) {
+        passes++;
+        posted += await capture.harvest();
+        if (capture.unreadBytes() === 0) break;
+      }
+
+      // The window has to have actually bitten, or this is one ordinary pass
+      // and the loop it is here to justify was never needed.
+      expect(passes).toBeGreaterThan(1);
+      expect(posted).toBe(1);
+      expect(capture.unreadBytes()).toBe(0);
+      expect(bodies.join("")).toContain(SESSION_ID);
+    });
+  });
+});

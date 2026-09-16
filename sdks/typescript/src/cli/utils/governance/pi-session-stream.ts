@@ -52,7 +52,9 @@
  * passes are small because pi has appended little, but the first pass on a
  * resumed session starts at zero and would otherwise size itself to the file.
  * See {@link MAX_READ_BYTES} — the remainder is not skipped, it is the next
- * pass's window.
+ * pass's window. Which means a caller with a finite number of passes left, as
+ * the wrapper's exit path has, cannot assume one pass finished the file; see
+ * {@link PiSessionStream.unreadBytes}, which is what tells it.
  *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
@@ -115,6 +117,23 @@ interface FileCursor {
    */
   rowsConsumed: number;
   /**
+   * Bytes this file had past {@link FileCursor.offset} when the last pass
+   * finished with it. Zero means the pass reached the end of the file.
+   *
+   * Recorded rather than derived on demand because deriving it would mean a
+   * second `stat` of every file, on a path whose whole job is to be cheap
+   * enough to run every 2.5 seconds. The pass already has the size it read
+   * against, so remembering the subtraction costs a number per file.
+   *
+   * Counted in bytes rather than kept as a "there is more" flag on purpose.
+   * The caller that needs this — the wrapper's exit drain, `wrapper.ts:131` —
+   * loops until the file is consumed, and a loop needs to tell "this pass made
+   * progress" from "this pass moved nothing", which two `true`s cannot say. A
+   * pass that consumes a torn line's worth of bytes and a pass that consumes
+   * nothing at all are the same boolean and different numbers.
+   */
+  unreadBytes: number;
+  /**
    * Where this session came from, resolved once — on the pass that first read
    * the header — and reused by every later pass. `undefined` means not yet
    * resolved, which is not the same as a resolved absence: resolving costs a
@@ -162,6 +181,24 @@ export interface PiSessionStream {
    * arrived with only half a line of new bytes on disk.
    */
   read(path: string): Promise<PiTurnEvent[]>;
+  /**
+   * Bytes every file this stream has read still has past the point that file's
+   * last pass reached, summed. Zero when every file has been consumed to its
+   * end.
+   *
+   * This is the only honest end-of-file signal the reader can give, and the
+   * reason it has to exist is that the obvious substitute is wrong: a pass can
+   * emit zero events and still be nowhere near the end. A window that lands
+   * entirely inside a resumed session's historical rows finds every one of them
+   * already in the seen-set, emits nothing, and leaves the rest of the file
+   * unread — see {@link MAX_READ_BYTES}, a pass reads a window rather than the
+   * unread range. A caller that stopped on "no events" would stop there.
+   *
+   * Only files this stream has been offered are counted; a file it has never
+   * been handed has no cursor and contributes nothing, which is correct — the
+   * reader is not the thing that decides which files are in scope.
+   */
+  unreadBytes(): number;
 }
 
 /**
@@ -343,6 +380,12 @@ export function createPiSessionStream({
   const seen = new Set<string>();
 
   return {
+    unreadBytes(): number {
+      let total = 0;
+      for (const cursor of cursors.values()) total += cursor.unreadBytes;
+      return total;
+    },
+
     async read(path: string): Promise<PiTurnEvent[]> {
       let size: number;
       try {
@@ -350,6 +393,14 @@ export function createPiSessionStream({
       } catch {
         // No file, or one we may not read. Both are ordinary (ADR-132 §2) and
         // neither is worth an error on a capture path.
+        //
+        // A file we cannot stat has no retrievable bytes, so any backlog an
+        // earlier pass recorded against it is retired here. Leaving the old
+        // number standing would have a deleted session claim unread content
+        // forever, and the wrapper's exit drain would keep calling a pass that
+        // cannot possibly shrink it.
+        const known = cursors.get(path);
+        if (known) known.unreadBytes = 0;
         return [];
       }
 
@@ -359,6 +410,7 @@ export function createPiSessionStream({
           offset: 0,
           header: null,
           rowsConsumed: 0,
+          unreadBytes: 0,
           lineage: undefined,
           isLineageResolved: false,
         };
@@ -371,6 +423,21 @@ export function createPiSessionStream({
         cursor,
         maxBytesPerRead,
       });
+      // Here and nowhere else, because this is where the offset stops moving:
+      // `readCompleteLines` owns every byte decision above (the replaced-file
+      // reset, the window, the torn tail, the long-row fallback that reads past
+      // the cap), and nothing below it advances the cursor. Recording before the
+      // early returns is what keeps the number true on the paths that give up —
+      // a window that yielded no complete line, or a chunk with no session
+      // header — where bytes may still be sitting unread on disk.
+      //
+      // Clamped, though the subtraction cannot go negative as the code stands:
+      // `readCompleteLines` rewinds the offset to zero whenever `size` is below
+      // it (:310) and then advances it by at most `size - offset`. The clamp is
+      // there so an edit to that branch degrades into an over-read rather than
+      // into a negative that silently cancels another file's real backlog out
+      // of the sum.
+      cursor.unreadBytes = Math.max(0, size - cursor.offset);
       if (chunk === null) return [];
 
       const parsed = parsePiSessionFile(chunk);

@@ -12,7 +12,7 @@
  *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
-import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -103,7 +103,8 @@ vi.mock("../../spinner", () => ({
 // so the mocks are already in place, and the repo bans inline `import()`
 // outside the CLI's own boot path.
 import { resolveWrapperMode } from "../wrapper-mode";
-import { runWrapped } from "../wrapper";
+import { drainPiCapture, runWrapped } from "../wrapper";
+import type { PiCapture } from "../pi-capture";
 
 const OWN_ID = "11111111-1111-4111-8111-111111111111";
 const PARENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -158,7 +159,7 @@ function assistantRow(id: string): string {
  * of `posted`, and each one announces itself somewhere else: a run that never
  * reached the final sweep leaves a non-zero code in `exitCalls`; capture that
  * was never started for want of an endpoint says so on stderr
- * (`wrapper.ts:873`); a sweep cut off by its deadline says so too
+ * (`wrapper.ts:936`); a sweep cut off by its deadline says so too
  * (PI_FINAL_SWEEP_DEADLINE_MS). Without them, a failure here reads
  * `expected '' to contain ...` and names none of the three - which is exactly
  * what one CI-only failure of this file left behind, and the reason the cause
@@ -649,6 +650,255 @@ describe("given a pi session launched through the wrapper", () => {
 
       expect(posted).toEqual([]);
       expect(stderrText()).toContain("pi session capture is off");
+    });
+  });
+});
+
+/**
+ * The exit sweep reads to the end of the file, not to the end of one window.
+ *
+ * These two are the only tests in the suite that write a session file larger
+ * than the reader's real window, and they have to: the window is
+ * `pi-session-stream.ts:98`, 8 MiB, and the wrapper does not expose an override
+ * for it. Everything below the wrapper is covered against an injected window in
+ * `pi-capture.unit.test.ts`; what only a wrapper test can fail on is whether
+ * the exit path itself keeps reading, and the exit path reads through the real
+ * cap.
+ *
+ * The shape is a `pi --session` resume: a long conversation already on disk,
+ * this run's turn appended to the end of it. One pass consumes a window of pure
+ * history, whose rows the row clock in `readTurnsSince` drops as another run's
+ * work, so it posts nothing at all — and the turn the user just produced is
+ * past that window. A single-pass sweep exits there, and the next run's
+ * `sinceMs` is later than that turn, so nothing picks it up afterwards.
+ */
+describe("given a resumed pi session larger than one pass can read", () => {
+  /** The real cap in `pi-session-stream.ts`, which the wrapper cannot override. */
+  const READER_WINDOW_BYTES = 8 * 1024 * 1024;
+
+  /** A turn from a previous conversation: before this run, so capture drops it. */
+  function historicalRow(id: string, pad: string): string {
+    const then = "2026-01-02T03:04:05.000Z";
+    return JSON.stringify({
+      type: "message",
+      id,
+      parentId: null,
+      timestamp: then,
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: `old${pad}` }],
+        timestamp: Date.parse(then),
+        model: "openai/gpt-5-mini",
+      },
+    });
+  }
+
+  /**
+   * `count` rows of history, comfortably past the window between them.
+   *
+   * Built as one string and written once: the point is a file whose first
+   * window ends inside it, and how it got that size is not the subject.
+   */
+  function historyLines({
+    count,
+    startAt,
+  }: {
+    count: number;
+    startAt: number;
+  }): string {
+    const pad = "h".repeat(4_000);
+    const lines: string[] = [];
+    for (let index = 0; index < count; index++) {
+      // Ids are eight hex characters, which is what the reader keys on.
+      lines.push(historicalRow((startAt + index).toString(16).padStart(8, "0"), pad));
+    }
+    return `${lines.join("\n")}\n`;
+  }
+
+  describe("when the run's own turn sits past the first window", () => {
+    it("keeps reading until the file is consumed and posts that turn", async () => {
+      child.state.writes = async () => {
+        // Header, then more than a window of history, then this run's turn.
+        // 2,200 rows of just over 4 KiB each is a little over 9 MiB.
+        const contents =
+          `${headerLine({ id: OWN_ID })}\n` +
+          `${historyLines({ count: 2_200, startAt: 0x10000000 })}` +
+          `${assistantRow("99999999")}\n`;
+        await writeFile(join(dir, "own.jsonl"), contents, "utf8");
+        expect((await stat(join(dir, "own.jsonl"))).size).toBeGreaterThan(
+          READER_WINDOW_BYTES,
+        );
+      };
+
+      await launchPi();
+
+      // Exactly the one turn that belongs to this run. The history is dropped
+      // by the row clock, so a count of 1 also says the drain did not start
+      // re-sending somebody else's conversation.
+      expect(recordsSent(), why()).toBe(1);
+      // Counted as records rather than matched on the row id, because a row id
+      // is not something pi's events carry — the same reason the poll tests
+      // above count them.
+      expect(wire(), why()).toContain(OWN_ID);
+      // Nothing left behind, so the exit report stays quiet.
+      expect(stderrText()).not.toContain("short of the end");
+    }, 60_000);
+  });
+
+  describe("when the sweep is cut off with the file still unread", () => {
+    /**
+     * Giving up quietly here would rebuild the bug one door along.
+     *
+     * The counters the exit report already had cannot see this: a turn still
+     * on disk was never read, so it was never pending and never dropped, and
+     * a run that abandoned half a session file would print the same nothing
+     * as a run that captured all of it.
+     *
+     * Arranged as a post that never settles, the same stand-in for an
+     * unbounded wait the deadline test above uses. The current turn is at the
+     * TOP of the file this time, so the first pass has something to post and
+     * wedges on it with the rest of the file still unread — a hang on the last
+     * pass would leave nothing unread and prove nothing.
+     *
+     * Slow on purpose: it measures the ten second deadline, so it costs ten
+     * seconds. See PI_FINAL_SWEEP_DEADLINE_MS.
+     *
+     * Unbound: no scenario describes a sweep that runs out of time.
+     */
+    it("says how much of the session file it never read", async () => {
+      vi.mocked(globalThis.fetch).mockImplementation((async (
+        _url: unknown,
+        init?: { body?: string },
+      ) => {
+        if (init?.body) posted.push(init.body);
+        // Bound to a name so the dropped callbacks read as the point rather
+        // than as an omission, exactly as in the deadline test above.
+        const neverSettles = new Promise<Response>(() => undefined);
+        return await neverSettles;
+      }) as unknown as typeof fetch);
+
+      child.state.writes = async () => {
+        const contents =
+          `${headerLine({ id: OWN_ID })}\n` +
+          `${assistantRow("88888888")}\n` +
+          `${historyLines({ count: 2_200, startAt: 0x20000000 })}`;
+        await writeFile(join(dir, "own.jsonl"), contents, "utf8");
+        expect((await stat(join(dir, "own.jsonl"))).size).toBeGreaterThan(
+          READER_WINDOW_BYTES,
+        );
+      };
+
+      const startedAt = Date.now();
+      await launchPi();
+      const waited = Date.now() - startedAt;
+
+      // Bounded rather than forever, on the same three-times margin the
+      // deadline test uses: a loaded runner can add seconds to a ten second
+      // wait without the code under test being wrong.
+      expect(waited).toBeLessThan(30_000);
+      expect(stderrText()).toContain("pi session capture did not finish in");
+      // The line the counters could not have produced. Matched on the
+      // sentence rather than the byte figure, which is a property of the
+      // fixture and not a behaviour this test should be able to veto.
+      expect(stderrText()).toContain("short of the end of this session's file");
+      expect(stderrText()).toContain("will not be recorded");
+    }, 60_000);
+  });
+});
+
+/**
+ * The drain stops, whatever the file underneath it does.
+ *
+ * Driven against a stand-in capture rather than through `runWrapped`, because
+ * the claim is that the loop ends and a run through the wrapper cannot fail on
+ * a loop that does not: the ten second deadline would cut it off and the run
+ * would read as slow rather than as wrong. The stand-in is the whole of the
+ * `PiCapture` contract, so a future field cannot be quietly ignored here.
+ *
+ * Unbound: no scenario describes the number of passes a sweep makes.
+ */
+describe("draining capture at exit", () => {
+  /** A capture that reports whatever backlog a test tells it to. */
+  function fakeCapture(unread: () => number): {
+    capture: PiCapture;
+    harvests: () => number;
+  } {
+    let harvests = 0;
+    return {
+      harvests: () => harvests,
+      capture: {
+        harvest: async () => {
+          harvests++;
+          return 0;
+        },
+        pendingCount: () => 0,
+        droppedCount: () => 0,
+        unreadBytes: unread,
+      },
+    };
+  }
+
+  describe("given a file that is fully read on the first pass", () => {
+    it("makes exactly one pass, the way the single sweep it replaced did", async () => {
+      const { capture, harvests } = fakeCapture(() => 0);
+
+      await drainPiCapture(capture);
+
+      expect(harvests()).toBe(1);
+    });
+  });
+
+  describe("given a pass that consumes nothing", () => {
+    /**
+     * A backlog that does not move is the shape of a file that cannot be read
+     * at all — unreadable between the `stat` and the open, or a window holding
+     * no complete line.
+     *
+     * Measured with the guard deleted: the run does not fail, it hangs, and
+     * `--testTimeout=8000` does not rescue it. The loop only ever awaits
+     * already-resolved promises, so it drains the microtask queue without
+     * yielding to a timer, and vitest's own timeout never gets to fire. Two
+     * minutes produced no test result at all and the process had to be killed.
+     * So this asserts a pass count rather than a duration — a duration
+     * assertion is unreachable on a run that never reports.
+     */
+    it("stops instead of calling harvest again forever", async () => {
+      const { capture, harvests } = fakeCapture(() => 4_096);
+
+      await drainPiCapture(capture);
+
+      // One pass, then the pass that proves the first one moved nothing.
+      expect(harvests()).toBe(2);
+    });
+  });
+
+  describe("given a file pi is appending to faster than it is read", () => {
+    /**
+     * Stopping is the right answer, not a compromise: pi has already exited by
+     * the time this runs, so a growing file is another process's session, and
+     * the shell is waiting on us either way.
+     */
+    it("stops rather than chasing the end of the file", async () => {
+      let unread = 1_000;
+      const { capture, harvests } = fakeCapture(() => {
+        unread += 1_000;
+        return unread;
+      });
+
+      await drainPiCapture(capture);
+
+      expect(harvests()).toBe(2);
+    });
+  });
+
+  describe("given a file that takes several passes to finish", () => {
+    it("keeps going until nothing is left unread", async () => {
+      const remaining = [900, 600, 300, 0];
+      const { capture, harvests } = fakeCapture(() => remaining.shift() ?? 0);
+
+      await drainPiCapture(capture);
+
+      expect(harvests()).toBe(4);
     });
   });
 });

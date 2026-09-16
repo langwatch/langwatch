@@ -149,6 +149,21 @@ export interface PiCapture {
    * dropped never will be.
    */
   droppedCount(): number;
+  /**
+   * Bytes sitting on disk that {@link PiCapture.harvest} has not read yet,
+   * across every session file it has opened this run.
+   *
+   * Counted in bytes rather than in events because it measures what has NOT
+   * been read: an unread byte has no event yet, and the two counters above
+   * begin where this one ends. Both of them are blind to it — a turn still on
+   * disk was never pending and was never dropped — which is exactly why a
+   * caller deciding whether capture finished has to ask this as well.
+   *
+   * Non-zero at exit means turns the user just produced were left on disk, and
+   * they are lost rather than deferred: the next run's `sinceMs` is later than
+   * their timestamps, and `readTurnsSince` below drops every row older than it.
+   */
+  unreadBytes(): number;
 }
 
 /**
@@ -242,6 +257,12 @@ export interface PiCaptureOptions {
   /** Overridable so a test can fill the buffer without 20,000 events. */
   maxPending?: number;
   /**
+   * Passed straight to the reader. Overridable for the same reason it is there
+   * — see `PiSessionStreamOptions.maxBytesPerRead` — so a test can make a pass
+   * stop short of the end of a file without writing eight megabytes of one.
+   */
+  maxBytesPerRead?: number;
+  /**
    * Where the overflow notice goes. Defaults to stderr rather than to a no-op
    * on purpose: a caller that forgets to pass one still gets a loud drop.
    *
@@ -268,15 +289,20 @@ export function createPiCapture({
   scopeVersion = LANGWATCH_SDK_VERSION,
   fetchImpl,
   maxPending = MAX_PENDING_EVENTS,
+  maxBytesPerRead,
   warn = (message) => void process.stderr.write(message),
 }: PiCaptureOptions): PiCapture {
-  const stream = createPiSessionStream({ resolveLineage: resolvePiLineage });
+  const stream = createPiSessionStream({
+    resolveLineage: resolvePiLineage,
+    maxBytesPerRead,
+  });
   let pending: PiTurnEvent[] = [];
   let dropped = 0;
 
   return {
     pendingCount: () => pending.length,
     droppedCount: () => dropped,
+    unreadBytes: () => stream.unreadBytes(),
 
     async harvest(): Promise<number> {
       const paths = await sessionFilesTouchedSince({

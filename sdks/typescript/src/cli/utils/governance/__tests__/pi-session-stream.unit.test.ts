@@ -627,3 +627,275 @@ describe("given a lineage resolver that throws", () => {
     expect(names(second)).toEqual([PI_EVENT.API_REQUEST]);
   });
 });
+
+/**
+ * What the reader says is still on disk after a pass.
+ *
+ * The reason this is a question at all: one pass consumes one bounded window
+ * per file, so "the pass is over" and "the file is finished" are different
+ * facts, and the caller that has to stop somewhere — the wrapper's exit drain —
+ * can only tell them apart if the reader says which. The trap the whole block
+ * exists for is the first test: a window can land entirely on rows the reader
+ * has already recorded, emit nothing at all, and still be nowhere near the end
+ * of the file. A caller that read "no events" as "finished" would stop there
+ * and lose everything past the window.
+ *
+ * Unbound: the spec has no scenario for this, because it describes how much of
+ * a file a pass got through, which is not something a user can observe. What
+ * they observe is the last turns of a session arriving, which the wrapper suite
+ * asserts.
+ */
+describe("reporting what a pass left unread", () => {
+  describe("given a file consumed to its end", () => {
+    /**
+     * Both halves in one test on purpose. "Reports zero when finished" passes
+     * against a reader that reports zero always, which is the one wrong
+     * implementation this whole block has to exclude, so the pass that is NOT
+     * finished is asserted first and the zero only means something after it.
+     */
+    it("reports nothing unread, having reported the remainder before that", async () => {
+      const path = write(
+        "done.jsonl",
+        jsonl([
+          header(SESSION_A),
+          userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "p".repeat(300) }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "p".repeat(300) }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 400 });
+
+      await stream.read(path);
+      expect(stream.unreadBytes()).toBeGreaterThan(0);
+
+      for (let pass = 0; pass < 20; pass++) await stream.read(path);
+
+      expect(stream.unreadBytes()).toBe(0);
+    });
+  });
+
+  describe("given a window that falls entirely on rows already recorded", () => {
+    /**
+     * The whole reason the signal is bytes and not an event count.
+     *
+     * Two paths to one session is the cheapest way to manufacture the shape a
+     * resumed session has in production: a cursor at zero, in front of rows the
+     * stream has already seen. The pass reads a window of them, recognises
+     * every one, and returns an empty array — a return value indistinguishable
+     * from a file with nothing new in it, while the turn the user actually
+     * cares about sits past the window, unread.
+     */
+    it("reports bytes still unread even though the pass emitted no events", async () => {
+      const historical = [
+        header(SESSION_A),
+        userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "y".repeat(200) }),
+        assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "y".repeat(200) }),
+        userRow({ id: "aaaa0003", at: "2026-09-13T15:38:15.000Z", pad: "y".repeat(200) }),
+      ];
+      const seenPath = write("seen.jsonl", jsonl(historical));
+      const resumedPath = write(
+        "resumed.jsonl",
+        jsonl([
+          ...historical,
+          assistantRow({ id: "aaaa0009", at: "2026-09-13T15:39:00.000Z" }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 300 });
+
+      // Every historical row into the seen-set, under its own path and its own
+      // cursor, so the file below starts from zero with nothing new in front.
+      for (let pass = 0; pass < 20; pass++) await stream.read(seenPath);
+      expect(stream.unreadBytes()).toBe(0);
+
+      const firstPass = await stream.read(resumedPath);
+
+      expect(firstPass).toEqual([]);
+      // The trap: an empty pass that is not a finished file.
+      expect(stream.unreadBytes()).toBeGreaterThan(0);
+    });
+
+    it("delivers the tail turn on the later passes the window forces", async () => {
+      const historical = [
+        header(SESSION_A),
+        userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "y".repeat(200) }),
+        assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "y".repeat(200) }),
+        userRow({ id: "aaaa0003", at: "2026-09-13T15:38:15.000Z", pad: "y".repeat(200) }),
+      ];
+      const seenPath = write("seen.jsonl", jsonl(historical));
+      const resumedPath = write(
+        "resumed.jsonl",
+        jsonl([
+          ...historical,
+          assistantRow({ id: "aaaa0009", at: "2026-09-13T15:39:00.000Z" }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 300 });
+      for (let pass = 0; pass < 20; pass++) await stream.read(seenPath);
+
+      // Driven the way the wrapper's drain drives it: one pass unconditionally,
+      // then more for as long as the reader says bytes remain — rather than for
+      // as long as it is handing back events, which is the signal that stops
+      // one pass in and loses the turn below.
+      const events = [];
+      // Bounded rather than `while`, so a signal that never reaches zero fails
+      // this test instead of hanging it.
+      for (let pass = 0; pass < 40; pass++) {
+        events.push(...(await stream.read(resumedPath)));
+        if (stream.unreadBytes() === 0) break;
+      }
+
+      expect(names(events)).toEqual([PI_EVENT.API_REQUEST]);
+      expect(stream.unreadBytes()).toBe(0);
+    });
+  });
+
+  describe("given a file that grew after the pass that read it", () => {
+    /**
+     * The number is what the last pass measured, not a live reading of the
+     * file. That is deliberate — a live reading would cost a `stat` per call,
+     * on a signal the wrapper's drain asks for after every pass — and it is
+     * safe because the only caller reads it between passes of its own.
+     */
+    it("reports what the last pass measured until another pass looks", async () => {
+      const path = write(
+        "growing.jsonl",
+        jsonl([
+          header(SESSION_A),
+          userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "g".repeat(300) }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "g".repeat(300) }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 400 });
+      await stream.read(path);
+      const measured = stream.unreadBytes();
+      expect(measured).toBeGreaterThan(0);
+
+      appendFileSync(
+        path,
+        jsonl([userRow({ id: "aaaa0003", at: "2026-09-13T15:38:15.000Z" })]),
+      );
+
+      expect(stream.unreadBytes()).toBe(measured);
+      await stream.read(path);
+      expect(stream.unreadBytes()).not.toBe(measured);
+    });
+  });
+
+  describe("given a file pi replaced with a smaller one", () => {
+    /**
+     * The branch that rewinds the cursor to zero. Measured against the same
+     * migration the module note describes: the file is rewritten in place,
+     * smaller, keeping its rows. Without the rewind the subtraction would be
+     * against an offset past the end of the file, which is the one arrangement
+     * that could make it negative.
+     */
+    it("reports what is unread from the top of the replacement, never a negative", async () => {
+      const path = write(
+        "rewritten.jsonl",
+        jsonl([
+          header(SESSION_A),
+          userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "z".repeat(400) }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "z".repeat(400) }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 200 });
+      await stream.read(path);
+      expect(stream.unreadBytes()).toBeGreaterThan(0);
+
+      const smaller = jsonl([
+        header(SESSION_A),
+        userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z" }),
+      ]);
+      writeFileSync(path, smaller);
+
+      await stream.read(path);
+
+      expect(stream.unreadBytes()).toBeGreaterThanOrEqual(0);
+      expect(stream.unreadBytes()).toBeLessThan(smaller.length);
+    });
+  });
+
+  describe("given a row longer than one window", () => {
+    /**
+     * The fallback at the long-row branch reads past the cap, to the end of the
+     * file, rather than stalling. So the bytes it consumed are not the window's
+     * width, and a number derived from the cap instead of from the cursor would
+     * be wrong here by the length of the oversized row.
+     */
+    it("reports nothing unread once the oversized row has been consumed", async () => {
+      const path = write(
+        "long-row.jsonl",
+        jsonl([
+          header(SESSION_A),
+          userRow({
+            id: "aaaa0001",
+            at: "2026-09-13T15:38:13.000Z",
+            pad: "x".repeat(2_000),
+          }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z" }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 400 });
+
+      // The first pass gets as far as the header's newline and no further: the
+      // oversized row starts here, so this is the state the fallback resolves
+      // from and it has to read as unfinished.
+      await stream.read(path);
+      expect(stream.unreadBytes()).toBeGreaterThan(400);
+
+      for (let pass = 0; pass < 20; pass++) await stream.read(path);
+
+      expect(statSync(path).size).toBeGreaterThan(400);
+      expect(stream.unreadBytes()).toBe(0);
+    });
+  });
+
+  describe("given a file that is gone by the next pass", () => {
+    /**
+     * A file we cannot stat has no bytes anyone can still retrieve, so the
+     * backlog it was carrying is retired rather than left standing. Left
+     * standing it would make the wrapper's drain loop call a pass that cannot
+     * shrink it, and make the exit report claim unread turns in a session file
+     * that no longer exists.
+     */
+    it("stops claiming its bytes are unread", async () => {
+      const path = write(
+        "vanishing.jsonl",
+        jsonl([
+          header(SESSION_A),
+          userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "q".repeat(400) }),
+          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "q".repeat(400) }),
+        ]),
+      );
+      const stream = createPiSessionStream({ maxBytesPerRead: 200 });
+      await stream.read(path);
+      expect(stream.unreadBytes()).toBeGreaterThan(0);
+
+      rmSync(path);
+
+      expect(await stream.read(path)).toEqual([]);
+      expect(stream.unreadBytes()).toBe(0);
+    });
+  });
+
+  describe("given several files at different points", () => {
+    it("reports the sum across them", async () => {
+      const rows = (id: string) => [
+        header(id),
+        userRow({ id: "aaaa0001", at: "2026-09-13T15:38:13.000Z", pad: "w".repeat(400) }),
+        assistantRow({ id: "aaaa0002", at: "2026-09-13T15:38:14.000Z", pad: "w".repeat(400) }),
+      ];
+      const first = write("one.jsonl", jsonl(rows(SESSION_A)));
+      const second = write("two.jsonl", jsonl(rows(SESSION_B)));
+      const stream = createPiSessionStream({ maxBytesPerRead: 200 });
+
+      await stream.read(first);
+      const afterFirst = stream.unreadBytes();
+      await stream.read(second);
+
+      expect(afterFirst).toBeGreaterThan(0);
+      // Strictly greater, not merely non-zero: a reader that returned one
+      // file's figure instead of the total would pass a non-zero assertion.
+      expect(stream.unreadBytes()).toBeGreaterThan(afterFirst);
+    });
+  });
+});
