@@ -173,7 +173,14 @@ describe("resolving pi's session directory", () => {
       expect(resolved).not.toBe(join(home, ".pi", "agent", "sessions"));
     });
 
-    /** @scenario "A default pi launch is read from the folder pi makes for this project" */
+    /**
+     * The other half of the rule, and the reason the default cannot simply be
+     * "always append the project folder": pi applies the encoded folder only
+     * when it is choosing the directory itself. A directory the user named is
+     * the directory pi writes into, unchanged.
+     *
+     * @scenario "A session kept somewhere other than the default place is still found"
+     */
     it("keeps a named directory flat, the way pi uses it", async () => {
       const resolved = await resolvePiSessionDir({
         toolArgs: ["--session-dir", "/elsewhere/sessions"],

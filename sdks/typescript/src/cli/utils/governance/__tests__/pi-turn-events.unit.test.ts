@@ -63,10 +63,12 @@ function assistantRow({
   id,
   at,
   usage,
+  text = "xxxx",
 }: {
   id: string;
   at: string;
   usage?: unknown;
+  text?: string;
 }) {
   return {
     type: "message",
@@ -75,7 +77,7 @@ function assistantRow({
     timestamp: at,
     message: {
       role: "assistant",
-      content: [{ type: "text", text: "xxxx" }],
+      content: [{ type: "text", text }],
       api: "anthropic-messages",
       provider: "anthropic",
       model: "claude-opus-4-6",
@@ -86,7 +88,15 @@ function assistantRow({
   };
 }
 
-function toolResultRow({ id, at }: { id: string; at: string }) {
+function toolResultRow({
+  id,
+  at,
+  text = "xxxxx",
+}: {
+  id: string;
+  at: string;
+  text?: string;
+}) {
   return {
     type: "message",
     id,
@@ -96,7 +106,7 @@ function toolResultRow({ id, at }: { id: string; at: string }) {
       role: "toolResult",
       toolCallId: "aaaabbbb",
       toolName: "read",
-      content: [{ type: "text", text: "xxxxx" }],
+      content: [{ type: "text", text }],
       isError: false,
       timestamp: Date.parse(at),
     },
@@ -135,24 +145,44 @@ describe("building pi's turn events", () => {
      * scenario claimed the conversation was captured: the events carry the
      * shape of the turn and none of its text.
      *
-     * Every distinctive string the rows hold is searched for across the whole
-     * serialised payload, not across the attributes a reader thought to check,
-     * so a future field that happens to carry text fails this without anyone
-     * remembering to extend the list. Lengths are asserted alongside, because
-     * "no text" must not be satisfied by dropping the turn.
+     * All three texts are planted HERE and asserted from the same constants,
+     * so the assertion cannot drift away from the fixture. The first version of
+     * this test hard-coded the assistant and tool bodies as the literal "xxxx"
+     * copied out of the helpers, and its comment claimed that made a future
+     * leak fail without anyone remembering to extend a list. That was false and
+     * was caught by running it: renaming the assistant helper's text and then
+     * leaking it left all eleven tests green, because the assertion was still
+     * searching for a string the payload no longer had any reason to contain.
+     * A guard whose needle is not the fixture's own value asserts nothing once
+     * the fixture moves.
+     *
+     * Lengths and names are asserted alongside, because "no text" must not be
+     * satisfiable by dropping the turn.
      *
      * @scenario "A captured pi session records every turn in the order pi wrote them"
      */
     it("records each turn's speaker, timing and usage, and none of its text", () => {
+      const promptText = "SECRETPROMPT";
+      const replyText = "PRIVATEREPLY";
+      const toolText = "TOOLOUTPUTBODY";
+
       const events = buildPiTurnEvents({
         session: sessionOf([
           userRow({
             id: "aaaa0001",
             at: "2026-09-13T15:39:23.074Z",
-            text: "SECRETPROMPT",
+            text: promptText,
           }),
-          assistantRow({ id: "aaaa0002", at: "2026-09-13T15:39:25.000Z" }),
-          toolResultRow({ id: "aaaa0003", at: "2026-09-13T15:39:26.000Z" }),
+          assistantRow({
+            id: "aaaa0002",
+            at: "2026-09-13T15:39:25.000Z",
+            text: replyText,
+          }),
+          toolResultRow({
+            id: "aaaa0003",
+            at: "2026-09-13T15:39:26.000Z",
+            text: toolText,
+          }),
         ]),
       });
 
@@ -160,16 +190,16 @@ describe("building pi's turn events", () => {
         buildPiEventsPayload({ events, scopeVersion: "1.2.3" }),
       );
 
-      expect(serialised).not.toContain("SECRETPROMPT");
-      // "xxxx" and "xxxxx" are the assistant reply and the tool result body in
-      // the helpers above; neither may appear either.
-      expect(serialised).not.toContain("xxxx");
+      for (const text of [promptText, replyText, toolText]) {
+        expect(serialised).not.toContain(text);
+      }
 
-      // Recorded, not merely absent: the turn is there, measured.
-      expect(attributesOf(events[0]).prompt_length).toBe(
-        "SECRETPROMPT".length,
-      );
+      // Recorded, not merely absent: each turn is there, and measured.
+      expect(attributesOf(events[0]).prompt_length).toBe(promptText.length);
       expect(attributesOf(events[1]).model).toBe("claude-opus-4-6");
+      expect(attributesOf(events[2]).tool_result_size_bytes).toBe(
+        toolText.length,
+      );
       expect(attributesOf(events[2]).tool_name).toBe("read");
     });
   });

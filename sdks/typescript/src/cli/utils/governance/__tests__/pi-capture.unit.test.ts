@@ -18,6 +18,7 @@
 import {
   appendFile,
   copyFile,
+  mkdir,
   mkdtemp,
   rm,
   utimes,
@@ -29,6 +30,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createPiCapture, FS_CLOCK_SKEW_GRACE_MS } from "../pi-capture";
+import {
+  defaultPiSessionsRoot,
+  resolvePiSessionDir,
+} from "../pi-session-dir";
 
 const SESSION_ID = "44444444-4444-4444-8444-444444444444";
 
@@ -603,4 +608,85 @@ describe("given a filesystem clock that runs behind the run's own", () => {
       expect(wire).not.toContain(`${Date.parse(ROW_TIME_ISO)}000000`);
     });
   });
+});
+
+describe("given a default pi install, where pi writes below the sessions root", () => {
+  /**
+   * The end-to-end half of the directory fix, and the half that was missing
+   * while the fix itself was already in.
+   *
+   * `pi-session-dir.unit.test.ts` asserts the STRING `resolvePiSessionDir`
+   * returns. That pins the arithmetic and nothing else: it would still pass if
+   * capture never read the directory it was handed, and it would still pass if
+   * the walker were changed to stop one level short again, because no test
+   * there opens a file. Every other test in this suite hands capture a
+   * directory with the session file sitting directly inside it, so each of them
+   * passes at either depth and none of them can tell the two apart.
+   *
+   * So this one builds the layout pi actually builds — sessions root, one
+   * encoded folder per working directory, the file inside that — and runs the
+   * whole path: resolve, walk, parse, post. The negative control is the load
+   * bearing half. Pointing the same capture at the parent must yield nothing,
+   * which is precisely the bug as it shipped: no error, no file, no turns, and
+   * every test green.
+   *
+   * @scenario "A default pi launch is read from the folder pi makes for this project"
+   */
+  it("captures the session pi wrote, which the parent directory does not hold", async () => {
+    const home = join(dir, "home");
+    const cwd = "/work/project";
+
+    const resolved = await resolvePiSessionDir({
+      toolArgs: [],
+      env: {},
+      home,
+      cwd,
+    });
+    const root = defaultPiSessionsRoot(home);
+
+    // The resolved directory is below the root, not the root. Asserted here as
+    // well as on the string, because everything after this depends on it.
+    expect(resolved).not.toBe(root);
+    expect(resolved.startsWith(`${root}/`)).toBe(true);
+
+    await mkdir(resolved, { recursive: true });
+    await writeFile(
+      join(resolved, "20260914T100000_session.jsonl"),
+      sessionLines("aaaaaaaa", "bbbbbbbb"),
+      "utf8",
+    );
+
+    const captured = recordingCaptureFor(resolved);
+    expect(await captured.capture.harvest()).toBe(2);
+    expect(captured.bodies.join("")).toContain(SESSION_ID);
+
+    // The negative control: the root holds a directory, never a session file.
+    // A walker that stops here reads nothing and says nothing, which is how
+    // this shipped green.
+    const atRoot = recordingCaptureFor(root);
+    expect(await atRoot.capture.harvest()).toBe(0);
+    expect(atRoot.capture.pendingCount()).toBe(0);
+  });
+
+  function recordingCaptureFor(sessionsDir: string): {
+    capture: ReturnType<typeof createPiCapture>;
+    bodies: string[];
+  } {
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+      if (init?.body) bodies.push(init.body);
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+
+    return {
+      bodies,
+      capture: createPiCapture({
+        sinceMs: 0,
+        sessionsDir,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl,
+      }),
+    };
+  }
 });

@@ -23,8 +23,6 @@ Feature: pi session capture
   mints its own session identity and reaches LangWatch by its own route. These
   scenarios cover only sessions a person launches themselves.
 
-  Everything below is unbuilt.
-
   # --- What the user gets ---------------------------------------------------
 
   # What "shows the conversation" does and does not mean here, because this
@@ -111,18 +109,19 @@ Feature: pi session capture
     Then no session is recorded and no error is raised
 
   @unit
-  # The Then here is the directory we CHOOSE, not a session we read. Nothing
-  # reads a session until the capture rungs land, and a scenario that claims a
-  # read while no read exists passes on a promise. Reading is asserted by the
-  # capture scenarios below, against a real session file.
+  # The Then here is the directory we CHOOSE, not a session we read, and the
+  # title says so. A scenario that claims a read while its tests only compare a
+  # path passes on a promise: the path can be right and the read still never
+  # happen. Reading is asserted by the capture scenarios, against a real file.
   #
-  # The default row is not decoration. It is the only row that holds when a
-  # user has set nothing at all, which is every user on their first run, and it
-  # was the one level that broke with every bound test still green.
+  # Every row here is a user who named a directory, and a directory a user
+  # names is used exactly as named. The user who named nothing is not a row: it
+  # resolves somewhere else entirely, one level down, and so it is its own
+  # scenario below rather than a fourth example with a different Then.
   Scenario Outline: A session kept somewhere other than the default place is still found
     Given a user who set pi's session directory <how>
     When we work out where to look
-    Then we look in that directory
+    Then we look in that directory, exactly as they named it
 
     Examples:
       | how                                |
@@ -140,13 +139,17 @@ Feature: pi session capture
   # said. Measured against a real installation before this was written: no
   # files in the default place, seven in the folders below it.
   #
-  # We work out the project folder rather than reading every project's, so a
-  # run still records only the sessions of the project it was started in.
+  # We work out the project folder rather than widening the search from the
+  # place above it, so a run still records only the sessions of the project it
+  # was started in. Both halves are held by a bound test that builds the real
+  # layout and reads it: the session below is captured, and the same capture
+  # pointed at the parent gets nothing. Reverting either half fails it, which
+  # was checked by reverting each one.
   Scenario: A default pi launch is read from the folder pi makes for this project
-    Given a user who has not moved pi's session directory
-    When we work out where to look
-    Then we look in the folder pi makes for the working directory, not its parent
-    And a directory the user named is still read exactly as named
+    Given a user who has not moved pi's session directory, and a session pi wrote
+    When capture runs
+    Then that session is recorded
+    And the folder we looked in is the one pi makes for the working directory, not its parent
 
   # --- Naming the agent, not the provider -----------------------------------
 
