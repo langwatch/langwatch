@@ -24,7 +24,7 @@ let mint: ReturnType<typeof vi.fn>;
 let service: ControlRequestService;
 
 /** The one project read the service makes, and nothing else. */
-const projects = { tryReadOrganizationId: async () => "org_1" };
+const projects = { getOrganizationId: async () => "org_1" };
 
 function create(
   overrides: Partial<{ userId: string; conversationId: string }> = {},

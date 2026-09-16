@@ -80,9 +80,12 @@ export type ControlRequestKeyMinter = (args: {
   organizationId: string;
 }) => Promise<{ token: string; apiKeyId: string }>;
 
-/** The one project fact this service reads: which organization owns it. */
+/** The one project fact this service reads: which organization owns it. Rejects
+ * rather than answering null: a project row with no organization is broken
+ * data, not a normal absence, so it degrades to unknown error + trace id
+ * (ADR-045) at the caller's own boundary. */
 export type ControlRequestProjects = Readonly<{
-  tryReadOrganizationId(projectId: string): Promise<string | null>;
+  getOrganizationId(projectId: string): Promise<string>;
 }>;
 
 export interface ControlRequestServiceOptions {
@@ -418,11 +421,6 @@ export class ControlRequestService {
    * broken data, so it degrades to unknown error + trace id (ADR-045).
    */
   private async organizationOf(projectId: string): Promise<string> {
-    const organizationId = await this.projects.tryReadOrganizationId(projectId);
-    if (!organizationId) {
-      throw new Error(`Project ${projectId} resolves to no organization`);
-    }
-
-    return organizationId;
+    return this.projects.getOrganizationId(projectId);
   }
 }

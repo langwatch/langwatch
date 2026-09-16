@@ -15,7 +15,6 @@ import {
   LangyApi,
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
-  LangyUiActionUnknownError,
   langyUiActionDispatchBodySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
@@ -52,7 +51,7 @@ export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
     kind: string;
     definition: LangyUiActionDefinition;
   }>[];
-  abstract tryFind(kind: string): LangyUiActionDefinition | null;
+  abstract getByKind(kind: string): LangyUiActionDefinition;
 }
 
 /**
@@ -133,8 +132,7 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
     // The action's own permission is the key's ceiling for this dispatch.
     // Unknown kinds refuse before the ceiling so the error names the real
     // problem (the kind), not a permission the caller cannot reason about.
-    const definition = members.actions().tryFind(kind);
-    if (!definition) throw new LangyUiActionUnknownError(kind);
+    const definition = members.actions().getByKind(kind);
     await members.enforceCeiling({ resolved, permission: definition.requiredPermission });
 
     const langy = members.langy();

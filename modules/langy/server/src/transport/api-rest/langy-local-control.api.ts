@@ -55,7 +55,7 @@ export const langyLocalControlRestMembers = defineRestMiddleware(
  * refuses the same way an unknown request id does — the answer never
  * reveals which requests exist.
  */
-function requireControlUser(request: Request): { userId: string; projectId: string; projectSlug: string } {
+function controlUser(request: Request): { userId: string; projectId: string; projectSlug: string } {
   const resolved = projectCredentialOfRequest(request);
   const userId = resolved.type === "apiKey" ? resolved.userId : null;
   if (!userId) throw new LangyLocalRequestInvalidError();
@@ -198,7 +198,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ request }, members) => {
-    const auth = requireControlUser(request);
+    const auth = controlUser(request);
     const requests = await members.runtime().requests.listOpen({
       projectId: auth.projectId,
       userId: auth.userId,
@@ -224,7 +224,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ input, request }, members) => {
-    const auth = requireControlUser(request);
+    const auth = controlUser(request);
     const approved = await members.runtime().requests.approve({
       requestId: input.id,
       userId: auth.userId,
@@ -255,7 +255,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ input, request }, members) => {
-    const auth = requireControlUser(request);
+    const auth = controlUser(request);
     await members.runtime().requests.cancel({
       requestId: input.id,
       userId: auth.userId,

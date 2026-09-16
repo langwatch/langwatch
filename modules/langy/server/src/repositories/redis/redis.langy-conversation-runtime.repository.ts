@@ -98,7 +98,7 @@ export class EventingLangyConversationAdapter {
 
   private constructor(private readonly options: EventingLangyConversationAdapterOptions) {}
 
-  buildProcessing() {
+  buildProcessing(): ReturnType<LangyConversationPipelineAdapter["build"]> {
     const options = this.options;
     const conversationStore = options.langyConversationProjectionStore;
 

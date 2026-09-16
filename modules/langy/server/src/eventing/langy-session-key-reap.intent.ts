@@ -16,7 +16,7 @@ export interface LangySessionKeyReapDeps {
   now?: () => number;
 }
 
-export function runLangySessionKeyReap(deps: LangySessionKeyReapDeps) {
+export function runLangySessionKeyReap(deps: LangySessionKeyReapDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     // `reap` owns the outcome reporting — it increments the reaped counter and

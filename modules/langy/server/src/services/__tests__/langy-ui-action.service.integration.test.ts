@@ -6,6 +6,7 @@ import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redi
 import Redis from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
 import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service.ts";
 import type {
   LangyUiActionCatalog,
@@ -21,8 +22,10 @@ const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
 };
 
 class FakeUiActionCatalog implements LangyUiActionCatalog {
-  tryFind(kind: string): LangyUiActionDefinition | null {
-    return FAKE_DEFINITIONS[kind] ?? null;
+  getByKind(kind: string): LangyUiActionDefinition {
+    const definition = FAKE_DEFINITIONS[kind];
+    if (!definition) throw new LangyUiActionUnknownError(kind);
+    return definition;
   }
 }
 

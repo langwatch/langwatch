@@ -144,7 +144,7 @@ export class LangyConversationPipelineAdapter {
 
   private constructor(private readonly deps: LangyConversationProcessingPipelineDeps) {}
 
-  build() {
+  build(): ReturnType<typeof buildLangyConversationPipeline> {
     return buildLangyConversationPipeline(this.deps);
   }
 }

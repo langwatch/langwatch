@@ -251,7 +251,7 @@ export class LocalControlLongPoll {
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(done, ms);
-    function done() {
+    function done(): void {
       signal?.removeEventListener("abort", done);
       clearTimeout(timer);
       resolve();

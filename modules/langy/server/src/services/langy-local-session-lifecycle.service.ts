@@ -6,10 +6,10 @@
 import { createLogger } from "@langwatch/observability";
 import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 import { disconnectMessage } from "../rules/langy-local-session-text.rules.ts";
-import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
+import { type WorkspaceNudge, workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
 
 /** A nudge from another pod, or null when it is not one this build understands. */
-function safeNudge(raw: string) {
+function safeNudge(raw: string): WorkspaceNudge | null {
   try {
     const parsed = workspaceNudgeSchema.safeParse(JSON.parse(raw));
 

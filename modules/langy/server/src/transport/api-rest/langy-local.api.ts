@@ -18,6 +18,7 @@ import {
   createControlRequestResponseSchema,
   LangyApi,
   LangyApiIdentityDeniedError,
+  type LangyConversationDetail,
   LangyApiRequestInvalidError,
   LangyConversationNotFoundError,
   SHARE_CONTROL_COMMAND,
@@ -150,7 +151,7 @@ async function requireConversation(input: {
   conversationId: string;
   projectId: string;
   userId: string;
-}) {
+}): Promise<LangyConversationDetail> {
   const conversation = await input.app.findByIdVisible({
     id: input.conversationId,
     projectId: input.projectId,

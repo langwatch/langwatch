@@ -59,7 +59,9 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
  * `processName` names the refusal, so a stand-in reached by accident says which process reached it
  * rather than reporting an anonymous failure.
  */
-function buildLangyConversationProducerPipeline(input: { processName: string }) {
+function buildLangyConversationProducerPipeline(input: {
+  processName: string;
+}): ReturnType<EventingLangyConversationAdapter["buildProcessing"]> {
   const { processName } = input;
   const refuse = (capability: string) => (): Promise<never> =>
     Promise.reject(producerOnly(processName, capability));
@@ -129,7 +131,7 @@ export class RedisLangyConversationProducerRepository {
 
   private constructor(private readonly options: { processName: string }) {}
 
-  build() {
+  build(): ReturnType<typeof buildLangyConversationProducerPipeline> {
     return buildLangyConversationProducerPipeline(this.options);
   }
 }

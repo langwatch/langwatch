@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import {
-  LangyUiActionUnknownError,
   LangyUiHandlerFailedError,
   LangyUiNoBrowserError,
   LangyUiPayloadInvalidError,
@@ -180,10 +179,7 @@ export class LangyUiActionService {
       throw new LangyUiTurnInactiveError();
     }
 
-    const definition = this.actions.tryFind(kind);
-    if (!definition) {
-      throw new LangyUiActionUnknownError(kind);
-    }
+    const definition = this.actions.getByKind(kind);
 
     const parsed = definition.payloadSchema.safeParse(payload);
     if (!parsed.success) {

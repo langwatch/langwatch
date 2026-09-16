@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
 import {
   LangyUiActionService,
   UI_ACTION_MAX_BUDGET_MS,
@@ -35,8 +36,10 @@ const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
 };
 
 class FakeUiActionCatalog implements LangyUiActionCatalog {
-  tryFind(kind: string): LangyUiActionDefinition | null {
-    return FAKE_DEFINITIONS[kind] ?? null;
+  getByKind(kind: string): LangyUiActionDefinition {
+    const definition = FAKE_DEFINITIONS[kind];
+    if (!definition) throw new LangyUiActionUnknownError(kind);
+    return definition;
   }
 }
 

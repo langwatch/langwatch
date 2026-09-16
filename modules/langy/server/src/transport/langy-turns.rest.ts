@@ -73,7 +73,10 @@ function requestedWaitSeconds(request: Request): number | null {
 }
 
 /** Parse and validate a turn request body. */
-function parseTurnBody(raw: string, conversationId: string | null) {
+function parseTurnBody(
+  raw: string,
+  conversationId: string | null,
+): z.infer<typeof langyRestTurnBodySchema> {
   let body: unknown;
 
   try {

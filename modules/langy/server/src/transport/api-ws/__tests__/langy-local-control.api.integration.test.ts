@@ -140,7 +140,7 @@ function upgradeRouterFor(server: Server) {
 function testPorts(store: SessionStateStore) {
   const runtime = RedisLangyLocalControlRuntimeRepository.create({
     store,
-    projects: { tryReadOrganizationId: async () => organizationId },
+    projects: { getOrganizationId: async () => organizationId },
     mintSessionKey: async ({ userId: owner }) => {
       const token = `sk-lw-${nanoid(48)}`;
       const apiKeyId = `key_${nanoid(10)}`;

@@ -309,9 +309,12 @@ export type LangyUiActionDefinition = Readonly<{
   requiredPermission: AuthzPermission;
 }>;
 
-/** Looks one action kind up across every page family this process serves. */
+/** Looks one action kind up across every page family this process serves.
+ * Rejects an unknown kind with `LangyUiActionUnknownError` rather than
+ * answering null: a dispatch naming a kind this process does not serve is a
+ * client mistake, not a normal absence. */
 export interface LangyUiActionCatalog {
-  tryFind(kind: string): LangyUiActionDefinition | null;
+  getByKind(kind: string): LangyUiActionDefinition;
 }
 
 export type LangyDispatchOutcome =
