@@ -1,9 +1,7 @@
 /**
- * The provider marks the model picker and published-prompt rows render — a
- * duplicate of `@langwatch/model-provider-web`'s map, kept in sync
- * deliberately rather than promoted (see
- * `dev/docs/plans/ui-family-move-manifests.md`). The key set is the
- * contract's, so an added provider fails typecheck here, not a blank cell.
+ * The provider marks the model picker and published-prompt rows render - a
+ * deliberate duplicate of `@langwatch/model-provider-web`'s map. The key set
+ * is the contract's, so an added provider fails typecheck, not a blank cell.
  */
 
 import { Box } from "@chakra-ui/react";
@@ -102,10 +100,9 @@ function CerebrasIcon() {
 }
 
 /**
- * Two treatments toggled by color mode with pure CSS on `<g>` groups (no hook,
- * so it is SSR- and test-safe): the full-color brand tile in light mode, and
- * the monochrome glyph in white for dark mode, where the light tile's white
- * rounded square would otherwise glare.
+ * Two treatments toggled by color mode with pure CSS on `<g>` groups (SSR-
+ * and test-safe): a full-color tile in light mode, a monochrome glyph in
+ * white for dark, where the light tile's white square would otherwise glare.
  */
 function CodexIcon() {
   return (
@@ -291,11 +288,9 @@ export const modelProviderIcons: Record<keyof typeof modelProviders, ReactNode> 
 };
 
 /**
- * Provider icons that are flat monochrome marks - they ship with a hardcoded
- * near-black fill (or with no `fill` at all, so they default to SVG's own
- * black). On the dark theme that lands as near-invisible. Coloured-brand icons
- * (Groq orange, AWS yellow, GoogleCloud primaries, Cerebras orange) are left
- * alone - they read well in both modes already.
+ * Provider icons that ship a hardcoded near-black fill (or none, defaulting
+ * to SVG's own black) - near-invisible on the dark theme. Coloured-brand
+ * icons (Groq, AWS, GoogleCloud, Cerebras) are left alone; they read well in both.
  */
 export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
   "openai",

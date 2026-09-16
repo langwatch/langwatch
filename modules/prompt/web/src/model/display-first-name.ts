@@ -6,11 +6,8 @@
 
 /**
  * The person's first name, or null when the profile holds nothing worth
- * addressing them by.
- *
- * Null rather than a placeholder, because the right thing to put in the gap
- * differs by surface: the home greeting drops the name from its sentence, and
- * a message label falls back to the generic role.
+ * addressing them by. Null rather than a placeholder, because the right
+ * thing to put in the gap differs by surface (drop it, or a generic role).
  */
 export const displayFirstName = ({ name }: { name: string | null | undefined }): string | null => {
   const trimmed = name?.trim();

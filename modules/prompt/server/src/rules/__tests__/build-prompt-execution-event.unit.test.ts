@@ -1,9 +1,7 @@
 /**
- * The shape of the `execute_component` event the playground sends.
- *
- * The event used to be cast to `StudioClientEvent`, which let a payload field
- * that no schema declares ride along unnoticed. Parsing the real event against
- * the real schema is what keeps the two honest.
+ * The shape of the `execute_component` event the playground sends. Used to
+ * be cast to `StudioClientEvent`, letting an undeclared field ride along
+ * unnoticed; parsing the real event against the schema keeps the two honest.
  */
 import { describe, expect, it } from "vitest";
 import { studioClientEventSchema } from "@langwatch/workflow-contract";

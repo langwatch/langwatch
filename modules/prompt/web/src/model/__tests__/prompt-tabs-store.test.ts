@@ -369,12 +369,9 @@ describe("DraggableTabsBrowserStore", () => {
         expect(store.getState().windows[1]?.activeTabId).toBe(newTabId);
       });
 
-      // Characterization, not regression: this passes with either
-      // cloneDeep(data) or cloneDeep(current(data)) — the claimed
-      // lodash-es-throws-on-an-immer-draft bug could not be reproduced
-      // (immer@11 / lodash-es@4.18). `current()` stays because taking the
-      // snapshot before cloning is correct practice, not because it fixes an
-      // observed crash.
+      // Characterization, not regression: passes with either cloneDeep(data)
+      // or cloneDeep(current(data)) - the claimed lodash/immer bug could not
+      // be reproduced. `current()` stays because it's correct practice, not a fix.
       it("stores plain, fully detached data on the split tab", () => {
         const originalData = createTabData({ meta: { title: "Original" } });
         store.getState().addTab({ data: originalData });

@@ -444,10 +444,9 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }
 
   /**
-   * The handle is unique per project (or per organization for an org-scoped
-   * prompt), and storage is where that is enforced. A caller reusing one is
-   * making a mistake it can correct, so the violation becomes a named refusal
-   * here rather than travelling on as an unrecognised database failure.
+   * The handle is unique per project (or org, for an org-scoped prompt) -
+   * storage enforces it. A reused handle is a mistake the caller can correct,
+   * so it becomes a named refusal here, not an unrecognised database failure.
    */
   async #refusingTakenHandle<Result>(write: () => Promise<Result>): Promise<Result> {
     try {

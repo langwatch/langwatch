@@ -83,10 +83,9 @@ function VersionTimestamp({ createdAt }: { createdAt?: Date | string | null }) {
 }
 
 /**
- * Author line for a version: an avatar (SSO/OAuth photo → initials → generic
- * silhouette), the display name (falling back to email, then "Unknown
- * author"), and a tooltip. Versions created through the SDK/API have no
- * author on record; that is stated in the tooltip rather than left blank.
+ * Author line for a version: avatar (photo → initials → silhouette), display
+ * name (falling back to email, then "Unknown author"), and a tooltip. SDK/API
+ * versions have no author; the tooltip says so rather than leaving it blank.
  */
 function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
@@ -205,12 +204,9 @@ function VersionIdentityLine({
 }
 
 /**
- * One version, laid out as three lines so the eye can scan a column at a
- * time: identity (version + when, with the row's action), what changed (the
- * loudest line, the reason to read the row), and who wrote it. The version
- * number is a quiet label, not a tile; the current version is marked twice
- * (leading accent + "Current" tag) because "which one am I on?" is the
- * question a history is opened to answer.
+ * One version, laid out as three scannable lines: identity (version + when,
+ * with the row's action), what changed (the reason to read the row), and who
+ * wrote it. The current version is marked twice (accent + "Current" tag).
  */
 function VersionHistoryItem({
   data,
@@ -296,11 +292,8 @@ function VersionHistoryItem({
 }
 
 /**
- * The unsaved edits sitting in the editor.
- *
- * These belong to the editor, not to any version in the list, so they get
- * their own strip above it rather than a button beside the version they happen
- * to be based on.
+ * The unsaved edits sitting in the editor. They belong to the editor, not to
+ * any version in the list, so they get their own strip above it rather than a button on a version.
  */
 function UnsavedChangesStrip({ onDiscard }: { onDiscard: () => void }) {
   return (

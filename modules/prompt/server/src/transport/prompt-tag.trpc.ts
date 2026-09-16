@@ -1,8 +1,7 @@
 /**
- * The server half of `promptTags.*`. A tag definition is one organization row
- * whose assignments cascade across that organization, so the project the caller
- * named is only the first scope a rename or a delete reaches; which projects,
- * and the refusal, belong to the application.
+ * The server half of `promptTags.*`. A tag definition is one organization
+ * row whose assignments cascade across it, so the named project is only the
+ * first scope reached; which projects, and the refusal, belong to the app.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { PromptApi, promptTagTrpc } from "@langwatch/prompt-contract";

@@ -1,11 +1,8 @@
 import { z } from "zod";
 
 /**
- * Shared version metadata schema for tracking database-sourced prompts
- * Used across form values and node data for consistency
- * Note: configId is stored separately at the root level, not in metadata
- *
- * Single Responsibility: Define and validate version tracking metadata structure
+ * Shared version metadata schema for database-sourced prompts. `configId` is
+ * stored separately at the root level, not in metadata.
  */
 export const versionMetadataSchema = z.object({
   /** Database ID of the specific version */

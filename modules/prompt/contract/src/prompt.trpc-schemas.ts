@@ -169,12 +169,9 @@ export type PromptUpdateTrpcInput = z.infer<
 >;
 
 /**
- * The input shapes the nine borrowed procedures take, as declared types.
- *
- * The schemas above were already this contract's; only the `z.infer` aliases
- * were missing, and without them a browser package could name the wire shape
- * only by inferring it through the whole application router — the inference a
- * feature-web package may not do.
+ * The input shapes the nine borrowed procedures take, as declared types. The
+ * schemas above were already this contract's - only the missing `z.infer`
+ * aliases, needed since a feature-web package may not infer through the whole router.
  */
 export type PromptProjectTrpcInput = z.infer<typeof promptProjectTrpcInputSchema>;
 export type PromptIdOrHandleTrpcInput = z.infer<typeof promptIdOrHandleTrpcInputSchema>;

@@ -1,8 +1,7 @@
 /**
- * In-picker empty state for a model selection surface with no enabled
- * providers (or none of the right mode). Replaces a prior fallback that
- * rendered a bogus model string (e.g. "openai/gpt-5.2") which looked real
- * but errored at runtime — this is the honest "not configured yet" state.
+ * In-picker empty state for no enabled providers (or none of the right
+ * mode) - the honest "not configured yet" state, replacing a fallback
+ * that rendered a bogus model string.
  * @see specs/model-providers/no-models-empty-state.feature
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
@@ -101,14 +100,11 @@ export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Prop
   );
 }
 
-/** Three provider logos stacked with negative left-margins so each
- *  one overlaps the next by ~8px. Icons come from the shared registry
- *  so adding/removing a provider only changes one map.
- *
- *  Sized 20px so the row reads as 'these are providers' from a
- *  glance - smaller than the dropdown's 24px chips but larger than a
- *  lucide icon, and the colored brand marks make the row obviously
- *  about model selection without a label. */
+/**
+ * Three provider logos overlapping by ~8px, from the shared icon registry
+ * (one map to change). Sized 20px - between the dropdown's 24px chips and a
+ * plain icon - so colored brand marks read as "these are providers" alone.
+ */
 function StackedProviderIcons() {
   return (
     <HStack gap={0} flexShrink={0} aria-hidden>

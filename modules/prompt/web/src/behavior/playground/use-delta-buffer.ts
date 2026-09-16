@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 
 /**
- * Batches streaming deltas into one state write per animation frame.
- *
- * A token-by-token stream produces a state update per token, and the previous
- * arrangement also persisted the whole conversation to localStorage on each
- * one. Coalescing on a frame keeps the reply visibly live while leaving the
- * render count bounded by the display rather than by the model's throughput.
+ * Batches streaming deltas into one state write per animation frame, instead
+ * of one per token - coalescing keeps the reply visibly live while bounding
+ * the render count by the display rather than the model's throughput.
  */
 export interface DeltaBuffer {
   /** Starts a new run against a message id, discarding anything pending. */

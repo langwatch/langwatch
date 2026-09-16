@@ -1,10 +1,7 @@
 /**
- * Unit tests for the prompt form schema's system-prompt-required refinement.
- *
- * The refinement is the client-side counterpart to the server's
- * `SystemPromptRequiredError` (#3196): without it, the form lets a user
- * click **Save** on a freshly-scaffolded workflow whose system message is
- * empty, then surprises them with a server error.
+ * Unit tests for the system-prompt-required refinement - the client-side
+ * counterpart to the server's `SystemPromptRequiredError` (#3196), so Save
+ * on an empty system message fails client-side, not with a server surprise.
  */
 import { describe, expect, it } from "vitest";
 

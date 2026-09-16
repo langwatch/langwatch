@@ -10,10 +10,9 @@ import { Menu } from "@langwatch/design-system/menu";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 
 /**
- * A language tab for the segmented language picker. When `tabs` is provided the
- * dialog renders a SegmentedControl instead of the language dropdown, and the
- * caller owns snippet generation. Tabs render in the order given (Python first,
- * then TypeScript, then Shell).
+ * A language tab for the segmented language picker. When `tabs` is provided,
+ * the dialog renders a SegmentedControl (caller owns snippet generation) in
+ * the order given (Python, then TypeScript, then Shell).
  */
 export interface ApiSnippetTab {
   /** Stable value, e.g. "python". */
@@ -42,9 +41,8 @@ interface GenerateApiSnippetProps {
   children?: React.ReactNode;
   /**
    * Optional language tabs. When provided, the dialog renders a segmented
-   * language picker (in the order given) and shows the selected tab's snippet,
-   * bypassing the `snippets` / `targets` dropdown. Existing call sites that omit
-   * `tabs` keep the dropdown behavior unchanged.
+   * picker and shows the selected tab's snippet, bypassing the `snippets` /
+   * `targets` dropdown. Omitting `tabs` keeps the dropdown behavior.
    */
   tabs?: ApiSnippetTab[];
   /**
@@ -65,25 +63,14 @@ interface GenerateApiSnippetProps {
    */
   copyDisabled?: boolean;
   /**
-   * Controlled open state. When provided, the caller owns opening and closing
-   * the dialog (for example a menu item that closes its own popover as it opens
-   * the dialog) and the internal `Trigger` is not needed. When omitted, the
-   * dialog manages its own open state and is opened via `Trigger`.
+   * Controlled open state. When provided, the caller owns opening/closing
+   * (e.g. a menu item closing its own popover as it opens this dialog) and
+   * `Trigger` is not needed; omitted, the dialog manages its own state.
    */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
-/**
- * GeneratePromptApiSnippetDialog
- *
- * Renders an icon-only button that, when clicked, opens a modal (Dialog)
- * for displaying API code snippets for prompt usage.
- *
- * - SRP: This component only handles the button and modal UI.
- * - The actual code snippet generation logic will be injected later.
- * - Uses Chakra v3 and lucide-react icons as per project rules.
- */
 export function GenerateApiSnippetDialog({
   snippets,
   targets,
@@ -288,11 +275,8 @@ function formatTarget(target: Target) {
 }
 
 /**
- * Map of snippet targets to Prism languages.
- *
- * If a target is not supported by our Prism implementation, we use closest (or bash)
- *
- * NOTE: Note all targets are supported by the RenderCode component.
+ * Map of snippet targets to Prism languages. Unsupported targets fall back to
+ * the closest match, or bash. Not every target is supported by RenderCode.
  */
 const SnippetTargetToLanguageMap: Record<Target, string> = {
   c_libcurl: "bash",

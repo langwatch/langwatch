@@ -49,8 +49,7 @@ const isUnsetInput = (value: unknown) => value === undefined || value === "";
 
 /**
  * Resolves the conversation history and the input bindings for one run.
- *
- * Exported separately from the event so the heuristics can be tested without
+ * Exported separately from the event so the heuristics test without
  * building a workflow around them.
  */
 export function resolvePromptInputs({
@@ -103,13 +102,10 @@ export function resolvePromptInputs({
     return acc;
   }, {});
 
-  // `isUnsetInput`, not `=== undefined`: a saved prompt declares `input` in its
-  // inputs list, so the form always carries an `input` key, defaulting to "".
-  // A strict-undefined check left it empty, `{{input}}` rendered to nothing,
-  // AND the absorb step above dropped the live turn — the 2026-05-17 prod
-  // regression. A plain falsy check goes too far the other way and swallows an
-  // explicit `0` or `false`, so both ends are named: any other value from the
-  // Variables panel still wins.
+  // `isUnsetInput`, not `=== undefined` or plain falsy: a saved prompt always
+  // carries an `input` key (defaulting to ""), so strict-undefined leaves it
+  // empty and drops the live turn, while falsy would swallow an explicit `0`
+  // or `false`. Any other value from the Variables panel still wins.
   const lastLiveUserContent =
     typeof lastLiveUserMsg?.content === "string" ? lastLiveUserMsg.content : undefined;
   if (lastLiveUserContent !== undefined && isUnsetInput(inputs.input)) {
@@ -202,10 +198,8 @@ function buildWorkflow({
 }
 
 /**
- * Builds the `execute_component` event for one playground run.
- *
- * The caller supplies the trace id so the same id can be used for the message
- * the reply streams into — the conversation's "View trace" affordance then
+ * Builds the `execute_component` event for one playground run. The caller
+ * supplies the trace id so the reply's message shares it, and "View trace"
  * points at the run that produced it (#853).
  */
 export function buildPromptExecutionEvent({

@@ -5,13 +5,9 @@ import { promptApi } from "./prompt-api.ts";
 import { useTabById } from "./use-tab-by-id.ts";
 
 /**
- * Determines whether the prompt in the specified tab has unsaved changes.
- * Single Responsibility: Compare current form values against the version currently loaded in the form.
- *
- * This compares against the LOADED version (via versionId), not the latest version.
- * This means loading an older version and making no changes = no unsaved changes.
- * The "Update" button should still be enabled for older versions to allow "rollback".
- *
+ * Whether the prompt in this tab has unsaved changes: current form values
+ * against the LOADED version (not latest) - an older version with no edits
+ * shows none, keeping "Update" enabled for rollback.
  * @param tabId - The ID of the tab to check for unsaved changes
  * @returns true if there are unsaved changes, false otherwise
  */

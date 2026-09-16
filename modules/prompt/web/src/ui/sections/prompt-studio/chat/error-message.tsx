@@ -8,11 +8,9 @@ interface ErrorMessageProps {
 }
 
 /**
- * Displays error messages in the chat with type-specific styling and actions.
- * Used to render the provider's raw text behind a credential-shape mask —
- * but the mask only covered shapes someone had thought of, risking a leak
- * of LangWatch's own managed-provider key. Now each closed error type gets a
- * written-here sentence that can't contain anything upstream wrote.
+ * Displays chat error messages with type-specific styling and actions. Each
+ * closed error type gets a written-here sentence that can't contain
+ * anything upstream wrote, so no leaked provider text reaches the UI.
  */
 export function ErrorMessage({ error }: ErrorMessageProps) {
   const description =
@@ -32,12 +30,9 @@ export function ErrorMessage({ error }: ErrorMessageProps) {
 }
 
 /**
- * The sentence for each failure class `parseLLMError` recognises.
- *
- * Sits next to `renderAction`, which has always chosen the follow-on link off
- * the same discriminant - one switch for what happened, one for what to do
- * about it. `unknown` is absent on purpose: it means the parser recognised
- * nothing, which is the registry's generic case, not a case to write copy for.
+ * The sentence for each failure class `parseLLMError` recognises. Sits next
+ * to `renderAction` (same discriminant: one switch for what happened, one
+ * for what to do). `unknown` is absent - it is the registry's generic case.
  */
 function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
   switch (type) {

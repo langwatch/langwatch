@@ -45,13 +45,10 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
     const host = usePromptHost();
     const tabId = useTabId();
 
-    // The conversation is between this person and the model they picked, so it
-    // says so. The label follows the picker, which means it names the model the
-    // next reply will come from: a message carries no record of which model
-    // wrote it, so switching models mid-session re-labels the replies already
-    // in the thread as well.
-    // A restored tab can hold a partial form while the editor rehydrates, so the
-    // model is read defensively: an unnamed side falls back to its role label.
+    // The label follows the picker (not a per-message record), so switching
+    // models mid-session re-labels replies already in the thread. A restored tab
+    // can hold a partial form while the editor rehydrates, so the model is read
+    // defensively: an unnamed side falls back to its role label.
     const model = formValues.version?.configData?.llm?.model;
     const userName = host.currentUserName();
     const labels = useMemo(
@@ -147,12 +144,9 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
 );
 
 /**
- * The Clipboard API is absent on insecure origins and in some browsers, so
- * `navigator.clipboard` can be undefined and reading `.writeText` off it throws
- * synchronously - `void` catches nothing. A permission-denied write rejects
- * rather than throwing, so both paths need handling. Failure is silent: the
- * surface is an icon button with no room for an error string, and the reader
- * can still select the text by hand.
+ * `navigator.clipboard` can be undefined (insecure origin, some browsers), so
+ * `.writeText` throws synchronously and a permission-denied write rejects -
+ * both need handling. Failure is silent; the reader can select the text by hand.
  */
 function copyMessageText(text: string) {
   try {
@@ -163,11 +157,8 @@ function copyMessageText(text: string) {
 }
 
 /**
- * Per-message actions, revealed with the pointer.
- *
- * Copy and delete are the two that were ever wired: the CopilotKit control row
- * also drew regenerate and thumbs buttons, whose handlers were never passed, so
- * three of its four buttons did nothing when clicked.
+ * Per-message actions, revealed with the pointer. Only copy and delete are
+ * wired - regenerate and thumbs never had handlers passed to them.
  */
 function MessageActions({ part, onDelete }: { part: DisplayPart; onDelete: () => void }) {
   const text = part.kind === "text" ? part.content : undefined;

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The rule that opens a turn in the playground's conversation, and the trace
- * affordance on it.
- *
+ * The rule that opens a turn in the playground's conversation, and the
+ * trace affordance on it.
  * @see specs/prompts/playground-conversation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

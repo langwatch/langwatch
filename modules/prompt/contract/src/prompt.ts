@@ -6,12 +6,9 @@ export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
 export type PromptScope = z.infer<typeof promptScopeSchema>;
 
 /**
- * The two scope values, as a value.
- *
- * Browser surfaces compare against `PromptScope.PROJECT` and write
- * `PromptScope.ORGANIZATION`; they used to read the generated Prisma client's
- * enum object for it, which a browser package may not import. Stated here off
- * the schema's own members, so a third scope cannot be added on one side alone.
+ * The two scope values, as a value - stated here off the schema's own
+ * members (a browser package may not import the generated Prisma enum), so a
+ * third scope cannot be added on one side alone.
  */
 export const PromptScope = {
   PROJECT: "PROJECT",
@@ -248,10 +245,9 @@ export const promptShorthandSchema = z
 export type PromptShorthand = z.infer<typeof promptShorthandSchema>;
 
 /**
- * One copy a push may target, as the push-selection screen renders it: the
- * copy's own identity, the path that names where it lives, and whether this
- * caller may write to that project at all. A copy they cannot write to is
- * never offered, so the flag is what the list is filtered on.
+ * One copy a push may target, as the push-selection screen renders it:
+ * identity, the path naming where it lives, and whether this caller may
+ * write there. Never offered when they cannot, so the flag is what filters the list.
  */
 export const promptCopyChoiceSchema = promptCopySummarySchema
   .extend({
@@ -271,11 +267,9 @@ export const copiedPromptSchema = versionedPromptSchema
 export type CopiedPrompt = z.infer<typeof copiedPromptSchema>;
 
 /**
- * What a push to a source prompt's copies answers.
- *
- * The three counts are deliberately separate: a caller who may not write to
- * every copy sees fewer pushed than selected, and fewer selected than exist,
- * rather than a refusal for the whole push.
+ * What a push to a source prompt's copies answers. The three counts are
+ * deliberately separate: a caller who may not write to every copy sees fewer
+ * pushed than selected, and fewer selected than exist, rather than a whole-push refusal.
  */
 export const promptPushToCopiesResultSchema = z
   .object({

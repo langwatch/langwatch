@@ -5,11 +5,9 @@
  */
 
 /**
- * External LLM config values type - supports both naming conventions
- * for backward compatibility with existing form schemas.
- *
- * The max_tokens parameter uses a discriminated union to ensure only
- * one of max_tokens or maxTokens is set at a time.
+ * External LLM config values type - supports both naming conventions for
+ * backward compatibility. `max_tokens` uses a discriminated union so only
+ * one of `max_tokens`/`maxTokens` is set at a time.
  */
 export type LLMConfigValues = {
   model: string;

@@ -13,10 +13,9 @@ import { GenerateApiSnippetDialog } from "./generate-api-snippet-dialog.tsx";
 const API_KEYS_SETTINGS_PATH = "/settings/api-keys";
 
 /**
- * Full-length stand-in for a key the project does not have yet. Full length on
- * purpose: a short `sk-lw-xxx` reads like a real value that someone can paste,
- * and they only find out it is not when their SDK rejects it. Copying is
- * switched off while this is what the snippet carries.
+ * Full-length stand-in for a key the project doesn't have yet - on purpose:
+ * a short `sk-lw-xxx` reads like a pasteable value until the SDK rejects it.
+ * Copying is switched off while this is what the snippet carries.
  */
 const PLACEHOLDER_API_KEY = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
 

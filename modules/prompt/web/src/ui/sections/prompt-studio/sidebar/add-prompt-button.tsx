@@ -10,10 +10,8 @@ interface AddPromptButtonProps {
 }
 
 /**
- * AddPromptButton
- * Single Responsibility: Renders a button to create a new draft prompt.
- * Checks RBAC permissions first; if the check fails, shows the
- * restriction modal instead of creating the draft.
+ * Renders a button to create a new draft prompt. Checks RBAC permissions
+ * first; on failure shows the restriction modal instead of creating the draft.
  */
 export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
   const { createDraftPrompt } = useCreateDraftPrompt();

@@ -264,11 +264,9 @@ function pairUpRun({
 }
 
 /**
- * Pairs each message with its counterpart in the other version.
- *
- * Pairing by position alone misreads one insertion as every later message
- * changing, so the messages that stayed the same are matched first and only
- * the runs between those anchors are paired up positionally.
+ * Pairs each message with its counterpart in the other version. Position
+ * alone misreads one insertion as every later message changing, so unchanged
+ * messages are matched first and only the runs between anchors pair positionally.
  */
 function alignMessages({
   before,

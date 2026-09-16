@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * Covers specs/prompts/prompt-tab-switcher.feature. Only the tab's controller
- * is mocked; the tab itself renders for real, so this fails if it spends its
- * narrow width on a folder name or a close button it has no room for.
+ * is mocked; the tab renders for real, so it fails with no room for a folder name or close button.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { TabIdProvider } from "../../../studio-internals.ts";

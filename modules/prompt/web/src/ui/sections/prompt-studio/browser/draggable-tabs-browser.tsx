@@ -164,12 +164,6 @@ function DraggableTabsBrowserRoot({ children, onTabMove }: DraggableTabsBrowserP
     </DraggableTabsContext.Provider>
   );
 }
-/**
- * DragOverlayContent Component
- *
- * Single Responsibility: Renders the dragging tab overlay
- * TODO: Move to a separate file
- */
 function DragOverlayContent({
   activeDrag,
 }: {
@@ -383,13 +377,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
 
 const DraggableTabsContent = Tabs.Content;
 
-/**
- * Compound component for draggable browser-like tabs across multiple windows.
- * @example
- * <DraggableTabsBrowser.Root onTabMove={handleMove}>
- *   <DraggableTabsBrowser.Window windowId="g1" activeTabId="tab1">…</DraggableTabsBrowser.Window>
- * </DraggableTabsBrowser.Root>
- */
+/** Compound component for draggable browser-like tabs across multiple windows. */
 export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,
   Window: DraggableTabsWindow,

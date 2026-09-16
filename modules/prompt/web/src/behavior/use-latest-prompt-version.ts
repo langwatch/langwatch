@@ -21,23 +21,17 @@ type UseLatestPromptVersionOptions = {
   /** The current version number */
   currentVersion: number | undefined;
   /**
-   * Whether this instance keeps the latest version live by re-fetching on
-   * window focus. Defaults to `true`. Pass `false` where the hook is mounted
-   * once per open tab or per table column — N always-mounted instances each
-   * refetching on every focus was the query storm #5585 fixed. A gated
-   * instance is save-driven instead (`useHandleSavePrompt` invalidates the
-   * key), so another session's new version isn't reflected until reload.
+   * Whether this instance re-fetches on window focus (default `true`). Pass
+   * `false` for N-mounted instances (tab, column) - that storm was #5585.
+   * Gated instances are save-driven, so other sessions need a reload.
    */
   isLiveRefetchEnabled?: boolean;
 };
 
 /**
- * Hook to detect version drift between the current version and the database.
- * Used by SavePromptButton to show accurate "Update to vX" and by VersionBadge
- * to show outdated warnings.
- *
- * React-query will dedupe requests with the same configId, so multiple components
- * using this hook won't cause extra backend calls.
+ * Detects version drift between the current version and the database, for
+ * SavePromptButton's "Update to vX" and VersionBadge's outdated warning.
+ * React Query dedupes by configId, so multiple callers cost one request.
  */
 export const useLatestPromptVersion = ({
   configId,
@@ -60,14 +54,10 @@ export const useLatestPromptVersion = ({
     },
     {
       enabled: !!configId && !!project?.id,
-      // Live by default so "the prompt was updated in another tab/session"
-      // stays observable without a reload — that is the whole point of the
-      // drift check for the single-instance callers (save button, editor
-      // drawer). The N-mounted callers opt out with
-      // `isLiveRefetchEnabled: false`, matching the codebase convention for
-      // dashboard queries (see useFilterParams). True cross-session liveness
-      // for those would need a lightweight version-number endpoint (noted in
-      // #5585).
+      // Live by default so a version updated elsewhere stays observable
+      // without reload; N-mounted callers opt out via `isLiveRefetchEnabled:
+      // false`. True cross-session liveness would need a version-number
+      // endpoint (#5585).
       staleTime: isLiveRefetchEnabled ? 0 : 30_000,
       refetchOnWindowFocus: isLiveRefetchEnabled,
     },

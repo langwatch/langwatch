@@ -1,8 +1,6 @@
 /**
- * ParameterPopoverContent Component
- *
- * Renders the popover content for a single LLM parameter in compact mode.
- * Shows slider/input or select control with the parameter description.
+ * Popover content for a single LLM parameter in compact mode: slider/input
+ * or select control with its description.
  */
 
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";

@@ -1,9 +1,7 @@
 /**
- * Prompt Studio, as the browser application mounts it (ADR-004: a screen is an owner-only
- * export named after its frontend feature). It exposes a LOADER, not a component: the studio
- * drags a tabbed browser, a chat runtime, a model picker and six dialogs that don't belong in
- * the chunk that renders the rest of the app, and nothing here statically imports the screen,
- * so reaching this entry's host port never pulls those in.
+ * Prompt Studio, as the app mounts it (ADR-004). Exposes a LOADER, not a
+ * component: the studio drags a tabbed browser, a chat runtime and six
+ * dialogs that don't belong in the main chunk, since nothing here statically imports the screen.
  */
 
 import type { ComponentType } from "react";

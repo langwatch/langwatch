@@ -14,12 +14,8 @@ export type ResizableDividerProps = {
 };
 
 /**
- * ResizableDivider
- * A draggable divider that allows resizing between two panels.
- * Features:
- * - Drag to resize (entire bar including button)
- * - Click center button to toggle between expanded/collapsed
- * - Visual grip indicator
+ * A draggable divider between two panels: drag anywhere on the bar to
+ * resize, click the center button to toggle expanded/collapsed.
  */
 export function ResizableDivider({
   isExpanded,

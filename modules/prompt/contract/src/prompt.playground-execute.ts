@@ -15,9 +15,8 @@ export const PROMPT_EXECUTE_ENDPOINT = `${PROMPT_PLAYGROUND_BASE_PATH}${PROMPT_E
 
 /**
  * Strict: the endpoint builds the workflow server-side, so a caller-supplied
- * `workflow` (or any other unexpected key) is a malformed request, not an
- * ignorable extra. Stripping it silently would let a client believe its
- * workflow was executed.
+ * `workflow` key is malformed, not an ignorable extra - stripping it silently
+ * would let a client believe its workflow was executed.
  */
 export const executeRequestSchema = z
   .object({
@@ -32,11 +31,9 @@ export const executeRequestSchema = z
 export type PromptExecuteRequest = z.infer<typeof executeRequestSchema>;
 
 /**
- * One event on the playground's stream.
- *
- * A closed set, rather than the previous arrangement where a failure was a text
- * message whose content began with the literal string `[ERROR]` and the client
- * string-matched it back apart.
+ * One event on the playground's stream - a closed set, rather than a text
+ * message whose content began with the literal string `[ERROR]` for the
+ * client to string-match back apart.
  */
 export type PlaygroundStreamEvent =
   | { type: "start"; messageId: string; traceId: string }

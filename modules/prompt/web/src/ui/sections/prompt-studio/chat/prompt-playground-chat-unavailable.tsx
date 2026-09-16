@@ -1,10 +1,7 @@
 /**
- * What the Conversation tab shows when this deployment runs no chat runtime.
- * The alternative is worse than a missing tab: the chat would render, post a
- * message to a path the API declares absent at boot, and fail silently. Both
- * sentences are the host's, resolved from the error registry that owns every
- * other word a customer reads about a failure — this component only arranges
- * them.
+ * What the Conversation tab shows when no chat runtime is deployed - the
+ * alternative posts to a path the API declares absent and fails silently.
+ * Both sentences are the host's, from the error registry; this component just arranges them.
  */
 
 import { EmptyState, VStack } from "@chakra-ui/react";

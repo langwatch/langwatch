@@ -1,10 +1,7 @@
 /**
- * Every `prompts.*` procedure, declared once. The names are the browser's
- * cache keys, so they are the wire names the prompt studio has always called.
- *
- * `demonstrations` is a workflow dataset, and the workflow contract already
- * depends on this one, so the two write shapes take THIS contract's own
- * `nodeDatasetSchema` - the same shape, declared on the near side of the cycle.
+ * Every `prompts.*` procedure, declared once - the names are the browser's
+ * cache keys. `demonstrations` is a workflow dataset, so both write shapes
+ * take THIS contract's own `nodeDatasetSchema`, avoiding a contract cycle.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";

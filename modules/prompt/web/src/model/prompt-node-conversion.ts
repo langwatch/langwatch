@@ -75,10 +75,9 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 }
 
 /**
- * Safely converts node data to form initial values, handling legacy formats
- * and corrupted data: auto-generates missing identifiers, defaults handle
- * to null and scope to PROJECT, and migrates a legacy string `llm` (model
- * name) into `{ model }`.
+ * Safely converts node data to form initial values, handling legacy/corrupt
+ * data: generates missing identifiers, defaults handle/scope, and migrates
+ * a legacy string `llm` into `{ model }`.
  * @param nodeData - Raw node data from the workflow
  * @returns Partial form values with safe defaults for all required fields
  */

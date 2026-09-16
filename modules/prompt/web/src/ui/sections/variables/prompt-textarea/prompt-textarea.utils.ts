@@ -40,10 +40,9 @@ export const findUnclosedBraces = (
 };
 
 /**
- * Find a fully-typed `{{variable}}` ending exactly at the cursor. Typing the
- * final closing brace makes `findUnclosedBraces` return null, which used to
- * dismiss the insertion menu right when the user finished typing the name;
- * `start` follows the same convention (position right after `{{`).
+ * Finds a fully-typed `{{variable}}` ending exactly at the cursor - typing
+ * the closing brace makes `findUnclosedBraces` return null, dismissing the
+ * insertion menu right as the name finishes. `start` follows its convention.
  */
 export const findJustCompletedVariable = (
   text: string,

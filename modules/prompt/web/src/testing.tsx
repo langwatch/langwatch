@@ -1,9 +1,7 @@
 /**
  * What this package's suites mount the screen inside. The host port is an
- * abstract class, so a test constructs one rather than mocking a module: the
- * fake here RECORDS what the screen asked the application to do, the same
- * surface the real adapter answers. Its tab storage is an in-memory double so
- * one test's open tabs cannot leak into the next; not exported from the package.
+ * abstract class, so a test constructs one that RECORDS what the screen
+ * asked. Tab storage is an in-memory double, so tests don't leak state.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -3,11 +3,9 @@ import { LuSparkles } from "react-icons/lu";
 import { useCreateDraftPrompt } from "../../../../behavior/use-create-draft-prompt.ts";
 
 /**
- * What a project with no prompts at all shows.
- *
- * `SetupWithAgentButton` DID NOT TRAVEL: it is 367 lines of `platform/app`
- * chrome reaching Langy, and `apps/ui` may not import `@langwatch/langy-web`.
- * The same loss the me, automations, agents and datasets families took.
+ * What a project with no prompts at all shows. `SetupWithAgentButton` DID
+ * NOT TRAVEL: 367 lines of `platform/app` chrome reaching Langy, which
+ * `apps/ui` may not import - the same loss other families took.
  */
 export function NoPromptsOnboardingState() {
   const { createDraftPrompt } = useCreateDraftPrompt();

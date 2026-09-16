@@ -68,10 +68,8 @@ export type GroupedModelOptions = ModelOptionGroup[];
 
 /**
  * Fail-closed gate for restricted-provider models (codex today): a picker
- * only offers them when it declares which feature it serves AND that
- * feature is licensed to run them. Pickers that pass no `featureKey`
- * (playground, workflows, evaluators) therefore never see them.
- * Exported for tests.
+ * only offers them when it declares a `featureKey` AND that feature is
+ * licensed to run them. Exported for tests.
  */
 export const filterRestrictedModels = ({
   models,
@@ -92,10 +90,8 @@ const scopeRank = (scopeType?: string): number =>
 
 /**
  * Provider keys whose registry models in `mode` must not be offered, because
- * the row that would actually serve them cannot. Availability follows the row
- * `resolveServingRow` picks (enabled beats disabled, then narrowest scope) —
- * not the union of rows, so a broader-scope row does not rescue a
- * narrower-scope row that can't serve the mode. Exported for tests.
+ * the row `resolveServingRow` picks (enabled beats disabled, then narrowest
+ * scope) cannot serve them - a broader-scope row does not rescue it. Exported for tests.
  */
 export const providersWithoutRegistryModels = (
   rows: {
@@ -131,10 +127,9 @@ export const providersWithoutRegistryModels = (
 };
 
 /**
- * A real union by model id: the first row that declares a model wins, and the
- * same model declared again at a wider scope adds nothing. Concatenating
- * instead put one model in the picker twice, because `getCustomModels` turns
- * every entry into an option without looking for repeats.
+ * A real union by model id: the first row that declares a model wins; the
+ * same model at a wider scope adds nothing. Concatenating instead put one
+ * model in the picker twice.
  */
 const unionCustomModels = <T extends { modelId: string }>(
   first: readonly T[] | null | undefined,
@@ -148,11 +143,9 @@ const unionCustomModels = <T extends { modelId: string }>(
 };
 
 /**
- * Adapt the array shape (one row per provider+scope) into the legacy
- * `Record<provider, config>` shape that getCustomModels and the custom-model
- * dedup expect. Multiple rows for the same provider (multi-scope) are merged:
- * the provider counts as enabled if any row is enabled, custom model lists
- * union.
+ * Adapts the array shape (one row per provider+scope) into the legacy
+ * `Record<provider, config>` shape getCustomModels expects. Multi-scope rows
+ * merge: enabled if any row is, custom model lists union.
  */
 const mergeProviderRowsByKey = (
   rows: readonly MaybeStoredModelProvider[],
@@ -184,12 +177,8 @@ export const useModelSelectionOptions = (
   opts?: { featureKey?: string | undefined },
 ) => {
   const { project } = usePromptProject();
-  // `listAllForProjectForFrontend` returns the providers actually
-  // stored against any scope reachable from this project. The legacy
-  // `getAllForProject` merged env-fed defaults (every registry
-  // provider whose API key is present in the server's process env),
-  // which made unrelated providers like Gemini show up in the picker
-  // for a project that only stored Anthropic/OpenAI.
+  // `listAllForProjectForFrontend` returns providers actually stored for this
+  // project - unlike the legacy `getAllForProject`, it does not merge env-fed defaults.
   const modelProviders = promptApi.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
@@ -216,12 +205,10 @@ export const useModelSelectionOptions = (
       }
     }
 
-    // Gemini's Agent Platform door serves chat but not the embeddings
-    // endpoint (verified live: :batchEmbedContents answers 404 on
-    // aiplatform.googleapis.com). Offering registry embedding models a
-    // credential cannot run would recreate the selectable-but-always-fails
-    // class this fold removed. Explicit custom models stay - they are the
-    // customer's own claim about what their endpoint serves.
+    // Gemini's Agent Platform door serves chat but not embeddings
+    // (:batchEmbedContents 404s on aiplatform.googleapis.com). Registry
+    // embedding models are hidden there; explicit custom models stay - the
+    // customer's own claim about their endpoint.
     const withoutRegistryModels = providersWithoutRegistryModels(providers ?? [], mode);
 
     const allModels = filterRestrictedModels({

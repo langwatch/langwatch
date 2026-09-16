@@ -1,9 +1,7 @@
 /**
- * Recursively sort all object keys for deterministic JSON serialization.
- * Arrays preserve element order but their object elements get sorted keys.
- *
- * Lives in a neutral module so both the repository and the version schema can
- * import it without creating a repo↔schema import cycle.
+ * Recursively sorts object keys for deterministic JSON serialization; arrays
+ * keep element order but sort each object element's keys. Lives in a neutral
+ * module so the repository and version schema can both import it, avoiding a cycle.
  */
 export function sortKeysDeep(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(sortKeysDeep);

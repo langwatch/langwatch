@@ -1,10 +1,7 @@
 /**
- * The browser services Prompt Studio needs but does not own.
- *
- * An owner-only screen receives its browser capabilities from the application
- * that mounts it rather than reaching for the globals itself, so the same
- * screen runs against real Web Storage in the product and against an in-memory
- * double in a test without a jsdom shim standing in for composition.
+ * The browser services Prompt Studio needs but does not own. An owner-only
+ * screen receives them from the application that mounts it, so the same
+ * screen runs against real Web Storage in the product and an in-memory double in tests.
  */
 
 /**

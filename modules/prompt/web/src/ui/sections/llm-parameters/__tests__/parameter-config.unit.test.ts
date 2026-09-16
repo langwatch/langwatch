@@ -1,10 +1,4 @@
-/**
- * Unit tests for parameter configuration
- *
- * Updated for unified reasoning parameter refactor:
- * - Single 'reasoning' field replaces provider-specific fields
- * - Provider-specific mapping happens at runtime boundary
- */
+/** Unit tests for parameter configuration (unified reasoning field). */
 
 import { describe, expect, it } from "vitest";
 import type { ReasoningConfig } from "@langwatch/model-provider-contract";

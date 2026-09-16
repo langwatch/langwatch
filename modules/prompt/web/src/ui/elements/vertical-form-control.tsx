@@ -1,8 +1,7 @@
 /**
- * A labelled field, stacked, with its errors under the input. A narrowed,
- * family-local copy of the old two-direction `VerticalFormControl` — only
- * the vertical branch travels. `FormErrorDisplay`'s message walk comes with
- * it, since showing an error under its input is behaviour, not decoration.
+ * A labelled field, stacked, with errors under the input - a narrowed,
+ * family-local copy of the two-direction `VerticalFormControl` (only the
+ * vertical branch travels). `FormErrorDisplay`'s message walk comes with it.
  */
 
 import { Box, Field, HStack, type SystemStyleObject, Text, VStack } from "@chakra-ui/react";

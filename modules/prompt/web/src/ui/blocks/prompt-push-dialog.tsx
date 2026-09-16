@@ -1,9 +1,7 @@
 /**
- * Pushing one prompt's latest version out to the replicas made from it. A feature-local copy of
- * the shared push dialog, narrowed to prompts. The toast and `HandledErrorAlert` don't travel
- * here: the application's code-keyed error-presentation registry is unreachable from a
- * feature-web package, so the caller resolves the line through the host and hands it down as
- * `errorMessage`; the success notice is the screen's to raise.
+ * Pushing one prompt's latest version to its replicas - a feature-local
+ * copy of the shared push dialog. The toast/`HandledErrorAlert` don't travel
+ * here (the registry is unreachable); the caller hands down `errorMessage`.
  */
 
 import { Button, Text, VStack } from "@chakra-ui/react";

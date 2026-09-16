@@ -1,17 +1,9 @@
-/**
- * Transform camelCase parameter keys to snake_case for database storage.
- *
- * The 'reasoning' field is the canonical/unified field and is stored as-is.
- * Provider-specific mapping (to reasoning_effort, thinkingLevel, effort)
- * happens at the boundary layer when calling LLM APIs, not here.
- */
+/** Transforms camelCase parameter keys to snake_case for database storage. */
 
 /**
- * Mapping from camelCase to snake_case for LLM and prompt parameters.
- * Defined locally to avoid server code importing from components.
- *
- * Note: 'reasoning' is NOT mapped - it stays as 'reasoning' in the database.
- * Provider-specific parameters are mapped at runtime via reasoningBoundary.ts.
+ * Mapping from camelCase to snake_case for LLM and prompt parameters, defined
+ * locally to avoid server code importing from components. `reasoning` is NOT
+ * mapped - it stays as-is; provider params map at runtime via reasoningBoundary.ts.
  */
 const CAMEL_TO_SNAKE_MAPPING: Record<string, string> = {
   // LLM parameters
@@ -60,9 +52,8 @@ export function transformCamelToSnake(data: Record<string, unknown>): Record<str
 }
 
 /**
- * Transform an object's snake_case keys to camelCase.
- * Inverse of transformCamelToSnake, used when data arrives in snake_case
- * (e.g. from the SDK/API) but needs to be passed to methods expecting camelCase.
+ * Transform an object's snake_case keys to camelCase (inverse of
+ * transformCamelToSnake), for data arriving in snake_case (e.g. SDK/API).
  *
  * @param data - Object with potentially snake_case keys
  * @returns Object with camelCase keys

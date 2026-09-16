@@ -1,10 +1,7 @@
 /**
- * The `/api/prompts` REST family: a project's prompts, their versions and the
- * organization tag catalogue those versions are labelled from.
- *
- * Literal addressing, because `/api/prompts/...` and its `/api/v1` twin are the
- * whole published contract: the `/:id{.+}` doors below would swallow a dated
- * namespace segment, so the family has never had one.
+ * The `/api/prompts` REST family: a project's prompts, their versions and
+ * the tag catalogue those versions are labelled from. Literal addressing -
+ * the `/:id{.+}` doors below would swallow a dated namespace segment.
  */
 import {
   badRequestSchema,
@@ -162,10 +159,9 @@ const promptWireSchema = z.object({
 // ── the facts the process resolves ───────────────────────────────────────────
 
 /**
- * What this family knows about the project behind the credential that the
- * request itself does not carry: the organization the project belongs to (a
- * tag catalogue is an organization row), and the deep link back into the
- * prompt library, which is built from the deployment's own origin.
+ * What this family knows about the project that the credential itself does
+ * not carry: the organization it belongs to (a tag catalogue is an
+ * organization row), and the deep link back into the library, from the deployment's own origin.
  */
 export const promptRestFacts = defineRestMiddleware(
   "promptRestFacts",

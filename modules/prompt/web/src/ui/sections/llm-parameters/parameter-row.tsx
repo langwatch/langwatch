@@ -1,8 +1,6 @@
 /**
- * ParameterRow Component
- *
- * Renders a compact clickable row for an LLM parameter that opens a popover
- * with the parameter controls and description when clicked.
+ * A compact clickable row for an LLM parameter that opens a popover with
+ * the parameter controls and description.
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";

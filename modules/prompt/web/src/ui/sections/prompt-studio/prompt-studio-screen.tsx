@@ -1,9 +1,7 @@
 /**
  * Prompt Studio - the whole `/:project/prompts` page. `DashboardLayout` does
- * not travel: header, product menu, command bar, Langy dock and drawer
- * registry belong to the composing application, and this page is a child of
- * a layout route it still serves. Everything else — the prompt-config
- * dialogs, the chat-sync context, the two-column layout — is unchanged.
+ * not travel (header, product menu, command bar, Langy dock, drawer registry
+ * belong to the composing application); this page is a child of that layout route.
  */
 
 import { HStack, VStack } from "@chakra-ui/react";

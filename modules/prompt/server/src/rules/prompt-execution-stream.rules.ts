@@ -1,8 +1,7 @@
 /**
- * What one engine event means for the playground's stream.
- *
- * Pure, so the delta arithmetic and the run-is-over decision can be tested
- * without a socket: the transport owns the framing, this owns the reading.
+ * What one engine event means for the playground's stream. Pure, so the
+ * delta arithmetic and run-is-over decision test without a socket: the
+ * transport owns the framing, this owns the reading.
  */
 import type { PlaygroundStreamEvent } from "@langwatch/prompt-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
@@ -11,14 +10,9 @@ import { extractStreamableOutput, type OutputConfig } from "./prompt-output-form
 import { PROMPT_NODE_ID } from "./prompt-execution-event.rules.ts";
 
 /**
- * The new text since the last chunk we sent.
- *
- * The engine reports the output field's whole current value on every state
- * change, so the delta is what has been appended. A value shorter than what we
- * already sent is a different field winning a race rather than the model
- * retracting what it said, so it is ignored — an event that appended nothing
- * answers with empty text and the total unmoved, which is what the caller
- * sends on and remembers.
+ * The new text since the last chunk sent. The engine reports the field's
+ * whole current value each time, so a shorter value is a different field
+ * winning a race (not a retraction) and is ignored - text empty, total unmoved.
  */
 export function deltaFrom({
   outputs,
@@ -38,10 +32,8 @@ export function deltaFrom({
 }
 
 /**
- * Reads one engine event, sending whatever it means for the client.
- *
- * Returns `done` once the run is over, so the caller stops rather than the
- * handler having to reason about ordering.
+ * Reads one engine event, sending whatever it means for the client. Returns
+ * `done` once the run is over, so the caller stops without reasoning about ordering.
  */
 export function handleEngineEvent({
   serverEvent,

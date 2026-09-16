@@ -1,11 +1,7 @@
 /**
- * The model a prompt opens with when nothing else names one.
- *
- * A family-local copy of the one constant this screen reads out of
- * `platform/app/src/utils/constants.ts`, which has 75 other importers and
- * cannot be repointed while they exist. The value is derived rather than
- * restated: `@langwatch/model-provider-contract` publishes the flagship
- * lookup the application constant is built from, so the two cannot drift.
+ * The model a prompt opens with when nothing else names one, family-local
+ * (`platform/app`'s constant has 75 other importers). Derived, not restated:
+ * `@langwatch/model-provider-contract`'s flagship lookup, so the two cannot drift.
  */
 
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";

@@ -1,9 +1,6 @@
 /**
- * Who the playground says is speaking.
- *
- * The derivation only: `ConversationThread.integration.test.tsx` covers what a
- * thread handed these names actually draws.
- *
+ * Who the playground says is speaking - the derivation only.
+ * `ConversationThread.integration.test.tsx` covers what it actually draws.
  * Spec: specs/prompts/playground-conversation.feature
  */
 import { describe, expect, it } from "vitest";

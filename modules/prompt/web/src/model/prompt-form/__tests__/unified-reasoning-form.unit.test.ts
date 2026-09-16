@@ -1,7 +1,6 @@
 /**
- * The unified reasoning field: one `llm.reasoning` on the form, carried through
- * to the save payload without any of the provider-specific names it replaced.
- *
+ * The unified reasoning field: one `llm.reasoning` on the form, carried to
+ * the save payload without any of the provider-specific names it replaced.
  * UX contract: specs/model-config/unified-reasoning-form.feature.
  */
 import { describe, expect, it } from "vitest";

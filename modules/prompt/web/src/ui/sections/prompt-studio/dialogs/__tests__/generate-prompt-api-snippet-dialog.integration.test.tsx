@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The API dialog for a prompt: what it is titled, how it treats the project's
- * API key, and what it offers when there is no key to show.
- *
- * Spec: specs/prompts/prompt-api-snippet-dialog.feature
+ * The API dialog for a prompt: title, API key handling, and what it offers
+ * with no key to show. Spec: specs/prompts/prompt-api-snippet-dialog.feature
  */
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -4,10 +4,8 @@ import type { PlaygroundMessage } from "./use-prompt-execution.ts";
 
 /**
  * The conversation a playground tab is holding, and the failures against it.
- *
- * Separate from running a prompt: this owns what is on screen and what gets
- * persisted, and knows nothing about streams. `usePromptExecution` composes
- * the two.
+ * Separate from running a prompt: owns what is on screen and persisted,
+ * knows nothing about streams. `usePromptExecution` composes the two.
  */
 export interface ConversationState {
   messages: PlaygroundMessage[];

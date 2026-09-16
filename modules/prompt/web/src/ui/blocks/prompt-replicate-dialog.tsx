@@ -38,10 +38,9 @@ export function PromptReplicateDialog({
   const projectCollection = createListCollection({ items: [...projects] });
 
   /**
-   * The dialog does not close itself. Whether a replication succeeded is the
-   * caller's to know, and the platform version closing inside its own `try`
-   * meant a refused copy left the reader looking at the page it came from with
-   * only a toast to say why.
+   * The dialog does not close itself - success is the caller's to know. The
+   * platform version closed inside its own `try`, leaving a refused copy on
+   * the page it came from with only a toast to say why.
    */
   const handleCopy = async () => {
     const projectId = selectedProjectId[0];

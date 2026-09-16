@@ -21,10 +21,9 @@ import { FakePromptHost } from "../../../../../testing.tsx";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
- * One host for the whole file: nothing here asserts on what the screen asked
- * the application to do, so a default fake is the whole composition these
- * components need. Its tab storage is in-memory, which is what keeps one case's
- * open tabs out of the next one's.
+ * One host for the whole file: nothing here asserts what the screen asked,
+ * so a default fake is the whole composition needed. In-memory tab storage
+ * keeps one case's open tabs out of the next.
  */
 const testHost = new FakePromptHost();
 

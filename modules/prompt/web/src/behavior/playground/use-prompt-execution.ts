@@ -1,8 +1,7 @@
 /**
- * Runs a prompt from the playground and streams the reply back, replacing
- * `useCopilotChat`. Deltas are buffered and flushed on an animation frame
- * (`useDeltaBuffer`) — the old arrangement re-rendered and re-persisted the
- * whole conversation to localStorage per token.
+ * Runs a prompt from the playground and streams the reply, replacing
+ * `useCopilotChat`. Deltas buffer and flush on an animation frame
+ * (`useDeltaBuffer`) instead of re-persisting the whole conversation per token.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";
@@ -47,11 +46,9 @@ const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * The conversation as the server wants it: role and text only.
- *
- * A message whose content is not a string is one the server has no template
- * slot for — an image turn loaded from a trace — so it is left out rather than
- * stringified into the prompt.
+ * The conversation as the server wants it: role and text only. A message
+ * whose content is not a string (an image turn loaded from a trace) has no
+ * template slot, so it is left out rather than stringified.
  */
 function toWireHistory(messages: PlaygroundMessage[]): { role: string; content: string }[] {
   return messages
@@ -63,10 +60,8 @@ function toWireHistory(messages: PlaygroundMessage[]): { role: string; content: 
 }
 
 /**
- * Opens the execution stream and reports what arrives.
- *
- * Kept outside the hook so the transport is readable on its own, and so the
- * hook is left holding only React state.
+ * Opens the execution stream and reports what arrives. Kept outside the hook
+ * so the transport reads on its own, and the hook holds only React state.
  */
 async function streamExecution({
   payload,
@@ -180,10 +175,9 @@ export function usePromptExecution({
 }
 
 /**
- * One run, from opening the stream to settling the reply.
- *
- * Returned as a callback rather than inlined so `usePromptExecution` reads as
- * what it is — state, plus a thing you can start.
+ * One run, from opening the stream to settling the reply. Returned as a
+ * callback rather than inlined so `usePromptExecution` reads as state, plus
+ * a thing you can start.
  */
 function useRunPrompt({
   projectId,

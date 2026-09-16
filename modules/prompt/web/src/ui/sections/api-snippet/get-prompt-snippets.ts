@@ -20,10 +20,9 @@ interface ExampleObject {
 type ExampleValue = string | number | boolean | ExampleValue[] | ExampleObject;
 
 /**
- * Example values for common variable names. A reader scanning the snippet
- * learns more from `customer_name="Jane Doe"` than from a row of ellipses, and
- * a value of the right shape is one less thing to work out before the first
- * run. Order matters: the first pattern that matches wins.
+ * Example values for common variable names - a reader learns more from
+ * `customer_name="Jane Doe"` than a row of ellipses. Order matters: the
+ * first pattern that matches wins.
  */
 const STRING_EXAMPLES: [RegExp, string][] = [
   [/email/, "jane@example.com"],

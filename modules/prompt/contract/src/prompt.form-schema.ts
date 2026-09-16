@@ -126,10 +126,9 @@ export const hasNonEmptySystemMessage = (
   );
 
 /**
- * Wraps a base form schema with a `superRefine` that requires a non-empty
- * system message in `messages`. Used by both the static {@link formSchema}
- * and the dynamic {@link refinedFormSchemaWithModelLimits} so both code
- * paths enforce the same client-side requirement.
+ * Wraps a base form schema with a `superRefine` requiring a non-empty system
+ * message in `messages`, used by both {@link formSchema} and
+ * {@link refinedFormSchemaWithModelLimits} so both enforce the same rule.
  */
 function withSystemPromptRequired<T extends z.ZodTypeAny>(schema: T): T {
   return schema.superRefine((values, ctx) => {

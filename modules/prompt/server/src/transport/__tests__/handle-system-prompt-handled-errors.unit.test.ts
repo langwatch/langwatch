@@ -1,8 +1,7 @@
 /**
  * The REST mapping of the two system-prompt refusals onto their statuses,
- * pinned by Issue #3196 so a refactor of either class cannot regress it. The
- * toast at AC 6 forwards `error.message`, which is why the "friendly message,
- * no stack trace" assertion lives here.
+ * pinned by #3196 so a refactor cannot regress it. The toast forwards
+ * `error.message`, which is why the "friendly message, no stack trace" assertion lives here.
  */
 
 import { HTTPException } from "hono/http-exception";

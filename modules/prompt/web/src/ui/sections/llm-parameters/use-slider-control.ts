@@ -1,9 +1,6 @@
 /**
- * useSliderControl Hook
- *
- * Encapsulates the common slider control logic used by both ParameterField
- * and ParameterPopoverContent. Eliminates code duplication while allowing
- * each component to maintain its own styling.
+ * Common slider control logic shared by ParameterField and
+ * ParameterPopoverContent, letting each keep its own styling.
  */
 
 import { useEffect, useState } from "react";

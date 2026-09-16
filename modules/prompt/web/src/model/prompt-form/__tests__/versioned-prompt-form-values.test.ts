@@ -32,10 +32,8 @@ describe("versionedPromptToPromptConfigFormValues", () => {
   });
 
   /**
-   * The form derives the demonstration columns from the inputs and outputs and
-   * writes them into itself on load, so a baseline built from the stored prompt
-   * has to carry the same columns or an untouched prompt reads as modified.
-   *
+   * The form derives demonstration columns from inputs/outputs on load, so a
+   * baseline must carry the same columns or an untouched prompt reads as modified.
    * @see specs/prompts/prompt-editor-dirty-state.feature
    */
   describe("when the prompt has inputs and outputs", () => {

@@ -35,10 +35,8 @@ import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization
- * row whose assignments cascade across the organization, so the caller has to
- * be allowed to act on every project the catalogue reaches - and which answer
- * "allowed" means depends on what presented itself. A legacy project key names
- * no key row, so it can only ever answer for the project it is pinned to.
+ * row whose assignments cascade across it, so the caller must be allowed on
+ * every project reached; a legacy project key only answers for its own project.
  */
 export type PromptTagCatalogPrincipal =
   | Readonly<{ type: "user"; userId: string }>
@@ -62,12 +60,9 @@ export interface PromptCaller {
  */
 export interface PromptInfrastructure {
   /**
-   * The lifecycle nurturing that fires when a project gains a prompt, whether
-   * written, copied or duplicated. Fire-and-forget: it may not fail a create.
-   * No deployment composes a product-analytics sink for this yet, so
-   * `create()` always builds the logged fallback over the `logger` member -
-   * the deleted composition's own absent branch (`prompt.composition.ts`,
-   * `LoggedApiPromptNurturing`, before b383462d96).
+   * Fires when a project gains a prompt (write, copy or duplicate).
+   * Fire-and-forget: it may not fail a create. No deployment composes an
+   * analytics sink yet, so `create()` always uses the logged fallback over `logger`.
    */
   afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
   /** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
@@ -193,10 +188,9 @@ export class PromptApp implements PromptApi {
   };
   static readonly configSchema = promptAppConfigSchema;
   /**
-   * The one member the engine is built over. `PostgresPromptAdapter` is the
-   * bridge named on {@link PromptInfrastructure.prompts}; once the four
-   * repositories behind it move onto `defineRepositories`, this becomes a
-   * declared `repositories` bundle instead.
+   * The one member the engine is built over; becomes a declared `repositories`
+   * bundle once the four repositories behind `PostgresPromptAdapter` move onto
+   * `defineRepositories`.
    */
   static readonly reads = reads("prisma", "logger");
 
@@ -334,11 +328,9 @@ export class PromptApp implements PromptApi {
   }
 
   /**
-   * One prompt, or null when the project has none by that id or handle. The
-   * engine refuses in that case; absence is an answer the two callers here ask
-   * for — a browser query that renders "no such prompt", and a re-read after a
-   * write that falls back to what it already holds — so exactly that refusal is
-   * turned back into null and every other error propagates.
+   * One prompt, or null when the project has none by that id or handle. Only
+   * that refusal becomes null - for a "not found" render and a write's
+   * re-read fallback - every other error still propagates.
    */
   async findByIdOrHandle(
     input: PromptReference & { organizationId?: string },
@@ -586,11 +578,8 @@ export class PromptApp implements PromptApi {
 
   /**
    * Refuses unless the caller may manage prompts in EVERY project the tag
-   * catalog reaches. A tag definition is one organization row and its
-   * assignments cascade across the organization, so authorizing only the
-   * project the caller named lets one project's grant rename and delete what
-   * every sibling project resolves. The refusal names the first project the
-   * caller cannot manage.
+   * catalog reaches - authorizing only the named project would let its grant
+   * rename or delete what every sibling resolves. Names the first project it cannot manage.
    */
   async assertMayManageTagCatalog(input: {
     projectId: string;
@@ -609,10 +598,9 @@ export class PromptApp implements PromptApi {
   }
 
   /**
-   * Whether the CREDENTIAL this request arrived on - not the person who minted
-   * it - may manage prompts in one project. A legacy project key resolves no
-   * key row, so it answers only for the project it is pinned to; a write that
-   * reaches a sibling project is refused rather than assumed.
+   * Whether the CREDENTIAL on this request - not the person who minted it - may
+   * manage prompts in one project. A legacy project key answers only for the
+   * project it is pinned to.
    */
   async #mayManagePromptsIn(input: {
     by: PromptTagCatalogPrincipal;

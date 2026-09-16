@@ -1,10 +1,7 @@
 /**
- * The Push-to-replicas action on a published prompt.
- *
- * The generic `PushToCopiesDialog` did not travel - it reaches the toaster and
- * the application's `HandledErrorAlert` - so this wraps the family's narrowed
- * copy and tells the host what happened. The replicas listing already arrives
- * filtered to the ones the reader may write to; that filter is the server's.
+ * The Push-to-replicas action on a published prompt. The generic
+ * `PushToCopiesDialog` did not travel (toaster/`HandledErrorAlert`), so this
+ * wraps it and tells the host. The replicas list arrives pre-filtered by the server.
  */
 
 import { useEffect, useState } from "react";

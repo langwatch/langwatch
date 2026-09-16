@@ -121,11 +121,9 @@ function ChangeEntry({ change }: { change: PromptVersionChange }) {
 }
 
 /**
- * Everything one version changed relative to the version before it.
- *
- * An empty list is meaningful rather than an error: republishing an older
- * version as the latest produces a version whose content is identical to its
- * predecessor's, and saying so is more useful than showing nothing.
+ * Everything one version changed relative to the version before it. An
+ * empty list is meaningful, not an error: republishing an older version
+ * produces one identical to its predecessor, worth saying rather than hiding.
  */
 export function VersionChanges({ changes }: { changes: PromptVersionChange[] }) {
   if (changes.length === 0) {

@@ -4,12 +4,9 @@ type PromptMessage = {
 };
 
 /**
- * Moves a stored system message into the `prompt` field.
- *
- * `createPrompt` and `updatePrompt` reject input carrying both a `prompt` and
- * a system message (`SystemPromptConflictError`), so a prompt read back from
- * storage cannot be handed straight back to them. The system message is the
- * authority when both are present.
+ * Moves a stored system message into the `prompt` field, since
+ * `createPrompt`/`updatePrompt` reject input carrying both
+ * (`SystemPromptConflictError`). The system message wins when both are present.
  */
 export function hoistSystemMessage(source: {
   prompt?: string | null;

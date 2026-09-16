@@ -1,14 +1,7 @@
 /**
- * The Replicate action on a published prompt.
- *
- * `useProjectsForCopy` did not travel: it read `~/server/api/rbac`, which a
- * browser package may not name. The host answers `copyTargets()` instead, built
- * in `apps/ui` over `@langwatch/authz-contract`'s published rules - the same
- * answer the agents and datasets families rebuilt for their own pickers, and
- * the third time that rbac import comes off a gate list for a picker.
- *
- * Like the agents dialog, this one does not close itself on failure: the
- * refusal is handed to the host and the reader keeps the dialog they were in.
+ * The Replicate action on a published prompt. `useProjectsForCopy` did not
+ * travel (it read `~/server/api/rbac`); the host answers `copyTargets()`
+ * instead. Like the agents dialog, it does not close itself on failure.
  */
 
 import { useState } from "react";

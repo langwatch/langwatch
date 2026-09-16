@@ -1,9 +1,7 @@
 /**
- * The two refusals that must not close a dialog, recognised structurally:
- * a feature-web package may not import `@trpc/client` (ADR-004), so these
- * duck-type the payload instead. Kept because a plan-limit/lite-member
- * refusal shows as a MODAL from a global interceptor, and the dialog stays
- * open under it rather than dismiss behind an unseen message.
+ * The two refusals that must not close a dialog, recognised structurally
+ * (a feature-web package may not import `@trpc/client`, ADR-004). A
+ * plan-limit/lite-member refusal shows as a MODAL, so the dialog stays open under it.
  */
 
 type SerializedRefusal = {

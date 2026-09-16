@@ -1,10 +1,7 @@
 /**
- * What the studio's own modules compose each other through. Kept apart from `index.ts` so the
- * PUBLIC entry stays four names — the loader, the procedure map, the host port and its types.
- * A host mounting this package to reach the port would otherwise pull the sidebar, the tab
- * browser and the chat text area into its own compile: `apps/ui`'s stricter `noImplicitReturns`
- * turned four of `@langwatch/workflow-web`'s functions into errors in a project that doesn't own
- * them. Nothing outside this package imports this file.
+ * What the studio's own modules compose each other through, kept apart from
+ * `index.ts` so the PUBLIC entry stays four names. A host reaching only the
+ * port would otherwise pull heavy modules into its own (stricter) compile.
  */
 
 export { PromptBrowserTab, type PromptBrowserTabProps } from "./prompt-browser-tab.tsx";

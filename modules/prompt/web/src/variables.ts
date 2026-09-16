@@ -1,9 +1,6 @@
 /**
- * Variables UI.
- *
- * The interface for defining prompt variables and mapping them onto the
- * sources a run can read: dataset columns, workflow node fields, or a literal
- * value.
+ * Variables UI: defining prompt variables and mapping them onto the sources
+ * a run can read - dataset columns, workflow node fields, or a literal value.
  */
 
 export { FormVariablesSection } from "./ui/sections/variables/form-variables-section.tsx";

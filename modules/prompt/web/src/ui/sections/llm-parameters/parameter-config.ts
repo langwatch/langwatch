@@ -70,9 +70,7 @@ export type {
 // ============================================================================
 
 /**
- * Configuration for all known LLM parameters
- * The key matches the parameter name from supportedParameters
- *
+ * Configuration for all known LLM parameters, keyed by name from `supportedParameters`.
  * @deprecated Use parameterRegistry.getConfig(name) instead
  */
 export const PARAMETER_CONFIG: Record<string, ParameterDefinition> =

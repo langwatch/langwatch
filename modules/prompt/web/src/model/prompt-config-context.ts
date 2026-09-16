@@ -1,16 +1,7 @@
 /**
- * The prompt-configuration operations, published to everything under the screen.
- *
- * The CONTEXT lives in the package model and the PROVIDER that fills it lives
- * in the screen, because the two have different reach: the provider mounts
- * three dialogs and runs three mutations, while the context is a portable value
- * that `behavior` hooks read — and a global layer may not import a screen. The
- * datasets family made the same split for its table context, for the same
- * reason.
- *
- * The default value throws rather than returning a no-op: calling one of these
- * outside the provider is a composition fault, and a silently ignored save is
- * worse than a stack trace.
+ * Prompt-configuration operations, published under the screen. CONTEXT lives
+ * in the package model (a global layer may not import the screen that hosts
+ * PROVIDER); the default throws rather than no-op, since misuse is a composition fault.
  */
 
 import { createContext, useContext } from "react";

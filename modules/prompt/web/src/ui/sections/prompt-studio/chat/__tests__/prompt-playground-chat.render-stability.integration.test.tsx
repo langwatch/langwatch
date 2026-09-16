@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
  * The chat reads only its own tab's slice of the tab store, so a change to
  * something it did not select must not re-render it.
- *
  * @see specs/prompts/studio-render-stability.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

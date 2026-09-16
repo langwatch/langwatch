@@ -2,8 +2,7 @@ import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 /**
  * What the three prompt dialogs are asked to do, and what they answer with.
  * Declared against `@langwatch/prompt-contract`'s `PromptCreateTrpcInput`/
- * `PromptUpdateTrpcInput` rather than a router inference a browser package
- * may not name — a real repoint, since the server builds the same schemas.
+ * `PromptUpdateTrpcInput`, not a router inference a browser package may not name.
  */
 
 import type { PromptCreateTrpcInput, PromptUpdateTrpcInput } from "@langwatch/prompt-contract";

@@ -1,8 +1,6 @@
 /**
- * Parameter Value Utilities
- *
- * Helper functions for getting and setting parameter values,
- * handling the snake_case/camelCase conversion.
+ * Helpers for getting and setting parameter values, handling the
+ * snake_case/camelCase conversion.
  */
 
 import { toFormKey } from "./parameter-config.ts";

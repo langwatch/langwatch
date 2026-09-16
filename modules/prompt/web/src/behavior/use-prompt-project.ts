@@ -1,9 +1,7 @@
 /**
- * The project this screen is about, read from the host. `platform/app`'s prompt surfaces used
- * `usePromptProject()`, an application hook reaching the session client and org graph — both
- * sealed off from a feature-web package by ADR-004. The host answers the same two facts, read
- * here once rather than at each of twenty-odd call sites. `project` is `undefined` until one
- * is in scope, same as before, and every caller already handles that.
+ * The project this screen is about, read from the host - `platform/app`'s
+ * session client and org graph are sealed off from a feature-web package
+ * (ADR-004). `project` is `undefined` until one is in scope, as before.
  */
 
 import { useMemo } from "react";

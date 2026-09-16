@@ -1,9 +1,7 @@
 /**
- * The prompt transports the browser and the API clients already call: the
- * `prompts.*` and `promptTags.*` procedure names, and the `/api/prompts` base
- * path the REST family is published at. Both are declared once in
- * `@langwatch/prompt-server` and mounted over the process's own installed
- * application; this proves the declaration itself, not a process boot.
+ * The prompt transports the browser and API clients call: `prompts.*` /
+ * `promptTags.*` procedure names, and the `/api/prompts` REST base path -
+ * declared once in `@langwatch/prompt-server` and mounted here to prove it.
  * @see modules/prompt/specs/prompt.feature
  */
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";

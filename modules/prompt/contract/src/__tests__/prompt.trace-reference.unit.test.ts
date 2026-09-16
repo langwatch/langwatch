@@ -325,14 +325,9 @@ describe("parsePromptReference()", () => {
     });
 
     it("flat-format pairs prompt.id (raw identifier) with prompt.handle (canonical slug) when both are present", () => {
-      // Wire-format shift from #4094 (prompt-spans parity): the SDK now
-      // deliberately emits BOTH `prompt.id` (raw configId — opaque,
-      // stable, useful for storage lookup) AND `prompt.handle`
-      // (canonical user-facing slug) on the same span. When both are
-      // present, the user-facing handle wins for `promptHandle` — the
-      // raw configId is unreadable in toasts and deep-link labels.
-      // Pre-#4094, only one of the two attributes was expected on any
-      // given span, so this case was a transitional-emit oddity.
+      // #4094: the SDK emits both `prompt.id` (raw configId) and
+      // `prompt.handle` (canonical slug) on the same span. The handle wins
+      // for `promptHandle` - the raw configId is unreadable in toasts and deep-link labels.
       const attrs = {
         "langwatch.prompt.id": "prompt_configIdForStorage",
         "langwatch.prompt.handle": "team/canonical-slug",

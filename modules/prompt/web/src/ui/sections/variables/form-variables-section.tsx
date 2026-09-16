@@ -5,11 +5,9 @@ import type { AvailableSource, FieldMapping } from "./variable-mapping-input.tsx
 import { type Variable, VariablesSection } from "./variables-section.tsx";
 
 /**
- * The slice of the prompt config form this section reads and writes.
- *
- * Declared here rather than imported so the section stays inside the prompt
- * web package. `useFormContext` casts rather than checks, so a form whose
- * values carry these fields satisfies it.
+ * The slice of the prompt config form this section reads and writes,
+ * declared here (not imported) so the section stays inside the package.
+ * `useFormContext` casts rather than checks the form's shape.
  */
 type PromptInputsFormValues = {
   version: {

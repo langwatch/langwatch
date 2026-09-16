@@ -8,10 +8,9 @@ import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-cont
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
- * The few-shot examples a prompt carries, shown read-only — a narrowed family-local copy of
- * `platform/app`'s `DemonstrationsField.tsx`, which keeps its own editor. Demonstrations are
- * still edited through the prompt editor drawer, opened from the workflow studio and the
- * experiments workbench.
+ * The few-shot examples a prompt carries, shown read-only - a narrowed
+ * family-local copy of `platform/app`'s `DemonstrationsField.tsx`. Still
+ * edited through the prompt editor drawer, opened from workflow studio/experiments.
  */
 export function DemonstrationsField() {
   const { watch, formState } = useFormContext<PromptConfigFormValues>();

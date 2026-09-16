@@ -1,8 +1,7 @@
 /**
- * A syntax-highlighted code block with a copy button. A family-local copy of
- * `platform/app/src/components/code/RenderCode.tsx`, differing in that the
- * copy outcome is handed back rather than toasted — a feature-web package may
- * not reach a toaster singleton, so the caller tells the host.
+ * A syntax-highlighted code block with a copy button, family-local (see
+ * `platform/app/.../RenderCode.tsx`); it hands the copy outcome back rather
+ * than toasting - a feature-web package may not reach a toaster singleton.
  */
 
 import { Box, IconButton } from "@chakra-ui/react";
@@ -58,13 +57,10 @@ export const RenderCode = ({
     };
   }, [code, language, colorMode]);
 
-  // Tagged with its inputs and compared here, rather than cleared inside the
-  // effect: highlighting is async, so on the render right after `code` changes
-  // the PREVIOUS highlight is still in state, and rendering it shows the
-  // previous snippet — visible when switching language tabs. Deriving "is this
-  // highlight still current?" from the props keeps the plain-text fallback
-  // showing the right code until the new highlight lands, with no dependence
-  // on effect or microtask ordering.
+  // Tagged with its inputs and compared here, not cleared in the effect:
+  // highlighting is async, so right after `code` changes the PREVIOUS
+  // highlight is still in state - deriving "is this still current?" from
+  // props avoids depending on effect or microtask ordering.
   const isCurrentHighlight =
     highlighted &&
     highlighted.code === code &&

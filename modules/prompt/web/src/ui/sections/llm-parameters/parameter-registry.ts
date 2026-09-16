@@ -181,9 +181,8 @@ export class ParameterRegistry {
 
   /**
    * Filter and sort parameters for display. `max_tokens` is always included
-   * regardless of whether the model entry declares it: treating it as
-   * opt-in caused the slider to flicker-then-disappear for legacy custom
-   * models (notably managed Bedrock entries registered with `["temperature"]` only).
+   * regardless of the model entry: opt-in caused it to flicker-then-disappear
+   * for legacy custom models (e.g. Bedrock entries registered with `["temperature"]` only).
    */
   getDisplayParameters(supportedParameters: string[]): string[] {
     const displayOrder = this.getDisplayOrder();

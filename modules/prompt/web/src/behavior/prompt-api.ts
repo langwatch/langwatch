@@ -1,10 +1,7 @@
 /**
- * The procedures this screen calls, and the hooks that call them.
- * Hand-written until the mounted router can generate it (ADR-130). Segment
- * names are load-bearing tRPC cache-key segments — renaming one stops
- * sharing a cache with the many `promptApi.prompts.*` call sites that have
- * not moved. Where a payload is `unknown`, it is declared for its cache
- * entry rather than for a call, so invalidation reaches an un-migrated list.
+ * The procedures this screen calls, hand-written until the mounted router can
+ * generate it (ADR-130). Segment names are load-bearing tRPC cache keys -
+ * renaming one breaks sharing with un-migrated `promptApi.prompts.*` call sites.
  */
 
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
@@ -46,11 +43,9 @@ export type PromptApiMap = {
     };
 
     /**
-     * One prompt, optionally at a named version or tag.
-     *
-     * The drift check, the version history and the span hand-off all land on
-     * this entry, so the four inputs stay optional rather than being split into
-     * separate procedures.
+     * One prompt, optionally at a named version or tag. The drift check, the
+     * version history and the span hand-off all land here, so the four inputs
+     * stay optional rather than split into separate procedures.
      */
     getByIdOrHandle: {
       query: {
@@ -138,9 +133,8 @@ export type PromptApiMap = {
   modelProvider: {
     /**
      * The project's configured providers, keyed by provider id.
-     * `LegacyModelProvider` is `@langwatch/model-provider-contract`'s own
-     * shape, so naming it here checks the custom-model merge against the
-     * same type on both sides of the wire.
+     * `LegacyModelProvider` is `@langwatch/model-provider-contract`'s own shape,
+     * checked against the same type on both sides of the wire.
      */
     getAllForProjectForFrontend: {
       query: { input: ProjectScope; output: Record<string, LegacyModelProvider> };
@@ -152,10 +146,9 @@ export type PromptApiMap = {
     };
 
     /**
-     * The default model for a feature key, when the prompt names none.
-     *
-     * Null rather than throwing when nothing is configured at any scope, which
-     * is what lets the picker render its "configure a default" hint.
+     * The default model for a feature key, when the prompt names none. Null
+     * rather than throwing when nothing is configured, so the picker can render
+     * a "configure a default" hint.
      */
     getResolvedDefault: {
       query: {
@@ -196,11 +189,9 @@ export type PromptApiMap = {
 
   organization: {
     /**
-     * The organization graph, narrowed to this family's reads. Declared here
-     * (not by the screen) so it shares the shell's own cache entry. `apiKey`
-     * arrives blank when the reader may not see it (server-decided); two
-     * surfaces send rather than display it. Membership is per team, since
-     * the replication picker offers only projects the reader may create in.
+     * The organization graph, narrowed to this family's reads. `apiKey` arrives
+     * blank when the reader may not see it (server-decided). Membership is per
+     * team, since the replication picker only offers creatable projects.
      */
     getAll: {
       query: {
@@ -239,12 +230,9 @@ export type PromptApiMap = {
 };
 
 /**
- * The Prompt family's typed tRPC hooks. Same machinery, same transport and the
- * same React Query cache as the application's `api` proxy — see
- * `createModuleApi` for why separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: the screen calls it, and the process
- * shell mounts `promptApi.Provider`.
+ * The Prompt family's typed tRPC hooks - same machinery, transport and React
+ * Query cache as the application's `api` proxy (see `createModuleApi`).
+ * INTERNAL by convention: the screen calls it, the process shell mounts `promptApi.Provider`.
  */
 export const promptApi = createModuleApi<PromptApiMap>();
 

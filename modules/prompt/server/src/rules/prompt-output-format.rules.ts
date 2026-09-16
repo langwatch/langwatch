@@ -1,9 +1,7 @@
 /**
  * How one execution state's outputs become the text the playground streams.
- *
  * Lifted out of the CopilotKit runtime when that was removed; pure, so the
- * transport around it can change without touching the part that has been
- * through production.
+ * transport can change without touching the part proven in production.
  */
 import type { LlmConfigOutputType } from "@langwatch/prompt-contract";
 

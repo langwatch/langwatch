@@ -217,12 +217,10 @@ export const PromptTextAreaWithVariables = ({
     [usedVariables, existingVariableIds],
   );
 
-  // The undefined-variables banner overlays the bottom edge of the
-  // textarea, so the textarea reserves matching bottom padding -
-  // otherwise the banner hides the last line of the prompt. The banner
-  // height is measured (it grows when many names wrap onto two lines);
-  // 28px is the single-line floor, which also keeps jsdom (offsetHeight
-  // always 0) on the legacy reservation.
+  // The undefined-variables banner overlays the textarea's bottom edge, so
+  // the textarea reserves matching padding. Height is measured (grows with
+  // wrapped names); 28px is the single-line floor, also what jsdom
+  // (offsetHeight always 0) falls back to.
   const bannerRef = useRef<HTMLDivElement>(null);
   const [bannerHeight, setBannerHeight] = useState(0);
   // Padding stays in sync with the banner's real height via a ResizeObserver

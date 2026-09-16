@@ -10,10 +10,8 @@ import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
- * Header bar for the prompt browser with handle, model selector, and action buttons.
- * Single Responsibility: renders the top control bar for editing/managing prompt configurations.
- *
- * Uses the shared PromptEditorHeader component for consistency with the drawer.
+ * Header bar for the prompt browser: handle, model selector, and action
+ * buttons, built on the shared PromptEditorHeader for parity with the drawer.
  */
 export function PromptBrowserHeader() {
   const formMethods = useFormContext<PromptConfigFormValues>();
