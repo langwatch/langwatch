@@ -1,19 +1,7 @@
 /**
- * Feature: Forgot / reset password on credential (email-mode) sign-in
- * Source: specs/auth/password-reset.feature
- *
- * Bug-bash finding covered:
- *   #8 A completed password reset shows "Continue" (which signs the device
- *      in) and an "Add a passkey" action that starts the ceremony in place.
- *
- * CI has no mail provider, so `/auth/forgot-password` itself renders the
- * "cannot send email" card rather than its form (see `signin-basics.test.ts`'s
- * header for the same coupling). The request endpoint still writes its token
- * before it ever tries to send mail — better-auth's own `requestPasswordReset`
- * handler calls `runInBackgroundOrAwait` around `sendResetPassword`, so a
- * down mailer never blocks the response — so this calls that endpoint
- * directly and reads the token back out of where better-auth actually keeps
- * it: Redis, its secondary storage, keyed by the account's id (`redis.ts`).
+ * Feature: Forgot/reset password on credential sign-in
+ * (specs/auth/password-reset.feature). Bug-bash #8: a completed reset
+ * shows "Continue" (signs in) and an "Add a passkey" action in place.
  */
 import { expect, test } from "./fixtures";
 import { findUserIdByEmail } from "./db";
@@ -138,15 +126,10 @@ test.describe("Password reset completion", () => {
         timeout: 15000,
       });
 
-      // The old password no longer works and the new one does — the last
-      // half of the always-manual scenario this test now automates. Checked
-      // at the credential endpoint rather than through the sign-in screen:
-      // this account now holds a passkey, so the screen ASKS for it the
-      // moment the address is submitted (signin-signup-screens.feature "An
-      // account with a passkey is asked for it, not offered a button") and
-      // the virtual authenticator answers before a password box ever shows.
-      // The endpoint is the one thing both passwords are actually checked
-      // against, whichever door leads to it.
+      // Checked at the credential endpoint, not the sign-in screen: this
+      // account now holds a passkey, so the screen ASKS for it instead of
+      // showing a password box. The endpoint is what both passwords are
+      // actually checked against, whichever door leads to it.
       await whenISignOut(page);
       const withOld = await page.request.post("/api/auth/sign-in/email", {
         headers: betterAuthRequestHeaders(),

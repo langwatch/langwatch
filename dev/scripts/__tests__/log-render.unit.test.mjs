@@ -1,9 +1,6 @@
 // The Node half of the shared dev log format
 // (dev/docs/best_practices/dev-log-format.md). The Go half is
-// tools/thuishaven/domain/logfmt; both are asserted against the SAME fixture,
-// so a change to one that the other did not follow fails here.
-//
-//   TZ=UTC node --test dev/scripts/__tests__/log-render.unit.test.mjs
+// tools/thuishaven/domain/logfmt; both assert against the SAME fixture.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

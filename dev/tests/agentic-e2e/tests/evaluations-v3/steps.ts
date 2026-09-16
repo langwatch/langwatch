@@ -1,11 +1,6 @@
 /**
- * Step definitions for Evaluations V3 HTTP Agent feature tests
- *
- * These functions are named to match Gherkin language from feature files:
- * - specs/evaluations-v3/http-agent-support.feature
- *
- * Usage: Import and compose these steps in test files to create
- * readable tests that map directly to feature specifications.
+ * Step definitions for Evaluations V3 HTTP Agent feature tests.
+ * Source: specs/evaluations-v3/http-agent-support.feature
  */
 import { Page, expect } from "@playwright/test";
 

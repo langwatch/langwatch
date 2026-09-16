@@ -1,20 +1,8 @@
 #!/usr/bin/env node
 /**
- * Every REST fact a route declares but nothing binds.
- *
- * `createRestRuntime` refuses at MOUNT when a declaration names a fact the
- * mount bound no value for, so each one of these is a boot failure the api
- * reaches only after it has cleared every earlier one. Discovering them by
- * booting costs a full boot per fact; this reads them all in one pass.
- *
- * A fact is bound either by identifier — `bindRestMiddleware(langyTurnsMembers,
- * ...)`, wherever the module or the process states it — or inline, where the
- * definition sits inside the binding call. Both spellings count, and missing
- * the inline one is what made an earlier draft report the process's own
- * caller-address fact as unbound.
- *
- * Self-test first, and a refusal to scan if it fails: a detector that
- * over-reports costs a lane exactly what one that under-reports costs it.
+ * Every REST fact a route declares but nothing binds — `createRestRuntime`
+ * refuses at MOUNT for each, one boot failure at a time. A fact binds by
+ * identifier OR inline; self-test first, and refuses to scan if it fails.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";

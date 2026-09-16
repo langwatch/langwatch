@@ -25,10 +25,6 @@ import {
  * Feature: HTTP Agent Support in Evaluations V3
  * Source: specs/evaluations-v3/http-agent-support.feature
  * Test Plan: dev/tests/agentic-e2e/plans/http-agent-evaluations.plan.md
- *
- * As a user evaluating AI agents
- * I want to re-execute individual cells
- * So that I can test modifications without re-running the entire evaluation
  */
 test.describe("Single Cell Re-execution", () => {
   // fixme: blocked on missing testids — spreadsheet-cell, cell-play-button, save-agent-button
@@ -37,13 +33,7 @@ test.describe("Single Cell Re-execution", () => {
   test.fixme();
   /**
    * Scenario: Single cell re-execution for HTTP agent
-   * Source: http-agent-support.feature lines 233-238
-   * Test Plan: Suite 2, Test 2
-   *
-   * Given I have HTTP agent results from a previous run
-   * When I click the play button on a specific cell
-   * Then only that cell's HTTP request is re-executed
-   * And the evaluators re-run for that cell
+   * (http-agent-support.feature lines 233-238, Suite 2 Test 2).
    */
   test("re-execute single cell via play button", async ({ page }) => {
     // Setup: Create evaluation with HTTP agent (same as previous test)

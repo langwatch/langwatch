@@ -1,19 +1,7 @@
 /**
- * Feature: Passkeys - the fastest way in, and the one phishing cannot take
- * Source: specs/identity/passkeys.feature
- *
- * Bug-bash findings covered:
- *   #4 Adding a passkey while signed in succeeds (Playwright's CDP virtual
- *      authenticator).
- *   #5 The "Sign in faster next time" passkey offer appears after a
- *      PASSWORD sign-in and not after a passkey sign-in.
- *   #9 The passkey relying party is the public host (the `rpId` the options
- *      endpoint returns equals the page host).
- *
- * All three findings turn on the SAME account, in sequence, so they share one
- * test rather than three: adding the passkey (#4) is the only way to get an
- * account that can sign in with one at all, which is what #5's negative half
- * and #9 both need to observe.
+ * Feature: Passkeys (specs/identity/passkeys.feature). Bug-bash #4/#5/#9,
+ * sharing one test in sequence — adding the passkey (#4) is the only way
+ * to get an account whose sign-in #5 and #9 can then observe.
  */
 import { expect, test } from "./fixtures";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";

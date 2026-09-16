@@ -12,10 +12,6 @@ import {
 /**
  * Feature: Agent Testing page structure
  * Source: specs/features/agent-testing/page-structure.feature
- *
- * As a LangWatch user
- * I want to browse and manage my scenarios
- * So that I can organize my behavioral test cases
  */
 test.describe("Scenario Library", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,11 +19,8 @@ test.describe("Scenario Library", () => {
   });
 
   /**
-   * Scenario: The page opens on the Scenarios tab
-   * Source: page-structure.feature
-   *
-   * The page reads its title and both tabs, and the scenarios panel shows
-   * one of its states: a day zero empty state, an empty suite, or the table.
+   * Scenario: The page opens on the Scenarios tab (page-structure.feature).
+   * Panel shows one of its states: day-zero empty, empty suite, or table.
    */
   test("displays the scenarios tab with its panel", async ({ page }) => {
     await givenIAmOnTheScenariosPage(page);
@@ -48,11 +41,8 @@ test.describe("Scenario Library", () => {
   });
 
   /**
-   * Scenario: A saved simulations address opens in Agent Testing when the flag is on
-   * Source: page-structure.feature
-   *
-   * The flag is on by default, so the address an older SDK or a bookmark
-   * still names lands on the Agent Testing page.
+   * Scenario: A saved simulations address opens in Agent Testing when the
+   * flag is on (page-structure.feature, default-on).
    */
   test("redirects a saved simulations address to Agent Testing", async ({ page }) => {
     await whenIOpenTheSimulationsScenariosAddress(page);

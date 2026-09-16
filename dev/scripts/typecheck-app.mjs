@@ -1,11 +1,7 @@
 #!/usr/bin/env node
-// Runs an application's two typecheck phases unconditionally: the declarations
-// pre-pass, then the source/test compile. Neither phase's failure hides the
-// other's — the exit code is nonzero if either phase failed, zero only if both
-// passed. Each phase is banner-attributed so a failure is unambiguous about
-// which phase produced it.
-//
-// Usage: typecheck-app.mjs <declarations-project> <test-tsconfig> [tsc-args...]
+// Runs both typecheck phases unconditionally (declarations pre-pass, then
+// source/test compile): neither phase's failure hides the other, and each
+// is banner-attributed so a failure names which phase produced it.
 import { spawn } from "node:child_process";
 
 const [declarationsProject, testProject, ...extraTscArgs] = process.argv.slice(2);

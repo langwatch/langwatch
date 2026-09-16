@@ -1,10 +1,6 @@
 /**
- * Step definitions for Invitation Approval Workflow tests
- *
+ * Step definitions for Invitation Approval Workflow tests.
  * Source: specs/members/update-pending-invitation.feature
- *
- * Usage: Import and compose these steps in test files to create
- * readable tests that map directly to feature specifications.
  */
 import { Page, expect, test } from "@playwright/test";
 
@@ -82,12 +78,9 @@ export async function whenIClickCreateInvites(page: Page) {
  * Shows when no email provider is configured after admin invite.
  */
 export async function whenICloseInviteLinkDialog(page: Page) {
-  // The invite-link dialog appears when no email provider is configured. Match
-  // it by role+name (a single element) rather than by heading: the title
-  // renders two nested "Invite Link" headings (Dialog.Title > Heading), so a
-  // heading locator is a strict-mode multiple match that throws. Closing it is
-  // required — while open, the modal makes the underlying Invites table inert,
-  // so the "Invited" row is not visible to later assertions.
+  // Matched by role+name, not heading: the title renders two nested "Invite
+  // Link" headings, so a heading locator throws (strict-mode multiple
+  // match). Must close it — while open, it makes the Invites table inert.
   const dialog = page.getByRole("dialog", { name: "Invite Link" });
   if (await dialog.isVisible().catch(() => false)) {
     await dialog.getByRole("button", { name: /close/i }).click();
@@ -184,13 +177,9 @@ export function generateUniqueEmail(prefix: string): string {
 // =============================================================================
 
 /**
- * Activate a test ENTERPRISE license (maxMembers=100) for the current org.
- *
- * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
- * the owner alone is at the cap and createInvites 403s. The app trusts
- * this test-signed license because e2e-ci sets LANGWATCH_LICENSE_PUBLIC_KEY to
- * the matching TEST_PUBLIC_KEY; getActivePlan re-reads the org's license from
- * Postgres on every call, so activation takes effect with no app restart.
+ * Activates a test ENTERPRISE license (maxMembers=100). Trusted because
+ * e2e-ci sets LANGWATCH_LICENSE_PUBLIC_KEY to the matching TEST_PUBLIC_KEY;
+ * getActivePlan re-reads Postgres on every call, so no app restart needed.
  */
 export async function activateEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
@@ -208,18 +197,9 @@ export async function activateEnterpriseLicense(page: Page): Promise<void> {
 }
 
 /**
- * Remove the org's license, restoring the plan to FREE_PLAN so the shared org
- * does not leak an ENTERPRISE cap into other suites (e.g.
- * settings/plans-comparison asserts the Free plan is current). Mirrors
- * activateEnterpriseLicense's error handling: under sequential execution a
- * SILENT failure here would strand the shared singleton org on ENTERPRISE for
- * the rest of the run and surface as a far-removed flake, so we throw at the
- * point of cause.
- *
- * NOTE: activation also create-if-absent provisions org-level retention-policy
- * rows (provisionMissingRetentionPolicies); removeLicense does not revert those.
- * Harmless today (no e2e spec asserts retention state) — it's the plan/cap that
- * is scoped, not every activation side effect.
+ * Restores FREE_PLAN so the shared singleton org doesn't leak ENTERPRISE
+ * into other suites — throws at the point of cause, since silent failure
+ * here would surface as a far-removed flake elsewhere.
  */
 export async function removeEnterpriseLicense(page: Page): Promise<void> {
   const { organizationId } = await getOrgAndTeamIds(page);
@@ -235,14 +215,9 @@ export async function removeEnterpriseLicense(page: Page): Promise<void> {
 }
 
 /**
- * Registers per-test hooks that activate an ENTERPRISE license before each test
- * and remove it after — scoping the raised member cap to the members suite so
- * the shared test org returns to FREE_PLAN for every other suite.
- *
- * SAFE ONLY under sequential execution (playwright.config.ts:
- * fullyParallel:false, workers:1). The test org is a shared singleton, so with
- * parallel workers a concurrent test could observe it mid-ENTERPRISE-window;
- * raising CI parallelism would require moving this to an isolated per-test org.
+ * Per-test hooks toggling an ENTERPRISE license. SAFE ONLY under
+ * sequential execution (fullyParallel:false, workers:1) — the shared
+ * singleton test org could otherwise be observed mid-window.
  */
 export function withEnterpriseLicense(): void {
   test.beforeEach(async ({ page }) => {

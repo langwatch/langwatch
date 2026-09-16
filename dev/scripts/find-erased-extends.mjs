@@ -1,44 +1,18 @@
 #!/usr/bin/env node
 /**
- * Finds `class X extends Y` where Y is bound as a TYPE ONLY.
- *
- * A type-only binding is erased by the compiler, so the `extends` clause names
- * a binding that does not exist at run time. The failure is a ReferenceError at
- * class-definition time — at BOOT, before any request, any test, any log line.
- * `tsc` would report it (TS2689 and friends), which is exactly why these
- * accumulate in code whose type check does not actually run: each application's
- * `typecheck` script is `typecheck:declarations ... && tsc --noEmit -p
- * tsconfig.test.json`, so a failing declarations pre-pass short-circuits the
- * `&&` and the application is never checked at all.
- *
- * Two spellings bind a name as a type, and the SECOND is the one that bites:
- *
- *     import type { A } from "x";        // whole-clause — the obvious one
- *     import { a, type B } from "x";     // inline specifier in a VALUE import
- *
- * The first version of this script understood only the first spelling and
- * reported a confident zero across 15,000 files. Every real instance used the
- * second. Hence `--self-test`: a detector nobody has watched fail is not a
- * detector, and this one has already been wrong once.
- *
- *     node dev/scripts/find-erased-extends.mjs [path]   # scan (default: git ls-files)
- *     node dev/scripts/find-erased-extends.mjs --self-test
- *
- * Prints `file:line  class X extends Y`, one per line. Exit 0 when clean, 1
- * when it finds something (so it can gate), 2 when the self-test fails.
- *
- * KNOWN LIMIT — it does not catch the sibling defect: an interface imported in
- * VALUE position (`import { IdentityEventing }` where the module declares an
- * interface). That erases at the module boundary rather than at the import, so
- * it needs cross-module resolution this script deliberately does not do. If you
- * are hunting boot-time ReferenceErrors, this covers one of the two shapes.
+ * Finds `class X extends Y` where Y is a TYPE-ONLY binding, erased at
+ * runtime — `extends` then throws at boot, before `tsc` would catch it.
+ * KNOWN LIMIT: misses a value-imported interface erased at the boundary.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 
-/** Drops balanced <...> groups, so a generic constraint's `extends` is not read as a heritage clause. */
+/**
+ * Drops balanced <...> groups, so a generic constraint's `extends` is not
+ * read as a heritage clause.
+ */
 const stripGenerics = (text) => {
   let out = "";
   let depth = 0;

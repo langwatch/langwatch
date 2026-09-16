@@ -1,14 +1,7 @@
 /**
  * Feature: The first-party sign-in and sign-up screens
- * Source: specs/identity/signin-signup-screens.feature
- *
- * Bug-bash findings covered:
- *   #2 No error flash right after signing in (no alert/toast within a
- *      couple of seconds of landing).
- *   #3 Sign out and sign in again several times in a row without hitting
- *      the sign-in rate limit.
- *   #7 Forgot-password is prefilled with the address typed on the sign-in
- *      screen.
+ * (specs/identity/signin-signup-screens.feature). Bug-bash: #2 no error
+ * flash, #3 rate-limit tolerance, #7 forgot-password prefill.
  */
 import { expect, test } from "./fixtures";
 import {
@@ -51,19 +44,10 @@ test.describe("Sign-in basics", () => {
   test("signing out and back in several times never hits the rate limit", async ({
     page,
   }) => {
-    // The longest journey in the suite, and the only one that needs saying so:
-    // it drives ten real navigations through the auth screens, where a CI
-    // runner's software-rendered Chrome charges several hundred milliseconds
-    // per actionability check (a single `Continue` click measures four seconds
-    // there against well under one locally). That put it at ~90s on a quick
-    // run and past 120s on a slow one — the same suite has measured 14.4 and
-    // 18.7 minutes on consecutive runs of the same code, so the budget has to
-    // absorb that swing rather than sit just above the last good measurement.
-    //
-    // `slow()` rather than a bigger number for everybody: this is one test
-    // that is legitimately long, not evidence the suite needs more room. It
-    // cannot hide a hang either — `actionTimeout` and `navigationTimeout` are
-    // unchanged, so a stuck step still fails in 15-30s.
+    // The longest journey in the suite: ten real navigations, and CI's
+    // software-rendered Chrome has measured 90s-18.7min swings on the same
+    // code. `slow()` on just this test, not raised globally — a stuck step
+    // still fails fast since actionTimeout/navigationTimeout are unchanged.
     test.slow();
 
     const email = generateFrontDoorEmail("cycle");

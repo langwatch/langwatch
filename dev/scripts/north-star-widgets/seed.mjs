@@ -1,28 +1,10 @@
 #!/usr/bin/env node
 // @ts-nocheck
+
 /**
- * North-star: seeds the 10 "North-star: *" widgets into a project's
- * custom-chart playground via the REST API, so the golden set can be
- * recreated (or refreshed after editing the JSON files here) without
- * opening the UI.
- *
- * Auth and target project are read from the environment because this script
- * is meant to run against any LangWatch deployment, not just one hardcoded
- * project. See `app.dashboard-widgets.v1.ts` for the endpoint contract.
- *
- * Env vars:
- *   LW_ENDPOINT  Base URL of the LangWatch app, e.g. https://app.langwatch.ai
- *   LW_API_KEY   Project API key, sent as the X-Auth-Token header
- *   PROJECT_ID   Target project id (path parameter)
- *
- * Usage:
- *   LW_ENDPOINT=https://app.langwatch.ai LW_API_KEY=sk-... PROJECT_ID=proj_... \
- *     node platform/app/scripts/north-star-widgets/seed.mjs
- *
- * Idempotent-ish: before creating a widget, the script lists existing
- * widgets and skips any whose name already matches — re-running does not
- * duplicate widgets, but it also does not update ones that were edited
- * on the platform since the last seed.
+ * North-star: seeds the 10 "North-star: *" widgets via the REST API (see
+ * `app.dashboard-widgets.v1.ts`). Idempotent-ish: skips widgets whose name
+ * already matches, but does not update ones edited since the last seed.
  */
 
 import fs from "node:fs";

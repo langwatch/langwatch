@@ -1,8 +1,6 @@
 /**
- * The in-memory shop data: accounts, their plan, and their orders.
- *
- * A real application reads this from a database. The demo keeps it in a map so
- * the whole flow runs with no infrastructure.
+ * The in-memory shop data: accounts, their plan, and their orders. A real
+ * application reads this from a database; the demo keeps it in a map.
  */
 
 /** A refund above this amount is only available on the pro plan. */

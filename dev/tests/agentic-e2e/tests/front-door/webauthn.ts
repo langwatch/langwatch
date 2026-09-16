@@ -1,15 +1,7 @@
 /**
- * A CDP virtual WebAuthn authenticator, for driving real passkey ceremonies
- * without a physical device or an OS-level platform authenticator.
- *
- * No such helper existed anywhere under `tests/agentic-e2e` before this file —
- * every passkey-touching scenario in the four identity specs this pass binds
- * against was `@unimplemented`, `@unit`, or exercised only through mocks. This
- * is Playwright's own supported mechanism (the Chrome DevTools Protocol's
- * `WebAuthn` domain): it registers a software authenticator that answers
- * `navigator.credentials.create()` / `.get()` calls exactly as a real one
- * would, over the real `@simplewebauthn` verification path on the server —
- * nothing about the ceremony itself is stubbed.
+ * A CDP virtual WebAuthn authenticator for driving real passkey ceremonies
+ * without a physical device — Playwright's own CDP `WebAuthn` domain, over
+ * the real `@simplewebauthn` server path. Nothing about it is stubbed.
  */
 import type { CDPSession, Page } from "@playwright/test";
 
@@ -19,15 +11,9 @@ export interface VirtualAuthenticator {
 }
 
 /**
- * Attaches a resident-key, user-verifying platform authenticator to `page`
- * and enables the WebAuthn domain on its CDP session.
- *
- * `hasResidentKey: true` is required for a discoverable-credential request —
- * signing in with a passkey with no email typed, or a settings page
- * `addPasskey()` call with no `allowCredentials` list — to find anything at
- * all. `isUserVerified: true` answers the authenticator's own user-presence
- * and user-verification prompts automatically, which is what lets a ceremony
- * that would otherwise wait on a fingerprint or a PIN complete headlessly.
+ * Attaches a resident-key, user-verifying authenticator. `hasResidentKey`
+ * lets a discoverable-credential request (no email, no allowCredentials)
+ * find anything; `isUserVerified` auto-answers the fingerprint/PIN prompt.
  */
 export async function addVirtualAuthenticator(
   page: Page,

@@ -19,10 +19,6 @@ import {
 /**
  * Feature: Scenario editor
  * Source: specs/features/agent-testing/cases-table.feature
- *
- * As a LangWatch user
- * I want to create and edit scenarios
- * So that I can define behavioral test cases for my agents
  */
 test.describe("Scenario Editor", () => {
   test.slow();
@@ -71,15 +67,9 @@ test.describe("Scenario Editor", () => {
   // ===========================================================================
 
   /**
-   * Workflow test covering several feature scenarios:
-   * - Save a new scenario
-   * - The scenario appears in the table
-   * - A row click opens the scenario in the editor
-   * - The editor holds the saved data
-   * - Update the title
-   *
-   * This combines scenarios that would otherwise require seeded data
-   * into a single self-contained workflow test.
+   * Workflow test covering several feature scenarios (save, appears in
+   * list, opens on row click, holds saved data, title update) combined
+   * into one self-contained test instead of requiring seeded data each.
    */
   test("scenario lifecycle: create, view in list, edit, and verify", async ({ page }) => {
     const title = `Refund Request Test ${Date.now()}`;

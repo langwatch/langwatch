@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 // Renders one lane's structured log lines for a person, for the `pnpm dev`
-// path that has no haven in front of it.
-//
-// This is the Node half of ONE written format spec —
-// dev/docs/best_practices/dev-log-format.md. The Go half is
-// tools/thuishaven/domain/logfmt, and both are asserted against the same
-// fixture (dev/scripts/fixtures/dev-log-lines.jsonl -> .expected.txt), so the
-// plain `pnpm dev` terminal and a `haven logs` view read identically.
-//
-//   <lane command> | node dev/scripts/log-render.mjs <lane> [--color|--no-color]
+// path with no haven in front of it. The Node half of ONE format spec
+// (dev/docs/best_practices/dev-log-format.md); the Go half is
+// tools/thuishaven/domain/logfmt, both asserted against the same fixture.
 
 import { createInterface } from "node:readline";
 

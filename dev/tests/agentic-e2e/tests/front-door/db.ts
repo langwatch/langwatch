@@ -1,26 +1,7 @@
 /**
- * Direct Postgres access for the front-door e2e suite.
- *
- * CONFIRMATION AND RESET LINKS ARE EMAILED, AND CI HAS NO MAIL PROVIDER
- * (`e2e-ci.yml` sets no SendGrid/SES key, so `HAS_EMAIL_PROVIDER_KEY` is
- * false and `/auth/forgot-password` renders the "cannot send email" card
- * instead of its form). Sign-up's own `requestSignUpVerification` still
- * writes its single-use token row before it ever tries to send mail
- * (`SignUpVerificationService.issueLink` writes the row, then calls the
- * mailer), so reading the token straight out of Postgres reproduces exactly
- * what a person would do by clicking the email, without needing an inbox.
- *
- * The sign-up token lives in `VerificationToken`, under the identifier
- * `identity-signup-verification:{"email":"...","passwordHash":...}` with the
- * raw, URL-ready token in the `token` column (`signup-verification.service.ts`
- * `SIGN_UP_TOKEN_NAMESPACE`). Password-reset tokens are better-auth's own and
- * do NOT land here: with secondary storage configured better-auth keeps them
- * in Redis — see `redis.ts`.
- *
- * The `pg` dependency this file needs is one of the two deliberate exceptions
- * (with `ioredis`, for the same reason) to this package's "nothing but
- * @playwright/test" rule (see `license.fixture.ts`) — required to read a token
- * CI has no other way to hand a test.
+ * Direct Postgres access for the front-door e2e suite: CI has no mail
+ * provider, so the sign-up token is read from `VerificationToken` instead
+ * of an inbox. Password-reset tokens are NOT here — see `redis.ts`.
  */
 import { Pool } from "pg";
 
@@ -29,12 +10,9 @@ const DATABASE_URL =
   "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb";
 
 /**
- * The `pg` driver ignores the Prisma-style `?schema=` query parameter (see
- * `platform/app/src/server/prismaPgAdapter.ts`, which parses it out and hands
- * it to the adapter explicitly). Read it out here the same way, and set it as
- * the connection's search_path, so `SELECT ... FROM "VerificationToken"`
- * resolves against the schema the app itself writes into rather than
- * `public`.
+ * `pg` ignores the Prisma-style `?schema=` param (see
+ * prismaPgAdapter.ts). Read it out and set it as search_path, so queries
+ * resolve against the schema the app writes into, not `public`.
  */
 function schemaFrom(databaseUrl: string): string | undefined {
   try {
@@ -58,19 +36,9 @@ function getPool(): Pool {
 }
 
 /**
- * The sign-up confirmation token most recently issued for `email`, if any.
- *
- * Matches on the JSON-encoded `identifier`'s `email` field rather than
- * parsing every row in JS: the namespace prefix plus a literal
- * `"email":"<value>"` substring is exactly the shape
- * `signup-verification.service.ts` writes, and it is far cheaper to let
- * Postgres filter than to pull every pending sign-up token back into the
- * test.
- *
- * Query BEFORE visiting the link: claiming a token renames its `identifier`
- * into the `identity-signup-spent:` namespace (still queryable, but no longer
- * matched by this function on purpose — a spent token is not "most recent
- * live one for this email").
+ * The sign-up token most recently issued for `email`, matched via a LIKE
+ * substring on the JSON-encoded `identifier` rather than pulling every row
+ * into JS. Call BEFORE visiting the link — claiming renames the identifier.
  */
 export async function findSignUpVerificationToken(
   email: string,

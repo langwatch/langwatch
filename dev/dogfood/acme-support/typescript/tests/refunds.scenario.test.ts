@@ -1,9 +1,7 @@
 /**
- * Scenario tests for the refund rule.
- *
- * Both tests run the agent in this process, no HTTP server needed. The pro
- * test runs the connected agent itself, so the simulation on the platform and
- * this test share one code path.
+ * Scenario tests for the refund rule. Both run the agent in-process; the
+ * pro test runs the connected agent itself, sharing one code path with
+ * the platform simulation.
  */
 import "dotenv/config";
 

@@ -36,33 +36,9 @@ async function initObservability() {
 void initObservability();
 
 /**
- * Test AI Server — Weather Agent
- *
- * A minimal HTTP server that simulates a weather agent with tool calls.
- * Used for testing HTTP agent configurations and verifying that tool call
- * spans appear correctly in OTEL traces.
- *
- * The agent has a `get_weather` tool that returns mock weather data.
- * When asked about weather, the LLM will make a tool call, which produces
- * tool call spans in the trace for verification.
- *
- * Required headers:
- *   X-API-Key: <your-openai-api-key>
- *   X-Client-ID: <client-identifier>
- *
- * Request body:
- *   {
- *     "model": "gpt-4o-mini",  // required
- *     "messages": [...]        // required
- *   }
- *
- * Usage:
- *   pnpm tsx scripts/ai-server.ts
- *   curl -X POST http://localhost:3456/generate \
- *     -H "Content-Type: application/json" \
- *     -H "X-API-Key: sk-..." \
- *     -H "X-Client-ID: my-app" \
- *     -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is the weather in Tokyo?"}]}'
+ * Test AI server — a minimal HTTP weather agent for verifying tool-call
+ * spans appear in OTEL traces. Needs `X-API-Key` and `X-Client-ID`
+ * headers; body is `{ model, messages }`. Run: `pnpm tsx scripts/ai-server.ts`.
  */
 
 const MOCK_WEATHER: Record<string, { temperature: number; condition: string }> = {

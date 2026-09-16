@@ -1,24 +1,7 @@
 /**
- * Direct Redis access for the front-door e2e suite.
- *
- * better-auth keeps its single-use verification values in SECONDARY storage
- * whenever one is configured, and this app configures Redis
- * (`platform/app/src/server/better-auth/config/secondary-storage.ts`): its
- * `internalAdapter.createVerificationValue` writes
- * `better-auth:verification:<identifier>` with the row's own expiry as the
- * TTL and skips Postgres altogether (`dist/db/internal-adapter.mjs`,
- * `executeMainFn: options.verification?.storeInDatabase`, which this app
- * does not set). The identifier is stored plain — `verification.storeIdentifier`
- * is unset, so `processIdentifier` returns it as is — which is what makes the
- * password-reset token readable here at all: it is the tail of the key,
- * `reset-password:<token>`, and the value is JSON whose `value` is the user id.
- *
- * Sign-up confirmation tokens are NOT better-auth's and do live in Postgres;
- * `db.ts` reads those.
- *
- * The database index mirrors `platform/app/scripts/start.sh`: in development
- * the app derives `REDIS_DB_INDEX` from its PORT slot (5560 → 0, 5570 → 1,
- * …) unless one is set explicitly, and the e2e app runs on 5570.
+ * Direct Redis access: better-auth's secondary storage (configured here)
+ * is where single-use verification values live. Sign-up tokens are NOT
+ * here — those are in Postgres, see `db.ts`.
  */
 import Redis from "ioredis";
 
@@ -67,11 +50,9 @@ async function scanResetKeys(): Promise<string[]> {
 }
 
 /**
- * The password-reset token most recently issued for `userId`.
- *
- * Scoped to the user rather than "newest of all": the value better-auth
- * stores carries the user id (`value`) and its own `createdAt`, so two tests
- * requesting resets close together can never read each other's link.
+ * The password-reset token most recently issued for `userId` — scoped to
+ * the user (not "newest of all") so two tests requesting resets close
+ * together can never read each other's link.
  */
 export async function findPasswordResetToken(
   userId: string,

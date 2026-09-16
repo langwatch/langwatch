@@ -1,16 +1,8 @@
 #!/usr/bin/env node
 /**
- * The mechanical half of the Date-to-Temporal migration.
- *
- * The rewrite rules beside this file carry the `fix:` templates; this driver
- * decides WHERE each one may fire. ast-grep is syntactic, so a bare
- * `ast-grep scan -U` would rewrite the Dates that a boundary still owns —
- * Prisma arguments, Intl formatting, calendar stepping. The driver reads the
- * file-local evidence instead: a moment is only rewritten when the same file
- * proves what it is, and every other site is reported as residue for hands.
- *
- *   node apply-temporal-codemod.mjs --dry-run <paths...>
- *   node apply-temporal-codemod.mjs --apply   <paths...>
+ * The mechanical half of the Date-to-Temporal migration: rewrites a moment
+ * only when the same file proves what it is — a bare ast-grep pass would
+ * also rewrite Dates a boundary still owns. Everything else is residue.
  */
 
 import { execFileSync } from "node:child_process";
@@ -93,10 +85,8 @@ function scanOne(name, file, source) {
 }
 
 /**
- * Every rule's matches for a whole batch of files at once. One ast-grep process
- * per rule and language beats one per file by two orders of magnitude, and the
- * per-file decisions afterwards are unchanged.
- *
+ * Every rule's matches for a whole batch of files: one ast-grep process
+ * per rule and language beats one per file by two orders of magnitude.
  * @returns {Map<string, Map<string, object[]>>} rule name -> file -> matches
  */
 export function collectMatches(files, { cwd = ROOT } = {}) {
@@ -129,10 +119,9 @@ export function collectMatches(files, { cwd = ROOT } = {}) {
 }
 
 /**
- * ast-grep reports byte offsets; JavaScript slices in UTF-16 code units. One
- * non-ASCII character anywhere above a match makes the two disagree, and the
- * edit lands in the middle of the next statement, so every offset is converted
- * before anything reasons about it.
+ * ast-grep reports byte offsets; JS slices in UTF-16 code units. One
+ * non-ASCII character above a match makes them disagree and the edit lands
+ * mid-statement, so every offset is converted before use.
  */
 function byteToCharOffset(source) {
   if (Buffer.byteLength(source, "utf8") === source.length) return (offset) => offset;
@@ -219,12 +208,9 @@ function valueOccurrences(source, name) {
 }
 
 /**
- * The moments this file proves. A `const` bound to `new Date()` or to
- * `new Date(<string>)` is an instant only when EVERY later read of the name is
- * one the rewrite keeps working: `getTime`, `valueOf`, `toISOString`, or an
- * operand of a comparison or subtraction whose other side is also proven. One
- * unaccounted read and the binding is left alone, because that read is where a
- * Date is still expected.
+ * A `const` bound to `new Date()`/`new Date(<string>)` is an instant only
+ * when every later read is one the rewrite keeps working (`getTime`,
+ * `valueOf`, `toISOString`, or a proven comparison/subtraction operand).
  */
 function proveInstants({ file, index, source }) {
   const declarations = new Map();

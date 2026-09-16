@@ -1,21 +1,9 @@
 // @ts-nocheck
+
 /**
- * Bundles `src/features/custom-chart-playground/bridge/chartsLib/index.ts`
- * into a plain-JS IIFE string and writes it as the generated
- * `bridge/chartsLibSource.ts`, mirroring how `bridge/shimSource.ts` exports
- * `buildShimScript()`.
- *
- * `chartsLib/index.ts` reads `window.React` / `window.Recharts` directly
- * instead of `import`-ing "react"/"recharts" — the sandboxed frame's srcdoc
- * already loaded both as CDN UMD globals before this script runs (see
- * `buildSrcdoc.ts`) — so there is nothing to mark `external` or alias here:
- * the bundle is just the library's own code, sharing the frame's single
- * React/Recharts instance rather than shipping a second copy.
- *
- * Run manually after editing chartsLib: `node scripts/build-charts-lib.mjs`.
- * The output is a committed file, not built at app-build time — same
- * treatment `shimSource.ts` gets, since both are plain strings injected into
- * an iframe srcdoc rather than app code esbuild would otherwise bundle.
+ * Bundles chartsLib into a plain-JS IIFE (`bridge/chartsLibSource.ts`,
+ * mirrors `shimSource.ts`). Reads `window.React`/`window.Recharts`
+ * directly — the sandboxed iframe loads both as CDN UMD globals first.
  */
 
 import { writeFileSync } from "node:fs";

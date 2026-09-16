@@ -1,11 +1,7 @@
 // Unit tests for check-node-resolution.mjs's classifier
-// (specs/tooling/node-resolution-check.feature). Each case spawns a real
-// node against a small fixture tree under a temp directory, exactly the way
-// the real check spawns node against a barrel — no mocking of node's
-// resolver, since the whole point of the guard is what the real resolver
-// does that TypeScript's does not.
-//
-//   node --test dev/scripts/__tests__/check-node-resolution.unit.test.mjs
+// (specs/tooling/node-resolution-check.feature). Spawns a real node against
+// a fixture tree, exactly like the real check — no mocking of node's
+// resolver, since that's the whole point of the guard.
 
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";

@@ -13,17 +13,9 @@ type GetAllResponse = {
 };
 
 /**
- * Derives a project slug for the authenticated test user.
- *
- * Reads it from organization.getAll (the same API auth.setup uses to provision
- * the org and project) rather than from the app-root redirect. The root landing
- * is persona-dependent: a user whose persona resolves to personal lands on /me,
- * not a project route, so deriving the slug from the URL was non-deterministic
- * across runs (and 404s when the governance flag gating /me is off). The API is
- * authoritative regardless of persona.
- *
- * `E2E_PROJECT_SLUG` names one project instead, for a local run against a
- * project of your choice, for example a fresh one with no data.
+ * Derives a project slug via organization.getAll, not the app-root
+ * redirect — a personal-persona user lands on /me, making a URL-derived
+ * slug non-deterministic. `E2E_PROJECT_SLUG` pins one for local runs.
  */
 export async function getProjectSlug(page: Page): Promise<string> {
   const pinned = process.env.E2E_PROJECT_SLUG;

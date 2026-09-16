@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 /**
- * Browser Test Verification Script
- *
- * Proves that an AI agent can spin up an isolated LangWatch instance
- * and drive a headless browser against it. Takes screenshots at each step.
- *
- * Usage: node dev/scripts/verify-browser-test.js [APP_PORT]
- *
- * If APP_PORT is not given, reads from .dev-port file.
+ * Proves an AI agent can spin up an isolated LangWatch instance and drive
+ * a headless browser against it, screenshotting each step. Reads the port
+ * from .dev-port if APP_PORT is not given.
  */
 const { chromium } = require("playwright-core");
 const fs = require("fs");

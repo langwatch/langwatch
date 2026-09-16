@@ -1,12 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Settings Plans Comparison Page
- *
- * @e2e scenario from specs/features/settings-plans-comparison.feature
- *
- * Verifies that a member can navigate to /settings/plans and see the
- * comparison layout with Free, Growth, and Enterprise plan columns.
+ * Settings Plans Comparison Page — @e2e scenario from
+ * specs/features/settings-plans-comparison.feature: a member navigates to
+ * /settings/plans and sees Free, Growth and Enterprise plan columns.
  */
 
 test.describe("Settings Plans Comparison", () => {

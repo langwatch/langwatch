@@ -17,10 +17,6 @@ import {
 /**
  * Feature: Scenario execution
  * Source: specs/features/agent-testing/run-dialog.feature
- *
- * As a LangWatch user
- * I want to run scenarios against my agents
- * So that I can validate their behavior meets my criteria
  */
 test.describe("Scenario Execution", () => {
   // Describe-level slow() applies to every test in the suite. The execution
@@ -51,13 +47,9 @@ test.describe("Scenario Execution", () => {
   // ===========================================================================
 
   /**
-   * Scenario: Save & Run opens the run dialog for the scenario
-   * Source: run-dialog.feature
-   *
-   * Workflow test: creates a scenario, saves it and starts the run. The
-   * platform refuses the run in a project without a model provider and the
-   * dialog reads the notice, which is what CI is. With a provider the run is
-   * queued and the run drawer opens on it.
+   * Scenario: Save & Run opens the run dialog (run-dialog.feature).
+   * Workflow test: accepts either the queued run drawer or the
+   * no-model-provider notice — that's what CI is.
    */
   test("saves and runs a scenario from the editor", async ({ page }) => {
     await givenIAmOnTheScenariosPage(page);

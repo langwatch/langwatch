@@ -1,17 +1,9 @@
 #!/usr/bin/env node
-// Every backend process runs on `node --experimental-transform-types` now
-// (tsx was removed), and node's own ESM resolver is stricter than
-// TypeScript's: it needs the on-disk extension a barrel or a deep-package
-// import resolves to, not the extensionless specifier TypeScript is happy
-// with. Four api boot failures this week were exactly this — a barrel
-// `export * from "./constants"` missing its `.ts`, a deep import into
-// `@opentelemetry/otlp-transformer/build/src/generated/root` missing its
-// `.js`, and a barrel naming a file that had been renamed away. `tsc` never
-// sees the defect because it resolves the specifier itself; this script
-// exercises node's resolver directly, the same way the real boot does.
+// Every backend process runs on `node --experimental-transform-types`, whose
+// ESM resolver needs the on-disk extension `tsc` doesn't require. This
+// script exercises node's real resolver directly, the way boot does.
 //
-// Usage:
-//   node dev/scripts/check-node-resolution.mjs [--json]
+// Usage: node dev/scripts/check-node-resolution.mjs [--json]
 import { execFileSync, spawn } from "node:child_process";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,10 +23,8 @@ export function isBrowserSkipPath(relPath) {
 }
 
 /**
- * node's ERR_MODULE_NOT_FOUND message is
- *   Cannot find module '<resolved specifier, no extension>' imported from <importer>
- * Both halves are exactly what a fix needs: the unresolvable specifier and the
- * file that named it.
+ * node's ERR_MODULE_NOT_FOUND message: "Cannot find module '<specifier>'
+ * imported from <importer>" — both halves are what a fix needs.
  */
 export function parseModuleNotFound(message) {
   const match = /^Cannot find module '(.+)' imported from (.+)$/.exec(message ?? "");
@@ -43,17 +33,9 @@ export function parseModuleNotFound(message) {
 }
 
 /**
- * Three of the entrypoints this check should exercise are files that run the
- * application: importing `apps/api/src/api.entrypoint.ts` starts listeners
- * and connects to Postgres/ClickHouse/Redis, because it calls its start
- * function unconditionally at module scope (same for the worker and tasks
- * entrypoints — tasks calls `main()` outright, which resolves secrets and
- * opens infrastructure). None of that is what this check is for: it verifies
- * *import-time module resolution*, not boot behaviour. So each of those three
- * targets is swapped for the nearest module it imports that only *defines*
- * the executable/composition without calling it — verified by hand to have
- * no top-level side effects — which still exercises every import edge the
- * real entrypoint would resolve, minus the two-line wrapper that invokes it.
+ * The real entrypoints call their start function at module scope (just
+ * importing one connects to Postgres/ClickHouse/Redis), so each is swapped
+ * for the nearest module that only *defines* it without calling it.
  */
 export const PROCESS_ENTRYPOINTS = [
   "apps/api/src/app/api-standalone.executable.ts",
@@ -84,10 +66,9 @@ import(process.argv[1]).then(
 `;
 
 /**
- * Runs one absolute path through node's real resolver in a child process (a
- * bad specifier can crash the module graph in ways not safe to catch
- * in-process) and classifies the outcome, independent of where the file
- * lives — the piece the tests exercise directly against a temp directory.
+ * Runs one absolute path through node's real resolver in a child process —
+ * a bad specifier can crash the module graph in ways unsafe to catch
+ * in-process — and classifies the outcome.
  */
 export async function probeImport(absPath, { timeoutMs = 60_000 } = {}) {
   const child = spawn(
@@ -143,10 +124,9 @@ export async function probeImport(absPath, { timeoutMs = 60_000 } = {}) {
 }
 
 /**
- * Runs one repo-relative target through node's real resolver and classifies
- * the outcome. Never counts an error other than ERR_MODULE_NOT_FOUND as a
- * resolution failure — a module that throws while *running* at import time
- * is a different defect class, out of scope here.
+ * Runs one repo-relative target through node's real resolver. Only
+ * ERR_MODULE_NOT_FOUND counts as a resolution failure — a module that
+ * throws while *running* is a different defect class.
  */
 export async function checkTarget(relPath, { timeoutMs = 60_000 } = {}) {
   const result = await probeImport(join(root, relPath), { timeoutMs });

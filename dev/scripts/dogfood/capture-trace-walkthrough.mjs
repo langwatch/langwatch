@@ -1,25 +1,7 @@
 /**
- * Trace + admin UX screenshot driver for dogfood walkthroughs.
- *
- * Uses an isolated chromium profile so it never collides with the
- * peer-agent playwright-mcp session on the shared host. Logs in via
- * the dogfood seed creds, then walks: `/me/traces` (personal Path B
- * view), admin governance pages, install drawer, and the trace
- * detail v2 drawer (`drawer.open=traceV2Details`).
- *
- * Env overrides:
- *   BASE_URL                  default http://localhost:5560
- *   DOGFOOD_USER_EMAIL        default dogfood@langwatch.local
- *   DOGFOOD_PASSWORD          default DogfoodPassword!2026
- *   OUT_DIR                   default ./.claude/dogfood-evidence/trace-walkthrough
- *   PERSONAL_PROJECT_SLUG     default personal-hc4fdei9kqog--yvcpd
- *   TRACE_IDS                 comma-separated trace ids for the detail loop
- *   TARGETS                   "all" or csv of:
- *                             me-home,me-traces,trace-details,me-configure,
- *                             me-sessions,admin-tool-catalog-templates,
- *                             admin-governance
- *   PLAYWRIGHT_TEST_PATH      absolute path to @playwright/test index.js
- *                             default = the workspace root's node_modules
+ * Trace + admin UX screenshot driver for dogfood walkthroughs, using an
+ * isolated chromium profile so it never collides with the peer-agent
+ * playwright-mcp session on the shared host.
  */
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";

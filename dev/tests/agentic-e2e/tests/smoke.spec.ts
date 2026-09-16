@@ -3,10 +3,8 @@ import { test, expect } from "@playwright/test";
 import { getProjectSlug } from "./helpers";
 
 /**
- * Smoke Tests
- *
- * Basic sanity checks that run after authentication setup.
- * These verify infrastructure is working, not user behavior.
+ * Smoke tests: basic sanity checks after auth setup, verifying
+ * infrastructure works, not user behavior.
  */
 
 test("app loads after authentication", async ({ page }) => {

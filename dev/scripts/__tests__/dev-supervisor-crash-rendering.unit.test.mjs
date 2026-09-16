@@ -1,13 +1,7 @@
-// Unit and small-integration tests for the crash-rendering layer added to
-// dev-supervisor.mjs (specs/setup/dev-supervisor-crash-rendering.feature).
-//
-// The pure classifiers/collapsers are exercised directly; the two
-// end-to-end tests spawn dev-supervisor.mjs itself in --watch mode around a
-// throwaway fixture script that writes exactly the raw text Node prints for
-// each crash shape, so the wiring (spawnOne -> wireStdout/wireStderr ->
-// classify/collapse -> write) is what is under test, not a copy of it.
-//
-//   node --test dev/scripts/__tests__/dev-supervisor-crash-rendering.unit.test.mjs
+// Unit and small-integration tests for dev-supervisor.mjs's crash-rendering
+// layer (specs/setup/dev-supervisor-crash-rendering.feature). Pure
+// classifiers are exercised directly; two end-to-end tests spawn
+// dev-supervisor.mjs itself in --watch mode, so the real wiring is tested.
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";

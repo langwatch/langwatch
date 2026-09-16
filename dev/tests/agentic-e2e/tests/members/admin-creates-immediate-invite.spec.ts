@@ -13,9 +13,7 @@ import {
 
 /**
  * Feature: Invitation Approval Workflow
- * Source: specs/members/update-pending-invitation.feature
- *
- * Scenario: Admin creates an immediate invite (lines 19-24)
+ * (specs/members/update-pending-invitation.feature, lines 19-24).
  */
 test.describe("Invitation Approval - Admin Creates Immediate Invite", () => {
   // Member-invitation requires an org plan with maxMembers>=2. A no-license

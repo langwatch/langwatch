@@ -1,21 +1,7 @@
 /**
- * Rebuilds one dev entrypoint (apps/api's or apps/worker's) into a plain CJS
- * bundle that `node` runs directly — no per-restart TypeScript transform.
- *
- * `tsx watch` re-transforms the WHOLE loaded graph on every restart (the api
- * graph alone is thousands of files), so every debounced restart paid that
- * cost again. Production already solved this for the scenario child process
- * (apps/worker/scripts/build-server.mjs): bundle once, inline first-party and
- * workspace source, keep external only what resolves a real file relative to
- * its own location or patches `require` itself. This module is that same
- * shape, generalised so both apps/api and apps/worker's DEV loop can reuse it
- * without two copies — the shared piece dev-supervisor.mjs's `--watch` mode
- * calls after each debounced change, before it restarts anything.
- *
- * esbuild itself is borrowed from apps/worker's own `node_modules` (its
- * existing devDependency, used by build-server.mjs) via `createRequire`
- * rather than `import "esbuild"`, so this file resolves regardless of which
- * app calls it and neither app needs a second copy of the dependency.
+ * Rebuilds one dev entrypoint into a plain CJS bundle so `node` runs it
+ * directly, instead of `tsx watch` re-transforming the whole graph on every
+ * restart — generalising production's own build-server.mjs approach.
  */
 
 import { readFileSync } from "node:fs";
@@ -27,32 +13,25 @@ import { OPTIONAL_EXTERNALS } from "../../../apps/worker/scripts/bundle-optional
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 /**
- * Guarded-optional native bindings some inlined library tries to `require`
- * behind a try/catch and falls back without — the same class production's
- * own OPTIONAL_EXTERNALS (apps/worker/scripts/bundle-optional-externals.mjs)
- * exists for, extended with the two native drivers `pg` and the MongoDB
- * client probe for opportunistically: never declared as a dependency on
- * purpose, and their absence is handled by the code that requires them.
+ * Guarded-optional native bindings, same class as production's
+ * OPTIONAL_EXTERNALS — never declared as a dependency on purpose, since
+ * their absence is handled by the code that requires them.
  */
 const DEV_BUNDLE_ADDITIONAL_OPTIONAL = Object.freeze(["pg-native", "kerberos"]);
 
 /**
- * Loaded lazily, on the first actual build, not at module load: this file is
- * imported by dev-supervisor.mjs unconditionally (every `--watch` run, and
- * every plain stack-lifecycle run that never bundles anything), and a
- * missing `esbuild` must only break the apps that call `buildDevBundle`, not
- * every other dev-supervisor invocation on the machine.
+ * Loaded lazily, on the first actual build, not at module load: a missing
+ * `esbuild` must only break callers of `buildDevBundle`, not every
+ * dev-supervisor invocation that imports this file unconditionally.
  */
 function requireEsbuild() {
   return createRequire(path.join(REPO_ROOT, "apps/worker/package.json"))("esbuild");
 }
 
 /**
- * Packages that resolve a real file relative to their OWN location, or patch
+ * Packages that resolve a file relative to their OWN location, or patch
  * `require` globally — inlining moves the former and breaks the latter.
- * Mirrors apps/worker/scripts/build-server.mjs's NEVER_INLINED exactly; kept
- * here rather than imported from there because reading a script meant to be
- * *run*, not imported, is the wrong direction for a shared dependency.
+ * Mirrors build-server.mjs's NEVER_INLINED, duplicated rather than imported.
  */
 const NEVER_INLINED = [
   /^@opentelemetry\//,
@@ -67,7 +46,10 @@ function basePackage(id) {
   return id.startsWith("@") ? parts.slice(0, 2).join("/") : (parts[0] ?? id);
 }
 
-/** The workspace packages `appDir`'s package.json names — always inlined, since they ship raw TypeScript. */
+/**
+ * The workspace packages `appDir`'s package.json names — always inlined,
+ * since they ship raw TypeScript.
+ */
 function workspaceBundledNames(appDir) {
   const pkg = JSON.parse(readFileSync(path.join(appDir, "package.json"), "utf8"));
   return new Set(
@@ -95,7 +77,10 @@ function externalizePlugin(workspaceBundled) {
   };
 }
 
-/** esbuild's structured build errors, one line per diagnostic, file:line included when esbuild has it. */
+/**
+ * esbuild's structured build errors, one line per diagnostic, file:line
+ * included when esbuild has it.
+ */
 function formatEsbuildErrors(err) {
   if (Array.isArray(err?.errors) && err.errors.length > 0) {
     return err.errors.map((e) => {
@@ -107,11 +92,8 @@ function formatEsbuildErrors(err) {
 }
 
 /**
- * Builds `entry` (relative to `appDir`) into `outfile`. A failed build leaves
- * whatever bundle is already on disk untouched — esbuild only writes output
- * once a build succeeds — so the caller's decision to keep the previous
- * process running on failure needs no extra bookkeeping here.
- *
+ * Builds `entry` into `outfile`. A failed build leaves the previous bundle
+ * on disk untouched — esbuild only writes output once a build succeeds.
  * @param {{ appDir: string, entry: string, outfile: string }} options
  * @returns {Promise<{ ok: true } | { ok: false, errors: string[] }>}
  */
@@ -120,14 +102,9 @@ function builtinBasePackages() {
 }
 
 /**
- * A package required by the bundled (inlined) source but left external
- * because it is `NEVER_INLINED`, and not declared in `appDir`'s own
- * `dependencies` — the class of bug production's build-server.mjs's
- * `undeclared` check exists to catch: inlining moves the require from the
- * workspace package that actually resolves it (its own `node_modules`) to
- * the app's bundle, so at runtime it resolves from the APP's `node_modules`
- * instead. A missing entry there is a silent MODULE_NOT_FOUND at boot, not a
- * build failure, unless this catches it first.
+ * A package required by inlined source but left external and not declared
+ * in `appDir`'s own deps: a missing entry is a silent MODULE_NOT_FOUND at
+ * boot, not a build failure — unless this catches it.
  */
 function findUndeclaredExternals({ appDir, metafile, workspaceBundled, builtins }) {
   const declared = new Set(Object.keys(readAppPkg(appDir).dependencies ?? {}));
@@ -173,14 +150,11 @@ export async function buildDevBundle({ appDir, entry, outfile }) {
       },
       define: {
         "import.meta.url": "importMetaUrl",
-        // NOTE: this is WRONG for any inlined module that uses
-        // import.meta.dirname to locate a SIBLING FILE ON DISK at runtime
-        // (e.g. packages/clickhouse-client's goose migration runner finding
-        // its migrations/ directory) — inlining already moved that file's
-        // logical location to the bundle's own directory, and __dirname
-        // reflects the bundle, not the original source file. Kept only so a
-        // build does not hard-crash on the reference; see the module
-        // docblock's "known gaps" note.
+        // NOTE: WRONG for an inlined module using import.meta.dirname to
+        // find a SIBLING FILE ON DISK at runtime (e.g. the clickhouse-client
+        // goose migration runner's migrations/ dir) — __dirname here means
+        // the bundle's directory, not the original source. Kept only so the
+        // build doesn't hard-crash on the reference.
         "import.meta.dirname": "__dirname",
         "import.meta.env.DEV": "true",
         "import.meta.env.PROD": "false",

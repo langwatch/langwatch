@@ -21,10 +21,6 @@ import {
  * Feature: HTTP Agent Support in Evaluations V3
  * Source: specs/evaluations-v3/http-agent-support.feature
  * Test Plan: dev/tests/agentic-e2e/plans/http-agent-evaluations.plan.md
- *
- * As a user evaluating AI agents
- * I want to use HTTP agents as targets in Evaluations V3
- * So that I can evaluate external APIs that expose my agent via HTTP endpoints
  */
 test.describe("Full Evaluation Run with HTTP Agent Target", () => {
   // fixme: blocked on missing testids — spreadsheet-cell, cell-play-button, save-agent-button
@@ -33,17 +29,7 @@ test.describe("Full Evaluation Run with HTTP Agent Target", () => {
   test.fixme();
   /**
    * Scenario: Full evaluation run with HTTP agent target
-   * Source: http-agent-support.feature lines 222-231
-   * Test Plan: Suite 1, Test 1
-   *
-   * Given I have an HTTP agent target pointing to a mock endpoint
-   * And the mock endpoint echoes the input
-   * And I have a dataset with 3 rows
-   * And I have an exact_match evaluator
-   * When I click "Evaluate"
-   * Then the HTTP agent executes for all 3 rows
-   * And evaluator results appear in the spreadsheet
-   * And aggregate pass rate is shown in the target header
+   * (http-agent-support.feature lines 222-231, Suite 1 Test 1).
    */
   test("complete HTTP agent evaluation workflow", async ({ page }) => {
     // Given I am on the evaluations page

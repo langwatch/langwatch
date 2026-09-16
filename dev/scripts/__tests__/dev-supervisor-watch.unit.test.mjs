@@ -1,13 +1,7 @@
 // Unit tests for the `--watch` debounce/ignore logic and the SIGTERM-wait-
-// SIGKILL drain primitive added to dev-supervisor.mjs
-// (specs/setup/dev-process-topology.feature: "A burst of source changes
-// restarts the API once", "A restart lets the worker drain before it
-// exits"). Exercises the module's exported functions directly — no stack
-// boot; the one place this spawns a process at all is a tiny throwaway
-// fixture script standing in for "a process that drains on SIGTERM", not
-// the api/worker application.
-//
-//   node --test dev/scripts/__tests__/dev-supervisor-watch.unit.test.mjs
+// SIGKILL drain primitive (specs/setup/dev-process-topology.feature).
+// Exercises exported functions directly, spawning only a throwaway fixture
+// script standing in for a draining process, never the real api/worker.
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
@@ -21,13 +15,9 @@ import {
 } from "../dev-supervisor.mjs";
 
 /**
- * A standalone child (its own process group) that prints READY once its
- * SIGTERM handler is installed, then, on SIGTERM, waits `drainMs` — standing
- * in for "finishing an in-flight job" — before printing DRAINED and exiting
- * 0. Never installs a SIGKILL-proof handler: the point is to observe whether
- * `stackControls` gives it the time to finish on its own. The READY
- * handshake (rather than a fixed delay) is what makes the test not race a
- * fresh `node -e` process's own startup time.
+ * Prints READY once its SIGTERM handler is installed, then on SIGTERM
+ * waits `drainMs` (standing in for in-flight work) before exiting — never
+ * SIGKILL-proof, so the test observes whether it got time to finish.
  */
 function spawnDrainingChild(drainMs) {
   return spawn(

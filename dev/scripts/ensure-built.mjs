@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-// pnpm orders `build` topologically but has no graph for `dev`, so a lane that
-// resolves a workspace package's `dist` can start before that package was ever
-// built. Only three packages resolve `dist`; every other workspace package
-// exports its own `src`. `@langwatch/mail` joined them because Node cannot load
-// a `.tsx` file: its templates are the only JSX on a server boot graph, so the
-// package compiles and the three processes import the compiled entry.
+// pnpm has no `dev` graph, so a lane resolving a workspace `dist` can start
+// before that package built. Only three packages resolve `dist` (the
+// rest export `src`); `@langwatch/mail` joined because Node can't load
+// its `.tsx` templates directly, so it compiles first.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";

@@ -1,11 +1,7 @@
 /**
  * Writes the module lists a process installs, from modules/catalogue.json.
- *
- * A module declares its own halves; no application names one. The core tier is
- * what the open-source build compiles, so the checked-in files carry core
- * entries only and an enterprise build regenerates with
- * LANGWATCH_BUILD_TIER=enterprise, which appends the enterprise tier rather
- * than guarding it at runtime (ADR-144 s6).
+ * Checked-in files carry core entries only; an enterprise build
+ * regenerates with LANGWATCH_BUILD_TIER=enterprise (ADR-144 s6).
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -45,14 +41,9 @@ function declarationsFor({ root, catalogue, half, suffix, tiers }) {
 }
 
 /**
- * What one module's App declared it reads, off `static readonly reads`.
- *
- * The App is the single source: `reads("clock", "logger")` is both the type's
- * source and boot's, so this file is a read of the declaration rather than a
- * second list to keep in agreement with it. It exists so a reviewer can see
- * every client this build makes a process open, on one page, without booting
- * anything - and so a module that quietly starts reading Redis shows up in a
- * diff.
+ * What one module's App declared it reads (`static readonly reads`) — a
+ * read of the declaration, not a second list to keep in sync. Lets a
+ * reviewer see every client a build opens, on one page, without booting it.
  */
 function membersFor({ root, entry }) {
   const appDirectory = resolve(root, entry.root, "server", "src", "app");

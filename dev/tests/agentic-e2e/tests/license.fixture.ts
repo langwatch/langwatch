@@ -1,29 +1,6 @@
 /**
- * Test-only ENTERPRISE license for the member-invitation e2e tests.
- *
- * A no-license self-hosted deployment resolves to FREE_PLAN (maxMembers=1), so
- * the org owner alone is at the cap and inviting anyone 403s. Activating this
- * license (see members/steps.ts `withEnterpriseLicense()`, which activates it
- * before each members test and removes it after) raises the org to ENTERPRISE
- * (maxMembers=100) so the invitation flows can be exercised.
- *
- * This is the pre-signed `ENTERPRISE_LICENSE_KEY` fixture from
- * `enterprise/modules/licensing/server/src/testing.ts`, signed with the
- * in-repo TEST keypair (`.../src/fixtures/license-keys.fixture.ts`
- * `TEST_PRIVATE_KEY`), plan ENTERPRISE, maxMembers=100, expires 2030-12-31. It
- * stays a copied literal even though dev/tests/agentic-e2e is a workspace member
- * since ADR-076 and COULD now import that package's fixture: this suite
- * deliberately depends on nothing but
- * @playwright/test, so its install stays a few packages rather than the app's
- * whole tree. One string against that is a fair trade — but it must stay in
- * sync (see below).
- *
- * The app trusts it only because the e2e-ci workflow sets
- * `LANGWATCH_LICENSE_PUBLIC_KEY` to the matching `TEST_PUBLIC_KEY`. If the
- * in-repo test keypair is ever rotated, update BOTH this string and the
- * workflow's public key — a mismatch makes the license fail validation, the org
- * falls back to FREE_PLAN, and these specs fail loudly (invite 403s).
- *
+ * Test-only ENTERPRISE license, a copied literal on purpose (zero extra
+ * deps). Keep in sync with e2e-ci's public-key env var on TEST key rotation.
  * gitleaks:allow — test-only signed license, not a real secret
  */
 export const E2E_ENTERPRISE_LICENSE_KEY =

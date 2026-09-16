@@ -1,23 +1,7 @@
 /**
- * Step definitions for the identity front-door bug-bash pass.
- *
- * Sources:
- *   - specs/identity/signin-signup-screens.feature
- *   - specs/identity/passkeys.feature
- *   - specs/auth/password-reset.feature
- *   - specs/identity/identifier-model.feature (VerificationToken shape only)
- *
- * These screens are reached SIGNED OUT, unlike the rest of this package,
- * whose `chromium` project reuses `.auth/user.json`. Every `.test.ts` file in
- * this directory opts out with `test.use({ storageState: { cookies: [],
- * origins: [] } })` so it never inherits the shared `browser-test@langwatch.ai`
- * session.
- *
- * Every account these steps create uses a fresh, timestamped address
- * (`generateFrontDoorEmail`) so re-runs never collide with each other, with
- * `browser-test@langwatch.ai`, or with the per-address sign-in rate limit
- * (50 attempts / 15 minutes on `/sign-in/email` — see
- * `platform/app/src/server/better-auth/config/rate-limit.ts`).
+ * Step definitions for the identity front-door bug-bash pass. Reached
+ * SIGNED OUT — unlike the rest of this package's `.auth/user.json` reuse —
+ * via `test.use({ storageState: { cookies: [], origins: [] } })` per spec.
  */
 import {
   type APIRequestContext,
@@ -34,13 +18,9 @@ import { findSignUpVerificationToken } from "./db";
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
 /**
- * The headers every direct call to a better-auth endpoint needs. better-auth's
- * origin check (`api/middlewares/origin-check`) refuses any cookie-bearing
- * POST whose `Origin` (or `Referer`) is missing or untrusted, and Playwright's
- * `page.request` sends neither on its own — so a bare `page.request.post(
- * "/api/auth/...")` from a signed-in context is a silent 403, not a sign-out.
- * The app's own tRPC endpoints do not run this check, which is why
- * `user.register` and the onboarding calls below need nothing extra.
+ * better-auth's origin-check refuses a cookie-bearing POST with no trusted
+ * `Origin`/`Referer`; `page.request` sends neither, so a bare call reads as
+ * a silent 403, not a sign-out. tRPC endpoints skip this check.
  */
 export function betterAuthRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
@@ -77,10 +57,9 @@ export async function whenIEnterANewAddressToSignUpWith(
 }
 
 /**
- * Finishes sign-up with a password: types it twice, submits, and waits for
- * the "check your email" state. Does NOT sign anybody in — see
- * `signin-signup-screens.feature` "Sign-up creates the account but does not
- * let me in until I confirm".
+ * Finishes sign-up with a password and waits for "check your email". Does
+ * NOT sign anybody in — see signin-signup-screens.feature's "does not let
+ * me in until I confirm".
  */
 export async function whenIChooseAPasswordToFinishSigningUp(
   page: Page,
@@ -100,10 +79,9 @@ export async function whenIChooseAPasswordToFinishSigningUp(
 }
 
 /**
- * Finishes sign-up with a passkey instead of a password. Requires a virtual
- * authenticator already attached to `page` (see `webauthn.ts`) — the
- * ceremony this button starts is a REAL `navigator.credentials.create()`
- * call, verified over the real `@simplewebauthn` path on the server.
+ * Finishes sign-up with a passkey; needs a virtual authenticator already
+ * attached to `page` (see `webauthn.ts`) — this is a REAL
+ * `navigator.credentials.create()` ceremony, verified server-side.
  */
 export async function whenIChooseAPasskeyToFinishSigningUp(
   page: Page,
@@ -112,11 +90,9 @@ export async function whenIChooseAPasskeyToFinishSigningUp(
 }
 
 /**
- * Reads the confirmation link's token straight out of Postgres — CI has no
- * mail provider, so there is no inbox to read it from (see `db.ts`'s header
- * for the full coupling). Polls briefly: the token row and the response that
- * put "check your email" on screen are two separate things, and the row can
- * lag the render by a beat under load.
+ * Reads the confirmation token straight out of Postgres — CI has no mail
+ * provider (see `db.ts`). Polls briefly since the row can lag the "check
+ * your email" render by a beat under load.
  */
 export async function findSignUpTokenFor(email: string): Promise<string> {
   const deadline = Date.now() + 10000;
@@ -133,10 +109,9 @@ export async function findSignUpTokenFor(email: string): Promise<string> {
 }
 
 /**
- * Asks production to issue a link, then reads the token CI cannot receive by
- * email. A missing mail provider makes the HTTP call fail after persistence;
- * observing the row distinguishes that expected delivery failure from a
- * failure to issue the link.
+ * Asks production to issue a link, then reads the token CI can't receive by
+ * email. Observing the row distinguishes an expected delivery failure
+ * (no mail provider) from a real failure to issue the link.
  */
 export async function requestSignUpVerificationToken(
   request: APIRequestContext,
@@ -180,10 +155,9 @@ const confirmedAddressSchema = z.object({
 });
 
 /**
- * Proves a fresh address through the same public endpoints as the sign-up UI.
- * CI has no inbox, so the token is read through `findSignUpTokenFor`; the
- * token is still minted, spent and exchanged for its single-use address proof
- * by production code.
+ * Proves a fresh address through the same public endpoints as the sign-up
+ * UI. CI has no inbox, so the token comes via `findSignUpTokenFor`, but
+ * production code still mints, spends and exchanges it for real.
  */
 export async function requestSignUpAddressProof(
   request: APIRequestContext,
@@ -227,19 +201,9 @@ export async function whenIOpenTheConfirmationLinkFor(
 }
 
 /**
- * Bug-bash finding #1 / #11: opening the link signs the person straight in —
- * no passkey error, no second password prompt — and lands them past the
- * sign-up screen. Bound to "Opening the link is what signs me in for the
- * first time" (signin-signup-screens.feature).
- *
- * The screen's "You're in" handoff card (`signed-in-handoff`) is set in the
- * same tick as the `hardRedirect` that leaves the page
- * (`VerificationFirstSignUp.tsx`), so against a local prod build the browser
- * is often already on the next page before the card is ever painted. It is
- * not a dependable observable, and the component test already pins it. What
- * this step asserts instead is what the person actually gets: the browser
- * leaves /auth/signup on its own, the session behind it belongs to `email`,
- * and nothing on the way asked for a password or a passkey.
+ * Bug-bash #1/#11 (signin-signup-screens.feature): asserts what the person
+ * actually gets, not the "You're in" handoff card — it's set in the same
+ * redirect tick, so it's often unpainted before the browser moves on.
  */
 export async function thenTheLinkSignsMeInWithNoSecondPrompt(
   page: Page,
@@ -360,23 +324,9 @@ export async function thenIAmCalledByMyEmailNeverNull(
 }
 
 /**
- * Declines whichever modal the app shell opens over a fresh account's first
- * screen, and does nothing when none does. Two exist today, and either can
- * arrive a beat after the page (each waits on its own query):
- *
- *   - the join-your-team takeover (`JoinYourTeamTakeover`, "Your colleagues
- *     are already here"), offered to a CONFIRMED address whose domain already
- *     has organizations — every account this suite confirms is
- *     `@langwatch.ai`, the same domain as `browser-test@langwatch.ai`'s org
- *     and every earlier front-door run's, so a link-confirmed account always
- *     gets it (the lookup answers only for verified addresses, which is why a
- *     `user.register` account, unverified, does not);
- *   - the passkey / two-step offer (`SecureAccountNudge`, "Sign in faster
- *     next time"), for a password-made account.
- *
- * Both are modals, so any step that needs to click through the shell has to
- * get past them first. Declined in turn, then checked once more, because
- * dismissing the takeover is what lets the nudge's turn come.
+ * Declines whichever modal opens first: the join-your-team takeover
+ * (confirmed same-domain address) or the passkey nudge (password account).
+ * Loops twice — dismissing one is what lets the other's turn come.
  */
 export async function whenIDeclineWhatTheShellOffersFirst(
   page: Page,
@@ -417,12 +367,9 @@ function escapeRegExp(value: string): string {
 // =============================================================================
 
 /**
- * Registers a fresh account directly (no UI), after proving its address
- * through the same confirmation endpoint as the sign-up screen.
- * No `name` is sent — `user.register`'s schema treats it as optional rather
- * than nullable (`z.string().min(1).optional()`, so an empty string would be
- * REFUSED, not accepted), and omitting it is exactly the shape a passkey or
- * front-door sign-up leaves behind, which is what finding #6 needs.
+ * Registers a fresh account directly (no UI). No `name` is sent —
+ * `user.register`'s schema is optional, not nullable, so an empty string
+ * would be REFUSED — matching what finding #6 needs.
  */
 export async function givenARegisteredAccount(
   page: Page,
@@ -488,10 +435,8 @@ export async function whenISignInWithPassword(
 }
 
 /**
- * Ends the session via better-auth's endpoint directly — no UI sign-out
- * control is needed for what these tests check, and going straight to the
- * endpoint keeps a sign-in/sign-out cycle to exactly the two requests the
- * rate limit actually counts.
+ * Ends the session via better-auth's endpoint directly — keeps a
+ * sign-in/sign-out cycle to exactly the two requests the rate limit counts.
  */
 export async function whenISignOut(page: Page): Promise<void> {
   // An empty JSON body, because better-auth answers a bodiless POST with 415
@@ -509,11 +454,9 @@ export async function whenISignOut(page: Page): Promise<void> {
 }
 
 /**
- * Bug-bash finding #2: no error flash appears within a couple of seconds of
- * a successful sign-in landing. `role="alert"` is how this app's error
- * toasts and `HandledErrorAlert`s both render (see `components/ui/toaster.tsx`
- * and `features/errors`), so this is a single check across every failure
- * surface a stray refusal could have used.
+ * Bug-bash #2: no error flash within a couple seconds of a successful
+ * sign-in. `role="alert"` covers both toasts and `HandledErrorAlert`, so
+ * this is one check across every failure surface a refusal could use.
  */
 export async function thenNoErrorFlashAppears(page: Page): Promise<void> {
   await page.waitForTimeout(2000);

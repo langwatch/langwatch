@@ -158,14 +158,9 @@ const SENTINEL_FLAG = "--sentinel";
 /** Opts a command into debounced watch-and-restart instead of a one-shot run. */
 const WATCH_FLAG = "--watch";
 /**
- * Default quiet window: how long the tree must be still before restarting.
- *
- * 750 ms rather than a few hundred because the writer that matters is an agent
- * editing across a feature package, which lands hundreds of files over several
- * seconds with gaps between them. A short window turns that into a restart per
- * gap — each one a fresh set of Postgres, ClickHouse and Redis connections. The
- * same number is the Go lane's rebuild delay (Makefile `service-watch`), so the
- * two halves of a stack can never drift apart.
+ * 750 ms: an agent write storm lands hundreds of files over several seconds
+ * with gaps, so a shorter window means a restart per gap. Matches the Go
+ * lane's rebuild delay (`service-watch`) so the two halves stay in sync.
  */
 const DEFAULT_WATCH_DEBOUNCE_MS = 750;
 /** Default watch roots, relative to cwd: the package's own source, plus every
@@ -213,15 +208,9 @@ function alive(pid) {
 }
 
 /**
- * The leader of the process group we were launched into, or null when there is
- * nothing to watch: no leader, or the leader is us, which is the shape an
- * interactive shell produces for a job of its own and where the tty already
- * sends SIGHUP to everything.
- *
- * A leader that is one of our own ancestors is deliberately NOT excluded. That
- * is the normal supervised shape: `pnpm dev` delegates through several pnpm
- * levels, all inside the launching group, and that group's leader dying is
- * exactly the event this exists to notice.
+ * The launching group's leader, or null when there is nothing to watch (the
+ * interactive-shell case, whose tty already sends SIGHUP). An ancestor
+ * leader is deliberately not excluded — that is the normal `pnpm dev` shape.
  */
 function launchingGroupLeader() {
   const result = spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], {
@@ -365,11 +354,8 @@ export function firstAppFrame(stack) {
 }
 
 /**
- * A record the child already wrote itself (`processFailureLine`'s shape:
- * JSON, a `stack` field) collapsed to one line: the stack becomes a
- * `— at file:line` suffix on the message instead of a field the renderer
- * would indent under it. Null for anything that is not JSON, or carries no
- * stack to collapse — passed through unchanged by the caller.
+ * Collapses a `processFailureLine` record to one line: the stack becomes a
+ * `file:line` suffix on the message. Null when there's nothing to collapse.
  */
 export function collapseStackRecord(line) {
   const trimmed = line.trim();
@@ -424,11 +410,9 @@ export function classifyMissingPackage(text) {
 }
 
 /**
- * The fallback shape: an exception Node dumped because it was thrown before
- * anything in the process could catch it (a module's own top-level code, an
- * unhandled rejection before the handler is installed). Looks for the first
- * line that reads as an Error banner (`SomeError: message`) and takes the
- * stack frames after it.
+ * Fallback shape: an exception thrown before anything could catch it (a
+ * top-level module, an unhandled rejection pre-handler). Finds the first
+ * Error-banner line and takes the stack frames after it.
  */
 export function classifyBootException(text) {
   const lines = text.split("\n");
@@ -480,11 +464,9 @@ export function crashRecordLine(classified) {
 }
 
 /**
- * Reads the watched child's stdout line by line. With the escape hatch on,
- * every byte is piped straight through, unread. Otherwise a record carrying a
- * `stack` (`collapseStackRecord`) is rewritten to one line and its full text
- * appended to the crash log; everything else — the ordinary structured JSON
- * the app logs while it runs — passes through untouched.
+ * Reads the child's stdout: the escape hatch passes bytes straight through;
+ * otherwise a `stack`-carrying record collapses to one line (full text kept
+ * in the crash log) and everything else passes through untouched.
  */
 function wireStdout(stream, { raw, crashLog }) {
   if (raw) {
@@ -504,10 +486,9 @@ function wireStdout(stream, { raw, crashLog }) {
 }
 
 /**
- * Reads the watched child's stderr. A Node crash dump arrives as one burst
- * and the telling line is often not the last one, so lines are held until
- * the stream has been quiet for `quietMs` (or ends), then classified as a
- * whole: a recognised crash renders as one line, anything else is echoed.
+ * Reads the child's stderr, holding lines until quiet for `quietMs` (a crash
+ * dump arrives as one burst and the telling line isn't always last), then
+ * classifies the whole burst: a recognised crash renders as one line.
  */
 function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
   if (raw) {
@@ -552,10 +533,9 @@ function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
 }
 
 /**
- * Coalesces a burst of file-change notifications into one call after the
- * tree has been quiet for `debounceMs`. Each `note(file)` both restarts the
- * quiet window and adds `file` to the set `onFire` receives, so a restart
- * always reports every file that contributed to it, not just the last one.
+ * Coalesces file-change notifications into one `onFire` call after
+ * `debounceMs` of quiet, reporting every file that contributed, not just
+ * the last one.
  */
 export function createDebouncer({ debounceMs, onFire }) {
   let timer = null;
@@ -580,10 +560,9 @@ export function createDebouncer({ debounceMs, onFire }) {
 }
 
 /**
- * Watches `dirs` (relative to cwd) and feeds every non-ignored change into
- * `debouncer`. Missing or unwatchable directories are skipped with a warning
- * — the same "never a gate" rule the rest of this file follows: a command
- * that cannot be watched still runs, just without live reload.
+ * Watches `dirs` and feeds non-ignored changes to `debouncer`. An
+ * unwatchable directory is skipped with a warning, never a gate — the
+ * command still runs, just without live reload for that path.
  */
 function watchDirs(dirs, debouncer) {
   const watchers = [];
@@ -608,16 +587,9 @@ function watchDirs(dirs, debouncer) {
 }
 
 /**
- * `--watch -- <command>`: runs `<command>` as a plain (non-detached) child —
- * deliberately in the SAME process group as this supervisor, not a group of
- * its own, so an external group-wide SIGTERM (haven's procsupervisor, or the
- * outer takedown this file does elsewhere) reaches the child directly and
- * does not depend on this process forwarding it in time — and replaces it,
- * debounced, whenever the watched tree changes. A restart targets the
- * child's own pid (never the group, which is shared with us). Exits with the
- * command's own code when it exits on its own; forwards SIGINT/SIGTERM/SIGHUP
- * to the current child rather than leaving it running underneath an
- * already-dead supervisor.
+ * Runs `<command>` in the SAME process group as this supervisor (not
+ * detached) so an external group-wide SIGTERM reaches it directly, and
+ * restarts it, debounced, by pid — never the shared group — on tree changes.
  */
 async function runWatchSupervisor(rawArgv, env) {
   const argv = rawArgv[0] === "--" ? rawArgv.slice(1) : rawArgv;
@@ -630,17 +602,9 @@ async function runWatchSupervisor(rawArgv, env) {
   const bundle = resolveBundleConfig(env);
 
   /**
-   * Rebuilds the dev bundle when one is configured; a no-op (always ok)
-   * otherwise. The import is deliberately dynamic and deliberately scoped to
-   * only this branch: packages/architecture-enforcer/tests/dev-supervisor.test.ts
-   * copies this whole file to a scratch directory and runs the copy in
-   * isolation to provoke failures that cannot be triggered from the outside
-   * (see its `supervisorWith` helper) — an invariant its own comment states
-   * plainly ("it imports nothing but node builtins, so it runs anywhere"). A
-   * static top-level `import` of a sibling file would break that the moment
-   * the copy tried to load, whether or not bundling was ever configured; a
-   * dynamic import reached only when a caller actually asks for bundling
-   * does not.
+   * The import is deliberately dynamic: dev-supervisor.test.ts copies this
+   * file to a scratch dir and runs it expecting nothing but node builtins
+   * imported at load time. A static import here would break that copy.
    */
   const rebuild = async () => {
     if (bundle === null) return { ok: true };
@@ -730,11 +694,9 @@ async function runWatchSupervisor(rawArgv, env) {
 }
 
 /**
- * Starts the command, or reports why it could not start and returns null.
- * `captureIO` is what lets the crash renderer see the child's stdout/stderr
- * at all: plain `stdio: "inherit"` is a direct fd passthrough that this
- * process never reads a byte of, so with it off (every caller but the
- * watched child) nothing here changes from before.
+ * Starts the command, or reports why and returns null. `captureIO` is what
+ * lets the crash renderer see stdout/stderr; off, `stdio: "inherit"` passes
+ * through untouched, same as before this existed.
  */
 function startChild(argv, env, detached, { captureIO = false } = {}) {
   try {
@@ -817,15 +779,8 @@ function hangUp() {
 
 /**
  * The sentinel: the stack's parent, in a session of its own, so no teardown
- * aimed at the launching group can reach it and the stack is never without a
- * guard outside that group. It idles while either the supervisor or the
- * launcher is alive (whichever of them is up owns the stack's lifetime),
- * takes the stack down when both are gone, and exits once the last lane is
- * gone — including when the stack was taken down properly and the sentinel
- * was simply never needed.
- *
- * Anything after the two pids in its argv is the guarded command, which it
- * runs and which `ps` therefore shows as what a sentinel stands for.
+ * of the launching group can reach it. Idles while the supervisor or
+ * launcher is alive, takes the stack down when both are gone.
  */
 async function runSentinel(args, env) {
   const supervisorPid = Number.parseInt(args[0] ?? "", 10);
@@ -886,10 +841,9 @@ async function runSentinel(args, env) {
 }
 
 /**
- * Starts the sentinel, which starts the stack, and waits for it to say which
- * pid the stack got. Returns null when it never does, so the caller can run
- * the command itself: an unguarded run is the cost of a sentinel that will not
- * start, and a dev server that refuses to come up is not.
+ * Starts the sentinel and waits for the stack's pid. Null means the caller
+ * runs the command itself — an unguarded run beats one that refuses to
+ * start.
  */
 async function startSentinel({ leader, argv, env }) {
   let proc = null;
@@ -959,10 +913,9 @@ async function startSentinel({ leader, argv, env }) {
 }
 
 /**
- * The supervisor's half of the handshake: the stack's pid, then its exit code.
- * Two lines rather than waiting on the sentinel itself, which stays up as long
- * as any lane does and would otherwise make a stack that exits on its own look
- * like one this had to wait for. An end with nothing on it answers both.
+ * Reads the handshake: the stack's pid, then its exit code — two lines,
+ * not a wait on the sentinel itself (it outlives the stack). A closed
+ * stream with nothing left answers both as null.
  */
 function readHandshake(stream, { onPid, onExit }) {
   if (!stream) {
@@ -1025,10 +978,9 @@ function watchLauncher({ leader, env, onGone }) {
 }
 
 /**
- * Starts the run this supervisor reports on. A detached run goes through a
- * sentinel, which is what actually spawns the stack; anything else runs the
- * command here. A sentinel that cannot be started falls back to the direct
- * run rather than failing the command.
+ * A detached run goes through a sentinel, which actually spawns the stack;
+ * anything else runs the command here. A sentinel that fails to start falls
+ * back to a direct run rather than failing the command.
  */
 async function startRun(argv, env, { detached, leader }) {
   if (detached) {
@@ -1111,14 +1063,10 @@ function exitCodeFor(childResult) {
   return code ?? 0;
 }
 
-// Guarded so tests can `import` the functions above without this running:
-// only true when this file is the one node was actually asked to execute.
-// realpathSync on both sides on purpose — a straight string compare breaks
-// the moment either path crosses a symlink (macOS's /tmp -> /private/tmp is
-// exactly this: `argv[1]` keeps the invoked, symlinked path while
-// `import.meta.url` already reports the resolved one), which read as "never
-// run" everywhere packages/architecture-enforcer/tests/dev-supervisor.test.ts
-// copies this file into a scratch tmp dir and executes the copy.
+// realpathSync on both sides: a straight string compare breaks across a
+// symlink (macOS's /tmp -> /private/tmp) since argv[1] keeps the invoked
+// path while import.meta.url reports the resolved one — exactly the case
+// dev-supervisor.test.ts hits by copying this file into a scratch tmp dir.
 function isMainModule() {
   if (!process.argv[1]) return false;
   try {

@@ -1,30 +1,10 @@
 #!/usr/bin/env node
 // @ts-nocheck
+
 /**
- * Seed realistic synthetic traffic through the real collector so analytics
- * charts look alive on a dev box.
- *
- * Unlike seed.mjs (widgets) and seed-sample-traces.ts (a fixed, idempotent
- * demo set), this script generates a large volume of RANDOM traces spread
- * over the past DAYS days, each with a unique id. It is NOT idempotent —
- * every run adds new traces on top of whatever is already there.
- *
- * Evaluations are intentionally skipped: seed-trace-evals.ts writes
- * directly into ClickHouse via an internal repository import
- * (EvaluationRunClickHouseRepository) and bypasses the event-sourcing
- * queue. That's a repo-internal path, not the plain-HTTP collector this
- * script is restricted to, so evaluation seeding is left out here.
- *
- * Env:
- *   LW_ENDPOINT  Base URL of the LangWatch app. Default http://localhost:5560
- *   LW_API_KEY   Project API key, sent as the X-Auth-Token header (required)
- *   DAYS         How many days back to spread traces over. Default 30
- *   PER_DAY      Target trace count per day (jittered). Default 40
- *   SEED         Optional integer to make the randomness reproducible
- *
- * Usage:
- *   LW_ENDPOINT=http://localhost:5560 LW_API_KEY=sk-lw-local-development-key \
- *     DAYS=30 PER_DAY=40 node platform/app/scripts/legacy-parity-widgets/seed-demo-traffic.mjs
+ * Seeds realistic synthetic RANDOM traffic through the real collector so
+ * analytics charts look alive. NOT idempotent — every run adds new
+ * traces. Evaluations are skipped (see seed-trace-evals.ts).
  */
 
 import crypto from "node:crypto";

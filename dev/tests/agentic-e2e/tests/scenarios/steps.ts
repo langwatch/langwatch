@@ -1,18 +1,7 @@
 /**
- * Step definitions for the Agent Testing feature tests.
- *
- * These functions are named to match the Gherkin language of the feature files:
- * - specs/features/agent-testing/page-structure.feature
- * - specs/features/agent-testing/cases-table.feature
- * - specs/features/agent-testing/run-dialog.feature
- *
- * Usage: import and compose these steps in test files to create readable
- * tests that map directly to the feature specifications.
- *
- * A fresh project starts at day zero: no agent, no test suite, no scenario.
- * The steps that need one of them create it when it is missing, so the same
- * test runs against an empty CI project and against a project that already
- * holds data.
+ * Step definitions for the Agent Testing feature tests (see
+ * specs/features/agent-testing/*.feature). Steps that need an agent, suite
+ * or scenario create one when missing, so the test runs on an empty project.
  */
 import { Page, expect } from "@playwright/test";
 
@@ -97,11 +86,8 @@ export async function thenISeeTheResultsTab(page: Page) {
 // =============================================================================
 
 /**
- * Given the scenarios panel has settled
- * The panel shows a skeleton while its queries are in flight. A day-zero
- * probe run against the skeleton finds no empty state, reads that as "the
- * project already has one" and skips the setup it was there to do, so the
- * steps below wait for the panel to reach one of its settled states first.
+ * Waits past the loading skeleton: a probe run against it finds no empty
+ * state, reads that as "already set up", and skips the setup it needed.
  */
 export async function givenTheScenariosPanelHasSettled(page: Page) {
   await page
@@ -113,10 +99,9 @@ export async function givenTheScenariosPanelHasSettled(page: Page) {
 }
 
 /**
- * Given the project has an agent
- * A project with no agent reads "Setup agent" first. This creates an HTTP
- * agent through the same drawer a person uses. The address does not have to
- * answer: a run against it fails, and that is a result too.
+ * Creates an HTTP agent through the same drawer a person uses, if the
+ * project has none yet. The address need not answer — a failed run is
+ * still a result.
  */
 export async function givenTheProjectHasAnAgent(page: Page) {
   await givenTheScenariosPanelHasSettled(page);
@@ -353,11 +338,9 @@ export async function whenIStartTheRun(page: Page) {
 }
 
 /**
- * Then the run is queued, or the dialog reads that no model provider is set up
- * The platform refuses a run in a project without a model provider, and the
- * dialog reads the notice in place of a queued run; that is what CI is. With a
- * provider the run drawer opens on the run: queued, waiting for a verdict,
- * judged, or failed to start, every one of them is the run being shown.
+ * Accepts either outcome: a run drawer showing any state (queued, waiting,
+ * judged, failed to start) or the no-model-provider notice — that's what
+ * CI is, since the platform refuses a run with no provider configured.
  */
 export async function thenTheRunIsQueuedOrNeedsAProvider(page: Page) {
   const drawer = page.getByTestId("agent-testing-run-drawer");

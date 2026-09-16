@@ -51,13 +51,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
 
-    /* Forces prefers-reduced-motion: reduce (the sign-in/sign-up screens'
-     * front-door ground). Without it the perpetual ground keeps interactive
-     * elements from ever settling, so Playwright's "visible, enabled and
-     * stable" actionability wait on a button never resolves and the click
-     * times out. This became load-bearing when the ground stopped being
-     * hosted-only and started rendering on the self-hosted (non-IS_SAAS)
-     * surface CI runs. */
+    /* Forces prefers-reduced-motion: reduce — without it the front-door
+     * ground animation keeps buttons from ever settling, so Playwright's
+     * actionability wait times out. Became load-bearing once the ground
+     * started rendering on the self-hosted (non-IS_SAAS) CI surface. */
     reducedMotion: "reduce",
 
     /* In CI, use the runner's preinstalled Google Chrome

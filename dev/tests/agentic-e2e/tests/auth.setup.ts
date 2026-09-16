@@ -13,14 +13,9 @@ if (!fs.existsSync(AUTH_DIR)) {
 }
 
 /**
- * Auth Setup for E2E Tests
- *
- * Creates a test user and authenticates before all tests run.
- * Session state is saved to .auth/user.json and reused by all test projects.
- *
- * Test user credentials (shared with /browser-test and verify-browser-test.js):
- * - Email: browser-test@langwatch.ai
- * - Password: BrowserTest123!
+ * Auth setup for E2E tests: creates/authenticates a test user, saving
+ * session state to .auth/user.json for reuse by all test projects.
+ * Credentials (shared with /browser-test): browser-test@langwatch.ai.
  */
 
 const TEST_USER = {
@@ -155,12 +150,9 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Org/project already exists, skipping setup.");
   }
 
-  // Step 4: Confirm the authenticated shell on a settings page. We use
-  // /settings rather than the app root because root redirects to the
-  // trace-backed personal landing, whose data fetch can disturb the layout;
-  // /settings renders the same sidebar from Postgres alone. We confirm we did
-  // not bounce back to /auth and that the sidebar rendered. (The old "Home"
-  // link no longer exists in the personal-portal sidebar.)
+  // Uses /settings, not the app root: root redirects to the trace-backed
+  // personal landing, whose data fetch can disturb layout. /settings
+  // renders the same sidebar from Postgres alone.
   console.log("Navigating to settings to confirm setup...");
   await page.goto("/settings");
 

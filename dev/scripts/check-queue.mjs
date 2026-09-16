@@ -86,10 +86,8 @@ const stderr = (line) => process.stderr.write(line);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * The CI convention: the variable is set to something that is not one of the
- * values meaning "no". CI and CLAUDECODE both follow it, so the slot limit and
- * the pressure policy read them by one rule that cannot drift apart. Mirrors
- * isTruthyEnv in tools/thuishaven/domain/checkslots.go.
+ * The CI convention: anything but "no" means yes. CI and CLAUDECODE both read
+ * it this way. Mirrors isTruthyEnv in tools/thuishaven/domain/checkslots.go.
  */
 function isTruthyEnv(value) {
   const normalized = (value ?? "").trim().toLowerCase();
@@ -97,22 +95,9 @@ function isTruthyEnv(value) {
 }
 
 /**
- * How much trouble the machine is in: "green", "amber" or "red". A mirror of
- * domain/pressure.go in tools/thuishaven, which is the source of truth for the
- * thresholds (ADR-090): swap above 40% is amber and above 75% red, compressor
- * occupancy above 10% of RAM is amber and above 20% red, and either signal
- * alone can raise the level. CHECK_PRESSURE forces a level the same way for an
- * operator and for the tests; a misspelling measures, like a CHECK_SLOTS typo.
- *
- * A machine this cannot read is green: a governor that cannot see must not
- * throttle. Only darwin is measured, because the thrash this exists to stop is
- * the compressor-and-swap spiral of a memory-oversubscribed Mac.
- *
- * CI is green whatever the machine says. The queue already stands down there,
- * and the same reasoning retires the pressure policy with it: a runner runs one
- * job and nobody is typing on it, so halving its cores buys back an interactive
- * machine that does not exist and only makes the job slower. This is what makes
- * "CI is unaffected" true rather than a side effect of the runner's kernel.
+ * How much trouble the machine is in: green/amber/red, mirroring
+ * domain/pressure.go in tools/thuishaven (ADR-090). Darwin-only, chasing the
+ * Mac compressor/swap spiral; unreadable or CI reads as green.
  */
 function resolvePressure(env) {
   const forced = (env.CHECK_PRESSURE ?? "").trim().toLowerCase();
@@ -160,10 +145,9 @@ function resolvePressure(env) {
 }
 
 /**
- * One field of `pid` read through ps, because Node knows only its own process.
- * Null when it cannot be read. `-ww` because ps otherwise cuts a command line
- * at the terminal width, and the script path this reads for sits at the end of
- * one.
+ * One field of `pid` via `ps` (Node knows only its own process). `-ww`
+ * because ps otherwise truncates a command line at the terminal width, and
+ * the script path this reads for sits at the end of one.
  */
 function psField(pid, field) {
   try {
@@ -198,17 +182,9 @@ function isQueueCommand(command) {
 }
 
 /**
- * Whether `candidate` is a slot-holding wrapper above this process: it must sit
- * in the live parent chain AND be one of the queue's own programs. Ancestry
- * alone proves nothing, because a shell is an ancestor of everything it runs,
- * so `CHECK_QUEUE_HELD=$$` would otherwise hand any agent the gate-off. A chain
- * that cannot be read answers no: a marker that cannot be verified must gate
- * nothing off.
- *
- * This is a lock on an honest door, not a vault. Anyone who may spawn processes
- * on the machine may also spawn one named `haven`. It stops the one-token
- * bypasses, which is what the queue needs: the runs it serializes are all
- * started by the wrappers themselves.
+ * `candidate` must be BOTH a queue program AND in the live parent chain —
+ * ancestry alone would let `CHECK_QUEUE_HELD=$$` grant any shell the
+ * gate-off. Not a vault: it only stops the one-token bypass.
  */
 function heldByQueueAncestor(candidate) {
   if (!Number.isInteger(candidate) || candidate <= 1) return false;
@@ -224,21 +200,9 @@ function heldByQueueAncestor(candidate) {
 }
 
 /**
- * Resolves how many checks may proceed at once.
- *
- * An explicit CHECK_SLOTS always wins, including under CI, which is what lets
- * the tests exercise the queue on a CI runner. One exception: a gate-off value
- * from an agent shell is ignored, see the comment at the check. Unset, CI gets
- * no queue at all (one job runs one check, so a gate could only add risk) and a
- * developer machine gets a limit bounded by both memory and cores: tsgo is
- * memory-hungry AND parallel, so the tighter of the two bounds is the honest
- * one. Never below 1, or the queue would deadlock every run.
- *
- * A machine already under memory pressure gets one slot, whatever the formula
- * says. The formula assumes an otherwise idle machine, and pressure is the
- * machine reporting that assumption false: its RAM is spoken for, so a second
- * concurrent check is paid for in everyone's swap. Only the derived default
- * narrows; an explicit CHECK_SLOTS is the operator's call either way.
+ * Resolves the slot count. Explicit CHECK_SLOTS always wins (even under CI),
+ * except an agent's gate-off, ignored per the check below. Otherwise:
+ * pressure forces one slot; else the tighter of a memory and a cpu bound.
  */
 function resolveSlots(env, pressure = "green") {
   const raw = (env.CHECK_SLOTS ?? "").trim();
@@ -246,15 +210,9 @@ function resolveSlots(env, pressure = "green") {
     const parsed = Number.parseInt(raw, 10);
     const gateOff = /^(off|none|unlimited|false)$/i.test(raw) || parsed === 0;
     if (gateOff) {
-      // The gate-off is the operator's lever, and agents are who the queue
-      // exists to serialize, so from an agent shell (Claude Code sets
-      // CLAUDECODE in every shell it spawns) it is honored only when the queue
-      // itself asked for it: a wrapper that already counted the run puts its
-      // own pid in CHECK_QUEUE_HELD, and only a live ancestor that is itself
-      // one of the queue's wrappers counts, so neither a copied pid nor a
-      // shell's own `$$` gates anything off. Observed in the wild: an agent
-      // prefixed CHECK_SLOTS=0 onto a whole-tree typecheck to jump the queue,
-      // and the machine ran three checks at once, 14 GB into swap.
+      // Honored only when the queue itself asked for it (see
+      // heldByQueueAncestor) — an agent must not be able to jump the queue
+      // by copying CHECK_QUEUE_HELD or its own $$.
       if (!isTruthyEnv(env.CLAUDECODE)) {
         return { slots: 0, source: "CHECK_SLOTS" };
       }
@@ -334,10 +292,9 @@ function statMtimeMs(target) {
 }
 
 /**
- * Runs `body` with the queue lock held. Whoever creates the lock directory
- * wins, and a lock left behind by a process that died mid-decision is broken
- * once it goes stale. Failing to ever get the lock runs the body anyway: a
- * miscounted slot is a far better outcome than a check that never starts.
+ * Runs `body` with the queue lock held. A lock from a process that died
+ * mid-decision is broken once stale. Never getting the lock still runs
+ * `body` — a miscount beats a check that never starts.
  */
 async function withQueueLock(dir, body) {
   // 0o700 because the uid in the directory name makes the path unique, not
@@ -511,14 +468,9 @@ async function waitForTurn({ dir, ticket, slots, pollMs, maxWaitMs, heartbeatMs 
 }
 
 /**
- * On a machine with haven installed, the queue's decisions are Go code inside
- * haven: the run is handed to `haven slot run`, which takes a slot from the
- * same flock semaphore `haven typecheck` holds — one counter for everything
- * that saturates the cores — then runs the command with CHECK_SLOTS=0 and
- * GOMEMLIMIT set, exactly as runCommand below would. Resolves to the child's
- * exit code, or null when there is no haven to delegate to (the JS queue
- * below then takes over — the fallback for machines without haven).
- * CHECK_QUEUE_IMPL=js forces the JS queue, which is how its tests pin it.
+ * With haven installed, hands the run to `haven slot run` (same flock
+ * semaphore as `haven typecheck`) instead of the JS queue below. Null means
+ * no haven to delegate to. CHECK_QUEUE_IMPL=js forces the JS path for tests.
  */
 function delegateToHaven(commandArgv, env) {
   if ((env.CHECK_QUEUE_IMPL ?? "").trim().toLowerCase() === "js") {
@@ -543,20 +495,9 @@ function delegateToHaven(commandArgv, env) {
 }
 
 /**
- * Soft memory cap for the Go-runtime tools this queue wraps (the TypeScript
- * compiler is a Go binary): GOMEMLIMIT makes the runtime collect harder to stay
- * under the limit instead of ballooning (ADR-095). Half the machine, clamped to
- * [3,6] GiB; an operator's explicit GOMEMLIMIT always wins. The haven daemon's
- * process watch is the hard backstop above this.
- *
- * Both ends of the clamp are measured, not chosen — see ADR-100. GOMEMLIMIT is
- * a ceiling the runtime expands toward, so the old cap of 10 turned an 18 GiB
- * laptop into a 9 GiB typecheck against a 2.29 GB working set; and a limit
- * below the live heap is worse than none, because the runtime collects
- * continuously and misses it anyway.
- *
- * Kept in step with domain.CheckGoMemLimit in tools/thuishaven, which is what
- * actually runs on a machine with haven installed. This is the fallback.
+ * Soft memory cap for the Go tools this queue wraps: half the machine,
+ * clamped to [3,6] GiB — measured, not chosen (ADR-095, ADR-100). Kept in
+ * step with domain.CheckGoMemLimit in tools/thuishaven.
  */
 function goMemLimit(pressure = "green") {
   if (process.env.GOMEMLIMIT) return process.env.GOMEMLIMIT;
@@ -571,11 +512,9 @@ function goMemLimit(pressure = "green") {
 }
 
 /**
- * The parallelism the queue grants the Go-runtime tools it wraps. Green sets
- * nothing (every core is the right spend for one run on an idle machine);
- * under pressure half the cores, never below two, so the run stops being
- * eleven threads all taking page faults while somebody tries to type. An
- * operator's explicit GOMAXPROCS always wins.
+ * Parallelism granted to the Go tools: green sets nothing (every core is
+ * right on an idle machine); under pressure, half the cores, never below
+ * two — so the run stops fighting someone typing over eleven page faults.
  */
 function goMaxProcs(pressure = "green") {
   if (process.env.GOMAXPROCS) return process.env.GOMAXPROCS;
@@ -590,34 +529,19 @@ function runCommand(commandArgv, pressure = "green") {
   return new Promise((resolve) => {
     const childEnv = {
       ...process.env,
-      // We are the slot for everything below us. Without this, a run holding
-      // the only slot queues behind itself the moment it reaches a bin shim
-      // (`pnpm typecheck` spawns .bin/tsgo, which is one) or a nested package
-      // script, and waits out the whole maximum wait before starting. The pid
-      // marker is what keeps this working in agent shells, where a bare
-      // CHECK_SLOTS=0 is ignored; it only convinces a descendant, so an agent
-      // cannot borrow it.
+      // We are the slot for everything below us: CHECK_SLOTS=0 plus our pid
+      // in CHECK_QUEUE_HELD is what stops a nested bin shim (e.g. tsgo) from
+      // queuing behind its own parent.
       CHECK_SLOTS: "0",
       CHECK_QUEUE_HELD: String(process.pid),
       GOMEMLIMIT: goMemLimit(pressure),
     };
     const procs = goMaxProcs(pressure);
     if (procs !== null) childEnv.GOMAXPROCS = procs;
-    // Handling these keeps the wrapper alive through a Ctrl-C so it releases its
-    // slot after the child is done, instead of dying first and leaving an entry
-    // for the next run to prune.
-    // Which signals were forwarded, not merely whether any was. A run that is
-    // interrupted and then killed by the OS dies of a signal nobody forwarded,
-    // and that is the death worth naming; a flag would have suppressed it
-    // because an earlier SIGINT set it.
-    // They go on before the spawn, not after. A signal keeps its default
-    // disposition until the first listener exists, so one arriving between the
-    // two ends the wrapper in the kernel: the interrupt reaches nobody and the
-    // command runs on with no parent. Occupancy follows the wrapper's pid, so
-    // the queue then counts that slot free and can start another check on top
-    // of a run that is still using the machine, which is the oversubscription
-    // the queue exists to prevent. No handler can see a null child, because a
-    // signal raised during this synchronous block only reaches JS a turn later.
+    // Handlers go on BEFORE spawn: a signal before a listener exists kills
+    // the wrapper, orphaning the child and freeing its slot — the exact
+    // oversubscription this queue exists to prevent. Tracks which signals
+    // fired (not just whether) so an unforwarded OS kill is named correctly.
     let child = null;
     const forwarded = new Set();
     const handlers = ["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => {

@@ -1,29 +1,10 @@
 #!/usr/bin/env node
 // @ts-nocheck
+
 /**
- * Starter dashboard: one-shot populates an "Analytics starter" dashboard
- * with 8 widgets pulled from the north-star-widgets and legacy-parity-widgets
- * packs, in a fixed order (order = vertical layout order).
- *
- * This does NOT replace the pack seeders — it reuses their env contract and
- * fetch style, but pins pre-existing (or newly created) dashboard widgets
- * onto a dashboard. Pinning does NOT move a widget: the widget's dashboardId
- * is set so it renders on the dashboard, but it stays visible and editable
- * on the playground too. See README.md.
- *
- * Env vars:
- *   LW_ENDPOINT  Base URL of the LangWatch app, e.g. https://app.langwatch.ai
- *   LW_API_KEY   Project API key, sent as the X-Auth-Token header
- *   PROJECT_ID   Target project id (path parameter for widget routes only —
- *                dashboard routes resolve the project from LW_API_KEY)
- *
- * Usage:
- *   LW_ENDPOINT=https://app.langwatch.ai LW_API_KEY=sk-... PROJECT_ID=proj_... \
- *     node platform/app/scripts/starter-dashboard/seed.mjs
- *
- * Idempotent: re-running skips the dashboard (name match), skips widgets
- * that already exist (name match), and skips pins already on this
- * dashboard (dashboardId match) — no duplicates.
+ * Starter dashboard: pins 8 widgets from the north-star/legacy-parity
+ * packs onto a dashboard, in a fixed order. Pinning does NOT move a
+ * widget — it stays visible on the playground too. Idempotent by name.
  */
 
 import fs from "node:fs";

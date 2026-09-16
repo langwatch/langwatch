@@ -1,30 +1,8 @@
 #!/usr/bin/env node
 /**
- * Finds residue: code that survives only because nothing forced its deletion.
- *
- * A refactor lands in two halves. The new shape gets written and merged; deleting
- * what it replaced needs someone to notice, and nothing in the toolchain notices.
- * `tsc` is happy, the old generation's own tests still pass, lint baselined it.
- * So both generations sit in the tree and the next reader cannot tell which one
- * they are meant to extend. Each detector asks the same question mechanically —
- * if this were deleted, what would break? — and reports where the honest answer
- * is "only the thing that exists to keep it alive".
- *
- * What each detector means, how to confirm a finding, and the reading passes this
- * script cannot do: `.claude/skills/residue/SKILL.md`.
- *
- *     node dev/scripts/find-residue.mjs [path]      # default: whole repository
- *     node dev/scripts/find-residue.mjs --only test-only,orphan
- *     node dev/scripts/find-residue.mjs --json
- *     node dev/scripts/find-residue.mjs --self-test
- *
- * Prints `detector  file:line  detail`. Exit 0 clean, 1 with findings, 2 when the
- * self-test fails.
- *
- * KNOWN LIMIT — it reads import specifiers, not the type checker, so a file
- * reached only through a string (a runtime path, a glob, a spawn by filename)
- * reads as an orphan. It resolves relative paths and workspace `@langwatch/*`
- * entries and nothing else. Findings are leads with evidence, not a delete list.
+ * Finds residue: code kept alive only because nothing forces its deletion
+ * (see `.claude/skills/residue/SKILL.md`). Reads specifiers, not types, so
+ * a string-only reference reads as an orphan — leads, not a delete list.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -36,10 +14,9 @@ const SOURCE = /\.[cm]?[jt]sx?$/;
 const TEST = /\.(?:test|spec)\.[cm]?[jt]sx?$|(^|\/)__tests__\//;
 const DETECTORS = ["orphan", "test-only", "re-export", "twin", "slack-ratchet", "dangling-guard"];
 /**
- * Files a tool finds by glob rather than by import: stories, fixtures, mocks.
- * Storybook's CSF convention has every story file export `Default`, `Sizes` and
- * `Disabled`, so leaving them in made 182 of the first run's twins a naming
- * convention rather than a finding.
+ * Files a tool finds by glob rather than by import: stories, fixtures,
+ * mocks. Storybook's CSF convention means every story exports `Default`,
+ * `Sizes` and `Disabled` — a naming convention, not a "twin" finding.
  */
 const DISCOVERED =
   /\.stories\.[cm]?[jt]sx?$|(^|\/)\.storybook\/|(^|\/)__(?:fixtures|mocks|snapshots)__\//;
@@ -55,18 +32,19 @@ const read = (file) => {
 };
 
 /**
- * Blanks line and block comments so a specifier inside a doc example is not read
- * as an edge. Line count is preserved: every finding is reported as `file:line`,
- * and a strip that deletes newlines silently moves each one up by the size of
- * the doc comment above it — which is how a `type` at line 101 was first
- * reported at 96.
+ * Blanks line/block comments so a specifier inside a doc example isn't read
+ * as an edge, preserving line count — deleting newlines here would shift
+ * every later finding's reported line number.
  */
 const stripComments = (text) =>
   text
     .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "))
     .replace(/(^|[^:])\/\/[^\n]*/g, (_match, prefix) => prefix);
 
-/** Every module specifier the file names: static import, `export ... from`, and dynamic `import()`. */
+/**
+ * Every module specifier the file names: static import, `export ... from`,
+ * and dynamic `import()`.
+ */
 export const specifiersIn = (text) => {
   const source = stripComments(text);
   const found = [];
@@ -115,7 +93,10 @@ const packageDirs = () =>
     .filter((file) => file && !/(^|\/)node_modules\//.test(file))
     .map((file) => (dirname(file) === "." ? "" : dirname(file)));
 
-/** name -> { dir, entries: Map<subpath, file> } for every workspace package, plus its declared roots. */
+/**
+ * name -> { dir, entries: Map<subpath, file> } for every workspace
+ * package, plus its declared roots.
+ */
 /** Every `exports`/`main`/`bin` target a manifest declares, as raw repo-relative specs. */
 const manifestEntries = ({ dir, manifest }) => {
   const entries = new Map();
@@ -174,11 +155,9 @@ const readWorkspace = () => {
 };
 
 /**
- * Turns declared entries into files that exist. A published package points its
- * `exports` at built output, so `./dist/observability-sdk/index.d.ts` has to be
- * read back as `src/observability-sdk/index.ts` — without that rewrite the whole
- * TypeScript SDK reads as unreachable, which is how the first full run reported
- * 539 phantom test-only files in one package.
+ * Turns declared entries into files that exist: a package's `exports` may
+ * point at built output (`./dist/x/index.d.ts`), which must map back to
+ * `src/x/index.ts` or the whole SDK reads as unreachable.
  */
 export const resolveRoots = ({ rootSpecs, known }) => {
   const roots = new Set();
@@ -325,7 +304,10 @@ const packageOf = (file, workspace) => {
 
 // --- detectors ---------------------------------------------------------------
 
-/** A file the loader reaches without anyone importing it: entrypoints, configs, and declared roots. */
+/**
+ * A file the loader reaches without anyone importing it: entrypoints,
+ * configs, and declared roots.
+ */
 const isDeclaredRoot = (file, workspace) =>
   workspace.roots.has(file) ||
   /(^|\/)[\w.-]*\.config\.[cm]?[jt]s$/.test(file) ||
@@ -370,7 +352,10 @@ export const findGraphResidue = ({ files, workspace, graph }) => {
   return findings;
 };
 
-/** The first `export ... from "./sibling"` line, or null. Bare-package re-exports are a package's own business. */
+/**
+ * The first `export ... from "./sibling"` line, or null. Bare-package
+ * re-exports are a package's own business.
+ */
 export const reExportSites = (text) => {
   const source = stripComments(text);
   const sites = [];

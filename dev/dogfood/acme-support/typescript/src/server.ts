@@ -1,9 +1,7 @@
 /**
  * The ACME support application: one HTTP endpoint over the support agent.
- *
- * Run it with `pnpm dev`. The same process serves `POST /chat` and answers
- * simulations from LangWatch, because `connectAgent` opens one outbound
- * connection when the module loads.
+ * `pnpm dev` runs it; the same process serves POST /chat and answers
+ * LangWatch simulations, since `connectAgent` opens a connection on load.
  */
 import "dotenv/config";
 
