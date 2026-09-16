@@ -84,6 +84,56 @@ answers success to a dropped write, which is the failure the rule above exists
 to prevent. Making that refusal loud is a one-line change in
 `transport/tracked-event.rest.ts`, which is lane-owned at the time of writing.
 
+## The largest single behavioural cause: family error handlers are bound nowhere
+
+Seven modules export a per-family REST error handler —
+`trackedEventRestErrorHandler`, `scenarioRestErrorHandler`,
+`scenarioEventErrorHandler`, `simulationRunErrorHandler`, `agentRestErrorHandler`,
+`suitesAliasErrorHandler`, `scimProtocolErrorHandler`. **Every one of them is
+re-exported from its module's `index.ts` and bound by nobody.**
+`apps/api/src/app-rest/api-rest.host.ts:315` mounts every family with the same
+global fallback, `onError: familyErrors`, whose own comment calls it "the
+envelope a family that names none of its own answers a refusal in" — so the
+fallback is doing duty for every family because no family can name one.
+
+The framework expects otherwise. `packages/api/src/rest/runtime.ts:632` raises a
+typed refusal precisely so "a family with an `onError` of its own must not
+answer 500 for a request every other family answers 422 for", and
+`credential.ts:349` re-exports `RestErrorHandler` "so a feature package needs no
+dependency on Hono to name the argument its `errorHandler` takes". The seam is
+missing in the middle: `defineRestRouter`'s declaration carries no
+`errorHandler` field, so nothing can travel from the module to the mount.
+
+This is measurable, and it is the branch's largest behavioural regression class.
+Every operation below answers a 500 where main answered the right code, and each
+belongs to a module whose handler is unbound:
+
+| operation | main → branch | family handler, unbound |
+| --- | --- | --- |
+| `GET /api/scenarios/{id}` | 404 → **500** | `scenarioRestErrorHandler` |
+| `GET /api/scenarios/{id}/versions` | 404 → **500** | `scenarioRestErrorHandler` |
+| `GET /api/test-suites/{id}` | 404 → **500** | `suitesAliasErrorHandler` |
+| `PATCH /api/test-suites/{id}` | 404 → **500** | `suitesAliasErrorHandler` |
+| `POST /api/test-suites/{id}/run` | 404 → **500** | `suitesAliasErrorHandler` |
+| `DELETE /api/test-suites/{id}` | 200 → **500** | `suitesAliasErrorHandler` |
+| `GET /api/simulation-runs` | 200 → **503** | `simulationRunErrorHandler` |
+| `POST /api/events/track` | 400 → **500** | `trackedEventRestErrorHandler` |
+
+A customer asking for a scenario that does not exist is told "An unknown error
+occurred" instead of 404. Per `dev/docs/best_practices/error-handling.md` that
+is a bug in the feature, not a gap in the error system.
+
+**The fix is one seam, not eight ports.** Give the declaration an
+`errorHandler` (the handlers already have the right shape,
+`(boundary: RestErrorHandler) => RestErrorHandler`), and make the host use
+`declaration.errorHandler?.(familyErrors) ?? familyErrors` at
+`api-rest.host.ts:315`. Files are clean as of this writing except
+`tracked-event.rest.ts` and `gateway-platform.rest.ts`, which are lane-owned.
+Worth its own lane: it needs one design choice — whether the handler attaches on
+the router builder before `.build()` or on `defineServerModule` beside
+`withTransportFacts` — because today each handler is written *after* its
+router's `.build()` call.
+
 ## Reclassified
 
 - **`GET /api/traces/{traceId}/transcript` is not a gap.** The pre-conversion
