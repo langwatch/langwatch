@@ -408,6 +408,32 @@ export async function whenIDeclineWhatTheShellOffersFirst(
   }
 }
 
+/**
+ * Declines ONLY the join-your-team takeover, leaving whatever is underneath it
+ * standing.
+ *
+ * `whenIDeclineWhatTheShellOffersFirst` answers both modals, which is what a
+ * step that just wants to reach the shell needs. A test whose SUBJECT is the
+ * nudge cannot use it — it would dismiss the thing being asserted. The
+ * takeover still has to go first, because it opens over the nudge and takes
+ * the rest of the page out of the accessibility tree with it: a
+ * `getByRole("button", { name: "Not now" })` matches by substring, so with the
+ * takeover up the click lands on its "Not now — keep working on my own" and
+ * the nudge is left open behind it.
+ */
+export async function whenIDeclineTheJoinTakeover(page: Page): Promise<void> {
+  const takeover = page.getByRole("dialog", {
+    name: "Your colleagues are already here",
+  });
+  try {
+    await takeover.waitFor({ state: "visible", timeout: 15000 });
+  } catch {
+    return;
+  }
+  await takeover.getByRole("button", { name: /keep working on my own/ }).click();
+  await expect(takeover).not.toBeVisible();
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

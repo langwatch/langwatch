@@ -22,6 +22,7 @@ import {
   generateFrontDoorEmail,
   givenARegisteredAccount,
   givenMyAccountHasAWorkspace,
+  whenIDeclineTheJoinTakeover,
   whenISignInWithPassword,
   whenISignOut,
 } from "./steps";
@@ -56,6 +57,13 @@ test.describe("Passkeys", () => {
       await whenISignInWithPassword(page, { email, password });
       await givenMyAccountHasAWorkspace(page);
       await page.goto("/settings");
+
+      // This account's address is confirmed and `@langwatch.ai`, so the shell
+      // also offers it the organizations already on that domain — and that
+      // takeover opens OVER the nudge. It has to be answered first or the
+      // "Not now" below lands on it instead (substring match), leaving the
+      // nudge standing and failing the assertion after it.
+      await whenIDeclineTheJoinTakeover(page);
 
       const nudge = page.getByTestId("secure-account-nudge");
       await expect(nudge).toBeVisible({ timeout: 10000 });

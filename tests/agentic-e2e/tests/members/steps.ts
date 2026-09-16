@@ -23,10 +23,16 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // session's active org), not project-prefixed — every app nav link uses this
   // exact href (see platform/app/src/routes.tsx). The org context comes from the
   // authenticated session, not the URL.
+  //
+  // The address is kept rather than updated to `/settings/directory` on
+  // purpose: members became the first cut of Directory, and `members.tsx` is
+  // now a `<Navigate>` that forwards the old address on. Arriving the way a
+  // stale link does is what proves that forward still works, so this step
+  // covers the redirect as well as the page it lands on.
   await page.goto(`/settings/members`);
-  await expect(
-    page.getByRole("heading", { name: "Organization Members" })
-  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
