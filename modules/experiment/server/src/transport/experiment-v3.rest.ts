@@ -1,3 +1,4 @@
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 /**
  * `/api/experiments/*` - the workbench's project-keyed doors for the CI/CD
  * run, run reads and saved setup. Each route names its required permission,
@@ -12,16 +13,10 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/kernel";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
-
 import {
   ExperimentNotFoundError,
   ExperimentRunNotFoundError as RunNotFoundError,
+  ExperimentRunLoopUnavailableError,
   ExperimentVersionNotFoundError,
   InvalidExperimentConfigurationError,
   persistedEvaluationsV3StateSchema,
@@ -31,21 +26,27 @@ import {
   type EvaluationsV3State,
   type ExecutionScope,
 } from "@langwatch/experiment-contract";
-import { z } from "zod";
+import { HandledError } from "@langwatch/handled-error";
+import { moduleApi } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";
+import { z } from "zod";
 
-import type { ExperimentApp } from "#app/experiment.app";
 import type {
   ExperimentV3RestSession,
   ExperimentV3RunLoop,
 } from "#app/experiment-workbench.members";
+import type { ExperimentApp } from "#app/experiment.app";
+
+import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
+import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
+import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import type { LoadedExecutionData } from "../services/experiment-execution-data.service.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
-import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
-import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
-import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
@@ -67,6 +68,13 @@ export interface ExperimentV3RestApi {
     projectId: string,
     permission: AuthzPermission,
   ): Promise<boolean>;
+  abortWorkbenchRun(
+    input: Readonly<{
+      userId: string | null;
+      projectId: string;
+      runId: string;
+    }>,
+  ): Promise<{ success: true; runId: string; message: "Abort requested" }>;
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
   /**
@@ -101,18 +109,6 @@ export interface ExperimentV3AliasApi {
 export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>()("experiment");
 
 /** The refusal a run door answers where this process composed no run loop. */
-export class ExperimentRunLoopUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ExperimentRunLoopUnavailableError";
-  }
-}
-
 /**
  * A JSON answer this door writes itself, rather than validating against one
  * success schema — each route states its 200 body in its own words.

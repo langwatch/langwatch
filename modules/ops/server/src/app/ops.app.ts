@@ -1,3 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
+
+import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
 /** Operator back office application: holds every capability the feature api
  * reaches, and centralizes rules the transport was deciding separately. */
 import {
@@ -5,60 +8,91 @@ import {
   type AuditLogApi as AuditLogApiContract,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
-import { FeatureFlagApi,listFeatureFlags } from "@langwatch/feature-flag-contract";
-import type {
-  FeatureFlagRules,
-  OperatorFeatureFlagCatalogue,
-} from "@langwatch/feature-flag-contract";
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { OpsService } from "../services/ops.service.ts";
-import type { AdminIdentity, AggregateDiscovery, AggregateEventView, AggregateProcessManager, AggregateSearchResult, Anomaly, AnomalyKind, DashboardData, DeadLetterCount, DeadOutboxMessageView, GroupInfo, OpsSnapshotService, OutboxAttemptView, ProcessAuditEntryView, ProcessFleetSummary, ProcessInstanceDetail, ProcessInstanceRow, ProcessOutboxMessageView, ProcessWakeRow, ProjectionStateAtEvent, ReplayHistoryEntry, ReplayStatus,
-  BugReport,
-  BugReportListing,
-  ListBugReportsInput,
-  OpsApiGetBadgeCountsOutput,
-  OpsEventLogSearchWindow,
-  OpsGrafanaLinkConfig,
-  OpsMigrationCohortResult,
-  OpsMigrationEnrollmentListing,
-  OpsMigrationOrganizationMatch,
-  OpsMigrationOverview,
-  OpsMigrationTargetedRunResult,
-  OpsOperator,
-  OpsOperatorPermission,
-  OpsPipelineRegistrations,
-  OpsExplainAnswer,
-  OpsExplainRequest,
-  OpsScope,
-  SubmitBugReport } from "@langwatch/ops-contract";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import type {
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+  RegisteredStateProjection,
+  ReplayService as EventingReplayService,
+} from "@langwatch/eventing";
+import {
+  FeatureFlagApi,
+  listFeatureFlags,
+  type FeatureFlagRules,
+  type OperatorFeatureFlagCatalogue,
+} from "@langwatch/feature-flag-contract";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/kernel";
+import {
+  AdminSessionExpiredError,
+  AdminSurfaceHiddenError,
+  OpsApi,
+  adminResourceNameSchema,
+  type AdminIdentity,
+  type AggregateDiscovery,
+  type AggregateEventView,
+  type AggregateProcessManager,
+  type AggregateSearchResult,
+  type Anomaly,
+  type AnomalyKind,
+  type BugReport,
+  type BugReportListing,
+  type DashboardData,
+  type DeadLetterCount,
+  type DeadOutboxMessageView,
+  type GroupInfo,
+  type ListBugReportsInput,
+  type OpsApiGetBadgeCountsOutput,
+  type OpsEventLogSearchWindow,
+  type OpsExplainAnswer,
+  type OpsExplainRequest,
+  type OpsGrafanaLinkConfig,
+  type OpsMigrationCohortResult,
+  type OpsMigrationEnrollmentListing,
+  type OpsMigrationOrganizationMatch,
+  type OpsMigrationOverview,
+  type OpsMigrationTargetedRunResult,
+  type OpsOperator,
+  type OpsOperatorPermission,
+  type OpsPipelineRegistrations,
+  type OpsScope,
+  type OpsSnapshotService,
+  type OutboxAttemptView,
+  type ProcessAuditEntryView,
+  type ProcessFleetSummary,
+  type ProcessInstanceDetail,
+  type ProcessInstanceRow,
+  type ProcessOutboxMessageView,
+  type ProcessWakeRow,
+  type ProjectionStateAtEvent,
+  type ReplayHistoryEntry,
+  type ReplayStatus,
+  type RunAdminOperationInput,
+  type StartAdminImpersonationInput,
+  type StopAdminImpersonationInput,
+  type SubmitBugReport,
+} from "@langwatch/ops-contract";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
+import { type Instant, nowInstant } from "@langwatch/time";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
-import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
+import { z } from "zod";
+
+import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
+import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
-import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
-import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import { z } from "zod";
-import { buildOpsInfrastructure } from "./ops-composition.build.ts";
-import { timingSafeEqual } from "node:crypto";
-import { type Instant, nowInstant } from "@langwatch/time";
-import {
-  buildExplainQuery,
-  redactQueryForAudit,
-} from "../rules/ops-clickhouse-explain.rules.ts";
-import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 
-import type { RegisteredFoldProjection, RegisteredMapProjection, RegisteredStateProjection, ReplayService as EventingReplayService } from "@langwatch/eventing";
+import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
+import type { OpsService } from "../services/ops.service.ts";
+import { buildOpsInfrastructure } from "./ops-composition.build.ts";
 /**
  * Who an operator request is attributed to: the impersonator where there is
  * one, so a back-office read is recorded against the human who made it rather
@@ -85,6 +119,12 @@ const EVENT_LOG_SEARCH_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
 
 /** What every audited row on the support inbox points at. */
 const BUG_REPORT_TARGET_KIND = "bugReport";
+
+const ADMIN_RESOURCE_NAMES: Readonly<Record<string, string>> = {
+  organizations: "organization",
+  subscriptions: "subscription",
+  teams: "team",
+};
 
 /** One process ref, the triple every process-manager read is keyed by. */
 export type OpsProcessRef = {
@@ -268,11 +308,7 @@ export interface OpsSystemMigrationRunner {
     minimumWriterGeneration: string;
     actorUserId: string;
   }): Promise<void>;
-  rollBack(input: {
-    migrationName: string;
-    tenantId: string;
-    actorUserId: string;
-  }): Promise<void>;
+  rollBack(input: { migrationName: string; tenantId: string; actorUserId: string }): Promise<void>;
 }
 
 /** Team alert for a filed report. Best-effort: intake already succeeded. */
@@ -809,6 +845,57 @@ export class OpsApp implements OpsApi {
   adminOperation(input: Parameters<OpsService["adminOperation"]>[0]) {
     return this.#dependencies.ops.adminOperation(input);
   }
+
+  async startAdminImpersonation(input: StartAdminImpersonationInput) {
+    const staff = this.admitBackOfficeStaff(input.actor);
+    const session = this.#adminSession(input.session);
+
+    await this.#dependencies.ops.startImpersonation({
+      sessionId: session.id,
+      impersonatorUserId: staff.id,
+      userIdToImpersonate: input.userIdToImpersonate,
+      reason: input.reason,
+      req: input.req,
+    });
+
+    return { message: "Impersonation started" } as const;
+  }
+
+  async stopAdminImpersonation(input: StopAdminImpersonationInput) {
+    this.admitBackOfficeStaff(input.actor);
+    const session = this.#adminSession(input.session);
+
+    await this.#dependencies.ops.stopImpersonation({ sessionId: session.id });
+
+    return { message: "Impersonation ended" } as const;
+  }
+
+  runAdminOperation(input: RunAdminOperationInput) {
+    const staff = this.admitBackOfficeStaff(input.actor);
+    const resource = adminResourceNameSchema.safeParse(
+      ADMIN_RESOURCE_NAMES[input.resource] ?? input.resource,
+    );
+
+    if (!resource.success) {
+      throw new ValidationError("Unknown admin resource", {
+        meta: { fieldErrors: { resource: ["This isn't a resource the admin API serves."] } },
+      });
+    }
+
+    return this.#dependencies.ops.adminOperation({
+      resource: resource.data,
+      method: input.method,
+      params: input.params,
+      actorId: staff.id,
+      req: input.req,
+    });
+  }
+
+  #adminSession(session: StopAdminImpersonationInput["session"]): { id: string } {
+    if (!session) throw new AdminSessionExpiredError();
+
+    return session;
+  }
   listBlobQueues() {
     return this.#dependencies.ops.listBlobQueues();
   }
@@ -1064,9 +1151,7 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.systemMigrations.getEnrollments(input);
   }
 
-  searchMigrationOrganizations(input: {
-    query: string;
-  }): Promise<OpsMigrationOrganizationMatch[]> {
+  searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]> {
     return this.#dependencies.systemMigrations.searchOrganizations(input);
   }
 
@@ -1345,7 +1430,6 @@ export interface OpsKillSwitchDescriptor {
   pipelineName: string;
 }
 
-
 export interface OpsEventingIntrospection {
   /** Every fold, map and state projection mounted across the pipelines. */
   projections(): OpsProjectionMetadata[];
@@ -1362,7 +1446,6 @@ export interface OpsEventingIntrospection {
    */
   dejaViewProjections(): OpsDejaViewProjection[];
 }
-
 
 export interface OpsSnapshotRedis {
   eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
@@ -1406,7 +1489,6 @@ export type OrganizationDataplane =
   | Readonly<{ kind: "shared" }>
   | Readonly<{ kind: "private"; endpoint: string }>;
 
-
 export interface OrganizationDataplaneResolver {
   /**
    * Synchronous: the routing table is an environment fact read once at boot,
@@ -1415,12 +1497,8 @@ export interface OrganizationDataplaneResolver {
   dataplaneFor(organizationId: string): OrganizationDataplane;
 }
 
-
 export interface QueuePayloadDecoder {
-  tryDecode(input: {
-    queueName: string;
-    value: string;
-  }): Promise<Record<string, unknown> | null>;
+  tryDecode(input: { queueName: string; value: string }): Promise<Record<string, unknown> | null>;
 }
 
 /**
@@ -1561,4 +1639,3 @@ export interface UsageStatsTelemetryClient {
 export interface UsageStatsErrorReporter {
   capture(input: { instanceId: string; error: unknown }): Promise<void>;
 }
-

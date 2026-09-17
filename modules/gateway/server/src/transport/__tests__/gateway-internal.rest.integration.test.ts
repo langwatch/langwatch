@@ -11,14 +11,14 @@ import type {
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
-import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
 } from "../../repositories/gateway-guardrail.repository.ts";
+import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
 import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
@@ -382,12 +382,10 @@ describe("the gateway internal control plane", () => {
       );
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        error: {
-          type: "permission_denied",
-          code: "missing_signature",
-          message: "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
-        },
+      expect(await response.json()).toMatchObject({
+        type: "unauthenticated",
+        code: "permission_denied",
+        meta: { reason: "missing_signature" },
       });
       expect(changes.since).not.toHaveBeenCalled();
     });
@@ -420,12 +418,10 @@ describe("the gateway internal control plane", () => {
       );
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        error: {
-          type: "permission_denied",
-          code: "invalid_signature",
-          message: "signature mismatch",
-        },
+      expect(await response.json()).toMatchObject({
+        type: "unauthenticated",
+        code: "permission_denied",
+        meta: { reason: "invalid_signature" },
       });
       expect(changes.since).not.toHaveBeenCalled();
     });
@@ -440,12 +436,9 @@ describe("the gateway internal control plane", () => {
       );
 
       expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({
-        error: {
-          type: "internal_error",
-          code: "gateway_internal_secret_missing",
-          message: "Gateway internal authentication is not configured",
-        },
+      expect(await response.json()).toMatchObject({
+        type: "internal_error",
+        code: "internal_error",
       });
     });
   });

@@ -10,35 +10,28 @@ import {
   MANAGEMENT_API_VERSION,
   type RestRawResult,
 } from "@langwatch/api/rest";
-import { createLogger } from "@langwatch/observability";
-import { resolveRequestBound } from "@langwatch/plans";
 import {
-  ExperimentRunNotFoundError as RunNotFoundError,
+  abortExperimentRunRequestSchema,
+  abortExperimentRunResponseSchema,
   createInitialUIState,
   executionRequestSchema,
   type EvaluationsV3State,
 } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { HTTPException } from "hono/http-exception";
 
+import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
-import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import {
   ExperimentExecutionDataService,
   type LoadedExecutionData,
 } from "../services/experiment-execution-data.service.ts";
+import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import { ExperimentRunResultsWriterService } from "../services/experiment-run-results-writer.service.ts";
 import { ExperimentRunStateMirrorService } from "../services/experiment-run-state-mirror.service.ts";
-import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import { ExperimentV3RestApi, jsonAnswer, runLoopOf } from "./experiment-v3.rest.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
-const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /**
  * Who the session door let in, read off the door's own answer. A project key
@@ -199,50 +192,13 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── POST /abort ────────────────────────────────────────────────────────
-  // The body is read unparsed: the two refusals below are this door's own
-  // words, and they have been on the wire since before the rewrite.
   .post("/abort", "abortExperimentRun")
-  .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withInput(abortExperimentRunRequestSchema)
   .withAccess(deferredScope({ reason: BODY_NAMES_THE_PROJECT }))
-  .withRawResponse({ produces: "application/json" })
+  .withOutput(abortExperimentRunResponseSchema)
   .withDocs({ hide: true })
   .withMiddleware(experimentWorkbenchCaller)
-  .handle(async ({ app, raw }, caller): Promise<RestRawResult> => {
-    let body: { projectId?: string; runId?: string };
-    try {
-      body = JSON.parse(raw) as { projectId?: string; runId?: string };
-    } catch {
-      return jsonAnswer({ error: "Invalid request body" }, 400);
-    }
-
-    const { projectId, runId } = body;
-    if (!projectId || !runId) {
-      return jsonAnswer(
-        { error: "Invalid request body", details: "projectId and runId are required" },
-        400,
-      );
-    }
-
-    const person = await permittedPerson({ app, userId: caller.userId, projectId });
-    if (person instanceof Response) return person;
-
-    const { ports: runPorts, progress } = runLoopOf(app.run());
-
-    // The runId is attacker-controlled: verify it is owned by the authenticated project before
-    // signaling an abort, or a caller could abort another tenant's run by guessing its id.
-    const ownerProjectId =
-      (await runPorts.abort.findRunningProjectId(runId)) ??
-      (await progress.findRunState(runId))?.projectId;
-    if (!ownerProjectId || ownerProjectId !== projectId) {
-      throw new RunNotFoundError(runId);
-    }
-
-    logger.info({ projectId, runId }, "Requesting abort");
-    await ExperimentRunOrchestratorService.requestAbort({ abort: runPorts.abort, runId });
-
-    return jsonAnswer({ success: true, runId, message: "Abort requested" }, 200);
-  })
+  .handle(({ app, input }, caller) => app.abortWorkbenchRun({ ...input, userId: caller.userId }))
 
   .build();
 

@@ -1,4 +1,6 @@
 import { moduleApi } from "@langwatch/kernel";
+
+import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection.ts";
 import type {
   GithubAppConfig,
   GithubInstallation,
@@ -9,8 +11,8 @@ import type {
   GithubPullRequestRef,
   GithubRepositoryRef,
   GithubTurnToken,
+  GithubWebhookEnvelope,
 } from "./github.ts";
-import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection.ts";
 
 /** Callable GitHub installation, webhook and pull-request capabilities. */
 export interface GithubApi {
@@ -27,6 +29,11 @@ export interface GithubApi {
   popupResponseHtml(login: string): string;
   popupErrorHtml(message: string): string;
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null;
+  applyWebhookPayload(input: {
+    payload: GithubWebhookEnvelope;
+    eventType: string | undefined;
+    deliveryId: string | undefined;
+  }): Promise<void>;
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]>;
   findByInstallationId(installationId: string): Promise<GithubInstallation | null>;
   isOrganizationMember(input: { userId: string; organizationId: string }): Promise<boolean>;

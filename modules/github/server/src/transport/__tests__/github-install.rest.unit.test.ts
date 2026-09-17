@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 /**
  * @vitest-environment node
  * The installation flow's routes and their `/github-langy/*` aliases.
@@ -9,12 +11,11 @@ import type {
   GithubAppConfig,
   GithubInstallStatePayload,
 } from "@langwatch/github-contract";
-import { createHmac } from "node:crypto";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
 import { GithubInstallNonceRedisRepository } from "../../repositories/redis/redis.github-install-nonce.repository.ts";
+import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
 import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
 
 const SIGNING_KEY = "x".repeat(64);
@@ -94,6 +95,22 @@ function mount(
     },
     parsePullRequestEvent: () => null,
     applyPullRequestEvent: async () => true,
+    applyWebhookPayload: async ({ payload, eventType }) => {
+      if (eventType !== "installation" && eventType !== "installation_repositories") return;
+
+      const action = typeof payload.action === "string" ? payload.action : undefined;
+      const installation = payload.installation;
+      const id =
+        typeof installation === "object" &&
+        installation !== null &&
+        "id" in installation &&
+        typeof installation.id === "number"
+          ? installation.id
+          : undefined;
+      if (action && id !== undefined) {
+        webhookEvents.push({ action, installationId: String(id) });
+      }
+    },
   };
 
   const installation: GithubInstallApi = {
@@ -162,15 +179,15 @@ describe("given the declared installation family", () => {
   it("answers at exactly the addresses the App registrations point at", () => {
     const declaration = githubInstallRest.router();
 
-    expect(declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`)).toEqual(
-      [
-        "GET /api/github/install",
-        "GET /api/github/setup",
-        "POST /api/github/webhook",
-        "GET /api/github-langy/setup",
-        "POST /api/github-langy/webhook",
-      ],
-    );
+    expect(
+      declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`),
+    ).toEqual([
+      "GET /api/github/install",
+      "GET /api/github/setup",
+      "POST /api/github/webhook",
+      "GET /api/github-langy/setup",
+      "POST /api/github-langy/webhook",
+    ]);
     expect(declaration.addressing).toBe("literal");
   });
 

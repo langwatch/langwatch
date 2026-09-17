@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import {
   commitMessageSchema,
   handleSchema,
@@ -101,7 +102,7 @@ export const assignTagResponseSchema = z.object({
 export const tagDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  createdAt: z.coerce.date(),
+  createdAt: z.coerce.date().optional(),
 });
 export const syncInputSchema = z.object({
   configData: getLatestConfigVersionSchema().shape.configData,

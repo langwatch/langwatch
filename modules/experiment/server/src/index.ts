@@ -100,7 +100,6 @@ export {
   buildEvaluatorCellWorkflow,
 } from "./eventing/experiment-cell-workflow.process.ts";
 export {
-  ExperimentRunLoopUnavailableError,
   experimentV3Rest,
   experimentV3AliasRest,
   type ExperimentV3RestApi,

@@ -1,3 +1,5 @@
+import { AgentApi } from "@langwatch/agent-contract";
+import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authz-contract";
 /**
  * The workflow module's application: what all five of its doors call. A caller
  * arrives as an argument, never read from a session or a request, so one
@@ -5,18 +7,21 @@
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { AgentApi } from "@langwatch/agent-contract";
-import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
-import type { LanguageModel } from "ai";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import { z } from "zod";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
+import { ModelProviderApi, type ModelRole } from "@langwatch/model-provider-contract";
+import type { Instant } from "@langwatch/time";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
   NlpLambdaFleetNotComposedError,
   WorkflowApi,
   WorkflowExecutionFailedError,
+  WorkflowNotFoundError,
+  WorkflowNotPublishedError,
+  WorkflowVersionNotFoundError,
   type ArchiveWorkflowCommand,
   type CopyStudioWorkflowCommand,
   type CopyWorkflowCommand,
@@ -33,6 +38,8 @@ import {
   type WorkflowCaller,
   type WorkflowCascadeArchive,
   type WorkflowCopiesRow,
+  type WorkflowCodeCompletionResponse,
+  type WorkflowRestEnvelope,
   type WorkflowCopyWithPath,
   type WorkflowDsl,
   type WorkflowEvaluationRequest,
@@ -50,30 +57,30 @@ import {
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
-import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
-import { WorkflowService } from "../services/workflow.service.ts";
-import type { FeatureSetup } from "@langwatch/kernel";
-import type { Instant } from "@langwatch/time";
-import { generate } from "@langwatch/ksuid";
-import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
-import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
-import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
-import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
-import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
-import {
-  workflowRepositories,
-  type WorkflowRepositories,
-} from "../repositories/workflow-repositories.registry.ts";
-import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
-import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
-import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
-import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
-import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
-import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import type { LanguageModel } from "ai";
+import { z } from "zod";
+
 import {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
 } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
+import {
+  workflowRepositories,
+  type WorkflowRepositories,
+} from "../repositories/workflow-repositories.registry.ts";
+import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
+import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
+import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
+import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
+import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
+import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
+import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
+import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
+import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
+import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
+import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
+import { WorkflowService } from "../services/workflow.service.ts";
 
 /** Whether one person may act on a project other than the scoped one. */
 export interface WorkflowPermissionProbe {
@@ -167,7 +174,10 @@ export interface WorkflowEvaluationTrigger {
 
 /** One Monaco completion for the studio's code editor. */
 export interface WorkflowCodeCompletions {
-  complete(input: { projectId: string; body: unknown }): Promise<unknown>;
+  complete(input: {
+    projectId: string;
+    body: WorkflowRestEnvelope;
+  }): Promise<WorkflowCodeCompletionResponse>;
 }
 
 /** One streaming studio run, opened and read back event by event. */
@@ -593,6 +603,30 @@ export class WorkflowApp implements WorkflowApi {
     return this.#members.workflows.run(input);
   }
 
+  async runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer> {
+    try {
+      return await this.#members.workflows.run(input);
+    } catch (error) {
+      if (error instanceof WorkflowNotFoundError) {
+        throw new NotFoundError("workflow_not_found", "Workflow", input.workflowId);
+      }
+      if (error instanceof WorkflowNotPublishedError) {
+        throw new ValidationError("Workflow not published", {
+          meta: { workflowId: input.workflowId },
+        });
+      }
+      if (error instanceof WorkflowVersionNotFoundError) {
+        throw new NotFoundError(
+          "published_workflow_version_not_found",
+          "Published workflow version",
+          error.versionId,
+        );
+      }
+
+      throw error;
+    }
+  }
+
   /**
    * Runs the project's published workflow once, on the same service the public
    * run endpoint dispatches through.
@@ -652,8 +686,24 @@ export class WorkflowApp implements WorkflowApi {
     return this.#studioCopies.copyWithDatasets(input);
   }
 
-  completeCode(input: { projectId: string; body: unknown }): Promise<unknown> {
-    return this.#members.codeCompletions.complete(input);
+  async completeCode(input: { projectId: string; userId: string; body: WorkflowRestEnvelope }) {
+    const permitted = await this.#members.permissions.has({
+      userId: input.userId,
+      projectId: input.projectId,
+      permission: "workflows:manage",
+    });
+
+    if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
+
+    try {
+      return await this.#members.codeCompletions.complete({
+        projectId: input.projectId,
+        body: input.body,
+      });
+    } catch (error) {
+      this.#members.signals.failed(error, { projectId: input.projectId });
+      throw error;
+    }
   }
 
   postStudioEvent(input: {

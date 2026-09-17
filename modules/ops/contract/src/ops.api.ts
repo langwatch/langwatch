@@ -1,34 +1,39 @@
+import type {
+  FeatureFlagRules,
+  OperatorFeatureFlagCatalogue,
+} from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/kernel";
-import type { AdminIdentity,StartImpersonationInput,StopImpersonationInput } from "./admin.ts";
+import type { SearchProjectsResult } from "@langwatch/project-contract";
+
+import type {
+  AdminImpersonationStarted,
+  AdminImpersonationStopped,
+  AdminOperationInput,
+  AdminOperationResult,
+  RunAdminOperationInput,
+  StartAdminImpersonationInput,
+  StopAdminImpersonationInput,
+} from "./admin-backoffice.ts";
+import type { AdminIdentity, StartImpersonationInput, StopImpersonationInput } from "./admin.ts";
+import type {
+  DeleteBlobInput,
+  DeleteBlobResult,
+  GetBlobInput,
+  ListBlobsInput,
+  OpsBlobPage,
+  OpsBlobSummary,
+  OpsBlobStoreStats,
+  BlobSweepReport,
+  RunBlobCleanupInput,
+} from "./blob-store.ts";
+import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type {
   BugReport,
   BugReportListing,
   ListBugReportsInput,
   SubmitBugReport,
 } from "./ops-bug-report.ts";
-import type {
-  OpsEventLogSearchWindow,
-  OpsExplainAnswer,
-  OpsExplainRequest,
-  OpsGrafanaLinkConfig,
-  OpsOperator,
-  OpsOperatorPermission,
-  OpsPipelineRegistrations,
-  OpsScope,
-} from "./ops.responses.ts";
-import type {
-  OpsMigrationCohortResult,
-  OpsMigrationEnrollmentListing,
-  OpsMigrationOrganizationMatch,
-  OpsMigrationOverview,
-  OpsMigrationTargetedRunResult,
-} from "./ops-system-migration.ts";
-import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type { DashboardData, GroupInfo } from "./ops-dashboard.ts";
-import type {
-  FeatureFlagRules,
-  OperatorFeatureFlagCatalogue,
-} from "@langwatch/feature-flag-contract";
 import type {
   AggregateDiscovery,
   AggregateEventView,
@@ -47,28 +52,6 @@ import type {
   ProcessOutboxMessageView,
   ProcessWakeRow,
 } from "./ops-process.ts";
-import type { ReplayHistoryEntry, ReplayStatus } from "./ops-replay.ts";
-import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice.ts";
-import type {
-  DeleteBlobInput,
-  DeleteBlobResult,
-  GetBlobInput,
-  ListBlobsInput,
-  OpsBlobPage,
-  OpsBlobSummary,
-  OpsBlobStoreStats,
-  BlobSweepReport,
-  RunBlobCleanupInput,
-} from "./blob-store.ts";
-import type {
-  ListPausedSchedulesInput,
-  ListScheduledJobsInput,
-  ListSchedulerActionsInput,
-  OpsScheduledJob,
-  ScheduleControlInput,
-  SchedulerAuditEntryView,
-  SetScheduleActiveInput,
-} from "./ops-scheduler.ts";
 import type {
   OpsBlockedSummary,
   OpsParkedGroupsPage,
@@ -82,9 +65,38 @@ import type {
   QueueInfo,
   QueueSummaryInfo,
 } from "./ops-queue.ts";
-import type { SearchProjectsResult } from "@langwatch/project-contract";
+import type { ReplayHistoryEntry, ReplayStatus } from "./ops-replay.ts";
+import type {
+  ListPausedSchedulesInput,
+  ListScheduledJobsInput,
+  ListSchedulerActionsInput,
+  OpsScheduledJob,
+  ScheduleControlInput,
+  SchedulerAuditEntryView,
+  SetScheduleActiveInput,
+} from "./ops-scheduler.ts";
+import type {
+  OpsMigrationCohortResult,
+  OpsMigrationEnrollmentListing,
+  OpsMigrationOrganizationMatch,
+  OpsMigrationOverview,
+  OpsMigrationTargetedRunResult,
+} from "./ops-system-migration.ts";
+import type {
+  OpsEventLogSearchWindow,
+  OpsExplainAnswer,
+  OpsExplainRequest,
+  OpsGrafanaLinkConfig,
+  OpsOperator,
+  OpsOperatorPermission,
+  OpsPipelineRegistrations,
+  OpsScope,
+} from "./ops.responses.ts";
 
 export interface OpsApi {
+  startAdminImpersonation(input: StartAdminImpersonationInput): Promise<AdminImpersonationStarted>;
+  stopAdminImpersonation(input: StopAdminImpersonationInput): Promise<AdminImpersonationStopped>;
+  runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult>;
   startImpersonation(input: StartImpersonationInput): Promise<void>;
   stopImpersonation(input: StopImpersonationInput): Promise<void>;
   adminOperation(input: AdminOperationInput): Promise<AdminOperationResult>;

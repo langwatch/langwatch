@@ -36,6 +36,42 @@ export class ExperimentRunNotFoundError extends NotFoundError {
   }
 }
 
+export class ExperimentWorkbenchUnauthorizedError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "You must be logged in to access this endpoint.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "ExperimentWorkbenchUnauthorizedError";
+  }
+}
+
+export class ExperimentWorkbenchForbiddenError extends HandledError {
+  declare readonly code: "forbidden";
+
+  constructor() {
+    super("forbidden", "You do not have permission to access this endpoint.", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "ExperimentWorkbenchForbiddenError";
+  }
+}
+
+export class ExperimentRunLoopUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ExperimentRunLoopUnavailableError";
+  }
+}
+
 export class InvalidExperimentConfigurationError extends HandledError {
   declare readonly code: "invalid_experiment_configuration";
 

@@ -1,15 +1,18 @@
-/**
- * @see ADR-072 (pull gates under the same plan flag as push)
- * Billing reconciliation REST on `/api/gateway/v1`, shared with the
- * virtual-key surface — each route owns its whole path, no wildcard claimed.
- */
-import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
-import { defineRestMiddleware, defineRestRouter,
+import {
+  defineRestMiddleware,
+  defineRestRouter,
   BadRequestError,
   canonicalBaseResponses,
-  MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+  MANAGEMENT_API_VERSION,
+} from "@langwatch/api/rest";
+import {
+  gatewaySpendEnvelopeSchema,
+  USD_DISPLAY_STRING_FORMAT,
+  type GatewaySpendEnvelope,
+} from "@langwatch/gateway-contract";
 import { moduleApi } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
+import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import { GatewaySpendCursorAdapter } from "../adapters/gateway-spend-cursor.adapter.ts";
@@ -23,15 +26,19 @@ import {
   GatewaySpendGroupingAdapter,
   MAX_GROUP_BY_KEYS,
 } from "../adapters/gateway-spend-grouping.adapter.ts";
+import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
 import {
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
 } from "../repositories/gateway-spend-events.repository.ts";
-import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
+/**
+ * @see ADR-072 (pull gates under the same plan flag as push)
+ * Billing reconciliation REST on `/api/gateway/v1`, shared with the
+ * virtual-key surface — each route owns its whole path, no wildcard claimed.
+ */
+import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
-import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
-import { Temporal, nowInstant } from "@langwatch/time";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const spendFilters = GatewaySpendFiltersAdapter.create();
@@ -51,19 +58,6 @@ export const END_USER_SPEND_DESCRIPTION =
 type SpendLedgerRow = Awaited<
   ReturnType<GatewaySpendEventsService["walkSpendEvents"]>
 >["rows"][number];
-
-/**
- * One billing envelope in the canonical wire format — the SAME shape the
- * signed webhooks deliver, so a reconciliation pull and a webhook receiver
- * parse with one reader.
- */
-export type GatewaySpendEnvelope = {
-  id: string;
-  type: string;
-  created: string;
-  schema_version: string;
-  data: Record<string, unknown>;
-};
 
 /** A deliverable endpoint, reduced to what a replay reads off it. */
 export type GatewaySpendWebhookEndpoint = {
@@ -291,42 +285,6 @@ const spendSummaryRowSchema = z.object({
   settled_count: z.number().int(),
   usage: usageWithImagesSchema,
   cost: costSchema,
-});
-
-/**
- * One billing envelope, the SAME shape the signed webhooks deliver, so a
- * reconciliation pull and a webhook receiver parse with one reader.
- */
-const spendEventEnvelopeSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  created: z.string(),
-  schema_version: z.string(),
-  data: z
-    .object({
-      event_id: z.string(),
-      event_type: z.string(),
-      /** The join key across the settled/completed pair. */
-      gateway_request_id: z.string(),
-      occurred_at: z.string(),
-      // Null on rows whose quantities are not known yet (admitted) or no
-      // longer authoritative (settled).
-      usage: usageSchema.nullable(),
-      cost: costSchema.nullable(),
-      status: z.string(),
-      needs_reconciliation: z.boolean().nullable(),
-      settle_reason: z.string().nullable(),
-      error: z
-        .object({
-          class: z.string(),
-          http_status: z.number().int().nullable(),
-        })
-        .nullable(),
-      duration_ms: z.number().int().nullable(),
-      labels: z.array(z.string()),
-      metadata: z.record(z.string(), z.unknown()),
-    })
-    .passthrough(),
 });
 
 const endUserCapSchema = z.object({
@@ -682,7 +640,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withPermission("gatewaySpend:view")
   .withOutput(
     z.object({
-      data: z.array(spendEventEnvelopeSchema),
+      data: z.array(gatewaySpendEnvelopeSchema),
       next_cursor: nextCursorSchema,
     }),
   )

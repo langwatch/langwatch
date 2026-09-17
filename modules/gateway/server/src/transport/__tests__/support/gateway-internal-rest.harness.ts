@@ -3,8 +3,10 @@
  * process: no framework credential, the family's own HMAC gate, the Go
  * plane's error envelope. Unsupplied members throw, naming what was asked.
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
   buildGatewayCanonicalString,
@@ -20,12 +22,26 @@ import {
  */
 export const GATEWAY_INTERNAL_TEST_SECRET = "0123456789abcdef0123456789abcdef";
 
-/** Nothing here is expected to throw, so a failure must be legible. */
-const renderUnexpected: ErrorHandler = (error, c) =>
-  c.json(
-    { error: { type: "internal_error", code: "internal_error", message: String(error) } },
-    500,
+/** The process boundary's handled-error envelope, with an explicit unexpected fallback. */
+const renderUnexpected: ErrorHandler = (error, c) => {
+  if (!HandledError.isHandled(error)) {
+    return c.json({ type: "internal_error", code: "internal_error", message: String(error) }, 500);
+  }
+
+  const status = error.httpStatus as ContentfulStatusCode;
+  const internal = status >= 500;
+
+  return c.json(
+    apiErrorBody({
+      status,
+      code: internal ? "internal_error" : error.code,
+      message: internal ? "An unknown error occurred" : error.message,
+      meta: internal ? undefined : error.meta,
+      retryable: error.retryable,
+    }),
+    status,
   );
+};
 
 /** Only what the test named; everything else says so by name. */
 function suppliedMembers(members: Partial<GatewayInternalApp>): GatewayInternalApp {

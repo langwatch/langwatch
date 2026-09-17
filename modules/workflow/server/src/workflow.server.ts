@@ -1,5 +1,4 @@
 import {
-  bindRestHeader,
   bindRestMiddleware,
   browserCallerOfRequest,
   projectCredentialOfRequest,
@@ -12,7 +11,7 @@ import {
 } from "#repositories/workflow-repositories.registry";
 import { cronRest } from "#transport/cron.rest";
 import { createWorkflowRest, workflowEvaluationRunCeiling } from "#transport/workflow.rest";
-import { workflowRunContentType, workflowRunRest } from "#transport/workflow-run.rest";
+import { workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest, workflowStudioSession } from "#transport/workflow-studio.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
@@ -51,12 +50,7 @@ export const workflowServer = defineServerModule("workflow")
     workflowStudioRest,
     cronRest,
   )
-  // The run family is handed the media type rather than a parsed body: the
-  // body is the workflow's own entry fields, so nothing validates it. The
-  // studio family answers its own 401 in the sentence the editor renders, so
-  // the byte door's answer reaches it as a fact rather than as a refusal.
   .withTransportFacts(({ members }) => [
-    bindRestHeader(workflowRunContentType, "content-type"),
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);
 

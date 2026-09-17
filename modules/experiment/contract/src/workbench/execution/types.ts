@@ -1,6 +1,9 @@
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { resolveRequestBound } from "@langwatch/plans";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { z } from "zod";
+
 import {
   type DatasetReference,
   type EvaluatorConfig,
@@ -8,8 +11,6 @@ import {
   type TargetConfig,
   targetConfigSchema,
 } from "../../experiment-workbench.ts";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 
 /**
  * The outer validation shell is the registry's enterprise ceiling; the
@@ -205,6 +206,18 @@ export const executionRequestSchema = z
     message: "Pass either inline data or a dataset_id, not both",
     path: ["data"],
   });
+
+/** `/api/experiments/abort`'s body: the two fields it has always required. */
+export const abortExperimentRunRequestSchema = z.object({
+  projectId: z.string().min(1),
+  runId: z.string().min(1),
+});
+
+export const abortExperimentRunResponseSchema = z.object({
+  success: z.literal(true),
+  runId: z.string(),
+  message: z.literal("Abort requested"),
+});
 
 /**
  * Optional run inputs accepted as a JSON body by the run API and the workflow

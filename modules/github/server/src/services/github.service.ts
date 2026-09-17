@@ -1,5 +1,5 @@
-import type { GithubApi } from "@langwatch/github-contract";
 import type {
+  GithubApi,
   GithubConnectionStatus,
   GithubDisconnectResult,
   GithubInstallation,
@@ -9,14 +9,19 @@ import type {
   GithubTurnToken,
   GithubPullRequest,
   GithubPullRequestEvent,
+  GithubWebhookEnvelope,
   GithubInstallStatePayload,
   GithubAppConfig,
 } from "@langwatch/github-contract";
-import type { GithubHost } from "../app/github.members.ts";
-import type { GithubInstallResponse } from "../app/github.members.ts";
-import type { GithubInstallState } from "../app/github.members.ts";
-import type { GithubPullRequestEventParser } from "../app/github.members.ts";
+import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
+import type {
+  GithubHost,
+  GithubInstallResponse,
+  GithubInstallState,
+  GithubPullRequestEventParser,
+} from "../app/github.members.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
 import { GithubInstallationsService } from "./github-installations.service.ts";
 import {
@@ -24,6 +29,20 @@ import {
   GithubPullRequestMappingService,
 } from "./github-pull-request-mapping.service.ts";
 import { GithubPullRequestStatusService } from "./github-pull-request-status.service.ts";
+
+const logger = createLogger("langwatch:github:webhook");
+const installationEnvelopeSchema = z.object({
+  action: z.unknown().optional(),
+  installation: z.object({ id: z.number().optional() }).nullish(),
+});
+const webhookActionSchema = z.enum([
+  "created",
+  "deleted",
+  "suspend",
+  "unsuspend",
+  "added",
+  "removed",
+]);
 
 type GithubServiceDependencies = {
   installations: GithubInstallationsService;
@@ -195,6 +214,48 @@ export class GithubFeatureService implements GithubApi {
 
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
     return this.pullRequestEvents.parse(payload);
+  }
+
+  async applyWebhookPayload(input: {
+    payload: GithubWebhookEnvelope;
+    eventType: string | undefined;
+    deliveryId: string | undefined;
+  }): Promise<void> {
+    if (input.eventType === "pull_request") {
+      const event = this.pullRequestEvents.parse(input.payload);
+      if (!event) {
+        logger.info(
+          { deliveryId: input.deliveryId },
+          "github pull request delivery dropped before linkage",
+        );
+        return;
+      }
+
+      try {
+        await this.mapping.applyPullRequestEvent(event);
+      } catch (error) {
+        logger.warn(
+          { error, action: event.action, installationId: event.installationId },
+          "github pull request webhook handling failed",
+        );
+      }
+      return;
+    }
+
+    if (input.eventType !== "installation" && input.eventType !== "installation_repositories") {
+      return;
+    }
+
+    const event = installationEnvelopeSchema.safeParse(input.payload).data;
+    const action = webhookActionSchema.safeParse(event?.action).data;
+    const installationId = event?.installation?.id != null ? String(event.installation.id) : null;
+    if (!installationId || !action) return;
+
+    try {
+      await this.installations.handleWebhookEvent({ action, installationId });
+    } catch (error) {
+      logger.warn({ error, action, installationId }, "github webhook handling failed");
+    }
   }
 
   requestBranchMapping(input: BranchMappingRequest): Promise<void> {

@@ -8,18 +8,22 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  UnauthorizedError,
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
 import {
   LlmModelNotSetError,
+  workflowCodeCompletionBodySchema,
+  workflowCodeCompletionQuerySchema,
+  workflowCodeCompletionResponseSchema,
+  workflowStudioSessionSchema,
   workflowStudioRestEventSchema,
   WorkflowApi,
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
-import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 
 const logger = createLogger("langwatch:workflows");
@@ -33,7 +37,7 @@ const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPR
 /** The signed-in person behind the request, as the mounting process resolves one. */
 export const workflowStudioSession = defineRestMiddleware(
   "workflowStudioSession",
-  z.object({ user: z.object({ id: z.string() }) }).nullable(),
+  workflowStudioSessionSchema,
 );
 
 /** Why both routes resolve their own caller rather than standing behind a door. */
@@ -73,15 +77,6 @@ function findHandledCode(error: unknown): string | undefined {
   return typeof code === "string" ? code : undefined;
 }
 
-/** The posted body as sent, whatever JSON value it was; nothing when unparseable. */
-function postedBody(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-}
-
 /** The posted document, or nothing where the body was not a JSON object. */
 function findPostedJson(raw: string): Record<string, unknown> | null {
   try {
@@ -106,47 +101,18 @@ export const workflowStudioRest = defineRestRouter(WorkflowApi)
   // and this family checks the project itself, in the handler, against the
   // session it resolved.
   .post("/api/workflows/code-completion", "completeWorkflowCode")
-  .withRawBody("text", { mediaType: "application/json" })
+  .withQuery(workflowCodeCompletionQuerySchema)
+  .withInput(workflowCodeCompletionBodySchema)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: SESSION_RESOLVED_IN_HANDLER }))
-  .withRawResponse({ produces: "application/json" })
+  .withAccess({ kind: "public", reason: SESSION_RESOLVED_IN_HANDLER })
+  .withOutput(workflowCodeCompletionResponseSchema)
   .withMiddleware(workflowStudioSession)
-  .handle(async ({ app, raw, request }, session): Promise<RestRawResult> => {
-    if (!session) {
-      return jsonAnswer({ error: "You must be logged in to access this endpoint." }, 401);
-    }
+  .handle(({ app, input }, session) => {
+    if (!session) throw new UnauthorizedError("You must be logged in to access this endpoint.");
 
-    const projectId = new URL(request.url).searchParams.get("projectId");
+    const { projectId, ...body } = input;
 
-    if (!projectId) return jsonAnswer({ error: "Project ID is required." }, 400);
-
-    if (
-      !(await app.hasProjectPermission({
-        userId: session.user.id,
-        projectId,
-        permission: "workflows:manage",
-      }))
-    ) {
-      return jsonAnswer({ error: "You do not have permission to access this endpoint." }, 403);
-    }
-
-    try {
-      return jsonAnswer(await app.completeCode({ projectId, body: postedBody(raw) }), 200);
-    } catch (error) {
-      logger.error(
-        {
-          err: error,
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          projectId,
-        },
-        "code-completion failed",
-      );
-      app.reportStudioFailure(error, { projectId });
-
-      // Generic on purpose (ADR-045): the cause is on the log line above.
-      return jsonAnswer({ error: "Code completion failed." }, 500);
-    }
+    return app.completeCode({ projectId, body, userId: session.user.id });
   })
 
   .post("/api/workflows/post_event", "postWorkflowStudioEvent")

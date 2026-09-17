@@ -16,13 +16,7 @@ import {
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
-  commitMessageSchema,
   getLatestConfigVersionSchema,
-  handleSchema,
-  inputsSchema,
-  messageSchema,
-  modelNameSchema,
-  outputsSchema,
   parsePromptShorthand,
   PromptApi,
   type ApiResponsePrompt,
@@ -39,19 +33,14 @@ import {
   PromptTagNotFoundError,
   PromptTagProtectedError,
   PromptTagValidationError,
-  runtimeParametersSchema,
-  schemaVersionSchema,
-  scopeSchema,
   type PromptScope,
   ShorthandParseError,
   SystemPromptConflictError,
   SystemPromptRequiredError,
-  versionSchema,
   promptWireSchema,
   syncInputSchema,
   tagDefinitionSchema,
   tagParamsSchema,
-  updateHandleInputSchema,
   updatePromptInputSchema,
 } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";

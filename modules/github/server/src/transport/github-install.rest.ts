@@ -11,15 +11,15 @@ import {
   GithubInstallationAccountMismatchError,
   GithubInstallationConflictError,
   GithubInstallationNotFromFlowError,
+  githubWebhookEnvelopeSchema,
   type GithubApi,
   type GithubConnectionAuditEntry,
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
+import { moduleApi } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 
 /** Who is signed in, as this process resolves a browser session. */
@@ -616,21 +616,6 @@ async function recordInstallAudit({
 // idempotent, and acknowledged whatever happens.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The envelope both installation events share, parsed before any field read. */
-const installationEnvelopeSchema = z.object({
-  action: z.unknown().optional(),
-  installation: z.object({ id: z.number().optional() }).nullish(),
-});
-
-const webhookActionSchema = z.enum([
-  "created",
-  "deleted",
-  "suspend",
-  "unsuspend",
-  "added",
-  "removed",
-]);
-
 function verifyWebhookSignature(
   rawBody: string,
   header: string | undefined,
@@ -672,85 +657,14 @@ async function receiveWebhook({
     return jsonAnswer({ error: "Invalid JSON" }, 400);
   }
 
-  const eventType = request.headers.get("x-github-event") ?? undefined;
+  const envelope = githubWebhookEnvelopeSchema.safeParse(payload);
+  if (!envelope.success) return jsonAnswer({ error: "Invalid JSON object" }, 400);
 
-  if (eventType === "pull_request") {
-    await applyPullRequestEvent({
-      payload,
-      deliveryId: request.headers.get("x-github-delivery") ?? undefined,
-      service,
-    });
-
-    return jsonAnswer({ received: true }, 200);
-  }
-
-  await applyInstallationEvent({ payload, eventType, service });
+  await service.applyWebhookPayload({
+    payload: envelope.data,
+    eventType: request.headers.get("x-github-event") ?? undefined,
+    deliveryId: request.headers.get("x-github-delivery") ?? undefined,
+  });
 
   return jsonAnswer({ received: true }, 200);
-}
-
-/**
- * Parsed rather than asserted: an assertion is erased at runtime, so a delivery
- * whose body is a valid JSON `null` threw on property access and answered 500
- * instead of reaching the acknowledgment.
- */
-async function applyInstallationEvent({
-  payload,
-  eventType,
-  service,
-}: {
-  payload: unknown;
-  eventType: string | undefined;
-  service: GithubApi;
-}): Promise<void> {
-  const event = installationEnvelopeSchema.safeParse(payload).data;
-  const action = webhookActionSchema.safeParse(event?.action).data;
-  const installationId = event?.installation?.id != null ? String(event.installation.id) : null;
-
-  // Unknown or unrelated event — acked so GitHub does not retry.
-  if (eventType !== "installation" && eventType !== "installation_repositories") return;
-  if (!installationId || !action) return;
-
-  try {
-    await service.handleWebhookEvent({ action, installationId });
-  } catch (err) {
-    // Still ack — retries won't help a persistent handling error, and the next
-    // event (or the setup callback) reconciles.
-    logger.warn({ err, action, installationId }, "github webhook handling failed");
-  }
-}
-
-/**
- * A `pull_request` delivery: link the head branch to its pull request now,
- * rather than waiting for that branch's next scheduled recheck, which for a
- * branch asked about a few times already is up to a day away.
- */
-async function applyPullRequestEvent({
-  payload,
-  deliveryId,
-  service,
-}: {
-  payload: unknown;
-  deliveryId: string | undefined;
-  service: GithubApi;
-}): Promise<void> {
-  const event = service.parsePullRequestEvent(payload);
-
-  if (!event) {
-    // The parser declines four different deliveries, and every one still
-    // answers 200; without this line a linkage outage looks like an unbroken
-    // run of successful deliveries. The payload is deliberately not logged.
-    logger.info({ deliveryId }, "github pull request delivery dropped before linkage");
-
-    return;
-  }
-
-  try {
-    await service.applyPullRequestEvent(event);
-  } catch (err) {
-    logger.warn(
-      { err, action: event.action, installationId: event.installationId },
-      "github pull request webhook handling failed",
-    );
-  }
 }

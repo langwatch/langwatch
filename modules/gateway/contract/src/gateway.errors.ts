@@ -9,6 +9,33 @@ import { z } from "zod";
 
 type ExternalIdResource = "virtual_key" | "budget";
 
+/** The internal gateway's signed request could not be authenticated. */
+export class GatewayInternalAuthenticationError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor(reason: string, message: string) {
+    super("permission_denied", message, {
+      httpStatus: 401,
+      fault: "customer",
+      meta: { reason },
+    });
+    this.name = "GatewayInternalAuthenticationError";
+  }
+}
+
+/** This process has no secret with which to authenticate its gateway. */
+export class GatewayInternalAuthenticationUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "Gateway internal authentication is not configured", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+    this.name = "GatewayInternalAuthenticationUnavailableError";
+  }
+}
+
 /**
  * The gateway's own provider bindings were folded into ModelProvider in
  * iteration 110. The address stays served so a caller still on it is told

@@ -1,9 +1,12 @@
+import { createHash, createHmac, timingSafeEqual } from "crypto";
+
 /**
  * `/api/internal/gateway`: control plane between the two halves of one
  * deployment. Every route answers behind {@link gatewayInternalSignature}'s
  * HMAC gate; each capability is OPTIONAL, refusing (503) rather than silent.
  */
 import { publicRoute } from "@langwatch/api/access";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import {
   attributedUserBucketScopeId,
   bucketPeriodFloorMs,
@@ -17,45 +20,45 @@ import {
   gatewayInternalResolveKeySchema,
   gatewayInternalSessionParamsSchema,
   gatewayInternalSpendCommandBatchSchema,
+  GatewayInternalAuthenticationError,
+  GatewayInternalAuthenticationUnavailableError,
   GATEWAY_INTERNAL_SPEND_COMMANDS,
   type GatewayBudget,
   type GatewayInternalSpendCommandName,
   type GatewayInternalSpendCommandRecord,
   type SpendUsage,
 } from "@langwatch/gateway-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, MiddlewareHandler, Next } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import {
-  VirtualKeyCryptoService,
-  VirtualKeyCryptoError,
-} from "../services/virtual-key-crypto.service.ts";
-import type { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import type {
   GatewayBudgetSpend,
   GatewayChangeEvents,
   GatewaySpendRating,
 } from "../app/gateway.members.ts";
-import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
 } from "../eventing/gateway-spend-commands.process.ts";
+import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import type { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
+import type { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service.ts";
+import {
+  VirtualKeyCryptoService,
+  VirtualKeyCryptoError,
+} from "../services/virtual-key-crypto.service.ts";
 import type { VirtualKeyService } from "../services/virtual-key.service.ts";
 
 const realtimeSessionService = GatewayRealtimeSessionService.create();
@@ -213,17 +216,7 @@ export function gatewayInternalSignature(secretOf: () => string | undefined): Mi
     const secret = secretOf();
     if (!secret) {
       logAuthDecision(c.req.raw, "gateway_internal_secret_missing", 500);
-
-      return c.json(
-        {
-          error: {
-            type: "internal_error",
-            code: "gateway_internal_secret_missing",
-            message: "Gateway internal authentication is not configured",
-          },
-        },
-        500,
-      );
+      throw new GatewayInternalAuthenticationUnavailableError();
     }
 
     const presentedSig = c.req.header("X-LangWatch-Gateway-Signature");
@@ -234,15 +227,9 @@ export function gatewayInternalSignature(secretOf: () => string | undefined): Mi
         hasTimestamp: Boolean(presentedTs),
       });
 
-      return c.json(
-        {
-          error: {
-            type: "permission_denied",
-            code: "missing_signature",
-            message: "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
-          },
-        },
-        401,
+      throw new GatewayInternalAuthenticationError(
+        "missing_signature",
+        "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
       );
     }
 
@@ -261,31 +248,16 @@ export function gatewayInternalSignature(secretOf: () => string | undefined): Mi
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
       logAuthDecision(c.req.raw, "invalid_signature", 401);
 
-      return c.json(
-        {
-          error: {
-            type: "permission_denied",
-            code: "invalid_signature",
-            message: "signature mismatch",
-          },
-        },
-        401,
-      );
+      throw new GatewayInternalAuthenticationError("invalid_signature", "signature mismatch");
     }
 
     const ts = Number.parseInt(presentedTs, 10);
     if (!Number.isFinite(ts)) {
       logAuthDecision(c.req.raw, "invalid_timestamp", 401, { presentedTs });
 
-      return c.json(
-        {
-          error: {
-            type: "permission_denied",
-            code: "invalid_timestamp",
-            message: "X-LangWatch-Gateway-Timestamp must be unix seconds",
-          },
-        },
-        401,
+      throw new GatewayInternalAuthenticationError(
+        "invalid_timestamp",
+        "X-LangWatch-Gateway-Timestamp must be unix seconds",
       );
     }
 
@@ -293,15 +265,9 @@ export function gatewayInternalSignature(secretOf: () => string | undefined): Mi
     if (Math.abs(now - ts) > GATEWAY_SIGNATURE_WINDOW_SECONDS) {
       logAuthDecision(c.req.raw, "timestamp_out_of_window", 401, { driftSeconds: now - ts });
 
-      return c.json(
-        {
-          error: {
-            type: "permission_denied",
-            code: "timestamp_out_of_window",
-            message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
-          },
-        },
-        401,
+      throw new GatewayInternalAuthenticationError(
+        "timestamp_out_of_window",
+        `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
       );
     }
 

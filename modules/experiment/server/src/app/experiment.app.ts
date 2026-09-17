@@ -1,3 +1,5 @@
+import { on, type EventEmitter } from "node:events";
+
 /**
  * The experiment feature's application: what both of its doors call.
  */
@@ -6,12 +8,10 @@ import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { PromptApi } from "@langwatch/prompt-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
   ExperimentApi,
+  ExperimentWorkbenchForbiddenError,
+  ExperimentWorkbenchUnauthorizedError,
   type ExperimentCaller,
   type ExperimentRunLookupInput,
   type ExperimentUpdateFrame,
@@ -55,25 +55,31 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
-import type { ModelCostRate } from "@langwatch/model-provider-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type {
-  ExperimentV3RestSession,
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-  ExperimentWorkbenchPermissions,
-} from "#app/experiment-workbench.members";
-import { on, type EventEmitter } from "node:events";
-import type { ExperimentService } from "../services/experiment.service.ts";
-import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import type { ModelCostRate } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import {
   WorkflowApi,
   WorkflowNotFoundError,
   type StudioWorkflow,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
+
+import type {
+  ExperimentV3RestSession,
+  ExperimentV3RunLoop,
+  ExperimentWorkbenchObserver,
+  ExperimentWorkbenchPermissions,
+} from "#app/experiment-workbench.members";
+
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
+import type { ExperimentService } from "../services/experiment.service.ts";
 import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
 
 /**
@@ -681,6 +687,34 @@ export class ExperimentApp implements ExperimentApi {
     permission: AuthzPermission,
   ): Promise<boolean> {
     return this.#dependencies.workbenchPermissions.permitted({ session, projectId, permission });
+  }
+
+  async abortWorkbenchRun(
+    input: Readonly<{
+      userId: string | null;
+      projectId: string;
+      runId: string;
+    }>,
+  ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
+    if (!input.userId) {
+      throw new ExperimentWorkbenchUnauthorizedError();
+    }
+
+    const permitted = await this.probeProjectPermission(
+      { user: { id: input.userId } },
+      input.projectId,
+      "evaluations:manage",
+    );
+    if (!permitted) {
+      throw new ExperimentWorkbenchForbiddenError();
+    }
+
+    return ExperimentRunOrchestratorService.requestOwnedAbort({
+      ports: this.#dependencies.runLoop.ports,
+      progress: this.#dependencies.runLoop.progress,
+      projectId: input.projectId,
+      runId: input.runId,
+    });
   }
 
   /**

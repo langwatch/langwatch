@@ -83,6 +83,8 @@ export class TestGithubService implements GithubApi {
     return null;
   }
 
+  async applyWebhookPayload(): Promise<void> {}
+
   async getAllForOrganization(): Promise<readonly GithubInstallation[]> {
     return [];
   }

@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** The signed webhook's JSON envelope; each GitHub event owns its inner definition. */
+export const githubWebhookEnvelopeSchema = z.record(z.string(), z.unknown());
+export type GithubWebhookEnvelope = z.infer<typeof githubWebhookEnvelopeSchema>;
+
 export const githubRepositoryRefSchema = z.object({
   id: z.string(),
   fullName: z.string(),

@@ -1,25 +1,40 @@
 /** Manages evaluation execution across cells: builds/dispatches workflows, maps events to SSE. */
 
-import type { WorkflowService } from "@langwatch/workflow-server";
 import {
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
   type EvaluationV3Event,
   type EvaluatorConfig,
+  ExperimentRunLoopUnavailableError,
+  ExperimentRunNotFoundError,
   type ExecutionCell,
   type ExecutionScope,
   type RecordEvaluatorResultCommandData,
   type RecordTargetResultCommandData,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
+import type { WorkflowService } from "@langwatch/workflow-server";
+
+import {
+  comparisonSkipMessage as processComparisonSkipMessage,
+  formatList as processFormatList,
+  type ComparisonSkipReason,
+} from "../eventing/experiment-comparison-skip.process.ts";
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
-import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
+import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
+import type {
+  ConnectedCellInput,
+  ExperimentRunCollaborators,
+  OrchestratorInput,
+} from "../rules/experiment-run-input.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
-import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import {
+  ExperimentCellExecutionService,
+  type LoadedCellData,
+} from "./experiment-cell-execution.service.ts";
 import {
   ExperimentCellPlanService,
   type SeededTargetOutput,
@@ -28,24 +43,13 @@ import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
 } from "./experiment-comparison-plan.service.ts";
-import {
-  ExperimentCellExecutionService,
-  type LoadedCellData,
-} from "./experiment-cell-execution.service.ts";
-import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 import { ExperimentConnectedCellService } from "./experiment-connected-cell.service.ts";
-import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
-import {
-  comparisonSkipMessage as processComparisonSkipMessage,
-  formatList as processFormatList,
-  type ComparisonSkipReason,
-} from "../eventing/experiment-comparison-skip.process.ts";
-import type {
-  ConnectedCellInput,
-  ExperimentRunCollaborators,
-  OrchestratorInput,
-} from "../rules/experiment-run-input.rules.ts";
+import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
+import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
+import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
+import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
+import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 
 /**
  * What a cell's tokens cost, in the deployment's own rate table. Lives with
@@ -399,4 +403,27 @@ export class ExperimentRunOrchestratorService {
   }): Promise<void> => {
     await abort.requestAbort(runId);
   };
+
+  static async requestOwnedAbort(input: {
+    ports: ExperimentRunCollaborators | null;
+    progress: ExperimentRunProgressRepository | null;
+    projectId: string;
+    runId: string;
+  }): Promise<{ success: true; runId: string; message: "Abort requested" }> {
+    if (!input.ports || !input.progress) {
+      throw new ExperimentRunLoopUnavailableError("experiment run loop");
+    }
+
+    const ownerProjectId =
+      (await input.ports.abort.findRunningProjectId(input.runId)) ??
+      (await input.progress.findRunState(input.runId))?.projectId;
+
+    if (!ownerProjectId || ownerProjectId !== input.projectId) {
+      throw new ExperimentRunNotFoundError(input.runId);
+    }
+
+    await this.requestAbort({ abort: input.ports.abort, runId: input.runId });
+
+    return { success: true, runId: input.runId, message: "Abort requested" };
+  }
 }

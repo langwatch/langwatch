@@ -7,9 +7,9 @@
 // runtime's scope check compares it against the project the credential
 // resolved. Every handler reads the CREDENTIAL's project, never the claim.
 
+import type { Actor } from "@langwatch/actor";
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
 import { defineRestRouter, type RestTransportDeclaration } from "@langwatch/api/rest";
-import type { Actor } from "@langwatch/actor";
 import {
   SecretApi,
   secretPublicCreateInputSchema,
@@ -137,7 +137,7 @@ function defineSecretRest(
     .handle(async ({ app, input, scope }) => {
       await app.delete({ projectId: scope.id, id: input.id });
 
-      return { id: input.id, deleted: true };
+      return { id: input.id, deleted: true as const };
     })
     .build();
 }

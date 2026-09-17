@@ -1,118 +1,19 @@
-/**
- * The three URLs a synchronous Optimization Studio run is started from, served
- * by ONE handler: the legacy path once carried its own copy and the two had
- * drifted. Literal, because twenty other families share their prefix.
- */
-import {
-  defineRestMiddleware,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { PayloadTooLargeError } from "@langwatch/api";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   workflowRunAnswerSchema,
   workflowRunRestBodySchema,
   workflowRunRestParamsSchema,
-  workflowRunRestRefusalSchema,
   workflowRunRestVersionedParamsSchema,
   WorkflowApi,
-  WorkflowNotFoundError,
-  WorkflowNotPublishedError,
-  WorkflowVersionNotFoundError,
-  type WorkflowRunAnswer,
 } from "@langwatch/workflow-contract";
-import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
-import { HTTPException } from "hono/http-exception";
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
-
-/**
- * The media type this request was sent as. A fact rather than a parsed body:
- * the run's body is the workflow's own entry fields, so nothing validates it,
- * and refusing a form post is a sentence an SDK already parses.
- */
-export const workflowRunContentType = defineRestMiddleware(
-  "workflowRunContentType",
-  z.string().nullable(),
-);
-
-/** One run, whichever of the three addresses asked for it. */
-async function runWorkflow({
-  app,
-  projectId,
-  workflowId,
-  versionId,
-  contentType,
-  raw,
-}: {
-  app: WorkflowApi;
-  projectId: string;
-  workflowId: string;
-  versionId?: string | undefined;
-  contentType: string | null;
-  raw: string;
-}): Promise<
-  | Readonly<{ status: 400; body: { message: string } }>
-  | Readonly<{ status: 200; body: WorkflowRunAnswer }>
-> {
-  if (!contentType?.includes("application/json")) {
-    return { status: 400, body: { message: "Invalid body, expecting json" } } as const;
-  }
-
-  let body: Record<string, unknown>;
-
-  try {
-    body = JSON.parse(raw) as Record<string, unknown>;
-  } catch {
-    return { status: 400, body: { message: "Invalid body" } } as const;
-  }
-
-  // Failures propagate to the family's error boundary, which already maps a
-  // handled error to its own status. Catching here and hard-coding 500 was
-  // what masked all three of the named refusals below as raw 500s.
-  try {
-    const answer = await app.run({
-      workflowId,
-      projectId,
-      inputs: body,
-      ...(versionId ? { versionId } : {}),
-    });
-
-    return { status: 200, body: answer } as const;
-  } catch (error) {
-    throw namedRefusalFor({ error, workflowId });
-  }
-}
-
-/**
- * The three refusals a caller acts on differently: a workflow that does not
- * exist, one that was never published, and a pinned version that was never
- * committed. Each keeps its own code rather than collapsing into one.
- */
-function namedRefusalFor({ error, workflowId }: { error: unknown; workflowId: string }): unknown {
-  if (error instanceof WorkflowNotFoundError) {
-    return new NotFoundError("workflow_not_found", "Workflow", workflowId);
-  }
-
-  if (error instanceof WorkflowNotPublishedError) {
-    return new ValidationError("Workflow not published", { meta: { workflowId } });
-  }
-
-  if (error instanceof WorkflowVersionNotFoundError) {
-    return new NotFoundError(
-      "published_workflow_version_not_found",
-      "Published workflow version",
-      error.versionId,
-    );
-  }
-
-  return error;
-}
+const bodyLimit = {
+  maxBytes: BODY_LIMIT_JSON_BYTES,
+  onExceeded: () => new PayloadTooLargeError(),
+} as const;
 
 export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-run")
@@ -122,10 +23,10 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
 
   .post("/api/optimization/:workflowId/:versionId", "postApiOptimizationByWorkflowIdByVersionId")
   .withParams(workflowRunRestVersionedParamsSchema)
-  .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withInput(workflowRunRestBodySchema)
+  .withBodyLimit(bodyLimit)
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
+  .withOutput(workflowRunAnswerSchema)
   .withDocs({
     summary: "Run a workflow version (legacy path)",
     description:
@@ -134,26 +35,19 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "integrations; this one stays for callers written against it. The body is the workflow's " +
       "own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunContentType)
-  .handle(({ app, input, scope, raw }, contentType) =>
-    runWorkflow({
-      app,
-      projectId: scope.id,
-      workflowId: input.workflowId,
-      versionId: input.versionId,
-      contentType,
-      raw,
-    }),
-  )
+  .handle(({ app, input, scope }) => {
+    const { workflowId, versionId, ...inputs } = input;
+
+    return app.runSynchronous({ workflowId, versionId, projectId: scope.id, inputs });
+  })
 
   .post("/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun")
   .withParams(workflowRunRestParamsSchema)
-  .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withInput(workflowRunRestBodySchema)
+  .withBodyLimit(bodyLimit)
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
+  .withOutput(workflowRunAnswerSchema)
   .withDocs({
     summary: "Run a workflow",
     description:
@@ -161,25 +55,19 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "workflow's published version; address a specific version with the `{versionId}` form of " +
       "this path. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunContentType)
-  .handle(({ app, input, scope, raw }, contentType) =>
-    runWorkflow({
-      app,
-      projectId: scope.id,
-      workflowId: input.workflowId,
-      contentType,
-      raw,
-    }),
-  )
+  .handle(({ app, input, scope }) => {
+    const { workflowId, ...inputs } = input;
+
+    return app.runSynchronous({ workflowId, projectId: scope.id, inputs });
+  })
 
   .post("/api/workflows/:workflowId/:versionId/run", "postApiWorkflowsByWorkflowIdByVersionIdRun")
   .withParams(workflowRunRestVersionedParamsSchema)
-  .withRawBody("text", { mediaType: "application/json" })
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withInput(workflowRunRestBodySchema)
+  .withBodyLimit(bodyLimit)
   .withPermission("workflows:manage")
-  .responds({ 200: workflowRunAnswerSchema, 400: workflowRunRestRefusalSchema })
+  .withOutput(workflowRunAnswerSchema)
   .withDocs({
     summary: "Run a specific workflow version",
     description:
@@ -187,17 +75,10 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       "output. Use this when a caller must keep hitting the same version as the workflow is " +
       "edited. The body is the workflow's own input fields, named as its entry node names them.",
     tags: ["Workflows"],
-    requestBody: { schema: workflowRunRestBodySchema },
   })
-  .withMiddleware(workflowRunContentType)
-  .handle(({ app, input, scope, raw }, contentType) =>
-    runWorkflow({
-      app,
-      projectId: scope.id,
-      workflowId: input.workflowId,
-      versionId: input.versionId,
-      contentType,
-      raw,
-    }),
-  )
+  .handle(({ app, input, scope }) => {
+    const { workflowId, versionId, ...inputs } = input;
+
+    return app.runSynchronous({ workflowId, versionId, projectId: scope.id, inputs });
+  })
   .build();

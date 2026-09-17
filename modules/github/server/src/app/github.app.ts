@@ -16,34 +16,40 @@ import {
   githubServerConfigSchema,
   type GithubRepository,
 } from "@langwatch/github-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import { type GithubProjectActivity,type GithubHost,type GithubBranchDemand,type GithubBranchMaintenance } from "./github.members.ts";
-import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
-import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
-import { GithubInstallStateService } from "../services/github-install-state.service.ts";
-import { GithubInstallNonceRedisRepository } from "../repositories/redis/redis.github-install-nonce.repository.ts";
-import { GithubPullRequestEventRules } from "../rules/github-pull-request-event.rules.ts";
 import {
   RedisGithubAdapter,
   type GithubRedisConnection,
 } from "../repositories/redis/github-redis.connection.ts";
+import { GithubInstallNonceRedisRepository } from "../repositories/redis/redis.github-install-nonce.repository.ts";
+import { GithubPullRequestStatusCacheRedisRepository } from "../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
+import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
+import { GithubPullRequestEventRules } from "../rules/github-pull-request-event.rules.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
+import { GithubHostService } from "../services/github-host.service.ts";
+import { GithubInstallStateService } from "../services/github-install-state.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
-import { GithubPullRequestStatusCacheRedisRepository } from "../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
+import {
+  type GithubProjectActivity,
+  type GithubHost,
+  type GithubBranchDemand,
+  type GithubBranchMaintenance,
+} from "./github.members.ts";
+import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 
 export const GITHUB_WRITE_PERMISSIONS: Record<string, string> = {
   contents: "write",
@@ -197,8 +203,7 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
   private constructor(
     private readonly demand: GithubBranchDemandService,
     private readonly host: GithubHost,
-  ) {
-  }
+  ) {}
 
   canMapRepositoryHost(repositoryHost: string): boolean {
     return this.host.isMappable(repositoryHost);
@@ -326,9 +331,7 @@ export class GithubApp implements GithubApiContract {
    * objects as the sweep, deliberately — demand needs a project seam, the
    * sweep must be composable without one, and either may be mounted alone.
    */
-  static composeBranchDemand(
-    parts: GithubBranchDemandComposition,
-  ): GithubBranchDemand {
+  static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
     const host = GithubHostService.create(parts.hostConfig);
     const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
     const appTokens = RedisGithubAppTokenCache.create(
@@ -407,6 +410,9 @@ export class GithubApp implements GithubApiContract {
   }
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
     return this.#service.parsePullRequestEvent(payload);
+  }
+  applyWebhookPayload(input: Parameters<GithubApi["applyWebhookPayload"]>[0]): Promise<void> {
+    return this.#service.applyWebhookPayload(input);
   }
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
     return this.#service.getAllForOrganization(organizationId);

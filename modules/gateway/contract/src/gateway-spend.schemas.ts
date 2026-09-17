@@ -1,10 +1,10 @@
+import type { Instant } from "@langwatch/time";
 /**
  * Spend-event filter vocabulary and row shape shared by every reader of the
  * `gateway_spend` ledger: tRPC, REST, and the repositories underneath. One
  * module owns it so the screen and a reconciliation script never diverge.
  */
 import { z } from "zod";
-import type { Instant } from "@langwatch/time";
 
 export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
@@ -154,3 +154,13 @@ export const spendUsageSchema = z.object({
   image_count: z.number().int().min(0).default(0),
 });
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
+
+/** One billing event in the canonical envelope shared by pull and webhook delivery. */
+export const gatewaySpendEnvelopeSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  created: z.string(),
+  schema_version: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
+export type GatewaySpendEnvelope = z.infer<typeof gatewaySpendEnvelopeSchema>;

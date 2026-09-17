@@ -17,7 +17,6 @@ export {
   gatewaySpendBillingPlanGate,
   gatewaySpendRest,
   type GatewaySpendApp,
-  type GatewaySpendEnvelope,
   type GatewaySpendWebhookDelivery,
   type GatewaySpendWebhookEndpoint,
   type GatewaySpendWebhookEndpoints,
