@@ -15,8 +15,8 @@
     },
     {
       "id": 3,
-      "prompt": "Explain how a screen in a module's web package ends up as a page a user can open.",
-      "expected_output": "Walks the install steps: the flat web entry export, catalogue.json, the private apps/ui module folder whose host implements the HostPort and whose routes use uiPage (host, guard, screen), the WebInstallation in installed-ui-features, the pinned page keys, feature-map.json.",
+      "prompt": "A process needs to boot with one new module installed. What changes, and what must not change?",
+      "expected_output": "Installing a module edits modules/catalogue.json and regenerates the installed-modules lists (pnpm generate:modules); the composition root does not grow. Names the ruled chain - createApp({ role }).withModules(serverModules).withConfig(...).with<store>(...).withObservability(...).withTransportAuth(...).boot() - where boot() takes no arguments and an unsupplied requirement is a MissingSupply compile refusal. Rejects editing a per-process host file, adding a bespoke member bag, or any deleted spelling (withProvided, withMemoryRepositories, reads statics).",
       "files": []
     }
   ]
