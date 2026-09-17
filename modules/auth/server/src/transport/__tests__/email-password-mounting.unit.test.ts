@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { isEmailPasswordEnabled } from "../../../channels/http/http.better-auth.channel.ts";
+import { isEmailPasswordEnabled } from "../../channels/http/http.better-auth.channel.ts";
 
 describe("given a SaaS deployment that names an identity provider", () => {
   describe("when the email/password routes are considered", () => {

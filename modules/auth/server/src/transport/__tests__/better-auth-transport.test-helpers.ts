@@ -7,8 +7,8 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
-} from "../../../channels/http/http.better-auth.channel.ts";
-import { createSecondaryStorage } from "../../../app/auth-composition.build.ts";
+} from "../../channels/http/http.better-auth.channel.ts";
+import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
 
 export function deployment(
   overrides: Partial<BetterAuthDeploymentConfiguration> = {},

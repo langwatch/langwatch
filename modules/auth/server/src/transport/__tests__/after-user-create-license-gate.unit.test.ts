@@ -5,13 +5,13 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthPendingInvite,
-} from "../../../channels/better-auth.channel.ts";
-import { afterUserCreate } from "../../../channels/http/http.better-auth-hooks.channel.ts";
+} from "../../channels/better-auth.channel.ts";
+import { afterUserCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}

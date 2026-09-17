@@ -15,7 +15,7 @@ import {
   runSignInRouterShadow,
   type SignInRouterMode,
   type SignInRouterShadow,
-} from "../../../channels/http/http.sign-in-router-shadow.channel.ts";
+} from "../../channels/http/http.sign-in-router-shadow.channel.ts";
 
 const PASSWORD: SignInMethod = {
   id: "password",
