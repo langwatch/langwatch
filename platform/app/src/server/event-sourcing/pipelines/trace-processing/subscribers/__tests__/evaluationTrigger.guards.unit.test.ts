@@ -5,14 +5,16 @@ import { evaluatorLoopBlockedCounter } from "~/server/metrics";
 import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
 import { TraceAttributeAccumulationService } from "../../projections/services/trace-attribute-accumulation.service";
 import { TraceOriginService } from "../../projections/services/trace-origin.service";
-import { needsOriginResolution } from "../originGate.subscriber";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { NormalizedSpan } from "../../schemas/spans";
 import {
   createEvaluationTriggerSubscriber,
   type EvaluationTriggerSubscriberDeps,
 } from "../evaluationTrigger.subscriber";
-import { DEFERRED_CHECK_DELAY_MS } from "../originGate.subscriber";
+import {
+  DEFERRED_CHECK_DELAY_MS,
+  needsOriginResolution,
+} from "../originGate.subscriber";
 
 /**
  * Reads the prom-client counter so assertions stay delta-based and isolated
