@@ -234,6 +234,15 @@ asked for `withAnalytical` at all.
 
 ## Three findings from working the shape through
 
+**Environment is a tier, and belongs in config.** `local` / `development` /
+`production` is already the `ENVIRONMENT` leaf of `runtimeIdentityConfigDefinition`.
+It needs no call.
+
+**Tracing is a BACKEND choice, not a facility handed over.** Which of otel or
+something else carries logs, traces and profiles is the same kind of decision as
+which backend a store uses, so it belongs with logging and metrics under one
+observability call.
+
 **`telemetry` is misnamed, and tracing is missing.** The member is
 `count(name, value?, attributes?)` and `observe(...)` - metrics and nothing else.
 A module that wants a span has no declared way to get one: it reaches the global
@@ -256,6 +265,59 @@ pass:
 database and the process is ignoring it - which is right in a test and a mistake
 anywhere else, and silent either way today. Warn at boot naming both facts, the
 same shape as the dropped-config-key log.
+
+## The three processes, whole
+
+```ts
+// apps/api
+await createApp({ role: "api" })
+  .withModules(serverModules)
+  .withConfig(apiModuleConfig(config))
+  .withSecrets(secrets)
+  .withEncryption(cipher)
+  .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
+  .withTransportAuth((a) => a
+    .withStaticTokens({ cron, langyInternal, instanceAdmin })
+    .withBrowserSession(session))
+  .boot();
+
+// apps/worker - the same, minus the doors. That IS the difference between the roles.
+await createApp({ role: "worker" })
+  .withModules(serverModules)
+  .withConfig(workerModuleConfig(config))
+  .withSecrets(secrets)
+  .withEncryption(cipher)
+  .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
+  .boot();
+
+// an installation test - only what its one module declares
+await createApp({ role: "api" })
+  .withModules([entitlementServer])
+  .withConfig({ entitlement: { isSaas: true, processName: "test" } })
+  .withRelational(memory())
+  .withObservability((o) => o.withLogging(testLogger))
+  .provide({ user: userFixture })
+  .boot();
+```
+
+Stores never appear in production: they are built from the connection strings in
+config, and a `with*` store call is an override.
+
+### apps/ui is not on this shape, and that is its own piece of work
+
+`modules/web-modules.generated.ts` reads "No module declares a web half yet" and
+exports `[]`, so the catalogue-driven path is unwired. What runs is
+`collectWebInstallations({ installations: features })` over a hand-listed array,
+merged with `installedLegacyUiFeatures`, and a `WebInstallation` is
+`{ name, install(ui) }` - an imperative install rather than a declaration. The
+equivalent shape would be
+
+```ts
+createUi().withModules(webModules).withSession(useBrowserUiSession).boot();
+```
+
+but reaching it needs every web half to declare itself in the catalogue and the
+legacy merge to go. Bigger than it looks, and separate from the server builder.
 
 ## Where a thing goes, with fifty modules installed
 
