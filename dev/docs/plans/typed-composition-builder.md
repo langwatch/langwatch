@@ -117,7 +117,25 @@ module that needs it, both compile.
   secrets by family, the instance-admin bearer, idempotency, the rate limiter,
   the browser session, the execution proxy. `workerClosedDoors()` is a host
   too, whose `mount()` throws a named refusal rather than returning undefined.
-  One word, two things - that collision is worth renaming, not removing.
+  One word, two things. The process side is renamed `withDoors`, which is the
+  word this codebase already uses everywhere: "door" appears 141 times and
+  "doors" 58 across the api, worker and runtime-composition sources -
+  `workerClosedDoors`, `ClosedDoorMount`, `trpcDoor`, `bearerDoor`,
+  `internalDoorFamily`, `DoorContribution`, `ApiRestDoorUnverifiedError`.
+  `withTransportSource` would be a fifth word for a thing already named.
+
+  ```ts
+  .withDoors(openDoors({ rest: { ... }, trpc: { ... } }))   // api
+  .withDoors(closedDoors())                                 // worker
+  ```
+
+  `withDoors` takes a FACTORY, `(peers) => hosts`, not a built host: the host is
+  assembled from resolved peers, which do not exist until the graph boots. That
+  is the same ordering constraint that stopped `members` being checked when it
+  was passed before `withModules`. What CAN move is the assembly - the forty
+  lines currently inline in the composition root belong in the door package, as
+  `openDoors(config)`.
+
 - **Config is supplied at `boot`**, not beside the modules. It is per-module in
   shape, but it is one object the process assembles, and splitting it across
   `withModules` calls would only move the same map.
