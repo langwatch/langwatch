@@ -87,7 +87,7 @@ const FIELD_HELPER_OVERRIDES: Record<string, { helper: string; tooltip: string }
   swap_and_reconcile: {
     helper: "Check each row again with the candidates in the opposite order. Doubles judge cost.",
     tooltip:
-      "Judges tend to favour whichever answer they read first, and reversing the order is the most reliable way to catch it — swapping alone flips 10-30% of verdicts on close rows. When the two checks disagree, the row is left without a result rather than called a tie: a tie would say the candidates are equally good, which is not what was found.",
+      "Judges tend to favour whichever answer they read first, and reversing the order is the most reliable way to catch it: swapping alone flips 10-30% of verdicts on close rows. When the two checks disagree, the row is left without a result rather than called a tie: a tie would say the candidates are equally good, which is not what was found.",
   },
 };
 
@@ -96,12 +96,12 @@ const METRIC_META: Record<string, MetricMeta> = {
   cost: {
     label: "Cost",
     tooltip:
-      "Per-candidate model spend (USD), summed across the candidate's run. Injected so the judge can prefer cheaper options when quality is comparable. Use cautiously — judges may over-weight cost.",
+      "Per-candidate model spend (USD), summed across the candidate's run. Injected so the judge can prefer cheaper options when quality is comparable. Use cautiously: judges may over-weight cost.",
   },
   duration: {
     label: "Duration",
     tooltip:
-      "Per-candidate wall-clock latency (ms) for this row's call. For aggregate views, p95 is reported in the leaderboard — the value sent to the judge here is the single-row time.",
+      "Per-candidate wall-clock latency (ms) for this row's call. For aggregate views, p95 is reported in the leaderboard; the value sent to the judge here is the single-row time.",
   },
 };
 

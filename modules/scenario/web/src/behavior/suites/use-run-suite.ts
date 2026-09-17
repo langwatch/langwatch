@@ -11,7 +11,7 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
-import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
+import { targetLabelOf, parseSuiteTargets, type SuiteRunResult } from "@langwatch/suite-contract";
 import { api } from "../scenario-api.ts";
 import { useRunAttempt } from "./use-run-attempt.ts";
 import {
@@ -147,6 +147,89 @@ export function toRunParameters({
   return Object.keys(parameters).length > 0 ? parameters : undefined;
 }
 
+function notifyRunScheduled({
+  result,
+  onEditRunPlan,
+  onViewRun,
+}: {
+  result: SuiteRunResult;
+  onEditRunPlan: () => void;
+  onViewRun: (() => void) | undefined;
+}): void {
+  const archivedCount =
+    (result.skippedArchived?.scenarios?.length ?? 0) +
+    (result.skippedArchived?.targets?.length ?? 0);
+
+  if (archivedCount > 0) {
+    const parts: string[] = [];
+    if (result.skippedArchived.scenarios.length > 0) {
+      parts.push(
+        `${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`,
+      );
+    }
+    if (result.skippedArchived.targets.length > 0) {
+      parts.push(
+        `${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`,
+      );
+    }
+
+    toaster.create({
+      title: `Run plan scheduled (${result.jobCount} jobs)`,
+      description: `${parts.join(" and ")} skipped.`,
+      type: "warning",
+      action: {
+        label: "Edit Run Plan",
+        onClick: onEditRunPlan,
+      },
+    });
+  } else {
+    toaster.create({
+      title: `Run plan scheduled (${result.jobCount} jobs)`,
+      type: "success",
+      action: onViewRun
+        ? {
+            label: "View run",
+            onClick: onViewRun,
+          }
+        : void 0,
+    });
+  }
+}
+
+function parameterValuesOf({
+  parameterDefinitions,
+  parameterOverrides,
+}: {
+  parameterDefinitions: ScenarioParameterDefinition[];
+  parameterOverrides: Record<string, string>;
+}): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const definition of parameterDefinitions) {
+    values[definition.name] =
+      parameterOverrides[definition.name] ??
+      displayTypedValue({
+        value: definition.defaultValue,
+        type: definition.type,
+      });
+  }
+  return values;
+}
+
+function countActiveScenarios({
+  pendingSuite,
+  allScenarios,
+}: {
+  pendingSuite: SimulationSuite | null;
+  allScenarios: readonly { id: string }[] | undefined;
+}): number {
+  if (!pendingSuite || !allScenarios) {
+    return pendingSuite?.scenarioIds.length ?? 0;
+  }
+
+  const activeIds = new Set(allScenarios.map((scenario) => scenario.id));
+  return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
+}
+
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -166,48 +249,15 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       clearRunAttempt();
       setPendingSuite(null);
 
-      const archivedCount =
-        (result.skippedArchived?.scenarios?.length ?? 0) +
-        (result.skippedArchived?.targets?.length ?? 0);
-
-      if (archivedCount > 0) {
-        const parts: string[] = [];
-        if (result.skippedArchived.scenarios.length > 0) {
-          parts.push(
-            `${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`,
-          );
-        }
-        if (result.skippedArchived.targets.length > 0) {
-          parts.push(
-            `${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`,
-          );
-        }
-
-        toaster.create({
-          title: `Run plan scheduled (${result.jobCount} jobs)`,
-          description: `${parts.join(" and ")} skipped.`,
-          type: "warning",
-          action: {
-            label: "Edit Run Plan",
-            onClick: () => {
-              openDrawer("suiteEditor", {
-                urlParams: { suiteId: variables.id },
-              });
-            },
-          },
-        });
-      } else {
-        toaster.create({
-          title: `Run plan scheduled (${result.jobCount} jobs)`,
-          type: "success",
-          action: optionsRef.current.onViewRun
-            ? {
-                label: "View run",
-                onClick: () => optionsRef.current.onViewRun?.(variables.id),
-              }
-            : undefined,
-        });
-      }
+      notifyRunScheduled({
+        result,
+        onEditRunPlan: () => {
+          openDrawer("suiteEditor", { urlParams: { suiteId: variables.id } });
+        },
+        onViewRun: optionsRef.current.onViewRun
+          ? () => optionsRef.current.onViewRun?.(variables.id)
+          : void 0,
+      });
 
       optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
     },
@@ -231,13 +281,14 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     { enabled: !!project && !!pendingSuite },
   );
 
-  const parameterDefinitions = useMemo(() => {
-    if (!pendingSuite || !allScenarios) return [];
-    return unionParameterDefinitions({
-      scenarioIds: pendingSuite.scenarioIds,
-      scenarios: allScenarios,
-    });
-  }, [pendingSuite, allScenarios]);
+  const parameterDefinitions = useMemo(
+    () =>
+      unionParameterDefinitions({
+        scenarioIds: pendingSuite?.scenarioIds ?? [],
+        scenarios: allScenarios ?? [],
+      }),
+    [pendingSuite, allScenarios],
+  );
 
   /**
    * What the confirmation shows for each name: the declared default, replaced by
@@ -245,16 +296,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
    * arrives with the scenarios cannot overwrite an edit made before they loaded.
    */
   const parameterValues = useMemo(() => {
-    const values: Record<string, string> = {};
-    for (const definition of parameterDefinitions) {
-      values[definition.name] =
-        parameterOverrides[definition.name] ??
-        displayTypedValue({
-          value: definition.defaultValue,
-          type: definition.type,
-        });
-    }
-    return values;
+    return parameterValuesOf({ parameterDefinitions, parameterOverrides });
   }, [parameterDefinitions, parameterOverrides]);
 
   const setParameterValue = useCallback((name: string, value: string) => {
@@ -297,11 +339,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     setPendingSuite(null);
   }, [runMutation.isPending]);
 
-  const activeScenarioCount = useMemo(() => {
-    if (!pendingSuite || !allScenarios) return pendingSuite?.scenarioIds.length ?? 0;
-    const activeIds = new Set(allScenarios.map((s) => s.id));
-    return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
-  }, [pendingSuite, allScenarios]);
+  const activeScenarioCount = useMemo(
+    () => countActiveScenarios({ pendingSuite, allScenarios }),
+    [pendingSuite, allScenarios],
+  );
 
   const targetCount = useMemo(() => {
     if (!pendingSuite) return 0;

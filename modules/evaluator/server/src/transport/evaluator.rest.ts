@@ -12,7 +12,11 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
+  archivedEvaluatorResponseSchema,
   EvaluatorApi,
+  evaluatorIdOrSlugParamsSchema,
+  evaluatorIdParamsSchema,
+  evaluatorWireSchema,
   EvaluatorNotFoundError,
   EvaluatorTypeImmutableError,
   type EvaluatorWithFields,
@@ -27,17 +31,6 @@ import {
 } from "../rules/evaluator-schemas.rules.ts";
 
 const logger = createLogger("langwatch:api:evaluators");
-
-const evaluatorWireSchema = z.object({
-  ...apiResponseEvaluatorSchema.shape,
-  platformUrl: z.string().url(),
-});
-
-const idParamsSchema = z.object({ id: z.string().min(1).describe("The evaluator id.") });
-const idOrSlugParamsSchema = z.object({
-  idOrSlug: z.string().min(1).describe("The evaluator id or its project-unique slug."),
-});
-const archivedSchema = z.object({ success: z.boolean() });
 
 const notFound = documentedResponses({ 404: badRequestSchema });
 const badRequest = documentedResponses({ 400: badRequestSchema, 404: badRequestSchema });
@@ -113,7 +106,7 @@ async function createEvaluator(params: {
  */
 async function updateEvaluator(params: {
   app: EvaluatorApi;
-  input: z.infer<typeof idParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>;
+  input: z.infer<typeof evaluatorIdParamsSchema> & z.infer<typeof updateEvaluatorInputSchema>;
   project: ProjectFacts;
   projectId: string;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
@@ -152,7 +145,7 @@ async function archiveEvaluator(params: {
   app: EvaluatorApi;
   id: string;
   projectId: string;
-}): Promise<z.infer<typeof archivedSchema>> {
+}): Promise<z.infer<typeof archivedEvaluatorResponseSchema>> {
   const { app, id, projectId } = params;
   logger.info({ projectId, evaluatorId: id }, "Archiving evaluator");
 
@@ -194,7 +187,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       })
 
       .get("/:idOrSlug", "getApiEvaluatorsByIdOrSlug")
-      .withParams(idOrSlugParamsSchema)
+      .withParams(evaluatorIdOrSlugParamsSchema)
       .withPermission("evaluations:view")
       .withOutput(evaluatorWireSchema)
       .withDocs({
@@ -225,7 +218,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       )
 
       .put("/:id", "putApiEvaluatorsById")
-      .withParams(idParamsSchema)
+      .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
       .withPermission("evaluations:update")
       .withOutput(evaluatorWireSchema)
@@ -240,9 +233,9 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
 
       // Archiving deliberately stays at `:manage`.
       .delete("/:id", "deleteApiEvaluatorsById")
-      .withParams(idParamsSchema)
+      .withParams(evaluatorIdParamsSchema)
       .withPermission("evaluations:manage")
-      .withOutput(archivedSchema)
+      .withOutput(archivedEvaluatorResponseSchema)
       .withDocs({
         description: "Archive (soft-delete) an evaluator",
         responses: notFound,

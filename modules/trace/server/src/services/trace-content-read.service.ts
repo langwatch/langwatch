@@ -1,5 +1,5 @@
 import {
-  TraceContentReadService,
+  TraceContentReadService as TraceContentReadContract,
   type Span,
   type Trace,
   type TraceLegacyListInput,
@@ -7,9 +7,9 @@ import {
 } from "@langwatch/trace-contract";
 import type { TraceLegacyRead } from "../app/trace.members.ts";
 
-export class TraceContentReadServiceImpl extends TraceContentReadService {
-  static create(read: TraceLegacyRead): TraceContentReadServiceImpl {
-    return new TraceContentReadServiceImpl(read);
+export class TraceContentReadService extends TraceContentReadContract {
+  static create(read: TraceLegacyRead): TraceContentReadService {
+    return new TraceContentReadService(read);
   }
 
   private constructor(private readonly read: TraceLegacyRead) {

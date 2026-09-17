@@ -61,6 +61,7 @@ function Catalog() {
         <VStack align="stretch" gap={3}>
           {SHOWCASE.map((type) => {
             const def = AVAILABLE_EVALUATORS[type];
+            if (!def) throw new Error(`Missing evaluator definition for ${type}`);
             const settings = evaluatorsSchema.shape[type].shape.settings;
             const defaults = settings.parse({});
             const fields = Object.entries(settings.shape);

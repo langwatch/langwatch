@@ -5,13 +5,7 @@
  */
 import type { EvaluatorNlpDispatcher } from "../services/evaluator-code-execution.service.ts";
 
-/**
- * Refuses by name rather than crashing on `undefined`: no deployment supplies
- * this module an NLP dispatcher yet (its builder died with the deleted
- * composition and nothing replaced it), so the one capability that needs it —
- * running a code evaluator — fails with an attributable error instead of a
- * silent `TypeError` the first time a customer runs one.
- */
+/** Refuses by name when no deployment supplies this module an NLP dispatcher. */
 export function refusingEvaluatorNlpDispatcher(): EvaluatorNlpDispatcher {
   return {
     dispatch() {

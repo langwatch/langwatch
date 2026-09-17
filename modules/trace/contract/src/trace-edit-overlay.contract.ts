@@ -67,15 +67,15 @@ export type TraceEditTraceField = (typeof TRACE_EDIT_TRACE_FIELDS)[number];
  */
 const traceMetadataEditSchema = z.record(z.string(), z.unknown());
 
+export const traceEditTracePatchSchema = z.object({
+  input: traceIOEditSchema.optional(),
+  output: traceIOEditSchema.optional(),
+  metadata: traceMetadataEditSchema.nullable().optional(),
+});
+
 const traceEditOverlayPatchObjectSchema = z.object({
   version: z.literal(TRACE_EDIT_OVERLAY_PATCH_VERSION),
-  trace: z
-    .object({
-      input: traceIOEditSchema.optional(),
-      output: traceIOEditSchema.optional(),
-      metadata: traceMetadataEditSchema.nullable().optional(),
-    })
-    .optional(),
+  trace: traceEditTracePatchSchema.optional(),
   spans: z.array(traceEditSpanPatchSchema).default([]),
   /**
    * Spans the reviewer removed. Only the deletion roots are stored; the

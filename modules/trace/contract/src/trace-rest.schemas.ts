@@ -130,6 +130,31 @@ export const traceFormatQuerySchema = z.object({
 
 export const traceMetadataResponseSchema = z.object({ traceId: z.string() });
 
+const traceMetadataValueSchema = z.union([
+  z.string().max(4096),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z.record(z.string(), z.unknown()),
+]);
+
+export const traceMetadataUpdateSchema = z
+  .record(z.string(), traceMetadataValueSchema)
+  .refine((metadata) => Object.keys(metadata).length > 0, {
+    message: "metadata must contain at least one key",
+  })
+  .refine((metadata) => JSON.stringify(metadata).length <= 32768, {
+    message: "total metadata payload must not exceed 32KB",
+  });
+
+export type TraceMetadataUpdate = z.infer<typeof traceMetadataUpdateSchema>;
+
+export const traceMetadataBodySchema = z.object({ metadata: traceMetadataUpdateSchema });
+
+export const trackEventResponseSchema = z.object({
+  message: z.literal("Event tracked"),
+});
+
 export const transcriptResponseSchema = z.object({
   agent: z.string(),
   sessionId: z.string().nullable(),

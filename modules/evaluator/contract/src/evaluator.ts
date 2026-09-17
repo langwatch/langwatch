@@ -48,7 +48,7 @@ export const standardEvaluatorOutputFields = [
 ] as const satisfies readonly EvaluatorField[];
 
 export const evaluatorWithFieldsSchema = evaluatorSchema
-  .extend({
+  .safeExtend({
     fields: z.array(evaluatorFieldSchema),
     outputFields: z.array(evaluatorFieldSchema),
     workflowName: z.string().optional(),
@@ -107,6 +107,18 @@ export const fieldType = (fieldName: string): string =>
     conversation: "list",
   })[fieldName] ?? "str";
 
+function evaluatorSettingDefault(
+  key: string,
+  setting: { readonly default: unknown },
+  resolved: { defaultModel?: string | null; embeddingsModel?: string | null },
+  fallback: { defaultModel: string; embeddingsModel: string },
+): unknown {
+  if (key === "model") return resolved.defaultModel ?? fallback.defaultModel;
+  if (key === "embeddings_model") return resolved.embeddingsModel ?? fallback.embeddingsModel;
+
+  return setting.default;
+}
+
 export function getEvaluatorDefaultSettings(
   definition: EvaluatorDefinition | CustomEvaluatorDefinition | undefined,
   resolved: { defaultModel?: string | null; embeddingsModel?: string | null } = {},
@@ -119,11 +131,7 @@ export function getEvaluatorDefaultSettings(
   return Object.fromEntries(
     Object.entries(definition.settings).map(([key, setting]) => [
       key,
-      key === "model"
-        ? (resolved.defaultModel ?? fallback.defaultModel)
-        : key === "embeddings_model"
-          ? (resolved.embeddingsModel ?? fallback.embeddingsModel)
-          : setting.default,
+      evaluatorSettingDefault(key, setting, resolved, fallback),
     ]),
   );
 }

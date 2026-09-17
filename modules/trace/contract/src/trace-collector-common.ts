@@ -15,15 +15,18 @@ const hasMeaningfulInput = (span: Span): boolean => {
   if (span.input.type === "json" && isEmptyJson(span.input.value)) return false;
 
   // Agent inputs captured by openinference from agno are not really human redable, skip it
-  return !(
-    span.params?.scope?.name === "openinference.instrumentation.agno" && span.type === "agent"
-  );
+  const scopeName = span.params?.scope?.name;
+  if (scopeName !== "openinference.instrumentation.agno") return true;
+
+  return span.type !== "agent";
 };
 
 /** Haystack wraps a pipeline's input in `{ data: { <component>: ... } }`. */
 const findHaystackInput = (span: Span | undefined): SpanInputOutput | undefined => {
   if (span?.type !== "chain") return undefined;
-  if (!span.params?.scope?.name?.includes("haystack")) return undefined;
+  const scopeName = span.params?.scope?.name;
+  if (!scopeName) return undefined;
+  if (!scopeName.includes("haystack")) return undefined;
   const inputValue = span.input?.value;
   if (!inputValue || typeof inputValue !== "object" || !("data" in inputValue)) return undefined;
   const data = inputValue.data;
@@ -58,24 +61,17 @@ export const getFirstInputAsText = (spans: Span[]): string => {
 };
 
 export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
-  let isEmpty =
-    !value ||
-    value === "null" ||
-    value === "{}" ||
-    (typeof value === "object" && Object.keys(value).length === 0);
+  if (!value || value === "null" || value === "{}") return true;
+  if (typeof value !== "object") return false;
 
-  if (
-    !isEmpty &&
-    typeof value === "object" &&
-    value &&
-    !Array.isArray(value) &&
-    Object.keys(value).length === 1
-  ) {
-    const value_ = value[Object.keys(value)[0]!];
-    isEmpty = isEmptyJson(value_);
-  }
+  const keys = Object.keys(value);
+  if (keys.length === 0) return true;
+  if (Array.isArray(value) || keys.length !== 1) return false;
 
-  return isEmpty;
+  const onlyKey = keys[0];
+  if (onlyKey === undefined) return true;
+
+  return isEmptyJson(value[onlyKey]);
 };
 
 export const getLastOutputAsText = (spans: Span[]): string => {
@@ -292,14 +288,14 @@ const readLangChainWrapper = (json: any): string | undefined => {
 
 /** Langgraph.js keeps the answer on the last `AIMessage`'s kwargs. */
 const readLanggraphMessage = (json: any): string | undefined => {
-  if (
-    Array.isArray(json.messages) &&
-    Array.isArray(json.messages.at(-1)?.id) &&
-    json.messages.at(-1)?.id.includes("AIMessage") &&
-    json.messages.at(-1)?.kwargs?.content
-  ) {
-    return json.messages.at(-1)?.kwargs?.content;
-  }
+  if (!Array.isArray(json.messages)) return undefined;
+
+  const lastMessage = json.messages.at(-1);
+  if (!Array.isArray(lastMessage?.id)) return undefined;
+  if (!lastMessage.id.includes("AIMessage")) return undefined;
+
+  const content = lastMessage.kwargs?.content;
+  if (content) return content;
 
   return undefined;
 };

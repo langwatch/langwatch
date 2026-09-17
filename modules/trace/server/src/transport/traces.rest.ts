@@ -6,7 +6,6 @@ import { TraceFormattingService } from "#services/trace-formatting.service";
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
-import { traceMetadataUpdateSchema } from "#services/trace-metadata-write.service";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
   badRequestSchema,
@@ -28,6 +27,8 @@ import {
   traceIdParamsSchema,
   traceAmbiguousPrefixBodySchema,
   traceDetailResponseSchema,
+  traceMetadataBodySchema,
+  traceMetadataResponseSchema,
   traceNotFoundBodySchema,
   traceSearchBodyExtensions,
   traceSearchBodySchema,
@@ -42,7 +43,6 @@ import {
 } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { z } from "zod";
 import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:traces");
@@ -59,8 +59,6 @@ export const tracesRestCredential = defineRestMiddleware(
   "tracesRestCredential",
   tracesRestCredentialSchema,
 );
-const traceMetadataBodySchema = z.object({ metadata: traceMetadataUpdateSchema });
-
 /** Written out because the search route writes its own body, so no output schema speaks for it. */
 const SHARED_ERROR_ANSWERS = documentedResponses({
   400: badRequestSchema,
@@ -370,7 +368,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       .withParams(traceIdParamsSchema)
       .withInput(traceMetadataBodySchema)
       .withPermission("traces:update")
-      .withOutput(z.object({ traceId: z.string() }))
+      .withOutput(traceMetadataResponseSchema)
       .withDocs({
         description:
           "Update metadata on a trace after creation. Inserts a synthetic span carrying the new " +

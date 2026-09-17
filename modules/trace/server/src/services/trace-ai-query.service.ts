@@ -1,6 +1,6 @@
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
+  AiQueryProviderError,
   isEmptyAST,
   parse,
   type AiActionErrorDetails,
@@ -51,24 +51,6 @@ export interface AiQueryInput {
   timeRange: { from: number; to: number };
   resolveModel: AiQueryModelResolver;
   traces: Pick<TraceApi, "buildQueryFieldCatalogue">;
-}
-
-/**
- * Raised when the AI composer could not turn a prompt into a usable trace query: the provider threw
- * on every attempt, or every attempt produced something unparseable. The words a customer reads
- * come from the registry entry for this code, and the fault is the provider's.
- */
-export class AiQueryProviderError extends HandledError {
-  declare readonly code: "ai_query_provider_error";
-
-  constructor(details: AiActionErrorDetails = {}) {
-    super("ai_query_provider_error", "The model did not produce a usable trace query.", {
-      httpStatus: 502,
-      fault: "provider",
-      meta: { ...details },
-    });
-    this.name = "AiQueryProviderError";
-  }
 }
 
 const aiActionSchema = z.discriminatedUnion("kind", [

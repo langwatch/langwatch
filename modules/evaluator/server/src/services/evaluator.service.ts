@@ -46,12 +46,14 @@ export type EvaluatorServiceOptions = {
   generateId: (kind: string) => string;
 };
 
-/**
- * The evaluator runtime this module composes over its own repository: every
- * read, write, execution and copy-lineage rule an evaluator carries. Private
- * to the module - `EvaluatorApp` is the only caller, and every operation here
- * reaches a peer through `EvaluatorApi` instead.
- */
+function evaluatorResultFieldType(identifier: string): string {
+  if (identifier === "score") return "float";
+  if (identifier === "passed") return "bool";
+
+  return "str";
+}
+
+/** The evaluator runtime this module composes over its own repository. */
 export class EvaluatorService {
   private readonly code: EvaluatorCodeService;
   private readonly native = EvaluatorNativeService.create();
@@ -273,7 +275,7 @@ export class EvaluatorService {
     const outputFields = definition
       ? Object.entries(definition.result).map(([identifier, result]) => ({
           identifier,
-          type: identifier === "score" ? "float" : identifier === "passed" ? "bool" : "str",
+          type: evaluatorResultFieldType(identifier),
           ...(result ? {} : {}),
         }))
       : [...standardEvaluatorOutputFields];
@@ -406,10 +408,7 @@ export class EvaluatorService {
     return { copy, source };
   }
 
-  getHistory(input: {
-    evaluatorId: string;
-    projectId: string;
-  }): Promise<EvaluatorHistoryEntry[]> {
+  getHistory(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorHistoryEntry[]> {
     return this.options.history.listForEvaluator(input);
   }
 }

@@ -73,7 +73,7 @@ import type {
 import type { TraceLegacyRead } from "./trace.members.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
-import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
+import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import {
   TraceExportBoundsService,
@@ -552,7 +552,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   #dependencies: TraceAppDependencies;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
-    this.#contentReader = TraceContentReadServiceImpl.create(dependencies.traces.read);
+    this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
     this.#readBounds = TraceReadBoundsService.create({
       entitlement: dependencies.requestBounds,
       projects: dependencies.projects,

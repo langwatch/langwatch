@@ -6,6 +6,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
   type TrackEventRESTParamsValidator,
+  trackEventResponseSchema,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
 import {
@@ -21,7 +22,6 @@ import {
 import { moduleApi } from "@langwatch/runtime-composition";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 
 const logger = createLogger("langwatch:api:events");
 
@@ -31,10 +31,6 @@ const payloadTooLarge = (): Error =>
 
 /** Telemetry posts; the bulk cap is the ceiling a misbehaving SDK can hit. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
-
-const trackEventResponseSchema = z.object({
-  message: z.literal("Event tracked"),
-});
 
 /**
  * A payload this family refused, carrying the prose the caller reads. The

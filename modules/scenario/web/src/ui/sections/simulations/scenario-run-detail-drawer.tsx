@@ -26,7 +26,10 @@ import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon.t
 import { SimulationConsole } from "../../elements/simulation-console/simulation-console.tsx";
 import { useRunAgainActions } from "./use-run-again-actions.ts";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
-import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
+import {
+  useRunStateStream,
+  type ScenarioRunState,
+} from "../../../behavior/simulations/use-run-state-stream.ts";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 import { AgentTestingRunDrawer } from "../agent-testing/drawers/agent-testing-run-drawer.tsx";
 
@@ -157,6 +160,98 @@ export function ScenarioRunDetailDrawer(props: ScenarioRunDetailDrawerProps) {
   return <ClassicScenarioRunDetailDrawer {...props} />;
 }
 
+function RunDetailLoadState({ error }: { error: { data?: { code: string } } | null }) {
+  if (!error) {
+    return (
+      <VStack gap={4} align="start" w="100%" pt={4}>
+        <Skeleton height="32px" width="60%" />
+        <Skeleton height="24px" width="40%" />
+        <Skeleton height="200px" width="100%" borderRadius="md" />
+      </VStack>
+    );
+  }
+
+  if (error.data?.code === "NOT_FOUND") {
+    return (
+      <VStack gap={2} align="start" w="100%" pt={4}>
+        <Drawer.CloseTrigger />
+        <Heading size="md">Run details not available yet</Heading>
+        <Text color="fg.muted" fontSize="sm">
+          This run may be queued, in progress, or recently cancelled. Details will appear once
+          available.
+        </Text>
+      </VStack>
+    );
+  }
+
+  return (
+    <VStack gap={2} align="start" w="100%" pt={4}>
+      <Drawer.CloseTrigger />
+      <Box width="100%">
+        <HandledErrorAlert error={error} fallbackTitle="Failed to load run" />
+      </Box>
+    </VStack>
+  );
+}
+
+function RunDetailChips({
+  scenarioState,
+  timeAgo,
+  isArchived,
+  copyableIds,
+}: {
+  scenarioState: ScenarioRunState;
+  timeAgo: string | undefined;
+  isArchived: boolean;
+  copyableIds: readonly { label: string; value: string }[] | undefined;
+}) {
+  return (
+    <HStack w="100%" gap={1.5} flexWrap="wrap">
+      {scenarioState.results && !hasNoResults(scenarioState.status) && (
+        <RunCriteriaChip
+          metCriteria={scenarioState.results.metCriteria ?? []}
+          unmetCriteria={scenarioState.results.unmetCriteria ?? []}
+        />
+      )}
+      {scenarioState.durationInMs > 0 && (
+        <Chip label="Duration" value={formatLatency(scenarioState.durationInMs)} />
+      )}
+      {scenarioState.totalCost != null && (
+        <Chip label="Cost" value={formatCost(scenarioState.totalCost)} />
+      )}
+      {timeAgo && <Chip label="Ran" value={timeAgo} />}
+      {isArchived && <Chip value="Archived" tone="yellow" />}
+      {copyableIds?.map((id) => (
+        <CopyIdChip key={id.label} label={id.label} value={id.value} />
+      ))}
+    </HStack>
+  );
+}
+
+function ConversationExpandButton({
+  expandAllMessages,
+  onToggle,
+}: {
+  expandAllMessages: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Button
+      size="2xs"
+      variant="ghost"
+      color="fg.muted"
+      _hover={{ color: "fg" }}
+      onClick={onToggle}
+      aria-label={expandAllMessages ? "Collapse all messages" : "Expand all messages"}
+    >
+      {expandAllMessages ? <ChevronsDownUp size={12} /> : <ChevronsUpDown size={12} />}
+      <Text textStyle="2xs" fontWeight="500">
+        {expandAllMessages ? "Collapse all" : "Expand all"}
+      </Text>
+    </Button>
+  );
+}
+
 function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
@@ -226,35 +321,7 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
         >
           {!scenarioState && open && (
             <Drawer.Body bg={{ base: "bg.surface", _dark: "bg.panel" }}>
-              {runStateError ? (
-                runStateError.data?.code === "NOT_FOUND" ? (
-                  <VStack gap={2} align="start" w="100%" pt={4}>
-                    <Drawer.CloseTrigger />
-                    <Heading size="md">Run details not available yet</Heading>
-                    <Text color="fg.muted" fontSize="sm">
-                      This run may be queued, in progress, or recently cancelled. Details will
-                      appear once available.
-                    </Text>
-                  </VStack>
-                ) : (
-                  // The alert is the whole error surface here: it reads the
-                  // handled payload, an authored non-5xx message, or the
-                  // generic unknown state, and carries the tips, docs link and
-                  // copyable error id with it.
-                  <VStack gap={2} align="start" w="100%" pt={4}>
-                    <Drawer.CloseTrigger />
-                    <Box width="100%">
-                      <HandledErrorAlert error={runStateError} fallbackTitle="Failed to load run" />
-                    </Box>
-                  </VStack>
-                )
-              ) : (
-                <VStack gap={4} align="start" w="100%" pt={4}>
-                  <Skeleton height="32px" width="60%" />
-                  <Skeleton height="24px" width="40%" />
-                  <Skeleton height="200px" width="100%" borderRadius="md" />
-                </VStack>
-              )}
+              <RunDetailLoadState error={runStateError} />
             </Drawer.Body>
           )}
           {scenarioState && (
@@ -325,25 +392,12 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
 
                 {/* Chip strip — metrics + copyable ids, one visual language
                     with the Traces V2 drawer header */}
-                <HStack w="100%" gap={1.5} flexWrap="wrap">
-                  {scenarioState.results && !hasNoResults(scenarioState.status) && (
-                    <RunCriteriaChip
-                      metCriteria={scenarioState.results.metCriteria ?? []}
-                      unmetCriteria={scenarioState.results.unmetCriteria ?? []}
-                    />
-                  )}
-                  {scenarioState.durationInMs > 0 && (
-                    <Chip label="Duration" value={formatLatency(scenarioState.durationInMs)} />
-                  )}
-                  {scenarioState.totalCost != null && (
-                    <Chip label="Cost" value={formatCost(scenarioState.totalCost)} />
-                  )}
-                  {timeAgo && <Chip label="Ran" value={timeAgo} />}
-                  {scenarioData?.archivedAt && <Chip value="Archived" tone="yellow" />}
-                  {copyableIds?.map((id) => (
-                    <CopyIdChip key={id.label} label={id.label} value={id.value} />
-                  ))}
-                </HStack>
+                <RunDetailChips
+                  scenarioState={scenarioState}
+                  timeAgo={timeAgo}
+                  isArchived={Boolean(scenarioData?.archivedAt)}
+                  copyableIds={copyableIds}
+                />
               </VStack>
 
               {/* Body — accordion sections, Traces V2 drawer language */}
@@ -360,25 +414,10 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
                     count={conversationCount}
                     isFirst
                     actions={
-                      <Button
-                        size="2xs"
-                        variant="ghost"
-                        color="fg.muted"
-                        _hover={{ color: "fg" }}
-                        onClick={() => setExpandAllMessages((v) => !v)}
-                        aria-label={
-                          expandAllMessages ? "Collapse all messages" : "Expand all messages"
-                        }
-                      >
-                        {expandAllMessages ? (
-                          <ChevronsDownUp size={12} />
-                        ) : (
-                          <ChevronsUpDown size={12} />
-                        )}
-                        <Text textStyle="2xs" fontWeight="500">
-                          {expandAllMessages ? "Collapse all" : "Expand all"}
-                        </Text>
-                      </Button>
+                      <ConversationExpandButton
+                        expandAllMessages={expandAllMessages}
+                        onToggle={() => setExpandAllMessages((value) => !value)}
+                      />
                     }
                   >
                     <ConversationExpandContext.Provider

@@ -1,4 +1,3 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import {
@@ -10,6 +9,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
@@ -51,8 +51,8 @@ function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepo
   } as EvaluatorRepository;
 }
 
-function workflows(overrides: Partial<WorkflowService> = {}): WorkflowService {
-  return {
+function workflows(overrides: Partial<WorkflowApi> = {}): WorkflowApi {
+  return createApiFixture<WorkflowApi>({
     assertInProject: vi.fn().mockResolvedValue(undefined),
     getFields: vi.fn().mockResolvedValue({
       workflowId: "w1",
@@ -61,13 +61,13 @@ function workflows(overrides: Partial<WorkflowService> = {}): WorkflowService {
       outputFields: [],
     }),
     ...overrides,
-  } as WorkflowService;
+  });
 }
 
 function service(
   options: {
     repository?: EvaluatorRepository;
-    workflows?: WorkflowService;
+    workflows?: WorkflowApi;
     codeExecution?: EvaluatorCodeExecution;
   } = {},
 ): EvaluatorService {

@@ -1,33 +1,12 @@
-import { z } from "zod";
 import type { TraceSpanIngest } from "../app/trace.members.ts";
-import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
+import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type CustomMetadata,
+  type ReservedTraceMetadata,
+  type TraceMetadataUpdate,
+} from "@langwatch/trace-contract";
 import { TraceCollectorSpanService } from "./trace-collector-span.service.ts";
 import { nowInstant } from "@langwatch/time";
-
-/**
- * Post-hoc trace metadata updates, applied by recording a synthetic `langwatch.metadata_update`
- * span through the standard ingestion pipeline: new keys added, existing updated, missing
- * preserved, labels replaced whole. Shared by the tRPC mutation and the REST metadata route.
- */
-const metadataValueSchema = z.union([
-  z.string().max(4096),
-  z.number(),
-  z.boolean(),
-  z.array(z.string()),
-  z.record(z.string(), z.unknown()),
-]);
-
-export const traceMetadataUpdateSchema = z
-  .record(z.string(), metadataValueSchema)
-  .refine((obj) => Object.keys(obj).length > 0, {
-    message: "metadata must contain at least one key",
-  })
-  .refine((obj) => JSON.stringify(obj).length <= 32768, {
-    message: "total metadata payload must not exceed 32KB",
-  });
-
-export type TraceMetadataUpdate = z.infer<typeof traceMetadataUpdateSchema>;
 
 /** Metadata keys that map onto the trace's first-class identity fields rather
  *  than free-form custom metadata. */

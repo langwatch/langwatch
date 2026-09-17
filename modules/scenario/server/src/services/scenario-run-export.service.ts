@@ -85,8 +85,9 @@ export class ScenarioRunExportService {
     let visited = 0;
     let isFirstBatch = true;
     let cursor: string | undefined;
+    let hasMore = true;
 
-    while (true) {
+    while (hasMore) {
       if (signal?.aborted) {
         logger.info(
           { projectId: request.projectId, visited, total },
@@ -127,9 +128,7 @@ export class ScenarioRunExportService {
       isFirstBatch = false;
       cursor = page.nextCursor;
 
-      if (!page.hasMore || !cursor || page.runs.length === 0) {
-        break;
-      }
+      hasMore = page.hasMore && Boolean(cursor) && page.runs.length > 0;
     }
 
     logger.info({ projectId: request.projectId, visited, total }, "Scenario run export completed");

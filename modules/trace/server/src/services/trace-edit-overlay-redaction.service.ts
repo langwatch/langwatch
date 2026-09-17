@@ -7,6 +7,8 @@ import {
   type TraceEditSpanField,
   type TraceEditSpanPatch,
   type TraceEditTraceField,
+  traceEditSpanPatchSchema,
+  traceEditTracePatchSchema,
 } from "@langwatch/trace-contract";
 import { traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
 
@@ -86,11 +88,7 @@ function redactSpanPatch({
   isDeniedByCategory: IsDeniedByCategory;
   hiddenAttributes: Protections["hiddenAttributes"];
 }): TraceEditSpanPatch | null {
-  const next: TraceEditSpanPatch = { spanId: spanPatch.spanId };
-  // Every field name is shared between the patch and its redacted copy, so one
-  // assignment carries all of them; the structural alias is what lets this stay
-  // a loop instead of six branches.
-  const draft = next as unknown as Record<TraceEditSpanField, unknown>;
+  const draft: Record<string, unknown> = { spanId: spanPatch.spanId };
   let carriesEdit = false;
   let changed = false;
 
@@ -114,7 +112,11 @@ function redactSpanPatch({
     return null;
   }
 
-  return changed ? next : spanPatch;
+  if (!changed) return spanPatch;
+
+  const next = traceEditSpanPatchSchema.parse(draft);
+  Object.assign(next, draft);
+  return next;
 }
 
 /**
@@ -217,8 +219,7 @@ function redactTraceEdits({
     return { value: traceEdits, isChanged: false };
   }
 
-  const next: NonNullable<TraceEditOverlayPatch["trace"]> = {};
-  const draft = next as unknown as Record<TraceEditTraceField, unknown>;
+  const draft: Record<string, unknown> = {};
   let carriesEdit = false;
   let isChanged = false;
 
@@ -242,7 +243,11 @@ function redactTraceEdits({
     return { value: traceEdits, isChanged: false };
   }
 
-  return { value: carriesEdit ? next : void 0, isChanged: true };
+  if (!carriesEdit) return { value: void 0, isChanged: true };
+
+  const value = traceEditTracePatchSchema.parse(draft);
+  Object.assign(value, draft);
+  return { value, isChanged: true };
 }
 
 export class TraceEditOverlayRedactionService {

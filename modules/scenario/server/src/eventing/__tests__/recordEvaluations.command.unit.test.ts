@@ -1,18 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
-// DANGLING: `RecordEvaluationsCommandData` was never ported off main's
-// ../schemas/commands. See handoff merge-scenario-dangling-imports.
-import type { RecordEvaluationsCommandData } from "../../schemas/commands";
+import type {
+  ScenarioEvaluationResult,
+  RecordEvaluationsCommandData,
+} from "@langwatch/scenario-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import type { RecordEvaluationsDeps } from "../recordEvaluations.command";
-import {
-  evaluationsFingerprint,
-  RecordEvaluationsCommand,
-} from "../recordEvaluations.command";
+import { evaluationsFingerprint, RecordEvaluationsCommand } from "../recordEvaluations.command";
 
 const FAILED_REQUIRED: ScenarioEvaluationResult = {
   evaluatorId: "ragas/sql_query_equivalence",
@@ -75,9 +72,7 @@ function startedEvent(): SimulationProcessingEvent {
   } as unknown as SimulationProcessingEvent;
 }
 
-function finishedEvent(
-  overrides: Record<string, unknown> = {},
-): SimulationProcessingEvent {
+function finishedEvent(overrides: Record<string, unknown> = {}): SimulationProcessingEvent {
   return {
     type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
     data: {
@@ -93,9 +88,7 @@ function finishedEvent(
   } as unknown as SimulationProcessingEvent;
 }
 
-function evaluatedEvent(
-  overrides: Record<string, unknown> = {},
-): SimulationProcessingEvent {
+function evaluatedEvent(overrides: Record<string, unknown> = {}): SimulationProcessingEvent {
   return {
     type: SIMULATION_RUN_EVENT_TYPES.EVALUATED,
     data: {
@@ -114,13 +107,9 @@ describe("RecordEvaluationsCommand", () => {
   describe("when the run has not finished", () => {
     /** @scenario "Recording evaluations on a run that has not finished is refused" */
     it("refuses the command", async () => {
-      const handler = new RecordEvaluationsCommand(
-        makeDeps([queuedEvent(), startedEvent()]),
-      );
+      const handler = new RecordEvaluationsCommand(makeDeps([queuedEvent(), startedEvent()]));
 
-      await expect(handler.handle(makeCommand() as any)).rejects.toThrowError(
-        /has not finished/,
-      );
+      await expect(handler.handle(makeCommand() as any)).rejects.toThrowError(/has not finished/);
     });
   });
 
@@ -181,13 +170,9 @@ describe("RecordEvaluationsCommand", () => {
 
   describe("when nothing gates", () => {
     it("keeps the judge's verdict and status", async () => {
-      const handler = new RecordEvaluationsCommand(
-        makeDeps([queuedEvent(), finishedEvent()]),
-      );
+      const handler = new RecordEvaluationsCommand(makeDeps([queuedEvent(), finishedEvent()]));
 
-      const [event] = await handler.handle(
-        makeCommand({ evaluations: [PASSED_REQUIRED] }) as any,
-      );
+      const [event] = await handler.handle(makeCommand({ evaluations: [PASSED_REQUIRED] }) as any);
 
       expect(event!.data).toMatchObject({
         verdict: "success",
@@ -201,15 +186,10 @@ describe("RecordEvaluationsCommand", () => {
   describe("when the run errored before any judgement", () => {
     it("keeps the error status and carries no verdict", async () => {
       const handler = new RecordEvaluationsCommand(
-        makeDeps([
-          queuedEvent(),
-          finishedEvent({ status: "ERROR", results: undefined }),
-        ]),
+        makeDeps([queuedEvent(), finishedEvent({ status: "ERROR", results: undefined })]),
       );
 
-      const [event] = await handler.handle(
-        makeCommand({ evaluations: [PASSED_REQUIRED] }) as any,
-      );
+      const [event] = await handler.handle(makeCommand({ evaluations: [PASSED_REQUIRED] }) as any);
 
       expect(event!.data).toMatchObject({
         status: "ERROR",
@@ -226,9 +206,7 @@ describe("RecordEvaluationsCommand", () => {
         makeDeps([queuedEvent(), finishedEvent(), evaluatedEvent()]),
       );
 
-      const [event] = await handler.handle(
-        makeCommand({ evaluations: [PASSED_REQUIRED] }) as any,
-      );
+      const [event] = await handler.handle(makeCommand({ evaluations: [PASSED_REQUIRED] }) as any);
 
       expect(event!.data).toMatchObject({
         verdict: "success",
@@ -242,14 +220,10 @@ describe("RecordEvaluationsCommand", () => {
   describe("when the same evaluations are recorded twice", () => {
     /** @scenario "Recording the same evaluations twice records one event" */
     it("carries the same idempotency key, and a different set carries a new one", async () => {
-      const handler = new RecordEvaluationsCommand(
-        makeDeps([queuedEvent(), finishedEvent()]),
-      );
+      const handler = new RecordEvaluationsCommand(makeDeps([queuedEvent(), finishedEvent()]));
 
       const [first] = await handler.handle(makeCommand() as any);
-      const [second] = await handler.handle(
-        makeCommand({ occurredAt: 6_000 }) as any,
-      );
+      const [second] = await handler.handle(makeCommand({ occurredAt: 6_000 }) as any);
       const [changed] = await handler.handle(
         makeCommand({ evaluations: [PASSED_REQUIRED] }) as any,
       );

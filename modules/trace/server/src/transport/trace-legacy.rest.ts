@@ -339,19 +339,16 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
 
     const pageSize = params.pageSize ?? DEFAULT_TRACES_PAGE_SIZE;
     const protections = await app.getProtections({ projectId: project.id, credential });
+    const query: TraceLegacyListInput = {
+      ...params,
+      projectId: project.id,
+      startDate:
+        typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
+      endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
+      pageSize,
+    };
     const results = await app.traces().listTraces({
-      // The body carried the deployment's own filter vocabulary through the
-      // members' schema, so it already IS a list input once the two date
-      // spellings are collapsed; the cast names that rather than restating the
-      // shape.
-      query: {
-        ...params,
-        projectId: project.id,
-        startDate:
-          typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
-        endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
-        pageSize,
-      } as unknown as TraceLegacyListInput,
+      query,
       protections,
       options: {
         downloadMode: true,

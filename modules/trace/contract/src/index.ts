@@ -27,7 +27,6 @@ export {
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
-  type TraceApi as TraceApiContract,
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
 export * from "./trace.errors.ts";

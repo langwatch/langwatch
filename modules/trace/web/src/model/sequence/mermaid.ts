@@ -91,6 +91,115 @@ function findIncludedDescendants(
   return out;
 }
 
+function processExcludedSpan(
+  span: SpanWithChildren,
+  ctx: BuildContext,
+  parentParticipant: string | null,
+): void {
+  const descendants = findIncludedDescendants(span, ctx.typesToInclude);
+  descendants
+    .slice()
+    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .forEach((descendant) => processSpan(descendant, ctx, parentParticipant));
+}
+
+function processToolSpan({
+  span,
+  ctx,
+  parentParticipant,
+  duration,
+  isError,
+}: {
+  span: SpanWithChildren;
+  ctx: BuildContext;
+  parentParticipant: string | null;
+  duration: number;
+  isError: boolean;
+}): boolean {
+  if (span.type !== "tool") return false;
+  if (!parentParticipant) return false;
+  if (!span.name) return false;
+
+  const label = escapeLabel(
+    `tool: ${span.name} · ${formatDuration(duration)}${isError ? " · error" : ""}`,
+  );
+  if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
+  ctx.messages.push(`    ${parentParticipant}->>${parentParticipant}: ${label}`);
+  if (isError) ctx.messages.push("    end");
+  span.children
+    .slice()
+    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .forEach((child) => processSpan(child, ctx, parentParticipant));
+  return true;
+}
+
+function interactionLabel({
+  span,
+  type,
+  duration,
+  parentType,
+}: {
+  span: SpanWithChildren;
+  type: string;
+  duration: number;
+  parentType: string | undefined;
+}): string {
+  if (type === "llm") return `LLM call · ${formatDuration(duration)}`;
+  if (type === "agent") {
+    const verb = parentType === "agent" ? "handover" : "call";
+    return `${verb} · ${formatDuration(duration)}`;
+  }
+
+  const head = (span.name ?? type).slice(0, 40);
+  return `${head} · ${formatDuration(duration)}`;
+}
+
+function emitInteractionStart({
+  span,
+  ctx,
+  type,
+  duration,
+  isError,
+  currentParticipant,
+  parentParticipant,
+}: {
+  span: SpanWithChildren;
+  ctx: BuildContext;
+  type: string;
+  duration: number;
+  isError: boolean;
+  currentParticipant: string;
+  parentParticipant: string;
+}): void {
+  let label = interactionLabel({
+    span,
+    type,
+    duration,
+    parentType: ctx.participantTypes.get(parentParticipant),
+  });
+  if (isError) label += " · error";
+
+  if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
+  ctx.messages.push(`    ${parentParticipant}->>${currentParticipant}: ${escapeLabel(label)}`);
+  ctx.messages.push(`    activate ${currentParticipant}`);
+}
+
+function emitInteractionEnd({
+  ctx,
+  isError,
+  currentParticipant,
+  parentParticipant,
+}: {
+  ctx: BuildContext;
+  isError: boolean;
+  currentParticipant: string;
+  parentParticipant: string;
+}): void {
+  ctx.messages.push(`    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`);
+  ctx.messages.push(`    deactivate ${currentParticipant}`);
+  if (isError) ctx.messages.push("    end");
+}
+
 function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipant: string | null) {
   if (ctx.processed.has(span.spanId)) return;
   ctx.processed.add(span.spanId);
@@ -102,28 +211,11 @@ function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipan
   const isError = span.status === "error";
 
   if (!isIncluded) {
-    const descendants = findIncludedDescendants(span, ctx.typesToInclude);
-    descendants
-      .slice()
-      .sort((a, b) => a.startTimeMs - b.startTimeMs)
-      .forEach((d) => processSpan(d, ctx, parentParticipant));
+    processExcludedSpan(span, ctx, parentParticipant);
     return;
   }
 
-  // Tool spans render as self-calls on the parent participant.
-  if (type === "tool" && parentParticipant && span.name) {
-    const label = escapeLabel(
-      `tool: ${span.name} · ${formatDuration(duration)}${isError ? " · error" : ""}`,
-    );
-    if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
-    ctx.messages.push(`    ${parentParticipant}->>${parentParticipant}: ${label}`);
-    if (isError) ctx.messages.push("    end");
-    span.children
-      .slice()
-      .sort((a, b) => a.startTimeMs - b.startTimeMs)
-      .forEach((child) => processSpan(child, ctx, parentParticipant));
-    return;
-  }
+  if (processToolSpan({ span, ctx, parentParticipant, duration, isError })) return;
 
   const id = getParticipantId(span);
   const display = getParticipantDisplay(span);
@@ -136,23 +228,15 @@ function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipan
     !!currentParticipant && !!parentParticipant && currentParticipant !== parentParticipant;
 
   if (isInteraction) {
-    let label: string;
-    if (type === "llm") {
-      label = `LLM call · ${formatDuration(duration)}`;
-    } else if (type === "agent") {
-      const parentType = ctx.participantTypes.get(parentParticipant!);
-      const verb = parentType === "agent" ? "handover" : "call";
-      label = `${verb} · ${formatDuration(duration)}`;
-    } else {
-      const head = (span.name ?? type).slice(0, 40);
-      label = `${head} · ${formatDuration(duration)}`;
-    }
-    if (isError) label += " · error";
-    label = escapeLabel(label);
-
-    if (isError) ctx.messages.push("    rect rgba(248, 113, 113, 0.12)");
-    ctx.messages.push(`    ${parentParticipant}->>${currentParticipant}: ${label}`);
-    ctx.messages.push(`    activate ${currentParticipant}`);
+    emitInteractionStart({
+      span,
+      ctx,
+      type,
+      duration,
+      isError,
+      currentParticipant,
+      parentParticipant,
+    });
   }
 
   const nextParent = currentParticipant ?? parentParticipant;
@@ -162,10 +246,36 @@ function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipan
     .forEach((child) => processSpan(child, ctx, nextParent));
 
   if (isInteraction) {
-    ctx.messages.push(`    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`);
-    ctx.messages.push(`    deactivate ${currentParticipant}`);
-    if (isError) ctx.messages.push("    end");
+    emitInteractionEnd({ ctx, isError, currentParticipant, parentParticipant });
   }
+}
+
+function processRoots({
+  roots,
+  tree,
+  ctx,
+}: {
+  roots: SpanTreeNode[];
+  tree: Record<string, SpanWithChildren>;
+  ctx: BuildContext;
+}): void {
+  for (const root of roots) {
+    const node = tree[root.spanId];
+    if (node) processSpan(node, ctx, null);
+  }
+}
+
+function buildParticipantKindMap(ctx: BuildContext): Map<string, ParticipantKind> {
+  const kindByParticipant = new Map<string, ParticipantKind>();
+  for (const id of ctx.participants) {
+    const type = ctx.participantTypes.get(id);
+    if (type === "agent") kindByParticipant.set(id, "agent");
+    else if (type === "llm") kindByParticipant.set(id, "llm");
+    else if (type === "tool") kindByParticipant.set(id, "tool");
+    else kindByParticipant.set(id, "other");
+  }
+
+  return kindByParticipant;
 }
 
 export function generateMermaidSyntax(
@@ -203,10 +313,7 @@ export function generateMermaidSyntax(
     .slice()
     .sort((a, b) => a.startTimeMs - b.startTimeMs);
 
-  for (const root of roots) {
-    const node = tree[root.spanId];
-    if (node) processSpan(node, ctx, null);
-  }
+  processRoots({ roots, tree, ctx });
 
   // Agents render as stick-figure `actor`s; everything else as labelled
   // `participant` boxes. The stick figure visually tags humanish/agentic
@@ -226,20 +333,13 @@ export function generateMermaidSyntax(
     }: diagram truncated at ${MAX_MESSAGES} messages\n`;
   }
 
-  const kindMap = new Map<string, ParticipantKind>();
-  for (const id of ctx.participants) {
-    const t = ctx.participantTypes.get(id);
-    if (t === "agent") kindMap.set(id, "agent");
-    else if (t === "llm") kindMap.set(id, "llm");
-    else if (t === "tool") kindMap.set(id, "tool");
-    else kindMap.set(id, "other");
-  }
+  const participantKind = buildParticipantKindMap(ctx);
 
   return {
     syntax,
     participantToSpanId: ctx.participantToSpanId,
     participantDisplay: ctx.participantDisplay,
-    participantKind: kindMap,
+    participantKind,
     messageCount: ctx.messages.length,
     participants: Array.from(ctx.participants),
   };

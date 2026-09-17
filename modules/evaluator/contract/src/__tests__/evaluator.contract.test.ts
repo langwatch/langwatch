@@ -77,6 +77,7 @@ describe("evaluator contract", () => {
   /** @scenario "Evaluator vocabulary has one portable source" */
   it("merges native and generated evaluators into one catalogue", () => {
     const native = AVAILABLE_EVALUATORS[API_KEYS_AND_SECRETS_DETECTION];
+    if (!native) throw new Error("Missing native evaluator definition");
 
     expect(native.category).toBe("safety");
     expect(native.isGuardrail).toBe(true);

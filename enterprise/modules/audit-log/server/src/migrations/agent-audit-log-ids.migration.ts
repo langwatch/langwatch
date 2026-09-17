@@ -1,7 +1,10 @@
 import { auditLogJsonValueSchema } from "@langwatch/audit-log-contract";
 import { z } from "zod";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import type { AgentAuditLogMigrationRepository } from "../repositories/agent-audit-log-migration.repository.ts";
+import type {
+  AgentAuditLogMigrationRepository,
+  AgentAuditLogRow,
+} from "../repositories/agent-audit-log-migration.repository.ts";
 import {
   PrismaAgentAuditLogMigrationRepository,
   type AgentAuditLogMigrationDatabase,
@@ -58,51 +61,69 @@ export class AgentAuditLogIdsMigration implements SystemMigration {
     const actions = [];
     for (const repair of repairs) {
       input.signal?.throwIfAborted();
-      const logs = await this.#repository.listLogs({
-        action: repair.action,
-        projectId: input.projectId,
-      });
-      const result = { action: repair.action, missing: 0, patched: 0, skipped: 0 };
-
-      for (const log of logs) {
-        input.signal?.throwIfAborted();
-        const parsed = argsSchema.safeParse(log.args);
-        const args = parsed.success ? parsed.data : {};
-        if (args[repair.missingKey] !== void 0) continue;
-        result.missing += 1;
-        const source = args.agentId;
-        const isCopy = repair.action === "agents.copy";
-        if (!log.projectId || (isCopy && (typeof source !== "string" || source === ""))) {
-          result.skipped += 1;
-          continue;
-        }
-
-        const matches = await this.#repository.listCandidates({
-          projectId: log.projectId,
-          window: {
-            gte: log.createdAt.subtract({ milliseconds: WINDOW_MS }),
-            lte: log.createdAt.add({ milliseconds: WINDOW_MS }),
-          },
-          ...(isCopy && typeof source === "string" ? { copiedFromAgentId: source } : {}),
-        });
-        const candidate = matches.length === 1 ? matches[0] : void 0;
-        if (!candidate) {
-          result.skipped += 1;
-          continue;
-        }
-
-        if (input.execute) {
-          await this.#repository.updateArgs({
-            logId: log.id,
-            projectId: log.projectId,
-            args: { ...args, [repair.missingKey]: candidate.id },
-          });
-        }
-        result.patched += 1;
-      }
-      actions.push(result);
+      actions.push(await this.repairLogs(repair, input));
     }
 
     return { mode: input.execute ? "execute" : "dry-run", actions };
+  }
+
+  private async repairLogs(
+    repair: (typeof repairs)[number],
+    input: { execute: boolean; projectId?: string; signal?: AbortSignal },
+  ) {
+    const logs = await this.#repository.listLogs({
+      action: repair.action,
+      projectId: input.projectId,
+    });
+    const result = { action: repair.action, missing: 0, patched: 0, skipped: 0 };
+
+    for (const log of logs) {
+      input.signal?.throwIfAborted();
+      const outcome = await this.repairLog(log, repair, input.execute);
+      if (outcome === "already-present") continue;
+      result.missing += 1;
+      if (outcome === "skipped") result.skipped += 1;
+      if (outcome === "patched") {
+        result.patched += 1;
+      }
+    }
+
+    return result;
+  }
+
+  private async repairLog(
+    log: AgentAuditLogRow,
+    repair: (typeof repairs)[number],
+    execute: boolean,
+  ): Promise<"already-present" | "missing" | "skipped" | "patched"> {
+    const parsed = argsSchema.safeParse(log.args);
+    const args = parsed.success ? parsed.data : {};
+    if (args[repair.missingKey] !== void 0) return "already-present";
+
+    const source = args.agentId;
+    const isCopy = repair.action === "agents.copy";
+    if (!log.projectId || (isCopy && (typeof source !== "string" || source === ""))) {
+      return "skipped";
+    }
+
+    const matches = await this.#repository.listCandidates({
+      projectId: log.projectId,
+      window: {
+        gte: log.createdAt.subtract({ milliseconds: WINDOW_MS }),
+        lte: log.createdAt.add({ milliseconds: WINDOW_MS }),
+      },
+      ...(isCopy && typeof source === "string" ? { copiedFromAgentId: source } : {}),
+    });
+    const candidate = matches.length === 1 ? matches[0] : void 0;
+    if (!candidate) return "skipped";
+
+    if (execute) {
+      await this.#repository.updateArgs({
+        logId: log.id,
+        projectId: log.projectId,
+        args: { ...args, [repair.missingKey]: candidate.id },
+      });
+    }
+    return "patched";
   }
 }

@@ -9,6 +9,7 @@ import {
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate } from "@langwatch/time";
+import { z } from "zod";
 import type { EvaluatorRepository, PersistEvaluatorInput } from "../evaluator.repository.ts";
 
 const generateEvaluatorSlug = (name: string): string => {
@@ -38,7 +39,7 @@ type EvaluatorRow = {
   id: string;
   projectId: string;
   name: string;
-  slug: string;
+  slug: string | null;
   type: unknown;
   config: unknown;
   workflowId: string | null;
@@ -73,6 +74,12 @@ function mapRow(row: EvaluatorRow): Evaluator {
   });
 }
 
+const prismaJsonInputSchema = z.custom<Prisma.InputJsonValue>((value) => value !== null);
+
+function jsonInput(value: EvaluatorConfig): Prisma.InputJsonValue {
+  return prismaJsonInputSchema.parse(z.json().parse(value));
+}
+
 export class PrismaEvaluatorRepository
   extends PrismaRepository.for("Evaluator")
   implements EvaluatorRepository
@@ -84,13 +91,13 @@ export class PrismaEvaluatorRepository
       where: { id: input.id, projectId: input.projectId, archivedAt: null },
     });
 
-    return row ? mapRow(row as unknown as EvaluatorRow) : void 0;
+    return row ? mapRow(row) : void 0;
   }
 
   async findByIdAcrossProjects(id: string): Promise<Evaluator | undefined> {
     const row = await this.prisma.evaluator.findFirst({ where: { id, archivedAt: null } });
 
-    return row ? mapRow(row as unknown as EvaluatorRow) : void 0;
+    return row ? mapRow(row) : void 0;
   }
 
   async findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | undefined> {
@@ -98,7 +105,7 @@ export class PrismaEvaluatorRepository
       where: { slug: input.slug, projectId: input.projectId, archivedAt: null },
     });
 
-    return row ? mapRow(row as unknown as EvaluatorRow) : void 0;
+    return row ? mapRow(row) : void 0;
   }
 
   async findByWorkflow(input: {
@@ -109,7 +116,7 @@ export class PrismaEvaluatorRepository
       where: { workflowId: input.workflowId, projectId: input.projectId, archivedAt: null },
     });
 
-    return row ? mapRow(row as unknown as EvaluatorRow) : void 0;
+    return row ? mapRow(row) : void 0;
   }
 
   async findByIdOrSlug(input: {
@@ -124,17 +131,36 @@ export class PrismaEvaluatorRepository
       },
     });
 
-    return row ? mapRow(row as unknown as EvaluatorRow) : void 0;
+    return row ? mapRow(row) : void 0;
   }
 
   async findAll(input: { projectId: string }): Promise<Evaluator[]> {
     const rows = await this.prisma.evaluator.findMany({
       where: { projectId: input.projectId, archivedAt: null },
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { copiedEvaluators: true } } },
     });
 
-    return (rows as unknown[]).map((row) => mapRow(row as EvaluatorRow));
+    const copyCounts = await this.prisma.evaluator.groupBy({
+      by: ["copiedFromEvaluatorId"],
+      where: {
+        copiedFromEvaluatorId: { in: rows.map((row) => row.id) },
+        archivedAt: null,
+      },
+      _count: { _all: true },
+    });
+    const countsByEvaluatorId = new Map<string, number>();
+    for (const count of copyCounts) {
+      if (count.copiedFromEvaluatorId !== null) {
+        countsByEvaluatorId.set(count.copiedFromEvaluatorId, count._count._all);
+      }
+    }
+
+    return rows.map((row) =>
+      mapRow({
+        ...row,
+        _count: { copiedEvaluators: countsByEvaluatorId.get(row.id) ?? 0 },
+      }),
+    );
   }
 
   async findCopies(input: { evaluatorId: string }): Promise<EvaluatorCopy[]> {
@@ -167,7 +193,7 @@ export class PrismaEvaluatorRepository
             name: input.name,
             slug: requestedSlug,
             type: input.type,
-            config: input.config as unknown as Prisma.InputJsonValue,
+            config: jsonInput(input.config),
             ...(input.workflowId !== void 0 ? { workflowId: input.workflowId } : {}),
             ...(input.copiedFromEvaluatorId !== void 0
               ? { copiedFromEvaluatorId: input.copiedFromEvaluatorId }
@@ -175,7 +201,7 @@ export class PrismaEvaluatorRepository
           },
         });
 
-        return mapRow(row as unknown as EvaluatorRow);
+        return mapRow(row);
       } catch (error) {
         if (!isSlugCollision(error)) throw error;
 
@@ -189,7 +215,7 @@ export class PrismaEvaluatorRepository
   async update(input: EvaluatorUpdateInput): Promise<Evaluator> {
     const data: Record<string, unknown> = { ...input.data };
     if (input.data.config !== void 0) {
-      data.config = input.data.config as unknown as Prisma.InputJsonValue;
+      data.config = jsonInput(input.data.config);
     }
 
     const row = await this.prisma.evaluator.update({
@@ -197,7 +223,7 @@ export class PrismaEvaluatorRepository
       data: data as never,
     });
 
-    return mapRow(row as unknown as EvaluatorRow);
+    return mapRow(row);
   }
 
   async archive(input: { id: string; projectId: string }): Promise<Evaluator> {
@@ -206,7 +232,7 @@ export class PrismaEvaluatorRepository
       data: { archivedAt: toDate(nowInstant()) },
     });
 
-    return mapRow(row as unknown as EvaluatorRow);
+    return mapRow(row);
   }
 
   async updateNameAndConfig(input: {
@@ -217,7 +243,7 @@ export class PrismaEvaluatorRepository
   }): Promise<void> {
     await this.prisma.evaluator.update({
       where: { id: input.id, projectId: input.projectId },
-      data: { name: input.name, config: input.config as unknown as Prisma.InputJsonValue },
+      data: { name: input.name, config: jsonInput(input.config) },
     });
   }
 }

@@ -1,4 +1,19 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
+import type { AiActionErrorDetails } from "./trace-ai-query.ts";
+
+/** The configured model provider did not produce a usable trace query. */
+export class AiQueryProviderError extends HandledError {
+  declare readonly code: "ai_query_provider_error";
+
+  constructor(details: AiActionErrorDetails = {}) {
+    super("ai_query_provider_error", "The model did not produce a usable trace query.", {
+      httpStatus: 502,
+      fault: "provider",
+      meta: { ...details },
+    });
+    this.name = "AiQueryProviderError";
+  }
+}
 
 export class TraceNotFoundError extends NotFoundError {
   declare readonly code: "trace_not_found";

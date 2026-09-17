@@ -81,12 +81,16 @@ describe("GuardrailsDrawer", () => {
   });
 
   describe("given the guardrails code block is displayed", () => {
-    /** @scenario "Python code shows async by default" */
-    it("shows the Python async SDK usage by default", async () => {
-      const user = userEvent.setup();
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
       renderDrawer();
       await selectEvaluator(user, PII_CHECK);
+    });
 
+    /** @scenario "Python code shows async by default" */
+    it("shows the Python async SDK usage by default", async () => {
       await waitFor(() => {
         expect(screen.getByText("Python (async)")).toBeInTheDocument();
       });
@@ -96,10 +100,6 @@ describe("GuardrailsDrawer", () => {
 
     /** @scenario "Copy code to clipboard" */
     it("copies the code to the clipboard when the copy button is clicked", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-      await selectEvaluator(user, PII_CHECK);
-
       const copyButton = await screen.findByRole("button", { name: "Copy code" });
       await user.click(copyButton);
 
@@ -110,10 +110,6 @@ describe("GuardrailsDrawer", () => {
 
     /** @scenario "API key placeholder in code" */
     it("includes a placeholder for the API key rather than a literal secret", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-      await selectEvaluator(user, PII_CHECK);
-
       await waitFor(() => {
         expect(screen.getByText("LANGWATCH_API_KEY")).toBeInTheDocument();
       });

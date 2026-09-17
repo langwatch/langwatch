@@ -7,7 +7,15 @@ import {
   type CodeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { type Code, type End, type Entry, type Field, LATEST_SPEC_VERSION, type StudioWorkflow, type StudioClientEvent } from "@langwatch/workflow-contract";
+import {
+  type Code,
+  type End,
+  type Entry,
+  type Field,
+  LATEST_SPEC_VERSION,
+  type StudioWorkflow,
+  type StudioClientEvent,
+} from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "./evaluator-code-execution.service.ts";
 
@@ -25,6 +33,13 @@ const stripValues = (fields: CodeEvaluatorConfig["inputs"]): Field[] =>
 /** The ksuid kinds a code evaluator run mints an ad hoc trace and workflow id under. */
 const TRACE_KSUID_KIND = "codeevaluatortrace";
 const WORKFLOW_KSUID_KIND = "codeevaluatorworkflow";
+
+function formatInputValue(value: unknown): string {
+  if (value === null || value === void 0) return "";
+  if (typeof value === "string") return value;
+
+  return JSON.stringify(value);
+}
 
 export class EvaluatorCodeService {
   static create(options: {
@@ -62,14 +77,7 @@ export class EvaluatorCodeService {
         config.inputs.map(({ identifier }) => {
           const value = input.data[identifier];
 
-          return [
-            identifier,
-            value === null || value === void 0
-              ? ""
-              : typeof value === "string"
-                ? value
-                : JSON.stringify(value),
-          ];
+          return [identifier, formatInputValue(value)];
         }),
       );
       const event: StudioClientEvent = {

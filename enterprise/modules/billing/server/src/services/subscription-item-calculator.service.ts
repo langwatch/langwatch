@@ -28,6 +28,13 @@ type StripePlanPriceConfig = {
   tracesUnit: 10_000 | 100_000;
 };
 
+type ExistingPlanItems = {
+  tracesItem: Stripe.SubscriptionItem | undefined;
+  userItem: Stripe.SubscriptionItem | undefined;
+  planItem: Stripe.SubscriptionItem | undefined;
+  deleteItems: Stripe.SubscriptionItem[];
+};
+
 const STRIPE_PLAN_CONFIG: Record<AddOnPlan, StripePlanPriceConfig> = {
   [PlanTypes.LAUNCH]: {
     basePriceKey: "LAUNCH",
@@ -72,26 +79,11 @@ export class SubscriptionItemCalculatorService {
     membersToAdd: number;
   }): SubscriptionItemUpdate[] {
     const planConfig = this.tryGetPlanConfig(input.plan);
+    const { tracesItem, userItem, planItem, deleteItems } = this.findExistingPlanItems(
+      input.currentItems,
+      planConfig,
+    );
     const updates: SubscriptionItemUpdate[] = [];
-    let tracesItem: Stripe.SubscriptionItem | undefined;
-    let userItem: Stripe.SubscriptionItem | undefined;
-    let planItem: Stripe.SubscriptionItem | undefined;
-    let deleteItems: Stripe.SubscriptionItem[] = [];
-
-    if (planConfig) {
-      const keepPriceIds = new Set([
-        this.prices[planConfig.basePriceKey],
-        this.prices[planConfig.userPriceKey],
-        this.prices[planConfig.tracesPriceKey],
-      ]);
-      const keepItems = input.currentItems.filter((item) => keepPriceIds.has(item.price.id));
-      deleteItems = input.currentItems.filter((item) => !keepItems.includes(item));
-      tracesItem = keepItems.find(
-        (item) => item.price.id === this.prices[planConfig.tracesPriceKey],
-      );
-      userItem = keepItems.find((item) => item.price.id === this.prices[planConfig.userPriceKey]);
-      planItem = keepItems.find((item) => item.price.id === this.prices[planConfig.basePriceKey]);
-    }
 
     const limits = PLAN_LIMITS[input.plan];
     if (!limits) {
@@ -101,47 +93,112 @@ export class SubscriptionItemCalculatorService {
     const totalTraces = Math.max(0, input.tracesToAdd - limits.maxMessagesPerMonth);
     const totalMembers = Math.max(0, input.membersToAdd - limits.maxMembers);
 
-    if (tracesItem && planConfig) {
-      updates.push({
-        id: tracesItem.id,
-        quantity: Math.floor(totalTraces / planConfig.tracesUnit),
-      });
-    } else if (totalTraces > 0 && planConfig) {
-      const quantity = Math.floor(totalTraces / planConfig.tracesUnit);
-      if (quantity > 0) {
-        updates.push({ price: this.prices[planConfig.tracesPriceKey], quantity });
-      }
-    }
-
-    if (userItem) {
-      updates.push({ id: userItem.id, quantity: totalMembers });
-    } else if (totalMembers > 0 && planConfig) {
-      updates.push({
-        price: this.prices[planConfig.userPriceKey],
-        quantity: totalMembers,
-      });
-    }
-
-    if (planItem) {
-      updates.push({ id: planItem.id, quantity: 1 });
-    } else {
-      const basePrice = this.tryGetBasePrice(input.plan);
-      if (basePrice) {
-        updates.push({ price: basePrice, quantity: 1 });
-      }
-    }
+    this.appendTracesUpdate({
+      updates,
+      item: tracesItem,
+      planConfig,
+      totalTraces,
+    });
+    this.appendMembersUpdate({ updates, item: userItem, planConfig, totalMembers });
+    this.appendBasePlanUpdate({ updates, item: planItem, plan: input.plan });
 
     for (const item of deleteItems) {
       updates.push({ id: item.id, deleted: true });
     }
 
-    for (const item of updates) {
-      if (item.quantity === 0) {
-        item.deleted = true;
-      }
-    }
+    this.markZeroQuantityUpdatesAsDeleted(updates);
 
     return updates;
+  }
+
+  private appendTracesUpdate(input: {
+    updates: SubscriptionItemUpdate[];
+    item: Stripe.SubscriptionItem | undefined;
+    planConfig: StripePlanPriceConfig | undefined;
+    totalTraces: number;
+  }): void {
+    if (!input.planConfig) return;
+
+    const quantity = Math.floor(input.totalTraces / input.planConfig.tracesUnit);
+    if (input.item) {
+      input.updates.push({ id: input.item.id, quantity });
+      return;
+    }
+    if (quantity > 0) {
+      input.updates.push({
+        price: this.prices[input.planConfig.tracesPriceKey],
+        quantity,
+      });
+    }
+  }
+
+  private appendMembersUpdate(input: {
+    updates: SubscriptionItemUpdate[];
+    item: Stripe.SubscriptionItem | undefined;
+    planConfig: StripePlanPriceConfig | undefined;
+    totalMembers: number;
+  }): void {
+    if (input.item) {
+      input.updates.push({ id: input.item.id, quantity: input.totalMembers });
+      return;
+    }
+    if (input.totalMembers > 0 && input.planConfig) {
+      input.updates.push({
+        price: this.prices[input.planConfig.userPriceKey],
+        quantity: input.totalMembers,
+      });
+    }
+  }
+
+  private appendBasePlanUpdate(input: {
+    updates: SubscriptionItemUpdate[];
+    item: Stripe.SubscriptionItem | undefined;
+    plan: PlanType;
+  }): void {
+    if (input.item) {
+      input.updates.push({ id: input.item.id, quantity: 1 });
+      return;
+    }
+    const basePrice = this.tryGetBasePrice(input.plan);
+    if (basePrice) {
+      input.updates.push({ price: basePrice, quantity: 1 });
+    }
+  }
+
+  private markZeroQuantityUpdatesAsDeleted(updates: SubscriptionItemUpdate[]): void {
+    for (const item of updates) {
+      if (item.quantity === 0) item.deleted = true;
+    }
+  }
+
+  private findExistingPlanItems(
+    currentItems: Stripe.SubscriptionItem[],
+    planConfig: StripePlanPriceConfig | undefined,
+  ): ExistingPlanItems {
+    if (!planConfig) {
+      return {
+        tracesItem: void 0,
+        userItem: void 0,
+        planItem: void 0,
+        deleteItems: [],
+      };
+    }
+
+    const keepPriceIds = new Set([
+      this.prices[planConfig.basePriceKey],
+      this.prices[planConfig.userPriceKey],
+      this.prices[planConfig.tracesPriceKey],
+    ]);
+    const keepItems = currentItems.filter((item) => keepPriceIds.has(item.price.id));
+
+    return {
+      tracesItem: keepItems.find(
+        (item) => item.price.id === this.prices[planConfig.tracesPriceKey],
+      ),
+      userItem: keepItems.find((item) => item.price.id === this.prices[planConfig.userPriceKey]),
+      planItem: keepItems.find((item) => item.price.id === this.prices[planConfig.basePriceKey]),
+      deleteItems: currentItems.filter((item) => !keepItems.includes(item)),
+    };
   }
 
   calculateQuantityForPrice(input: {

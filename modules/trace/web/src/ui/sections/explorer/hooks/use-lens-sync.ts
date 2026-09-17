@@ -19,6 +19,7 @@ const KIND = "v2-traces-lens";
  * silently break if we add fields to LensConfig — TypeScript will warn at the encoder.
  */
 interface SerializedLens {
+  [key: string]: unknown;
   v: 1;
   columns: string[];
   addons: string[];
@@ -129,7 +130,7 @@ export function useLensSync(): void {
           // local active id.
           id: lens.id,
           name: lens.name,
-          filters: encode(lens) as unknown as Record<string, unknown>,
+          filters: encode(lens),
           kind: KIND,
           scope: "project",
         });

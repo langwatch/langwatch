@@ -111,6 +111,7 @@ describe("given Zod schemas are the single source of truth", () => {
       // llm_boolean's entry fields all carry a default in the evaluation
       // service, so they are omittable and the catalog says so.
       const llmBoolean = AVAILABLE_EVALUATORS["langevals/llm_boolean"];
+      if (!llmBoolean) throw new Error("Missing llm_boolean evaluator definition");
       expect(llmBoolean.requiredFields).toEqual([]);
       expect(llmBoolean.optionalFields).toEqual(["input", "output", "contexts"]);
 
@@ -131,10 +132,12 @@ describe("given Zod schemas are the single source of truth", () => {
       // an unmapped run compared empty to empty and reported a pass, which the
       // run summary then counted as a correct answer.
       const exactMatch = AVAILABLE_EVALUATORS["langevals/exact_match"];
+      if (!exactMatch) throw new Error("Missing exact_match evaluator definition");
       expect(exactMatch.requiredFields).toEqual(["output", "expected_output"]);
       expect(exactMatch.optionalFields).toEqual([]);
 
       const answerMatch = AVAILABLE_EVALUATORS["langevals/llm_answer_match"];
+      if (!answerMatch) throw new Error("Missing llm_answer_match evaluator definition");
       expect(answerMatch.requiredFields).toEqual(["output", "expected_output"]);
       // The question is context the judge can work without.
       expect(answerMatch.optionalFields).toEqual(["input"]);

@@ -45,6 +45,26 @@ function targetUpdatedAtMs(value: ScenarioTargetPrompt["updatedAt"]): number {
   return typeof value === "string" ? toEpochMs(value) : value.epochMilliseconds;
 }
 
+function filterPublishedPrompts({
+  prompts,
+  searchValue,
+}: {
+  prompts: ScenarioTargetPrompt[] | undefined;
+  searchValue: string;
+}): ScenarioTargetPrompt[] {
+  const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
+  const sorted = [...publishedPrompts].sort(
+    (left, right) => targetUpdatedAtMs(right.updatedAt) - targetUpdatedAtMs(left.updatedAt),
+  );
+  if (searchValue === "") {
+    return sorted;
+  }
+  const normalizedSearch = searchValue.toLowerCase();
+  return sorted.filter((prompt) =>
+    (prompt.handle ?? prompt.id).toLowerCase().includes(normalizedSearch),
+  );
+}
+
 function LocalTunnelBadge() {
   return (
     <Tooltip content="Points at a local development tunnel started with langwatch agent dev">
@@ -52,6 +72,18 @@ function LocalTunnelBadge() {
         Local tunnel
       </Badge>
     </Tooltip>
+  );
+}
+
+function ScenarioTargetSelectionMark({ target }: { target: ScenarioTarget }) {
+  return (
+    <>
+      {target?.type === "prompt" && <BookText size={14} />}
+      {target?.type === "http" && <Globe size={14} />}
+      {target?.type === "code" && <Code size={14} />}
+      {target?.type === "workflow" && <Workflow size={14} />}
+      {target?.type === "connected" && <Plug size={14} />}
+    </>
   );
 }
 
@@ -101,19 +133,10 @@ export function ScenarioTargetSelector({
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, [open]);
 
-  const filteredPrompts = useMemo(() => {
-    const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
-    const sorted = [...publishedPrompts].sort(
-      (left, right) => targetUpdatedAtMs(right.updatedAt) - targetUpdatedAtMs(left.updatedAt),
-    );
-    if (searchValue === "") {
-      return sorted;
-    }
-    const normalizedSearch = searchValue.toLowerCase();
-    return sorted.filter((prompt) =>
-      (prompt.handle ?? prompt.id).toLowerCase().includes(normalizedSearch),
-    );
-  }, [prompts, searchValue]);
+  const filteredPrompts = useMemo(
+    () => filterPublishedPrompts({ prompts, searchValue }),
+    [prompts, searchValue],
+  );
 
   const filteredAgents = useMemo(
     () => scenarioAgentsOf({ agents, searchValue, viewerUserId }),
@@ -179,11 +202,7 @@ export function ScenarioTargetSelector({
         data-testid="target-selector-trigger"
       >
         <HStack gap={2}>
-          {value?.type === "prompt" && <BookText size={14} />}
-          {value?.type === "http" && <Globe size={14} />}
-          {value?.type === "code" && <Code size={14} />}
-          {value?.type === "workflow" && <Workflow size={14} />}
-          {value?.type === "connected" && <Plug size={14} />}
+          <ScenarioTargetSelectionMark target={value} />
           <Text>{selectedLabel ?? placeholder}</Text>
         </HStack>
         <ChevronDown size={14} />

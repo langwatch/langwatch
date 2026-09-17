@@ -336,11 +336,7 @@ export { TraceIOExtractionService } from "./services/trace-io-extraction.service
 export { TraceReadableSpanService } from "./services/trace-readable-span.service.ts";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service.ts";
 export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service.ts";
-export {
-  TraceMetadataWriteService,
-  traceMetadataUpdateSchema,
-  type TraceMetadataUpdate,
-} from "./services/trace-metadata-write.service.ts";
+export { TraceMetadataWriteService } from "./services/trace-metadata-write.service.ts";
 export {
   TraceAiQueryService,
   type AiQueryInput,
@@ -420,7 +416,7 @@ export {
   TraceViewerReadService,
   type TraceViewerServiceOptions,
 } from "./services/trace-viewer.service.ts";
-export { TraceContentReadServiceImpl } from "./services/trace-content-read.service.ts";
+export { TraceContentReadService } from "./services/trace-content-read.service.ts";
 
 /** The REST projection compiler. Was `server/traces/projection/**`. */
 export { TraceProjectionCompileService } from "./services/projection/trace-projection-compile.service.ts";
