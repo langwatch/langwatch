@@ -67,7 +67,7 @@ describe("the Authentication settings address", () => {
     expect(screen.getByTestId("settings-layout")).toBeInTheDocument();
     expect(screen.getByTestId("authentication-layout")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Overview" }),
+      screen.getByRole("heading", { name: "Authentication" }),
     ).toBeInTheDocument();
     expect(screen.getByTestId("authentication-settings")).toHaveTextContent(
       "org_acme",
