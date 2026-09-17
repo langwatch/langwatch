@@ -1,3 +1,7 @@
+import type {
+  AuthzAction as Action,
+  AuthzResource as Resource,
+} from "@langwatch/authz";
 import {
   AUTHZ_RESOURCES,
   type AuthzPermission,
@@ -10,7 +14,6 @@ import {
   getValidActionsForResource,
   orderedResources,
 } from "~/utils/permissionsConfig";
-import type { Action, Resource } from "~/utils/rbacVocabulary";
 
 /**
  * What a permission means, in the words of somebody who has never read our

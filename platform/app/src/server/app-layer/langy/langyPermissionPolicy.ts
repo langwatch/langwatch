@@ -1,5 +1,9 @@
-import { type AuthzPermission, permissionGrantTiers } from "@langwatch/authz";
-import { Actions, Resources } from "~/utils/rbacVocabulary";
+import {
+  AUTHZ_ACTIONS,
+  type AuthzPermission,
+  permissionGrantTiers,
+} from "@langwatch/authz";
+import { CUSTOM_ROLE_RESOURCES } from "../authz/custom-role-permissions";
 
 /**
  * Langy delegates tenant work within the caller's current permission ceiling.
@@ -65,7 +69,7 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   sso: "an SSO connection decides how everyone in the org signs in",
   // Its own entry rather than a clause in `sso`'s: they are two families in
-  // `Resources`, and a family with no entry of its own is exactly what the
+  // the resource catalogue, and a family with no entry of its own is exactly what the
   // classification tripwire exists to catch. Writing it provisions and
   // deprovisions membership, which changes who can do what.
   scim: "directory sync writes who exists in the organization",
@@ -123,7 +127,7 @@ const FULL_ACCESS_FAMILIES = new Set([
  * permission HIERARCHY makes a coarser grain imply an excluded one.
  *
  * `virtualKeys:manage` is here because `:manage` implies `:rotate`
- * (rbac.ts:545-555): granting it would make the `rotate` exclusion above a
+ * so granting it would make the `rotate` exclusion above a
  * statement about this file's text rather than about the credential. See the
  * `virtualKeys` note on `AUTH_SCOPE_FAMILIES` for the accepted cost.
  */
@@ -135,7 +139,7 @@ const GRAIN_EXCLUSIONS: Record<string, string> = {
 
 /**
  * Every family in the system, in exactly one bucket. Exported so the coverage
- * test can assert the partition is total against `Resources` — the check that
+ * test can assert the partition is total against the resource catalogue — the check that
  * makes a newly-invented family fail CI instead of sitting silently refused.
  */
 /**
@@ -165,14 +169,14 @@ export const LANGY_FAMILY_BUCKET_TOTAL =
   Object.keys(AUTH_SCOPE_FAMILIES).length +
   FULL_ACCESS_FAMILIES.size;
 
-/** Every family `Resources` declares. The universe the partition must cover. */
-export const ALL_PERMISSION_FAMILIES: readonly string[] = Object.freeze(
-  Object.values(Resources),
-);
+/** Every family the resource catalogue declares. The universe the partition must cover. */
+export const ALL_PERMISSION_FAMILIES: readonly string[] = Object.freeze([
+  ...CUSTOM_ROLE_RESOURCES,
+]);
 
 /**
  * Every action classified one way or the other, for the coverage test's
- * totality check against `Actions`.
+ * totality check against the action catalogue.
  */
 export const LANGY_CLASSIFIED_ACTIONS: ReadonlySet<string> = new Set([
   ...DELEGABLE_ACTIONS,
@@ -183,13 +187,13 @@ export const LANGY_CLASSIFIED_ACTIONS: ReadonlySet<string> = new Set([
 export const LANGY_ACTION_BUCKET_TOTAL =
   DELEGABLE_ACTIONS.size + Object.keys(ACTION_EXCLUSIONS).length;
 
-/** Every action `Actions` declares. The universe the partition must cover. */
-export const ALL_PERMISSION_ACTIONS: readonly string[] = Object.freeze(
-  Object.values(Actions),
-);
+/** Every action the action catalogue declares. The universe the partition must cover. */
+export const ALL_PERMISSION_ACTIONS: readonly string[] = Object.freeze([
+  ...AUTHZ_ACTIONS,
+]);
 
 /** The read grain. Anything else is a write as far as this policy is concerned. */
-const READ_ACTION: string = Actions.VIEW;
+const READ_ACTION: string = "view";
 
 /** Derive a stable candidate list, limited to what a project-scoped key can grant. */
 export function langyCandidatePermissions(): AuthzPermission[] {
@@ -226,8 +230,8 @@ function grainExclusionReason(
   const grainExcluded = GRAIN_EXCLUSIONS[`${family}:${action}`];
   if (grainExcluded) return grainExcluded;
   if (
-    (action === Actions.ATTACH || action === Actions.DETACH) &&
-    family !== (Resources.GATEWAY_GUARDRAILS as string)
+    (action === "attach" || action === "detach") &&
+    family !== "gatewayGuardrails"
   ) {
     return `\`${action}\` polices gateway guardrails and means nothing on \`${family}\``;
   }
@@ -283,7 +287,7 @@ export function classifyForLangy(
   }
 
   // The policy would grant it, but the session key is minted with a single
-  // PROJECT-scoped binding and `bindingScopeCanGrant` (rbac.ts:190-196)
+  // project-scoped binding and organization-exclusive permissions
   // refuses org-exclusive permissions below the org tier. Listing it as a
   // candidate would put dead rows in front of `batchProjectPermissions` on
   // every turn and invite a reader to conclude Langy has access it has

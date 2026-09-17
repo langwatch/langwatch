@@ -33,6 +33,7 @@ export type {
 } from "./types";
 export {
   ALL_PERMISSIONS,
+  AUTHZ_ACTIONS,
   AUTHZ_RESOURCES,
   bindingScopeCanGrantPermission,
   isRegistryPermission,
@@ -42,6 +43,7 @@ export {
   SHAREABLE_RESOURCE_KINDS,
 } from "./registry";
 export type {
+  AuthzAction,
   AuthzPermission,
   AuthzResource,
   AuthzScopeType,

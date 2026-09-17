@@ -1,11 +1,11 @@
 import {
+  AUTHZ_RESOURCES,
   builtinRoleGrants,
   builtinRolePermissions,
   roleKeyForTeamRole,
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { Resources } from "~/utils/rbacVocabulary";
 import {
   getValidActionsForResource,
   orderedResources,
@@ -28,9 +28,9 @@ const canView = (role: TeamUserRole, resource: string) =>
 // permission picker UI as a read-only entry.
 
 describe("AuditLog resource in RBAC", () => {
-  describe("given the Resources enum", () => {
+  describe("given the permission registry", () => {
     it("includes an AUDIT_LOG entry with value 'auditLog'", () => {
-      expect(Resources.AUDIT_LOG).toBe("auditLog");
+      expect(AUTHZ_RESOURCES.auditLog.actions).toContain("view");
     });
   });
 
@@ -88,23 +88,23 @@ describe("AuditLog resource in RBAC", () => {
 
   describe("given the permissions UI configuration", () => {
     it("includes auditLog in orderedResources", () => {
-      expect(orderedResources).toContain(Resources.AUDIT_LOG);
+      expect(orderedResources).toContain("auditLog");
     });
 
     it("exposes only :view as a valid action (audit log is read-only)", () => {
-      const actions = getValidActionsForResource(Resources.AUDIT_LOG);
+      const actions = getValidActionsForResource("auditLog");
       expect(actions).toEqual(["view"]);
     });
   });
 
   describe("given the helper functions", () => {
     it("confirms canView returns true for all team roles", () => {
-      expect(canView(TeamUserRole.ADMIN, Resources.AUDIT_LOG)).toBe(true);
-      expect(canView(TeamUserRole.MEMBER, Resources.AUDIT_LOG)).toBe(true);
-      expect(canView(TeamUserRole.VIEWER, Resources.AUDIT_LOG)).toBe(true);
+      expect(canView(TeamUserRole.ADMIN, "auditLog")).toBe(true);
+      expect(canView(TeamUserRole.MEMBER, "auditLog")).toBe(true);
+      expect(canView(TeamUserRole.VIEWER, "auditLog")).toBe(true);
       // CUSTOM is the legacy-fallback bucket — covered explicitly so a
       // regression that only breaks CUSTOM doesn't slip past the suite.
-      expect(canView(TeamUserRole.CUSTOM, Resources.AUDIT_LOG)).toBe(true);
+      expect(canView(TeamUserRole.CUSTOM, "auditLog")).toBe(true);
     });
   });
 });

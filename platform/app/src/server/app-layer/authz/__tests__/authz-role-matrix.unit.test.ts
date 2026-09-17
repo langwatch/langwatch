@@ -1,7 +1,10 @@
 import {
+  AUTHZ_ACTIONS,
+  AUTHZ_RESOURCES,
   type AuthzPermission,
   builtinRoleGrants,
   builtinRolePermissions,
+  isRegistryPermission,
   permissionSatisfiedBy,
   roleKeyForTeamRole,
 } from "@langwatch/authz";
@@ -11,7 +14,6 @@ import {
   isDemoProject,
   isDemoProjectId,
 } from "~/server/app-layer/authz/permission-adapters";
-import { Actions, Resources } from "~/utils/rbacVocabulary";
 
 type Permission = AuthzPermission;
 
@@ -370,103 +372,99 @@ describe("RBAC Permission System", () => {
   describe("Permission Helper Functions", () => {
     describe("canView", () => {
       it("returns true for ADMIN role on all resources", () => {
-        expect(canView(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
-        expect(canView(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
-        expect(canView(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.ADMIN, Resources.TRACES)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, "evaluations")).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, "datasets")).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, "analytics")).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, "traces")).toBe(true);
       });
 
       it("returns true for MEMBER role on all resources", () => {
-        expect(canView(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(true);
-        expect(canView(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
-        expect(canView(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.MEMBER, Resources.TRACES)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, "evaluations")).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, "datasets")).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, "analytics")).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, "traces")).toBe(true);
       });
 
       it("returns true for VIEWER role on most resources", () => {
-        expect(canView(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(true);
-        expect(canView(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(true);
-        expect(canView(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.VIEWER, Resources.TRACES)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, "evaluations")).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, "datasets")).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, "analytics")).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, "traces")).toBe(true);
       });
 
       it("returns false for VIEWER role on cost resource", () => {
-        expect(canView(TeamUserRole.VIEWER, Resources.COST)).toBe(false);
+        expect(canView(TeamUserRole.VIEWER, "cost")).toBe(false);
       });
     });
 
     describe("canManage", () => {
       it("returns true for ADMIN role on all resources", () => {
-        expect(canManage(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
-        expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
-        expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, "evaluations")).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, "datasets")).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, "analytics")).toBe(true);
         // Traces only has view and share, not manage
-        expect(canManage(TeamUserRole.ADMIN, Resources.TRACES)).toBe(false);
+        expect(canManage(TeamUserRole.ADMIN, "traces")).toBe(false);
       });
 
       it("returns true for MEMBER role on most resources", () => {
-        expect(canManage(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(
-          true,
-        );
-        expect(canManage(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
-        expect(canManage(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
+        expect(canManage(TeamUserRole.MEMBER, "evaluations")).toBe(true);
+        expect(canManage(TeamUserRole.MEMBER, "datasets")).toBe(true);
+        expect(canManage(TeamUserRole.MEMBER, "analytics")).toBe(true);
         // Traces only has view and share, not manage
-        expect(canManage(TeamUserRole.MEMBER, Resources.TRACES)).toBe(false);
+        expect(canManage(TeamUserRole.MEMBER, "traces")).toBe(false);
       });
 
       it("returns false for MEMBER role on project resource", () => {
-        expect(canManage(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+        expect(canManage(TeamUserRole.MEMBER, "project")).toBe(false);
       });
 
       it("returns false for VIEWER role on all resources", () => {
-        expect(canManage(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(
-          false,
-        );
-        expect(canManage(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(false);
-        expect(canManage(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(false);
-        expect(canManage(TeamUserRole.VIEWER, Resources.TRACES)).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, "evaluations")).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, "datasets")).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, "analytics")).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, "traces")).toBe(false);
       });
     });
 
     describe("canCreate", () => {
       it("returns true for ADMIN role on project resource", () => {
-        expect(canCreate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+        expect(canCreate(TeamUserRole.ADMIN, "project")).toBe(true);
       });
 
       it("returns true for MEMBER role on project resource", () => {
-        expect(canCreate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(true);
+        expect(canCreate(TeamUserRole.MEMBER, "project")).toBe(true);
       });
 
       it("returns false for VIEWER role on project resource", () => {
-        expect(canCreate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+        expect(canCreate(TeamUserRole.VIEWER, "project")).toBe(false);
       });
     });
 
     describe("canUpdate", () => {
       it("returns true for ADMIN role on project resource", () => {
-        expect(canUpdate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+        expect(canUpdate(TeamUserRole.ADMIN, "project")).toBe(true);
       });
 
       it("returns true for MEMBER role on project resource", () => {
-        expect(canUpdate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(true);
+        expect(canUpdate(TeamUserRole.MEMBER, "project")).toBe(true);
       });
 
       it("returns false for VIEWER role on project resource", () => {
-        expect(canUpdate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+        expect(canUpdate(TeamUserRole.VIEWER, "project")).toBe(false);
       });
     });
 
     describe("canDelete", () => {
       it("returns true for ADMIN role on project resource", () => {
-        expect(canDelete(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+        expect(canDelete(TeamUserRole.ADMIN, "project")).toBe(true);
       });
 
       it("returns false for MEMBER role on project resource", () => {
-        expect(canDelete(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+        expect(canDelete(TeamUserRole.MEMBER, "project")).toBe(false);
       });
 
       it("returns false for VIEWER role on project resource", () => {
-        expect(canDelete(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+        expect(canDelete(TeamUserRole.VIEWER, "project")).toBe(false);
       });
     });
   });
@@ -710,55 +708,51 @@ describe("RBAC Permission System", () => {
     });
   });
 
-  describe("Permission Constants", () => {
-    it("has all expected resources defined", () => {
-      expect(Resources.ORGANIZATION).toBe("organization");
-      expect(Resources.PROJECT).toBe("project");
-      expect(Resources.TEAM).toBe("team");
-      expect(Resources.ANALYTICS).toBe("analytics");
-      expect(Resources.COST).toBe("cost");
-      expect(Resources.TRACES).toBe("traces");
-      expect(Resources.SCENARIOS).toBe("scenarios");
-      expect(Resources.ANNOTATIONS).toBe("annotations");
-      expect(Resources.EVALUATIONS).toBe("evaluations");
-      expect(Resources.DATASETS).toBe("datasets");
-      expect(Resources.TRIGGERS).toBe("triggers");
-      expect(Resources.WORKFLOWS).toBe("workflows");
-      expect(Resources.PROMPTS).toBe("prompts");
-      expect(Resources.PLAYGROUND).toBe("playground");
+  describe("the shared permission catalogue", () => {
+    it("contains the resource families the application exposes", () => {
+      expect(Object.keys(AUTHZ_RESOURCES)).toEqual(
+        expect.arrayContaining([
+          "organization",
+          "project",
+          "team",
+          "analytics",
+          "cost",
+          "traces",
+          "scenarios",
+          "annotations",
+          "evaluations",
+          "datasets",
+          "triggers",
+          "workflows",
+          "prompts",
+          "playground",
+        ]),
+      );
     });
 
-    it("has all expected actions defined", () => {
-      expect(Actions.VIEW).toBe("view");
-      expect(Actions.CREATE).toBe("create");
-      expect(Actions.UPDATE).toBe("update");
-      expect(Actions.DELETE).toBe("delete");
-      expect(Actions.MANAGE).toBe("manage");
-      expect(Actions.SHARE).toBe("share");
-    });
-  });
-
-  describe("Permission Type Safety", () => {
-    it("creates valid permission strings", () => {
-      const permission: Permission = `${Resources.WORKFLOWS}:${Actions.VIEW}`;
-      expect(permission).toBe("workflows:view");
-
-      const managePermission: Permission = `${Resources.DATASETS}:${Actions.MANAGE}`;
-      expect(managePermission).toBe("datasets:manage");
+    it("keeps the public action catalogue in its existing order", () => {
+      expect(AUTHZ_ACTIONS).toEqual([
+        "view",
+        "create",
+        "update",
+        "delete",
+        "manage",
+        "share",
+        "rotate",
+        "attach",
+        "detach",
+        "viewOtherPersonal",
+      ]);
     });
 
-    it("validates permission format", () => {
-      const validPermissions: Permission[] = [
-        "workflows:view",
-        "datasets:manage",
-        "analytics:create",
-        "traces:share",
-        "project:delete",
-      ];
-
-      validPermissions.forEach((permission) => {
-        expect(permission).toMatch(/^[a-z]+:[a-z]+$/);
-      });
+    it("accepts supported permissions and refuses unknown resource/action pairs", () => {
+      expect(isRegistryPermission("workflows:view")).toBe(true);
+      expect(isRegistryPermission("datasets:manage")).toBe(true);
+      expect(isRegistryPermission("analytics:create")).toBe(true);
+      expect(isRegistryPermission("traces:share")).toBe(true);
+      expect(isRegistryPermission("project:delete")).toBe(true);
+      expect(isRegistryPermission("traces:manage")).toBe(false);
+      expect(isRegistryPermission("unknown:view")).toBe(false);
     });
   });
 

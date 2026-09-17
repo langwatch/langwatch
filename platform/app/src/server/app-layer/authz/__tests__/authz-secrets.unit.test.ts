@@ -1,11 +1,11 @@
 import {
+  AUTHZ_RESOURCES,
   builtinRoleGrants,
   builtinRolePermissions,
   roleKeyForTeamRole,
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { Resources } from "~/utils/rbacVocabulary";
 import {
   getValidActionsForResource,
   orderedResources,
@@ -24,9 +24,9 @@ const canManage = (role: TeamUserRole, resource: string) =>
   teamRoleHasPermission(role, `${resource}:manage`);
 
 describe("Secrets resource in RBAC", () => {
-  describe("given the Resources enum", () => {
+  describe("given the permission registry", () => {
     it("includes a SECRETS entry with value 'secrets'", () => {
-      expect(Resources.SECRETS).toBe("secrets");
+      expect(AUTHZ_RESOURCES.secrets.actions).toContain("view");
     });
   });
 
@@ -110,11 +110,11 @@ describe("Secrets resource in RBAC", () => {
 
   describe("given the permissions UI configuration", () => {
     it("includes secrets in orderedResources", () => {
-      expect(orderedResources).toContain(Resources.SECRETS);
+      expect(orderedResources).toContain("secrets");
     });
 
     it("returns view and manage as valid actions for secrets", () => {
-      const actions = getValidActionsForResource(Resources.SECRETS);
+      const actions = getValidActionsForResource("secrets");
       expect(actions).toContain("view");
       expect(actions).toContain("manage");
     });
@@ -122,15 +122,15 @@ describe("Secrets resource in RBAC", () => {
 
   describe("given the helper functions", () => {
     it("confirms canView returns true for all roles", () => {
-      expect(canView(TeamUserRole.ADMIN, Resources.SECRETS)).toBe(true);
-      expect(canView(TeamUserRole.MEMBER, Resources.SECRETS)).toBe(true);
-      expect(canView(TeamUserRole.VIEWER, Resources.SECRETS)).toBe(true);
+      expect(canView(TeamUserRole.ADMIN, "secrets")).toBe(true);
+      expect(canView(TeamUserRole.MEMBER, "secrets")).toBe(true);
+      expect(canView(TeamUserRole.VIEWER, "secrets")).toBe(true);
     });
 
     it("confirms canManage returns true only for ADMIN and MEMBER", () => {
-      expect(canManage(TeamUserRole.ADMIN, Resources.SECRETS)).toBe(true);
-      expect(canManage(TeamUserRole.MEMBER, Resources.SECRETS)).toBe(true);
-      expect(canManage(TeamUserRole.VIEWER, Resources.SECRETS)).toBe(false);
+      expect(canManage(TeamUserRole.ADMIN, "secrets")).toBe(true);
+      expect(canManage(TeamUserRole.MEMBER, "secrets")).toBe(true);
+      expect(canManage(TeamUserRole.VIEWER, "secrets")).toBe(false);
     });
   });
 });

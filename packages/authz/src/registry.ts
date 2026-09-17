@@ -7,6 +7,21 @@
  */
 import type { ScopeTier } from "./vocabulary";
 
+export const AUTHZ_ACTIONS = [
+  "view",
+  "create",
+  "update",
+  "delete",
+  "manage",
+  "share",
+  "rotate",
+  "attach",
+  "detach",
+  "viewOtherPersonal",
+] as const;
+
+export type AuthzAction = (typeof AUTHZ_ACTIONS)[number];
+
 const READ_ONLY = ["view"] as const;
 
 export const AUTHZ_RESOURCES = {
@@ -185,7 +200,7 @@ export const AUTHZ_RESOURCES = {
     //
     // Org-tier only: the screen aggregates every lane of the organization's
     // spend across every team, so a team- or project-scoped binding must
-    // never grant it (ORG_EXCLUSIVE_RESOURCES in rbac.ts).
+    // never grant it.
     actions: ["view"],
     scopes: ["organization"],
   },
@@ -256,9 +271,8 @@ export function permissionResource(permission: string): string {
 }
 
 /**
- * Legacy hierarchy rule, verbatim semantics: `<resource>:manage` satisfies
+ * Permission hierarchy: `<resource>:manage` satisfies
  * view/create/update/delete/rotate/attach/detach on the same resource.
- * Parity-tested against `hasPermissionWithHierarchy` in rbac.ts.
  */
 const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
   "view",
