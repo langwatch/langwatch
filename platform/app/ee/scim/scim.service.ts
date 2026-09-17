@@ -356,6 +356,15 @@ export class ScimService {
         });
       }
 
+      if (request.active === false) {
+        return this.createInactiveUser({
+          request,
+          organizationId,
+          connectionId,
+          existingUser,
+        });
+      }
+
       try {
         await this.createMembership({
           userId: existingUser.id,
@@ -414,6 +423,15 @@ export class ScimService {
       return this.toScimUser(reloadedUser);
     }
 
+    if (request.active === false) {
+      return this.createInactiveUser({
+        request,
+        organizationId,
+        connectionId,
+        existingUser: null,
+      });
+    }
+
     const newUser = await this.userService.create({ name, email });
 
     try {
@@ -448,6 +466,43 @@ export class ScimService {
     });
 
     return this.toScimUser(newUser);
+  }
+
+  /** Inactive provisioning records identity without granting organization access. */
+  private async createInactiveUser({
+    request,
+    organizationId,
+    connectionId,
+    existingUser,
+  }: {
+    request: ScimCreateUserRequest;
+    organizationId: string;
+    connectionId: string | null;
+    existingUser: User | null;
+  }): Promise<ScimUser | ScimError> {
+    if (existingUser && !existingUser.deactivatedAt) {
+      return this.scimError({
+        status: "409",
+        detail: "An active account already exists for this user",
+      });
+    }
+
+    const user =
+      existingUser ??
+      (await this.userService.create({
+        name: this.buildNameFromRequest(request),
+        email: request.userName,
+        active: false,
+      }));
+
+    await this.recordPush({
+      organizationId,
+      connectionId,
+      userId: user.id,
+      externalId: request.externalId ?? null,
+      op: existingUser ? "deactivate" : "create",
+    });
+    return this.toScimUser(user);
   }
 
   /**
@@ -513,8 +568,8 @@ export class ScimService {
   }
 
   /**
-   * State on the connection's sync that this push happened, and remember who
-   * the directory means by this identifier.
+   * Record a successful push and its ownership. DELETE logs the removal
+   * without reclaiming the ownership it just forgot.
    *
    * Both are no-ops for a token that predates connection scoping: there is no
    * connection to attribute the push to, and no pair to key an identity on.
@@ -530,10 +585,10 @@ export class ScimService {
     connectionId: string | null;
     userId: string;
     externalId: string | null;
-    op: "create" | "update" | "deactivate";
+    op: "create" | "update" | "deactivate" | "delete";
   }): Promise<void> {
     if (!connectionId) return;
-    if (externalId) {
+    if (op !== "delete") {
       await this.directoryIdentity.remember({
         connectionId,
         externalId,
@@ -548,7 +603,7 @@ export class ScimService {
       // provider that sends none leaves us only ours. Recording the user id
       // in its place keeps the fact about a person rather than about nobody.
       externalId: externalId ?? userId,
-      op,
+      op: op === "delete" ? "deactivate" : op,
     });
   }
 
@@ -947,9 +1002,9 @@ export class ScimService {
     active: boolean;
   }): Promise<ScimUser | null> {
     if (!active || !connectionId) return null;
-    const known = await this.prisma.scimExternalId.findFirst({
-      where: { connectionId, userId: id },
-      select: { externalId: true },
+    const known = await this.directoryIdentity.manages({
+      connectionId,
+      userId: id,
     });
     if (!known) return null;
 
@@ -1118,42 +1173,42 @@ export class ScimService {
       },
     });
 
-    if (!membership) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
+    if (membership) {
+      await this.directoryIdentity.assertWritable({ connectionId, userId: id });
 
-    await this.directoryIdentity.assertWritable({ connectionId, userId: id });
-
-    if (scimGrantsWritePathEnabled()) {
-      // Through the SERVICE, whose transaction re-collects the person's
-      // effective permissions inside itself and rolls the whole thing back if
-      // anything still resolves. The previous code called the ledger writer
-      // underneath it, which is why that proof had no production call site at
-      // all. It removes the memberships too — organization, groups, legacy
-      // team rows and pending invites — so nothing is left for this method to
-      // delete by hand.
-      await this.deprovision.removeAccess({
-        userId: id,
-        organizationId,
-        connectionId,
-        op: "delete_user",
-      });
+      if (scimGrantsWritePathEnabled()) {
+        // The service proves that every access source has been removed.
+        await this.deprovision.removeAccess({
+          userId: id,
+          organizationId,
+          connectionId,
+          op: "delete_user",
+        });
+      } else {
+        await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
+        await this.prisma.organizationUser.delete({
+          where: { userId_organizationId: { userId: id, organizationId } },
+        });
+      }
+      await this.userService.deactivate({ id });
     } else {
-      await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
-      // A deletion also gives up the membership; a deactivation keeps it.
-      await this.prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: id, organizationId } },
-      });
+      const owned =
+        connectionId &&
+        (await this.directoryIdentity.manages({ connectionId, userId: id }));
+      if (!owned) {
+        return this.scimError({ status: "404", detail: "User not found" });
+      }
+      // Retained ownership permits forgetting this directory's resource,
+      // not deactivating an account that may now belong elsewhere.
     }
 
-    await this.userService.deactivate({ id });
     await this.forgetDirectoryIdentity({ connectionId, userId: id });
     await this.recordPush({
       organizationId,
       connectionId,
       userId: id,
       externalId: null,
-      op: "deactivate",
+      op: "delete",
     });
     return null;
   }
@@ -1172,9 +1227,7 @@ export class ScimService {
     userId: string;
   }): Promise<void> {
     if (!connectionId) return;
-    await this.prisma.scimExternalId.deleteMany({
-      where: { connectionId, userId },
-    });
+    await this.directoryIdentity.forget({ connectionId, userId });
   }
 
   toScimUser(user: User): ScimUser {

@@ -2,8 +2,8 @@
  * What the two reconciliation surfaces READ (ADR-122).
  *
  * Everything here is a read of event truth already written by D08: the
- * `ScimSyncState` projection, the `(connectionId, externalId) -> userId`
- * mapping, and the grants facts the directory authored (`source: "scim"`).
+ * `ScimSyncState` projection, directory ownership and external identifiers,
+ * and the grants facts the directory authored (`source: "scim"`).
  * There is no write path in this file and there is not meant to be one — the
  * customer's remediation is the directory's next push, and the operator's one
  * act goes through a guarded command, not through here.
@@ -148,28 +148,31 @@ export class PrismaScimReconciliationRepository
     return row ? rowToScimSync(row) : null;
   }
 
-  /**
-   * How many people each connection's directory currently manages.
-   *
-   * Grouped on `connectionId` rather than counted per connection, so a
-   * settings page listing four connections still makes one query. The count
-   * is of MAPPINGS, which is the honest number: it is how many people this
-   * directory has told us about, not how many members the organization has.
-   */
+  /** Count owned users once per connection, excluding users since erased. */
   async countManagedPeople({
     connectionIds,
   }: {
     connectionIds: string[];
   }): Promise<Map<string, number>> {
     if (connectionIds.length === 0) return new Map();
-    const grouped = await this.prisma.scimExternalId.groupBy({
-      by: ["connectionId"],
+    const ownership = await this.prisma.scimDirectoryUser.findMany({
       where: { connectionId: { in: connectionIds } },
-      _count: { _all: true },
+      select: { connectionId: true, userId: true },
     });
-    return new Map(
-      grouped.map((row) => [row.connectionId, row._count._all] as const),
-    );
+    if (ownership.length === 0) return new Map();
+
+    const people = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(ownership.map((row) => row.userId))] } },
+      select: { id: true },
+    });
+    const existingUserIds = new Set(people.map((person) => person.id));
+    const counts = new Map<string, number>();
+    for (const { connectionId, userId } of ownership) {
+      if (existingUserIds.has(userId)) {
+        counts.set(connectionId, (counts.get(connectionId) ?? 0) + 1);
+      }
+    }
+    return counts;
   }
 
   /**

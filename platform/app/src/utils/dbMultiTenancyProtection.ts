@@ -83,6 +83,7 @@ const GLOBAL_MODELS = [
   // comes from the token's connection scope, which is checked at the endpoint
   // rather than here.
   "ScimExternalId",
+  "ScimDirectoryUser",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

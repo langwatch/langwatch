@@ -121,6 +121,84 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the person is accepted with no external identifier
     And the push is not refused over a field nothing required
 
+  @integration @regression
+  Scenario: A directory manages a person even when externalId is absent
+    Given a directory pushes a person with no externalId or a blank externalId
+    When the person is created and then updated by that connection
+    Then the directory manages that person exactly once
+    And the organization shows that directory as their source
+    And no invented external identifier is stored
+    And another organization cannot read that ownership
+
+  @integration @regression
+  Scenario: Omitting externalId does not let another connection change the person
+    Given a directory created a person without an externalId
+    When another connection tries to deactivate them
+    Then the push is refused with code scim_write_outside_connection
+    And the stored user is unchanged
+
+  @integration @regression
+  Scenario: A directory can reactivate its person without an externalId
+    Given a directory created a person without an externalId
+    And the person was deactivated and their membership removed
+    When the same connection pushes the person active again
+    Then they can sign in again
+    But their old membership and role bindings are not restored
+
+  @integration @regression
+  Scenario: Deleting a directory person forgets ownership without reclaiming it
+    Given a person is known by two connections
+    When one connection deletes them
+    Then that connection's ownership and external identifiers are removed
+    And the other connection's identifiers and ownership remain
+    And the deleting connection cannot reactivate the person it forgot
+
+  @integration @regression
+  Scenario: Creating an inactive directory person grants no access
+    Given a directory creates a person with active false and a cost center
+    When the same inactive creation is submitted again
+    Then one inactive account exists and the directory owns it
+    And no organization membership, role binding or department assignment exists
+
+  @integration @regression
+  Scenario: Repeating an inactive creation does not restore a departed person's access
+    Given a directory deactivated a person and their membership was removed
+    When it submits that person for creation with active false again
+    Then the same account remains inactive
+    And no membership, role binding or department assignment is restored
+
+  @integration @regression
+  Scenario: Inactive provisioning cannot deactivate an unowned account in another organization
+    Given an active account belongs to another organization
+    And this directory does not own that account
+    When the directory tries to create that email with active false
+    Then the push is refused with status 409
+    And the existing account and its membership are unchanged
+    And the requesting directory acquires no ownership or access
+
+  @integration @regression
+  Scenario: Retained directory ownership cannot deactivate an account that has left the organization
+    Given a directory-owned person no longer belongs to that organization
+    And their active account administers another organization with a live session
+    When the old directory submits their account for creation with active false
+    Then the push is refused with status 409
+    And the active account, other organization's membership and session are unchanged
+
+  @integration @regression
+  Scenario: An inactive directory resource can be deleted without a membership
+    Given a directory created an inactive person without organization access
+    When it deletes that resource
+    Then its ownership and external identifiers are removed
+    And another deletion or reactivation is refused with status 404
+
+  @integration @regression
+  Scenario: Deleting a former directory resource preserves access in other organizations
+    Given a directory-owned person no longer belongs to that organization
+    And their active account belongs to another directory and organization with a live session
+    When the old directory deletes its resource
+    Then only the old directory's ownership and external identifiers are removed
+    And the active account, other organization's membership and session are unchanged
+
   @unit
   Scenario: A person keeps their place when their address changes
     Given a person provisioned through "okta-primary"

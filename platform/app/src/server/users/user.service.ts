@@ -32,11 +32,15 @@ export class UserService {
   async create({
     name,
     email,
+    active = true,
   }: {
     name: string;
     email: string;
+    active?: boolean;
   }): Promise<User> {
-    return this.prisma.user.create({ data: { name, email } });
+    return this.prisma.user.create({
+      data: { name, email, ...(!active && { deactivatedAt: new Date() }) },
+    });
   }
 
   /**

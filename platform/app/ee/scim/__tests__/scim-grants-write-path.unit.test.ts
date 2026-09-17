@@ -84,6 +84,12 @@ function createMockPrisma() {
       delete: vi.fn().mockResolvedValue({}),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    scimDirectoryUser: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     scimExternalId: {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
@@ -281,9 +287,9 @@ describe("ScimService, on the grants write path", () => {
     describe("given the deprovision already removed their membership", () => {
       beforeEach(() => {
         prisma.organizationUser.findUnique = vi.fn().mockResolvedValue(null);
-        prisma.scimExternalId.findFirst = vi
+        prisma.scimDirectoryUser.findUnique = vi
           .fn()
-          .mockResolvedValue({ externalId: "u-1" });
+          .mockResolvedValue({ connectionId: CONNECTION, userId: USER });
         prisma.user.findUnique = vi
           .fn()
           .mockResolvedValue(buildUser({ deactivatedAt: new Date() }));
@@ -331,7 +337,7 @@ describe("ScimService, on the grants write path", () => {
       });
 
       it("still answers not found once the connection has forgotten them", async () => {
-        prisma.scimExternalId.findFirst = vi.fn().mockResolvedValue(null);
+        prisma.scimDirectoryUser.findUnique = vi.fn().mockResolvedValue(null);
 
         const result = await service.updateUser({
           id: USER,
@@ -474,7 +480,7 @@ describe("ScimService, on the grants write path", () => {
 
   describe("when a push aims at somebody another connection provisioned", () => {
     it("refuses and changes nothing about them", async () => {
-      prisma.scimExternalId.findMany = vi
+      prisma.scimDirectoryUser.findMany = vi
         .fn()
         .mockResolvedValue([{ connectionId: "conn-entra" }]);
 

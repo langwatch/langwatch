@@ -1332,6 +1332,16 @@ model ScimExternalId {
   @@index([connectionId])
 }
 
+/// A connection's managed users, including resources without an externalId.
+/// Scalar keys only; readers exclude users that no longer exist.
+model ScimDirectoryUser {
+  connectionId String
+  userId       String
+
+  @@id([connectionId, userId])
+  @@index([userId])
+}
+
 /// D08 — one connection's directory sync, as the `scim-sync` pipeline's fold
 /// writes it.
 ///

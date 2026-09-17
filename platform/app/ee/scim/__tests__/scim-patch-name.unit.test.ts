@@ -70,6 +70,12 @@ function createMockPrisma() {
       update: vi.fn().mockResolvedValue({}),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    scimDirectoryUser: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     scimExternalId: {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),

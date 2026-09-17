@@ -108,6 +108,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         ["scimRequestLog", { organizationId: { in: organizationIds } }],
         ["scimToken", { organizationId: { in: organizationIds } }],
         ["scimExternalId", { userId: { in: userIds } }],
+        ["scimDirectoryUser", { userId: { in: userIds } }],
         ["groupMembership", { userId: { in: userIds } }],
         ["roleBinding", { organizationId: { in: organizationIds } }],
         ["group", { organizationId: { in: organizationIds } }],
@@ -238,10 +239,8 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
     });
   });
 
-  describe.each([
-    "FINALIZING",
-    "FINALIZED",
-  ] as const)("given the direct replacement is %s", (migrationPhase) => {
+  const closedPhases = ["FINALIZING", "FINALIZED"] as const;
+  describe.each(closedPhases)("given replacement is %s", (migrationPhase) => {
     it("refuses the legacy token before recording it as used", async () => {
       await prisma.ssoConnection.update({
         where: { id: first.directConnectionId },
@@ -397,6 +396,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         userId: user.id,
       },
     });
+    await prisma.scimDirectoryUser.create({
+      data: { connectionId, userId: user.id },
+    });
     await prisma.roleBinding.create({
       data: {
         id: `${ns}-${label}-grant`,
@@ -452,56 +454,67 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       orderBy: { userId: "asc" },
     });
     const scopedUserIds = memberships.map(({ userId }) => userId);
-    const [users, directoryIds, groups, groupMemberships, grants] =
-      await Promise.all([
-        prisma.user.findMany({
-          where: { id: { in: scopedUserIds } },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            deactivatedAt: true,
-          },
-          orderBy: { id: "asc" },
-        }),
-        prisma.scimExternalId.findMany({
-          where: { userId: { in: scopedUserIds } },
-          select: { connectionId: true, externalId: true, userId: true },
-          orderBy: [{ connectionId: "asc" }, { externalId: "asc" }],
-        }),
-        prisma.group.findMany({
-          where: { organizationId },
-          select: {
-            id: true,
-            name: true,
-            externalId: true,
-            scimConnectionId: true,
-          },
-          orderBy: { id: "asc" },
-        }),
-        prisma.groupMembership.findMany({
-          where: { group: { organizationId } },
-          select: { groupId: true, userId: true },
-          orderBy: [{ groupId: "asc" }, { userId: "asc" }],
-        }),
-        prisma.roleBinding.findMany({
-          where: { organizationId },
-          select: {
-            id: true,
-            userId: true,
-            groupId: true,
-            role: true,
-            scopeType: true,
-            scopeId: true,
-          },
-          orderBy: { id: "asc" },
-        }),
-      ]);
+    const [
+      users,
+      directoryIds,
+      directoryOwners,
+      groups,
+      groupMemberships,
+      grants,
+    ] = await Promise.all([
+      prisma.user.findMany({
+        where: { id: { in: scopedUserIds } },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          deactivatedAt: true,
+        },
+        orderBy: { id: "asc" },
+      }),
+      prisma.scimExternalId.findMany({
+        where: { userId: { in: scopedUserIds } },
+        select: { connectionId: true, externalId: true, userId: true },
+        orderBy: [{ connectionId: "asc" }, { externalId: "asc" }],
+      }),
+      prisma.scimDirectoryUser.findMany({
+        where: { userId: { in: scopedUserIds } },
+        orderBy: [{ connectionId: "asc" }, { userId: "asc" }],
+      }),
+      prisma.group.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          name: true,
+          externalId: true,
+          scimConnectionId: true,
+        },
+        orderBy: { id: "asc" },
+      }),
+      prisma.groupMembership.findMany({
+        where: { group: { organizationId } },
+        select: { groupId: true, userId: true },
+        orderBy: [{ groupId: "asc" }, { userId: "asc" }],
+      }),
+      prisma.roleBinding.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          userId: true,
+          groupId: true,
+          role: true,
+          scopeType: true,
+          scopeId: true,
+        },
+        orderBy: { id: "asc" },
+      }),
+    ]);
 
     return {
       users,
       memberships,
       directoryIds,
+      directoryOwners,
       groups,
       groupMemberships,
       grants,

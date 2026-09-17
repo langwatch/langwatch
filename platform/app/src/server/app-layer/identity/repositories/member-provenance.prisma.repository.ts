@@ -8,7 +8,7 @@
  * query here that could name a person outside the list it was handed.
  *
  * All three are reads of facts written for other reasons — the directory's
- * own identifier mapping, the join-request projection, and the invitation
+ * ownership records, the join-request projection, and the invitation
  * table — so nothing new is recorded to answer the question.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -31,16 +31,7 @@ const AUTOMATIC_RESOLVER = "domain-auto";
 export class PrismaMemberProvenanceRepository implements MemberProvenancePort {
   constructor(private readonly prisma: PrismaClient) {}
 
-  /**
-   * People an identity provider created, via a connection of THIS
-   * organization.
-   *
-   * Two steps rather than one join: the directory's identifier mapping
-   * carries no organization (a connection is the only thing that scopes it),
-   * so the organization's connections are resolved first and the mapping is
-   * read against those. A person mapped on somebody else's connection is
-   * therefore unreachable from here by construction.
-   */
+  /** Ownership is scoped through this organization's connections and live users. */
   async directoryProvisioned({
     organizationId,
     userIds,
@@ -61,10 +52,16 @@ export class PrismaMemberProvenanceRepository implements MemberProvenancePort {
       ]),
     );
 
-    const rows = await this.prisma.scimExternalId.findMany({
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] } },
+      select: { id: true },
+    });
+    if (users.length === 0) return [];
+
+    const rows = await this.prisma.scimDirectoryUser.findMany({
       where: {
         connectionId: { in: [...providerById.keys()] },
-        userId: { in: [...userIds] },
+        userId: { in: users.map((user) => user.id) },
       },
       select: { userId: true, connectionId: true },
     });

@@ -23,12 +23,45 @@ type Row = { connectionId: string; externalId: string; userId: string };
  *  stop rendering as text and which `noBinarySourceFiles` fails on. */
 function createStore() {
   const rows: Row[] = [];
+  const owners: { connectionId: string; userId: string }[] = [];
   const keyOf = (row: { connectionId: string; externalId: string }) =>
     `${row.connectionId}\u0000${row.externalId}`;
 
   return {
     rows,
     prisma: {
+      $transaction: async (operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      scimDirectoryUser: {
+        findMany: async ({ where }: { where: { userId: string } }) =>
+          owners.filter((owner) => owner.userId === where.userId),
+        upsert: async ({
+          create,
+        }: {
+          create: { connectionId: string; userId: string };
+        }) => {
+          const existing = owners.find(
+            (owner) =>
+              owner.connectionId === create.connectionId &&
+              owner.userId === create.userId,
+          );
+          if (!existing) owners.push({ ...create });
+          return existing ?? create;
+        },
+        deleteMany: async ({
+          where,
+        }: {
+          where: { connectionId: string; userId: string };
+        }) => {
+          const index = owners.findIndex(
+            (owner) =>
+              owner.connectionId === where.connectionId &&
+              owner.userId === where.userId,
+          );
+          if (index >= 0) owners.splice(index, 1);
+          return { count: index >= 0 ? 1 : 0 };
+        },
+      },
       scimExternalId: {
         findUnique: async ({
           where,
@@ -72,12 +105,12 @@ function createStore() {
         deleteMany: async ({
           where,
         }: {
-          where: { connectionId: string; externalId: string };
+          where: { connectionId: string; userId: string };
         }) => {
           const index = rows.findIndex(
             (row) =>
               row.connectionId === where.connectionId &&
-              row.externalId === where.externalId,
+              row.userId === where.userId,
           );
           if (index >= 0) rows.splice(index, 1);
           return { count: index >= 0 ? 1 : 0 };
@@ -261,7 +294,7 @@ describe("ScimDirectoryIdentityService", () => {
         userId: "user_sam",
       });
 
-      await service.forget({ connectionId: OKTA, externalId: "u-1" });
+      await service.forget({ connectionId: OKTA, userId: "user_sam" });
 
       await expect(
         service.getUserId({ connectionId: OKTA, externalId: "u-1" }),

@@ -108,6 +108,9 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  await prisma.scimDirectoryUser.deleteMany({
+    where: { connectionId: CONNECTION },
+  });
   await prisma.scimExternalId.deleteMany({
     where: { connectionId: CONNECTION },
   });
@@ -120,11 +123,8 @@ afterAll(async () => {
 });
 
 describe("given a directory pushing somebody who has no account here", () => {
-  describe.each([
-    "admit",
-    "request",
-    "refuse",
-  ] as const)("when the connection's arrival policy is '%s'", (policy) => {
+  const arrivalPolicies = ["admit", "request", "refuse"] as const;
+  describe.each(arrivalPolicies)("when arrivals are %s", (policy) => {
     /** @scenario "A directory push provisions whatever the sign-in door would do" */
     it("makes the account and the membership, because the administrator already decided", async () => {
       const email = `new-${policy}-${ns}@acme.test`;
