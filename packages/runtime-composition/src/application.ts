@@ -468,22 +468,29 @@ export class ApplicationBuilder<
   ): ReadonlyMap<TokenIdentity, string> {
     const providerOf = new Map<TokenIdentity, string>();
     const apiOwners = new Map<string, string>();
-    const register = (token: TokenIdentity, owner: string): void => {
+    /**
+     * A module's contract token claims the module's name; the process claims no
+     * name, so a core token named for a module is not thereby that module's API.
+     */
+    const register = (token: TokenIdentity, owner: string, claimsName: boolean): void => {
       const existing =
-        token instanceof ModuleApiToken ? apiOwners.get(token.name) : providerOf.get(token);
+        providerOf.get(token) ??
+        (claimsName && token instanceof ModuleApiToken ? apiOwners.get(token.name) : void 0);
       if (existing !== void 0) {
         throw new DuplicateProviderError(tokenName(token), [existing, owner]);
       }
-      if (token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
+      if (claimsName && token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
       providerOf.set(token, owner);
     };
-    // The process's own provisions first, so a module that also claims the
-    // token is refused by the token both answer for rather than silently
-    // overwriting what the caller handed in.
-    for (const provision of this.state.provisions) register(provision.token, "the process");
+    // The process's own provisions first, so a module answering for the very
+    // same token is refused rather than silently overwriting what the caller
+    // handed in. That check is by identity, so it holds for both.
+    for (const provision of this.state.provisions) {
+      register(provision.token, "the process", false);
+    }
     for (const declaration of declarations) {
       for (const provider of declaration.providers) {
-        register(provider.token, declaration.name);
+        register(provider.token, declaration.name, true);
       }
     }
     return providerOf;

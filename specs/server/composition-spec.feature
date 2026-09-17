@@ -31,6 +31,21 @@ Feature: Composing a process from feature installers
       And the process never becomes ready
       And no transport accepts a request
 
+    @unit
+    Scenario: The process supplies a capability a module of that name does not answer for
+      Given a module that provides its own callable API
+      And an application root that supplies a different capability carrying the same name
+      When the application boots
+      Then each peer receives the capability it asked for
+      And neither answer replaces the other
+
+    @unit
+    Scenario: A module cannot answer for a capability the process already supplied
+      Given an application root that supplies a capability by token
+      And an installed module that answers for that very token
+      When the application boots
+      Then boot fails naming the token and both answers
+
   Rule: the server app class owns its factory and dependency declaration
 
     @unimplemented @unit

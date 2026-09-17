@@ -427,6 +427,74 @@ describe("feature APIs", () => {
     await expect(builder.boot()).rejects.toBeInstanceOf(DuplicateProviderError);
   });
 
+  describe("when the process supplies a capability by token", () => {
+    interface ProjectGrant {
+      grant(): string;
+    }
+    /** A second token carrying an installed module's name, the way the core
+     * license source carries the licensing module's. */
+    const ProjectGrant = moduleApi<ProjectGrant>("project");
+
+    class GrantedOrganizationApp implements OrganizationApi {
+      static readonly contract = OrganizationApi;
+      static readonly dependencies = { projects: ProjectApi, grant: ProjectGrant };
+      static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
+      readonly #projects: ProjectApi;
+      readonly #grant: ProjectGrant;
+
+      private constructor(projects: ProjectApi, grant: ProjectGrant) {
+        this.#projects = projects;
+        this.#grant = grant;
+      }
+
+      static create({
+        dependencies,
+      }: FeatureSetup<typeof GrantedOrganizationApp.dependencies, DeclaredMembers, undefined>) {
+        return new GrantedOrganizationApp(dependencies.projects, dependencies.grant);
+      }
+
+      async name(): Promise<string> {
+        return this.#grant.grant();
+      }
+      projectName(): Promise<string> {
+        return this.#projects.name();
+      }
+    }
+
+    const grantedOrganization = defineServerModule("organization")
+      .withApp(GrantedOrganizationApp)
+      .build();
+
+    /** @scenario "The process supplies a capability a module of that name does not answer for" */
+    it("keeps the module's own API and the process's apart", async () => {
+      const runtime = await createApp({ role: "api", members: processMembers() })
+        .withModules([project, grantedOrganization])
+        .withProvided(ProjectGrant, { grant: () => "granted" })
+        .boot();
+
+      await expect(runtime.service(ProjectApi).name()).resolves.toBe("project");
+      await expect(runtime.service(OrganizationApi).name()).resolves.toBe("granted");
+      await runtime.stop();
+    });
+
+    /** @scenario "A module cannot answer for a capability the process already supplied" */
+    it("refuses a module answering for the very token the process handed over", async () => {
+      await expect(
+        createApp({ role: "api", members: processMembers() })
+          .withModules([project, organization])
+          .withProvided(ProjectApi, {
+            name: async () => "provided",
+            organizationName: async () => "provided",
+            echo: (value: unknown) => value,
+            fail: (error: Error): never => {
+              throw error;
+            },
+          })
+          .boot(),
+      ).rejects.toBeInstanceOf(DuplicateProviderError);
+    });
+  });
+
   it("rejects a declaration/API name mismatch before invoking the factory", async () => {
     const events: string[] = [];
     const declaration = defineServerModule("organization").withApp(ProjectApp).build();
